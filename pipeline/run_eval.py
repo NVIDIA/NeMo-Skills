@@ -101,7 +101,7 @@ if __name__ == "__main__":
     args.model_path = Path(args.model_path).absolute()
     args.output_dir = Path(args.output_dir).absolute()
 
-    server_start_cmd = get_server_command(args.server_type, args.num_gpus)
+    server_start_cmd, num_tasks = get_server_command(args.server_type, args.num_gpus)
 
     format_dict = {
         "model_path": args.model_path,
@@ -130,11 +130,6 @@ if __name__ == "__main__":
 
     # splitting eval cmds equally across num_nodes nodes
     eval_cmds = [" ".join(eval_cmds[i :: args.num_nodes]) for i in range(args.num_nodes)]
-
-    num_tasks = format_dict["num_gpus"]
-    # somehow on slurm nemo needs multiple tasks, but locally only 1
-    if args.server_type == "nemo" and CLUSTER_CONFIG["cluster"] == "local":
-        num_tasks = 1
 
     for idx, eval_cmd in enumerate(eval_cmds):
         extra_sbatch_args = ["--parsable", f"--output={args.output_dir}/slurm_logs_eval{idx}.log"]

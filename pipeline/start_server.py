@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     args.model_path = Path(args.model_path).absolute()
 
-    server_start_cmd = get_server_command(args.server_type, args.num_gpus)
+    server_start_cmd, num_tasks = get_server_command(args.server_type, args.num_gpus)
 
     format_dict = {
         "model_path": args.model_path,
@@ -74,11 +74,6 @@ if __name__ == "__main__":
         "server_type": args.server_type,
     }
     fill_env_vars(format_dict, ["NEMO_SKILLS_CODE"])
-
-    num_tasks = format_dict["num_gpus"]
-    # somehow on slurm nemo needs multiple tasks, but locally only 1
-    if args.server_type == "nemo" and CLUSTER_CONFIG["cluster"] == "local":
-        num_tasks = 1
 
     job_id = launch_job(
         cmd=SLURM_CMD.format(**format_dict),

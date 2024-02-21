@@ -67,15 +67,10 @@ def run_script(format_dict, seed, extra_arguments, partition=None, dependency=No
     if dependency is not None:
         extra_sbatch_args.append(f"--dependency=afterany:{dependency}")
 
-    num_tasks = format_dict["num_gpus"]
-    # somehow on slurm nemo needs multiple tasks, but locally only 1
-    if format_dict["server_type"] == "nemo" and CLUSTER_CONFIG["cluster"] == "local":
-        num_tasks = 1
-
     job_id = launch_job(
         cmd=SLURM_CMD.format(**format_dict),
         num_nodes=1,
-        tasks_per_node=num_tasks,
+        tasks_per_node=format_dict["num_tasks"],
         gpus_per_node=format_dict["num_gpus"],
         job_name=JOB_NAME.format(**format_dict),
         container=CLUSTER_CONFIG["containers"][format_dict["server_type"]],
@@ -116,7 +111,7 @@ if __name__ == "__main__":
 
     extra_arguments = f'{" ".join(unknown)}'
 
-    server_start_cmd = get_server_command(args.server_type, args.num_gpus)
+    server_start_cmd, num_tasks = get_server_command(args.server_type, args.num_gpus)
 
     format_dict = {
         "model_path": args.model_path,
@@ -124,6 +119,7 @@ if __name__ == "__main__":
         "output_dir": args.output_dir,
         "num_gpus": args.num_gpus,
         "server_start_cmd": server_start_cmd,
+        "num_tasks": num_tasks,
         "server_type": args.server_type,
     }
     fill_env_vars(format_dict, ["NEMO_SKILLS_CODE"])

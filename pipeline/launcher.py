@@ -40,16 +40,23 @@ def fill_env_vars(format_dict, env_vars):
 
 
 def get_server_command(server_type, num_gpus):
+    num_tasks = num_gpus
     if server_type == 'nemo':
         server_start_cmd = (
             f"(python /code/nemo_skills/inference/server/serve_nemo.py gpt_model_file=/model trainer.devices={num_gpus} "
             f"tensor_model_parallel_size={num_gpus} > /tmp/server_logs.txt &)"
         )
+        # somehow on slurm nemo needs multiple tasks, but locally only 1
+        if CLUSTER_CONFIG["cluster"] == "local":
+            num_tasks = 1
     else:
         server_start_cmd = (
-            "(python /code/nemo_skills/inference/server/serve_trt.py --model_path /model > /tmp/server_logs.txt &)"
+            f"(mpirun -np {num_gpus} --allow-run-as-root --oversubscribe python /code/nemo_skills/inference/server/serve_trt.py "
+            "--model_path /model > /tmp/server_logs.txt &)"
         )
-    return server_start_cmd
+        num_tasks = 1  # we launch via mpirun directly
+
+    return server_start_cmd, num_tasks
 
 
 SLURM_HEADER = """
