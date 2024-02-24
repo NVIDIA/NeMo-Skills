@@ -21,7 +21,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import hydra
 import numpy as np
@@ -33,7 +33,7 @@ sys.path.append(str(Path(__file__).absolute().parents[2]))
 
 from nemo_skills.finetuning.filtering_utils import downsample_data, process_bad_solutions
 from nemo_skills.inference.prompt.utils import PromptConfig, get_prompt
-from nemo_skills.utils import setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
 
@@ -63,7 +63,7 @@ class PrepareSFTDataConfig:
     preprocessed_dataset_files: Optional[str] = None  # can specify datasets from HF instead of prediction_jsonl_files
     output_path: str = MISSING
     # can provide additional metadata to store (e.g. dataset or generation_type)
-    metadata: Dict = field(default_factory=dict)
+    metadata: Dict[Any, Any] = field(default_factory=dict)
     skip_first: int = 0  # useful for skipping validation set from train_full generation (it's always first)
     add_correct: bool = True  # can set to False if only want to export incorrect solutions
     add_incorrect: bool = False  # if True, saves only incorrect solutions instead of correct
@@ -206,5 +206,9 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
 
 
 if __name__ == "__main__":
-    setup_logging()
-    prepare_sft_data()
+    if '--help' in sys.argv:
+        help_msg = get_help_message(PrepareSFTDataConfig)
+        print(help_msg)
+    else:
+        setup_logging()
+        prepare_sft_data()

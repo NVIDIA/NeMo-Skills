@@ -14,6 +14,7 @@
 
 import json
 import logging
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -25,7 +26,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.prompt.utils import PromptConfig, get_prompt
 from nemo_skills.inference.server.model import get_model
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_help_message, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -137,5 +138,9 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
 
 
 if __name__ == "__main__":
-    setup_logging()
-    generate_solutions()
+    if '--help' in sys.argv:
+        help_msg = get_help_message(GenerateSolutionsConfig)
+        print(help_msg)
+    else:
+        setup_logging()
+        generate_solutions()

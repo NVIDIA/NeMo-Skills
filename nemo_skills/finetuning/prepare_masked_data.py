@@ -24,7 +24,7 @@ from omegaconf import MISSING, OmegaConf
 
 sys.path.append(str(Path(__file__).absolute().parents[2]))
 
-from nemo_skills.utils import setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
 
@@ -157,5 +157,9 @@ def prepare_masked_data(cfg: PrepareMaskedDataConfig):
 
 
 if __name__ == '__main__':
-    setup_logging()
-    prepare_masked_data()
+    if '--help' in sys.argv:
+        help_msg = get_help_message(PrepareMaskedDataConfig)
+        print(help_msg)
+    else:
+        setup_logging()
+        prepare_masked_data()
