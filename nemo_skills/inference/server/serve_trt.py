@@ -184,6 +184,7 @@ def read_model_name(engine_dir: str):
     name_map = {
         'MistralForCausalLM'.lower(): 'mistral',
         'LlamaForCausalLM'.lower(): 'llama',
+        'MixtralForCausalLM'.lower(): 'mixtral',
     }
     return name_map[name]
 
