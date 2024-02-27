@@ -30,7 +30,6 @@ cluster, you can skip to the [Slurm prerequisites](#slurm) section.
 3. Run and add the export commands to your shell configuration file (e.g. `~/.bashrc`).
 
    ```
-   export NEMO_SKILLS_CODE=<path to this repo>
    export NEMO_SKILLS_CONFIG=<path to this repo>/cluster_configs/local.yaml
    # only required for pipeline/run_sft_and_eval.py - will be used to save sft checkpoints and eval results
    export NEMO_SKILLS_RESULTS=<where you want to save results>
@@ -50,7 +49,6 @@ The following are prerequisites for running scripts on a Slurm cluster.
 2. Run and add the export commands to your shell configuration file (e.g. `~/.bashrc`).
 
    ```
-   export NEMO_SKILLS_CODE=<path to this repo>
    export NEMO_SKILLS_CONFIG=<path to this repo>/cluster_configs/slurm.yaml
    # only required for pipeline/run_sft_and_eval.py - will be used to save sft checkpoints and eval results
    export NEMO_SKILLS_RESULTS=<where you want to save results>

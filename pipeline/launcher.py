@@ -69,6 +69,7 @@ SLURM_HEADER = """
 #SBATCH --gpus-per-node={gpus_per_node}
 """
 
+NEMO_SKILLS_CODE = str(Path(__file__).absolute().parents[1])
 config_file = os.getenv("NEMO_SKILLS_CONFIG")
 if not config_file:
     raise ValueError("Must provide NEMO_SKILLS_CONFIG environment variable")

@@ -20,7 +20,7 @@ from pathlib import Path
 # adding nemo_skills to python path to avoid requiring installation
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 
-from launcher import CLUSTER_CONFIG, fill_env_vars
+from launcher import CLUSTER_CONFIG, NEMO_SKILLS_CODE, fill_env_vars
 
 from nemo_skills.utils import setup_logging
 
@@ -133,8 +133,10 @@ if __name__ == "__main__":
     # these are the extra SFT arguments you can provide
     extra_sft_arguments = f'{" ".join(unknown)}'
 
-    format_dict = {}
-    fill_env_vars(format_dict, ["NEMO_SKILLS_CODE", "NEMO_SKILLS_RESULTS"])
+    format_dict = {
+        "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+    }
+    fill_env_vars(format_dict, ["NEMO_SKILLS_RESULTS"])
 
     exp_path = f"{format_dict['NEMO_SKILLS_RESULTS']}/{args.project}"
 
