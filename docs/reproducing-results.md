@@ -97,6 +97,8 @@ documentation to learn how to make inference more efficient.
 
    If you get permission errors, run the command with sudo or change permissions of the results folder.
 
+You can also download the generation results of all of our released models from [here](https://openmath-test-predictions.s3.amazonaws.com/openmath-test-predictions.zip).
+
 ## Dataset generation
 
 To re-create the masked versions of the GSM8K and MATH datasets, you can follow the steps
