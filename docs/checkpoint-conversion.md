@@ -25,6 +25,7 @@ trtllm-build \
     --gpt_attention_plugin <dtype from step above> \
     --gemm_plugin <dtype from step above> \
     --context_fmha <"enable" on A100+ GPUs and "disable" otherwise> \
+    --paged_kv_cache <"enable" on A100+ GPUs and "disable" otherwise> \
     --max_input_len 4096 \
     --max_output_len 512 \
     --max_batch_size <desired batch size>
