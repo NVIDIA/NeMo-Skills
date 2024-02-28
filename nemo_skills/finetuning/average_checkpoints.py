@@ -173,7 +173,7 @@ def main():
         os.path.join(args.untarred_nemo_folder, "model_config.yaml"),
         os.path.join(ckpt_name, "model_config.yaml"),
     )
-    for file in glob.glob(f"{args.untarred_nemo_folder}/*_tokenizer.model"):
+    for file in glob.glob(f"{args.untarred_nemo_folder}/*.model"):
         shutil.copy(file, os.path.join(ckpt_name, os.path.basename(file)))
 
     with tarfile.open(ckpt_name + ".nemo", "w") as tar:
