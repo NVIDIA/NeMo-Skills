@@ -45,7 +45,7 @@ cluster, you can skip to the [Slurm prerequisites](#slurm) section.
 
 The following are prerequisites for running scripts on a Slurm cluster.
 
-1. Populate [cluster_configs/slurm.yaml](cluster_configs/slurm.yaml) with required information.
+1. Populate [cluster_configs/slurm.yaml](/cluster_configs/slurm.yaml) with required information.
 2. Run and add the export commands to your shell configuration file (e.g. `~/.bashrc`).
 
    ```
