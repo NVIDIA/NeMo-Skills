@@ -203,6 +203,7 @@ def main(cfg) -> None:
         drop_last=val_data_cfg.drop_last,
         pad_samples_to_global_batch_size=not val_data_cfg.drop_last,
         load_gbs=True,
+        use_random_sampler=False,
     )
 
     init_using_ptl(trainer, ptl_model, train_dataloader, train_ds)

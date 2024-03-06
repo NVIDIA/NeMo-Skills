@@ -23,9 +23,9 @@ extra_sandbox_args:
   - --overlap
 
 containers:
-  tensorrt_llm: igitman/nemo-skills-trtllm:0.1.0
-  nemo: igitman/nemo-skills-sft:0.1.0
-  sandbox: igitman/nemo-skills-sandbox:0.1.0
+  tensorrt_llm: igitman/nemo-skills-trtllm:0.2.0
+  nemo: igitman/nemo-skills-sft:0.2.0
+  sandbox: igitman/nemo-skills-sandbox:0.2.0
 
 # can use this section to set timeouts for different partitions
 # this will be used as a slurm parameter + to signal SFT job to finish

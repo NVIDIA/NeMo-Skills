@@ -15,8 +15,8 @@
 cluster: local
 
 containers:
-  tensorrt_llm: igitman/nemo-skills-trtllm:0.1.0
-  nemo: igitman/nemo-skills-sft:0.1.0
+  tensorrt_llm: igitman/nemo-skills-trtllm:0.2.0
+  nemo: igitman/nemo-skills-sft:0.2.0
   # sandbox is always re-built locally
 
 # change this to "sudo docker" if non-root user access is not set up

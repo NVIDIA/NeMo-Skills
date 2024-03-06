@@ -13,19 +13,19 @@
 # limitations under the License.
 
 # copied from https://github.com/NVIDIA/NeMo-Aligner/blob/main/Dockerfile
-# with 3 additional commits for random seed in generate and LR schedule fixes in NeMo
+# with pinned NeMo-Aligner version for reproducibility
 
-# CUDA 12.2
-FROM nvcr.io/nvidia/pytorch:23.10-py3
+# CUDA 12.3
+FROM nvcr.io/nvidia/pytorch:24.01-py3
 
 ### config tags
 ARG APEX_TAG=master
-ARG TE_TAG=release_v1.1
-ARG MLM_TAG=core_r0.4.0
-ARG NEMO_TAG=r1.22.0
+ARG TE_TAG=release_v1.4
+ARG MLM_TAG=core_r0.5.0
+ARG NEMO_TAG=r1.23.0
 ARG PYTRITON_VERSION=0.4.1
 ARG PROTOBUF_VERSION=4.24.4
-ARG ALIGNER_COMMIT=main
+ARG ALIGNER_COMMIT=2de2f184fcc7c9bafcdd871f2657f74ef43ea3df
 
 # if you get errors building TE or Apex, decrease this to 4
 ARG MAX_JOBS=8
@@ -40,8 +40,8 @@ RUN pip uninstall -y transformer-engine && \
     git clone https://github.com/NVIDIA/TransformerEngine.git && \
     cd TransformerEngine && \
     if [ ! -z $TE_TAG ]; then \
-    git fetch origin $TE_TAG && \
-    git checkout FETCH_HEAD; \
+        git fetch origin $TE_TAG && \
+        git checkout FETCH_HEAD; \
     fi && \
     git submodule init && git submodule update && \
     NVTE_FRAMEWORK=pytorch NVTE_WITH_USERBUFFERS=1 MPI_HOME=/usr/local/mpi pip install .
@@ -51,8 +51,8 @@ RUN pip uninstall -y apex && \
     git clone https://github.com/NVIDIA/apex && \
     cd apex && \
     if [ ! -z $APEX_TAG ]; then \
-    git fetch origin $APEX_TAG && \
-    git checkout FETCH_HEAD; \
+        git fetch origin $APEX_TAG && \
+        git checkout FETCH_HEAD; \
     fi && \
     pip install install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
 
@@ -66,20 +66,12 @@ RUN git clone https://github.com/NVIDIA/NeMo.git && \
     cd NeMo && \
     git pull && \
     if [ ! -z $NEMO_TAG ]; then \
-    git fetch origin $NEMO_TAG && \
-    git checkout FETCH_HEAD; \
+        git fetch origin $NEMO_TAG && \
+        git checkout FETCH_HEAD; \
     fi && \
     pip uninstall -y nemo_toolkit sacrebleu && \
     git cherry-pick --no-commit -X theirs \
-    fa8d416793d850f4ce56bea65e1fe28cc0d092c0 \
-    a7f0bc1903493888c31436efc2452ff721fa5a67 \
-    52d50e9e09a3e636d60535fd9882f3b3f32f92ad \
-    9940ec60058f644662809a6787ba1b7c464567ad \
-    7d3d9ac3b1aecf5786b5978a0c1e574701473c62 \
-    7449c672c87d5825485c93d11a6cc72e1e83a100 \
-    b84c2314f27d125b5eff1a4fe6936a5370e1f6c2 \
-    6143f6b75a2e26a6821aa0b3ad1ae97f2d6d7dcc && \
-    sed -i 's/shutil.rmtree(ckpt_to_dir(filepath))/shutil.rmtree(ckpt_to_dir(filepath), ignore_errors=True)/g' nemo/collections/nlp/parts/nlp_overrides.py && \
+        9940ec60058f644662809a6787ba1b7c464567ad && \
     rm -rf .git && pip install -e ".[nlp]" && \
     cd nemo/collections/nlp/data/language_modeling/megatron && make
 
@@ -89,8 +81,8 @@ RUN pip uninstall -y megatron-core && \
     cd Megatron-LM && \
     git pull && \
     if [ ! -z $MLM_TAG ]; then \
-    git fetch origin $MLM_TAG && \
-    git checkout FETCH_HEAD; \
+        git fetch origin $MLM_TAG && \
+        git checkout FETCH_HEAD; \
     fi && \
     pip install -e .
 
@@ -99,8 +91,8 @@ RUN git clone https://github.com/NVIDIA/NeMo-Aligner.git && \
     cd NeMo-Aligner && \
     git pull && \
     if [ ! -z $ALIGNER_COMMIT ]; then \
-    git fetch origin $ALIGNER_COMMIT && \
-    git checkout FETCH_HEAD; \
+        git fetch origin $ALIGNER_COMMIT && \
+        git checkout FETCH_HEAD; \
     fi && \
     pip install --no-deps -e .
 
