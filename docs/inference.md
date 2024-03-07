@@ -89,7 +89,7 @@ after `start_server.py` is already killed. In that case you should manually stop
 e.g. by running
 
 ```
-docker ps -a -q --filter ancestor=igitman/nemo-skills-sft:0.1.0 | xargs docker stop
+docker ps -a -q --filter ancestor=igitman/nemo-skills-sft:0.2.0 | xargs docker stop
 ```
 
 If for some reason you do not want to use [pipeline/start_server.py](/pipeline/start_server.py) helper script,

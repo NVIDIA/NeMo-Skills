@@ -10,7 +10,7 @@ Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we pu
 conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
 
 Convert the model in 3 steps. Note that you need to explicitly specify input/output length, batch size and number of GPUs.
-Make sure to run the commands inside TensorRT-LLM docker container, e.g. you can use `igitman/nemo-skills-trtllm:0.1.0`
+Make sure to run the commands inside TensorRT-LLM docker container, e.g. you can use `igitman/nemo-skills-trtllm:0.2.0`
 
 ```
 python nemo_skills/conversion/hf_to_trtllm.py \
@@ -45,7 +45,7 @@ Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we pu
 conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
 
 To convert Llama-based model you can use the following command.
-Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.1.0`
+Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.2.0`
 
 ```
 python nemo_skills/conversion/nemo_to_hf.py \
@@ -64,7 +64,7 @@ Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we pu
 conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
 
 To convert Llama-based model you can use the following command.
-Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.1.0`
+Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.2.0`
 
 ```
 python nemo_skills/conversion/hf_to_nemo.py \
