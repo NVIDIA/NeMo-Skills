@@ -206,7 +206,7 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv:
+    if '--help' in sys.argv or '-h' in sys.argv:
         help_msg = get_help_message(PrepareSFTDataConfig)
         print(help_msg)
     else:

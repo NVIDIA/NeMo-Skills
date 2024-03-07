@@ -157,7 +157,7 @@ def prepare_masked_data(cfg: PrepareMaskedDataConfig):
 
 
 if __name__ == '__main__':
-    if '--help' in sys.argv:
+    if '--help' in sys.argv or '-h' in sys.argv:
         help_msg = get_help_message(PrepareMaskedDataConfig)
         print(help_msg)
     else:

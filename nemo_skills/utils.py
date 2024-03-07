@@ -128,7 +128,8 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 
         indent = '  ' * level
         comment = f"\n{indent}".join(comment_cache)
         comment = "- " + comment if comment else ""
-        field_detail = f"{indent}{field_name}: {field_type}{default_str} {comment}"
+        comment = comment.replace('\n', f'\n{indent}  ')
+        field_detail = f"{indent}\033[92m{field_name}: {field_type}{default_str}\033[0m {comment}"
         comments[field_name] = field_detail
         comment_cache = []
 
@@ -149,7 +150,7 @@ def get_fields_docstring(dataclass_obj):
     return '\n'.join(docstring)
 
 
-def get_help_message(dataclass_obj):
+def get_help_message(dataclass_obj, help_message="", **kwargs):
     heading = """
 This script uses Hydra (https://hydra.cc/) for dynamic configuration management.
 You can apply Hydra's command-line syntax for overriding configuration values directly.
@@ -157,5 +158,34 @@ Below are the available configuration options and their default values:
     """.strip()
 
     docstring = get_fields_docstring(dataclass_obj)
+    # to handle {} in docstring. Might need to add some other edge-case handling
+    # here, so that formatting does not complain
+    docstring = docstring.replace('{}', '{{}}')
+    docstring = docstring.format(**kwargs)
 
-    return f"{heading}\n{'-' * 75}\n{docstring}"
+    full_help = f"{heading}\n{'-' * 75}\n{docstring}"
+    if help_message:
+        full_help = f"{help_message}\n\n{full_help}"
+
+    return full_help
+
+
+def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
+    """Converts python doc to cmd help format.
+
+    Will color the args and change the format to match what we use in cmd help.
+    """
+    all_args = docs_prefix
+    all_args += doc_class.__doc__.split("Args:")[1].rstrip()
+    # \033[92m ... \033[0m - green in terminal
+    colored_args = ""
+    for line in all_args.split("\n"):
+        if "        " in line and " - " in line:
+            # add colors
+            line = line.replace("        ", "        \033[92m").replace(" - ", "\033[0m - ")
+            # fixing arg format
+            line = line.replace('        \033[92m', f'        \033[92m{arg_prefix}')
+        # fixing indent
+        line = line.replace("        ", "    ").replace("    ", "  ")
+        colored_args += line + '\n'
+    return colored_args[:-1]

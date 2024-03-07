@@ -23,18 +23,17 @@ import hydra
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
-from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.inference.prompt.utils import PromptConfig, get_prompt
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
+from nemo_skills.inference.prompt.utils import PromptConfig, datasets, get_prompt, prompt_types
+from nemo_skills.inference.server.model import get_model, server_params
 from nemo_skills.utils import get_help_message, setup_logging
 
 LOG = logging.getLogger(__file__)
 
 
-# TODO: help message?
 @dataclass
 class InferenceConfig:
-    temperature: float = 0.0  # greedy
+    temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = 0
     top_p: float = 0.95
     random_seed: int = 0
@@ -46,19 +45,27 @@ class InferenceConfig:
 class GenerateSolutionsConfig:
     """Top-level parameters for the script"""
 
-    output_file: str
-    server: dict  # will be directly passed to model.get_client function
-    sandbox: dict  # will be directly passed to sandbox.get_sandbox function
+    output_file: str  # Where to save the generations
+    # Inference server configuration {server_params}
+    server: dict
+    # Sandbox configuration {sandbox_params}
+    sandbox: dict
+    # Prompt configuration.
+    # Available pre-configured prompts: {prompt_types}.
     prompt: PromptConfig = field(default_factory=PromptConfig)
-    inference: InferenceConfig = field(default_factory=InferenceConfig)
+    inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
+    # Can specify one of the existing datasets.
+    # Choices: {datasets}.
     dataset: Optional[str] = None
-    split_name: Optional[str] = None
-    data_file: Optional[str] = None
+    split_name: Optional[str] = None  # Can be train, validation, test or train_full (train + validation)
+    data_file: Optional[str] = None  # Can directly specify a data file, if using a custom dataset
 
     batch_size: int = 16
-    max_samples: int = -1
-    skip_filled: bool = False
+    max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
+    skip_filled: bool = False  # If True, will skip the generations that are already in the output file
+    # if > 0, will skip this many samples from the beginning of the data file.
+    # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
 
     def __post_init__(self):
@@ -137,10 +144,18 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
                 fout.write(json.dumps(output) + "\n")
 
 
+HELP_MESSAGE = get_help_message(
+    GenerateSolutionsConfig,
+    datasets=datasets,
+    prompt_types=prompt_types,
+    server_params=server_params(),
+    sandbox_params=sandbox_params(),
+)
+
+
 if __name__ == "__main__":
-    if '--help' in sys.argv:
-        help_msg = get_help_message(GenerateSolutionsConfig)
-        print(help_msg)
+    if '--help' in sys.argv or '-h' in sys.argv:
+        print(HELP_MESSAGE)
     else:
         setup_logging()
         generate_solutions()

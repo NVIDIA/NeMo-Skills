@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
 from typing import Dict, List, Optional, Tuple
 
-from nemo_skills.utils import unroll_files
+from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 
 LOG = logging.getLogger(__file__)
 
@@ -170,6 +170,20 @@ class Sandbox(abc.ABC):
 
 
 class LocalSandbox(Sandbox):
+    """Locally hosted sandbox.
+
+    Args:
+        host: Optional[str] = '127.0.0.1' - Host of the sandbox server.
+            Can also be specified through NEMO_SKILLS_SANDBOX_HOST env var.
+        port: Optional[str] = '5000' - Port of the sandbox server.
+            Can also be specified through NEMO_SKILLS_SANDBOX_PORT env var.
+        ssh_server: Optional[str] = None - SSH server for tunneling requests.
+            Useful if server is running on slurm cluster to which there is an ssh access.
+            Can also be specified through SSH_SERVER env var.
+        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
+            Can also be specified through SSH_KEY_PATH env var.
+    """
+
     def __init__(
         self,
         host: str = os.getenv("NEMO_SKILLS_SANDBOX_HOST", "127.0.0.1"),
@@ -255,10 +269,19 @@ class LocalSandbox(Sandbox):
         return output
 
 
+sandboxes = {
+    'local': LocalSandbox,
+}
+
+
 def get_sandbox(sandbox_type, **kwargs):
-    if sandbox_type == "local":
-        return LocalSandbox(**kwargs)
-    elif sandbox_type == "aws":
-        raise NotImplementedError("Support for AWS sandbox is coming soon!")
-    else:
-        raise ValueError(f"Unsupported sandbox type: {sandbox_type}")
+    """A helper function to make it easier to set sandbox through cmd."""
+    sandbox_class = sandboxes[sandbox_type.lower()]
+    return sandbox_class(**kwargs)
+
+
+def sandbox_params():
+    """Returns sandbox documentation (to include in cmd help)."""
+    prefix = f'\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}'
+    # only exposing docs for local sandbox for now. Need to change when we support other types
+    return python_doc_to_cmd_help(LocalSandbox, docs_prefix=prefix, arg_prefix="sandbox.")

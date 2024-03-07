@@ -28,6 +28,11 @@ from time import sleep
 import yaml
 
 LOG = logging.getLogger(__file__)
+WRAPPER_HELP = """
+This is a wrapper script that will help to launch a pipeline job. You can find the job configuration
+arguments under the "wrapper arguments" section. You can also customize any of the arguments of
+the underlying script, which are listed under the "script arguments" section.
+""".strip()
 
 
 def fill_env_vars(format_dict, env_vars):

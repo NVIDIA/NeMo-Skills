@@ -19,7 +19,7 @@ import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Union
+from typing import List
 
 import requests
 
@@ -31,6 +31,7 @@ from nemo_skills.code_execution import (
 )
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import Sandbox
+from nemo_skills.utils import python_doc_to_cmd_help
 
 LOG = logging.getLogger(__name__)
 
@@ -45,6 +46,27 @@ def remove_stop_tokens(text: str, stop_phrases: List[str]) -> str:
 
 
 class BaseModel(abc.ABC):
+    """Base model class for handling requests to the inference server.
+
+    Args:
+        host: Optional[str] = '127.0.0.1' - Host of the inference server.
+        port: Optional[str] = '5000' - Port of the inference server.
+        sandbox: Optional[Sandbox] = None - Sandbox for executing code.
+            Only required if handle_code_execution is True.
+        ssh_server: Optional[str] = None - SSH server for tunneling requests.
+            Useful if server is running on slurm cluster to which there is an ssh access
+            Can also be specified through SSH_SERVER env var.
+        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
+            Can also be specified through SSH_KEY_PATH env var.
+        max_code_output_characters: Optional[int] = 1000 - Maximum number of characters for code execution output.
+        code_execution_timeout: Optional[float] = 10.0 - Timeout for code execution in seconds.
+        max_code_executions: Optional[int] = 3 - Maximum number of code executions per generation.
+        stop_on_code_error: Optional[bool] = True - Whether to stop generation if code execution fails.
+        handle_code_execution: Optional[bool] = True - Whether to handle code execution in this class
+            or make a single call to the server. If set to False, the server needs to have special logic
+            for communicating with the sandbox.
+    """
+
     def __init__(
         self,
         host='127.0.0.1',
@@ -56,7 +78,7 @@ class BaseModel(abc.ABC):
         code_execution_timeout=10.0,
         max_code_executions=3,
         stop_on_code_error=True,
-        handle_code_execution=True,  # for some of the inference types (e.g. nemo), code execution is handled internally
+        handle_code_execution=True,
     ):
         self.server_host = host
         self.server_port = port
@@ -298,6 +320,12 @@ models = {
 
 
 def get_model(server_type, **kwargs):
-    """A helper function to make it easier to set server type through cmd."""
+    """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
     return model_class(**kwargs)
+
+
+def server_params():
+    """Returns server documentation (to include in cmd help)."""
+    prefix = f'\n        server_type: str = MISSING - Choices: {list(models.keys())}'
+    return python_doc_to_cmd_help(BaseModel, docs_prefix=prefix, arg_prefix="server.")
