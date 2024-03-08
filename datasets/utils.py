@@ -20,19 +20,19 @@ import yaml
 # adding nemo_skills to python path to avoid requiring installation
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 
-from nemo_skills.inference.prompt.utils import get_prompt, get_prompt_config
+from nemo_skills.inference.prompt.utils import Prompt, get_prompt_config
 
 
 def prepare_for_sft(data, prompt_type, dataset):
     # reading prompt format from the yaml file
     prompt_config = get_prompt_config(prompt_type)
     prompt_config.context_type = "empty"
-    prompt_config.num_few_shots = 0
+    prompt_config.few_shot_examples.num_few_shots = 0
 
     prepared_data = []
     for original_elem in data:
         elem = {}
-        elem["input"] = get_prompt(prompt_config, original_elem)
+        elem["input"] = str(Prompt(prompt_config, original_elem))
         # note that the loss will not be meaningful,
         # since our solution format is different, but we need to populate that field
         elem["output"] = original_elem['reference_solution']

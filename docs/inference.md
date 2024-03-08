@@ -40,7 +40,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
 
     from nemo_skills.inference.server.model import get_model
     from nemo_skills.code_execution.sandbox import get_sandbox
-    from nemo_skills.inference.prompt.utils import get_prompt, get_prompt_config
+    from nemo_skills.inference.prompt.utils import Prompt, get_prompt_config
     from nemo_skills.inference.generate_solutions import InferenceConfig
 
     sandbox = get_sandbox(
@@ -58,11 +58,11 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
     # you can also write a new .yaml file and put it inside nemo_skills/inference/prompt
     # to customize further
     prompt_config = get_prompt_config("code_sfted")
-    prompt_config.num_few_shots = 0
+    prompt_config.few_shot_examples.num_few_shots = 0
     # replace with the following if model that was not pretrained with our pipeline
     # you can pick different few shot examples based on your needs
-    # prompt_config.num_few_shots = 5
-    # prompt_config.examples_type = "gsm8k_text_with_code"
+    # prompt_config.few_shot_examples.num_few_shots = 5
+    # prompt_config.few_shot_examples.examples_type = "gsm8k_text_with_code"
 
     question = (
         "In a dance class of 20 students, 20% enrolled in contemporary dance, "
@@ -70,13 +70,13 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
         "hip-hop dance. What percentage of the entire students enrolled in hip-hop dance?"
     )
     # can provide multiple requests
-    prompts = [get_prompt(prompt_config, input_dict={'question': question})]
+    prompts = [Prompt(prompt_config, input_dict={'question': question})]
 
     # can provide different inference parameters here
     inference_cfg = InferenceConfig(temperature=0)  # greedy
     outputs = llm(
         prompts=prompts,
-        stop_phrases=[prompt_config.delimiter],
+        stop_phrases=list(prompt_config.stop_phrases),
         **asdict(inference_cfg),
     )
     print(outputs[0]["generated_solution"])

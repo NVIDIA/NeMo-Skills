@@ -32,7 +32,7 @@ from omegaconf import MISSING, OmegaConf
 sys.path.append(str(Path(__file__).absolute().parents[2]))
 
 from nemo_skills.finetuning.filtering_utils import downsample_data, process_bad_solutions
-from nemo_skills.inference.prompt.utils import PromptConfig, get_prompt
+from nemo_skills.inference.prompt.utils import Prompt, PromptConfig
 from nemo_skills.utils import get_help_message, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -50,8 +50,8 @@ def get_default_prompt_config():
     ) as fin:
         prompt_config = PromptConfig(**yaml.safe_load(fin))
     prompt_config.context_type = "empty"
-    prompt_config.examples_type = "gsm8k_text_with_code"  # not used since num_few_shots = 0
-    prompt_config.num_few_shots = 0
+    prompt_config.few_shot_examples.examples_type = "gsm8k_text_with_code"  # not used since num_few_shots = 0
+    prompt_config.few_shot_examples.num_few_shots = 0
     return prompt_config
 
 
@@ -176,7 +176,7 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
             # including all fields in case they are useful for training
             elem = sample.copy()
             # NeMo requires input/output fields
-            elem["input"] = get_prompt(cfg.prompt, {"question": question})
+            elem["input"] = str(Prompt(cfg.prompt, {"question": question}))
             elem["output"] = elem.pop("generated_solution")
             elem.update(cfg.metadata)
             prepared_data.append(elem)

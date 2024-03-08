@@ -100,7 +100,7 @@ def run_eval(
         f'    --server_type {args.server_type} '
         f'    ++split_name=validation '
         f'    +prompt=code_sfted '
-        f'    ++prompt.num_few_shots=0 '
+        f'    ++prompt.few_shot_examples.num_few_shots=0 '
         f'    {args.extra_eval_args} '
     )
     last_job_id = start_job(extra_sbatch_args, cmd)

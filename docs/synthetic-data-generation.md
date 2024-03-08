@@ -23,14 +23,14 @@ any "teacher" model, e.g. [Mixtral-8x7B](https://huggingface.co/mistralai/Mixtra
      --num_gpus <number of GPUs on your machine/cluster node> \
      --num_runs 128 \
      +prompt=code_base \
-     ++prompt.examples_type=gsm8k_text_with_code \
+     ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
      ++prompt.context_type=empty \
      ++dataset=gsm8k \
      ++split_name=train_full
    ```
 
    This will run 128 slurm jobs each generating a solutions with unique random seed. You can customize solution
-   format with `++prompt.examples_type` (see [nemo_skills/inference/prompt/few_shot_examples](nemo_skills/inference/prompt/few_shot_examples)) and whether to show reference solution with `++prompt.context_type=reference_solution`. We found
+   format with `++prompt.few_shot_examples.examples_type` (see [nemo_skills/inference/prompt/few_shot_examples](nemo_skills/inference/prompt/few_shot_examples)) and whether to show reference solution with `++prompt.context_type=reference_solution`. We found
    that showing original solution is generally harmful, so it's recommended to either set `++prompt.context_type=empty` (no
    reference solution in prompt) or to show *masked* reference solution and select `++dataset=gsm8k_masked` and `++prompt.context_type=masked_solution` to use our
    masked version of solutions (see the [paper](TODO) for details).
@@ -49,7 +49,7 @@ Here are the steps to create masked solutions for the different dataset or using
    to convert it to TensorRT-LLM format. While you can do inference with NeMo, we highly
    recommend using TensorRT-LLM for synthetic data generation as it can be up to 10x faster.
 
-2. For GSM8K and MATH you can use `++prompt.examples_type=gsm8k_generate_masked` and `++prompt.examples_type=math_generate_masked` respectively.
+2. For GSM8K and MATH you can use `++prompt.few_shot_examples.examples_type=gsm8k_generate_masked` and `++prompt.few_shot_examples.examples_type=math_generate_masked` respectively.
    If using other dataset, create few-shot examples that show how to "translate" original reference solution to a masked one.
 
 3. Start data generation. Note that if you're running locally, all jobs will run sequentially.
@@ -62,7 +62,7 @@ Here are the steps to create masked solutions for the different dataset or using
      --num_gpus <number of GPUs on your machine/cluster node> \
      --num_runs 32 \
      +prompt=text_masked_base \
-     ++prompt.examples_type=gsm8k_generate_masked \
+     ++prompt.few_shot_examples.examples_type=gsm8k_generate_masked \
      ++prompt.context_type=reference_solution \
      ++dataset=gsm8k \
      ++split_name=train_full

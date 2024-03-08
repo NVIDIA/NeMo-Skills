@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
+from re import M
+from typing import Any, Dict, List, Optional
 
 import yaml
+from omegaconf import OmegaConf
 
 # guarding import to allow prompt_types to be used in scripts without extra packages required
 try:
@@ -37,19 +39,90 @@ datasets = [
 
 
 @dataclass
-class PromptConfig:
-    delimiter: str = MISSING
-    prefix: str = MISSING
+class FewShotExamples:
     template: str = MISSING
-    context_type: str = "empty"
-    examples_type: Optional[str] = None
+    examples_type: str = "gsm8k_text_with_code"
     num_few_shots: int = 5
+
+
+@dataclass
+class PromptConfig:
+    few_shot_examples: FewShotExamples = field(default_factory=FewShotExamples)
+    prompt_template: str = MISSING
+    user: str = MISSING
+    system: str = MISSING
+    context_type: str = "empty"
+    stop_phrases: List[str] = field(default_factory=list)
+
+
+@dataclass
+class Prompt:
+    config: PromptConfig
+    input_dict: Dict[str, Any]
+    example_dicts: Optional[List[Dict[str, Any]]] = None
+    context_template: Optional[str] = None
+    generated_solution: str = ""
+
+    def __post_init__(self):
+        """Initialize example_dicts/context_template if not provided."""
+        if self.example_dicts is None:
+            self.example_dicts = examples_map.get(self.config.few_shot_examples.examples_type, [])[
+                : self.config.few_shot_examples.num_few_shots
+            ]
+        if self.context_template is None:
+            self.context_template = context_templates.get(self.config.context_type, "")
+
+    def build_context(self, example_dict: Dict[str, Any]) -> str:
+        """Builds the context string based on the example dictionary."""
+        context = self.context_template.format(**example_dict)
+        return context
+
+    def build_filled_example(self, example_dict: Dict[str, Any]) -> str:
+        """Builds a filled example string based on the example dictionary."""
+        context = self.build_context(example_dict)
+        return self.config.few_shot_examples.template.format(context=context, **example_dict)
+
+    def build_examples(self) -> str:
+        """Builds all examples string concatenated by delimiter."""
+        filled_examples = [self.build_filled_example(example) for example in self.example_dicts]
+        examples = "".join(filled_examples)
+        context = self.build_context(self.input_dict)
+        user = self.config.user.format(examples=examples, context=context, **self.input_dict)
+        return user
+
+    def build_chat_prompt(self) -> List[Dict[str, str]]:
+        """Builds a structured representation of the prompt."""
+        structured_prompt = [{"role": "system", "content": self.config.system}] if self.config.system else []
+        structured_prompt.append({"role": "user", "content": self.build_examples()})
+        if self.generated_solution:
+            structured_prompt.append({"role": "assistant", "content": self.generated_solution})
+        return structured_prompt
+
+    def __str__(self) -> str:
+        """Returns the complete prompt string representation."""
+        prompt = self.config.prompt_template.format(
+            system=self.config.system,
+            user=self.build_examples(),
+            generated_solution=self.generated_solution,
+        )
+        return prompt
 
 
 def get_prompt_config(prompt_type: str) -> PromptConfig:
     # reading prompt format from the yaml file, if not running through hydra
-    with open(Path(__file__).parent / f"{prompt_type}.yaml", "rt", encoding="utf-8") as fin:
-        return PromptConfig(**yaml.safe_load(fin))
+    config_path = Path(__file__).parent / f"{prompt_type}.yaml"
+    with open(config_path, "rt", encoding="utf-8") as fin:
+        # Load the YAML file using OmegaConf
+        loaded_config = OmegaConf.load(fin)
+
+        # Create a default PromptConfig and convert it to a DictConfig
+        default_config = OmegaConf.create(asdict(PromptConfig()))
+
+        # Merge the default config with the loaded config
+        merged_config = OmegaConf.merge(default_config, loaded_config)
+
+        prompt_config = OmegaConf.structured(PromptConfig(**merged_config))
+        return prompt_config
 
 
 # this does not come from the config as it's coupled with few shot examples structure
@@ -59,21 +132,3 @@ context_templates = {
     "reference_solution": "Reference solution (do not copy it):\n{reference_solution}\n\n",
     "masked_solution": "Reference solution:\n{reference_masked_solution}\n\n",
 }
-
-
-def get_prompt(prompt_config: PromptConfig, input_dict: dict):
-    """Will build few-shot prompt from the provided pieces of information."""
-    if prompt_config.num_few_shots != 0:
-        examples = examples_map[prompt_config.examples_type][: prompt_config.num_few_shots]
-    else:
-        examples = []
-    context = context_templates[prompt_config.context_type]
-
-    filled_examples = []
-    for example_dict in examples:
-        filled_examples.append(prompt_config.template.format(context=context.format(**example_dict), **example_dict))
-    filled_examples.append(
-        prompt_config.template.format(context=context.format(**input_dict), **input_dict, generated_solution="")
-    )
-
-    return prompt_config.prefix + prompt_config.delimiter.join(filled_examples)

@@ -1,7 +1,9 @@
-delimiter: "\n\n\n\n\n\n"
-prefix: "\
-  System:\n\
+few_shot_examples:
+  template: ""
+system: "\
   You're an expert Python programmer and mathematician. \
   Help the user to solve this problem using code when necessary. \
-  Make sure to put the answer (and only answer) inside \\boxed{}.\n\n"
-template: "User:\n{question}\n\n{context}Assistant:\n{generated_solution}"
+  Make sure to put the answer (and only answer) inside \\boxed{}."
+user: "{question}\n\n{context}"
+prompt_template: "System:\n{system}\n\nUser:\n{user}Assistant:\n{generated_solution}"
+stop_phrases: ["\n\n\n\n\n\n"]

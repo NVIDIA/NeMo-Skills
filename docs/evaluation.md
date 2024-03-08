@@ -19,7 +19,7 @@ different GPU types or with different inference frameworks.
      --num_gpus <number of GPUs on your machine/cluster node> \
      --num_nodes 1 \
      +prompt=code_sfted \
-     ++prompt.num_few_shots=0 \
+     ++prompt.few_shot_examples.num_few_shots=0 \
      ++split_name=test
    ```
 
@@ -28,8 +28,8 @@ different GPU types or with different inference frameworks.
 
    ```
    +prompt_type=code_base \
-   ++prompt.examples_type=gsm8k_text_with_code \
-   ++prompt.num_few_shots=5
+   ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
+   ++prompt.few_shot_examples.num_few_shots=5
    ```
 
    If you need to, change the batch size with `batch_size=<X>` argument.
@@ -108,8 +108,8 @@ the [quick start](#quick-start) section.
    python nemo_skills/inference/generate_solutions.py \
      output_file=./test-results/gsm8k/output-greedy.jsonl \
      +prompt=code_sfted \
-     ++prompt.examples_type=null \
-     ++prompt.num_few_shots=0 \
+     ++prompt.few_shot_examples.examples_type=null \
+     ++prompt.few_shot_examples.num_few_shots=0 \
      ++prompt.context_type=empty \
      ++dataset=gsm8k \
      ++split_name=test \

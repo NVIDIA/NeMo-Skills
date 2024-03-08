@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.prompt.utils import PromptConfig, datasets, get_prompt, prompt_types
+from nemo_skills.inference.prompt.utils import Prompt, PromptConfig, datasets, prompt_types
 from nemo_skills.inference.server.model import get_model, server_params
 from nemo_skills.utils import get_help_message, setup_logging
 
@@ -122,12 +122,12 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
             if idx == cfg.max_samples:
                 break
 
-            prompts.append(get_prompt(cfg.prompt, input_dict=data_point))
+            prompts.append(Prompt(cfg.prompt, data_point))
             data_points.append(data_point)
 
             if len(prompts) == cfg.batch_size:
                 # batch-computing the outputs
-                outputs = llm(stop_phrases=[cfg.prompt.delimiter], prompts=prompts, **asdict(cfg.inference))
+                outputs = llm(stop_phrases=list(cfg.prompt.stop_phrases), prompts=prompts, **asdict(cfg.inference))
                 for output, original_data_point in zip(outputs, data_points):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
@@ -138,7 +138,7 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
 
         # collecting the final batch
         if len(prompts) > 0:
-            outputs = llm(stop_phrases=[cfg.prompt.delimiter], prompts=prompts, **asdict(cfg.inference))
+            outputs = llm(stop_phrases=list(cfg.prompt.stop_phrases), prompts=prompts, **asdict(cfg.inference))
             for output, original_data_point in zip(outputs, data_points):
                 output.update(original_data_point)
                 fout.write(json.dumps(output) + "\n")
