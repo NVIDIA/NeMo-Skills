@@ -11,7 +11,7 @@ with no external network access unless necessary.
 ## Local sandbox
 
 The default sandbox option used in our pipeline is a local docker container.
-Check out [nemo_skills/code_execution/local_sandbox](nemo_skills/code_execution/local_sandbox)
+Check out [nemo_skills/code_execution/local_sandbox](/nemo_skills/code_execution/local_sandbox)
 for implementation details. 
 
 ## AWS sandbox

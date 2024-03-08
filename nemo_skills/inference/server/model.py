@@ -298,7 +298,6 @@ class NemoModel(BaseModel):
         stop_phrases: List[str],
     ):
         string_prompts = [str(prompt) for prompt in prompts]
-        print(string_prompts)
         request = {
             "sentences": string_prompts,
             "tokens_to_generate": tokens_to_generate,

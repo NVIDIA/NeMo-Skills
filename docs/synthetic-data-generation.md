@@ -30,10 +30,10 @@ any "teacher" model, e.g. [Mixtral-8x7B](https://huggingface.co/mistralai/Mixtra
    ```
 
    This will run 128 slurm jobs each generating a solutions with unique random seed. You can customize solution
-   format with `++prompt.few_shot_examples.examples_type` (see [nemo_skills/inference/prompt/few_shot_examples](nemo_skills/inference/prompt/few_shot_examples)) and whether to show reference solution with `++prompt.context_type=reference_solution`. We found
+   format with `++prompt.few_shot_examples.examples_type` (see [nemo_skills/inference/prompt/few_shot_examples](/nemo_skills/inference/prompt/few_shot_examples)) and whether to show reference solution with `++prompt.context_type=reference_solution`. We found
    that showing original solution is generally harmful, so it's recommended to either set `++prompt.context_type=empty` (no
    reference solution in prompt) or to show *masked* reference solution and select `++dataset=gsm8k_masked` and `++prompt.context_type=masked_solution` to use our
-   masked version of solutions (see the [paper](TODO) for details).
+   masked version of solutions (see the [paper](https://arxiv.org/abs/2402.10176) for details).
 
 3. You would typically follow by [converting the data to SFT format and finetuning models](/docs/finetuning.md).
 

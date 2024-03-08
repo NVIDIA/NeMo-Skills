@@ -57,9 +57,9 @@ Let's break down what [pipeline/run_eval.py](/pipeline/run_eval.py) is doing.
 - Starts a local [sandbox](/docs/sandbox.md) which will handle code execution requests.
 - Starts an LLM server in a docker container (defined in the `NEMO_SKILLS_CONFIG` file).
 - Waits for the sandbox and server to start.
-- Runs [nemo_skills/inference/generate_solutions.py](nemo_skills/inference/generate_solutions.py) to
+- Runs [nemo_skills/inference/generate_solutions.py](/nemo_skills/inference/generate_solutions.py) to
   generate solutions for all benchmarks requested (potentially running multiple samples per benchmark).
-- Runs [nemo_skills/evaluation/evaluate_results.py](nemo_skills/evaluation/evaluate_results.py) on each
+- Runs [nemo_skills/evaluation/evaluate_results.py](/nemo_skills/evaluation/evaluate_results.py) on each
   of the generated output files.
 - If running in a Slurm cluster, you can parallelize evaluation across multiple nodes. You can also
   customize any of the parameters of evaluation - all extra arguments of the
@@ -132,7 +132,7 @@ After this you would typically follow up with the same command to compute metric
 ## Typical customizations
 
 To customize the prompt template for the model, create a new .yaml file inside
-[nemo_skills/inference/prompt](nemo_skills/inference/prompt) folder. Have a look
+[nemo_skills/inference/prompt](/nemo_skills/inference/prompt) folder. Have a look
 at the existing templates there for an example.
 
 You can run `python nemo_skills/inference/generate_solutions.py --help`
