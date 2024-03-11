@@ -9,6 +9,12 @@ All commands were tested on a cluster with 8 80Gb A100 GPUs per node (or a local
 If you're using different GPU configuration, change the commands accordingly and
 expect ~1% variation in results.
 
+**To ensure exact reproducibility of the results, we recommend checking out the v0.1 tag of the repository:**
+
+```bash
+git checkout v0.1
+```
+
 ## Evaluation
 
 Here are the commands you can run to reproduce our evaluation numbers.
