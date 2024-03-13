@@ -81,7 +81,7 @@ def type_to_str(type_hint):
         return str(type_hint).replace('typing.', '')
 
 
-def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 0):
+def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 0, **kwargs):
     source_lines = inspect.getsource(dataclass_obj).split('\n')
     fields_info = {
         field.name: {
@@ -144,8 +144,8 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 
     return comments
 
 
-def get_fields_docstring(dataclass_obj):
-    commented_fields = extract_comments_above_fields(dataclass_obj)
+def get_fields_docstring(dataclass_obj, **kwargs):
+    commented_fields = extract_comments_above_fields(dataclass_obj, **kwargs)
     docstring = [content for content in commented_fields.values()]
     return '\n'.join(docstring)
 

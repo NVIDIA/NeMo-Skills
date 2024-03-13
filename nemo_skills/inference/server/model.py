@@ -18,7 +18,9 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import List
 
 import requests
@@ -40,6 +42,22 @@ LOG = logging.getLogger(__name__)
 #       requests and getting new prompts in a queue to make sure we can always
 #       pack full batches, instead of only resubmitting a small set of prompts
 #       that require additional code executions
+
+
+@dataclass
+class ErrorRecoveryConfig:
+    # Number of attempts to recover from code execution error
+    recovery_attempts: int = 0
+    # If true, take code block based on majority voting of `recovery_attempts` code outputs.
+    # Otherwise take the first valid code output.
+    # So `majority_voting=False` is potentially faster.
+    majority_voting: bool = True
+    # Temperature for recovery requests
+    temperature: float = 0.7
+    # Top-p for recovery requests
+    top_p: float = 0.95
+    # Top-k for recovery requests
+    top_k: int = 0
 
 
 def remove_stop_tokens(text: str, stop_phrases: List[str]) -> str:
@@ -66,6 +84,7 @@ class BaseModel(abc.ABC):
         handle_code_execution: Optional[bool] = True - Whether to handle code execution in this class
             or make a single call to the server. If set to False, the server needs to have special logic
             for communicating with the sandbox.
+        error_recovery: Optional[dict] = None - Configuration for error recovery.
     """
 
     def __init__(
@@ -80,6 +99,7 @@ class BaseModel(abc.ABC):
         max_code_executions=3,
         stop_on_code_error=True,
         handle_code_execution=True,
+        error_recovery=None,
     ):
         self.server_host = host
         self.server_port = port
@@ -88,6 +108,9 @@ class BaseModel(abc.ABC):
         self.max_code_output_characters = max_code_output_characters
         self.code_execution_timeout = code_execution_timeout
         self.max_code_executions = max_code_executions
+        if error_recovery is None:
+            error_recovery = {}
+        self.error_recovery = ErrorRecoveryConfig(**error_recovery)
         self.handle_code_execution = handle_code_execution
         self.stop_on_code_error = stop_on_code_error
         if self.handle_code_execution and sandbox is None:
@@ -184,7 +207,6 @@ class BaseModel(abc.ABC):
                             session_id=new_outputs[idx]['session_id'],
                         )
                 for idx, output in zip(remaining_ids, outputs):
-                    new_outputs[idx]['full_prompt'].generated_solution += output
                     if output.endswith(CODE_SEPARATORS[-1]):
                         result, new_outputs[idx]['session_id'] = futures[idx].result()
                         # for now if there is any error or no output, we stop generation
@@ -192,14 +214,22 @@ class BaseModel(abc.ABC):
                         if result['error_message']:
                             new_outputs[idx]['error_message'] = result['error_message']
                             if self.stop_on_code_error:
+                                new_outputs[idx]['full_prompt'].generated_solution += output
                                 continue
+                            text_only_part = output.split(CODE_SEPARATORS[0])[0]
+                            new_outputs[idx]['full_prompt'].generated_solution += text_only_part
+                            code_output = self._recover_from_error(request, new_outputs[idx], executor)
+                            # if re-generation did not help
+                            if code_output is None:
+                                code_output = result["result"]
+                                new_outputs[idx]['full_prompt'].generated_solution += output[len(text_only_part) :]
                         else:
+                            new_outputs[idx]['full_prompt'].generated_solution += output
                             new_outputs[idx]['error_message'] = ''
+                            code_output = result["result"]
 
                         # adding code output to the prompt
-                        code_output = (
-                            f'\n{CODE_OUTPUT_SEPARATORS[0]}\n{result["result"]}\n{CODE_OUTPUT_SEPARATORS[1]}\n'
-                        )
+                        code_output = f'\n{CODE_OUTPUT_SEPARATORS[0]}\n{code_output}\n{CODE_OUTPUT_SEPARATORS[1]}\n'
                         new_outputs[idx]['full_prompt'].generated_solution += code_output
                         # setting a limit on max code executions to speed things up
                         # (sometimes keeps repeating the same sequence forever)
@@ -207,6 +237,8 @@ class BaseModel(abc.ABC):
                             new_outputs[idx]['error_message'] = "Max code executions reached"
                         else:
                             new_ids.append(idx)
+                    else:
+                        new_outputs[idx]['full_prompt'].generated_solution += output
                 remaining_ids = new_ids
 
         # removing original prompt and stop tokens from the end of the generated text
@@ -223,6 +255,59 @@ class BaseModel(abc.ABC):
                 }
             )
         return outputs
+
+    def _recover_from_error(self, request, new_output, executor):
+        recovery_request = {key: value for key, value in request.items() if key != 'prompts'}
+        recovery_request['prompts'] = [new_output['full_prompt']]
+
+        recovery_request['temperature'] = self.error_recovery.temperature
+        recovery_request['top_p'] = self.error_recovery.top_p
+        recovery_request['top_k'] = self.error_recovery.top_k
+
+        outputs = []
+        futures = [None] * self.error_recovery.recovery_attempts
+        results = [None] * self.error_recovery.recovery_attempts
+        for rs in range(self.error_recovery.recovery_attempts):
+            recovery_request['random_seed'] = rs
+            output = self._single_call(**recovery_request)[0]
+            outputs.append(output)
+            if output.endswith(CODE_SEPARATORS[-1]):
+                futures[rs] = executor.submit(
+                    self.sandbox.execute_code,
+                    generated_code=extract_code_to_execute(output),
+                    timeout=self.code_execution_timeout,
+                    max_output_characters=self.max_code_output_characters,
+                    session_id=new_output['session_id'],
+                )
+
+                if not self.error_recovery.majority_voting:
+                    result, _ = futures[rs].result()
+                    # quit on first correct output if not majority voting
+                    if not result['error_message']:
+                        results[rs] = result['result']
+                        break
+
+        for idx, output in enumerate(outputs):
+            if not output.endswith(CODE_SEPARATORS[-1]) or not self.error_recovery.majority_voting:
+                continue
+            result, _ = futures[idx].result()
+            if result['error_message']:
+                continue
+            results[idx] = result['result']
+
+        # majority voting on valid code output results
+        # if majority voting is disabled, we just take the first valid output
+        counts = Counter(res for res in results if res)
+        # all errors
+        if not counts:
+            return
+
+        most_common = counts.most_common(1)[0][0]
+        valid_idx = results.index(most_common)
+        new_output['full_prompt'].generated_solution += outputs[valid_idx]
+        new_output['error_message'] = ''
+
+        return most_common
 
     def _send_request(self, request):
         # temperature of 0 means greedy, but it's not always supported by the server
@@ -283,7 +368,22 @@ class NemoModel(BaseModel):
         **kwargs,
     ):
         # nemo inference handles code execution directly
-        kwargs['handle_code_execution'] = False
+        if 'handle_code_execution' not in kwargs:
+            kwargs['handle_code_execution'] = False
+        if not kwargs['handle_code_execution']:
+            unsupported_arguments = [
+                'max_code_output_characters',
+                'code_execution_timeout',
+                'max_code_executions',
+                'error_recovery',
+                'stop_on_code_error',
+            ]
+            for arg in unsupported_arguments:
+                if arg in kwargs:
+                    raise ValueError(
+                        f"`{arg}` is not supported by NemoModel if handle_code_execution=False. To use it, set handle_code_execution=True."
+                    )
+
         super().__init__(**kwargs)
 
     def _single_call(

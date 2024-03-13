@@ -25,8 +25,8 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.prompt.utils import Prompt, PromptConfig, datasets, prompt_types
-from nemo_skills.inference.server.model import get_model, server_params
-from nemo_skills.utils import get_help_message, setup_logging
+from nemo_skills.inference.server.model import ErrorRecoveryConfig, get_model, server_params
+from nemo_skills.utils import get_fields_docstring, get_help_message, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -46,7 +46,7 @@ class GenerateSolutionsConfig:
     """Top-level parameters for the script"""
 
     output_file: str  # Where to save the generations
-    # Inference server configuration {server_params}
+    # Inference server configuration {server_params} {error_recovery_params}
     server: dict
     # Sandbox configuration {sandbox_params}
     sandbox: dict
@@ -144,12 +144,20 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
                 fout.write(json.dumps(output) + "\n")
 
 
+error_recovery_params = '\n' + get_fields_docstring(
+    ErrorRecoveryConfig,
+    prefix='server.error_recovery.',
+    level=2,
+)
+
+
 HELP_MESSAGE = get_help_message(
     GenerateSolutionsConfig,
     datasets=datasets,
     prompt_types=prompt_types,
     server_params=server_params(),
     sandbox_params=sandbox_params(),
+    error_recovery_params=error_recovery_params,
 )
 
 
