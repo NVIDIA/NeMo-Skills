@@ -35,9 +35,10 @@ if [ $SLURM_LOCALID -eq 0 ]; then \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/Running on all addresses/ q' && \
     tail -n10 /tmp/server_logs.txt &&  \
-    echo "Server is running on `tail -n 10 /tmp/server_logs.txt | \
-    grep -oP 'http://\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1`" && \
-    echo "Sandbox is running on $NEMO_SKILLS_SANDBOX_HOST" && \
+    SERVER_ADDRESS=$(tail -n 10 /tmp/server_logs.txt | \
+    grep -oP 'http://\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1) && \
+    echo "Server is running on $SERVER_ADDRESS" && \
+    echo "Sandbox is running on ${{NEMO_SKILLS_SANDBOX_HOST:-$SERVER_ADDRESS}}" && \ 
     sleep infinity;
 else \
     sleep infinity; \

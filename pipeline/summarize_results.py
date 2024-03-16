@@ -37,10 +37,22 @@ if __name__ == "__main__":
         'results_folder',
         help="Path to the folder with results. Needs to contain <benchmark> folders inside.",
     )
+    parser.add_argument(
+        '--benchmarks',
+        nargs="+",
+        default=[],
+        help="Specify benchmarks to run. If not specified, all benchmarks in the results_folder will be used.",
+    )
     args = parser.parse_args()
 
     # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
     benchmarks = glob.glob(f'{args.results_folder}/*')
+
+    if args.benchmarks:
+        for benchmark in benchmarks.copy():
+            if Path(benchmark).name not in args.benchmarks:
+                benchmarks.remove(benchmark)
+
     current_folder = Path(__file__).absolute().parent
     results = {}
     for benchmark_path in benchmarks:

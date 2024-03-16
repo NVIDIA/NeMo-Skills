@@ -12,17 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*.json
-*.npy
-*.info
-*.jsonl
-*.csv
-nemo_experiments
-build
-.hypothesis
-*.zip
-*.egg-info
-*.xml
-*.DS_Store
+import sys
 
-__pycache__
+summarize_results_template = (
+    sys.executable
+    + """ pipeline/summarize_results.py {results_path} \\
+    --benchmarks {benchmarks}"""
+)

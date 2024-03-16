@@ -14,10 +14,8 @@
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from re import M
 from typing import Any, Dict, List, Optional
 
-import yaml
 from omegaconf import OmegaConf
 
 # guarding import to allow prompt_types to be used in scripts without extra packages required
@@ -41,7 +39,7 @@ datasets = [
 @dataclass
 class FewShotExamples:
     template: str = MISSING
-    examples_type: str = "gsm8k_text_with_code"
+    examples_type: Optional[str] = None
     num_few_shots: int = 5
 
 

@@ -17,7 +17,7 @@ import logging
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import hydra
 from omegaconf import OmegaConf
@@ -61,9 +61,12 @@ class GenerateSolutionsConfig:
     split_name: Optional[str] = None  # Can be train, validation, test or train_full (train + validation)
     data_file: Optional[str] = None  # Can directly specify a data file, if using a custom dataset
 
+    example_dicts: Optional[List[Dict]] = None  # A list of few-shot demonstrations to be shown in the prompt
+
     batch_size: int = 16
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
+
     # if > 0, will skip this many samples from the beginning of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
@@ -122,12 +125,15 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
             if idx == cfg.max_samples:
                 break
 
-            prompts.append(Prompt(cfg.prompt, data_point))
+            prompts.append(Prompt(cfg.prompt, data_point, example_dicts=cfg.example_dicts))
+
             data_points.append(data_point)
 
             if len(prompts) == cfg.batch_size:
                 # batch-computing the outputs
+
                 outputs = llm(stop_phrases=list(cfg.prompt.stop_phrases), prompts=prompts, **asdict(cfg.inference))
+
                 for output, original_data_point in zip(outputs, data_points):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions

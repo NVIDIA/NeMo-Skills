@@ -95,9 +95,9 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 
 
     for line in source_lines:
         # skip unfinished multiline comments
-        if line.count("'") == 3 or line.count('"') == 3:
-            continue
-        line_comment = extract_comments(line)
+        line_comment = []
+        if '#' in line:
+            line_comment = extract_comments(line)
         if line_comment:
             comment_cache.append(line_comment[0])
         if ':' not in line:
