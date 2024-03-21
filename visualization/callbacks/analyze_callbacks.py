@@ -488,7 +488,6 @@ def show_item(
         for file_id, file in enumerate(get_table_data()[question_id][models[model_id]]):
             if file['file_name'] == name:
                 file_ids[model_id] = file_id
-
     return get_table_detailed_inner_data(
         question_id=question_id,
         rows_names=rows_names,
@@ -633,8 +632,7 @@ def change_label(
     ],
     [
         State('datatable', 'selected_rows'),
-        State({"type": "sorting_function_input", "id": ALL}, "value"),
-        State({"type": "filter_function_input", "id": ALL}, "value"),
+        State({"type": 'file_selector', "id": ALL}, 'options'),
         State({"type": "model_selector", "id": ALL}, "value"),
         State({"type": "model_selector", "id": ALL}, "id"),
         State({"type": "row_name", "id": ALL}, "children"),
@@ -651,8 +649,7 @@ def change_file(
     file_names: List[str],
     plain_text_switch: List[str],
     idx: List[int],
-    sorting_functions: List[str],
-    filter_functions: List[str],
+    file_options: List[str],
     models: List[str],
     model_ids: List[int],
     rows_names: List[str],
@@ -677,14 +674,10 @@ def change_file(
 
     model = models[button_id]
 
-    filtered_files = get_filtered_files(
-        filter_function=filter_functions[button_id + 1],
-        sorting_function=sorting_functions[button_id + 1],
-        array_to_filter=get_table_data()[question_id][model],
-    )
     file_id = 0
-    for i, file_data in enumerate(filtered_files):
-        if file_data['file_name'] == file_names[button_id]:
+    file_name = file_names[button_id]['value'] if isinstance(file_names[button_id], Dict) else file_names[button_id]
+    for i, file_data in enumerate(get_table_data()[question_id][model]):
+        if file_data['file_name'] == file_name:
             file_id = i
             break
 
@@ -694,9 +687,8 @@ def change_file(
         model=model,
         file_id=file_id,
         rows_names=rows_names,
+        files_names=[option['value'] for option in file_options[button_id]],
         col_id=button_id,
-        filter_function=filter_functions[button_id + 1],
-        sorting_function=sorting_functions[button_id + 1],
         plain_text=(plain_text_switch[button_id] and len(plain_text_switch[button_id])),
     )
     return table_data
@@ -908,7 +900,6 @@ def change_files_order(
     ctx = callback_context
     if not ctx.triggered:
         return no_updates, no_updates
-
     try:
         button_id = model_ids.index(
             json.loads(MODEL_SELECTOR_ID.format(json.loads(ctx.triggered[-1]['prop_id'].split('.')[0])['id']))

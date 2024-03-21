@@ -98,7 +98,7 @@ def get_filter_layout(id: int = -1, available_filters: List[str] = [], files_onl
             dbc.Button(
                 "Filters",
                 id={"type": "set_filter_button", "id": id},
-                style={'margin-left': '2px'},
+                class_name='button-class',
             ),
             dbc.Modal(
                 [
@@ -160,7 +160,7 @@ def get_sorting_layout(id: int = -1, available_params: List[str] = []) -> html.D
             dbc.Button(
                 "Sort",
                 id={"type": "set_sorting_button", "id": id},
-                style={'margin-left': '2px'},
+                class_name='button-class',
             ),
             dbc.Modal(
                 [
@@ -259,7 +259,7 @@ def get_change_label_layout(id: int = -1, apply_for_all_files: bool = True) -> h
             dbc.Button(
                 "Labels",
                 id={"type": "set_file_label_button", "id": id},
-                style={'margin-left': '2px'},
+                class_name='button-class',
             ),
             dbc.Modal(
                 [header, body, footer],
@@ -457,18 +457,12 @@ def get_row_detailed_inner_data(
     question_id: int,
     model: str,
     rows_names: List[str],
+    files_names: List[str],
     file_id: int,
     col_id: int,
-    filter_function: str = "",
-    sorting_function: str = "",
     plain_text: bool = False,
 ) -> List:
-    table_data = get_filtered_files(
-        filter_function=filter_function,
-        sorting_function=sorting_function,
-        array_to_filter=get_table_data()[question_id].get(model, []),
-    )
-    files_name = [data['file_name'] for data in table_data]
+    table_data = get_table_data()[question_id].get(model, [])
     row_data = []
     for key in filter(
         lambda key: is_detailed_answers_rows_key(key),
@@ -478,7 +472,7 @@ def get_row_detailed_inner_data(
             value = ""
         elif key == 'file_name':
             value = get_selector_layout(
-                files_name,
+                files_names,
                 {"type": "file_selector", "id": col_id},
                 table_data[file_id].get(key, None),
             )
@@ -511,10 +505,16 @@ def get_table_detailed_inner_data(
             question_id=question_id,
             model=model,
             rows_names=rows_names,
+            files_names=[
+                file['file_name']
+                for file in get_filtered_files(
+                    filter_function,
+                    sorting_function,
+                    get_table_data()[question_id][model],
+                )
+            ],
             file_id=file_id,
             col_id=col_id,
-            filter_function=filter_function,
-            sorting_function=sorting_function,
         )
         table_data.extend(row_data)
     return table_data
@@ -536,8 +536,13 @@ def get_general_stats_layout(
         )
         if len(errors_dict):
             logging.error(ERROR_MESSAGE_TEMPLATE.format(name, errors_dict))
+
+    overall_samples = sum(len(question_data) for question_data in data_for_base_model)
+    dataset_size = len(data_for_base_model)
     stats = {
-        "overall number of samples": sum(len(question_data) for question_data in data_for_base_model),
+        "dataset size": dataset_size,
+        "overall number of samples": overall_samples,
+        "generations per sample": (overall_samples / dataset_size if dataset_size else 0),
         **custom_stats,
     }
     return [html.Div([html.Div(f'{name}: {value}') for name, value in stats.items()])]

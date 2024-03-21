@@ -123,7 +123,7 @@ class WholeDatasetModeStrategy(ModeStrategies):
         if not success:
             return html.Pre(f"Something went wrong\n{errors}")
 
-        runs_storage[run_index] = {
+        runs_storage[str(run_index)] = {
             "utils": utils,
             "examples": get_examples().get(utils["examples_type"], []),
         }
@@ -136,11 +136,12 @@ class WholeDatasetModeStrategy(ModeStrategies):
             [
                 html.Div(
                     [
-                        html.Pre(f'Done. Results are in folder\n{"/".join(output_file.split("/")[:-1])}'),
+                        html.Pre(f'Done. Results are in folder\n{metrics_directory}'),
                         dash_table.DataTable(
                             id='table',
                             columns=[{"name": i, "id": i} for i in df.columns],
                             data=df.to_dict('records'),
+                            cell_selectable=False,
                             style_table={'overflowX': 'auto'},
                         ),
                     ]

@@ -1,0 +1,9 @@
+.button-class {
+    line-height: 20px;
+    font-size: 14px;
+    height: 40px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-left: 2px;
+}

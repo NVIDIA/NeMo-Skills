@@ -3,8 +3,14 @@
 ## Demo
 This is a tool for data analysis, consisting of two pages: "Inference" and "Analyze".
 
-[![Demo of the tool](/visualization/images/demo.png)](https://youtu.be/SWKNovw55HQ)
+### Overview of the tool
+[![Demo of the tool](/visualization/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE)
 
+### Demo of the Inference Page
+[![Demo of the inference page](/visualization/images/inference_page.png)](https://www.youtube.com/watch?v=yRu6pxZG0IY)
+
+### Demo of the Analyze Page
+[![Demo of the analyze page](/visualization/images/analyze_page.png)](https://www.youtube.com/watch?v=y-Nj4knGGZ4)
 
 ## Getting Started
 Before using this tool, follow the instructions in [prerequisites.md](/docs/prerequisites.md), and install requirements:
