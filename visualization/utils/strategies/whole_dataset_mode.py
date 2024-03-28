@@ -24,7 +24,15 @@ import requests
 from dash import dash_table, html
 from flask import current_app
 from omegaconf import OmegaConf
-from settings.constants import GREEDY, OUTPUT, OUTPUT_PATH, PARAMETERS_FILE_NAME, SEPARATOR_ID, WHOLE_DATASET_MODE
+from settings.constants import (
+    GREEDY,
+    OUTPUT,
+    OUTPUT_PATH,
+    PARAMETERS_FILE_NAME,
+    SEPARATOR_ID,
+    STATISTICS_FOR_WHOLE_DATASET,
+    WHOLE_DATASET_MODE,
+)
 from settings.templates import summarize_results_template
 from utils.common import get_available_models, get_examples, run_subprocess
 from utils.strategies.base_strategy import ModeStrategies
@@ -132,6 +140,8 @@ class WholeDatasetModeStrategy(ModeStrategies):
             f.write(json.dumps(runs_storage))
 
         df = pd.read_csv(os.path.join(results_path, "results.csv"))
+        for statistic in STATISTICS_FOR_WHOLE_DATASET:
+            df[statistic] = df[statistic].map(lambda x: '{:.2f}%'.format(x))
         return html.Div(
             [
                 html.Div(

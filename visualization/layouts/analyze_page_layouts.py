@@ -166,7 +166,7 @@ def get_compare_test_layout() -> html.Div:
 
 def get_stats_text(general_stats: bool = False, delete: bool = False):
     if delete:
-        return "write name of the statistic you want to delete"
+        return "Choose the name of the statistic you want to delete"
     else:
         if general_stats:
             return (
@@ -230,7 +230,7 @@ def get_add_stats_layout() -> html.Div:
                 id="stats_modes",
                 labels=["general stats", "delete mode"],
                 values=[GENERAL_STATS, DELETE],
-                additional_params={"inline": True},
+                additional_params={"inline": True, "style": {"margin-left": "10px"}},
             ),
         ],
         close_button=True,

@@ -33,7 +33,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
 
    Make sure to provide the path to the `nemo_model` subfolder if using NeMo models.
 
-4. Wait until you see "Server is running on" message, then send requests to the server.
+4. Wait until you see "Server is running on" message, then send requests to the server through Python API or by using our [visualization tool](/visualization/Readme.md).
 
     ```python
     from dataclasses import asdict

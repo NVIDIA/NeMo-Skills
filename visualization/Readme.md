@@ -7,10 +7,10 @@ This is a tool for data analysis, consisting of two pages: "Inference" and "Anal
 [![Demo of the tool](/visualization/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE)
 
 ### Demo of the Inference Page
-[![Demo of the inference page](/visualization/images/inference_page.png)](https://www.youtube.com/watch?v=yRu6pxZG0IY)
+[![Demo of the inference page](/visualization/images/inference_page.png)](https://www.youtube.com/watch?v=6utSkPCdNks)
 
 ### Demo of the Analyze Page
-[![Demo of the analyze page](/visualization/images/analyze_page.png)](https://www.youtube.com/watch?v=y-Nj4knGGZ4)
+[![Demo of the analyze page](/visualization/images/analyze_page.png)](https://www.youtube.com/watch?v=cnPyDlDmQXg)
 
 ## Getting Started
 Before using this tool, follow the instructions in [prerequisites.md](/docs/prerequisites.md), and install requirements:
@@ -29,25 +29,28 @@ This page enables the analysis of model answers based on different parameters. I
 
 - **Chat** mode facilitates a conversation with the model and requires minimal parameter setup.
 - **Run one sample** mode allows you to send a single question to the model. It can be a question from the dataset (with parameters `data_file` or `dataset` and `split_name`) or a custom question. The answer is validated by comparing it with the `expected_answer` field.
-- **Run whole dataset** mode lets you launch the model with chosen parameters on the entire dataset. Results are saved in `visualization/results/output-greedy.jsonl` and `visualization/results/metrics-greedy.jsonl`. If the "use random seed range" flag is enabled, each answer will be sampled with multiple random seeds in the range from `start_random_seed` to `end_random_seed`. After generation is done, you can review the results on the "Analyze" page. The parameters used for dataset launch are also recorded in the `visualization/results/parameters.jsonl` file and displayed on the "Analyze" page.
+- **Run whole dataset** mode lets you launch the generation with chosen parameters on the entire dataset. Results are saved in `visualization/results/output-greedy.jsonl` and `visualization/results/metrics-greedy.jsonl`. If the "use random seed range" flag is enabled, each answer will be sampled with multiple random seeds in the range from `start_random_seed` to `end_random_seed`. After generation is done, you can review the results on the "Analyze" page. The parameters used for dataset launch are also recorded in the `visualization/results/parameters.jsonl` file and displayed on the "Analyze" page.
 
 ## Analyze page
-To use the Analyze page, specify paths to the datasets you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++visualization_params.model_prediction.model1='/some_path/model1/output-greedy.jsonl'` or add them in an additional config file.
+To use the Analyze page, specify paths to the generations you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++visualization_params.model_prediction.generation1='/some_path/generation1/output-greedy.jsonl'` or add them in an additional config file.
 
 ```yaml
 visualization_params:
   model_prediction:
-    model1: /some_path/model1/output-greedy.jsonl
-    model2: /some_path/model2/output-rs*.jsonl
+    generation1: /some_path/generation1/output-greedy.jsonl
+    generation2: /some_path/generation2/output-rs*.jsonl
 ```
 
-The tool also supports comparison of multiple model outputs (e.g. 
- `model1` and `model2` in the config above). All files satisfying the given pattern will be considered for analysis.
+The tool also supports comparison of multiple generations (e.g. 
+ `generation1` and `generation2` in the config above). All files satisfying the given pattern will be considered for analysis.
 
-On this page, you can sort, filter, and compare model outputs. You can also add labels to the data and save your modified, filtered, and sorted dataset by specifying `save_dataset_path`.
+On this page, you can sort, filter, and compare generations. You can also add labels to the data and save your modified, filtered, and sorted dataset by specifying `save_dataset_path`.
 
 ### Filtering
-You can create custom functions to filter data. These functions should take a dictionary containing keys representing model names and values as JSON data from your dataset.
+You can create custom functions to filter data. There are two modes: Filter Files mode and Filter Questions mode.
+
+#### Filter Files mode
+In this mode the functions will filter each sample from different files. It should take a dictionary containing keys representing generation names and values as JSON data from your dataset.
 
 Custom filtering functions should return a Boolean value. For instance:
 
@@ -56,22 +59,40 @@ def custom_filtering_function(error_message: str) -> bool:
    # Your code here
    return result
 
-custom_filtering_function(data['model1']['error_message']) # This line will be used for filtering
+custom_filtering_function(data['generation1']['error_message']) # This line will be used for filtering
 ```
 The last line in the custom filtering function will be used for data filtering; all preceding code within the function is executed but does not directly impact the filtering process.
 
-To apply different filters for different models, separate expressions with '&&' symbols. 
+To apply filters for different generations, separate expressions with '&&' symbols. 
  ```python
- data['model1']['is_correct'] && not data['model2']['is_correct']
+ data['generation1']['is_correct'] && not data['generation2']['is_correct']
  ```
- Do not write expressions for different models without separators.
+ Do not write expressions for different generations without separators in this mode.
 
+#### Filter Questions mode
+In this mode the function will filter each question. Files will not be filtered. It should take a dictionary containing keys representing generation names and a list of values as JSON data from your dataset from each file.
+
+In this mode you should not use the && separator. For instance, an example from the previous mode can be written like this:
+ ```python
+ data['generation1'][0]['is_correct'] and not data['generation2'][0]['is_correct']
+ # Filter questions where the first file of the first generation contains a correct solution and the first file from the second generation contains a wrong solution
+ ```
+ or like this:
+  ```python
+ data['generation1'][0]['correct_responses'] == 1 and data['generation2'][0]['correct_responses'] == 0
+ # Custom Statistics are dublicated in all JSONs. So here, 'correct_responses' value will be the same for all file for a specific generation and question 
+ ```
+ In this mode you can also compare fields of different generations
+   ```python
+ data['generation1'][0]['is_correct'] != data['generation2'][0]['is_correct']
+ ```
+ These examples can not be used in the Filter Files mode
 
 ### Sorting
 Sorting functions operate similarly to filtering functions, with a few distinctions:
 
-1. Sorting functions operate on individual data entries rather than on dictionaries containing model name keys.
-2. Sorting functions cannot be applied across different models simultaneously.
+1. Sorting functions operate on individual data entries rather than on dictionaries containing generation name keys.
+2. Sorting functions cannot be applied across different generations simultaneously.
 
 Here is an example of a correct sorting function:
 
@@ -83,7 +104,7 @@ custom_sorting_function(data['generated_solution'])
 ```
 
 ### Statistics
-There are two types of statistics: "Custom Statistics" and "General Custom Statistics". Custom statistics apply to different runs of a single question. There are some default custom statistics: "correct_responses", "wrong_responses", and "no_responses". General Custom Statistics apply to each run across all questions. Default general custom statistic - "overall number of runs"
+There are two types of statistics: "Custom Statistics" and "General Custom Statistics". Custom statistics apply to different samples of a single question. There are some default custom statistics: "correct_responses", "wrong_responses", and "no_responses". General Custom Statistics apply to each sample across all questions. Default general custom statistics - "dataset size", "overall number of samples" and "generations per sample"
 
 ![stats](/visualization/images/stats.png)
 

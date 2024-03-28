@@ -20,7 +20,6 @@ import os
 import re
 import subprocess
 from collections import defaultdict
-from os import path
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from dash import html
@@ -156,7 +155,7 @@ def get_height_adjustment() -> html.Iframe:
 
 @functools.lru_cache()
 def get_test_data(index: int, dataset: str) -> Tuple[Dict, int]:
-    if dataset == UNDEFINED or path.isfile(dataset) is False:
+    if dataset == UNDEFINED or os.path.isfile(dataset) is False:
         return {QUESTION_FIELD: "", ANSWER_FIELD: ""}, 0
     with open(dataset) as file:
         tests = file.readlines()
