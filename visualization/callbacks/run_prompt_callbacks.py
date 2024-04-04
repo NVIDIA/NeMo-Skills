@@ -171,7 +171,12 @@ def del_example(
     examples_type: str,
     view_mode: List[str],
     js_trigger: str,
-) -> Tuple[Union[int, NoUpdate], Union[int, NoUpdate], Union[Tuple[html.Div], NoUpdate], Union[int, NoUpdate],]:
+) -> Tuple[
+    Union[int, NoUpdate],
+    Union[int, NoUpdate],
+    Union[Tuple[html.Div], NoUpdate],
+    Union[int, NoUpdate],
+]:
     if not n_clicks:
         return no_update, no_update, no_update, no_update, no_update
     if not examples_type:

@@ -229,7 +229,5 @@ def get_utils_field_representation(value: Union[str, int, float, bool], key: Opt
     return (
         UNDEFINED
         if value is None and key.split(SEPARATOR_ID)[-1] in current_app.config['data_explorer']['types']
-        else value
-        if value == "" or str(value).strip() != ""
-        else repr(value)[1:-1]
+        else value if value == "" or str(value).strip() != "" else repr(value)[1:-1]
     )

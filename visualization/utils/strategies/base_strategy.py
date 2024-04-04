@@ -69,9 +69,7 @@ class ModeStrategies:
                         key=lambda item: (
                             1
                             if item[0].split(SEPARATOR_DISPLAY)[-1] in current_app.config['data_explorer']['types']
-                            else 0
-                            if not isinstance(item[1], str)
-                            else 2
+                            else 0 if not isinstance(item[1], str) else 2
                         ),
                     )
                     if condition(name, value)

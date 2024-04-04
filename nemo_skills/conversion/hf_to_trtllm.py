@@ -828,10 +828,12 @@ def convert_hf_llama(
                     tllm_prex + 'attention.qkv.',
                     [
                         1,
-                        3 * hidden_size // tensor_parallel
-                        if mha_mode
-                        else hidden_size // tensor_parallel
-                        + (hidden_size // num_key_value_heads) // tensor_parallel * 2,
+                        (
+                            3 * hidden_size // tensor_parallel
+                            if mha_mode
+                            else hidden_size // tensor_parallel
+                            + (hidden_size // num_key_value_heads) // tensor_parallel * 2
+                        ),
                     ],
                     tensor_parallel,
                     is_qkv=True,
