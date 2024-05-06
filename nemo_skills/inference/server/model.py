@@ -74,9 +74,9 @@ class BaseModel(abc.ABC):
             Only required if handle_code_execution is True.
         ssh_server: Optional[str] = None - SSH server for tunneling requests.
             Useful if server is running on slurm cluster to which there is an ssh access
-            Can also be specified through SSH_SERVER env var.
+            Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
         ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
-            Can also be specified through SSH_KEY_PATH env var.
+            Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
         max_code_output_characters: Optional[int] = 1000 - Maximum number of characters for code execution output.
         code_execution_timeout: Optional[float] = 10.0 - Timeout for code execution in seconds.
         max_code_executions: Optional[int] = 3 - Maximum number of code executions per generation.
@@ -103,8 +103,8 @@ class BaseModel(abc.ABC):
     ):
         self.server_host = host
         self.server_port = port
-        self.ssh_server = os.getenv("SSH_SERVER", ssh_server)
-        self.ssh_key_path = os.getenv("SSH_KEY_PATH", ssh_key_path)
+        self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
+        self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
         self.max_code_output_characters = max_code_output_characters
         self.code_execution_timeout = code_execution_timeout
         self.max_code_executions = max_code_executions

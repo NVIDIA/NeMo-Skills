@@ -21,7 +21,6 @@ sys.path.append(str(Path(__file__).absolute().parents[1]))
 
 from launcher import CLUSTER_CONFIG, NEMO_SKILLS_CODE, get_server_command, launch_job
 
-from nemo_skills.inference.prompt.utils import context_templates, datasets, examples_map, prompt_types
 from nemo_skills.utils import setup_logging
 
 SLURM_CMD = """
@@ -30,6 +29,7 @@ cd /code && \
 export PYTHONPATH=$PYTHONPATH:/code && \
 {server_start_cmd} && \
 if [ $SLURM_LOCALID -eq 0 ]; then \
+    pip install backoff && \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/Running on all addresses/ q' && \
     python nemo_skills/inference/generate_solutions.py \
@@ -42,7 +42,7 @@ if [ $SLURM_LOCALID -eq 0 ]; then \
         output_file=/results/output-rs{random_seed}.jsonl \
         {extra_arguments} && \
     python nemo_skills/evaluation/evaluate_results.py \
-        prediction_jsonl_files=/results/output-rs{random_seed}.jsonl && \
+        prediction_jsonl_files=/results/output-rs{random_seed}.jsonl {extra_eval_args} && \
     kill %1; \
 else \
     sleep infinity; \
@@ -104,6 +104,11 @@ if __name__ == "__main__":
         required=False,
         help="Can specify if need interactive jobs or a specific non-default partition",
     )
+    parser.add_argument(
+        "--extra_eval_args",
+        default="",
+        help="Any extra arguments to pass to nemo_skills/evaluation/evaluate_results.py",
+    )
     args, unknown = parser.parse_known_args()
 
     args.model_path = Path(args.model_path).absolute()
@@ -121,6 +126,7 @@ if __name__ == "__main__":
         "server_start_cmd": server_start_cmd,
         "num_tasks": num_tasks,
         "server_type": args.server_type,
+        "extra_eval_args": args.extra_eval_args,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
     }
 

@@ -20,7 +20,7 @@ from typing import Any
 import hydra
 from omegaconf import MISSING, OmegaConf
 
-from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.utils import get_help_message, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -30,9 +30,11 @@ LOG = logging.getLogger(__file__)
 class EvaluateResultsConfig:
     """Top-level parameters for the script"""
 
-    # this is really a str | List[str] type, but that's not supported in OmegaConf
-    # so keeping as str, since that's what comes from config
-    prediction_jsonl_files: Any = MISSING  # can specify multiple patters separated by space
+    # list of files to evaluate. Can specify multiple patterns separated by space
+    # e.g. "path/to/file1.jsonl path/to/file2.jsonl" or with regex
+    # "test_folder/output-rs*.jsonl"
+    prediction_jsonl_files: Any = MISSING
+    # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
     ignore_cache: bool = False
 
@@ -70,10 +72,15 @@ def evaluate_results(cfg: EvaluateResultsConfig):
     )
 
 
+HELP_MESSAGE = get_help_message(
+    EvaluateResultsConfig,
+    sandbox_params=sandbox_params(),
+)
+
+
 if __name__ == "__main__":
     if '--help' in sys.argv or '-h' in sys.argv:
-        help_msg = get_help_message(EvaluateResultsConfig)
-        print(help_msg)
+        print(HELP_MESSAGE)
     else:
         setup_logging()
         evaluate_results()

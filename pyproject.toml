@@ -35,6 +35,7 @@ dependencies = [
   'pyyaml',
   'numpy',
   'requests',
+  'backoff',
   'sympy',
 ]
 

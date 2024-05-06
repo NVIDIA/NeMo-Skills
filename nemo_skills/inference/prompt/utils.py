@@ -16,13 +16,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from omegaconf import OmegaConf
-
-# guarding import to allow prompt_types to be used in scripts without extra packages required
-try:
-    from omegaconf import MISSING
-except ImportError:
-    MISSING = ''
+from omegaconf import MISSING, OmegaConf
 
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
 

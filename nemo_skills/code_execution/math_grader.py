@@ -358,13 +358,3 @@ def format_intervals(prediction):
                 return f"({inner_content})"
 
     return prediction
-
-
-def _test_math_equal():
-    ref = "6,-2"
-    pred = "6"
-    print(math_equal(ref, pred))
-
-
-if __name__ == "__main__":
-    _test_math_equal()

@@ -20,7 +20,11 @@ import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+import backoff
+import requests
 
 from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 
@@ -88,6 +92,20 @@ def write_tmp_files_back(prediction_jsonl_files):
 
 
 class Sandbox(abc.ABC):
+    """Code execution sandbox.
+
+    Args:
+        host: Optional[str] = '127.0.0.1' - Host of the sandbox server.
+            Can also be specified through NEMO_SKILLS_SANDBOX_HOST env var.
+        port: Optional[str] = '5000' - Port of the sandbox server.
+            Can also be specified through NEMO_SKILLS_SANDBOX_PORT env var.
+        ssh_server: Optional[str] = None - SSH server for tunneling requests.
+            Useful if server is running on slurm cluster to which there is an ssh access.
+            Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
+        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
+            Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
+    """
+
     NOT_EXECUTED = "<not_executed>"
     EXECUTION_ERROR = "Execution error:"
     SYNTAX_ERROR = "Syntax error:"
@@ -96,13 +114,167 @@ class Sandbox(abc.ABC):
     UNDEFINED_ERROR = "Undefined error:"
     ERROR_PREFIXES = (EXECUTION_ERROR, SYNTAX_ERROR, RESULT_NOT_DEFINED_ERROR, TIMEOUT_ERROR, UNDEFINED_ERROR)
 
+    def __init__(
+        self,
+        host: Optional[str] = os.getenv("NEMO_SKILLS_SANDBOX_HOST", "127.0.0.1"),
+        port: Optional[str] = os.getenv("NEMO_SKILLS_SANDBOX_PORT", "6000"),
+        ssh_server: Optional[str] = None,
+        ssh_key_path: Optional[str] = None,
+    ):
+        self.host = host
+        self.port = port
+        self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
+        self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
+        # will keep state of code sessions
+        self.sessions = {}
+
+    def clear_session(self, session_id):
+        del self.sessions[session_id]
+
+    @backoff.on_exception(backoff.constant, requests.exceptions.Timeout, interval=1, max_tries=3)
+    def _send_request(self, request, timeout):
+        if self.ssh_server and self.ssh_key_path:
+            import sshtunnel_requests
+
+            sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
+            output = sshtunnel_request.post(
+                url=self._get_execute_url(),
+                data=json.dumps(request),
+                timeout=timeout,
+                headers={"Content-Type": "application/json"},
+            )
+        else:
+            output = requests.post(
+                url=self._get_execute_url(),
+                data=json.dumps(request),
+                timeout=timeout,
+                headers={"Content-Type": "application/json"},
+            )
+
+        return self._parse_request_output(output)
+
     @abc.abstractmethod
-    def execute_code(self, generated_code, timeout=10.0, max_output_characters=1000) -> Dict:
+    def _parse_request_output(self, output):
         pass
 
     @abc.abstractmethod
-    def is_output_correct(self, pred_output, gt_output, timeout=10.0) -> bool:
+    def _get_execute_url(self):
         pass
+
+    @abc.abstractmethod
+    def _prepare_request(self, generated_code, timeout):
+        pass
+
+    def execute_code(
+        self,
+        generated_code: str,
+        timeout: float = 10.0,
+        max_output_characters: int = 1000,
+        session_id: Optional[str] = None,
+    ) -> Tuple[Dict, str]:
+        if session_id is None:  # creating a new session with empty state
+            session_id = uuid.uuid4()
+            self.sessions[session_id] = []
+        generated_code = generated_code.replace('"""', r'\"\"\"')
+        self.sessions[session_id].append(generated_code)
+        TO_EXECUTE = """
+import traceback
+import json
+import os
+import warnings
+warnings.filterwarnings('ignore')
+os.environ['OPENBLAS_NUM_THREADS'] = '16'
+
+from IPython.core.interactiveshell import InteractiveShell
+from IPython.utils import io
+
+code_snippets = []
+"""
+        for code_snippet in self.sessions[session_id]:
+            TO_EXECUTE += f'\ncode_snippets.append("""{code_snippet}""")\n'
+
+        TO_EXECUTE += f"""
+try:
+    shell = InteractiveShell()
+    for code in code_snippets:
+        with io.capture_output() as captured:
+            exec_result = shell.run_cell(code)
+    # serializing to str to make sure things like Rational can be converted to json
+    output = f"{{captured.stdout}}{{captured.stderr}}".strip().replace("Out[1]: ", "")
+    if len(output) > {max_output_characters}:
+        output = output[:{max_output_characters}] + "<output cut>"
+    error_message = ""
+    if exec_result.error_in_exec is not None:
+        # full traceback will be part of output
+        error_message = f"{Sandbox.EXECUTION_ERROR} {{str(exec_result.error_in_exec)}}"
+    elif exec_result.error_before_exec is not None:
+        # full traceback will be part of output
+        error_message = f"{Sandbox.SYNTAX_ERROR} {{str(exec_result.error_before_exec)}}"
+    elif output == "":
+        error_message = "{Sandbox.RESULT_NOT_DEFINED_ERROR}"
+    to_return = {{"result": output, "error_message": error_message}}
+except Exception:
+    # removing useless prefix from traceback
+    to_return = {{
+        "result": None,
+        "error_message": "{Sandbox.UNDEFINED_ERROR}" + "\\n".join(traceback.format_exc().split("\\n")[3:]),
+    }}
+print(json.dumps(to_return))
+"""
+        request = self._prepare_request(TO_EXECUTE, timeout)
+        try:
+            output = self._send_request(request, timeout)
+        except requests.exceptions.Timeout:
+            output = {'result': None, 'error_message': Sandbox.TIMEOUT_ERROR}
+        # resetting state to not re-execute code with errors
+        if output['error_message']:
+            self.clear_session(session_id)
+            session_id = None
+        return output, session_id
+
+    def is_output_correct(self, pred_output, gt_output, include_percentage=True, tolerance=1e-4, timeout=10.0):
+        # embedding the full math grader code here to send to server for execution
+        with open(Path(__file__).absolute().parent / "math_grader.py", "rt") as fin:
+            math_grader_code = fin.read()
+
+        TO_EXECUTE = f"""
+import os
+import sys
+import json
+from io import StringIO
+os.environ['OPENBLAS_NUM_THREADS'] = '16'
+
+{math_grader_code}
+
+stdout = sys.stdout
+# removing all output to not capture that
+sys.stdout = sys.stderr = StringIO()
+try:
+    output = math_equal(
+        r"{pred_output}",
+        r"{gt_output}",
+        {include_percentage},
+        {tolerance},
+        {timeout},
+    )
+    error_message = ""
+except Exception as e:
+    output = False
+    error_message = str(e)
+# restoring the output to get the print
+sys.stdout = stdout
+print(json.dumps({{"result": output, "error_message": error_message}}))
+"""
+        request = self._prepare_request(TO_EXECUTE, timeout)
+        try:
+            output = self._send_request(request, timeout)
+        except requests.exceptions.Timeout:
+            output = {'result': False, 'error_message': Sandbox.TIMEOUT_ERROR}
+        if output['error_message']:
+            # logging the error
+            LOG.warning("Error during correctness check: %s", output['error_message'])
+
+        return output['result']
 
     def batch_evaluate_results(
         self,
@@ -170,107 +342,53 @@ class Sandbox(abc.ABC):
 
 
 class LocalSandbox(Sandbox):
-    """Locally hosted sandbox.
+    """Locally hosted sandbox."""
 
-    Args:
-        host: Optional[str] = '127.0.0.1' - Host of the sandbox server.
-            Can also be specified through NEMO_SKILLS_SANDBOX_HOST env var.
-        port: Optional[str] = '5000' - Port of the sandbox server.
-            Can also be specified through NEMO_SKILLS_SANDBOX_PORT env var.
-        ssh_server: Optional[str] = None - SSH server for tunneling requests.
-            Useful if server is running on slurm cluster to which there is an ssh access.
-            Can also be specified through SSH_SERVER env var.
-        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
-            Can also be specified through SSH_KEY_PATH env var.
-    """
+    def _get_execute_url(self):
+        return f"http://{self.host}:{self.port}/execute"
 
-    def __init__(
-        self,
-        host: str = os.getenv("NEMO_SKILLS_SANDBOX_HOST", "127.0.0.1"),
-        port: str = os.getenv("NEMO_SKILLS_SANDBOX_PORT", "6000"),
-        ssh_server=None,
-        ssh_key_path=None,
-    ):
-        self.host = host
-        self.port = port
-        self.ssh_server = os.getenv("SSH_SERVER", ssh_server)
-        self.ssh_key_path = os.getenv("SSH_KEY_PATH", ssh_key_path)
-        # will keep state of code sessions
-        self.sessions = {}
+    def _parse_request_output(self, output):
+        return output.json()
 
-    def clear_session(self, session_id):
-        del self.sessions[session_id]
-
-    def _send_request(self, request, timeout, endpoint):
-        if self.ssh_server and self.ssh_key_path:
-            import sshtunnel_requests
-
-            sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-            output = sshtunnel_request.put(
-                url=f"http://{self.host}:{self.port}/{endpoint}",
-                data=json.dumps(request),
-                timeout=timeout,
-                headers={"Content-Type": "application/json"},
-            )
-        else:
-            import requests
-
-            output = requests.put(
-                url=f"http://{self.host}:{self.port}/{endpoint}",
-                data=json.dumps(request),
-                timeout=timeout,
-                headers={"Content-Type": "application/json"},
-            )
-
-        return output
-
-    def execute_code(
-        self,
-        generated_code: str,
-        timeout: float = 10.0,
-        max_output_characters: int = 1000,
-        session_id: Optional[str] = None,
-    ) -> Tuple[Dict, str]:
-        import requests
-
-        if session_id is None:  # creating a new session with empty state
-            session_id = uuid.uuid4()
-            self.sessions[session_id] = []
-
-        request = {
+    def _prepare_request(self, generated_code, timeout):
+        return {
             "generated_code": generated_code,
             "timeout": timeout,
-            "max_output_characters": max_output_characters,
-            "state": self.sessions[session_id],
         }
-        try:
-            output = self._send_request(request, timeout, "execute_code").json()
-            state = output.pop("state")
-            if state is not None:
-                self.sessions[session_id] = state
-        except requests.exceptions.Timeout:
-            output = {'result': None, 'error_message': Sandbox.TIMEOUT_ERROR}
-        return output, session_id
 
-    def is_output_correct(self, pred_output, gt_output, include_percentage=True, tolerance=1e-4, timeout=10.0):
-        import requests
 
-        request = {
-            "pred_output": pred_output,
-            "gt_output": gt_output,
-            "include_percentage": include_percentage,
-            "tolerance": tolerance,
-            "timeout": timeout,
+class PistonSandbox(Sandbox):
+    """Piston sandbox (https://github.com/engineer-man/piston)"""
+
+    def _get_execute_url(self):
+        return f"{self.host}/execute"
+
+    def _parse_request_output(self, output):
+        output = output.json()
+        if output['run']['signal'] == "SIGKILL":
+            return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
+        return json.loads(output['run']['output'])
+
+    def _prepare_request(self, generated_code, timeout):
+        return {
+            "language": "py",
+            "version": "3.10.0",
+            "files": [
+                {
+                    "content": generated_code,
+                }
+            ],
+            "stdin": "",
+            "args": [],
+            "run_timeout": timeout * 1000.0,  # milliseconds
+            "compile_memory_limit": -1,
+            "run_memory_limit": -1,
         }
-        try:
-            output = self._send_request(request, timeout, "is_output_correct").json()
-        except requests.exceptions.Timeout:
-            output = False
-        return output
 
 
 sandboxes = {
     'local': LocalSandbox,
+    'piston': PistonSandbox,
 }
 
 
@@ -283,5 +401,4 @@ def get_sandbox(sandbox_type, **kwargs):
 def sandbox_params():
     """Returns sandbox documentation (to include in cmd help)."""
     prefix = f'\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}'
-    # only exposing docs for local sandbox for now. Need to change when we support other types
-    return python_doc_to_cmd_help(LocalSandbox, docs_prefix=prefix, arg_prefix="sandbox.")
+    return python_doc_to_cmd_help(Sandbox, docs_prefix=prefix, arg_prefix="sandbox.")

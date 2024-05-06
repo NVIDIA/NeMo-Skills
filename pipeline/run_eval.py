@@ -21,7 +21,13 @@ sys.path.append(str(Path(__file__).absolute().parents[1]))
 
 from launcher import CLUSTER_CONFIG, NEMO_SKILLS_CODE, WRAPPER_HELP, get_server_command, launch_job
 
-from nemo_skills.inference.generate_solutions import HELP_MESSAGE
+try:
+    from nemo_skills.inference.generate_solutions import HELP_MESSAGE
+except ImportError:
+    HELP_MESSAGE = """
+To see all supported agruments, nemo_skills package needs to be installed.
+Please note that it is not recommended to install Python packages on a slurm cluster login node.
+"""
 from nemo_skills.utils import setup_logging
 
 SCRIPT_HELP = """
@@ -35,7 +41,7 @@ in the Hydra format.
 """
 
 
-def get_greedy_cmd(benchmark, output_name='output-greedy.jsonl', extra_arguments=""):
+def get_greedy_cmd(benchmark, output_name='output-greedy.jsonl', extra_eval_args="", extra_arguments=""):
     return f"""echo "Evaluating benchmark {benchmark}" && \
 python nemo_skills/inference/generate_solutions.py \
     server.server_type={{server_type}} \
@@ -44,13 +50,18 @@ python nemo_skills/inference/generate_solutions.py \
     output_file=/results/{benchmark}/{output_name} \
     {extra_arguments} && \
 python nemo_skills/evaluation/evaluate_results.py \
-    prediction_jsonl_files=/results/{benchmark}/{output_name} && \
+    prediction_jsonl_files=/results/{benchmark}/{output_name} {extra_eval_args} && \
 """
 
 
-def get_sampling_cmd(benchmark, random_seed, extra_arguments=""):
+def get_sampling_cmd(benchmark, random_seed, extra_eval_args="", extra_arguments=""):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
-    return get_greedy_cmd(benchmark, output_name=f"output-rs{random_seed}.jsonl", extra_arguments=extra_arguments)
+    return get_greedy_cmd(
+        benchmark,
+        output_name=f"output-rs{random_seed}.jsonl",
+        extra_eval_args=extra_eval_args,
+        extra_arguments=extra_arguments,
+    )
 
 
 # default number of samples for majority voting
@@ -59,12 +70,15 @@ BENCHMARKS = {
     "math": 4,
 }
 
+# TODO: remove backoff installation after it gets into docker
+
 SLURM_CMD = """
 nvidia-smi && \
 cd /code && \
 export PYTHONPATH=$PYTHONPATH:/code && \
 {server_start_cmd} && \
 if [ $SLURM_LOCALID -eq 0 ]; then \
+    pip install backoff && \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/Running on all addresses/ q' && \
     {eval_cmds} \
@@ -104,6 +118,11 @@ if __name__ == "__main__":
         required=False,
         help="Can specify if need interactive jobs or a specific non-default partition",
     )
+    wrapper_args.add_argument(
+        "--extra_eval_args",
+        default="",
+        help="Any extra arguments to pass to nemo_skills/evaluation/evaluate_results.py",
+    )
     args, unknown = parser.parse_known_args()
 
     extra_arguments = f'{" ".join(unknown)}'
@@ -129,9 +148,12 @@ if __name__ == "__main__":
     if args.benchmarks:
         BENCHMARKS = {k: int(v) for k, v in [b.split(":") for b in args.benchmarks]}
 
-    eval_cmds = [get_greedy_cmd(benchmark, extra_arguments=extra_arguments) for benchmark in BENCHMARKS.keys()]
+    eval_cmds = [
+        get_greedy_cmd(benchmark, extra_eval_args=args.extra_eval_args, extra_arguments=extra_arguments)
+        for benchmark in BENCHMARKS.keys()
+    ]
     eval_cmds += [
-        get_sampling_cmd(benchmark, rs, extra_arguments=extra_arguments)
+        get_sampling_cmd(benchmark, rs, extra_eval_args=args.extra_eval_args, extra_arguments=extra_arguments)
         for benchmark, rs_num in BENCHMARKS.items()
         for rs in range(args.starting_seed, args.starting_seed + rs_num)
     ]

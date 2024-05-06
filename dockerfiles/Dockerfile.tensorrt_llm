@@ -30,7 +30,7 @@ RUN ["ln", "-sf", "/usr/bin/pip3", "/usr/bin/pip"]
 RUN pip install tensorrt_llm==0.8.0 -U --pre --extra-index-url https://pypi.nvidia.com
 
 # installing packages required for our server code
-RUN pip install flask flask_restful hydra-core tqdm pyyaml numpy
+RUN pip install flask flask_restful hydra-core tqdm pyyaml numpy backoff
 
 # bug fix https://github.com/NVIDIA/TensorRT-LLM/pull/1146
 RUN pip install mpmath==1.3.0

@@ -14,13 +14,11 @@
 
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
-# copying everything inside nemo_skills to make it available in the sandbox
-COPY nemo_skills /app/nemo_skills
 # registering local_sandbox_server.py as the starting point
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 # installing required packages
-RUN pip install -r /app/nemo_skills/code_execution/requirements.txt
-
+COPY nemo_skills/code_execution/requirements.txt /app
+RUN pip install -r /app/requirements.txt
 
 ARG UWSGI_CHEAPER
 ENV UWSGI_CHEAPER $UWSGI_CHEAPER

@@ -29,6 +29,9 @@ setup(
         'tqdm',
         'pyyaml',
         'numpy',
+        'requests',
+        'backoff',
+        'sympy',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
