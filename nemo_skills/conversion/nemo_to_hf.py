@@ -128,15 +128,18 @@ def convert(input_nemo_path, output_hf_path, hf_model_name, max_shard_size, prec
     heads_per_group = head_num // num_query_groups
     qkv_total_dim = head_num + 2 * num_query_groups
 
+    weight_base_name = 'model'
+    if f'{weight_base_name}.embedding.word_embeddings.weight' not in model.state_dict():
+        weight_base_name = 'model.module'
     # Embedding
-    embed_weight = model.state_dict()[f'model.embedding.word_embeddings.weight']
+    embed_weight = model.state_dict()[f'{weight_base_name}.embedding.word_embeddings.weight']
     embed_weights_base_name = f'model.embed_tokens.weight'
     checkpoint[embed_weights_base_name] = param_to_weights(embed_weight)
 
     for l in range(int(num_layers)):
         print(f"converting layer {l}")
 
-        qkv_weights = model.state_dict()[f'model.decoder.layers.{l}.self_attention.linear_qkv.weight']
+        qkv_weights = model.state_dict()[f'{weight_base_name}.decoder.layers.{l}.self_attention.linear_qkv.weight']
         qkv_weights = qkv_weights.reshape([qkv_total_dim, head_size, hidden_size])
 
         q_slice = torch.cat(
@@ -166,12 +169,12 @@ def convert(input_nemo_path, output_hf_path, hf_model_name, max_shard_size, prec
         checkpoint[v_weights_base_name] = param_to_weights(qkv_weights[v_slice].reshape(-1, hidden_size))
 
         # attention dense
-        o_weight = model.state_dict()[f'model.decoder.layers.{l}.self_attention.linear_proj.weight']
+        o_weight = model.state_dict()[f'{weight_base_name}.decoder.layers.{l}.self_attention.linear_proj.weight']
         o_weight_base_name = f'model.layers.{l}.self_attn.o_proj.weight'
         checkpoint[o_weight_base_name] = param_to_weights(o_weight)
 
         # mlp
-        mlp_weights = model.state_dict()[f'model.decoder.layers.{l}.mlp.linear_fc1.weight']
+        mlp_weights = model.state_dict()[f'{weight_base_name}.decoder.layers.{l}.mlp.linear_fc1.weight']
         mlp_down_proj_weight = mlp_weights[:ffn_hidden_size, :]
         mlp_gate_proj_weight = mlp_weights[ffn_hidden_size:, :]
 
@@ -181,26 +184,30 @@ def convert(input_nemo_path, output_hf_path, hf_model_name, max_shard_size, prec
         checkpoint[mlp_down_proj_base_name] = param_to_weights(mlp_down_proj_weight)
         checkpoint[mlp_gate_proj_base_name] = param_to_weights(mlp_gate_proj_weight)
 
-        mlp_up_proj_weight = model.state_dict()[f'model.decoder.layers.{l}.mlp.linear_fc2.weight']
+        mlp_up_proj_weight = model.state_dict()[f'{weight_base_name}.decoder.layers.{l}.mlp.linear_fc2.weight']
         mlp_up_proj_base_name = f'model.layers.{l}.mlp.down_proj.weight'
         checkpoint[mlp_up_proj_base_name] = param_to_weights(mlp_up_proj_weight)
 
         # layernorm
-        input_ln_weight = model.state_dict()[f'model.decoder.layers.{l}.self_attention.linear_qkv.layer_norm_weight']
+        input_ln_weight = model.state_dict()[
+            f'{weight_base_name}.decoder.layers.{l}.self_attention.linear_qkv.layer_norm_weight'
+        ]
         input_ln_base_name = f'model.layers.{l}.input_layernorm.weight'
         checkpoint[input_ln_base_name] = param_to_weights(input_ln_weight)
 
-        post_attn_ln_weight = model.state_dict()[f'model.decoder.layers.{l}.mlp.linear_fc1.layer_norm_weight']
+        post_attn_ln_weight = model.state_dict()[
+            f'{weight_base_name}.decoder.layers.{l}.mlp.linear_fc1.layer_norm_weight'
+        ]
         post_attn_ln_base_name = f'model.layers.{l}.post_attention_layernorm.weight'
         checkpoint[post_attn_ln_base_name] = param_to_weights(post_attn_ln_weight)
 
         print(f"done layer {l}")
 
-    final_ln_weight = model.state_dict()[f'model.decoder.final_layernorm.weight']
+    final_ln_weight = model.state_dict()[f'{weight_base_name}.decoder.final_layernorm.weight']
     final_ln_base_name = f'model.norm.weight'
     checkpoint[final_ln_base_name] = param_to_weights(final_ln_weight)
 
-    output_layer_weight = model.state_dict()[f'model.output_layer.weight']
+    output_layer_weight = model.state_dict()[f'{weight_base_name}.output_layer.weight']
     output_layer_base_name = f'lm_head.weight'
     checkpoint[output_layer_base_name] = param_to_weights(output_layer_weight)
 
