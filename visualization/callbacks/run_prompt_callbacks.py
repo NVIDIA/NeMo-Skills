@@ -246,7 +246,9 @@ def update_examples(
             SEPARATOR_ID.join(field.split(SEPARATOR_DISPLAY)),
             "value",
         )
-        for field in get_utils_from_config({"prompt": asdict(PromptConfig(FewShotExamples()))}).keys()
+        for field in get_utils_from_config(
+            {"prompt": asdict(PromptConfig(few_shot_examples=FewShotExamples()))}
+        ).keys()
     ]
     + [
         Output("js_container", "children", allow_duplicate=True),
@@ -268,7 +270,7 @@ def update_prompt_type(prompt_type: str, js_trigger: str) -> Union[NoUpdate, dbc
         if os.path.splitext(file)[1] == '.yaml'
     ]
     if prompt_type not in prompt_types:
-        output_len = len(get_utils_from_config(asdict(PromptConfig(FewShotExamples()))).keys())
+        output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamples()))).keys())
         return [no_update] * (output_len + 2)
     prompt_config = get_prompt_config(prompt_type)
     current_app.config['data_explorer']['prompt']['stop_phrases'] = list(prompt_config.stop_phrases)

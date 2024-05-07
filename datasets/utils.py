@@ -32,7 +32,7 @@ def prepare_for_sft(data, prompt_type, dataset):
     prepared_data = []
     for original_elem in data:
         elem = {}
-        elem["input"] = str(Prompt(prompt_config, original_elem))
+        elem["input"] = str(Prompt(config=prompt_config, input_dict=original_elem))
         # note that the loss will not be meaningful,
         # since our solution format is different, but we need to populate that field
         elem["output"] = original_elem['reference_solution']

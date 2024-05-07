@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import Dict, Tuple
 
 import hydra
 
 from nemo_skills.code_execution.utils import CODE_OUTPUT_SEPARATORS, CODE_SEPARATORS
 from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig
-from nemo_skills.utils import unroll_files
+from nemo_skills.utils import nested_dataclass, unroll_files
 
 
-@dataclass
+@nested_dataclass
 class BaseVisualizationConfig:
     model_prediction: Dict[str, str] = field(default_factory=dict)
 
@@ -38,7 +38,7 @@ class BaseVisualizationConfig:
         }
 
 
-@dataclass
+@nested_dataclass
 class VisualizationConfig(GenerateSolutionsConfig):
     visualization_params: BaseVisualizationConfig = field(default_factory=BaseVisualizationConfig)
 

@@ -20,7 +20,38 @@ import re
 import sys
 import tokenize
 import typing
-from dataclasses import MISSING, fields, is_dataclass
+from dataclasses import MISSING, dataclass, fields, is_dataclass
+
+
+def nested_dataclass(*args, **kwargs):
+    """Decorator that will recursively instantiate all nested dataclasses.
+
+    Adapted from https://www.geeksforgeeks.org/creating-nested-dataclass-objects-in-python/.
+    """
+
+    def wrapper(check_class):
+        from omegaconf.dictconfig import DictConfig
+
+        # passing class to investigate
+        check_class = dataclass(check_class, **kwargs)
+        orig_init = check_class.__init__
+
+        def __init__(self, *, _init_nested=False, **kwargs):
+            if _init_nested:
+                for name, value in kwargs.items():
+                    # getting field type
+                    ft = check_class.__annotations__.get(name, None)
+
+                    if is_dataclass(ft) and isinstance(value, (dict, DictConfig)):
+                        obj = ft(**value, _init_nested=_init_nested)
+                        kwargs[name] = obj
+            orig_init(self, **kwargs)
+
+        check_class.__init__ = __init__
+
+        return check_class
+
+    return wrapper(args[0]) if args else wrapper
 
 
 def unroll_files(prediction_jsonl_files):

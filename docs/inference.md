@@ -70,7 +70,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
         "hip-hop dance. What percentage of the entire students enrolled in hip-hop dance?"
     )
     # can provide multiple requests
-    prompts = [Prompt(prompt_config, input_dict={'question': question})]
+    prompts = [Prompt(config=prompt_config, input_dict={'question': question})]
 
     # can provide different inference parameters here
     inference_cfg = InferenceConfig(temperature=0)  # greedy

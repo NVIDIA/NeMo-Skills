@@ -18,7 +18,7 @@ import os
 import random
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import field
 from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -27,18 +27,18 @@ import hydra
 import numpy as np
 import tqdm
 import yaml
-from omegaconf import MISSING, OmegaConf
+from omegaconf import MISSING
 
 sys.path.append(str(Path(__file__).absolute().parents[2]))
 
 from nemo_skills.finetuning.filtering_utils import downsample_data, process_bad_solutions
 from nemo_skills.inference.prompt.utils import Prompt, PromptConfig
-from nemo_skills.utils import get_help_message, setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
 
 # TODO: this should be done as a pipeline with different filterings / downsampling
-#       ideally directly use SDP for this
+#       ideally directly use nemo curator for this
 
 
 def get_default_prompt_config():
@@ -48,14 +48,14 @@ def get_default_prompt_config():
         "rt",
         encoding="utf-8",
     ) as fin:
-        prompt_config = PromptConfig(**yaml.safe_load(fin))
+        prompt_config = PromptConfig(_init_nested=True, **yaml.safe_load(fin))
     prompt_config.context_type = "empty"
     prompt_config.few_shot_examples.examples_type = "gsm8k_text_with_code"  # not used since num_few_shots = 0
     prompt_config.few_shot_examples.num_few_shots = 0
     return prompt_config
 
 
-@dataclass
+@nested_dataclass
 class PrepareSFTDataConfig:
     """Top-level parameters for the script"""
 
@@ -147,7 +147,7 @@ cs.store(name="base_prepare_sft_data_config", node=PrepareSFTDataConfig)
 
 @hydra.main(version_base=None, config_name="base_prepare_sft_data_config")
 def prepare_sft_data(cfg: PrepareSFTDataConfig):
-    cfg = OmegaConf.to_object(cfg)
+    cfg = PrepareSFTDataConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
     data_size = None
@@ -176,7 +176,7 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
             # including all fields in case they are useful for training
             elem = sample.copy()
             # NeMo requires input/output fields
-            elem["input"] = str(Prompt(cfg.prompt, {"question": question}))
+            elem["input"] = str(Prompt(config=cfg.prompt, input_dict={"question": question}))
             elem["output"] = elem.pop("generated_solution")
             elem.update(cfg.metadata)
             prepared_data.append(elem)

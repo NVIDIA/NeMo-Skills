@@ -14,19 +14,19 @@
 
 import logging
 import sys
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import Any
 
 import hydra
-from omegaconf import MISSING, OmegaConf
+from omegaconf import MISSING
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.utils import get_help_message, setup_logging
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
 
-@dataclass
+@nested_dataclass
 class EvaluateResultsConfig:
     """Top-level parameters for the script"""
 
@@ -57,7 +57,7 @@ cs.store(name="base_evaluate_results_config", node=EvaluateResultsConfig)
 
 @hydra.main(version_base=None, config_name="base_evaluate_results_config")
 def evaluate_results(cfg: EvaluateResultsConfig):
-    cfg = OmegaConf.to_object(cfg)
+    cfg = EvaluateResultsConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
     sandbox = get_sandbox(**cfg.sandbox)

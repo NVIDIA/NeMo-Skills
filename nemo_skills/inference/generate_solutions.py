@@ -15,23 +15,22 @@
 import json
 import logging
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import hydra
-from omegaconf import OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.prompt.utils import Prompt, PromptConfig, datasets, prompt_types
 from nemo_skills.inference.server.model import ErrorRecoveryConfig, get_model, server_params
-from nemo_skills.utils import get_fields_docstring, get_help_message, setup_logging
+from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
 
-@dataclass
+@nested_dataclass
 class InferenceConfig:
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = 0
@@ -41,7 +40,7 @@ class InferenceConfig:
     repetition_penalty: float = 1.0
 
 
-@dataclass
+@nested_dataclass
 class GenerateSolutionsConfig:
     """Top-level parameters for the script"""
 
@@ -88,7 +87,7 @@ cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
 
 @hydra.main(version_base=None, config_name='generation_config', config_path='.')
 def generate_solutions(cfg: GenerateSolutionsConfig):
-    cfg = OmegaConf.to_object(cfg)
+    cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
 
     LOG.info("Config used: %s", cfg)
     sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
@@ -125,7 +124,7 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
             if idx == cfg.max_samples:
                 break
 
-            prompts.append(Prompt(cfg.prompt, data_point, example_dicts=cfg.example_dicts))
+            prompts.append(Prompt(config=cfg.prompt, input_dict=data_point, example_dicts=cfg.example_dicts))
 
             data_points.append(data_point)
 

@@ -114,7 +114,7 @@ the [quick start](#quick-start) section.
      ++dataset=gsm8k \
      ++split_name=test \
      ++server.server_type=nemo \
-     ++server.host=<IP from the step above>
+     ++server.host=<IP from the step above> \
      ++sandbox.host=<Sandbox IP from the sandbox launch step>
    ```
 
