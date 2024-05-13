@@ -166,6 +166,7 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
     prepared_data = []
     total_covered = 0
     samples_per_question = []
+    # only looping over the correct samples (unless asked for incorrect)
     for question, samples in tqdm.tqdm(grouped_samples.items()):
         filtered_solutions = process_bad_solutions(samples, cfg.filters, cfg.text_filter_type, cfg.trim_solutions)
 
@@ -182,6 +183,11 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
             prepared_data.append(elem)
 
     samples_per_question = np.array(samples_per_question)
+    # adding questions that don't have any samples in grouped_samples
+    if data_size > len(samples_per_question):
+        samples_per_question = np.concatenate(
+            [samples_per_question, np.zeros(data_size - len(samples_per_question), dtype=int)]
+        )
     LOG.info("Total SFT entries: %d", len(prepared_data))
     if data_size is not None:
         LOG.info("Dataset coverage: %.2f%%", 100 * total_covered / data_size)
