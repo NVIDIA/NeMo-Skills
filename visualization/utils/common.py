@@ -214,18 +214,29 @@ def get_utils_from_config(cfg: Dict, display_path: bool = True) -> Dict:
     }
 
 
-def get_stats(all_files_data: List[Dict], is_correct: bool = True) -> float:
-    right = 0
-    for data in all_files_data:
-        right += data.get("is_correct", not is_correct) == is_correct
+def get_stats(all_files_data: List[Dict]) -> Tuple[float, float, float]:
+    """Returns the percentage of correct, wrong, and no response answers in the given data.
 
-    return right / len(all_files_data) if len(all_files_data) else -1
+    If not data is provided, returns -1 for all values.
+    """
+    correct = 0
+    wrong = 0
+    no_response = 0
+    for data in all_files_data:
+        if data.get("predicted_answer") is None:
+            no_response += 1
+        elif data.get("is_correct", False):
+            correct += 1
+        else:
+            wrong += 1
+
+    if len(all_files_data):
+        return correct / len(all_files_data), wrong / len(all_files_data), no_response / len(all_files_data)
+    return -1, -1, -1
 
 
 def get_metrics(all_files_data: List[Dict], errors_dict: Dict = {}) -> Dict:
-    correct_responses = get_stats(all_files_data, True)
-    wrong_responses = get_stats(all_files_data, False)
-    no_response = 1.0 - correct_responses - wrong_responses
+    correct_responses, wrong_responses, no_response = get_stats(all_files_data)
     custom_stats = {}
     for name, func in get_custom_stats().items():
         if name not in errors_dict:
