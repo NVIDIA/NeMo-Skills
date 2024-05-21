@@ -141,14 +141,14 @@ def prepare_masked_data(cfg: PrepareMaskedDataConfig):
 
             # Replace reference solution with masked solution
             train_instance["reference_solution"] = ref_soln
-            train_instance["reference_masked_solution"] = cand_soln
+            train_instance["masked_reference_solution"] = cand_soln
 
             if cand_soln == "":
                 # Masked solution length is too different from the reference solution
                 cand_soln = ref_soln
                 problematic_instances += 1
 
-            train_instance["reference_masked_solution"] = cand_soln
+            train_instance["masked_reference_solution"] = cand_soln
             output_f.write(json.dumps(train_instance) + '\n')
 
         LOG.info("Answer not masked soln: %d", answer_not_masked_instance)

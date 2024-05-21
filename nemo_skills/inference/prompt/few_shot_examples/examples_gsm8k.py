@@ -16,6 +16,7 @@ text_with_code = [
     {
         "question": "Missy had a giant piggy bank in her bedroom.  Every day she would search the house for change to put in her bank.  After 4 years, the bank was opened and it contained $450 in change.  If the second, third, and fourth-year she doubled the amount of money she put in the bank from the amount she had put in the previous year, how much money, in dollars, did she put in the bank the first year?",
         "reference_solution": "We let x be the amount of money she put in the bank the first year.\nThen the second year was 2*x, \nand the third year was 2*2*x=4*x,\nand the fourth year was 2*2*2*x=8*x.\nAnd the total amount she put in the bank, $450, is the sum of all four years, or $450 = x+(2*x)+(4*x)+(8*x).\nThis simplifies to $450=15*x.\nAnd therefore, the amount of money she put in the bank the first year was x=$30.",
+        "masked_reference_solution": "We let x be the amount of money she put in the bank the first year,\nThen the second year was 2*x,\nand the third year was 2*2*x=M*x,\nand the fourth year was 2*2*2*x=N*x.\nAnd the total amount she put in the bank, $450, is the sum of all four years, or $450 = x+(2*x)+(M*x)+(N*x).\nThis simplifies to $450=(1 + 2 + M + N)*x.\nAnd therefore, the amount of money she put in the bank the first year was x=P dollars.",
         "generated_solution": """
 Missy started with some amount of money in the first year.
 She was then doubling the amount of money every year for 4 years and ended up with $450.
@@ -39,6 +40,7 @@ Thus Missy put \\boxed{30} dollars in the bank the first year.
     {
         "question": "Pete has to take a 10-minute walk down to the train station and then board a 1hr 20-minute train to LA. When should he leave if he cannot get to LA later than 0900 hours? (24-hr time)",
         "reference_solution": "There are 60 minutes in an hour so 1 hour 20 minutes = (60+20) minutes = 80 minutes\nHe will spend a total of 80+10 = 90 minutes\n90 minutes is = (60/60) hours and 30 minutes = 1 hour 30 minutes = 0130 in 24-hr time\nHe has to leave 0130 hours earlier than 0900 i.e. 0900-0130 = 0730 hours",
+        "masked_reference_solution": "There are 60 minutes in an hour so 1 hour 20 minutes = M minutes\nHe will spend a total of M+10 = N minutes\nN minutes is = O hours and P minutes = O hour P minutes = Q in 24-hr time\nHe has to leave Q hours earlier than 0900 i.e. 0900-Q = R hours",
         "generated_solution": """
 Since Pete needs to take a 10 minutes walk and then a 1 hour 20 minutes train ride, he will spend a total of 1 hour and 30 minutes.
 This means that he needs to leave 1 hour and 30 minutes earlier than 09:00 hours.
@@ -48,6 +50,7 @@ Subtracting 1 hour and 30 minutes from 09:00 hours we get \\boxed{07:30} hours.
     {
         "question": "Mark deposited $88 in a bank. Bryan deposited $40 less than five times as much as Mark. How much did Bryan deposit in the bank?",
         "reference_solution": "Five times the amount Mark deposited is $88 x 5 = $440.\nSo, Bryan deposited $440 - $40 = $400.",
+        "masked_reference_solution": "Five times the amount Mark deposited is $88 x 5 = $M.\nSo, Mark deposited $M - $40 = $N.",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -65,6 +68,7 @@ So Bryan deposited \\boxed{400} dollars in the bank.
     {
         "question": "A department store displays a 20% discount on all fixtures. What will be the new price of a 25 cm high bedside lamp that was worth $120?",
         "reference_solution": "The amount of the discount is $120 x 0.2 = $24.\nThe new price will be $120 \u2013 $24 = $96.",
+        "masked_reference_solution": "The amount of the discount is $120 x 0.2 = $M.\nThe new price will be $120 \u2013 $M = $N.",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -84,6 +88,7 @@ So the new price of the lamp is \\boxed{96} dollars.
     {
         "question": "James opens up a flower shop.  He needs to pay rent of $1200 a week with an additional 20% of rent to pay for utilities and he has 2 employees per shift with the store open 16 hours a day for 5 days a week.  If he pays each employee $12.50 an hour, what are his weekly expenses to run the store?",
         "reference_solution": "He is open 16*5=80 hours a week.\nSo he pays each of his employees 12.5*80=$1000 per week.\nSince there are two employees, he pays them in total 2 * $1000 = $2000 per week.\nThe utilities cost 1200*.2=$240.\nSo his total cost per week is 1200+2000+240=$3440",
+        "masked_reference_solution": "He is open 16*5=M hours a week\nSo he pays each of his employees 12.5*M=$N per week\nSince there are two employees, he pays them in total 2 * $N = $O per week.\nThe utilities cost 1200*.2=$P\nSo his total cost per week is 1200+O+P=$Q",
         "generated_solution": """
 The cost consists of rent, utilities, and employee salaries. Let's compute each of them separately and then add them up.
 {start_code}
@@ -179,7 +184,7 @@ only_code = [
     {
         "question": "Very early this morning, Elise left home in a cab headed for the hospital. Fortunately, the roads were clear, and the cab company only charged her a base price of $3, and $4 for every mile she traveled. If Elise paid a total of $23, how far is the hospital from her house?",
         "reference_solution": "For the distance she traveled, Elise paid 23 - 3 = 20 dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is 20/4 = 5 miles.\nAnswer is 5",
-        "reference_masked_solution": "For the distance she traveled, Elise paid 23 - 3 = M dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is M/4 = N miles.\nAnswer is N",
+        "masked_reference_solution": "For the distance she traveled, Elise paid 23 - 3 = M dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is M/4 = N miles.\nAnswer is N",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -199,7 +204,7 @@ Thus the hospital is \\boxed{5} miles from Elise's house.
     {
         "question": "Pete has to take a 10-minute walk down to the train station and then board a 1hr 20-minute train to LA. When should he leave if he cannot get to LA later than 0900 hours? (24-hr time)",
         "reference_solution": "There are 60 minutes in an hour so 1 hour 20 minutes = (60+20) minutes = 80 minutes\nHe will spend a total of 80+10 = 90 minutes\n90 minutes is = (60/60) hours and 30 minutes = 1 hour 30 minutes = 0130 in 24-hr time\nHe has to leave 0130 hours earlier than 0900 i.e. 0900-0130 = 0730 hours",
-        "reference_masked_solution": "There are 60 minutes in an hour so 1 hour 20 minutes = (60+20) minutes = M minutes\nHe will spend a total of M+10 = N minutes\nN minutes is = (60/60) hours and O minutes = P hour O minutes = Q in 24-hr time\nHe has to leave Q hours earlier than 0900 i.e. 0900-Q = R hours",
+        "masked_reference_solution": "There are 60 minutes in an hour so 1 hour 20 minutes = (60+20) minutes = M minutes\nHe will spend a total of M+10 = N minutes\nN minutes is = (60/60) hours and O minutes = P hour O minutes = Q in 24-hr time\nHe has to leave Q hours earlier than 0900 i.e. 0900-Q = R hours",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -225,7 +230,7 @@ So Pete needs to leave by \\boxed{07:30} to reach LA in time.
     {
         "question": "Mark deposited $88 in a bank. Bryan deposited $40 less than five times as much as Mark. How much did Bryan deposit in the bank?",
         "reference_solution": "Five times the amount Mark deposited is $88 x 5 = $440.\nSo, Bryan deposited $440 - $40 = $400.",
-        "reference_masked_solution": "Five times the amount Mark deposited is $88 x 5 = M.\nSo, Bryan deposited M - $40 = N.",
+        "masked_reference_solution": "Five times the amount Mark deposited is $88 x 5 = M.\nSo, Bryan deposited M - $40 = N.",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -243,7 +248,7 @@ So Bryan deposited \\boxed{400} dollars in the bank.
     {
         "question": "A department store displays a 20% discount on all fixtures. What will be the new price of a 25 cm high bedside lamp that was worth $120?",
         "reference_solution": "The amount of the discount is $120 x 0.2 = $24.\nThe new price will be $120 \u2013 $24 = $96.",
-        "reference_masked_solution": "The amount of the discount is $120 x 0.2 = M.\nThe new price will be $120 \u2013 M = N.",
+        "masked_reference_solution": "The amount of the discount is $120 x 0.2 = M.\nThe new price will be $120 \u2013 M = N.",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -263,7 +268,7 @@ So the new price of the lamp is \\boxed{96} dollars.
     {
         "question": "James opens up a flower shop.  He needs to pay rent of $1200 a week with an additional 20% of rent to pay for utilities and he has 2 employees per shift with the store open 16 hours a day for 5 days a week.  If he pays each employee $12.50 an hour, what are his weekly expenses to run the store?",
         "reference_solution": "He is open 16*5=80 hours a week.\nSo he pays each of his employees 12.5*80=$1000 per week.\nSince there are two employees, he pays them in total 2 * $1000 = $2000 per week.\nThe utilities cost 1200*.2=$240.\nSo his total cost per week is 1200+2000+240=$3440",
-        "reference_masked_solution": "He is open 16 * 5 = M hours a week.\nSo he pays each of his employees 12.5 * M = N per week.\nSince there are two employees, he pays them in total 2 * N = O per week.\nThe utilities cost 1200 * .2 = P.\nSo his total cost per week is 1200 + O + P = Q",
+        "masked_reference_solution": "He is open 16 * 5 = M hours a week.\nSo he pays each of his employees 12.5 * M = N per week.\nSince there are two employees, he pays them in total 2 * N = O per week.\nThe utilities cost 1200 * .2 = P.\nSo his total cost per week is 1200 + O + P = Q",
         "generated_solution": """
 The cost consists of rent, utilities, and employee salaries. Let's compute each of them separately and then add them up.
 {start_code}
@@ -295,7 +300,7 @@ only_sympy = [
     {
         "question": 'A farmer is selling ducks and chickens at the market. He sells ducks for $10 and chickens for $8. He sells 5 chickens and some ducks. He then spends half his earnings on a new wheelbarrow. After buying it, someone sees it and agrees to pay the farmer double what the farmer paid and the farmer earns another $60. How many ducks did the farmer sell?',
         "reference_solution": "The wheelbarrow cost $30 because 60 / 2 = 30. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned $40 selling chickens because 5 x 8 = 40. The farmer earned $20 selling ducks because 60 - 40 = 20. The farmer sold 2 ducks because 20 / 10 = 2",
-        "reference_masked_solution": "The wheelbarrow cost M because 60 / 2 = M. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned N selling chickens because 5 x 8 = N. The farmer earned O selling ducks because 60 - N = O. The farmer sold P ducks because O / 10 = P",
+        "masked_reference_solution": "The wheelbarrow cost M because 60 / 2 = M. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned N selling chickens because 5 x 8 = N. The farmer earned O selling ducks because 60 - N = O. The farmer sold P ducks because O / 10 = P",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -325,7 +330,7 @@ Thus the farmer sold \\boxed{2} ducks.
     {
         "question": 'Yvonne brings a box of chocolates to school. Half have nuts and half do not. The students eat 80% of the ones with nuts and eat half of the ones without nuts. If there are 28 chocolates left, how many chocolates were in the box?',
         "reference_solution": "The ones with nuts that they ate was 40% of the box because 80% x .5 = 40%. The ones without nuts that they ate equaled 25% of the box because 50% x .5 = 25%. They ate 65% of the box because 40 + 25 = 65. They left 35% of the box because 100 - 65 = 35. The box had 80 chocolates because 28 / .35 = 80",
-        "reference_masked_solution": "The ones with nuts that they ate was M% of the box because 80% x .5 = M%. The ones without nuts that they ate equaled N% of the box because 50% x .5 = N%. They ate O% of the box because M + N = O. They left P% of the box because 100 - O = P. The box had 80 chocolates because 28 / (P/100) = 80",
+        "masked_reference_solution": "The ones with nuts that they ate was M% of the box because 80% x .5 = M%. The ones without nuts that they ate equaled N% of the box because 50% x .5 = N%. They ate O% of the box because M + N = O. They left P% of the box because 100 - O = P. The box had 80 chocolates because 28 / (P/100) = 80",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -352,7 +357,7 @@ Thus there were \\boxed{80} chocolates in the box.
     {
         "question": 'There are some jelly beans in a jar. Three fourths of the jelly beans are red, and one quarter of the red jelly beans are coconut flavored. If 750 jelly beans are coconut flavored, how many jelly beans are there in the jar?',
         "reference_solution": "There are 750*4=3000 red jelly beans. There are 3000/3*4=4000 jelly beans in the jar.",
-        "reference_masked_solution": "There are 750*4=M red jelly beans. There are M/3*4=N jelly beans in the jar.",
+        "masked_reference_solution": "There are 750*4=M red jelly beans. There are M/3*4=N jelly beans in the jar.",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -380,7 +385,7 @@ Thus there are \\boxed{4000} jelly beans in the jar.
     {
         "question": 'Abigail spent 60% of her money on food, and 25% of the remainder on her phone bill. After spending $20 on entertainment, she is left with $40. How much money did Abigail have initially?',
         "reference_solution": "Abigail had $20 + $40 = $60 left after paying her phone bill. The $60 is 100% - 25% = 75% of the remainder of her money after spending for food. Since 75% is $60, then 1% is $60/75 = $0.80. Thus, Abigail had $0.80 x 100 = $80 left after she spent money on food. The $80 is 100% - 60% = 40% of her original money. So 1% is $80/40 = $2. Therefore, Abigail initially had $2 x 100 = $200.",
-        "reference_masked_solution": "Abigail had $20 + $40 = M left after paying her phone bill. The M is 100% - 25% = N% of the remainder of her money after spending for food. Since N% is $60, then 1% is $60/75 = O. Thus, Abigail had O x 100 = P left after she spent money on food. The P is 100% - 60% = Q% of her original money. So 1% is $80/40 = R. Therefore, Abigail initially had R x 100 = S.",
+        "masked_reference_solution": "Abigail had $20 + $40 = M left after paying her phone bill. The M is 100% - 25% = N% of the remainder of her money after spending for food. Since N% is $60, then 1% is $60/75 = O. Thus, Abigail had O x 100 = P left after she spent money on food. The P is 100% - 60% = Q% of her original money. So 1% is $80/40 = R. Therefore, Abigail initially had R x 100 = S.",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -410,7 +415,7 @@ Thus, Abigail initially had \\boxed{200} dollars.
     {
         'question': 'In five years, Grant will be 2/3 the age of the hospital that he is hired into. If Grant is currently 25 years old, how old is the hospital now?',
         'reference_solution': "If Grant is currently 25 years old, he will be 25+5 = 30 years old in five years. If 2/3 represents Grant's age in five years, then the fraction representing the number of years the hospital is older than Grant is 1-2/3 = 1/3. If 2/3 represents 30 years, 3/3, which is the fraction representing the age of the hospital, represents 3/3*30*3/2 = 45 years. Currently, the hospital is 45-5 = 40 years old.",
-        'reference_masked_solution': "If Grant is currently 25 years old, he will be 25+5 = M years old in five years. If 2/3 represents 30 years, 3/3, which is the fraction representing the age of the hospital, represents 30*3/2 = O years. Currently, the hospital is O-5 = P years old.",
+        'masked_reference_solution': "If Grant is currently 25 years old, he will be 25+5 = M years old in five years. If 2/3 represents 30 years, 3/3, which is the fraction representing the age of the hospital, represents 30*3/2 = O years. Currently, the hospital is O-5 = P years old.",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -441,7 +446,7 @@ code_with_sympy = [
     {
         "question": "Very early this morning, Elise left home in a cab headed for the hospital. Fortunately, the roads were clear, and the cab company only charged her a base price of $3, and $4 for every mile she traveled. If Elise paid a total of $23, how far is the hospital from her house?",
         "reference_solution": "For the distance she traveled, Elise paid 23 - 3 = 20 dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is 20/4 = 5 miles.\nAnswer is 5",
-        "reference_masked_solution": "For the distance she traveled, Elise paid 23 - 3 = M dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is M/4 = N miles.\nAnswer is N",
+        "masked_reference_solution": "For the distance she traveled, Elise paid 23 - 3 = M dollars\nSince the cost per mile is $4, the distance from Elise\u2019s house to the hospital is M/4 = N miles.\nAnswer is N",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -461,7 +466,7 @@ Thus the hospital is \\boxed{5} miles from Elise's house.
     {
         "question": "A department store displays a 20% discount on all fixtures. What will be the new price of a 25 cm high bedside lamp that was worth $120?",
         "reference_solution": "The amount of the discount is $120 x 0.2 = $24.\nThe new price will be $120 \u2013 $24 = $96.",
-        "reference_masked_solution": "The amount of the discount is $120 x 0.2 = M.\nThe new price will be $120 \u2013 M = N.",
+        "masked_reference_solution": "The amount of the discount is $120 x 0.2 = M.\nThe new price will be $120 \u2013 M = N.",
         "generated_solution": """
 Let's solve this problem using Python code.
 {start_code}
@@ -481,7 +486,7 @@ So the new price of the lamp is \\boxed{96} dollars.
     {
         "question": 'A farmer is selling ducks and chickens at the market. He sells ducks for $10 and chickens for $8. He sells 5 chickens and some ducks. He then spends half his earnings on a new wheelbarrow. After buying it, someone sees it and agrees to pay the farmer double what the farmer paid and the farmer earns another $60. How many ducks did the farmer sell?',
         "reference_solution": "The wheelbarrow cost $30 because 60 / 2 = 30. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned $40 selling chickens because 5 x 8 = 40. The farmer earned $20 selling ducks because 60 - 40 = 20. The farmer sold 2 ducks because 20 / 10 = 2",
-        "reference_masked_solution": "The wheelbarrow cost M because 60 / 2 = M. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned N selling chickens because 5 x 8 = N. The farmer earned O selling ducks because 60 - N = O. The farmer sold P ducks because O / 10 = P",
+        "masked_reference_solution": "The wheelbarrow cost M because 60 / 2 = M. The farmer earned $60 from selling fowl because 30 / (1/2) = 60. The farmer earned N selling chickens because 5 x 8 = N. The farmer earned O selling ducks because 60 - N = O. The farmer sold P ducks because O / 10 = P",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
@@ -511,7 +516,7 @@ Thus the farmer sold \\boxed{2} ducks.
     {
         "question": "James opens up a flower shop.  He needs to pay rent of $1200 a week with an additional 20% of rent to pay for utilities and he has 2 employees per shift with the store open 16 hours a day for 5 days a week.  If he pays each employee $12.50 an hour, what are his weekly expenses to run the store?",
         "reference_solution": "He is open 16*5=80 hours a week.\nSo he pays each of his employees 12.5*80=$1000 per week.\nSince there are two employees, he pays them in total 2 * $1000 = $2000 per week.\nThe utilities cost 1200*.2=$240.\nSo his total cost per week is 1200+2000+240=$3440",
-        "reference_masked_solution": "He is open 16 * 5 = M hours a week.\nSo he pays each of his employees 12.5 * M = N per week.\nSince there are two employees, he pays them in total 2 * N = O per week.\nThe utilities cost 1200 * .2 = P.\nSo his total cost per week is 1200 + O + P = Q",
+        "masked_reference_solution": "He is open 16 * 5 = M hours a week.\nSo he pays each of his employees 12.5 * M = N per week.\nSince there are two employees, he pays them in total 2 * N = O per week.\nThe utilities cost 1200 * .2 = P.\nSo his total cost per week is 1200 + O + P = Q",
         "generated_solution": """
 The cost consists of rent, utilities, and employee salaries. Let's compute each of them separately and then add them up.
 Let's solve this problem using Python code.
@@ -540,7 +545,7 @@ Thus James's weekly expenses add up to \\boxed{3440} dollars.
     {
         "question": 'Yvonne brings a box of chocolates to school. Half have nuts and half do not. The students eat 80% of the ones with nuts and eat half of the ones without nuts. If there are 28 chocolates left, how many chocolates were in the box?',
         "reference_solution": "The ones with nuts that they ate was 40% of the box because 80% x .5 = 40%. The ones without nuts that they ate equaled 25% of the box because 50% x .5 = 25%. They ate 65% of the box because 40 + 25 = 65. They left 35% of the box because 100 - 65 = 35. The box had 80 chocolates because 28 / .35 = 80",
-        "reference_masked_solution": "The ones with nuts that they ate was M% of the box because 80% x .5 = M%. The ones without nuts that they ate equaled N% of the box because 50% x .5 = N%. They ate O% of the box because M + N = O. They left P% of the box because 100 - O = P. The box had 80 chocolates because 28 / (P/100) = 80",
+        "masked_reference_solution": "The ones with nuts that they ate was M% of the box because 80% x .5 = M%. The ones without nuts that they ate equaled N% of the box because 50% x .5 = N%. They ate O% of the box because M + N = O. They left P% of the box because 100 - O = P. The box had 80 chocolates because 28 / (P/100) = 80",
         'generated_solution': '''
 Let's solve this problem using Python's sympy library.
 {start_code}
