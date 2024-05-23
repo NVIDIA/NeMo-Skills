@@ -27,7 +27,7 @@ different GPU types or with different inference frameworks.
    allow it to use Python interpreter, you can show it a couple of few-shot examples
 
    ```
-   +prompt_type=code_base \
+   +prompt=code_base \
    ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
    ++prompt.few_shot_examples.num_few_shots=5
    ```
