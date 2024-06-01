@@ -182,11 +182,16 @@ def launch_slurm_job(
     if os.getenv("EXTRA_SBATCH_ARGS"):
         extra_sbatch_args += os.getenv("EXTRA_SBATCH_ARGS").split(" ")
 
+    if 'timeouts' not in CLUSTER_CONFIG:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = CLUSTER_CONFIG["timeouts"][partition]
+
     header = SLURM_HEADER.format(
         account=CLUSTER_CONFIG["account"],
         partition=partition,
         num_nodes=num_nodes,
-        timeout=CLUSTER_CONFIG["timeouts"][partition],
+        timeout=timeout,
         job_name_prefix=CLUSTER_CONFIG["job_name_prefix"],
         job_name=job_name,
         tasks_per_node=tasks_per_node,

@@ -40,6 +40,8 @@ def test_data_scripts():
         'gsm-hard/test.jsonl',
         'mawps/test.jsonl',
         'svamp/test.jsonl',
+        'tabmwp/train.jsonl',
+        'tabmwp/validation.jsonl',
         'tabmwp/test.jsonl',
         'gsm8k/train.jsonl',
         'gsm8k/train_full.jsonl',

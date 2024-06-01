@@ -27,6 +27,7 @@ from nemo_skills.utils import setup_logging
 
 def start_job(extra_sbatch_args: str, cmd: str) -> int:
     full_cmd = f'{extra_sbatch_args} {cmd}'
+
     if CLUSTER_CONFIG['cluster'] == 'local':
         subprocess.run(full_cmd, shell=True)
         return 0
@@ -90,7 +91,7 @@ def run_eval(
     # launching evaluation
     dependency = f'--dependency=afterany:{last_job_id}' if last_job_id is not None else ''
     # logs are managed by run_eval.py script
-    extra_sbatch_args = f'EXTRA_SBATCH_ARGS="--parsable {dependency}"'
+    extra_sbatch_args = f'EXTRA_SBATCH_ARGS="--parsable {dependency.strip()}"'
 
     cmd = (
         f'{sys.executable} {current_folder}/run_eval.py '

@@ -68,6 +68,7 @@ def get_sampling_cmd(benchmark, random_seed, extra_eval_args="", extra_arguments
 BENCHMARKS = {
     "gsm8k": 8,
     "math": 4,
+    "tabmwp": 4,
 }
 
 # TODO: remove backoff installation after it gets into docker

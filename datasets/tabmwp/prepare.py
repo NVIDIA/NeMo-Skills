@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import json
 import os
 import urllib.request
 from pathlib import Path
 
-URL = "https://raw.githubusercontent.com/lupantech/PromptPG/main/data/tabmwp/problems_test1k.json"
+URL_prefix = "https://raw.githubusercontent.com/lupantech/PromptPG/main/data/tabmwp/problems_"
 
 # Data Format
 #
@@ -30,38 +31,66 @@ URL = "https://raw.githubusercontent.com/lupantech/PromptPG/main/data/tabmwp/pro
 
 
 if __name__ == "__main__":
-    data_folder = Path(__file__).absolute().parent
-    data_folder.mkdir(exist_ok=True)
-    original_file = str(data_folder / f"original_test.json")
-    output_file = str(data_folder / f"test.jsonl")
-    question_template = "Read the following table and then answer the question that follows.\n{table}\n\n{question}"
+    parser = argparse.ArgumentParser(
+        "Reads TabMWP data and converts it to a format readable by the llm-structured-data scripts."
+    )
+    parser.add_argument(
+        "--data_dir",
+        default=f"{Path(__file__).absolute().parent / 'original'}",
+        help="Path to directory with JSON files with TabMWP data. Will automatically download if not found.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=f"{Path(__file__).absolute().parent}",
+        help="Path to where the output file will be written.",
+    )
+    args = parser.parse_args()
 
-    if not os.path.exists(original_file):
-        urllib.request.urlretrieve(URL, original_file)
+    splits = ["train", "dev", "test"]
 
-    with open(original_file, "r") as fin:
-        data = json.load(fin)
+    for split in splits:
+        original_file = os.path.join(args.data_dir, f"problems_{split}.json")
 
-    with open(output_file, "wt", encoding="utf-8") as fout:
-        for original_entry in data.values():
-            question = question_template.format(
-                table_title=original_entry["table_title"],
-                table=original_entry["table"],
-                question=original_entry["question"],
-            )
+        if not os.path.exists(original_file):
+            os.makedirs(args.data_dir, exist_ok=True)
+            urllib.request.urlretrieve(URL_prefix + split + ".json", original_file)
 
-            new_entry = dict(
-                question=question,
-                expected_answer=original_entry["answer"],
-                reference_solution=original_entry["solution"],
-                grade=original_entry["grade"],
-            )
+        output_file = (
+            os.path.join(args.output_dir, "validation.jsonl")
+            if split == "dev"
+            else os.path.join(args.output_dir, split + ".jsonl")
+        )
 
-            if original_entry["ques_type"] == "multi_choice":
-                new_entry["question"] += "\nAnswer options:\n{}".format(", ".join(original_entry["choices"]))
+        question_template = (
+            "Read the following table and then answer the question that follows.\n{table}\n\n{question}"
+        )
 
-            # converting to int if able to for cleaner text representation
-            if original_entry["ans_type"] == "integer_number":
-                new_entry["expected_answer"] = int(new_entry["expected_answer"].replace(",", ""))
+        with open(original_file, "r") as fin:
+            data = json.load(fin)
 
-            fout.write(json.dumps(new_entry) + "\n")
+        with open(output_file, "wt", encoding="utf-8") as fout:
+            for original_entry in data.values():
+                question = question_template.format(
+                    table_title=original_entry["table_title"],
+                    table=original_entry["table"],
+                    question=original_entry["question"],
+                )
+
+                new_entry = dict(
+                    question=question,
+                    expected_answer=original_entry["answer"],
+                    reference_solution=original_entry["solution"],
+                    table_title=original_entry["table_title"],
+                    table=original_entry["table_for_pd"],
+                    grade=original_entry["grade"],
+                )
+
+                if original_entry["ques_type"] == "multi_choice":
+                    new_entry["question"] += "\nAnswer options:\n{}".format(", ".join(original_entry["choices"]))
+
+                # converting to int if able to for cleaner text representation
+                if original_entry["ans_type"] == "integer_number":
+                    new_entry["expected_answer"] = int(new_entry["expected_answer"].replace(",", ""))
+
+                fout.write(json.dumps(new_entry) + "\n")
