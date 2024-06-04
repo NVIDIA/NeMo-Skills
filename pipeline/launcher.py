@@ -44,7 +44,7 @@ def fill_env_vars(format_dict, env_vars):
         format_dict[env_var] = env_var_value
 
 
-def get_server_command(server_type, num_gpus):
+def get_server_command(server_type, num_gpus, model_name: str):
     num_tasks = num_gpus
     if server_type == 'nemo':
         server_start_cmd = (
@@ -54,6 +54,15 @@ def get_server_command(server_type, num_gpus):
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if CLUSTER_CONFIG["cluster"] == "local":
             num_tasks = 1
+
+    elif server_type == 'vllm':
+        server_start_cmd = (
+            f"(NUM_GPUS={num_gpus} bash /code/nemo_skills/inference/server/serve_vllm.sh /model/ {model_name} "
+            # f"0 openai 5000 2>&1 | tee /tmp/server_logs.txt &)"
+            f"0 openai 5000 > /tmp/server_logs.txt &)"
+        )
+        num_tasks = 1
+
     else:
         server_start_cmd = (
             f"(mpirun -np {num_gpus} --allow-run-as-root --oversubscribe python /code/nemo_skills/inference/server/serve_trt.py "
@@ -61,7 +70,12 @@ def get_server_command(server_type, num_gpus):
         )
         num_tasks = 1  # we launch via mpirun directly
 
-    return server_start_cmd, num_tasks
+    if server_type == "vllm":
+        server_wait_string = "Uvicorn running"
+    else:
+        server_wait_string = "Running on all addresses"
+
+    return server_start_cmd, num_tasks, server_wait_string
 
 
 SLURM_HEADER = """
@@ -157,7 +171,7 @@ def launch_local_job(
     else:
         start_cmd = "bash /start.sh"
 
-    cmd = f"{docker_cmd} run --rm --gpus all --ipc=host {mounts} {container} {start_cmd}"
+    cmd = f"{docker_cmd} run --rm -p 5000:5000 --gpus all --ipc=host {mounts} {container} {start_cmd}"
     subprocess.run(cmd, shell=True, check=True)
 
     # TODO: same behavior of streaming logs to a file and supporting dependencies?
@@ -258,8 +272,8 @@ if __name__ == "__main__":
     parser.add_argument("--cmd", required=True, help="Full command for cluster execution")
     parser.add_argument("--partition", required=False)
     parser.add_argument("--num_nodes", type=int, required=True)
-    parser.add_argument("--tasks_per_node", type=int, choices=(1, 4, 8), required=True)
-    parser.add_argument("--gpus_per_node", type=int, choices=(1, 4, 8), default=8)
+    parser.add_argument("--tasks_per_node", type=int, choices=(1, 2, 4, 8), required=True)
+    parser.add_argument("--gpus_per_node", type=int, choices=(1, 2, 4, 8), default=8)
     parser.add_argument("--with_sandbox", action="store_true")
     parser.add_argument("--job_name", required=True)
     parser.add_argument("--container", required=True)

@@ -20,7 +20,7 @@ import os
 import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Union
 
 import requests
 
@@ -493,10 +493,185 @@ class OpenAIModel(BaseModel):
         return content
 
 
+class VLLMModel(BaseModel):
+
+    def __init__(
+        self,
+        host='127.0.0.1',
+        port='5000',
+        sandbox=None,
+        ssh_server=None,
+        ssh_key_path=None,
+        max_code_output_characters=1000,
+        code_execution_timeout=10.0,
+        max_code_executions=3,
+        stop_on_code_error=True,
+        handle_code_execution=True,
+        error_recovery=None,
+    ):
+        super().__init__(
+            host=host,
+            port=port,
+            sandbox=sandbox,
+            ssh_server=ssh_server,
+            ssh_key_path=ssh_key_path,
+            max_code_output_characters=max_code_output_characters,
+            code_execution_timeout=code_execution_timeout,
+            max_code_executions=max_code_executions,
+            stop_on_code_error=stop_on_code_error,
+            handle_code_execution=handle_code_execution,
+            error_recovery=error_recovery,
+        )
+
+        self.server_type = "openai"
+        self.oai_client = None
+        self.oai_client = self.prepare_openai(self.server_host, self.server_port)  # type: openai.OpenAI
+
+        self.model_name_server = self.get_model_name_from_server()
+        self.model = self.model_name_server
+
+        LOG.info("Model hosted by %s server: %s", self.server_type, self.model)
+
+    def _single_call(
+        self,
+        prompts,
+        tokens_to_generate,
+        temperature,
+        top_p,
+        top_k,
+        repetition_penalty,
+        random_seed,
+        stop_phrases: List[str],
+    ):
+        request = {
+            'prompt': prompts,
+            'max_tokens': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'num_generations': 1,  # VLLM provides 1 generation per prompt, duplicate prompts if you want more
+            'stop': stop_phrases,
+            'echo': False,
+            'repetition_penalty': repetition_penalty,
+            'frequency_penalty': 0.0,
+            'presence_penalty': 0.0,
+            'logprobs': None,
+            'logit_bias': None,
+            'seed': random_seed,
+        }
+
+        return self._send_request(request)
+
+    def _send_request(self, request):
+        if self.ssh_server and self.ssh_key_path:
+            raise NotImplementedError("SSH tunnelling is not implemented for vLLM OpenAI server.")
+
+        # temperature of 0 means greedy, but it's not always supported by the server
+        # so setting explicit greedy parameters instead
+        if request["temperature"] == 0:
+            request["temperature"] = 1.0
+            request["top_k"] = 1
+            request["top_p"] = 1.0
+
+        outputs = self.prompt_api(**request, parse_response=True)
+
+        return outputs
+
+    def prompt_api(
+        self,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        top_p: float,
+        top_k: int = 1,
+        num_generations: int = 1,
+        stop=None,
+        echo: bool = False,
+        repetition_penalty: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+        logprobs: int = None,
+        logit_bias: dict = None,
+        seed: int = None,
+        parse_response: bool = True,
+    ) -> Union["openai.types.Completion", List[str]]:
+
+        if isinstance(prompt, (list, tuple)):
+            prompt = [str(prmt) for prmt in prompt]
+
+        if temperature == 0.0:
+            temperature = 1.0
+            top_k = 1
+
+        if top_k == 0:
+            top_k = 1
+
+        # Process top_k
+        extra_body = {
+            "extra_body": {
+                "top_k": 1,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            }
+        }
+
+        response = self.oai_client.completions.create(
+            model=self.model,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            n=num_generations,
+            stream=False,
+            stop=stop,
+            echo=echo,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            logprobs=logprobs,
+            logit_bias=logit_bias,
+            seed=seed,
+            **extra_body,
+        )
+
+        if parse_response:
+            response = self.parse_openai_response(response)
+
+        return response
+
+    @classmethod
+    def parse_openai_response(cls, response: "openai.types.Completion") -> List[str]:
+        responses = []
+        if not isinstance(response, list):
+            response = [response]
+
+        for resp in response:
+            for choice in resp.choices:
+                responses.append(choice.text)
+        return responses
+
+    @staticmethod
+    def prepare_openai(host: str, port: str = "5000") -> "OpenAI":
+        import openai
+
+        # Update global config of openai
+        openai.api_key = "EMPTY"
+        openai.base_url = f"http://{host}:{port}/v1"
+
+        # Create local client with no timeout
+        client = openai.OpenAI(api_key="EMPTY", base_url=f"http://{host}:{port}/v1", timeout=None)
+        return client
+
+    def get_model_name_from_server(self) -> str:
+        model_list = self.oai_client.models.list()
+        model_name = model_list.data[0].id
+        return model_name
+
+
 models = {
     'tensorrt_llm': TensorRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
+    'vllm': VLLMModel,
 }
 
 

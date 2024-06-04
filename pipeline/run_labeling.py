@@ -31,7 +31,7 @@ export PYTHONPATH=$PYTHONPATH:/code && \
 if [ $SLURM_LOCALID -eq 0 ]; then \
     pip install backoff && \
     echo "Waiting for the server to start" && \
-    tail -n0 -f /tmp/server_logs.txt | sed '/Running on all addresses/ q' && \
+    tail -n0 -f /tmp/server_logs.txt | sed '/{server_wait_string}/ q' && \
     python nemo_skills/inference/generate_solutions.py \
         server.server_type={server_type} \
         skip_filled=True \
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     setup_logging(disable_hydra_logs=False)
     parser = ArgumentParser()
     parser.add_argument("--model_path", required=True)
-    parser.add_argument("--server_type", choices=('nemo', 'tensorrt_llm'), default='tensorrt_llm')
+    parser.add_argument("--server_type", choices=('nemo', 'tensorrt_llm', 'vllm'), default='tensorrt_llm')
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--num_runs", type=int, default=1)
     parser.add_argument("--num_gpus", type=int, required=True)
@@ -116,7 +116,9 @@ if __name__ == "__main__":
 
     extra_arguments = f'{" ".join(unknown)}'
 
-    server_start_cmd, num_tasks = get_server_command(args.server_type, args.num_gpus)
+    server_start_cmd, num_tasks, server_wait_string = get_server_command(
+        args.server_type, args.num_gpus, args.model_path.name
+    )
 
     format_dict = {
         "model_path": args.model_path,
@@ -128,6 +130,7 @@ if __name__ == "__main__":
         "server_type": args.server_type,
         "extra_eval_args": args.extra_eval_args,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+        "server_wait_string": server_wait_string,
     }
 
     Path(args.output_dir).mkdir(exist_ok=True, parents=True)
