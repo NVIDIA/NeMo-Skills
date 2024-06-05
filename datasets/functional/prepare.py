@@ -59,9 +59,9 @@ if __name__ == "__main__":
     archive_path = original_file + '.tar.gz'
     if not os.path.exists(archive_path):
         urllib.request.urlretrieve(URL.format(args.date), archive_path)
-        # Open and extract the tar.gz file with a filter
+        # Open and extract the tar.gz file
         with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=original_file, filter='data')
+            tar.extractall(original_file)
 
     fin_data = []
     for category in args.categories:
