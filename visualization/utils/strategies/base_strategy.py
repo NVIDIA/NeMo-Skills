@@ -33,7 +33,7 @@ from utils.common import get_examples, get_utils_from_config
 
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig, InferenceConfig
-from nemo_skills.inference.prompt.utils import FewShotExamples, Prompt, PromptConfig
+from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, Prompt, PromptConfig
 from nemo_skills.inference.server.model import get_model
 
 
@@ -239,9 +239,9 @@ class ModeStrategies:
         return html.Div(
             [
                 get_results_content_layout(
-                    outputs[0]['generated_solution'],
+                    outputs[0]['generation'],
                     get_single_prompt_output_layout(
-                        outputs[0]['generated_solution'],
+                        outputs[0]['generation'],
                     ),
                     style={"border": f"2px solid {color}"},
                     switch_is_active=True,
@@ -262,21 +262,18 @@ class ModeStrategies:
         prompt_config = self._get_config(PromptConfig, utils, current_app.config['data_explorer']['prompt'])
 
         prompt_config.few_shot_examples = self._get_config(
-            FewShotExamples,
+            FewShotExamplesConfig,
             utils,
             current_app.config['data_explorer']['prompt']['few_shot_examples'],
         )
 
-        prompt = Prompt(
-            config=prompt_config,
-            input_dict=input_dict,
-            example_dicts=get_examples().get(
-                utils.get('examples_type', None),
-                [],
-            ),
-            context_template=utils['context_template'],
+        prompt = Prompt(config=prompt_config)
+        prompt.context_template = utils['context_template']
+        prompt.few_shot_examples.examples_dicts = get_examples().get(
+            utils.get('examples_type', None),
+            [],
         )
-        return prompt
+        return prompt.build_string(input_dict)
 
     def _get_search_prompt_layout(self) -> dbc.InputGroup:
         return dbc.InputGroup(
@@ -317,11 +314,11 @@ class ModeStrategies:
 
     def _get_config(
         self,
-        config_class: Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamples],
+        config_class: Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamplesConfig],
         utils: Dict[str, str],
         config: Dict,
         params: Dict = {},
-    ) -> Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamples]:
+    ) -> Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamplesConfig]:
         return config_class(
             **{
                 key: value

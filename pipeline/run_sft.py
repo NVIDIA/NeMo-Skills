@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
@@ -28,6 +29,7 @@ from nemo_skills.utils import setup_logging
 # which contains most of the important parameters
 SLURM_CMD = """
 export WANDB_API_KEY={WANDB_API_KEY} \
+&& export HF_TOKEN={HF_TOKEN} \
 && export HYDRA_FULL_ERROR=1 \
 && echo "Starting training" \
 && export PYTHONPATH=$PYTHONPATH:/code \
@@ -37,7 +39,6 @@ export WANDB_API_KEY={WANDB_API_KEY} \
     trainer.devices={num_gpus} \
     trainer.num_nodes={num_nodes} \
     model.restore_from_path=/nemo_model \
-    model.data.validation_ds.file_path=/code/datasets/{validation_dataset}/validation-sft.jsonl \
     {logging_params} \
     exp_manager.name={expname} \
     exp_manager.explicit_log_dir=/results \
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--disable_wandb", action="store_true", help="Disable wandb logging and use tensorboard instead"
     )
+    parser.add_argument("--chat_format", action="store_true", help="Use chat format for SFT data")
     parser.add_argument(
         "--partition",
         required=False,
@@ -77,6 +79,17 @@ if __name__ == "__main__":
     args, unknown = parser.parse_known_args()
 
     extra_arguments = f'{" ".join(unknown)}'
+
+    if args.chat_format:
+        extra_arguments = (
+            " ++model.data.chat=True "
+            f" model.data.validation_ds.file_path=/code/datasets/{args.validation_dataset}/validation-sft-chat.jsonl "
+        ) + extra_arguments
+    else:
+        extra_arguments = (
+            " ++model.data.chat=False "
+            f" model.data.validation_ds.file_path=/code/datasets/{args.validation_dataset}/validation-sft.jsonl "
+        ) + extra_arguments
 
     args.checkpoints_folder = Path(args.checkpoints_folder).absolute()
     args.nemo_model = Path(args.nemo_model).absolute()
@@ -97,13 +110,13 @@ if __name__ == "__main__":
         "config_name": args.config_name,
         "config_path": args.config_path,
         "checkpoints_folder": args.checkpoints_folder,
-        "validation_dataset": args.validation_dataset,
         "nemo_model": args.nemo_model,
         "num_nodes": args.num_nodes,
         "num_gpus": args.num_gpus,
         "extra_arguments": extra_arguments,
         "timeout": timeout,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+        "HF_TOKEN": os.getenv("HF_TOKEN", ""),  # needed for some of the models, so making an option to pass it in
     }
     fill_env_vars(format_dict, ["NEMO_SKILLS_DATA"])
     if not args.disable_wandb:

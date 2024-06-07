@@ -22,7 +22,7 @@ any "teacher" model, e.g. [Mixtral-8x7B](https://huggingface.co/mistralai/Mixtra
      --output_dir ./synthetic-solutions/ \
      --num_gpus <number of GPUs on your machine/cluster node> \
      --num_runs 128 \
-     +prompt=code_base \
+     +prompt=openmathinstruct/base \
      ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
      ++prompt.context_type=empty \
      ++dataset=gsm8k \
@@ -61,7 +61,7 @@ Here are the steps to create masked solutions for the different dataset or using
      --output_dir ./masked-solutions/ \
      --num_gpus <number of GPUs on your machine/cluster node> \
      --num_runs 32 \
-     +prompt=text_masked_base \
+     +prompt=openmathinstruct/text_masked_base \
      ++prompt.few_shot_examples.examples_type=gsm8k_generate_masked \
      ++prompt.context_type=reference_solution \
      ++dataset=gsm8k \

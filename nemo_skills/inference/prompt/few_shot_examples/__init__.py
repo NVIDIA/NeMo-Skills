@@ -28,11 +28,8 @@ assert len(examples_map) == len(examples_gsm8k) + len(examples_math) + len(
 for examples in examples_map.values():
     for example in examples:
         # not using .format to not complicate other {X} parts of the solution
-        example["generated_solution"] = example["generated_solution"].replace("{start_code}", CODE_SEPARATORS[0])
-        example["generated_solution"] = example["generated_solution"].replace("{end_code}", CODE_SEPARATORS[1])
-        example["generated_solution"] = example["generated_solution"].replace(
-            "{start_code_output}", CODE_OUTPUT_SEPARATORS[0]
-        )
-        example["generated_solution"] = example["generated_solution"].replace(
-            "{end_code_output}", CODE_OUTPUT_SEPARATORS[1]
-        )
+        if 'generation' in example:
+            example["generation"] = example["generation"].replace("{start_code}", CODE_SEPARATORS[0])
+            example["generation"] = example["generation"].replace("{end_code}", CODE_SEPARATORS[1])
+            example["generation"] = example["generation"].replace("{start_code_output}", CODE_OUTPUT_SEPARATORS[0])
+            example["generation"] = example["generation"].replace("{end_code_output}", CODE_OUTPUT_SEPARATORS[1])

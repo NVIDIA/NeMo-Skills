@@ -30,7 +30,12 @@ def nested_dataclass(*args, **kwargs):
     """
 
     def wrapper(check_class):
-        from omegaconf.dictconfig import DictConfig
+        try:
+            from omegaconf.dictconfig import DictConfig
+
+            dict_types = (dict, DictConfig)
+        except ImportError:
+            dict_types = (dict,)
 
         # passing class to investigate
         check_class = dataclass(check_class, **kwargs)
@@ -42,7 +47,7 @@ def nested_dataclass(*args, **kwargs):
                     # getting field type
                     ft = check_class.__annotations__.get(name, None)
 
-                    if is_dataclass(ft) and isinstance(value, (dict, DictConfig)):
+                    if is_dataclass(ft) and isinstance(value, dict_types):
                         obj = ft(**value, _init_nested=_init_nested)
                         kwargs[name] = obj
             orig_init(self, **kwargs)

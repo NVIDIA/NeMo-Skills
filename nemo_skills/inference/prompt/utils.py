@@ -12,17 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import asdict, dataclass, field
+import json
+import logging
+from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from omegaconf import MISSING, OmegaConf
+import yaml
+
+try:
+    from omegaconf import MISSING
+except ImportError:
+    MISSING = "???"
 
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
 from nemo_skills.utils import nested_dataclass
 
+LOG = logging.getLogger(__file__)
+
 # listing all available configs here
-prompt_types = [cfg.stem for cfg in Path(__file__).parent.glob("*.yaml")]
+prompt_types = [str(cfg).split('nemo_skills/inference/prompt/')[1] for cfg in Path(__file__).parent.glob("**/*.yaml")]
 
 # listing all dataset folders available - note this will not be available
 # if using from installed package but you need to have data files available anyway
@@ -31,43 +40,97 @@ datasets = [
 ]
 
 
+class BM25Retriever:
+    def __init__(self, data_path: str, field: str):
+        from rank_bm25 import BM25Okapi
+
+        with open(data_path, "rt", encoding="utf-8") as fin:
+            self.entries = [json.loads(x) for x in fin]
+
+        corpus = [entry[field] for entry in self.entries]
+        tokenized_corpus = [doc.split(" ") for doc in corpus]
+        self.bm25 = BM25Okapi(tokenized_corpus)
+
+    def retrieve(self, query: str, top_k: int = 1):
+        tokenized_query = query.split(" ")
+        return self.bm25.get_top_n(tokenized_query, self.entries, n=top_k)
+
+
 @nested_dataclass
-class FewShotExamples:
+class FewShotExamplesConfig:
     template: str = MISSING
+    num_few_shots: int = 0
+
     examples_type: Optional[str] = None
-    num_few_shots: int = 5
+    example_dicts: Optional[List[Dict[str, Any]]] = None
+
+    retrieval_field: Optional[str] = None  # e.g. question, reference_solution, etc.
+    retrieval_file: Optional[str] = None  # needs to be provided if retrieval_field is not None
+    retrieved_entries: int = 0
+    max_retrieved_chars: int = 100000000  # no limit by default
+    max_retrieved_chars_field: str = "reference_solution"
+    retriever: Optional[Any] = None
+
+    def __post_init__(self):
+        """Error checks + building example_dicts and retriever if needed."""
+        if self.examples_type is not None:  # building example_dicts
+            self.example_dicts = examples_map[self.examples_type][: self.num_few_shots]
+
+        if self.example_dicts is not None and self.num_few_shots > len(self.example_dicts):
+            raise ValueError(
+                f"There are not enough few shot examples in {self.examples_type}. "
+                f"Max number is {len(self.example_dicts)}"
+            )
+
+        if self.retrieved_entries == 0:
+            self.retrieved_entries = 2 * self.num_few_shots
+
+        if self.example_dicts is not None and self.retriever is not None:
+            raise ValueError("example_dicts and retriever cannot be used together")
+
+        if self.retriever is not None:
+            return
+
+        if self.retrieval_field is not None:  # building retriever
+            if self.retrieval_file is None:
+                raise ValueError("retrieval_file must be provided if retrieval_field is not None")
+            self.retriever = BM25Retriever(self.retrieval_file, field=self.retrieval_field)
+        else:
+            if self.retrieval_file is not None:
+                raise ValueError("retrieval_field must be provided if retrieval_file is not None")
+
+        if self.example_dicts is None and self.retriever is None and self.num_few_shots > 0:
+            raise ValueError("You need to construct either example_dicts or retriever if num_few_shots > 0")
 
 
 @nested_dataclass
 class PromptConfig:
-    few_shot_examples: FewShotExamples = field(default_factory=FewShotExamples)
+    few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
     prompt_template: str = MISSING
     user: str = MISSING
     system: str = MISSING
     context_type: str = "empty"
+    context_template: Optional[str] = None
     stop_phrases: List[str] = field(default_factory=list)
 
-
-@nested_dataclass
-class Prompt:
-    config: PromptConfig
-    input_dict: Dict[str, Any]
-    example_dicts: Optional[List[Dict[str, Any]]] = None
-    context_template: Optional[str] = None
-    generated_solution: str = ""
-
     def __post_init__(self):
-        """Initialize example_dicts/context_template if not provided."""
-        if self.example_dicts is None:
-            self.example_dicts = examples_map.get(self.config.few_shot_examples.examples_type, [])[
-                : self.config.few_shot_examples.num_few_shots
-            ]
+        """Initialize context_template if not provided."""
         if self.context_template is None:
-            self.context_template = context_templates.get(self.config.context_type, "")
+            self.context_template = context_templates[self.context_type]
+        else:
+            if self.context_type != "empty":
+                raise ValueError("context_template should not be provided if context_type is not empty")
+
+
+class Prompt:
+    def __init__(self, config):
+        # rebuilding prompt config to make sure post init is called again in
+        # case some parameters were manually changed after the config was created
+        self.config = PromptConfig(_init_nested=True, **asdict(config))
 
     def build_context(self, example_dict: Dict[str, Any]) -> str:
         """Builds the context string based on the example dictionary."""
-        context = self.context_template.format(**example_dict)
+        context = self.config.context_template.format(**example_dict)
         return context
 
     def build_filled_example(self, example_dict: Dict[str, Any]) -> str:
@@ -75,28 +138,71 @@ class Prompt:
         context = self.build_context(example_dict)
         return self.config.few_shot_examples.template.format(context=context, **example_dict)
 
-    def build_examples(self) -> str:
+    def build_examples_dict(self, input_dict):
+        if self.config.few_shot_examples.num_few_shots == 0:
+            return []
+
+        if self.config.few_shot_examples.example_dicts:
+            return self.config.few_shot_examples.example_dicts
+
+        example_dicts = self.config.few_shot_examples.retriever.retrieve(
+            query=input_dict[self.config.few_shot_examples.retrieval_field],
+            # getting 2 times more to account for potential duplicates. This assumes there are not too many of them
+            top_k=self.config.few_shot_examples.retrieved_entries,
+        )
+        reference = input_dict[self.config.few_shot_examples.retrieval_field]
+        # filtering exact match if it's there
+        while example_dicts and example_dicts[0][self.config.few_shot_examples.retrieval_field] == reference:
+            example_dicts = example_dicts[1:]
+
+        # removing too long solutions
+        example_dicts = [
+            example_dict
+            for example_dict in example_dicts
+            if len(example_dict[self.config.few_shot_examples.max_retrieved_chars_field])
+            < self.config.few_shot_examples.max_retrieved_chars
+        ]
+
+        if len(example_dicts) < self.config.few_shot_examples.num_few_shots:
+            LOG.warning(
+                'Too little examples (%d) found for the query "%s"',
+                len(example_dicts),
+                input_dict[self.config.few_shot_examples.retrieval_field],
+            )
+
+        # let's reverse the order to show the most relevant last
+        return example_dicts[: self.config.few_shot_examples.num_few_shots][::-1]
+
+    def build_user_message(self, input_dict: Dict[str, str]) -> str:
         """Builds all examples string concatenated by delimiter."""
-        filled_examples = [self.build_filled_example(example) for example in self.example_dicts]
+        example_dicts = self.build_examples_dict(input_dict)
+
+        filled_examples = [self.build_filled_example(example) for example in example_dicts]
         examples = "".join(filled_examples)
-        context = self.build_context(self.input_dict)
-        user = self.config.user.format(examples=examples, context=context, **self.input_dict)
+        context = self.build_context(input_dict)
+        user = self.config.user.format(examples=examples, context=context, **input_dict)
         return user
 
-    def build_chat_prompt(self) -> List[Dict[str, str]]:
-        """Builds a structured representation of the prompt."""
+    def build_structured(self, input_dict: Dict[str, str]) -> List[Dict[str, str]]:
+        """Builds a structured representation of the prompt.
+
+        The "generation" in the input_dict is a special key that will be
+        appended to the structured prompt as an assistant message.
+        """
         structured_prompt = [{"role": "system", "content": self.config.system}] if self.config.system else []
-        structured_prompt.append({"role": "user", "content": self.build_examples()})
-        if self.generated_solution:
-            structured_prompt.append({"role": "assistant", "content": self.generated_solution})
+        structured_prompt.append({"role": "user", "content": self.build_user_message(input_dict)})
+        if input_dict.get('generation'):
+            structured_prompt.append({"role": "assistant", "content": input_dict.get('generation')})
         return structured_prompt
 
-    def __str__(self) -> str:
+    def build_string(self, input_dict: Dict[str, str]) -> str:
         """Returns the complete prompt string representation."""
+        generation = input_dict.get("generation", "")
+
         prompt = self.config.prompt_template.format(
             system=self.config.system,
-            user=self.build_examples(),
-            generated_solution=self.generated_solution,
+            user=self.build_user_message(input_dict),
+            generation=generation,
         )
         return prompt
 
@@ -105,16 +211,7 @@ def get_prompt_config(prompt_type: str) -> PromptConfig:
     # reading prompt format from the yaml file, if not running through hydra
     config_path = Path(__file__).parent / f"{prompt_type}.yaml"
     with open(config_path, "rt", encoding="utf-8") as fin:
-        # Load the YAML file using OmegaConf
-        loaded_config = OmegaConf.load(fin)
-
-        # Create a default PromptConfig and convert it to a DictConfig
-        default_config = OmegaConf.create(asdict(PromptConfig()))
-
-        # Merge the default config with the loaded config
-        merged_config = OmegaConf.merge(default_config, loaded_config)
-
-        prompt_config = OmegaConf.structured(PromptConfig(_init_nested=True, **merged_config))
+        prompt_config = PromptConfig(_init_nested=True, **yaml.safe_load(fin))
         return prompt_config
 
 
@@ -125,5 +222,8 @@ context_templates = {
     "reference_solution": "Reference solution (do not copy it):\n{reference_solution}\n\n",
     "masked_solution": "Reference solution:\n{masked_reference_solution}\n\n",
     "table": "Use the following table to answer the question:\n{table}\n\n",
-    "table_solution": "Use the following table to answer the question:\n{table}\nReference solution (do not copy it):\n{reference_solution}\n\n",
+    "table_solution": (
+        "Use the following table to answer the question:\n{table}\n"
+        "Reference solution (do not copy it):\n{reference_solution}\n\n"
+    ),
 }

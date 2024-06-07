@@ -34,7 +34,7 @@ documentation to learn how to make inference more efficient.
 2. Convert the model to TensorRT-LLM format for fastest evaluation.
 
    ```
-   docker run --rm --gpus all --ipc=host -v <path to nemo-skills repo>:/code -v <path to OpenMath-Mistral-7B-v0.1-hf>:/model igitman/nemo-skills-trtllm:0.2.0 \
+   docker run --rm --gpus all --ipc=host -v <path to nemo-skills repo>:/code -v <path to OpenMath-Mistral-7B-v0.1-hf>:/model igitman/nemo-skills-trtllm:0.3.0 \
    bash -c ' \
    export PYTHONPATH=/code && cd /code && \
    python nemo_skills/conversion/hf_to_trtllm.py \
@@ -54,7 +54,7 @@ documentation to learn how to make inference more efficient.
    cp /model/tokenizer.model /code/openmath-mistral-7b-trtllm'
    ```
 
-3. Run greedy decoding for all datasets. You can increase number of nodes if running on Slurm cluster for faster evaluation.
+3. Run greedy decoding for all datasets. You can increase number of jobs if running on Slurm cluster for faster evaluation.
 
    ```
    python pipeline/run_eval.py \
@@ -63,12 +63,12 @@ documentation to learn how to make inference more efficient.
      --output_dir `pwd`/openmath-mistral-7b-eval-results \
      --benchmarks gsm8k:0 asdiv:0 gsm-hard:0 mawps:0 svamp:0 tabmwp:0 algebra222:0 math:0 \
      --num_gpus 8 \
-     --num_nodes 1 \
-     +prompt=code_sfted \
+     --num_jobs 1 \
+     +prompt=openmathinstruct/sft \
      ++prompt.few_shot_examples.num_few_shots=0 \
      ++split_name=test \
-     ++server.max_code_executions=6 \
-     ++server.stop_on_code_error=False \
+     ++server.code_execution.max_code_executions=6 \
+     ++server.code_execution.stop_on_code_error=False \
      ++batch_size=64
    ```
 
@@ -81,13 +81,13 @@ documentation to learn how to make inference more efficient.
      --output_dir `pwd`/openmath-mistral-7b-eval-results \
      --benchmarks gsm8k:50 math:50 \
      --num_gpus 8 \
-     --num_nodes 1 \
-     +prompt=code_sfted \
+     --num_jobs 1 \
+     +prompt=openmathinstruct/sft \
      ++prompt.few_shot_examples.num_few_shots=0 \
      ++skip_filled=True \
      ++split_name=test \
-     ++server.max_code_executions=6 \
-     ++server.stop_on_code_error=False \
+     ++server.code_execution.max_code_executions=6 \
+     ++server.code_execution.stop_on_code_error=False \
      ++batch_size=64
    ```
 
@@ -129,7 +129,7 @@ you can run the following:
      --output_dir ./synthetic-solutions/gsm8k/ \
      --num_gpus 8 \
      --num_runs 128 \
-     +prompt=code_base \
+     +prompt=openmathinstruct/base \
      ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
      ++prompt.context_type=empty \
      ++dataset=gsm8k \
@@ -145,7 +145,7 @@ you can run the following:
      --output_dir ./synthetic-solutions/gsm8k-masked/ \
      --num_gpus 8 \
      --num_runs 128 \
-     +prompt=code_base \
+     +prompt=openmathinstruct/base \
      ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
      ++prompt.context_type=masked_solution \
      ++dataset=gsm8k-masked \
@@ -194,7 +194,7 @@ you can run the following:
    locally for small enough models. Here is an example command for Mistral-7b
 
    ```
-   python pipeline/run_sft_and_eval.py \
+   python pipeline/run_pipeline.py \
       --expname openmath-mistral-7b \
       --nemo_model <path to the nemo model> \
       --stages sft prepare_eval \

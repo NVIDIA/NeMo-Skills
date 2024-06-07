@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
@@ -27,9 +28,9 @@ SLURM_CMD = """
 nvidia-smi && \
 cd /code && \
 export PYTHONPATH=$PYTHONPATH:/code && \
-{server_start_cmd} && \
-if [ $SLURM_LOCALID -eq 0 ]; then \
-    pip install backoff && \
+export HF_TOKEN={HF_TOKEN} && \
+if [ $SLURM_PROCID -eq 0 ]; then \
+    {{ {server_start_cmd} 2>&1 | tee /tmp/server_logs.txt & }} && sleep 1 && \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/{server_wait_string}/ q' && \
     python nemo_skills/inference/generate_solutions.py \
@@ -43,9 +44,9 @@ if [ $SLURM_LOCALID -eq 0 ]; then \
         {extra_arguments} && \
     python nemo_skills/evaluation/evaluate_results.py \
         prediction_jsonl_files=/results/output-rs{random_seed}.jsonl {extra_eval_args} && \
-    kill %1 || true; \
+    pkill -f nemo_skills/inference/server; \
 else \
-    sleep infinity; \
+    {server_start_cmd}; \
 fi \
 """
 
@@ -58,7 +59,7 @@ LOGS = "{output_dir}/slurm_logs-rs{random_seed}.txt"
 JOB_NAME = "labelling-{model_name}-rs{random_seed}"
 
 
-def run_script(format_dict, seed, extra_arguments, partition=None, dependency=None):
+def run_script(format_dict, seed, extra_arguments, partition=None, dependency=None, num_nodes=1):
     format_dict["random_seed"] = seed
     format_dict["extra_arguments"] = extra_arguments
 
@@ -69,7 +70,7 @@ def run_script(format_dict, seed, extra_arguments, partition=None, dependency=No
 
     job_id = launch_job(
         cmd=SLURM_CMD.format(**format_dict),
-        num_nodes=1,
+        num_nodes=num_nodes,
         tasks_per_node=format_dict["num_tasks"],
         gpus_per_node=format_dict["num_gpus"],
         job_name=JOB_NAME.format(**format_dict),
@@ -91,6 +92,12 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--num_runs", type=int, default=1)
     parser.add_argument("--num_gpus", type=int, required=True)
+    parser.add_argument(
+        "--num_nodes",
+        type=int,
+        default=1,
+        help="Number of nodes required for hosting LLM server.",
+    )
     parser.add_argument(
         "--dependent_jobs",
         type=int,
@@ -117,7 +124,7 @@ if __name__ == "__main__":
     extra_arguments = f'{" ".join(unknown)}'
 
     server_start_cmd, num_tasks, server_wait_string = get_server_command(
-        args.server_type, args.num_gpus, args.model_path.name
+        args.server_type, args.num_gpus, args.num_nodes, args.model_path.name
     )
 
     format_dict = {
@@ -130,14 +137,22 @@ if __name__ == "__main__":
         "server_type": args.server_type,
         "extra_eval_args": args.extra_eval_args,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+        "HF_TOKEN": os.getenv("HF_TOKEN", ""),  # needed for some of the models, so making an option to pass it in
         "server_wait_string": server_wait_string,
     }
 
     Path(args.output_dir).mkdir(exist_ok=True, parents=True)
 
     for seed in range(args.starting_seed, args.starting_seed + args.num_runs):
-        job_id = run_script(format_dict, seed, extra_arguments, args.partition)
+        job_id = run_script(format_dict, seed, extra_arguments, args.partition, num_nodes=args.num_nodes)
         print(f"Submitted batch job {job_id}")
         for _ in range(args.dependent_jobs):
-            job_id = run_script(format_dict, seed, extra_arguments, args.partition, dependency=job_id)
+            job_id = run_script(
+                format_dict,
+                seed,
+                extra_arguments,
+                args.partition,
+                dependency=job_id,
+                num_nodes=args.num_nodes,
+            )
             print(f"Submitted batch job {job_id}")

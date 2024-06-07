@@ -1,0 +1,18 @@
+few_shot_examples:
+  template: "Question:\n{question}\n\n{context}Rephrase the above question:\n{rephrased_question}\n\n\n\n\n\n"
+
+system: ""
+
+user: |-
+  You are an AI assistant that excels at rephrasing questions. Follow the given examples.
+
+  {examples}Question:
+  {question}
+
+  {context}
+
+prompt_template: |-
+  {system}{user}Rephrase the above question:
+  {generation}
+
+stop_phrases: ["\n\n\n\n\n\n"]

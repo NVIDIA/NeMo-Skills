@@ -20,7 +20,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
 2. Run SFT + checkpoint averaging + evaluation in one script.
 
    ```
-   python pipeline/run_sft_and_eval.py \
+   python pipeline/run_pipeline.py \
       --expname <name for experiment> \
       --nemo_model <path to the nemo model> \
       --num_nodes <number of nodes> \
@@ -34,14 +34,14 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
    (e.g. to re-run with different sampling parameters) use `--stages eval`.
 
    You can also customize any evaluation parameters with `--extra_eval_args`, e.g.
-   to use 2 evaluation nodes, batch size of 32 and evaluate on the test set use
+   to use 2 evaluation jobs, batch size of 32 and evaluate on the test set use
 
    ```
-   --extra_eval_args="--num_nodes=2 ++split_name=test ++batch_size=32 "
+   --extra_eval_args="--num_jobs=2 ++split_name=test ++batch_size=32 "
    ```
 
    You can customize any of the SFT parameters by directly providing those
-   arguments to the [pipeline/run_sft_and_eval.py](/pipeline/run_sft_and_eval.py) script (training data is already customized
+   arguments to the [pipeline/run_pipeline.py](/pipeline/run_pipeline.py) script (training data is already customized
    in the example above). E.g. to disable dropout and use tensorboard logging instead of wandb you can set
 
    ```

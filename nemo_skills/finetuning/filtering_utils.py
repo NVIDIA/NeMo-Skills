@@ -30,11 +30,11 @@ def process_bad_solutions(
     code_solns = []
     text_solns = []
     for sample in samples:
-        if should_remove(sample['generated_solution'], solution_filters):
+        if should_remove(sample['generation'], solution_filters):
             continue
         if should_trim:
-            sample['generated_solution'] = trim_output(sample['generated_solution'])
-        if CODE_SEPARATORS[0] in sample['generated_solution']:
+            sample['generation'] = trim_output(sample['generation'])
+        if CODE_SEPARATORS[0] in sample['generation']:
             code_solns.append(sample)
         else:
             text_solns.append(sample)
@@ -100,24 +100,24 @@ PATTERN_ANS = re.compile(r"\\boxed\{([^}]*)\}")
 PATTERN_CODE = re.compile(CODE_SEPARATORS[0])
 
 
-def remove_multi_boxed(generated_solution: str):
+def remove_multi_boxed(generation: str):
     """
     Returns `True` if the solution contains more than one `\\boxed` entry.
     """
-    if len(PATTERN_ANS.findall(generated_solution)) > 1:
+    if len(PATTERN_ANS.findall(generation)) > 1:
         return True
 
     return False
 
 
-def remove_broken_code(generated_solution: str):
+def remove_broken_code(generation: str):
     """
     Returns `True` if the solution has inconsistent code and code output separators order.
     """
-    code_start_indices = [match.start() for match in re.finditer(CODE_SEPARATORS[0], generated_solution)]
-    code_end_indices = [match.start() for match in re.finditer(CODE_SEPARATORS[1], generated_solution)]
-    code_out_start_indices = [match.start() for match in re.finditer(CODE_OUTPUT_SEPARATORS[0], generated_solution)]
-    code_out_end_indices = [match.start() for match in re.finditer(CODE_OUTPUT_SEPARATORS[1], generated_solution)]
+    code_start_indices = [match.start() for match in re.finditer(CODE_SEPARATORS[0], generation)]
+    code_end_indices = [match.start() for match in re.finditer(CODE_SEPARATORS[1], generation)]
+    code_out_start_indices = [match.start() for match in re.finditer(CODE_OUTPUT_SEPARATORS[0], generation)]
+    code_out_end_indices = [match.start() for match in re.finditer(CODE_OUTPUT_SEPARATORS[1], generation)]
 
     num_code_occs = set(
         [len(code_start_indices), len(code_end_indices), len(code_out_start_indices), len(code_out_end_indices)]
@@ -137,12 +137,12 @@ def remove_broken_code(generated_solution: str):
     return False
 
 
-def remove_useless_code(generated_solution: str):
+def remove_useless_code(generation: str):
     """
     Returns `True` if the solution has the first `\\boxed` entry before the first code block.
     """
-    ans_match = PATTERN_ANS.search(generated_solution)
-    code_match = PATTERN_CODE.search(generated_solution)
+    ans_match = PATTERN_ANS.search(generation)
+    code_match = PATTERN_CODE.search(generation)
     if not ans_match or not code_match:
         return False
 
@@ -156,14 +156,14 @@ filters_map = {
 }
 
 
-def should_remove(generated_solution: str, filters: List):
+def should_remove(generation: str, filters: List):
     """
     Applies filters sequentially to a generated solution.
     Returns `True` if any filter returns `True`.
     """
     for filter_name in filters:
         filter_fn = filters_map[filter_name]
-        if filter_fn(generated_solution):
+        if filter_fn(generation):
             return True
 
     return False

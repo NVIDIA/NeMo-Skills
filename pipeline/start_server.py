@@ -30,18 +30,19 @@ from nemo_skills.utils import setup_logging
 SLURM_CMD = """
 nvidia-smi && \
 export PYTHONPATH=/code && \
-{server_start_cmd} && \
-if [ $SLURM_LOCALID -eq 0 ]; then \
+export HF_TOKEN={HF_TOKEN} && \
+if [ $SLURM_PROCID -eq 0 ]; then \
+    {{ {server_start_cmd} 2>&1 | tee /tmp/server_logs.txt & }} && sleep 1 && \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/{server_wait_string}/ q' && \
     tail -n10 /tmp/server_logs.txt &&  \
     SERVER_ADDRESS=$(tail -n 10 /tmp/server_logs.txt | \
     grep -oP 'http://\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1) && \
     echo "Server is running on $SERVER_ADDRESS" && \
-    echo "Sandbox is running on ${{NEMO_SKILLS_SANDBOX_HOST:-$SERVER_ADDRESS}}" && \
-    sleep infinity;
-else \
+    {sandbox_echo} \
     sleep infinity; \
+else \
+    {server_start_cmd}; \
 fi \
 """
 MOUNTS = "{NEMO_SKILLS_CODE}:/code,{model_path}:/model"
@@ -57,18 +58,29 @@ if __name__ == "__main__":
     parser.add_argument("--server_type", choices=('nemo', 'tensorrt_llm', 'vllm'), default='tensorrt_llm')
     parser.add_argument("--num_gpus", type=int, required=True)
     parser.add_argument(
+        "--num_nodes",
+        type=int,
+        default=1,
+        help="Number of nodes required for hosting LLM server.",
+    )
+    parser.add_argument(
         "--partition",
         required=False,
         help="Can specify if need interactive jobs or a specific non-default partition",
+    )
+    parser.add_argument(
+        "--no_sandbox", action="store_true", help="Disables sandbox if code execution is not required."
     )
     args = parser.parse_args()
 
     args.model_path = Path(args.model_path).absolute()
 
     server_start_cmd, num_tasks, server_wait_string = get_server_command(
-        args.server_type, args.num_gpus, args.model_path.name
+        args.server_type, args.num_gpus, args.num_nodes, args.model_path.name
     )
 
+    # TODO: VLLM
+    sandbox_echo = 'echo "Sandbox is running on {$NEMO_SKILLS_SANDBOX_HOST:-$SERVER_ADDRESS}" &&'
     format_dict = {
         "model_path": args.model_path,
         "model_name": args.model_path.name,
@@ -76,19 +88,21 @@ if __name__ == "__main__":
         "server_start_cmd": server_start_cmd,
         "server_type": args.server_type,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+        "HF_TOKEN": os.getenv("HF_TOKEN", ""),  # needed for some of the models, so making an option to pass it in
         "server_wait_string": server_wait_string,
+        "sandbox_echo": sandbox_echo if not args.no_sandbox else "",
     }
 
     job_id = launch_job(
         cmd=SLURM_CMD.format(**format_dict),
-        num_nodes=1,
+        num_nodes=args.num_nodes,
         tasks_per_node=num_tasks,
         gpus_per_node=format_dict["num_gpus"],
         job_name=JOB_NAME.format(**format_dict),
         container=CLUSTER_CONFIG["containers"][args.server_type],
         mounts=MOUNTS.format(**format_dict),
         partition=args.partition,
-        with_sandbox=True,
+        with_sandbox=(not args.no_sandbox),
         extra_sbatch_args=["--parsable"],
     )
 

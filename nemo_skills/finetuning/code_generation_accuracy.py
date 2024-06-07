@@ -17,8 +17,8 @@ import logging
 import torch
 from torchmetrics import Metric
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.inference.server.model import extract_answer
 
 LOG = logging.getLogger(__name__)
 

@@ -1,0 +1,9 @@
+backoff
+hydra-core
+numpy
+openai
+pyyaml
+rank_bm25
+requests
+sympy
+tqdm

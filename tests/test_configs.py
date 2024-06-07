@@ -22,7 +22,7 @@ def test_error_on_extra_params():
     # test is not supported
     cmd = """python nemo_skills/inference/generate_solutions.py \
         output_file=./test-results/gsm8k/output-greedy.jsonl \
-        +prompt=code_sfted \
+        +prompt=openmathinstruct/sft \
         ++prompt.few_shot_examples.examples_type=null \
         ++prompt.context_type=empty \
         ++dataset=gsm8k \
@@ -39,7 +39,7 @@ def test_error_on_extra_params():
     # prompt.num_few_shots is not supported
     cmd = """python nemo_skills/inference/generate_solutions.py \
         output_file=./test-results/gsm8k/output-greedy.jsonl \
-        +prompt=code_sfted \
+        +prompt=openmathinstruct/sft \
         ++prompt.few_shot_examples.examples_type=null \
         ++prompt.num_few_shots=0 \
         ++prompt.context_type=empty \

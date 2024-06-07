@@ -96,7 +96,6 @@ def set_config(cfg: VisualizationConfig) -> None:
     config['data_explorer'].pop('output_file')
     config['data_explorer'].pop('dataset')
     config['data_explorer'].pop('split_name')
-    config['data_explorer'].pop('example_dicts')
 
 
 set_config()

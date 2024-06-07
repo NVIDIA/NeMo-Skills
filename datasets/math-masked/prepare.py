@@ -49,7 +49,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--random_seed", type=int, default=42)
     parser.add_argument("--validation_size", type=int, default=1000)
-    parser.add_argument("--prompt_type", default="code_sfted", choices=prompt_types)
+    parser.add_argument("--prompt_type", default="openmathinstruct/sft", choices=prompt_types)
     args = parser.parse_args()
 
     data_folder = Path(__file__).absolute().parent
@@ -72,7 +72,10 @@ if __name__ == "__main__":
         data = data[: args.validation_size]
         # dumping SFT-ready validation file as well right away
         with open(data_folder / "validation-sft.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "math"):
+            for entry in prepare_for_sft(data, args.prompt_type, "math-masked", chat_format=False):
+                fout.write(json.dumps(entry) + "\n")
+        with open(data_folder / "validation-sft-chat.jsonl", "wt", encoding="utf-8") as fout:
+            for entry in prepare_for_sft(data, args.prompt_type, "math-masked", chat_format=True):
                 fout.write(json.dumps(entry) + "\n")
     elif args.split_name == "train":
         data = data[args.validation_size :]

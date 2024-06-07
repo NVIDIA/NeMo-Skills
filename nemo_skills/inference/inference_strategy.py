@@ -18,14 +18,13 @@ import torch
 from megatron.core import parallel_state
 from nemo.collections.nlp.modules.common.text_generation_strategy import GPTModelTextGenerationStrategy
 
-from nemo_skills.code_execution import CODE_OUTPUT_SEPARATORS, CODE_SEPARATORS, extract_code_to_execute
-from nemo_skills.code_execution.sandbox import get_sandbox
-
 
 class CodeExecutionStrategy(GPTModelTextGenerationStrategy):
     def __init__(
         self, sandbox_cfg: Dict, timeout=10.0, max_code_output_characters=1000, stop_on_code_error=True, **kwargs
     ):
+        from nemo_skills.code_execution.sandbox import get_sandbox
+
         super().__init__(**kwargs)
         self.sandbox = get_sandbox(**sandbox_cfg)
         self.execution_state = None
@@ -41,6 +40,8 @@ class CodeExecutionStrategy(GPTModelTextGenerationStrategy):
             new_token (torch.Tensor): sampled new token id
             context_length (int): the new token position in the tokens
         """
+        from nemo_skills.code_execution import CODE_OUTPUT_SEPARATORS, CODE_SEPARATORS, extract_code_to_execute
+
         if self.execution_state is None:
             self.execution_state = [
                 {

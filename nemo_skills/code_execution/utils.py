@@ -15,8 +15,6 @@
 import re
 from typing import Tuple
 
-from nemo_skills.code_execution.sandbox import Sandbox
-
 CODE_SEPARATORS = ('<llm-code>', '</llm-code>')  # used to execute code within these tags
 CODE_OUTPUT_SEPARATORS = ('<llm-code-output>', '</llm-code-output>')  # used to extract the code output
 
@@ -42,6 +40,8 @@ def extract_code_output(generation, extract_all=False):
 
 def extract_error_message(generation):
     """Parsing output for any error messages and returning if found."""
+    from nemo_skills.code_execution.sandbox import Sandbox
+
     if CODE_OUTPUT_SEPARATORS[0] not in generation:
         return Sandbox.NOT_EXECUTED
     code_output = generation.split(CODE_OUTPUT_SEPARATORS[0])[-1].split(CODE_OUTPUT_SEPARATORS[1])[0].strip()

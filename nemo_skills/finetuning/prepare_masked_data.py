@@ -81,7 +81,7 @@ def load_masked_solns(masked_soln_file):
         with open(masked_file) as masked_f:
             for masked_soln_line in masked_f:
                 masked_soln_obj = json.loads(masked_soln_line.strip())
-                masked_soln = masked_soln_obj["generated_solution"]
+                masked_soln = masked_soln_obj["generation"]
 
                 if masked_soln_obj.get("is_correct", False):
                     # Means that the correct answer could be extracted from the answer string

@@ -15,6 +15,7 @@
 # adapted from https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_eval.py
 
 import datetime
+import logging
 import os
 
 import torch
@@ -145,4 +146,6 @@ def main(cfg) -> None:
 
 
 if __name__ == '__main__':
+    # setting nemo logging to warning as there is too much info otherwise
+    logging.getLogger("nemo_logger").setLevel(logging.WARNING)
     main()  # noqa pylint: disable=no-value-for-parameter

@@ -24,9 +24,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parents[1]))
 from utils import prepare_for_sft
 
-# utils is adding main package to path already
-from nemo_skills.inference.prompt.utils import prompt_types
-
 URL = "https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/{}.jsonl"
 
 
@@ -64,7 +61,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--random_seed", type=int, default=42)
     parser.add_argument("--validation_size", type=int, default=1000)
-    parser.add_argument("--prompt_type", default="code_sfted", choices=prompt_types)
+    parser.add_argument("--prompt_type", default="openmathinstruct/sft")
     args = parser.parse_args()
 
     actual_split_name = "test" if args.split_name == "test" else "train"
@@ -106,7 +103,10 @@ if __name__ == "__main__":
         data = data[: args.validation_size]
         # dumping SFT-ready validation file as well right away
         with open(data_folder / "validation-sft.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "gsm8k"):
+            for entry in prepare_for_sft(data, args.prompt_type, "gsm8k", chat_format=False):
+                fout.write(json.dumps(entry) + "\n")
+        with open(data_folder / "validation-sft-chat.jsonl", "wt", encoding="utf-8") as fout:
+            for entry in prepare_for_sft(data, args.prompt_type, "gsm8k", chat_format=True):
                 fout.write(json.dumps(entry) + "\n")
     elif args.split_name == "train":
         data = data[args.validation_size :]

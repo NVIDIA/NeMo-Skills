@@ -195,9 +195,11 @@ def test_few_shots(sandbox_type):
 
     for example_name, example_list in examples_map.items():
         for example in example_list:
-            if len(extract_code_to_execute(example['generated_solution'], extract_all=True)) > 1:
-                code_snippets = extract_code_to_execute(example['generated_solution'], extract_all=True)
-                expected_outputs = extract_code_output(example['generated_solution'], extract_all=True)
+            if 'generation' not in example:
+                continue
+            if len(extract_code_to_execute(example['generation'], extract_all=True)) > 1:
+                code_snippets = extract_code_to_execute(example['generation'], extract_all=True)
+                expected_outputs = extract_code_output(example['generation'], extract_all=True)
                 session_id = None
                 for code_snippet, expected_output in zip(code_snippets, expected_outputs):
                     output, session_id = sandbox.execute_code(code_snippet, session_id=session_id)

@@ -16,7 +16,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="nemo_skills",
-    version="0.2.0",
+    version="0.3.0",
     description="NeMo Skills - a project to improve skills of LLMs",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -32,10 +32,12 @@ setup(
         'requests',
         'backoff',
         'sympy',
+        'rank_bm25',
+        'openai',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],

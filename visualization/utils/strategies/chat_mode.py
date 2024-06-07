@@ -58,7 +58,7 @@ class ChatModeStrategy(ModeStrategies):
             **{key: "" for key, value in get_utils_from_config(self.config).items() if isinstance(value, str)},
         }
         utils_updated['user'] = '{question}'
-        utils_updated['prompt_template'] = '{user}\n{generated_solution}'
+        utils_updated['prompt_template'] = '{user}\n{generation}'
         return super().get_prompt(
             utils_updated,
             params,

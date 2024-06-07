@@ -26,35 +26,18 @@ from typing import Any, Dict, List, Optional
 import hydra
 import numpy as np
 import tqdm
-import yaml
 from omegaconf import MISSING
 
 sys.path.append(str(Path(__file__).absolute().parents[2]))
 
 from nemo_skills.finetuning.filtering_utils import downsample_data, process_bad_solutions
-from nemo_skills.inference.prompt.utils import FewShotExamples, Prompt, PromptConfig
+from nemo_skills.inference.prompt.utils import Prompt, get_prompt_config
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
 
 # TODO: this should be done as a pipeline with different filterings / downsampling
 #       ideally directly use nemo curator for this
-
-
-def get_default_prompt_config():
-    # by default reading code_sfted.yaml, but users can override
-    with open(
-        Path(__file__).parents[1] / "inference" / "prompt" / f"code_sfted.yaml",
-        "rt",
-        encoding="utf-8",
-    ) as fin:
-        prompt_config = PromptConfig(_init_nested=True, **yaml.safe_load(fin))
-
-    prompt_config.context_type = "empty"
-    prompt_config.few_shot_examples = FewShotExamples(template="")
-    prompt_config.few_shot_examples.examples_type = "gsm8k_text_with_code"  # not used since num_few_shots = 0
-    prompt_config.few_shot_examples.num_few_shots = 0
-    return prompt_config
 
 
 @nested_dataclass
@@ -73,11 +56,14 @@ class PrepareSFTDataConfig:
     downsampling_method: Optional[str] = None  # random or fair
     num_output_samples: int = -1
 
-    prompt: PromptConfig = field(default_factory=get_default_prompt_config)
+    # TODO: support prompt config directly, but there are some hydra issues
+    prompt_type: str = 'openmathinstruct/sft'
 
     filters: List[str] = field(default_factory=lambda: ["multi_boxed", "broken_code"])
     text_filter_type: Optional[str] = None
     trim_solutions: bool = False
+
+    chat_format: bool = False  # whether to use NeMo's chat format
 
     def __post_init__(self):
         """Building data_file from dataset/split_name if not provided directly."""
@@ -100,23 +86,29 @@ class PrepareSFTDataConfig:
             self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(" ")
 
 
-def read_preprocessed_data(file_paths, grouped_samples: Dict[str, List]):
+def read_preprocessed_data(file_paths, grouped_samples: Dict[str, List]) -> int:
+    questions = set()
     for file_path in file_paths:
         with open(file_path, "rt", encoding="utf-8") as file_handle:
             for line in tqdm.tqdm(file_handle):
                 sample = json.loads(line)
+                questions.add(sample["question"])
+                # for backward compatibility
+                if "generation" not in sample and "generated_solution" in sample:
+                    sample["generation"] = sample.pop("generated_solution")
                 grouped_samples[sample["question"]].append(sample)
 
+    return len(questions)
 
-def read_raw_data(file_handles, cfg: PrepareSFTDataConfig, grouped_samples: Dict[str, List]):
-    data_size = 0
+
+def read_raw_data(file_handles, cfg: PrepareSFTDataConfig, grouped_samples: Dict[str, List]) -> int:
+    questions = set()
     for idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
         if idx < cfg.skip_first:
             continue
-        data_size += 1
 
-        seen_predictions = set()
-        for file_line in lines:
+        seen_predictions = {}
+        for lidx, file_line in enumerate(lines):
             # if different files have different number of lines
             if file_line is None:
                 continue
@@ -124,6 +116,11 @@ def read_raw_data(file_handles, cfg: PrepareSFTDataConfig, grouped_samples: Dict
             # can be empty for incomplete generations
             if not line_dict:
                 continue
+
+            questions.add(line_dict["question"])
+            if line_dict["question"] not in seen_predictions:
+                seen_predictions[line_dict["question"]] = set()
+
             # skipping any incomplete generations
             if "is_correct" not in line_dict:
                 LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
@@ -135,12 +132,18 @@ def read_raw_data(file_handles, cfg: PrepareSFTDataConfig, grouped_samples: Dict
             if not cfg.add_incorrect and not line_dict["is_correct"]:
                 continue
 
-            if line_dict["generated_solution"] in seen_predictions:
+            # for backward compatibility
+            if "generation" not in line_dict and "generated_solution" in line_dict:
+                line_dict["generation"] = line_dict.pop("generated_solution")
+
+            if line_dict["generation"] in seen_predictions[line_dict["question"]]:
                 continue
-            seen_predictions.add(line_dict["generated_solution"])
+
+            seen_predictions[line_dict["question"]].add(line_dict["generation"])
+            line_dict['filename'] = file_handles[lidx].name
             grouped_samples[line_dict["question"]].append(line_dict)
 
-    return data_size
+    return len(questions)
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -152,35 +155,44 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
     cfg = PrepareSFTDataConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    data_size = None
+    data_size = 0
     grouped_samples = defaultdict(list)
     if cfg.preprocessed_dataset_files:
-        read_preprocessed_data(cfg.preprocessed_dataset_files, grouped_samples)
+        data_size += read_preprocessed_data(cfg.preprocessed_dataset_files, grouped_samples)
 
     if cfg.prediction_jsonl_files:
         file_handles = [
             open(manifest, "rt", encoding="utf-8") for manifest in unroll_files(cfg.prediction_jsonl_files)
         ]
-        data_size = read_raw_data(file_handles, cfg, grouped_samples)
+        data_size += read_raw_data(file_handles, cfg, grouped_samples)
         for handle in file_handles:
             handle.close()
 
     prepared_data = []
     total_covered = 0
     samples_per_question = []
+    prompt_config = get_prompt_config(cfg.prompt_type)
+    prompt = Prompt(config=prompt_config)
     # only looping over the correct samples (unless asked for incorrect)
     for question, samples in tqdm.tqdm(grouped_samples.items()):
         filtered_solutions = process_bad_solutions(samples, cfg.filters, cfg.text_filter_type, cfg.trim_solutions)
-
         samples_per_question.append(len(filtered_solutions))
         total_covered += samples_per_question[-1] != 0
 
         for sample in filtered_solutions:
             # including all fields in case they are useful for training
             elem = sample.copy()
-            # NeMo requires input/output fields
-            elem["input"] = str(Prompt(config=cfg.prompt, input_dict={"question": question}))
-            elem["output"] = elem.pop("generated_solution")
+            if cfg.chat_format:
+                elem['conversations'] = [
+                    {'value': question, 'from': 'User', 'canonical_form': ''},
+                    {'value': elem.pop("generation"), 'from': 'Assistant', 'canonical_form': ''},
+                ]
+                elem['system'] = prompt_config.system
+                elem['mask'] = 'User'
+                elem['type'] = None
+            else:
+                elem["input"] = prompt.build_string(input_dict={"question": question})
+                elem["output"] = elem.pop("generation")
             elem.update(cfg.metadata)
             prepared_data.append(elem)
 
@@ -191,8 +203,7 @@ def prepare_sft_data(cfg: PrepareSFTDataConfig):
             [samples_per_question, np.zeros(data_size - len(samples_per_question), dtype=int)]
         )
     LOG.info("Total SFT entries: %d", len(prepared_data))
-    if data_size is not None:
-        LOG.info("Dataset coverage: %.2f%%", 100 * total_covered / data_size)
+    LOG.info("Dataset coverage: %.2f%%", 100 * total_covered / data_size)
     LOG.info("Samples per question = %.2f ± %.2f", samples_per_question.mean(), samples_per_question.std())
     random.shuffle(prepared_data)
 

@@ -39,7 +39,7 @@ from utils.strategies.base_strategy import ModeStrategies
 
 from nemo_skills.evaluation.evaluate_results import EvaluateResultsConfig, evaluate_results
 from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig, InferenceConfig, generate_solutions
-from nemo_skills.inference.prompt.utils import FewShotExamples, PromptConfig
+from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, PromptConfig
 
 
 class WholeDatasetModeStrategy(ModeStrategies):
@@ -84,7 +84,7 @@ class WholeDatasetModeStrategy(ModeStrategies):
         )
 
         generate_solutions_config.prompt.few_shot_examples = self._get_config(
-            FewShotExamples,
+            FewShotExamplesConfig,
             utils,
             current_app.config['data_explorer']['prompt']['few_shot_examples'],
         )

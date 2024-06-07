@@ -31,15 +31,19 @@ cluster, you can skip to the [Slurm prerequisites](#slurm) section.
 
    ```
    export NEMO_SKILLS_CONFIG=<path to this repo>/cluster_configs/local.yaml
-   # only required for pipeline/run_sft_and_eval.py - will be used to save sft checkpoints and eval results
+   # only required for pipeline/run_pipeline.py - will be used to save sft checkpoints and eval results
    export NEMO_SKILLS_RESULTS=<where you want to save results>
    # only required for running SFT jobs
    export NEMO_SKILLS_DATA=<folder containing training data file(s)>
    export WANDB_API_KEY=<your weights and biases api key if you want to use it for SFT logging>
+   export HF_TOKEN=<if you plan to use gated models such as llama3>
    ```
 
 4. Install the project and required dependencies: `pip install -e .`
 5. Download and prepare all benchmark datasets: `./datasets/prepare_all.sh`
+
+Please note that when running pipeline scripts locally, you will always see an mpi error
+at the end even if the script finished execution successfully.
 
 ## Slurm
 
@@ -50,11 +54,12 @@ The following are prerequisites for running scripts on a Slurm cluster.
 
    ```
    export NEMO_SKILLS_CONFIG=<path to this repo>/cluster_configs/slurm.yaml
-   # only required for pipeline/run_sft_and_eval.py - will be used to save sft checkpoints and eval results
+   # only required for pipeline/run_pipeline.py - will be used to save sft checkpoints and eval results
    export NEMO_SKILLS_RESULTS=<where you want to save results>
    # only required for running SFT jobs
    export NEMO_SKILLS_DATA=<folder containing training data file(s)>
    export WANDB_API_KEY=<your weights and biases api key if you want to use it for SFT logging>
+   export HF_TOKEN=<if you plan to use gated models such as llama3>
    ```
 
 3. We try to avoid installing packages on Slurm login nodes, but there is still one package that's required: `pip install --user pyyaml`

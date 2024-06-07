@@ -42,7 +42,12 @@ from utils.common import (
 )
 from utils.strategies.strategy_maker import RunPromptStrategyMaker
 
-from nemo_skills.inference.prompt.utils import FewShotExamples, PromptConfig, context_templates, get_prompt_config
+from nemo_skills.inference.prompt.utils import (
+    FewShotExamplesConfig,
+    PromptConfig,
+    context_templates,
+    get_prompt_config,
+)
 
 
 @app.callback(
@@ -247,7 +252,7 @@ def update_examples(
             "value",
         )
         for field in get_utils_from_config(
-            {"prompt": asdict(PromptConfig(few_shot_examples=FewShotExamples()))}
+            {"prompt": asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))}
         ).keys()
     ]
     + [
@@ -270,7 +275,7 @@ def update_prompt_type(prompt_type: str, js_trigger: str) -> Union[NoUpdate, dbc
         if os.path.splitext(file)[1] == '.yaml'
     ]
     if prompt_type not in prompt_types:
-        output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamples()))).keys())
+        output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))).keys())
         return [no_update] * (output_len + 2)
     prompt_config = get_prompt_config(prompt_type)
     current_app.config['data_explorer']['prompt']['stop_phrases'] = list(prompt_config.stop_phrases)

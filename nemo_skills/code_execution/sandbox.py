@@ -237,6 +237,17 @@ print(json.dumps(to_return))
         with open(Path(__file__).absolute().parent / "math_grader.py", "rt") as fin:
             math_grader_code = fin.read()
 
+        # corner cases
+        if isinstance(pred_output, str):
+            pred_output = pred_output.replace("'''", r'\'\'\'')
+            while pred_output.endswith('\\'):
+                pred_output = pred_output[:-1]
+
+        if isinstance(gt_output, str):
+            gt_output = gt_output.replace("'''", r'\'\'\'')
+            while gt_output.endswith('\\'):
+                gt_output = gt_output[:-1]
+
         TO_EXECUTE = f"""
 import os
 import sys
@@ -251,8 +262,8 @@ stdout = sys.stdout
 sys.stdout = sys.stderr = StringIO()
 try:
     output = math_equal(
-        r"{pred_output}",
-        r"{gt_output}",
+        r'''{pred_output}''',
+        r'''{gt_output}''',
         {include_percentage},
         {tolerance},
         {timeout},
@@ -319,6 +330,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     data[-1][-1] = json.dumps(line_dict)
 
                     predicted_answer = line_dict.get("predicted_answer", Sandbox.NOT_EXECUTED)
+                    if (predicted_answer, gt_answer) in map_to_future:
+                        continue
 
                     if ignore_cache or line_dict.get("is_correct") is None:
                         map_to_future[(predicted_answer, gt_answer)] = executor.submit(

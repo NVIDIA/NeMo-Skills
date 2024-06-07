@@ -15,7 +15,7 @@
 [tool.isort]
 profile = "black"  # black-compatible
 line_length = 119  # should match black parameters
-py_version = 38  # python 3.8 as a target version
+py_version = 310  # python 3.10 as a target version
 
 
 [tool.black]
@@ -26,7 +26,7 @@ skip_string_normalization = true
 name = "nemo_skills"
 description = "NeMo Skills - a project to improve skills of LLMs"
 dynamic = ["version"]
-requires-python = ">= 3.8"
+requires-python = ">= 3.10"
 readme = "README.md"
 license = {file = "LICENSE"}
 dependencies = [
@@ -37,6 +37,8 @@ dependencies = [
   'requests',
   'backoff',
   'sympy',
+  'rank_bm25',
+  'openai',
 ]
 
 [tool.setuptools.packages.find]
