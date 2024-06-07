@@ -100,8 +100,6 @@ def run_eval(
         f'    --num_gpus {args.num_gpus} '
         f'    --server_type {args.server_type} '
         f'    ++split_name=validation '
-        f'    +prompt=openmathinstruct/sft '  # TODO: this is not a good default anymore
-        f'    ++prompt.few_shot_examples.num_few_shots=0 '
         f'    {args.extra_eval_args} '
     )
     last_job_id = start_job(extra_sbatch_args, cmd)

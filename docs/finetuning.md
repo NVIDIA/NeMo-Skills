@@ -25,6 +25,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
       --nemo_model <path to the nemo model> \
       --num_nodes <number of nodes> \
       --num_gpus <number of GPUs per node> \
+      --extra_eval_args="+prompt=openmathinstruct/sft" \
       ++model.data.train_ds.file_path=/data/<path to the data inside NEMO_SKILLS_DATA folder>
    ```
 

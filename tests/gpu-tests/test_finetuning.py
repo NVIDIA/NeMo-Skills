@@ -45,7 +45,7 @@ python pipeline/run_pipeline.py \
       --num_nodes 1 \
       --num_gpus 2 \
       --disable_wandb \
-      --extra_eval_args "++max_samples=4 --benchmarks gsm8k:1 math:0 --num_jobs 1 --num_gpus 1" \
+      --extra_eval_args "+prompt=openmathinstruct/sft ++max_samples=4 --benchmarks gsm8k:1 math:0 --num_jobs 1 --num_gpus 1" \
       ++model.data.train_ds.file_path=/data/gsm8k/validation-sft.jsonl \
       ++trainer.sft.max_steps=15 \
       ++trainer.sft.val_check_interval=10 \
