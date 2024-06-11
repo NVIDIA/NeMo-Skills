@@ -112,16 +112,12 @@ class PromptConfig:
     user: str = MISSING
     system: str = MISSING
     context_type: str = "empty"
-    context_template: Optional[str] = None
+    _context_template: Optional[str] = None  # cannot be set directly for now!
     stop_phrases: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         """Initialize context_template if not provided."""
-        if self.context_template is None:
-            self.context_template = context_templates[self.context_type]
-        else:
-            if self.context_type != "empty":
-                raise ValueError("context_template should not be provided if context_type is not empty")
+        self._context_template = context_templates[self.context_type]
 
 
 class Prompt:
@@ -132,7 +128,7 @@ class Prompt:
 
     def build_context(self, example_dict: Dict[str, Any]) -> str:
         """Builds the context string based on the example dictionary."""
-        context = self.config.context_template.format(**example_dict)
+        context = self.config._context_template.format(**example_dict)
         return context
 
     def build_filled_example(self, example_dict: Dict[str, Any]) -> str:

@@ -17,15 +17,16 @@ from nemo_skills.inference.prompt.utils import Prompt, get_prompt_config
 
 
 def test_question_generation_rephrasing_prompt():
-    prompt = Prompt(config=get_prompt_config('question_generation/rephrasing'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('question_generation/rephrasing')
+    config.few_shot_examples.example_dicts = [
         {
             'question': 'Are you sure you want to do that?',
             'rephrased_question': "Is this really what you want to do?",
         },
         {'question': 'How are you?', 'rephrased_question': "How is it going?"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """You are an AI assistant that excels at rephrasing questions. Follow the given examples.
 
@@ -58,15 +59,16 @@ Rephrase the above question:
 
 
 def test_question_generation_augmentation_prompt():
-    prompt = Prompt(config=get_prompt_config('question_generation/augmentation'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('question_generation/augmentation')
+    config.few_shot_examples.example_dicts = [
         {
             'question': 'Are you sure you want to do that?',
             'augmented_question': "Is this really what you want to do?",
         },
         {'question': 'How are you?', 'augmented_question': "How is it going?"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """You are an AI assistant that excels at creating similar questions. Follow the given examples.
 
@@ -99,12 +101,13 @@ Write another question similar to this one:
 
 
 def test_llama3_instruct_prompt():
-    prompt = Prompt(config=get_prompt_config('llama3/instruct'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('llama3/instruct')
+    config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -143,12 +146,13 @@ Question:
 
 
 def test_llama3_base_prompt():
-    prompt = Prompt(config=get_prompt_config('llama3/base'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('llama3/base')
+    config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """<|begin_of_text|>Here are some examples of questions and solutions followed by a new question that you need to solve.
 Make sure to put the answer (and only answer) inside \\boxed{}.
@@ -182,12 +186,13 @@ My solution:
 
 
 def test_openmathinstruct_base_prompt():
-    prompt = Prompt(config=get_prompt_config('openmathinstruct/base'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('openmathinstruct/base')
+    config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """Here are some examples of questions and solutions followed by a new question that you need to solve.
 Make sure to put the answer (and only answer) inside \\boxed{}.
@@ -245,12 +250,13 @@ def test_nemotron_zeroshot_prompt():
 
 
 def test_nemotron_fewshot_prompt():
-    prompt = Prompt(config=get_prompt_config('nemotron/fewshot'))
-    prompt.config.few_shot_examples.example_dicts = [
+    config = get_prompt_config('nemotron/fewshot')
+    config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!"},
     ]
-    prompt.config.few_shot_examples.num_few_shots = 2
+    config.few_shot_examples.num_few_shots = 2
+    prompt = Prompt(config=config)
 
     expected_prompt = """<extra_id_0>System
 
@@ -258,20 +264,20 @@ def test_nemotron_fewshot_prompt():
 Here are some examples of questions and solutions followed by a new question that you need to solve.
 Make sure to put the answer (and only answer) inside \\boxed{}.
 
-Question:
+Example question:
 1 + 1 = ?
 
-My solution:
+Example solution:
 That's easy: 2!
 
 
 
 
 
-Question:
+Example question:
 5 + 5 = ?
 
-My solution:
+Example solution:
 That's easy: 10!
 
 
@@ -281,7 +287,67 @@ That's easy: 10!
 Question:
 2 + 2 = ?
 
+
+
+Don't forget that your final answer should be inside \\boxed{}!
 <extra_id_1>Assistant
-My solution:
 """
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
+
+
+def test_nemotron_fewshot_prompt_reference():
+    config = get_prompt_config('nemotron/fewshot')
+    config.few_shot_examples.example_dicts = [
+        {'question': '1 + 1 = ?', 'generation': "That's easy: 2!", 'reference_solution': "Think hard - it's 2"},
+        {'question': '5 + 5 = ?', 'generation': "That's easy: 10!", 'reference_solution': "Isn't it 10?"},
+    ]
+    config.few_shot_examples.num_few_shots = 2
+    config.context_type = 'reference_solution'
+    prompt = Prompt(config=config)
+
+    expected_prompt = """<extra_id_0>System
+
+<extra_id_1>User
+Here are some examples of questions and solutions followed by a new question that you need to solve.
+Make sure to put the answer (and only answer) inside \\boxed{}.
+
+Example question:
+1 + 1 = ?
+
+Reference solution (do not copy it):
+Think hard - it's 2
+
+Example solution:
+That's easy: 2!
+
+
+
+
+
+Example question:
+5 + 5 = ?
+
+Reference solution (do not copy it):
+Isn't it 10?
+
+Example solution:
+That's easy: 10!
+
+
+
+
+
+Question:
+2 + 2 = ?
+
+Reference solution (do not copy it):
+What should I do??
+
+
+
+Don't forget that your final answer should be inside \\boxed{}!
+<extra_id_1>Assistant
+"""
+    assert (
+        prompt.build_string({'question': '2 + 2 = ?', 'reference_solution': 'What should I do??'}) == expected_prompt
+    )

@@ -199,6 +199,7 @@ python pipeline/run_eval.py \
     +prompt=openmathinstruct/base \
     ++prompt.few_shot_examples.examples_type=gsm8k_only_code \
     ++prompt.few_shot_examples.num_few_shots=5 \
+    ++prompt.context_type=reference_solution \
     ++split_name=test \
     batch_size=8 \
     max_samples=20 \
@@ -215,5 +216,5 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"])
-    assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (10, 90, 0)
+    assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (95, 5, 0)
     assert total == 20

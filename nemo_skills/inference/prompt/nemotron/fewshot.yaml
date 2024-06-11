@@ -1,5 +1,5 @@
 few_shot_examples:
-  template: "Question:\n{question}\n\n{context}My solution:\n{generation}\n\n\n\n\n\n"
+  template: "Example question:\n{question}\n\n{context}Example solution:\n{generation}\n\n\n\n\n\n"
 
 system: ""
 
@@ -12,12 +12,15 @@ user: |-
 
     {context}
 
+    Don't forget that your final answer should be inside \boxed{{}}!
+
 prompt_template: |-
   <extra_id_0>System
   {system}
   <extra_id_1>User
-  {user}<extra_id_1>Assistant
-  My solution:
+  {user}
+  <extra_id_1>Assistant
   {generation}
 
 stop_phrases: ["\n\n\n\n\n\n", "<extra_id_1>"]
+
