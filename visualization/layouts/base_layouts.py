@@ -225,7 +225,7 @@ def get_input_group_layout(
     )
 
 
-def get_utils_field_representation(value: Union[str, int, float, bool], key: Optional[str] = None) -> str:
+def get_utils_field_representation(value: Union[str, int, float, bool], key: str = "") -> str:
     return (
         UNDEFINED
         if value is None and key.split(SEPARATOR_ID)[-1] in current_app.config['data_explorer']['types']

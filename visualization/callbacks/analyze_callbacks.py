@@ -17,7 +17,6 @@ import logging
 import os
 from typing import Dict, List, Tuple
 
-import dash_bootstrap_components as dbc
 from callbacks import app
 from dash import ALL, callback_context, html, no_update
 from dash.dependencies import Input, Output, State

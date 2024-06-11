@@ -31,6 +31,18 @@ METRICS = "metrics"
 OUTPUT = "output"
 OUTPUT_PATH = "{}-{}.jsonl"
 PARAMS_FOR_WHOLE_DATASET_ONLY = ['offset', 'max_samples', 'batch_size']
+PARAMS_TO_REMOVE = [
+    'output_file',
+    'dataset',
+    'split_name',
+    'example_dicts',
+    'retriever',
+    'retrieval_file',
+    'retrieval_field',
+    'max_retrieved_chars',
+    'max_retrieved_chars_field',
+    'retrieved_entries',
+]
 PARAMETERS_FILE_NAME = "visualization/results/parameters.json"
 STATS_KEYS = [
     'question_index',

@@ -22,11 +22,11 @@ import hydra
 from dash import Dash
 from flask import Flask
 from omegaconf import MISSING, DictConfig, OmegaConf
-from settings.constants import UNDEFINED
+from settings.constants import PARAMS_TO_REMOVE, UNDEFINED
 from settings.visualization_config import VisualizationConfig
 
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
-from nemo_skills.inference.prompt.utils import context_templates, get_prompt_config
+from nemo_skills.inference.prompt.utils import context_templates, get_prompt_config, prompt_types
 from nemo_skills.utils import setup_logging
 
 setup_logging()
@@ -41,18 +41,9 @@ def set_config(cfg: VisualizationConfig) -> None:
 
     prompt_type = UNDEFINED  # TODO detect prompt_type
 
-    prompt_types = [
-        os.path.splitext(file)[0]
-        for file in os.listdir(
-            Path.joinpath(
-                Path(__file__).parents[2].absolute(),
-                "nemo_skills/inference/prompt",
-            )
-        )
-        if os.path.splitext(file)[1] == '.yaml'
-    ]
+    prompt_types_without_extension = list(map(lambda name: name.split('.')[0], prompt_types))
 
-    for name in prompt_types:
+    for name in prompt_types_without_extension:
         if get_prompt_config(name) == cfg.prompt:
             prompt_type = name
             break
@@ -70,6 +61,14 @@ def set_config(cfg: VisualizationConfig) -> None:
                 setattr(cfg, key, UNDEFINED)
         return cfg
 
+    def remove_field(cfg: Dict, field: str) -> None:
+        for key, value in cfg.items():
+            if isinstance(value, Dict):
+                if field in value:
+                    value.pop(field)
+                    return
+                remove_field(cfg[key], field)
+
     cfg.prompt = set_undefined(OmegaConf.to_container(cfg.prompt), cfg.prompt)
 
     config['data_explorer'] = asdict(OmegaConf.to_object(cfg))
@@ -85,7 +84,7 @@ def set_config(cfg: VisualizationConfig) -> None:
     ]
 
     config['data_explorer']['types'] = {
-        "prompt_type": [UNDEFINED] + prompt_types,
+        "prompt_type": [UNDEFINED] + prompt_types_without_extension,
         "examples_type": [UNDEFINED] + list(examples_map.keys()),
         "context_type": [UNDEFINED] + list(context_templates.keys()),
     }
@@ -93,9 +92,8 @@ def set_config(cfg: VisualizationConfig) -> None:
     config['data_explorer']['data_file'] = str(config['data_explorer']['data_file'])
     # All parameters in config can be modified through the application except Server and Sandbox configs
     # Following parameters are not used and should not be modified
-    config['data_explorer'].pop('output_file')
-    config['data_explorer'].pop('dataset')
-    config['data_explorer'].pop('split_name')
+    for param in PARAMS_TO_REMOVE:
+        remove_field(config['data_explorer'], param)
 
 
 set_config()

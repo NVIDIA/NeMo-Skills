@@ -34,7 +34,7 @@ from utils.common import get_examples, get_utils_from_config
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig, InferenceConfig
 from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, Prompt, PromptConfig
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.inference.server.code_execution_model import get_code_execution_model
 
 
 class ModeStrategies:
@@ -204,7 +204,7 @@ class ModeStrategies:
     def run(self, utils: Dict, params: Dict) -> html.Div:
         utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in utils.items()}
         self.sandbox_init()
-        llm = get_model(
+        llm = get_code_execution_model(
             **current_app.config['data_explorer']['server'],
             sandbox=self.sandbox,
         )
@@ -214,7 +214,7 @@ class ModeStrategies:
         inference_cfg = self._get_config(InferenceConfig, utils, current_app.config['data_explorer']['inference'])
 
         try:
-            outputs = llm(
+            outputs = llm.generate(
                 prompts=params['prompts'],
                 stop_phrases=current_app.config['data_explorer']['prompt']['stop_phrases'],
                 **asdict(inference_cfg),
@@ -268,8 +268,7 @@ class ModeStrategies:
         )
 
         prompt = Prompt(config=prompt_config)
-        prompt.context_template = utils['context_template']
-        prompt.few_shot_examples.examples_dicts = get_examples().get(
+        prompt.config.few_shot_examples.example_dicts = get_examples().get(
             utils.get('examples_type', None),
             [],
         )
@@ -301,7 +300,7 @@ class ModeStrategies:
         return html.Div(
             html.P(
                 [
-                    "Could not connect to the server. " "Please check that the server is running (look at ",
+                    "Could not connect to the server. Please check that the server is running (look at ",
                     html.A(
                         "inference.md",
                         href="https://github.com/Kipok/NeMo-Skills/blob/main/docs/inference.md",
