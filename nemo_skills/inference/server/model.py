@@ -197,7 +197,13 @@ class NemoModel(BaseModel):
         # we need to remove the original prompt as nemo always returns it
         outputs = [None] * len(generations['sentences'])
         for idx, generation in enumerate(generations['sentences']):
-            outputs[idx] = {'generation': generation[len(prompts[idx]) :]}
+            # when the prompt starts from special tokens like bos, nemo will remove them,
+            # so we need this hack to find where to start the cut
+            begin_idx = 0
+            while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
+                begin_idx += 1
+            outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
+
         if remove_stop_phrases:
             postprocess_output(outputs, stop_phrases)
         return outputs
