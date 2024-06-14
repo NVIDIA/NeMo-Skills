@@ -29,6 +29,7 @@ from nemo_skills.utils import setup_logging
 
 SLURM_CMD = """
 nvidia-smi && \
+cd /code && \
 export PYTHONPATH=/code && \
 export HF_TOKEN={HF_TOKEN} && \
 if [ $SLURM_PROCID -eq 0 ]; then \
@@ -36,9 +37,8 @@ if [ $SLURM_PROCID -eq 0 ]; then \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/{server_wait_string}/ q' && \
     tail -n10 /tmp/server_logs.txt &&  \
-    SERVER_ADDRESS=$(tail -n 10 /tmp/server_logs.txt | \
-    grep -oP 'http://\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1) && \
-    echo "Server is running on $SERVER_ADDRESS" && \
+    export NEMO_SKILLS_SERVER_HOST=`hostname -I` && \
+    echo "Server is running on $NEMO_SKILLS_SERVER_HOST" && \
     {sandbox_echo} \
     sleep infinity; \
 else \
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     )
 
     # TODO: VLLM
-    sandbox_echo = 'echo "Sandbox is running on {$NEMO_SKILLS_SANDBOX_HOST:-$SERVER_ADDRESS}" &&'
+    sandbox_echo = 'echo "Sandbox is running on ${NEMO_SKILLS_SANDBOX_HOST:-$NEMO_SKILLS_SERVER_HOST}" &&'
     format_dict = {
         "model_path": args.model_path,
         "model_name": args.model_path.name,
@@ -132,7 +132,7 @@ if __name__ == "__main__":
             for line in fin:
                 if "running on node" in line:
                     server_host = line.split()[-1].strip()
-                if "Running on all addresses" in line:
+                if server_wait_string in line:
                     server_started = True
         if server_started:
             print(f"Server has started at {server_host}")

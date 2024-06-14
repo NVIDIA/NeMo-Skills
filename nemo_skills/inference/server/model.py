@@ -403,8 +403,8 @@ class VLLMModel(BaseModel):
         for resp in response:
             for choice in resp.choices:
                 output = choice.text
-                # adding back stop words
-                if choice.finish_reason == "stop":
+                # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+                if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
                     output += choice.stop_reason
                 responses.append(output)
         return responses
