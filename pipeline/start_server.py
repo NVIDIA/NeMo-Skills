@@ -80,9 +80,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Assert that both model_path and model_name are provided
-    if args.model_name is not None and args.model_name is not None:
+    if args.model_path is not None and args.model_name is not None:
         raise ValueError("Both model_path and model_name cannot be provided")
-    elif args.model_name is None and args.model_name is None:
+    elif args.model_path is None and args.model_name is None:
         raise ValueError("Either model_path or model_name must be provided")
 
     if args.model_path is not None:
