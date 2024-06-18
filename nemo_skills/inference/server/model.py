@@ -312,7 +312,7 @@ class VLLMModel(BaseModel):
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = 0,
+        top_k: int = -1,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
@@ -348,7 +348,7 @@ class VLLMModel(BaseModel):
         max_tokens: int,
         temperature: float,
         top_p: float,
-        top_k: int = 1,
+        top_k: int = -1,
         num_generations: int = 1,
         stop=None,
         echo: bool = False,
@@ -366,7 +366,7 @@ class VLLMModel(BaseModel):
         # Process top_k
         extra_body = {
             "extra_body": {
-                "top_k": 1,
+                "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "spaces_between_special_tokens": False,
             }

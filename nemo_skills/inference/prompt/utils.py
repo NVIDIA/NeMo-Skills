@@ -206,8 +206,27 @@ class Prompt:
 
 
 def get_prompt_config(prompt_type: str) -> PromptConfig:
+    """
+    Reads the prompt config from the yaml file.
+
+    Args:
+        prompt_type: The name of the prompt config file. Can be the path to a yaml file or one of the available configs.
+
+    Returns:
+        The prompt config object.
+    """
     # reading prompt format from the yaml file, if not running through hydra
-    config_path = Path(__file__).parent / f"{prompt_type}.yaml"
+    internal_config_path = Path(__file__).parent / f"{prompt_type}.yaml"
+    if internal_config_path.exists():
+        config_path = internal_config_path
+
+    elif ".yaml" in prompt_type:
+        # Assume prompt type is a str to a filepath
+        config_path = Path(prompt_type).absolute()
+
+    else:
+        raise ValueError(f"Prompt config not found for {prompt_type}")
+
     with open(config_path, "rt", encoding="utf-8") as fin:
         prompt_config = PromptConfig(_init_nested=True, **yaml.safe_load(fin))
         return prompt_config
