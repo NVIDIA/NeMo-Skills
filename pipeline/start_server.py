@@ -42,7 +42,7 @@ if [ $SLURM_PROCID -eq 0 ]; then \
     echo "Waiting for the server to start" && \
     tail -n0 -f /tmp/server_logs.txt | sed '/{server_wait_string}/ q' && \
     tail -n10 /tmp/server_logs.txt &&  \
-    export NEMO_SKILLS_SERVER_HOST=`hostname -I` && \
+    export NEMO_SKILLS_SERVER_HOST={hosthame_cmd} && \
     echo "Server is running on $NEMO_SKILLS_SERVER_HOST" && \
     {sandbox_echo} \
     sleep infinity; \
@@ -97,6 +97,7 @@ if __name__ == "__main__":
 
     # TODO: VLLM
     sandbox_echo = 'echo "Sandbox is running on ${NEMO_SKILLS_SANDBOX_HOST:-$NEMO_SKILLS_SERVER_HOST}" &&'
+    hosthame_cmd = '`hostname -I`' if CLUSTER_CONFIG['cluster'] == 'local' else '`hostname`'
     format_dict = {
         "model_path": args.model_path,
         "model_name": args.model_path.name if args.model_path is not None else args.model_name,
@@ -107,6 +108,7 @@ if __name__ == "__main__":
         "HF_TOKEN": get_token(),  # needed for some of the models, so making an option to pass it in
         "server_wait_string": server_wait_string,
         "sandbox_echo": sandbox_echo if not args.no_sandbox else "",
+        "hosthame_cmd": hosthame_cmd,
     }
 
     if args.model_path is not None:
