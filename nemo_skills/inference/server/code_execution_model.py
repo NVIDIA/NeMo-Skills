@@ -112,7 +112,7 @@ class CodeExecutionWrapper:
                 outputs = [output['generation'] for output in self.model.generate(**request)]
                 new_ids = []
                 # checking if any of the outputs need code execution and submitting requests in parallel
-                futures = [None] * len(outputs)
+                futures = [None] * len(prompts)
                 for idx, output in zip(remaining_ids, outputs):
                     if output.strip().endswith(CODE_SEPARATORS[-1]):
                         futures[idx] = executor.submit(
