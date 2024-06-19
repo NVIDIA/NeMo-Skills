@@ -89,8 +89,7 @@ SLURM_HEADER = """
 #SBATCH -t {timeout}
 #SBATCH -J "{job_name_prefix}:{job_name}"
 #SBATCH --ntasks-per-node={tasks_per_node}
-#SBATCH --gpus-per-node={gpus_per_node}
-"""
+#SBATCH --gpus-per-node={gpus_per_node}"""
 
 NEMO_SKILLS_CODE = str(Path(__file__).absolute().parents[1])
 config_file = os.getenv("NEMO_SKILLS_CONFIG")
@@ -100,7 +99,7 @@ if not config_file:
 with open(config_file, "rt", encoding="utf-8") as fin:
     CLUSTER_CONFIG = yaml.safe_load(fin)
 
-SLURM_HEADER = CLUSTER_CONFIG.get("slurm_header", SLURM_HEADER)
+SLURM_HEADER = CLUSTER_CONFIG.get("slurm_header", SLURM_HEADER) + '\n'
 
 
 def launch_local_job(
