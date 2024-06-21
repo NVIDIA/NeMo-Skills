@@ -69,6 +69,10 @@ def get_server_command(server_type: str, num_gpus: int, num_nodes: int, model_na
                 f"NUM_GPUS={num_gpus} bash /code/nemo_skills/inference/server/serve_vllm.sh "
                 f"/model/ {model_name} 0 openai 5000"
             )
+
+        if os.environ.get("MAX_SEQ_LEN", None) is not None:
+            server_start_cmd = f"export MAX_SEQ_LEN={os.environ['MAX_SEQ_LEN']} && {server_start_cmd}"
+
         num_tasks = 1
     else:
         # adding sleep to ensure the logs file exists

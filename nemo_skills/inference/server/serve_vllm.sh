@@ -56,13 +56,22 @@ QUANTIZATION=${6:-""}
 # Deploy model with all gpus on local machine
 NUM_GPUS=${NUM_GPUS:-$(nvidia-smi -L | wc -l)}
 
-# Check transformers cache and set download-dir if necessary
+# Check quantization is available or not
 if [ -n "$QUANTIZATION" ]
 then
       QUANTIZATION="--quantization ${QUANTIZATION}"
 else
       QUANTIZATION=""
 fi
+
+# Check max_sequence_length is available or not
+if [ -n "$MAX_SEQ_LEN" ]
+then
+      MAX_SEQUENCE_LENGTH="--max-model-len ${MAX_SEQ_LEN}"
+else
+      MAX_SEQUENCE_LENGTH=""
+fi
+
 
 # Select server
 # Start OpenAI Server
@@ -79,4 +88,4 @@ python -m vllm.entrypoints.openai.api_server \
   --tensor-parallel-size=${NUM_GPUS} \
   --max-num-seqs=1024 \
   --enforce-eager \
-  --disable-log-requests $QUANTIZATION
+  --disable-log-requests $QUANTIZATION $MAX_SEQUENCE_LENGTH
