@@ -87,5 +87,6 @@ python -m vllm.entrypoints.openai.api_server \
   --served-model-name "${MODEL_NAME}" \
   --tensor-parallel-size=${NUM_GPUS} \
   --max-num-seqs=1024 \
+  --gpu-memory-utilization 0.99 \
   --enforce-eager \
   --disable-log-requests $QUANTIZATION $MAX_SEQUENCE_LENGTH
