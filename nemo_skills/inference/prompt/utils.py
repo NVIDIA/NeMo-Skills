@@ -141,7 +141,7 @@ class Prompt:
             return []
 
         if self.config.few_shot_examples.example_dicts:
-            return self.config.few_shot_examples.example_dicts
+            return self.config.few_shot_examples.example_dicts[: self.config.few_shot_examples.num_few_shots]
 
         example_dicts = self.config.few_shot_examples.retriever.retrieve(
             query=input_dict[self.config.few_shot_examples.retrieval_field],

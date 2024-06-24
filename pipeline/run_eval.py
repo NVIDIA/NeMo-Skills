@@ -24,7 +24,7 @@ from launcher import CLUSTER_CONFIG, NEMO_SKILLS_CODE, WRAPPER_HELP, get_server_
 
 try:
     from nemo_skills.inference.generate_solutions import HELP_MESSAGE
-except ImportError:
+except (ImportError, TypeError):
     HELP_MESSAGE = """
 To see all supported agruments, nemo_skills package needs to be installed.
 Please note that it is not recommended to install Python packages on a slurm cluster login node.
