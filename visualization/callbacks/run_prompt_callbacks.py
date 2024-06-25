@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 from copy import deepcopy
 from dataclasses import asdict
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import dash_bootstrap_components as dbc
 from callbacks import app
-from dash import ALL, html, no_update
+from dash import ALL, callback_context, html, no_update
 from dash._callback import NoUpdate
 from dash.dependencies import Input, Output, State
 from flask import current_app
@@ -30,11 +31,23 @@ from layouts import (
     get_single_prompt_output_layout,
     get_utils_field_representation,
 )
-from settings.constants import FEW_SHOTS_INPUT, QUERY_INPUT_TYPE, SEPARATOR_DISPLAY, SEPARATOR_ID, UNDEFINED
+from settings.constants import (
+    FEW_SHOTS_INPUT,
+    QUERY_INPUT_TYPE,
+    RETRIEVAL,
+    RETRIEVAL_FIELDS,
+    SEPARATOR_DISPLAY,
+    SEPARATOR_ID,
+    UNDEFINED,
+)
 from utils.common import (
+    default_examples,
     extract_query_params,
+    get_config,
     get_examples,
+    get_settings,
     get_test_data,
+    get_utils_dict,
     get_utils_from_config,
     get_values_from_input_group,
 )
@@ -42,6 +55,7 @@ from utils.strategies.strategy_maker import RunPromptStrategyMaker
 
 from nemo_skills.inference.prompt.utils import (
     FewShotExamplesConfig,
+    Prompt,
     PromptConfig,
     context_templates,
     get_prompt_config,
@@ -64,17 +78,113 @@ def trigger_js(active_item: str, js_trigger: str) -> Tuple[str, str]:
 
 @app.callback(
     [
+        Output("utils_group", "children", allow_duplicate=True),
         Output("few_shots_div", "children"),
         Output("js_container", "children", allow_duplicate=True),
         Output("js_trigger", "children", allow_duplicate=True),
     ],
-    Input("examples_type", "value"),
-    State("js_trigger", "children"),
+    [
+        Input("examples_type", "value"),
+        Input("num_few_shots", "value"),
+        Input('data_file', 'value'),
+        Input('retrieve_button', 'n_clicks'),
+        Input({"type": RETRIEVAL, "id": ALL}, "value"),
+    ],
+    [
+        State("js_trigger", "children"),
+        State('utils_group', 'children'),
+        State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
+        State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
+    ],
     prevent_initial_call=True,
 )
-def update_examples_type(examples_type: str, js_trigger: str) -> Union[NoUpdate, dbc.AccordionItem]:
+def update_examples_type(
+    examples_type: str,
+    num_few_shots: int,
+    data_file: str,
+    retrieve_n_click: int,
+    retrieval_fields: List,
+    js_trigger: str,
+    raw_utils: List[Dict],
+    query_params: List[str],
+    query_params_ids: List[Dict],
+) -> Union[NoUpdate, dbc.AccordionItem]:
     if not examples_type:
         examples_type = ""
+    if retrieve_n_click:
+        for key, value in default_examples.items():
+            if key == examples_type:
+                get_examples()[examples_type] = deepcopy(value)
+                break
+    data_file_index = 0
+    retrieval_field_index = -1
+
+    for retrieval_index, util in enumerate(raw_utils):
+        name = util['props']['children'][0]['props']['children']
+        if name == 'data_file':
+            data_file_index = retrieval_index
+        if name == 'retrieval_field':
+            retrieval_field_index = retrieval_index
+
+    if examples_type == RETRIEVAL:
+        utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in get_values_from_input_group(raw_utils).items()}
+        utils.pop('examples_type', None)
+        prompt_config = get_config(PromptConfig, utils, get_settings())
+
+        try:
+            prompt_config.few_shot_examples = get_config(
+                FewShotExamplesConfig,
+                utils,
+                get_settings(),
+            )
+
+            prompt = Prompt(config=prompt_config)
+            get_examples()[examples_type] = prompt.build_examples_dict(
+                extract_query_params(query_params_ids, query_params)
+            )
+        except (ValueError, KeyError) as e:
+            get_examples()[examples_type] = []
+
+        if (
+            'retrieval_file' in utils
+            and utils['retrieval_file']
+            and os.path.isfile(utils['retrieval_file'])
+            and os.path.isfile(data_file)
+        ):
+            with open(utils['retrieval_file'], 'r') as retrieval_file, open(data_file, 'r') as data_file:
+                types = current_app.config['data_explorer']['types']
+                sample = {
+                    key: value
+                    for key, value in json.loads(retrieval_file.readline()).items()
+                    if key in json.loads(data_file.readline())
+                }
+            types['retrieval_field'] = list(filter(lambda key: isinstance(sample[key], str), sample.keys()))
+            if retrieval_field_index != -1:
+                retrieval_field = raw_utils[retrieval_field_index]['props']['children'][1]['props']
+                retrieval_field_value = raw_utils[retrieval_field_index]['props']['children'][1]['props']['value']
+                retrieval_field['options'] = types['retrieval_field']
+                if retrieval_field_value in types['retrieval_field']:
+                    retrieval_field['value'] = retrieval_field_value
+                else:
+                    retrieval_field['value'] = types['retrieval_field'][0]
+
+        if raw_utils[data_file_index + 1]['props']['children'][0]['props']['children'] not in RETRIEVAL_FIELDS:
+            for retrieval_field in RETRIEVAL_FIELDS:
+                raw_utils.insert(
+                    data_file_index + 1,
+                    get_utils_dict(
+                        retrieval_field,
+                        current_app.config['data_explorer']['retrieval_fields'][retrieval_field],
+                        {"type": RETRIEVAL, "id": retrieval_field},
+                    ),
+                )
+    else:
+        while (
+            data_file_index + 1 < len(raw_utils)
+            and raw_utils[data_file_index + 1]['props']['children'][0]['props']['children'] in RETRIEVAL_FIELDS
+        ):
+            raw_utils.pop(data_file_index + 1)
+
     size = len(
         get_examples().get(
             examples_type,
@@ -82,7 +192,8 @@ def update_examples_type(examples_type: str, js_trigger: str) -> Union[NoUpdate,
         )
     )
     return (
-        RunPromptStrategyMaker().get_strategy().get_few_shots_div_layout(size),
+        raw_utils,
+        RunPromptStrategyMaker().get_strategy().get_few_shots_div_layout(min(num_few_shots, size)),
         "",
         js_trigger + " ",
     )
@@ -103,21 +214,25 @@ def update_examples_type(examples_type: str, js_trigger: str) -> Union[NoUpdate,
             },
             "value",
         ),
-        Input('examples_type', "value"),
+        Input("dummy_output", "children"),
     ],
+    State('examples_type', "value"),
+    State("num_few_shots", "value"),
     State("js_trigger", "children"),
     prevent_initial_call=True,
 )
 def change_examples_page(
     page: int,
     view_mode: List[str],
+    dummy_output: str,
     examples_type: str,
+    num_few_shots: int,
     js_trigger: str,
 ) -> Tuple[Tuple[html.Div], int]:
     if not examples_type:
         examples_type = ""
     return (
-        get_few_shots_by_id_layout(page, examples_type, view_mode and len(view_mode)),
+        get_few_shots_by_id_layout(page, examples_type, num_few_shots, view_mode and len(view_mode)),
         '',
         js_trigger + '',
     )
@@ -158,6 +273,7 @@ def add_example(
     [
         State("few_shots_pagination", "active_page"),
         State('examples_type', "value"),
+        State("num_few_shots", "value"),
         State(
             {
                 "type": "view_mode",
@@ -173,6 +289,7 @@ def del_example(
     n_clicks: int,
     page: int,
     examples_type: str,
+    num_few_shots: int,
     view_mode: List[str],
     js_trigger: str,
 ) -> Tuple[
@@ -194,7 +311,7 @@ def del_example(
         return (
             last_page - 1,
             prev_pagination_page,
-            get_few_shots_by_id_layout(prev_pagination_page, examples_type, view_mode),
+            get_few_shots_by_id_layout(prev_pagination_page, examples_type, num_few_shots, view_mode),
             '',
             js_trigger + ' ',
         )
@@ -298,21 +415,19 @@ def update_random_seed_mode(
     range_random_mode: List[int],
     utils: List[Dict],
 ) -> List[Dict]:
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update
     for i, util in enumerate(utils):
         name = util['props']['children'][0]['props']['children']
         if name in ("random_seed", "start_random_seed", "end_random_seed"):
             break
-
+    value = utils[i]['props']['children'][1]['props']['value']
     if range_random_mode:
-        utils[i]['props']['children'][0]['props']['children'] = "start_random_seed"
-        utils[i]['props']['children'][1]['props']['id'] = "start_random_seed"
-        utils.insert(i + 1, deepcopy(utils[i]))
-        utils[i + 1]['props']['children'][0]['props']['children'] = "end_random_seed"
-        utils[i + 1]['props']['children'][1]['props']['id'] = "end_random_seed"
-        utils[i + 1]['props']['children'][1]['props']['value'] += 1
+        utils[i] = get_utils_dict("start_random_seed", value)
+        utils.insert(i + 1, get_utils_dict("end_random_seed", value + 1))
     else:
-        utils[i]['props']['children'][0]['props']['children'] = "random_seed"
-        utils[i]['props']['children'][1]['props']['id'] = "random_seed"
+        utils[i] = get_utils_dict("random_seed", value)
         utils.pop(i + 1)
     return utils
 

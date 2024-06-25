@@ -13,6 +13,7 @@
 # limitations under the License.
 
 ANSWER_FIELD = "expected_answer"
+NAME_FOR_BASE_MODEL = "base_generation"
 EXTRA_FIELDS = ["page_index", "file_name"]
 CHAT_MODE = "chat_mode"
 CHOOSE_MODEL = "choose generation"
@@ -37,19 +38,23 @@ PARAMS_TO_REMOVE = [
     'split_name',
     'example_dicts',
     'retriever',
+]
+PARAMETERS_FILE_NAME = "visualization/results/parameters.json"
+RETRIEVAL = 'retrieval'
+RETRIEVAL_FIELDS = [
+    'max_retrieved_chars_field',
+    'retrieved_entries',
     'retrieval_file',
     'retrieval_field',
     'max_retrieved_chars',
-    'max_retrieved_chars_field',
-    'retrieved_entries',
 ]
-PARAMETERS_FILE_NAME = "visualization/results/parameters.json"
 STATS_KEYS = [
     'question_index',
     'question',
 ]
 SEPARATOR_DISPLAY = '.'
 SEPARATOR_ID = '->'
+SETTING_PARAMS = ['server', 'sandbox', 'output_file', 'visualization_params', 'types']
 STATISTICS_FOR_WHOLE_DATASET = ["correct_answer", "wrong_answer", "no_answer"]
 UNDEFINED = "undefined"
 WHOLE_DATASET_MODE = "whole_dataset"

@@ -189,10 +189,7 @@ def validation_parameters(name: str, value: Union[str, int, float]) -> Dict[str,
     return parameters
 
 
-def get_input_group_layout(
-    name: str,
-    value: Union[str, int, float, bool],
-) -> dbc.InputGroup:
+def get_input_group_layout(name: str, value: Union[str, int, float, bool]) -> dbc.InputGroup:
     input_function = dbc.Textarea
     additional_params = {
         "style": {

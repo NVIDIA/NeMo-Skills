@@ -61,6 +61,7 @@ def get_utils_layout(utils: Dict) -> dbc.AccordionItem:
                 html.Pre(
                     (value if value == "" or str(value).strip() != "" else repr(value)[1:-1]),
                     className="mr-2",
+                    style={"overflow-x": "scroll"},
                 ),
             ],
             className="mb-3",

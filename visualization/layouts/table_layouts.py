@@ -26,6 +26,7 @@ from settings.constants import (
     FILES_FILTERING,
     FILES_ONLY,
     MODEL_SELECTOR_ID,
+    NAME_FOR_BASE_MODEL,
     QUESTIONS_FILTERING,
     STATS_KEYS,
 )
@@ -63,8 +64,8 @@ def get_filter_text(available_filters: List[str] = [], mode: str = FILES_FILTERI
     if mode == FILES_ONLY:
         return (
             "Write an expression to filter the data\n\n"
-            + "For example:\ndata['correct_responses'] > 0.5 and data['no_response'] < 0.2\n\n"
-            + "The function has to return bool.\n\n"
+            + "For example:\ndata['is_correct'] and not data['error_message']\n\n"
+            + "The expression has to return bool.\n\n"
             + "Available parameters to filter data:\n"
             + '\n'.join(
                 [', '.join(available_filters[start : start + 5]) for start in range(0, len(available_filters), 5)]
@@ -73,9 +74,10 @@ def get_filter_text(available_filters: List[str] = [], mode: str = FILES_FILTERI
     elif mode == FILES_FILTERING:
         return (
             "Write an expression to filter the data\n"
-            + "Separate expressions for different datasets with &&\n\n"
-            + "For example:\ndata['dataset1']['correct_responses'] > 0.5 && data['dataset2']['no_response'] < 0.2\n\n"
-            + "The function has to return bool.\n\n"
+            + "Separate expressions for different generations with &&\n"
+            + "You can use base_generation variable to access data from the current generation\n\n"
+            + "For example:\ndata['generation1']['correct_responses'] > 0.5 && data[base_generation]['no_response'] < 0.2\n\n"
+            + "The expression has to return bool.\n\n"
             + "Available parameters to filter data:\n"
             + '\n'.join(
                 [', '.join(available_filters[start : start + 5]) for start in range(0, len(available_filters), 5)]
@@ -83,11 +85,12 @@ def get_filter_text(available_filters: List[str] = [], mode: str = FILES_FILTERI
         )
     elif mode == QUESTIONS_FILTERING:
         return (
-            "Write a function to filter the data\n"
-            + "The function should take a dictionary containing keys representing dataset names\n"
-            + "and a list of values as JSON data from your dataset from each file.\n\n"
-            + "For example:\ndata['dataset1'][0]['is_correct'] != data['dataset2'][0]['is_correct']\n\n"
-            + "The function has to return bool.\n\n"
+            "Write an expression to filter the data\n"
+            + "You can operate with a dictionary containing keys representing generation names\n"
+            + "and a list of values as JSON data from your generation from each file.\n"
+            + "You can use base_generation variable to access data from the current generation\n\n"
+            + "For example:\ndata['generation1'][0]['is_correct'] != data[base_generation][0]['is_correct']\n\n"
+            + "The expression has to return bool.\n\n"
             + "Available parameters to filter data:\n"
             + '\n'.join(
                 [', '.join(available_filters[start : start + 5]) for start in range(0, len(available_filters), 5)]
@@ -526,18 +529,23 @@ def get_row_detailed_inner_data(
 ) -> List:
     table_data = get_table_data()[question_id].get(model, [])
     row_data = []
+    empty_list = False
+    if table_data[file_id].get('file_name', None) not in files_names:
+        empty_list = True
     for key in filter(
         lambda key: is_detailed_answers_rows_key(key),
-        map(lambda data: data, rows_names),
+        rows_names,
     ):
-        if len(table_data) <= file_id or key in get_excluded_row():
+        if file_id < 0 or len(table_data) <= file_id or key in get_excluded_row():
             value = ""
         elif key == 'file_name':
             value = get_selector_layout(
                 files_names,
                 {"type": "file_selector", "id": col_id},
-                table_data[file_id].get(key, None),
+                (table_data[file_id].get(key, None) if not empty_list else ""),
             )
+        elif empty_list:
+            value = ""
         else:
             value = (
                 get_single_prompt_output_layout(str(table_data[file_id].get(key, None)))
@@ -600,7 +608,7 @@ def get_general_stats_layout(
             logging.error(ERROR_MESSAGE_TEMPLATE.format(name, errors_dict))
 
     overall_samples = sum(len(question_data) for question_data in data_for_base_model)
-    dataset_size = len(data_for_base_model)
+    dataset_size = len(list(filter(lambda x: bool(x), data_for_base_model)))
     stats = {
         "dataset size": dataset_size,
         "overall number of samples": overall_samples,
@@ -702,7 +710,14 @@ def get_filter_answers_layout(
             common_expressions + "\n" + single_filter for single_filter in splitted_filters.split('&&')
         ]
         filtering_functions = (
-            list([get_eval_function(func) for func in full_splitted_filters]) if filtering_function else []
+            list(
+                [
+                    get_eval_function(f"{NAME_FOR_BASE_MODEL} = '{base_model}'\n" + func)
+                    for func in full_splitted_filters
+                ]
+            )
+            if filtering_function
+            else []
         )
 
         if filter_mode == FILES_FILTERING:
@@ -744,7 +759,7 @@ def get_filter_answers_layout(
                 if good_data:
                     clean_table_data.append(table_data[question_id])
         else:
-            func = get_eval_function(filtering_function.strip())
+            func = get_eval_function(f"{NAME_FOR_BASE_MODEL} = '{base_model}'\n" + filtering_function.strip())
             clean_table_data = list(
                 filter(
                     lambda data: catch_eval_exception(

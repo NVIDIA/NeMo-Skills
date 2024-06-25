@@ -29,12 +29,14 @@ from settings.constants import (
     OUTPUT,
     OUTPUT_PATH,
     PARAMETERS_FILE_NAME,
+    RETRIEVAL,
+    RETRIEVAL_FIELDS,
     SEPARATOR_ID,
     STATISTICS_FOR_WHOLE_DATASET,
     WHOLE_DATASET_MODE,
 )
 from settings.templates import summarize_results_template
-from utils.common import get_available_models, get_examples, run_subprocess
+from utils.common import get_available_models, get_config, get_examples, get_settings, run_subprocess
 from utils.strategies.base_strategy import ModeStrategies
 
 from nemo_skills.evaluation.evaluate_results import EvaluateResultsConfig, evaluate_results
@@ -52,10 +54,22 @@ class WholeDatasetModeStrategy(ModeStrategies):
         return []
 
     def run(self, utils: Dict, params: Dict) -> html.Div:
-        utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in utils.items()}
+        utils = {
+            key.split(SEPARATOR_ID)[-1]: value
+            for key, value in utils.items()
+            if key != RETRIEVAL and key not in RETRIEVAL_FIELDS
+        }
+        logging.info(f"Whole dataset mode utils: {utils}")
+        examples_type = utils.pop("examples_type", None)
+        example_dicts = get_examples().get(
+            examples_type,
+            [],
+        )[: utils['num_few_shots']]
+        utils['num_few_shots'] = min(len(example_dicts), utils['num_few_shots'])
         self.sandbox_init()
         runs_storage = get_available_models()
-        results_path = current_app.config['data_explorer']['visualization_params']['results_path']
+        config = current_app.config['data_explorer']
+        results_path = config['visualization_params']['results_path']
         run_index = len(runs_storage)
         metrics_directory = os.path.join(
             results_path,
@@ -64,39 +78,28 @@ class WholeDatasetModeStrategy(ModeStrategies):
         random_seed_start = utils['start_random_seed'] if params['range_random_mode'] else utils['random_seed']
         random_seed_end = utils['end_random_seed'] if params['range_random_mode'] else utils['random_seed'] + 1
 
-        generate_solutions_config = self._get_config(
-            GenerateSolutionsConfig,
-            utils,
-            current_app.config['data_explorer'],
-            {
-                "output_file": "dummy",  # will be set up later
-                "example_dicts": get_examples().get(
-                    utils['examples_type'],
-                    [],
-                ),
-            },
-        )
+        generate_solutions_config = get_config(GenerateSolutionsConfig, utils, get_settings())
 
-        generate_solutions_config.prompt = self._get_config(
+        generate_solutions_config.prompt = get_config(
             PromptConfig,
             utils,
-            current_app.config['data_explorer']['prompt'],
+            get_settings(),
         )
 
-        generate_solutions_config.prompt.few_shot_examples = self._get_config(
+        generate_solutions_config.prompt.few_shot_examples = get_config(
             FewShotExamplesConfig,
-            utils,
-            current_app.config['data_explorer']['prompt']['few_shot_examples'],
+            {**utils, "example_dicts": example_dicts},
+            get_settings(),
         )
 
-        generate_solutions_config.inference = self._get_config(
+        generate_solutions_config.inference = get_config(
             InferenceConfig,
             utils,
-            current_app.config['data_explorer']['inference'],
+            get_settings(),
         )
 
         for random_seed in range(random_seed_start, random_seed_end):
-            file_name = GREEDY if not params['range_random_mode'] else "rs" + str(random_seed)
+            file_name = GREEDY if utils['temperature'] == 0 else "rs" + str(random_seed)
             output_file = os.path.join(
                 metrics_directory,
                 OUTPUT_PATH.format(
@@ -133,7 +136,7 @@ class WholeDatasetModeStrategy(ModeStrategies):
 
         runs_storage[str(run_index)] = {
             "utils": utils,
-            "examples": get_examples().get(utils["examples_type"], []),
+            "examples": example_dicts,
         }
 
         with open(PARAMETERS_FILE_NAME, "w") as f:

@@ -20,6 +20,8 @@ import os
 import re
 import subprocess
 from collections import defaultdict
+from copy import deepcopy
+from dataclasses import fields
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -34,14 +36,18 @@ from settings.constants import (
     PARAMS_TO_REMOVE,
     QUESTION_FIELD,
     SEPARATOR_DISPLAY,
+    SETTING_PARAMS,
     STATS_KEYS,
     UNDEFINED,
 )
 
+from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig, InferenceConfig
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
+from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, PromptConfig
 from nemo_skills.utils import unroll_files
 
 custom_stats = {}
+default_examples = deepcopy(examples_map)
 general_custom_stats = {}
 deleted_stats = set()
 excluded_rows = set()
@@ -82,13 +88,14 @@ def parse_model_answer(answer: str) -> List[Dict]:
             - 'output': The output of the code block.
 
     """
+    config = current_app.config['data_explorer']
     code_start, code_end = map(
         re.escape,
-        current_app.config['data_explorer']["visualization_params"]["code_separators"],
+        config["visualization_params"]["code_separators"],
     )
     output_start, output_end = map(
         re.escape,
-        current_app.config['data_explorer']["visualization_params"]["code_output_separators"],
+        config["visualization_params"]["code_output_separators"],
     )
     code_pattern = re.compile(fr'{code_start}(.*?){code_end}', re.DOTALL)
     code_output_pattern = re.compile(
@@ -157,7 +164,7 @@ def get_height_adjustment() -> html.Iframe:
 
 @functools.lru_cache()
 def get_test_data(index: int, dataset: str) -> Tuple[Dict, int]:
-    if dataset == UNDEFINED or os.path.isfile(dataset) is False:
+    if not dataset or dataset == UNDEFINED or os.path.isfile(dataset) is False:
         return {QUESTION_FIELD: "", ANSWER_FIELD: ""}, 0
     with open(dataset) as file:
         tests = file.readlines()
@@ -173,27 +180,32 @@ def get_values_from_input_group(children: Iterable) -> Dict:
             if "id" in input_group_child["props"].keys() and "value" in input_group_child["props"].keys():
                 type_function = str
                 value = input_group_child["props"]["value"]
-
+                id = (
+                    input_group_child["props"]["id"]["id"]
+                    if isinstance(input_group_child["props"]["id"], Dict)
+                    else input_group_child["props"]["id"]
+                )
                 if value is None or value == UNDEFINED:
-                    values[input_group_child["props"]["id"]] = None
+                    values[id] = None
                     continue
                 if str(value).isdigit() or str(value).replace("-", "", 1).isdigit():
                     type_function = int
                 elif str(value).replace(".", "", 1).replace("-", "", 1).isdigit():
                     type_function = float
 
-                values[input_group_child["props"]["id"]] = type_function(str(value).replace('\\n', '\n'))
+                values[id] = type_function(str(value).replace('\\n', '\n'))
 
     return values
 
 
 def extract_query_params(query_params_ids: List[Dict], query_params: List[Dict]) -> Dict:
+    default_answer = {"question": "", "expected_answer": ""}
     try:
         query_params_extracted = {param_id['id']: param for param_id, param in zip(query_params_ids, query_params)}
     except ValueError:
-        query_params_extracted = {"question": "", "expected_answer": ""}
+        query_params_extracted = default_answer
 
-    return query_params_extracted
+    return query_params_extracted or default_answer
 
 
 def get_utils_from_config_helper(cfg: Dict, display_path: bool = True) -> Dict:
@@ -347,13 +359,20 @@ def get_data_from_files(cache_indicator=None) -> List:
 
     def process_model_files(model_id, results_files, dataset):
         model_data = defaultdict(list)
+        file_names = {}
         for file_id, path in enumerate(results_files):
+            file_name = path.split('/')[-1].split('.')[0]
+            if file_name in file_names:
+                file_names[file_name] += 1
+                file_name += f"_{file_names[file_name]}"
+            else:
+                file_names[file_name] = 1
             with open(path) as f:
                 answers = map(json.loads, f)
                 for question_index, answer in enumerate(answers):
                     result = {
-                        "file_name": path.split('/')[-1].split('.')[0],
-                        **(dataset[question_index] if dataset else {}),
+                        "file_name": file_name,
+                        **(dataset[question_index] if dataset and len(dataset) > question_index else {}),
                         "question_index": question_index + 1,
                         "page_index": file_id,
                         "labels": [],
@@ -462,3 +481,91 @@ def run_subprocess(command: str) -> Tuple[str, bool]:
         success = False
 
     return result.stdout.strip(), result.stderr.strip(), success
+
+
+def get_config(
+    config_class: Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamplesConfig],
+    utils: Dict[str, str],
+    config: Dict,
+) -> Union[GenerateSolutionsConfig, PromptConfig, InferenceConfig, FewShotExamplesConfig]:
+    return config_class(
+        **{
+            key: value
+            for key, value in {
+                **config,
+                **utils,
+            }.items()
+            if key in {field.name for field in fields(config_class)}
+        },
+    )
+
+
+@functools.lru_cache(maxsize=1)
+def get_settings():
+    def get_settings_helper(config: Dict):
+        settings = {}
+        for key, value in config.items():
+            if key in SETTING_PARAMS:
+                settings[key] = value
+            if isinstance(value, dict):
+                settings = {**settings, **get_settings_helper(value)}
+        return settings
+
+    return get_settings_helper(current_app.config['data_explorer'])
+
+
+def get_utils_dict(name: Union[str, Dict], value: Union[str, int], id: Union[str, Dict] = None):
+    if id is None:
+        id = name
+    if name in current_app.config['data_explorer']['types'].keys():
+        template = {
+            'props': {
+                'id': id,
+                'options': [
+                    {"label": value, "value": value} for value in current_app.config['data_explorer']['types'][name]
+                ],
+                'value': current_app.config['data_explorer']['types'][name][0],
+            },
+            'type': 'Select',
+            'namespace': 'dash_bootstrap_components',
+        }
+    elif isinstance(value, (int, float)):
+        float_params = {"step": 0.1} if isinstance(value, float) else {}
+        template = {
+            'props': {
+                'id': id,
+                'debounce': True,
+                'min': 0,
+                'type': 'number',
+                'value': value,
+                **float_params,
+            },
+            'type': 'Input',
+            'namespace': 'dash_bootstrap_components',
+        }
+    else:
+        template = {
+            'props': {
+                'id': id,
+                'debounce': True,
+                'style': {'width': '100%'},
+                'value': value,
+            },
+            'type': 'Textarea',
+            'namespace': 'dash_bootstrap_components',
+        }
+    return {
+        'props': {
+            'children': [
+                {
+                    'props': {'children': name},
+                    'type': 'InputGroupText',
+                    'namespace': 'dash_bootstrap_components',
+                },
+                template,
+            ],
+            'className': 'mb-3',
+        },
+        'type': 'InputGroup',
+        'namespace': 'dash_bootstrap_components',
+    }

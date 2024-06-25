@@ -15,9 +15,9 @@
 from typing import Dict, List
 
 import dash_bootstrap_components as dbc
+from flask import current_app
 
 from visualization.settings.constants import ANSWER_FIELD, ONE_SAMPLE_MODE, QUESTION_FIELD, SEPARATOR_ID
-from visualization.utils.common import get_utils_from_config
 from visualization.utils.strategies.base_strategy import ModeStrategies
 
 
@@ -28,7 +28,11 @@ class ChatModeStrategy(ModeStrategies):
         super().__init__()
 
     def get_utils_input_layout(self) -> List[dbc.AccordionItem]:
-        return super().get_utils_input_layout(lambda key, value: key in self.config['inference'].keys(), True)
+        config = current_app.config['data_explorer']
+        return super().get_utils_input_layout(
+            lambda key, value: key in config['inference'].keys(),
+            True,
+        )
 
     def get_few_shots_input_layout(self) -> List[dbc.AccordionItem]:
         return []
@@ -44,22 +48,14 @@ class ChatModeStrategy(ModeStrategies):
 
     def run(self, utils: Dict, params: Dict):
         utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in utils.items()}
-        utils_updated = {
-            **utils,
-            **{key: "" for key, value in get_utils_from_config(self.config, False).items() if isinstance(value, str)},
-        }
         params['prompts'] = [self.get_prompt(utils, params)]
-        return super().run(utils_updated, params)
+        return super().run(utils, params)
 
     def get_prompt(self, utils: Dict, params: Dict) -> str:
         utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in utils.items()}
-        utils_updated = {
-            **utils,
-            **{key: "" for key, value in get_utils_from_config(self.config).items() if isinstance(value, str)},
-        }
-        utils_updated['user'] = '{question}'
-        utils_updated['prompt_template'] = '{user}\n{generation}'
+        utils['user'] = '{question}'
+        utils['prompt_template'] = '{user}\n{generation}'
         return super().get_prompt(
-            utils_updated,
+            utils,
             params,
         )

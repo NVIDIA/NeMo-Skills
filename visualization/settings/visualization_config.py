@@ -28,7 +28,7 @@ class BaseVisualizationConfig:
 
     code_separators: Tuple[str, str] = CODE_SEPARATORS
     code_output_separators: Tuple[str, str] = CODE_OUTPUT_SEPARATORS
-    save_dataset_path: str = "visualization/results/saved_dataset"
+    save_generations_path: str = "visualization/results/saved_generations"
     results_path: str = "visualization/results/"
 
     def __post_init__(self):
