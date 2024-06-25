@@ -247,7 +247,8 @@ def from_dir(
         free_gpu_memory_fraction=free_gpu_memory_fraction,
         max_attention_window=max_attention_window_size,
         sink_token_length=sink_token_length,
-        enable_block_reuse=True,
+        # TODO: there is an accuracy degradation because of this and no speed gain. Likely a bug in trtllm
+        # enable_block_reuse=True,
     )
 
     if max_batch_size is None:
