@@ -25,24 +25,14 @@ skip_string_normalization = true
 [project]
 name = "nemo_skills"
 description = "NeMo Skills - a project to improve skills of LLMs"
-dynamic = ["version"]
-requires-python = ">= 3.10"
+dynamic = ["version","dependencies"]
+requires-python = ">=3.10"
 readme = "README.md"
 license = {file = "LICENSE"}
-dependencies = [
-  'hydra-core',
-  'tqdm',
-  'pyyaml',
-  'numpy',
-  'requests',
-  'backoff',
-  'sympy',
-  'rank_bm25',
-  'openai',
-]
 
 [tool.setuptools.packages.find]
 include = ["nemo_skills*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "nemo_skills.__version__"}
+dependencies = {file = ["requirements.txt"]}

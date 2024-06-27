@@ -1,0 +1,95 @@
+processors_to_run: all
+
+preprocessed_dataset_files: null  # can specify multiple patters separated by space
+prediction_jsonl_files: null  # can specify datasets from HF instead of prediction_jsonl_files
+output_path: ???
+
+metadata: null  # can provide additional metadata to store (e.g. dataset or generation_type)
+skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
+add_correct: true  # can set to False if only want to export incorrect solutions
+add_incorrect: false  # if True, saves only incorrect solutions instead of correct
+
+downsampling_method: null  # fair, random or null
+random_seed: 42
+do_shuffle: true
+num_output_samples: null
+
+prompt_type: openmathinstruct/sft
+chat_format: false  # whether to use NeMo's chat format
+
+filters:
+  solution_key: generation  # key to filter solutions by
+  group_key: question  # key to group samples by before code_text_filter
+
+  drop_multi_boxed: true
+  drop_useless_code: false
+  drop_broken_code: true
+  trim_solutions: true
+  drop_incorrect_arithmetic: true
+  split_arithmetic: true
+  code_text_filter: null
+
+
+processors:
+  - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.ReadData
+    preprocessed_dataset_files: ${preprocessed_dataset_files}
+    prediction_jsonl_files: ${prediction_jsonl_files}
+    skip_first: ${skip_first}
+    add_correct: ${add_correct}
+    add_incorrect: ${add_incorrect}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropMultiBoxed
+    should_run: ${filters.drop_multi_boxed}
+    solution_key: ${filters.solution_key}
+    test_cases:
+      - {input: {generation: "He had \\boxed{3} 4090s and \\boxed{2} 4080s"}, output: null}
+      - {input: {generation: "She had \\boxed{6} 4090s"}, output: {generation: "She had \\boxed{6} 4090s"}}
+      - {input: {generation: "boxed boxed 42"}, output: {generation: "boxed boxed 42"}}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropBrokenCode
+    should_run: ${filters.drop_broken_code}
+    solution_key: ${filters.solution_key}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.TrimSolutions
+    should_run: ${filters.trim_solutions}
+    solution_key: ${filters.solution_key}
+    test_cases:
+      - {input: {generation: "Solution ends at \\boxed{0}\nThis line is useless."}, output: {generation: "Solution ends at \\boxed{0}"}}
+      - {input: {generation: "Solution continues \\boxed{7} after boxed"}, output: {generation: "Solution continues \\boxed{7} after boxed"}}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropIncorrectArithmetic
+    should_run: ${filters.drop_incorrect_arithmetic}
+    solution_key: ${filters.solution_key}
+    test_cases:
+      - {input: {generation: "1 + 2 + 3 + 4 = 10"}, output: {generation: "1 + 2 + 3 + 4 = 10"}}
+      # TODO: implement fractional arithmetic
+      # - {input: {generation: "1 / 3 = 0.3"}, output: null}
+      # - {input: {generation: "1 / 3 = 0.3334"}, output: null}
+      - {input: {generation: "3 * (1 + 7) / 4 = 3 * 8 / 4 = 100"}, output: null}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.SplitArithmetic
+    should_run: ${filters.split_arithmetic}
+    solution_key: ${filters.solution_key}
+    test_cases:
+      - {input: {generation: "1 + 2 + 3 + 4 = 10"}, output: {generation: "1 + 2 + 3 + 4 = 3 + 3 + 4 = 6 + 4 = 10"}}
+      - {input: {generation: "1 + 7 * 19 = 134"}, output: {generation: "1 + 7 * 19 = 1 + 133 = 134"}}
+      - {input: {generation: "3 * (1 + 7) / 4 = 6"}, output: {generation: "3 * (1 + 7) / 4 = 3 * 8 / 4 = 24 / 4 = 6"}}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.GroupSamples
+    group_key: ${filters.group_key}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.CodeTextFilter
+    filter_type: ${filters.code_text_filter}
+    solution_key: ${filters.solution_key}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
+    num_samples: ${num_output_samples}
+    sampling_method: ${downsampling_method}
+    random_seed: ${random_seed}
+    do_shuffle: ${do_shuffle}
+
+  - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.WriteFinalSftManifest
+    output_manifest_file: ${output_path}
+    prompt_type: ${prompt_type}
+    chat_format: ${chat_format}
+    metadata: ${metadata}
