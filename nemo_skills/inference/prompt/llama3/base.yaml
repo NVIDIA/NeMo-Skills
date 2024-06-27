@@ -1,5 +1,5 @@
 few_shot_examples:
-  template: "Question:\n{question}\n\n{context}My solution:\n{generation}\n\n\n\n\n\n"
+  template: "Question:\n{question}{context}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
 
 system: ""
 user: |-
@@ -7,10 +7,8 @@ user: |-
     Make sure to put the answer (and only answer) inside \boxed{{}}.
 
     {examples}Question:
-    {question}
+    {question}{context}
 
-    {context}
-
-prompt_template: "<|begin_of_text|>{user}My solution:\n{generation}"
+prompt_template: "<|begin_of_text|>{user}\n\nMy solution:\n{generation}"
 
 stop_phrases: ["\n\n\n\n\n\n"]

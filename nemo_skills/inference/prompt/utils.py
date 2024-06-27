@@ -14,6 +14,7 @@
 
 import json
 import logging
+import random
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -60,7 +61,7 @@ class BM25Retriever:
 
 @nested_dataclass
 class FewShotExamplesConfig:
-    template: str = MISSING
+    template: str = ""
     num_few_shots: int = 0
 
     examples_type: Optional[str] = None
@@ -69,6 +70,7 @@ class FewShotExamplesConfig:
     retrieval_field: Optional[str] = None  # e.g. question, reference_solution, etc.
     retrieval_file: Optional[str] = None  # needs to be provided if retrieval_field is not None
     retrieved_entries: int = 0
+    randomize_retrieved_entries: bool = False
     max_retrieved_chars: int = 100000000  # no limit by default
     max_retrieved_chars_field: str = "reference_solution"
     retriever: Optional[Any] = None
@@ -145,7 +147,6 @@ class Prompt:
 
         example_dicts = self.config.few_shot_examples.retriever.retrieve(
             query=input_dict[self.config.few_shot_examples.retrieval_field],
-            # getting 2 times more to account for potential duplicates. This assumes there are not too many of them
             top_k=self.config.few_shot_examples.retrieved_entries,
         )
         reference = input_dict[self.config.few_shot_examples.retrieval_field]
@@ -169,7 +170,11 @@ class Prompt:
             )
 
         # let's reverse the order to show the most relevant last
-        return example_dicts[: self.config.few_shot_examples.num_few_shots][::-1]
+        examples = example_dicts[: self.config.few_shot_examples.num_few_shots][::-1]
+        if self.config.few_shot_examples.randomize_retrieved_entries:
+            random.shuffle(examples)
+
+        return examples
 
     def build_user_message(self, input_dict: Dict[str, str]) -> str:
         """Builds all examples string concatenated by delimiter."""
@@ -236,11 +241,11 @@ def get_prompt_config(prompt_type: str) -> PromptConfig:
 # and so most often will require changes to the code anyway
 context_templates = {
     "empty": "",
-    "reference_solution": "Reference solution (do not copy it):\n{reference_solution}\n\n",
-    "masked_solution": "Reference solution:\n{masked_reference_solution}\n\n",
-    "table": "Use the following table to answer the question:\n{table}\n\n",
+    "reference_solution": "\n\nReference solution (do not copy it):\n{reference_solution}",
+    "masked_solution": "\n\nReference solution:\n{masked_reference_solution}",
+    "table": "\n\nUse the following table to answer the question:\n{table}",
     "table_solution": (
-        "Use the following table to answer the question:\n{table}\n"
-        "Reference solution (do not copy it):\n{reference_solution}\n\n"
+        "\n\nUse the following table to answer the question:\n{table}\n"
+        "Reference solution (do not copy it):\n{reference_solution}"
     ),
 }

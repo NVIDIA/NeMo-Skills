@@ -123,6 +123,7 @@ class Sandbox(abc.ABC):
     ):
         self.host = host
         self.port = port
+        self.http_session = requests.Session()
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
         # will keep state of code sessions
@@ -144,7 +145,7 @@ class Sandbox(abc.ABC):
                 headers={"Content-Type": "application/json"},
             )
         else:
-            output = requests.post(
+            output = self.http_session.post(
                 url=self._get_execute_url(),
                 data=json.dumps(request),
                 timeout=timeout,

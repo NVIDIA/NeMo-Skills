@@ -111,9 +111,7 @@ def test_llama3_instruct_prompt():
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-You are Meta AI, a sophisticated and energetic AI Assistant. You excel at solving mathematical problems.
-
-You will look at the examples provided by the user and try to follow the solution format as much as possible.<|eot_id|><|start_header_id|>user<|end_header_id|>
+<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Here are some examples of questions and solutions followed by a new question that you need to solve.
 Make sure to put the answer (and only answer) inside \\boxed{}.
@@ -243,8 +241,11 @@ def test_nemotron_zeroshot_prompt():
     expected_prompt = """<extra_id_0>System
 
 <extra_id_1>User
-2 + 2 = ?
-<extra_id_1>Assistant
+You are an expert in math. Given the math question below, I want you to reason through the steps and then give a final answer.
+
+Your final answer should be inside \\boxed{}.
+
+2 + 2 = ?<extra_id_1>Assistant
 """
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
 
@@ -286,8 +287,6 @@ That's easy: 10!
 
 Question:
 2 + 2 = ?
-
-
 
 Don't forget that your final answer should be inside \\boxed{}!
 <extra_id_1>Assistant
@@ -342,8 +341,6 @@ Question:
 
 Reference solution (do not copy it):
 What should I do??
-
-
 
 Don't forget that your final answer should be inside \\boxed{}!
 <extra_id_1>Assistant

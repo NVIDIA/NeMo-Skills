@@ -27,7 +27,7 @@ SLURM_CMD = (
     "python /code/nemo_skills/finetuning/average_checkpoints.py "
     "    --untarred_nemo_folder /nemo_model "
     "    --name_prefix=model "
-    "    --checkpoint_dir=/training_folder "
+    "    --checkpoint_dir=/training_folder {average_steps}"
     "{conversion_step}"
 )
 MOUNTS = (
@@ -47,6 +47,12 @@ if __name__ == "__main__":
     parser.add_argument("--output_path", required=True, help="Path to save the TensorRT-LLM model")
     parser.add_argument("--nemo_model", required=True, help="Only need this to get the config file")
     parser.add_argument("--num_gpus", required=True, type=int)
+    parser.add_argument(
+        "--average_steps",
+        nargs="+",
+        type=int,
+        help="List of checkpoint steps to average. If not specified, will average all.",
+    )
     parser.add_argument(
         "--partition",
         required=False,
@@ -73,6 +79,7 @@ if __name__ == "__main__":
         "output_path": args.output_path,
         "conversion_step": conversion_step,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
+        "average_steps": f"--steps {' '.join(map(str, args.average_steps))} " if args.average_steps else "",
     }
 
     launch_job(

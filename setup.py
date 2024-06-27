@@ -22,6 +22,8 @@ def parse_requirements(filename):
 
 # Read the requirements from the requirements.txt file
 requirements = parse_requirements('requirements.txt')
+# sdp is not needed in docker containers, so not adding it to requirements.txt
+requirements.append("sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor")
 
 setup(
     name="nemo_skills",
@@ -34,6 +36,7 @@ setup(
     packages=find_packages(include=["nemo_skills*"]),
     python_requires=">=3.10",
     install_requires=requirements,
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",

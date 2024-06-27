@@ -246,9 +246,9 @@ EOF
         except KeyError:
             pass
         cmd += f"""
-srun {extra_main_args} --mpi=pmix --container-image={container} --container-mounts={mounts} bash -c "$cmd" &
+srun --no-container-mount-home {extra_main_args} --mpi=pmix --container-image={container} --container-mounts={mounts} bash -c "$cmd" &
 MAIN_PID=$!
-srun {extra_sandbox_args} --mpi=pmix --ntasks={num_nodes} \
+srun --no-container-mount-home {extra_sandbox_args} --mpi=pmix --ntasks={num_nodes} \
      --container-image={CLUSTER_CONFIG["containers"]["sandbox"]} \
      bash -c "/entrypoint.sh && /start.sh" &
 wait $MAIN_PID
@@ -256,7 +256,10 @@ wait $MAIN_PID
 
     # note how we are waiting only for the main command and sandbox will be killed when it finishes
     else:
-        cmd = cmd + f'\nsrun --mpi=pmix --container-image={container} --container-mounts={mounts} bash -c "$cmd"'
+        cmd = (
+            cmd
+            + f'\nsrun  --no-container-mount-home --mpi=pmix --container-image={container} --container-mounts={mounts} bash -c "$cmd"'
+        )
     with tempfile.NamedTemporaryFile(mode="wt", delete=False) as fp:
         fp.write(cmd)
     try:

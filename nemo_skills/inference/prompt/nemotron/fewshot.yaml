@@ -1,5 +1,5 @@
 few_shot_examples:
-  template: "Example question:\n{question}\n\n{context}Example solution:\n{generation}\n\n\n\n\n\n"
+  template: "Example question:\n{question}{context}\n\nExample solution:\n{generation}\n\n\n\n\n\n"
 
 system: ""
 
@@ -8,9 +8,7 @@ user: |-
     Make sure to put the answer (and only answer) inside \boxed{{}}.
 
     {examples}Question:
-    {question}
-
-    {context}
+    {question}{context}
 
     Don't forget that your final answer should be inside \boxed{{}}!
 
