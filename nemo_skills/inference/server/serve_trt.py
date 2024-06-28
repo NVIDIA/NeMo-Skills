@@ -160,9 +160,6 @@ def get_output_single(output_ids, input_length, max_output_len, tokenizer, eos_t
     if len(eos_ids) > 0:
         outputs = outputs[: eos_ids[0]]
     outputs = outputs.tolist()
-    # somehow sometimes it produces tokens out of range..
-    outputs = [elem if elem < tokenizer.vocab_size else tokenizer.vocab_size - 1 for elem in outputs]
-    outputs = [elem if 0 <= elem else 0 for elem in outputs]
     return tokenizer.decode(outputs)
 
 
