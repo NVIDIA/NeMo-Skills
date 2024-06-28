@@ -232,7 +232,7 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
     """A helper function to make it easier to set server through cmd."""
     model = get_model(server_type=server_type, **kwargs)
     if isinstance(model, NemoModel):  # nemo handles code execution directly
-        raise NotImplementedError(
+        LOG.warning(
             "Nemo model currently has a bug in handling stop words and thus shouldn't be used for code execution"
         )
         if code_execution is not None:
