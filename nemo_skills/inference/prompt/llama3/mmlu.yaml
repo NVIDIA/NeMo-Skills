@@ -1,0 +1,23 @@
+system: ""
+
+# TODO: should we not use \boxed format? Should we also not use it for math benchmarks?
+user: |-
+    Answer the following multiple choice question. The last line of your response should be of the following format: 'Answer: \boxed{{$LETTER}}' (without quotes) where LETTER is one of ABCD. Think step by step before answering.
+
+    {question}
+
+    A) {A}
+    B) {B}
+    C) {C}
+    D) {D}
+
+prompt_template: |-
+  <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+  {system}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+  {user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+  {generation}
+
+stop_phrases: ["<|eot_id|>"]

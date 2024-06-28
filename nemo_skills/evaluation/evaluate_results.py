@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
+import shutil
 import sys
+from argparse import Namespace
 from dataclasses import field
 from typing import Any
 
 import hydra
-from omegaconf import MISSING
+from omegaconf import MISSING, OmegaConf
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
+from nemo_skills.evaluation.code_utils import preprocess_code
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -36,14 +40,9 @@ class EvaluateResultsConfig:
     prediction_jsonl_files: Any = MISSING
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
-    ignore_cache: bool = False
 
-    include_percentage: bool = True
-    tolerance: float = 1e-4
-
-    timeout: float = 10.0
-    num_parallel_requests: int = 100
-    in_memory_lines: int = 1500
+    eval_type: str = "math"  # math or code
+    eval_config: dict = field(default_factory=dict)
 
     def __post_init__(self):
         """Building data_file from dataset/split_name if not provided directly."""
@@ -61,15 +60,50 @@ def evaluate_results(cfg: EvaluateResultsConfig):
     LOG.info("Config used: %s", cfg)
 
     sandbox = get_sandbox(**cfg.sandbox)
-    sandbox.batch_evaluate_results(
-        prediction_jsonl_files=cfg.prediction_jsonl_files,
-        num_parallel_requests=cfg.num_parallel_requests,
-        in_memory_lines=cfg.in_memory_lines,
-        include_percentage=cfg.include_percentage,
-        tolerance=cfg.tolerance,
-        timeout=cfg.timeout,
-        ignore_cache=cfg.ignore_cache,
-    )
+    if cfg.eval_type == "math":
+        sandbox.batch_evaluate_results(
+            prediction_jsonl_files=cfg.prediction_jsonl_files,
+            **cfg.eval_config,
+        )
+    elif cfg.eval_type == "code":  # using evalplus for code directly
+        # TODO: need to move it to a separate docker (either our sandbox or separate srun)
+        from evalplus.evaluate import evaluate
+
+        # processing each generation separately (TODO: evalplus can do it together, but need to figure out the format)
+        for jsonl_file in cfg.prediction_jsonl_files:
+            with open(jsonl_file) as f:
+                samples = [preprocess_code(json.loads(line)) for line in f]
+            # all changes will be done with a new key "completion", so it's ok to write to the same file
+            with open(jsonl_file, "wt", encoding="utf-8") as f:
+                for sample in samples:
+                    f.write(json.dumps(sample) + "\n")
+            eval_config = {
+                "samples": jsonl_file,
+                "base_only": False,
+                "parallel": None,
+                "i_just_wanna_run": False,
+                "test_details": False,
+                "min_time_limit": 1,
+                "gt_time_limit_factor": 4.0,
+                "mini": False,
+                "noextreme": False,
+                "version": "default",
+            }
+            eval_config.update(OmegaConf.to_container(cfg.eval_config))
+            evaluate(Namespace(**eval_config))
+            with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+                evalplus_grades = json.load(fin)
+            # adding is_correct key to allow compute_metrics to work
+            with open(jsonl_file, "wt", encoding="utf-8") as f:
+                for sample in samples:
+                    sample['is_correct'] = evalplus_grades['eval'][sample['task_id']][0]['base_status'] == "pass"
+                    sample['is_correct-plus'] = (
+                        sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
+                    )
+                    f.write(json.dumps(sample) + "\n")
+
+            # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
+            shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
 
 
 HELP_MESSAGE = get_help_message(

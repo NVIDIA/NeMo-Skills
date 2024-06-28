@@ -40,7 +40,8 @@ cluster, you can skip to the [Slurm prerequisites](#slurm) section.
    ```
 
 4. Install the project and required dependencies: `pip install -e .`
-5. Download and prepare all benchmark datasets: `./datasets/prepare_all.sh`
+5. Download and prepare all benchmark datasets: `python datasets/prepare.py`. If you're only interested in a subset
+   of benchmarks, you can add them as positional arguments, e.g. `python datasets/prepare.py mmlu human-eval mbpp gsm8k math`.
 
 Please note that when running pipeline scripts locally, you will always see an mpi error
 at the end even if the script finished execution successfully.
@@ -64,4 +65,5 @@ The following are prerequisites for running scripts on a Slurm cluster.
 
 3. We try to avoid installing packages on Slurm login nodes, but there is still one package that's required: `pip install --user pyyaml`
 
-4. Download and prepare all benchmark datasets: `./datasets/prepare_all.sh`
+4. Download and prepare all benchmark datasets: `python datasets/prepare.py`. If you're only interested in a subset
+   of benchmarks, you can add them as positional arguments, e.g. `python datasets/prepare.py mmlu human-eval mbpp gsm8k math`.

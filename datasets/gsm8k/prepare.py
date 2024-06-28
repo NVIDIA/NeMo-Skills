@@ -52,23 +52,12 @@ fixes = {
 #   - reference_solution (text-based solution)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--split_name",
-        required=True,
-        choices=("test", "validation", "train", "train_full"),
-    )
-    parser.add_argument("--random_seed", type=int, default=42)
-    parser.add_argument("--validation_size", type=int, default=1000)
-    parser.add_argument("--prompt_type", default="openmathinstruct/sft")
-    args = parser.parse_args()
-
-    actual_split_name = "test" if args.split_name == "test" else "train"
+def save_data(split_name, random_seed, validation_size, prompt_type):
+    actual_split_name = "test" if split_name == "test" else "train"
     data_folder = Path(__file__).absolute().parent
     original_file = str(data_folder / f"original_{actual_split_name}.jsonl")
     data_folder.mkdir(exist_ok=True)
-    output_file = str(data_folder / f"{args.split_name}.jsonl")
+    output_file = str(data_folder / f"{split_name}.jsonl")
 
     if not os.path.exists(original_file):
         urllib.request.urlretrieve(
@@ -96,21 +85,40 @@ if __name__ == "__main__":
             data.append(new_entry)
 
     # always shuffling to make it easier to get validation/train out of train_full
-    if args.split_name != "test":
-        random.seed(args.random_seed)
+    if split_name != "test":
+        random.seed(random_seed)
         random.shuffle(data)
-    if args.split_name == "validation":
-        data = data[: args.validation_size]
+    if split_name == "validation":
+        data = data[:validation_size]
         # dumping SFT-ready validation file as well right away
         with open(data_folder / "validation-sft.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "gsm8k", chat_format=False):
+            for entry in prepare_for_sft(data, prompt_type, "gsm8k", chat_format=False):
                 fout.write(json.dumps(entry) + "\n")
         with open(data_folder / "validation-sft-chat.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "gsm8k", chat_format=True):
+            for entry in prepare_for_sft(data, prompt_type, "gsm8k", chat_format=True):
                 fout.write(json.dumps(entry) + "\n")
-    elif args.split_name == "train":
-        data = data[args.validation_size :]
+    elif split_name == "train":
+        data = data[validation_size:]
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--split_name",
+        default="all",
+        choices=("all", "test", "validation", "train", "train_full"),
+    )
+    parser.add_argument("--random_seed", type=int, default=42)
+    parser.add_argument("--validation_size", type=int, default=1000)
+    parser.add_argument("--prompt_type", default="openmathinstruct/sft")
+    args = parser.parse_args()
+
+    if args.split_name == "all":
+        for split_name in ["test", "validation", "train", "train_full"]:
+            save_data(split_name, args.random_seed, args.validation_size, args.prompt_type)
+    else:
+        save_data(args.split_name, args.random_seed, args.validation_size, args.prompt_type)

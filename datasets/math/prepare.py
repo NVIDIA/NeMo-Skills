@@ -104,22 +104,10 @@ def extract_answer_string_2(answer_str):
     return stripped_answer
 
 
-def process_data():
-    """Download tar and condense data into single jsonl file."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--split_name",
-        required=True,
-        choices=("test", "validation", "train", "train_full"),
-    )
-    parser.add_argument("--random_seed", type=int, default=42)
-    parser.add_argument("--validation_size", type=int, default=1000)
-    parser.add_argument("--prompt_type", default="openmathinstruct/sft", choices=prompt_types)
-    args = parser.parse_args()
-
+def save_data(split_name, random_seed, validation_size, prompt_type):
     output_folder = Path(__file__).absolute().parent
     output_folder.mkdir(exist_ok=True)
-    actual_split_name = "test" if args.split_name == "test" else "train"
+    actual_split_name = "test" if split_name == "test" else "train"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         archive_filename = os.path.join(temp_dir, "temp.tar")
@@ -177,27 +165,47 @@ def process_data():
         assert len(split_instances_dict) == 1
         for split, instances in split_instances_dict.items():
             # always shuffling to make it easier to get validation/train out of train_full
-            if args.split_name != "test":
-                random.seed(args.random_seed)
+            if split_name != "test":
+                random.seed(random_seed)
                 random.shuffle(instances)
-            if args.split_name == "validation":
-                data = instances[: args.validation_size]
+            if split_name == "validation":
+                data = instances[:validation_size]
                 # dumping SFT-ready validation file as well right away
                 with open(output_folder / "validation-sft.jsonl", "wt", encoding="utf-8") as fout:
-                    for entry in prepare_for_sft(data, args.prompt_type, "math", chat_format=False):
+                    for entry in prepare_for_sft(data, prompt_type, "math", chat_format=False):
                         fout.write(json.dumps(entry) + "\n")
                 with open(output_folder / "validation-sft-chat.jsonl", "wt", encoding="utf-8") as fout:
-                    for entry in prepare_for_sft(data, args.prompt_type, "math", chat_format=True):
+                    for entry in prepare_for_sft(data, prompt_type, "math", chat_format=True):
                         fout.write(json.dumps(entry) + "\n")
-            elif args.split_name == "train":
-                data = instances[args.validation_size :]
+            elif split_name == "train":
+                data = instances[validation_size:]
             else:
                 data = instances
 
-            output_file = os.path.join(output_folder, f"{args.split_name}.jsonl")
+            output_file = os.path.join(output_folder, f"{split_name}.jsonl")
             with open(output_file, "wt", encoding="utf-8") as writer_f:
                 for instance in data:
                     writer_f.write(json.dumps(instance) + "\n")
+
+
+def process_data():
+    """Download tar and condense data into single jsonl file."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--split_name",
+        default="all",
+        choices=("all", "test", "validation", "train", "train_full"),
+    )
+    parser.add_argument("--random_seed", type=int, default=42)
+    parser.add_argument("--validation_size", type=int, default=1000)
+    parser.add_argument("--prompt_type", default="openmathinstruct/sft", choices=prompt_types)
+    args = parser.parse_args()
+
+    if args.split_name == "all":
+        for split_name in ["test", "validation", "train", "train_full"]:
+            save_data(split_name, args.random_seed, args.validation_size, args.prompt_type)
+    else:
+        save_data(args.split_name, args.random_seed, args.validation_size, args.prompt_type)
 
 
 if __name__ == "__main__":

@@ -15,8 +15,6 @@
 import sys
 from pathlib import Path
 
-import yaml
-
 # adding nemo_skills to python path to avoid requiring installation
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 

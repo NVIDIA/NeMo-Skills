@@ -40,22 +40,11 @@ URL = "https://huggingface.co/datasets/nvidia/OpenMath-MATH-masked/resolve/main/
 #   - reference_solution (text-based solution)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--split_name",
-        required=True,
-        choices=("validation", "train", "train_full"),
-    )
-    parser.add_argument("--random_seed", type=int, default=42)
-    parser.add_argument("--validation_size", type=int, default=1000)
-    parser.add_argument("--prompt_type", default="openmathinstruct/sft", choices=prompt_types)
-    args = parser.parse_args()
-
+def save_data(split_name, random_seed, validation_size, prompt_type):
     data_folder = Path(__file__).absolute().parent
     original_file = str(data_folder / f"original_train.jsonl")
     data_folder.mkdir(exist_ok=True)
-    output_file = str(data_folder / f"{args.split_name}.jsonl")
+    output_file = str(data_folder / f"{split_name}.jsonl")
 
     if not os.path.exists(original_file):
         urllib.request.urlretrieve(
@@ -66,20 +55,39 @@ if __name__ == "__main__":
     with open(original_file, "rt", encoding="utf-8") as fin:
         data = [json.loads(line) for line in fin]
 
-    random.seed(args.random_seed)
+    random.seed(random_seed)
     random.shuffle(data)
-    if args.split_name == "validation":
-        data = data[: args.validation_size]
+    if split_name == "validation":
+        data = data[:validation_size]
         # dumping SFT-ready validation file as well right away
         with open(data_folder / "validation-sft.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "math-masked", chat_format=False):
+            for entry in prepare_for_sft(data, prompt_type, "math-masked", chat_format=False):
                 fout.write(json.dumps(entry) + "\n")
         with open(data_folder / "validation-sft-chat.jsonl", "wt", encoding="utf-8") as fout:
-            for entry in prepare_for_sft(data, args.prompt_type, "math-masked", chat_format=True):
+            for entry in prepare_for_sft(data, prompt_type, "math-masked", chat_format=True):
                 fout.write(json.dumps(entry) + "\n")
-    elif args.split_name == "train":
-        data = data[args.validation_size :]
+    elif split_name == "train":
+        data = data[validation_size:]
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--split_name",
+        default="all",
+        choices=("all", "validation", "train", "train_full"),
+    )
+    parser.add_argument("--random_seed", type=int, default=42)
+    parser.add_argument("--validation_size", type=int, default=1000)
+    parser.add_argument("--prompt_type", default="openmathinstruct/sft", choices=prompt_types)
+    args = parser.parse_args()
+
+    if args.split_name == "all":
+        for split_name in ["validation", "train", "train_full"]:
+            save_data(split_name, args.random_seed, args.validation_size, args.prompt_type)
+    else:
+        save_data(args.split_name, args.random_seed, args.validation_size, args.prompt_type)

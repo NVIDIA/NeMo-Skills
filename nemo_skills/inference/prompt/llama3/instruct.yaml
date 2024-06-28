@@ -17,6 +17,8 @@ prompt_template: |-
 
   {user}
 
-  <|eot_id|><|start_header_id|>assistant<|end_header_id|>{generation}
+  <|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+  {generation}
 
 stop_phrases: ["<|eot_id|>"]

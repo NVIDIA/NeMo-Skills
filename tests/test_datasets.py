@@ -18,7 +18,7 @@ from pathlib import Path
 
 def test_data_scripts():
     subprocess.run(
-        f'bash {Path(__file__).absolute().parents[1] / "datasets" / "prepare_all.sh"}', shell=True, check=True
+        f'python {Path(__file__).absolute().parents[1] / "datasets" / "prepare.py"}', shell=True, check=True
     )
 
     # checking that all expected files are created
@@ -57,6 +57,11 @@ def test_data_scripts():
         'math-masked/validation.jsonl',
         'math-masked/validation-sft.jsonl',
         'math-masked/validation-sft-chat.jsonl',
+        'human-eval/test.jsonl',
+        'mbpp/test.jsonl',
+        'mmlu/test.jsonl',
+        'mmlu/dev.jsonl',
+        'mmlu/val.jsonl',
     ]
     for file in expected_files:
         assert (Path(__file__).absolute().parents[1] / "datasets" / file).exists()

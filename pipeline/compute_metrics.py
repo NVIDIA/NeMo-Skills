@@ -37,7 +37,14 @@ def fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete):
         raise RuntimeError("Need to run evaluate_results.py before computing metrics!")
 
 
-def compute_metrics(prediction_jsonl_files, allow_incomplete=False, max_samples=-1, aggregation_mode='first'):
+def compute_metrics(
+    prediction_jsonl_files,
+    allow_incomplete=False,
+    max_samples=-1,
+    aggregation_mode='first',
+    is_correct_key="is_correct",
+    eval_type="math",
+):
     correct_answer = []
 
     file_handles = [open(file, "rt", encoding="utf-8") for file in unroll_files(prediction_jsonl_files)]
@@ -59,11 +66,11 @@ def compute_metrics(prediction_jsonl_files, allow_incomplete=False, max_samples=
             if not line_dict:
                 fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete)
                 continue
-            if "is_correct" not in line_dict:
+            if is_correct_key not in line_dict:
                 fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete)
                 continue
-            pred_answers.append(line_dict["predicted_answer"])
-            evaluations.append(line_dict["is_correct"])
+            pred_answers.append(line_dict.get("predicted_answer"))
+            evaluations.append(line_dict[is_correct_key])
             log_probs.append(line_dict.get("log_prob"))
             if line_dict.get("log_prob") is None and aggregation_mode == "most_probable":
                 raise RuntimeError(
@@ -98,9 +105,16 @@ def compute_metrics(prediction_jsonl_files, allow_incomplete=False, max_samples=
     for file_handle in file_handles:
         file_handle.close()
 
-    correct_answer = total_correct / total * 100.0
-    no_answer = total_no_answer / total * 100.0
-    wrong_answer = (total - total_correct - total_no_answer) / total * 100.0
+    if eval_type == "math":
+        correct_answer = total_correct / total * 100.0
+        no_answer = total_no_answer / total * 100.0
+        wrong_answer = (total - total_correct - total_no_answer) / total * 100.0
+    elif eval_type == "code":
+        correct_answer = total_correct / total * 100.0
+        no_answer = 0
+        wrong_answer = (total - total_correct) / total
+    else:
+        raise ValueError(f"Unsupported eval_type {eval_type}")
     return correct_answer, wrong_answer, no_answer, total
 
 
@@ -130,6 +144,16 @@ if __name__ == '__main__':
         help="Will cut eval samples at that point (to compare with incomplete evals)",
     )
     parser.add_argument(
+        "--is_correct_key",
+        default="is_correct",
+        help="If need to run with different key. E.g. for evalplus, can use is_correct-plus instead",
+    )
+    parser.add_argument(
+        "--eval_type",
+        default="math",
+        help="Can be math or code",
+    )
+    parser.add_argument(
         "--aggregation_mode",
         choices=["best", "majority", "first", "most_probable"],
         default="first",
@@ -137,7 +161,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     correct_answer, wrong_answer, no_answer, total = compute_metrics(
-        args.prediction_jsonl_files, args.allow_incomplete, args.max_samples, args.aggregation_mode
+        args.prediction_jsonl_files,
+        args.allow_incomplete,
+        args.max_samples,
+        args.aggregation_mode,
+        args.is_correct_key,
+        args.eval_type,
     )
 
     LOG.info(f"Evaluation results for %s", args.prediction_jsonl_files)
