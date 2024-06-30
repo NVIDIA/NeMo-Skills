@@ -110,7 +110,7 @@ if __name__ == "__main__":
                         prediction_jsonl_files=sampling_outputs,
                         aggregation_mode="majority",
                     )
-                    results[benchmark][f'pass@{len(sampling_outputs)}'] = {
+                    results[benchmark][f'majority@{len(sampling_outputs)}'] = {
                         "num_entries": total,
                         "correct_answer": correct_answer,
                         "wrong_answer": wrong_answer,
