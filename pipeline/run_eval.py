@@ -157,7 +157,7 @@ if __name__ == "__main__":
     server_start_cmd, num_tasks, server_wait_string = get_server_command(
         args.server_type, args.num_gpus, args.num_nodes, args.model_path.name
     )
-
+    eval_map = None
     if any([args.prompt_folder, args.model_version]):
         if not all([args.prompt_folder, args.model_version]):
             raise ValueError("Both prompt_folder and model_version need to be specified if one of them is specified.")

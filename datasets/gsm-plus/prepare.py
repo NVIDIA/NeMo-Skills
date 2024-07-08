@@ -18,7 +18,7 @@ import os
 import urllib.request
 from pathlib import Path
 
-URL = "https://huggingface.co/datasets/qintongli/GSM-Plus/resolve/main/gsmplus_test.jsonl?download=true"
+URL = "https://huggingface.co/datasets/qintongli/GSM-Plus/resolve/main/data/test-00000-of-00001.jsonl?download=true"
 
 # Data Format
 #
