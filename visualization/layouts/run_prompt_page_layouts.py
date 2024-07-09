@@ -28,7 +28,7 @@ def get_few_shots_by_id_layout(page: int, examples_type: str, num_few_shots: int
         examples_type,
         [{}],
     )[:num_few_shots]
-    if not page or len(examples_list) <= page - 1:
+    if not page or len(examples_list) < page:
         return html.Div()
     return (
         html.Div(

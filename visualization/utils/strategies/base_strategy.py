@@ -64,7 +64,6 @@ class ModeStrategies:
         utils = get_utils_from_config(
             {key: value for key, value in current_app.config['data_explorer'].items() if key not in SETTING_PARAMS}
         ).items()
-        utils = list(filter(lambda x: x[0] not in RETRIEVAL_FIELDS, utils))
         input_group_layout = html.Div(
             (
                 [
@@ -279,8 +278,9 @@ class ModeStrategies:
         utils["example_dicts"] = get_examples().get(
             examples_type,
             [],
-        )[: utils['num_few_shots']]
-        utils['num_few_shots'] = min(len(utils["example_dicts"]), utils['num_few_shots'])
+        )[: utils.get('num_few_shots', -1)]
+        len_example_dicts = len(utils["example_dicts"])
+        utils['num_few_shots'] = min(len_example_dicts, utils.get('num_few_shots', len_example_dicts))
         prompt_config = get_config(PromptConfig, utils, get_settings())
 
         prompt_config.few_shot_examples = get_config(

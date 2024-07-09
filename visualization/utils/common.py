@@ -35,6 +35,7 @@ from settings.constants import (
     PARAMETERS_FILE_NAME,
     PARAMS_TO_REMOVE,
     QUESTION_FIELD,
+    RETRIEVAL_FIELDS,
     SEPARATOR_DISPLAY,
     SETTING_PARAMS,
     STATS_KEYS,
@@ -230,6 +231,7 @@ def get_utils_from_config(cfg: Dict, display_path: bool = True) -> Dict:
     return {
         SEPARATOR_DISPLAY.join(key.split(SEPARATOR_DISPLAY)[1:]) or key: value
         for key, value in get_utils_from_config_helper(cfg, display_path).items()
+        if key not in RETRIEVAL_FIELDS
     }
 
 
