@@ -67,7 +67,7 @@ def proccess_tag(
 
 def get_single_dollar_functions(direction: int, default_index_move: int) -> Callable[[str, int], Tuple[bool, int]]:
     return lambda text, index: (
-        text[index] == '$' and text[index - direction].isspace() and not text[index + direction].isspace(),
+        text[index] == '$' and not text[index + direction].isspace(),
         index + default_index_move,
     )
 
@@ -110,6 +110,8 @@ def preprocess_latex(text: str) -> str:
         '\n'
         + text.replace('\\[', '\n$$\n')
         .replace('\\]', '\n$$\n')
+        .replace('\\(', ' $')
+        .replace('\\)', '$ ')
         .replace('=', ' = ')
         .replace('+', ' + ')
         .replace('-', ' - ')
