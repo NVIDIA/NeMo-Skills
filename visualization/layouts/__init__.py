@@ -28,6 +28,7 @@ from layouts.base_layouts import (
     get_single_prompt_output_layout,
     get_switch_layout,
     get_text_area_layout,
+    get_text_modes_layout,
     get_utils_field_representation,
 )
 from layouts.run_prompt_page_layouts import (

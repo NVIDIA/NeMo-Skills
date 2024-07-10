@@ -15,13 +15,15 @@
 import random
 import re
 import string
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from ansi2html import Ansi2HTMLConverter
 from dash import dcc, html
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import PythonLexer
+
+from visualization.settings.constants import ANSI, LATEX, MARKDOWN
 
 
 def get_starts_with_tag_function(tag: str, default_index_move: int) -> Callable[[str, int], Tuple[bool, int]]:
@@ -105,7 +107,7 @@ def proccess_plain_text(text: str) -> str:
     return text
 
 
-def preprocess_latex(text: str) -> str:
+def preprocess_latex(text: str, escape: bool = True) -> str:
     text = (
         '\n'
         + text.replace('\\[', '\n$$\n')
@@ -133,7 +135,11 @@ def preprocess_latex(text: str) -> str:
         ) = get_detection_functions(text, index)
         if detect_start_token is not None:
             if start_plain_text_index != -1:
-                texts.append(proccess_plain_text(text[start_plain_text_index:index]))
+                texts.append(
+                    proccess_plain_text(text[start_plain_text_index:index])
+                    if escape
+                    else text[start_plain_text_index:index]
+                )
                 start_plain_text_index = -1
 
             start_index, new_index = proccess_tag(
@@ -144,7 +150,7 @@ def preprocess_latex(text: str) -> str:
                 end_sign,
                 use_last_block_only,
             )
-            texts.append(proccess_plain_text(text[index:start_index]))
+            texts.append(proccess_plain_text(text[index:start_index]) if escape else text[index:start_index])
             if add_dollars:
                 texts.append('\n$$\n')
                 texts.append(text[start_index:new_index].strip())
@@ -158,35 +164,34 @@ def preprocess_latex(text: str) -> str:
         else:
             index += 1
     if start_plain_text_index != -1:
-        texts.append(proccess_plain_text(text[start_plain_text_index:]))
+        texts.append(proccess_plain_text(text[start_plain_text_index:]) if escape else text[start_plain_text_index:])
     return ''.join(texts).replace('\n', '\n\n').strip()
 
 
-def design_text_output(text: str, style={}) -> html.Div:
+def design_text_output(text: str, style={}, text_modes: List[str] = [LATEX, ANSI]) -> html.Div:
     conv = Ansi2HTMLConverter()
     ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
-
-    if bool(ansi_escape.search(text)):
-        text = conv.convert(text, full=False)
-        return html.Div(
-            iframe_template(
-                '<link rel="stylesheet" type="text/css" href="/assets/ansi_styles.css">',
-                f'<pre>{text}</pre>',
-            ),
-            style=style,
-        )
-    elif 'ipython-input' in text or 'Traceback' in text:
-        text = conv.convert(text.replace('[', '\u001b['), full=False)
-        return html.Div(
-            iframe_template(
-                '<link rel="stylesheet" type="text/css" href="/assets/ansi_styles.css">',
-                f'<pre>{text}</pre>',
-            ),
-            style=style,
-        )
-
+    if ANSI in text_modes:
+        if bool(ansi_escape.search(text)) or 'ipython-input' in text or 'Traceback' in text:
+            if bool(ansi_escape.search(text)):
+                text = conv.convert(text, full=False)
+            else:
+                text = conv.convert(text.replace('[', '\u001b['), full=False)
+            return html.Div(
+                iframe_template(
+                    '<link rel="stylesheet" type="text/css" href="/assets/ansi_styles.css">',
+                    f'<pre>{text}</pre>',
+                ),
+                style=style,
+            )
     return html.Div(
-        dcc.Markdown(preprocess_latex(text), mathjax=True, dangerously_allow_html=True),
+        (
+            dcc.Markdown(
+                preprocess_latex(text, escape=MARKDOWN not in text_modes), mathjax=True, dangerously_allow_html=True
+            )
+            if LATEX in text_modes
+            else dcc.Markdown(text) if MARKDOWN in text_modes else html.Pre(text)
+        ),
         style=style,
     )
 

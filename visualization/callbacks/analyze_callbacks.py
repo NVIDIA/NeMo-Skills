@@ -691,7 +691,7 @@ def change_label(
     ),
     [
         Input({"type": 'file_selector', "id": ALL}, 'value'),
-        Input({"type": 'plain_text_switch', "id": ALL}, 'value'),
+        Input({"type": 'text_modes', "id": ALL}, 'value'),
     ],
     [
         State('datatable', 'selected_rows'),
@@ -710,7 +710,7 @@ def change_label(
 )
 def change_file(
     file_names: List[str],
-    plain_text_switch: List[str],
+    text_modes: List[List[str]],
     idx: List[int],
     file_options: List[str],
     models: List[str],
@@ -755,7 +755,7 @@ def change_file(
             rows_names=rows_names,
             files_names=[option['value'] for option in file_options[button_id]],
             col_id=button_id,
-            plain_text=(plain_text_switch[button_id] and len(plain_text_switch[button_id])),
+            text_modes=text_modes[button_id],
         )
     return table_data
 

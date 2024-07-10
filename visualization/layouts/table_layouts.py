@@ -19,12 +19,20 @@ from typing import List
 
 import dash_bootstrap_components as dbc
 from dash import dash_table, html
-from layouts.base_layouts import get_selector_layout, get_single_prompt_output_layout, get_switch_layout
+from layouts.base_layouts import (
+    get_selector_layout,
+    get_single_prompt_output_layout,
+    get_switch_layout,
+    get_text_modes_layout,
+)
 from settings.constants import (
+    ANSI,
+    CODE,
     DATA_PAGE_SIZE,
     ERROR_MESSAGE_TEMPLATE,
     FILES_FILTERING,
     FILES_ONLY,
+    LATEX,
     MODEL_SELECTOR_ID,
     NAME_FOR_BASE_MODEL,
     QUESTIONS_FILTERING,
@@ -399,6 +407,7 @@ def get_models_selector_table_cell(models: List[str], name: str, id: int, add_de
                 outline=True,
                 color="primary",
                 className="me-1",
+                style={"height": "40px"},
             ),
         ]
         if add_del_button
@@ -419,15 +428,7 @@ def get_models_selector_table_cell(models: List[str], name: str, id: int, add_de
                 get_change_label_layout(id),
             ]
             + del_model_layout
-            + [
-                get_switch_layout(
-                    {
-                        "type": "plain_text_switch",
-                        "id": id,
-                    },
-                    ["plain text"],
-                )
-            ],
+            + [get_text_modes_layout(id)],
             style={'display': 'inline-flex'},
         ),
         class_name='mt-1 bg-light font-monospace text-break small rounded border',
@@ -525,7 +526,7 @@ def get_row_detailed_inner_data(
     files_names: List[str],
     file_id: int,
     col_id: int,
-    plain_text: bool = False,
+    text_modes: List[str] = [CODE, LATEX, ANSI],
 ) -> List:
     table_data = get_table_data()[question_id].get(model, [])
     row_data = []
@@ -547,11 +548,7 @@ def get_row_detailed_inner_data(
         elif empty_list:
             value = ""
         else:
-            value = (
-                get_single_prompt_output_layout(str(table_data[file_id].get(key, None)))
-                if not plain_text
-                else html.Pre(str(table_data[file_id].get(key, None)))
-            )
+            value = get_single_prompt_output_layout(str(table_data[file_id].get(key, None)), text_modes)
         row_data.append(value)
     return row_data
 

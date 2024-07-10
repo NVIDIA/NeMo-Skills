@@ -13,10 +13,12 @@
 # limitations under the License.
 
 ANSWER_FIELD = "expected_answer"
+ANSI = "ansi"
 NAME_FOR_BASE_MODEL = "base_generation"
 EXTRA_FIELDS = ["page_index", "file_name"]
 CHAT_MODE = "chat_mode"
 CHOOSE_MODEL = "choose generation"
+CODE = "code"
 DATA_PAGE_SIZE = 10
 ERROR_MESSAGE_TEMPLATE = "When applying {} function\ngot errors\n{}"
 FEW_SHOTS_INPUT = "few_shots_input"
@@ -60,9 +62,11 @@ SETTING_PARAMS = ['server', 'sandbox', 'output_file', 'visualization_params', 't
 STATISTICS_FOR_WHOLE_DATASET = ["correct_answer", "wrong_answer", "no_answer"]
 UNDEFINED = "undefined"
 WHOLE_DATASET_MODE = "whole_dataset"
+MARKDOWN = "markdown"
 MODEL_SELECTOR_ID = '{{"type": "model_selector", "id": {}}}'
 LABEL_SELECTOR_ID = '{{"type": "label_selector", "id": {}}}'
 LABEL = "labels"
+LATEX = "latex"
 CHOOSE_LABEL = "choose label"
 DELETE = "delete"
 GENERAL_STATS = "general_stats"

@@ -18,7 +18,7 @@ from typing import Dict, Iterable, List, Optional, Union
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import current_app
-from settings.constants import SEPARATOR_DISPLAY, SEPARATOR_ID, UNDEFINED
+from settings.constants import ANSI, CODE, LATEX, MARKDOWN, SEPARATOR_DISPLAY, SEPARATOR_ID, UNDEFINED
 from utils.common import parse_model_answer
 from utils.decoration import design_text_output, highlight_code
 
@@ -60,6 +60,7 @@ def get_switch_layout(
     values: Optional[List[str]] = None,
     disabled: List[bool] = [False],
     is_active: bool = False,
+    chosen_values: Optional[List[str]] = None,
     additional_params: Dict = {},
 ) -> dbc.Checklist:
     if values is None:
@@ -74,8 +75,7 @@ def get_switch_layout(
             }
             for label, value, is_disabled in itertools.zip_longest(labels, values, disabled, fillvalue=False)
         ],
-        value=[values[0]] if is_active else [],
-        switch=True,
+        value=(chosen_values if chosen_values is not None else [values[0]] if is_active else []),
         **additional_params,
     )
 
@@ -96,13 +96,13 @@ def get_selector_layout(options: Iterable, id: str, value: str = "") -> dbc.Sele
     )
 
 
-def get_text_area_layout(id: str, value: str, view_mode: bool = False) -> Union[dbc.Textarea, html.Pre]:
+def get_text_area_layout(id: str, value: str, text_modes: bool = False) -> Union[dbc.Textarea, html.Pre]:
     component = dbc.Textarea
-    if view_mode:
+    if text_modes:
         component = html.Pre
 
     return component(
-        **({'children': get_single_prompt_output_layout(value)} if view_mode else {"value": value}),
+        **({'children': get_single_prompt_output_layout(value, text_modes)} if text_modes else {"value": value}),
         id=id,
         style={
             'width': '100%',
@@ -111,13 +111,15 @@ def get_text_area_layout(id: str, value: str, view_mode: bool = False) -> Union[
     )
 
 
-def get_single_prompt_output_layout(answer: str) -> List[html.Div]:
-    parsed_answers = parse_model_answer(answer)
+def get_single_prompt_output_layout(answer: str, text_modes: List[str] = [CODE, LATEX, ANSI]) -> List[html.Div]:
+    parsed_answers = (
+        parse_model_answer(answer) if CODE in text_modes else [{"explanation": answer, "code": None, "output": None}]
+    )
     return [
         item
         for parsed_answer in parsed_answers
         for item in [
-            design_text_output(parsed_answer["explanation"]),
+            design_text_output(text=parsed_answer["explanation"], text_modes=text_modes),
             (
                 highlight_code(
                     parsed_answer["code"],
@@ -127,7 +129,7 @@ def get_single_prompt_output_layout(answer: str) -> List[html.Div]:
             ),
             (
                 design_text_output(
-                    parsed_answer["output"],
+                    text=parsed_answer["output"],
                     style=(
                         {
                             "border": "1px solid black",
@@ -142,6 +144,7 @@ def get_single_prompt_output_layout(answer: str) -> List[html.Div]:
                             "marginTop": "-6px",
                         }
                     ),
+                    text_modes=text_modes,
                 )
                 if parsed_answer["output"] is not None
                 else ""
@@ -151,17 +154,29 @@ def get_single_prompt_output_layout(answer: str) -> List[html.Div]:
     ]
 
 
-def get_results_content_layout(text: str, content: str = None, style={}, switch_is_active: bool = False) -> html.Div:
+def get_text_modes_layout(id: str, is_formatted: bool = True):
+    return get_switch_layout(
+        id={
+            "type": "text_modes",
+            "id": id,
+        },
+        labels=[CODE, LATEX, MARKDOWN, ANSI],
+        chosen_values=[CODE, LATEX, ANSI] if is_formatted else [],
+        additional_params={
+            "style": {
+                "display": "inline-flex",
+                "flex-wrap": "wrap",
+            },
+            "inputStyle": {'margin-left': '-10px'},
+            "labelStyle": {'margin-left': '3px'},
+        },
+    )
+
+
+def get_results_content_layout(text: str, content: str = None, style: Dict = {}) -> html.Div:
     return html.Div(
         [
-            get_switch_layout(
-                {
-                    "type": "view_mode",
-                    "id": "results_content",
-                },
-                ["view mode"],
-                is_active=switch_is_active,
-            ),
+            get_text_modes_layout("results_content", False),
             html.Pre(
                 content if content else text,
                 id="results_content_text",

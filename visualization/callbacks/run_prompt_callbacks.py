@@ -210,7 +210,7 @@ def update_examples_type(
         Input("few_shots_pagination", "active_page"),
         Input(
             {
-                "type": "view_mode",
+                "type": "text_modes",
                 "id": FEW_SHOTS_INPUT,
             },
             "value",
@@ -224,7 +224,7 @@ def update_examples_type(
 )
 def change_examples_page(
     page: int,
-    view_mode: List[str],
+    text_modes: List[str],
     dummy_output: str,
     examples_type: str,
     num_few_shots: int,
@@ -233,7 +233,7 @@ def change_examples_page(
     if not examples_type:
         examples_type = ""
     return (
-        get_few_shots_by_id_layout(page, examples_type, num_few_shots, view_mode and len(view_mode)),
+        get_few_shots_by_id_layout(page, examples_type, num_few_shots, text_modes),
         '',
         js_trigger + '',
     )
@@ -276,7 +276,7 @@ def add_example(n_clicks: int, examples_type: str, last_page: int) -> Tuple[int,
         State("few_shots_pagination", "max_value"),
         State(
             {
-                "type": "view_mode",
+                "type": "text_modes",
                 "id": FEW_SHOTS_INPUT,
             },
             "value",
@@ -290,7 +290,7 @@ def del_example(
     page: int,
     examples_type: str,
     last_page: int,
-    view_mode: List[str],
+    text_modes: List[str],
     js_trigger: str,
 ) -> Tuple[
     Union[int, NoUpdate],
@@ -310,7 +310,7 @@ def del_example(
         return (
             last_page - 1,
             prev_pagination_page,
-            get_few_shots_by_id_layout(prev_pagination_page, examples_type, last_page - 1, view_mode),
+            get_few_shots_by_id_layout(prev_pagination_page, examples_type, last_page - 1, text_modes),
             '',
             js_trigger + ' ',
         )
@@ -330,7 +330,7 @@ def del_example(
         State('examples_type', "value"),
         State(
             {
-                "type": "view_mode",
+                "type": "text_modes",
                 "id": FEW_SHOTS_INPUT,
             },
             "value",
@@ -343,9 +343,9 @@ def update_examples(
     page_content_ids: List[int],
     page: int,
     examples_type: str,
-    view_mode: List[str],
+    text_modes: List[str],
 ) -> NoUpdate:
-    if view_mode and len(view_mode) or not page_content:
+    if text_modes and len(text_modes) or not page_content:
         return no_update
 
     if not examples_type:
@@ -524,12 +524,24 @@ def change_mode(run_mode: str, utils: List[Dict], js_trigger: str) -> Tuple[List
     ],
     [
         State("query_search_input", "value"),
+        State(
+            {
+                "type": "text_modes",
+                "id": QUERY_INPUT_TYPE,
+            },
+            "value",
+        ),
         State("js_trigger", "children"),
     ],
     prevent_initial_call=True,
 )
 def prompt_search(
-    n_clicks: int, data_file: str, run_mode: str, index: int, js_trigger: str
+    n_clicks: int,
+    data_file: str,
+    run_mode: str,
+    index: int,
+    text_modes: List[str],
+    js_trigger: str,
 ) -> Tuple[Union[List[str], NoUpdate]]:
     query_data = get_test_data(index, data_file)[0]
     return (
@@ -537,7 +549,7 @@ def prompt_search(
         .get_strategy()
         .get_query_input_children_layout(
             query_data,
-            [],
+            text_modes,
         ),
         query_data,
         "",
@@ -555,7 +567,7 @@ def prompt_search(
     [
         Input(
             {
-                "type": "view_mode",
+                "type": "text_modes",
                 "id": QUERY_INPUT_TYPE,
             },
             "value",
@@ -570,13 +582,13 @@ def prompt_search(
     prevent_initial_call=True,
 )
 def change_prompt_search_mode(
-    view_mode: List[str],
+    text_modes: List[str],
     query_store: Dict[str, str],
     query_params: List[str],
     query_params_ids: List[int],
     js_trigger: str,
 ) -> Tuple[Union[List[str], NoUpdate]]:
-    if view_mode and len(view_mode):
+    if None not in query_params:
         query_store = extract_query_params(query_params_ids, query_params)
 
     return (
@@ -584,7 +596,7 @@ def change_prompt_search_mode(
         .get_strategy()
         .get_query_input_children_layout(
             query_store,
-            view_mode,
+            text_modes,
         ),
         query_store,
         "",
@@ -624,7 +636,7 @@ def preview(
     Output("results_content_text", "children", allow_duplicate=True),
     Input(
         {
-            "type": "view_mode",
+            "type": "text_modes",
             "id": "results_content",
         },
         "value",
@@ -632,5 +644,5 @@ def preview(
     State("text_store", "data"),
     prevent_initial_call=True,
 )
-def change_results_content_mode(view_mode: List[str], text: str) -> html.Pre:
-    return get_single_prompt_output_layout(text) if view_mode and len(view_mode) else text
+def change_results_content_mode(text_modes: List[str], text: str) -> html.Pre:
+    return get_single_prompt_output_layout(text, text_modes) if text_modes and len(text_modes) else text
