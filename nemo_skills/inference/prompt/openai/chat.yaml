@@ -1,0 +1,24 @@
+few_shot_examples:
+  template: "Question:\n{question}{context}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
+
+system: |-
+  You're an expert mathematician. Your goal is to solve the math problem below.
+  To achieve this you always follow these steps:
+  1. Start by carefully analyzing the given problem.
+  2. Write DETAILED step-by-step solution.
+  3. Put the final answer inside \boxed{{}}.
+
+user: |-
+    Here are some examples of questions and solutions followed by a new question that you need to solve.
+
+    {examples}Question:
+    {question}{context}
+
+# <..._start> and <..._end> are special tokens that are not directly visible to the model.
+# They are used to parse the prompt into parts in our inference pipeline.
+prompt_template: |-
+  <system_start>{system}<system_end>
+  <user_start>{user}<user_end>
+  <assistant_start>{generation}
+
+stop_phrases: []

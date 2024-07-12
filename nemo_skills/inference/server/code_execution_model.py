@@ -23,7 +23,7 @@ from typing import List
 from nemo_skills.code_execution import CODE_OUTPUT_SEPARATORS, CODE_SEPARATORS, extract_code_to_execute
 from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.inference.prompt.utils import Prompt
-from nemo_skills.inference.server.model import BaseModel, NemoModel, get_model, models, postprocess_output
+from nemo_skills.inference.server.model import BaseModel, NemoModel, OpenAIModel, get_model, models, postprocess_output
 from nemo_skills.utils import nested_dataclass, python_doc_to_cmd_help
 
 LOG = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class CodeExecutionWrapper:
             while len(remaining_ids) > 0:
                 num_executions += 1
                 request["prompts"] = [new_outputs[idx]['prompt'] for idx in remaining_ids]
-                outputs = [output['generation'] for output in self.model.generate(**request)]
+                outputs = [self._handle_stop_words(output['generation']) for output in self.model.generate(**request)]
                 new_ids = []
                 # checking if any of the outputs need code execution and submitting requests in parallel
                 futures = [None] * len(prompts)
@@ -180,7 +180,7 @@ class CodeExecutionWrapper:
         results = [None] * self.config.error_recovery.recovery_attempts
         for rs in range(self.config.error_recovery.recovery_attempts):
             recovery_request['random_seed'] = rs
-            output = self.model.generate(**recovery_request)[0]['generation']
+            output = self._handle_stop_words(self.model.generate(**recovery_request)[0]['generation'])
             outputs.append(output)
             if output.strip().endswith(CODE_SEPARATORS[-1]):
                 futures[rs] = executor.submit(
@@ -219,6 +219,17 @@ class CodeExecutionWrapper:
         new_output['error_message'] = ''
 
         return most_common
+
+    def _handle_stop_words(self, output: str):
+        """
+        OpenAI chat API remove stop word from the output, so we need to add it back
+        to enable code execution.
+        """
+        if not isinstance(self.model, OpenAIModel):
+            return output
+        if output.find(CODE_SEPARATORS[0]) > output.find(CODE_SEPARATORS[-1]):
+            return output + CODE_SEPARATORS[-1]
+        return output
 
 
 def server_params():

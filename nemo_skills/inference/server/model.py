@@ -244,10 +244,9 @@ class OpenAIModel(BaseModel):
             raise ValueError("`top_k` is not supported by OpenAI, please set it to default value `0`.")
 
         outputs = []
-        for input_dict in input_dicts:
+        for prompt in prompts:
             response = self._send_request(
                 prompt=prompt,
-                input_dict=input_dict,
                 tokens_to_generate=tokens_to_generate,
                 temperature=temperature,
                 top_p=top_p,
@@ -272,7 +271,7 @@ class OpenAIModel(BaseModel):
         random_seed: int,
         stop_phrases: list[str],
     ) -> str:
-        messages = prompt.build_structured(input_dict)
+        messages = self._parse_prompt(prompt)
         response = self.client.chat.completions.create(
             model=self.model,
             temperature=temperature,
@@ -284,10 +283,24 @@ class OpenAIModel(BaseModel):
             messages=messages,
         ).choices[0]
         output = response.message.content
-        # adding back stop words
-        if response.finish_reason == "stop":
-            output += response.stop_reason
         return output
+
+    def _parse_prompt(self, prompt: str) -> dict:
+        """
+        OpenAI chat API requires a structured input, so we need to parse the prompt
+        into a structured list of messages.
+        """
+        system_pattern = re.compile(r"<system_start>(.*?)<system_end>", re.DOTALL)
+        user_pattern = re.compile(r"<user_start>(.*?)<user_end>", re.DOTALL)
+        generation_pattern = re.compile(r"<assistant_start>(.*)", re.DOTALL)
+        messages = [
+            {"role": "system", "content": system_pattern.search(prompt).group(1)},
+            {"role": "user", "content": user_pattern.search(prompt).group(1)},
+        ]
+        generation_msg = generation_pattern.search(prompt).group(1)
+        if generation_msg:
+            messages.append({"role": "assistant", "content": generation_msg})
+        return messages
 
 
 class VLLMModel(BaseModel):
@@ -430,7 +443,7 @@ class VLLMModel(BaseModel):
 models = {
     'tensorrt_llm': TensorRTLLMModel,
     'nemo': NemoModel,
-    # 'openai': OpenAIModel,
+    'openai': OpenAIModel,
     'vllm': VLLMModel,
 }
 
