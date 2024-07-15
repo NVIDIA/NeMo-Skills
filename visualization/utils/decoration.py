@@ -34,7 +34,7 @@ def get_starts_with_tag_function(tag: str, default_index_move: int) -> Callable[
         elif '{' not in tag:
             returning_index = index + len(tag)
         else:
-            returning_index = text.find('}', index) % (len(text) + 1) + 1
+            returning_index = text.find('}', index) % (len(text) + 1)
 
         return is_starts_with_tag, returning_index
 
@@ -108,20 +108,17 @@ def proccess_plain_text(text: str) -> str:
 
 
 def preprocess_latex(text: str, escape: bool = True) -> str:
-    text = (
-        '\n'
-        + text.replace('\\[', '\n$$\n')
-        .replace('\\]', '\n$$\n')
-        .replace('\\(', ' $')
-        .replace('\\)', '$ ')
-        .replace('=', ' = ')
-        .replace('+', ' + ')
-        .replace('-', ' - ')
-        .replace('*', ' * ')
-        .replace('/', ' / ')
-        .replace('  ', ' ')
-        + '\n'
-    )
+    text = '\n' + text.replace('\\[', '\n$$\n').replace('\\]', '\n$$\n').replace('\\(', ' $').replace('\\)', '$ ')
+
+    right_side_operations = ['-', '=', '+', '*', '/']
+    left_side_operations = ['=', '+', '*', '/']
+    for op in right_side_operations:
+        text = text.replace(op + '$', op + ' $')
+
+    for op in left_side_operations:
+        text = text.replace('$' + op, '$ ' + op)
+
+    text += '\n'
     index = 1
     texts = []
     start_plain_text_index = -1
