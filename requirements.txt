@@ -1,5 +1,5 @@
 backoff
-evalplus
+evalplus @ git+https://github.com/evalplus/evalplus@c91370f
 huggingface_hub
 hydra-core
 numpy
