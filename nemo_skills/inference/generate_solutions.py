@@ -73,6 +73,8 @@ class GenerateSolutionsConfig:
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
 
+    generation_key: str = "generation"
+
     def __post_init__(self):
         """Building data_file from dataset/split_name if not provided directly."""
         if self.data_file is not None:
@@ -152,6 +154,10 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
                     output.update(original_data_point)
                     # adding answer and error message
                     add_answer_and_error_message(output)
+
+                    if cfg.generation_key != "generation":
+                        output[cfg.generation_key] = output.pop("generation")
+
                     fout.write(json.dumps(output) + "\n")
                 data_points = []
 
@@ -165,6 +171,8 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
             for output, original_data_point in zip(outputs, data_points):
                 output.update(original_data_point)
                 add_answer_and_error_message(output)
+                if cfg.generation_key != "generation":
+                    output[cfg.generation_key] = output.pop("generation")
                 fout.write(json.dumps(output) + "\n")
 
 

@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[2] / 'pipeline'))
-from compute_metrics import compute_metrics
+from compute_metrics import MathEval, compute_metrics
 
 
 def test_trtllm_run_eval():
@@ -62,7 +62,9 @@ python pipeline/run_eval.py \
         assert elem['error_message'] != '<not_executed>'
 
     # running compute_metrics to check that results are expected
-    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"])
+    correct_answer, wrong_answer, no_answer, total = compute_metrics(
+        [f"{output_path}/gsm8k/output-greedy.jsonl"], MathEval()
+    )
     assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (35, 60, 5)
     assert total == 20
 
@@ -100,7 +102,9 @@ python pipeline/run_eval.py \
         assert elem['error_message'] != '<not_executed>'
 
     # running compute_metrics to check that results are expected
-    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"])
+    correct_answer, wrong_answer, no_answer, total = compute_metrics(
+        [f"{output_path}/gsm8k/output-greedy.jsonl"], MathEval()
+    )
     assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (40, 55, 5)
     assert total == 20
 
@@ -138,7 +142,9 @@ python pipeline/run_eval.py \
         assert elem['error_message'] == '<not_executed>'
 
     # running compute_metrics to check that results are expected
-    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/math/output-greedy.jsonl"])
+    correct_answer, wrong_answer, no_answer, total = compute_metrics(
+        [f"{output_path}/math/output-greedy.jsonl"], MathEval()
+    )
     assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (20, 65, 15)
     assert total == 20
 
@@ -177,7 +183,7 @@ python pipeline/run_labeling.py \
         assert elem['error_message'] != '<not_executed>'
 
     # running compute_metrics to check that results are expected
-    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/output-rs0.jsonl"])
+    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/output-rs0.jsonl"], MathEval())
     assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (35, 50, 15)
     assert total == 20
 
@@ -215,6 +221,8 @@ python pipeline/run_eval.py \
         assert elem['error_message'] != '<not_executed>'
 
     # running compute_metrics to check that results are expected
-    correct_answer, wrong_answer, no_answer, total = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"])
+    correct_answer, wrong_answer, no_answer, total = compute_metrics(
+        [f"{output_path}/gsm8k/output-greedy.jsonl"], MathEval()
+    )
     assert (int(correct_answer), int(wrong_answer), int(no_answer)) == (95, 5, 0)
     assert total == 20

@@ -46,6 +46,7 @@ def get_greedy_cmd(
     benchmark, output_name='output-greedy.jsonl', extra_eval_args="", extra_arguments="", eval_map=None
 ):
     extra_eval_args = f"{EXTRA_EVAL_ARGS.get(benchmark, '')} {extra_eval_args}"
+    extra_arguments = f"{EXTRA_ARGS.get(benchmark, '')} {extra_arguments}"
     if eval_map:
         extra_arguments = f"+prompt={eval_map.get(benchmark, eval_map['default'])} {extra_arguments}"
     return f"""echo "Evaluating benchmark {benchmark}" && \
@@ -95,7 +96,14 @@ EXTRA_EVAL_ARGS = {
     # some benchmarks require specific extra arguments, which are defined here
     'human-eval': '++eval_type=code ++eval_config.dataset=humaneval',
     'mbpp': '++eval_type=code ++eval_config.dataset=mbpp',
+    'ifeval': '++eval_type=ifeval',
 }
+
+EXTRA_ARGS = {
+    # some benchmarks require specific extra arguments, which are defined here
+    'ifeval': '++generation_key=response',
+}
+
 
 if __name__ == "__main__":
     setup_logging(disable_hydra_logs=False)

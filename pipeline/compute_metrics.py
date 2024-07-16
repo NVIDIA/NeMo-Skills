@@ -28,94 +28,221 @@ from nemo_skills.utils import setup_logging, unroll_files
 LOG = logging.getLogger(__file__)
 
 
-def fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete):
-    if allow_incomplete:
-        evaluations.append(False)
-        log_probs.append(-1e9)
-        pred_answers.append(None)
-    else:
-        raise RuntimeError("Need to run evaluate_results.py before computing metrics!")
+class MathEval:
+    def __init__(self):
+        self.reset()
+
+    def fill_up_missing(self):
+        return {'predicted_answer': None, 'is_correct': False}
+
+    def is_incomplete(self, elem):
+        return 'is_correct' not in elem or 'predicted_answer' not in elem
+
+    def update(self, predictions, aggregation_mode):
+        """Updating the evaluation results with the current element.
+
+        Args:
+            predictions (list[dict]): aggregated predictions across all generations.
+                The content of the file is benchmark specific.
+            aggregation_mode (str): "best", "majority", "first", etc. Might vary by benchmark.
+        """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
+        self.total += 1
+        if aggregation_mode == "best":
+            self.total_correct += any([elem['is_correct'] for elem in predictions])
+            if all([elem['predicted_answer'] is None for elem in predictions]):
+                self.total_no_answer += 1
+        elif aggregation_mode == "majority":
+            # TODO: currently majority does not take into account equivalent answers written in a different way
+            valid_answers_and_results = [
+                (elem['predicted_answer'], elem['is_correct'])
+                for elem in predictions
+                if elem['predicted_answer'] is not None
+            ]
+            if len(valid_answers_and_results) == 0:
+                self.total_no_answer += 1
+            else:
+                majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
+                self.total_correct += majority_result[1]
+        elif aggregation_mode == "first":
+            self.total_correct += predictions[0]['is_correct']
+            self.total_no_answer += predictions[0]['predicted_answer'] is None
+        else:
+            raise ValueError(f"Unsupported mode {aggregation_mode}")
+
+    def get_metrics(self):
+        return {
+            "num_entries": self.total,
+            "correct_answer": self.total_correct / self.total * 100.0,
+            "wrong_answer": (self.total - self.total_correct - self.total_no_answer) / self.total * 100.0,
+            "no_answer": self.total_no_answer / self.total * 100.0,
+        }
+
+    def reset(self):
+        self.total_correct = 0
+        self.total_no_answer = 0
+        self.total = 0
+
+
+class CodeEval:
+    def __init__(self):
+        self.reset()
+
+    def fill_up_missing(self):
+        return {'is_correct': False, 'is_correct-plus': False}
+
+    def is_incomplete(self, elem):
+        return 'is_correct' not in elem or 'is_correct-plus' not in elem
+
+    def update(self, predictions, aggregation_mode):
+        """Updating the evaluation results with the current element.
+
+        Args:
+            predictions (list[dict]): aggregated predictions across all generations.
+                The content of the file is benchmark specific.
+            aggregation_mode (str): "best", "majority", "first", etc. Might vary by benchmark.
+        """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
+        self.total += 1
+        if aggregation_mode == "best":
+            self.total_correct += any([elem['is_correct'] for elem in predictions])
+            self.total_correct_plus += any([elem['is_correct-plus'] for elem in predictions])
+        elif aggregation_mode == "first":
+            self.total_correct += predictions[0]['is_correct']
+            self.total_correct_plus += predictions[0]['is_correct-plus']
+        else:
+            raise ValueError(f"Unsupported mode {aggregation_mode}")
+
+    def get_metrics(self):
+        return {
+            "num_entries": self.total,
+            "passing_base_tests": self.total_correct / self.total * 100.0,
+            "passing_plus_tests": self.total_correct_plus / self.total * 100.0,
+        }
+
+    def reset(self):
+        self.total_correct = 0
+        self.total_correct_plus = 0
+        self.total = 0
+
+
+class IFEval:
+    def __init__(self):
+        self.reset()
+
+    def fill_up_missing(self):
+        return {'loose_eval': {'follow_all_instructions': False}, 'strict_eval': {'follow_all_instructions': False}}
+
+    def is_incomplete(self, elem):
+        incomplete = 'loose_eval' not in elem or 'strict_eval' not in elem
+        if incomplete:
+            return False
+        return (
+            'follow_all_instructions' not in elem['loose_eval'] or 'follow_all_instructions' not in elem['strict_eval']
+        )
+
+    def update(self, predictions, aggregation_mode):
+        """Updating the evaluation results with the current element.
+
+        Args:
+            predictions (list[dict]): aggregated predictions across all generations.
+                The content of the file is benchmark specific.
+            aggregation_mode (str): "best", "majority", "first", etc. Might vary by benchmark.
+        """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
+        self.total += 1
+        if aggregation_mode == "best":
+            self.total_correct_loose += any([elem['loose_eval']['follow_all_instructions'] for elem in predictions])
+            self.total_correct_strict += any([elem['strict_eval']['follow_all_instructions'] for elem in predictions])
+        elif aggregation_mode == "first":
+            self.total_correct_loose += predictions[0]['loose_eval']['follow_all_instructions']
+            self.total_correct_strict += predictions[0]['strict_eval']['follow_all_instructions']
+        else:
+            raise ValueError(f"Unsupported mode {aggregation_mode}")
+
+    def get_metrics(self):
+        return {
+            "num_entries": self.total,
+            "strict_accuracy": self.total_correct_strict / self.total * 100.0,
+            "loose_accuracy": self.total_correct_loose / self.total * 100.0,
+        }
+
+    def reset(self):
+        self.total_correct_loose = 0
+        self.total_correct_strict = 0
+        self.total = 0
 
 
 def compute_metrics(
     prediction_jsonl_files,
+    evaluator,
     allow_incomplete=False,
     max_samples=-1,
     aggregation_mode='first',
-    is_correct_key="is_correct",
-    eval_type="math",
 ):
-    correct_answer = []
-
     file_handles = [open(file, "rt", encoding="utf-8") for file in unroll_files(prediction_jsonl_files)]
 
-    total_correct = 0
-    total_no_answer = 0
-    total = 0
+    evaluator.reset()
     for idx, lines in enumerate(zip_longest(*file_handles)):
         if idx == max_samples:
             break
-        evaluations = []
-        log_probs = []
-        pred_answers = []
-        for lidx, line in enumerate(lines):
+        data = []
+        for line in lines:
             if not line:  # could have missing predictions
-                fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete)
+                if not allow_incomplete:
+                    raise RuntimeError("Some data is missing!")
+                data.append(evaluator.fill_up_missing())
                 continue
             line_dict = json.loads(line)
             if not line_dict:
-                fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete)
+                if not allow_incomplete:
+                    raise RuntimeError("Some data is missing!")
+                data.append(evaluator.fill_up_missing())
                 continue
-            if is_correct_key not in line_dict:
-                fill_up_missing(evaluations, log_probs, pred_answers, allow_incomplete)
+            if evaluator.is_incomplete(line_dict):
+                if not allow_incomplete:
+                    raise RuntimeError("Some data is missing!")
+                data.append(evaluator.fill_up_missing())
                 continue
-            pred_answers.append(line_dict.get("predicted_answer"))
-            evaluations.append(line_dict[is_correct_key])
-            log_probs.append(line_dict.get("log_prob"))
-            if line_dict.get("log_prob") is None and aggregation_mode == "most_probable":
-                raise RuntimeError(
-                    "Cannot compute most probable generation because some of the probabilities are missing"
-                )
+            data.append(line_dict)
 
-        total += 1
-        if aggregation_mode == "best":
-            total_correct += any(evaluations)
-            if all([ans is None for ans in pred_answers]):
-                total_no_answer += 1
-        elif aggregation_mode == "majority":
-            # TODO: currently majority does not take into account equivalent answers written in a different way
-            valid_answers_and_results = [
-                (ans, is_correct) for ans, is_correct in zip(pred_answers, evaluations) if ans is not None
-            ]
-            if len(valid_answers_and_results) == 0:
-                total_no_answer += 1
-            else:
-                majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
-                total_correct += majority_result[1]
-        elif aggregation_mode == "first":
-            total_correct += evaluations[0]
-            total_no_answer += pred_answers[0] is None
-        elif aggregation_mode == "most_probable":
-            most_probable_result = sorted(zip(log_probs, evaluations, pred_answers))[-1]
-            total_correct += most_probable_result[1]
-            total_no_answer += most_probable_result[2] is None
-        else:
-            raise ValueError(f"Unsupported mode {aggregation_mode}")
+        evaluator.update(data, aggregation_mode)
 
     for file_handle in file_handles:
         file_handle.close()
 
-    if eval_type == "math":
-        correct_answer = total_correct / total * 100.0
-        no_answer = total_no_answer / total * 100.0
-        wrong_answer = (total - total_correct - total_no_answer) / total * 100.0
-    elif eval_type == "code":
-        correct_answer = total_correct / total * 100.0
-        no_answer = 0
-        wrong_answer = (total - total_correct) / total
-    else:
-        raise ValueError(f"Unsupported eval_type {eval_type}")
-    return correct_answer, wrong_answer, no_answer, total
+    return evaluator.get_metrics()
+
+
+math_benchmarks = [
+    'algebra222',
+    'asdiv',
+    'functional',
+    'gsm-hard',
+    'gsm-ic-2step',
+    'gsm-ic-mstep',
+    'gsm-plus',
+    'gsm8k',
+    'math',
+    'mawps',
+    'svamp',
+    'tabmwp',
+]
+code_benchmarks = ['human-eval', 'mbpp']
+
+EVALUATOR_MAP = {
+    "ifeval": IFEval,
+    "mmlu": MathEval,  # TODO: update this
+}
+
+for benchmark in math_benchmarks:
+    EVALUATOR_MAP[benchmark] = MathEval
+
+for benchmark in code_benchmarks:
+    EVALUATOR_MAP[benchmark] = CodeEval
 
 
 if __name__ == '__main__':
@@ -144,44 +271,32 @@ if __name__ == '__main__':
         help="Will cut eval samples at that point (to compare with incomplete evals)",
     )
     parser.add_argument(
-        "--is_correct_key",
-        default="is_correct",
-        help="If need to run with different key. E.g. for evalplus, can use is_correct-plus instead",
-    )
-    parser.add_argument(
-        "--eval_type",
-        default="math",
-        help="Can be math or code",
+        "--benchmark",
+        required=True,
+        help="To select which evaluator to use",
     )
     parser.add_argument(
         "--aggregation_mode",
-        choices=["best", "majority", "first", "most_probable"],
+        choices=["best", "majority", "first"],
         default="first",
     )
     args = parser.parse_args()
 
-    correct_answer, wrong_answer, no_answer, total = compute_metrics(
+    evaluator = EVALUATOR_MAP[args.benchmark]()
+
+    metrics = compute_metrics(
         args.prediction_jsonl_files,
+        evaluator,
         args.allow_incomplete,
         args.max_samples,
         args.aggregation_mode,
-        args.is_correct_key,
-        args.eval_type,
     )
 
     LOG.info(f"Evaluation results for %s", args.prediction_jsonl_files)
-    LOG.info(f"Total eval entries: %d", total)
-    LOG.info(f"Correct answer: %.2f%%", correct_answer)
-    LOG.info(f"Wrong answer: %.2f%%", wrong_answer)
-    LOG.info(f"No answer: %.2f%%", no_answer)
+    for metric_key, metric_value in metrics.items():
+        if isinstance(metric_value, float):
+            metric_value = f"{metric_value:.2f}"
+        LOG.info(f"%s: %s", metric_key, metric_value)
     if args.save_metrics_file:
         with open(args.save_metrics_file, "wt", encoding="utf-8") as fout:
-            json.dump(
-                {
-                    "num_entries": total,
-                    "correct_answer": correct_answer,
-                    "wrong_answer": wrong_answer,
-                    "no_answer": no_answer,
-                },
-                fout,
-            )
+            json.dump(metrics, fout, indent=4)

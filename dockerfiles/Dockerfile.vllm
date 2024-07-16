@@ -60,5 +60,12 @@ ENV HF_DATASETS_CACHE=/cache/huggingface/datasets
 COPY requirements.txt /opt/requirements.txt
 RUN pip install -r /opt/requirements.txt
 
+# for ifeval benchmark
+# TODO: can we get just a single folder?
+RUN mkdir /opt/benchmarks
+RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1 && \
+    pip install langdetect absl-py immutabledict nltk && \
+    python -c "import nltk; nltk.download('punkt')"
+
 # Expose port for vLLM API
 EXPOSE 5000

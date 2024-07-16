@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[2] / 'pipeline'))
-from compute_metrics import compute_metrics
+from compute_metrics import MathEval, compute_metrics
 
 
 def test_sft_pipeline():
@@ -59,5 +59,5 @@ python pipeline/run_pipeline.py \
 
     # only checking the total, since model is tiny
     for gen_file in ['gsm8k/output-greedy.jsonl', 'gsm8k/output-rs0.jsonl', 'math/output-greedy.jsonl']:
-        *_, total = compute_metrics([f"{output_path}/nemo-skills-exps/results/test/{gen_file}"])
+        *_, total = compute_metrics([f"{output_path}/nemo-skills-exps/results/test/{gen_file}"], MathEval())
         assert total == 4
