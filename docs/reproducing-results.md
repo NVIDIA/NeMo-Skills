@@ -200,6 +200,8 @@ you can run the following:
       --stages sft prepare_eval \
       --num_nodes 8 \
       --num_gpus 8 \
+      --config-file sft_config_codegen \
+      --with_sandbox \
       ++model.data.train_ds.file_path=/data/sft-data.jsonl \
       ++trainer.sft.max_epochs=4 \
       ++trainer.sft.val_check_interval=4000 \

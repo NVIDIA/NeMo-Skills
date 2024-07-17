@@ -29,6 +29,7 @@ except (ImportError, TypeError):
 To see all supported agruments, nemo_skills package needs to be installed.
 Please note that it is not recommended to install Python packages on a slurm cluster login node.
 """
+from nemo_skills.evaluation.settings import EXTRA_EVAL_ARGS, EXTRA_GENERATION_ARGS
 from nemo_skills.utils import setup_logging
 
 SCRIPT_HELP = """
@@ -46,7 +47,7 @@ def get_greedy_cmd(
     benchmark, output_name='output-greedy.jsonl', extra_eval_args="", extra_arguments="", eval_map=None
 ):
     extra_eval_args = f"{EXTRA_EVAL_ARGS.get(benchmark, '')} {extra_eval_args}"
-    extra_arguments = f"{EXTRA_ARGS.get(benchmark, '')} {extra_arguments}"
+    extra_arguments = f"{EXTRA_GENERATION_ARGS.get(benchmark, '')} {extra_arguments}"
     if eval_map:
         extra_arguments = f"+prompt={eval_map.get(benchmark, eval_map['default'])} {extra_arguments}"
     return f"""echo "Evaluating benchmark {benchmark}" && \
@@ -91,18 +92,6 @@ fi \
 
 MOUNTS = "{NEMO_SKILLS_CODE}:/code,{model_path}:/model,{output_dir}:/results"
 JOB_NAME = "eval-{model_name}"
-
-EXTRA_EVAL_ARGS = {
-    # some benchmarks require specific extra arguments, which are defined here
-    'human-eval': '++eval_type=code ++eval_config.dataset=humaneval',
-    'mbpp': '++eval_type=code ++eval_config.dataset=mbpp',
-    'ifeval': '++eval_type=ifeval',
-}
-
-EXTRA_ARGS = {
-    # some benchmarks require specific extra arguments, which are defined here
-    'ifeval': '++generation_key=response',
-}
 
 
 if __name__ == "__main__":

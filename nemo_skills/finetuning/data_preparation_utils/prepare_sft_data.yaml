@@ -16,6 +16,7 @@ num_output_samples: null
 
 prompt_type: openmathinstruct/sft
 chat_format: false  # whether to use NeMo's chat format
+generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
 filters:
   solution_key: generation  # key to filter solutions by
@@ -92,4 +93,5 @@ processors:
     output_manifest_file: ${output_path}
     prompt_type: ${prompt_type}
     chat_format: ${chat_format}
+    generation_suffix: ${generation_suffix}
     metadata: ${metadata}

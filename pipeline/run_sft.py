@@ -63,6 +63,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--validation_dataset",
         default="gsm8k",
+        # TODO: how to disable it by default?
         help="Validation dataset to use. Make sure it exists inside datasets folder",
     )
     parser.add_argument("--num_nodes", type=int, default=1)
@@ -71,6 +72,7 @@ if __name__ == "__main__":
         "--disable_wandb", action="store_true", help="Disable wandb logging and use tensorboard instead"
     )
     parser.add_argument("--chat_format", action="store_true", help="Use chat format for SFT data")
+    parser.add_argument("--with_sandbox", action="store_true", help="If sandbox is required for code generation")
     parser.add_argument(
         "--partition",
         required=False,
@@ -142,5 +144,5 @@ if __name__ == "__main__":
         container=CLUSTER_CONFIG["containers"]["nemo"],
         mounts=MOUNTS.format(**format_dict),
         partition=args.partition,
-        with_sandbox=True,
+        with_sandbox=args.with_sandbox,
     )

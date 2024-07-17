@@ -17,7 +17,6 @@
 import argparse
 import glob
 import json
-import logging
 import subprocess
 import sys
 from collections import defaultdict
@@ -28,6 +27,8 @@ sys.path.append(str(Path(__file__).absolute().parents[1]))
 sys.path.append(str(Path(__file__).absolute().parents[0]))
 
 from compute_metrics import EVALUATOR_MAP, compute_metrics
+
+from nemo_skills.evaluation.metrics import MathEval
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -58,7 +59,7 @@ if __name__ == "__main__":
         if not Path(benchmark_path).is_dir():
             continue
         try:
-            evaluator = EVALUATOR_MAP[benchmark]()
+            evaluator = EVALUATOR_MAP.get(benchmark, MathEval)()
             if benchmark in ['human-eval', 'mbpp']:
                 if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
                     results[benchmark]['greedy'] = compute_metrics(
@@ -99,22 +100,22 @@ if __name__ == "__main__":
     lines_to_write = []
     for benchmark, benchmark_results in results.items():
         max_widths = {}
-        max_widths['evaluation mode'] = len('evaluation mode')
+        max_widths['evaluation_mode'] = len('evaluation_mode')
         for eval_mode, metrics in benchmark_results.items():
             for metric_key, metric_value in metrics.items():
                 max_widths[metric_key] = max(
                     max_widths.get(metric_key, len(metric_key)),
                     len(f"{metric_value:.2f}" if isinstance(metric_value, float) else str(metric_value)),
                 )
-            max_widths['evaluation mode'] = max(max_widths['evaluation mode'], len(eval_mode))
+            max_widths['evaluation_mode'] = max(max_widths['evaluation_mode'], len(eval_mode))
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation mode'] + list(list(benchmark_results.values())[0].keys())
+        headers = ['evaluation_mode'] + list(list(benchmark_results.values())[0].keys())
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
         for eval_mode, metrics in benchmark_results.items():
-            values = [f'{eval_mode:<{max_widths["evaluation mode"]}}']
+            values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
             for metric_key, metric_value in metrics.items():
                 if isinstance(metric_value, float):
                     metric_value = f"{metric_value:.2f}"

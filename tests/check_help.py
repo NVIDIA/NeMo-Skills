@@ -35,6 +35,7 @@ pipeline_script_list = [
 skills_script_list = [
     'nemo_skills/inference/generate_solutions.py',
     'nemo_skills/evaluation/evaluate_results.py',
+    'nemo_skills/evaluation/fill_majority_answer.py',
 ]
 
 

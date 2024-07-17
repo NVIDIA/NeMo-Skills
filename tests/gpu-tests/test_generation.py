@@ -25,8 +25,8 @@ from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[2] / 'pipeline'))
-from compute_metrics import MathEval, compute_metrics
+sys.path.append(str(Path(__file__).absolute().parents[1]))
+from nemo_skills.evaluation.metrics import MathEval, compute_metrics
 
 
 def test_trtllm_run_eval():
