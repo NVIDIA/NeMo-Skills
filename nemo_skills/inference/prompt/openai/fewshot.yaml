@@ -1,5 +1,5 @@
 few_shot_examples:
-  template: ""
+  template: "Question:\n{question}{context}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
 
 system: |-
   You're an expert mathematician. Your goal is to solve the math problem below.
@@ -9,7 +9,9 @@ system: |-
   3. Put the final answer inside \boxed{{}}.
 
 user: |-
-    Question:
+    Here are some examples of questions and solutions followed by a new question that you need to solve.
+
+    {examples}Question:
     {question}{context}
 
 # <..._start> and <..._end> are special tokens that are not directly visible to the model.
@@ -19,4 +21,4 @@ prompt_template: |-
   <user_start>{user}<user_end>
   <assistant_start>{generation}
 
-stop_phrases: []
+stop_phrases: []  # automatically stops on turn token

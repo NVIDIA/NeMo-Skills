@@ -72,8 +72,10 @@ class BaseModel(abc.ABC):
     ):
         self.server_host = host
         self.server_port = port
-        self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
-        self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
+        if ssh_server is None:
+            self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
+        if ssh_key_path is None:
+            self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
 
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel_requests
@@ -209,22 +211,33 @@ class NemoModel(BaseModel):
         return outputs
 
 
-# TODO: this is broken
 class OpenAIModel(BaseModel):
     def __init__(
         self,
-        model,
+        model=None,
+        base_url=None,
         api_key=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         from openai import OpenAI
 
+        if model is None:
+            model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
+            if model is None:
+                raise ValueError("model argument is required for OpenAI model.")
+
+        if base_url is None:
+            base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL")
+
         if api_key is None:
-            api_key = os.getenv("OPENAI_API_KEY", api_key)
+            if base_url is not None and 'api.nvidia.com' in base_url:
+                api_key = os.getenv("NVIDIA_API_KEY", api_key)
+            else:
+                api_key = os.getenv("OPENAI_API_KEY", api_key)
 
         self.model = model
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
 
     def generate(
         self,
@@ -241,7 +254,7 @@ class OpenAIModel(BaseModel):
         if stop_phrases is None:
             stop_phrases = []
         if top_k != 0:
-            raise ValueError("`top_k` is not supported by OpenAI, please set it to default value `0`.")
+            raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
 
         outputs = []
         for prompt in prompts:
@@ -293,13 +306,22 @@ class OpenAIModel(BaseModel):
         system_pattern = re.compile(r"<system_start>(.*?)<system_end>", re.DOTALL)
         user_pattern = re.compile(r"<user_start>(.*?)<user_end>", re.DOTALL)
         generation_pattern = re.compile(r"<assistant_start>(.*)", re.DOTALL)
+        try:
+            system_message = system_pattern.search(prompt).group(1)
+        except AttributeError:
+            system_message = ""
+        try:
+            user_message = user_pattern.search(prompt).group(1)
+        except AttributeError:
+            user_message = prompt
         messages = [
-            {"role": "system", "content": system_pattern.search(prompt).group(1)},
-            {"role": "user", "content": user_pattern.search(prompt).group(1)},
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
         ]
-        generation_msg = generation_pattern.search(prompt).group(1)
-        if generation_msg:
-            messages.append({"role": "assistant", "content": generation_msg})
+        try:
+            messages.append({"role": "assistant", "content": generation_pattern.search(prompt).group(1)})
+        except AttributeError:
+            pass
         return messages
 
 
