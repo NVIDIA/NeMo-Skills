@@ -65,6 +65,8 @@ def test_data_scripts():
         'mmlu/dev.jsonl',
         'mmlu/val.jsonl',
         'ifeval/test.jsonl',
+        'math-odyssey/test.jsonl',
+        'aime-2024/test.jsonl',
     ]
     for file in expected_files:
         assert (Path(__file__).absolute().parents[1] / "datasets" / file).exists()

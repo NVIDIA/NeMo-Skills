@@ -24,6 +24,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install .
+        pip install -r datasets/requirements.txt
         pip install pytest pytest-cov pytest-timeout
     - name: Run all tests
       run: |
@@ -51,8 +52,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install -r datasets/requirements.txt
         # testing cluster environment where no other packages should be required
-        pip install --user pyyaml evalplus pytest pytest-cov pytest-timeout
+        pip install --user pytest pytest-cov pytest-timeout
     - name: Run help
       run: |
         NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml python tests/check_help.py
