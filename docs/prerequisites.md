@@ -63,7 +63,8 @@ The following are prerequisites for running scripts on a Slurm cluster.
    export HF_TOKEN=<if you plan to use gated models such as llama3>
    ```
 
-3. We try to avoid installing packages on Slurm login nodes, but there is still one package that's required: `pip install --user pyyaml`
+3. We try to avoid installing packages on Slurm login nodes, but there are some that are required for certain datasets.
+   If you run into import errors try installing the requirements with: `pip install --user -r datasets/requirements.txt`
 
 4. Download and prepare all benchmark datasets: `python datasets/prepare.py`. If you're only interested in a subset
    of benchmarks, you can add them as positional arguments, e.g. `python datasets/prepare.py mmlu human-eval mbpp gsm8k math`.
