@@ -16,8 +16,8 @@
 # in addition to what's in this file, there is also some prompt engineering that needs
 # to happen in eval_map.py inside prompt folder for specific models
 
-from nemo_skills.evaluation.graders import code_eval, ifeval, math_eval
-from nemo_skills.evaluation.metrics import CodeEval, IFEval, MathEval
+from nemo_skills.evaluation.graders import arena_grader, code_grader, if_grader, math_grader
+from nemo_skills.evaluation.metrics import ArenaEval, CodeEval, IFEval, MathEval
 
 MATH_BENCHMARKS = [
     'algebra222',
@@ -41,6 +41,7 @@ CODE_BENCHMARKS = ['human-eval', 'mbpp']
 # ------------------------------- metrics settings -----------------------------
 EVALUATOR_MAP = {
     "ifeval": IFEval,
+    "arena-hard": ArenaEval,
     "mmlu": MathEval,  # TODO: update this
 }
 
@@ -57,13 +58,15 @@ EXTRA_EVAL_ARGS = {
     'human-eval': '++eval_type=code ++eval_config.dataset=humaneval',
     'mbpp': '++eval_type=code ++eval_config.dataset=mbpp',
     'ifeval': '++eval_type=ifeval',
+    'arena-hard': '++eval_type=arena',
 }
 
 # TODO: better name?
 GRADING_MAP = {
-    "math": math_eval,  # that's default. TODO: should we do this per-benchmark?
-    "code": code_eval,
-    "ifeval": ifeval,
+    "math": math_grader,  # that's default. TODO: should we do this per-benchmark?
+    "code": code_grader,
+    "ifeval": if_grader,
+    "arena": arena_grader,
 }
 # ------------------------------------------------------------------------------
 

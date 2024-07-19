@@ -22,7 +22,6 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.code_execution import extract_error_message
-from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.prompt.utils import Prompt, PromptConfig, datasets, prompt_types
 from nemo_skills.inference.server.code_execution_model import (
@@ -90,12 +89,6 @@ cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
 
 
-def add_answer_and_error_message(output: dict):
-    output['predicted_answer'] = extract_answer(output['generation'])
-    if 'error_message' not in output:
-        output['error_message'] = extract_error_message(output['generation'])
-
-
 @hydra.main(version_base=None, config_name='generation_config', config_path='.')
 def generate_solutions(cfg: GenerateSolutionsConfig):
     cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
@@ -152,8 +145,8 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
                     output.update(original_data_point)
-                    # adding answer and error message
-                    add_answer_and_error_message(output)
+                    if 'error_message' not in output:
+                        output['error_message'] = extract_error_message(output['generation'])
 
                     if cfg.generation_key != "generation":
                         output[cfg.generation_key] = output.pop("generation")
@@ -170,7 +163,8 @@ def generate_solutions(cfg: GenerateSolutionsConfig):
             )
             for output, original_data_point in zip(outputs, data_points):
                 output.update(original_data_point)
-                add_answer_and_error_message(output)
+                if 'error_message' not in output:
+                    output['error_message'] = extract_error_message(output['generation'])
                 if cfg.generation_key != "generation":
                     output[cfg.generation_key] = output.pop("generation")
                 fout.write(json.dumps(output) + "\n")

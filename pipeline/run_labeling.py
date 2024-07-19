@@ -29,6 +29,8 @@ nvidia-smi && \
 cd /code && \
 export PYTHONPATH=$PYTHONPATH:/code && \
 export HF_TOKEN={HF_TOKEN} && \
+export NVIDIA_API_KEY={NVIDIA_API_KEY} && \
+export OPENAI_API_KEY={OPENAI_API_KEY} && \
 if [ $SLURM_PROCID -eq 0 ]; then \
     {{ {server_start_cmd} 2>&1 | tee /tmp/server_logs.txt & }} && sleep 1 && \
     echo "Waiting for the server to start" && \
@@ -137,7 +139,10 @@ if __name__ == "__main__":
         "server_type": args.server_type,
         "extra_eval_args": args.extra_eval_args,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
-        "HF_TOKEN": os.getenv("HF_TOKEN", ""),  # needed for some of the models, so making an option to pass it in
+        # needed for some of the models, so making an option to pass it in
+        "HF_TOKEN": os.getenv("HF_TOKEN", ""),
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
+        "NVIDIA_API_KEY": os.getenv("NVIDIA_API_KEY", ""),
         "server_wait_string": server_wait_string,
     }
 

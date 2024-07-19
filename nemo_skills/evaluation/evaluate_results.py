@@ -38,7 +38,7 @@ class EvaluateResultsConfig:
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
 
-    eval_type: str = "math"  # math or code  TODO: benchmark?
+    eval_type: str = "math"
     eval_config: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -62,6 +62,7 @@ def evaluate_results(cfg: EvaluateResultsConfig):
     GRADING_MAP[cfg.eval_type](cfg)
 
 
+# TODO: sandbox should be inside the eval_config
 HELP_MESSAGE = get_help_message(
     EvaluateResultsConfig,
     sandbox_params=sandbox_params(),

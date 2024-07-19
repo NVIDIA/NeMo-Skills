@@ -26,6 +26,7 @@ from typing import Dict, List, Optional, Tuple
 import backoff
 import requests
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -330,7 +331,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     gt_answer = line_dict["expected_answer"]
                     data[-1][-1] = json.dumps(line_dict)
 
-                    predicted_answer = line_dict.get("predicted_answer", Sandbox.NOT_EXECUTED)
+                    predicted_answer = extract_answer(line_dict)
                     if (predicted_answer, gt_answer) in map_to_future:
                         continue
 

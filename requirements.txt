@@ -8,5 +8,6 @@ openai
 pyyaml
 rank_bm25
 requests
+scikit-learn
 sympy
 tqdm
