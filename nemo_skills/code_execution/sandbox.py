@@ -331,7 +331,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     gt_answer = line_dict["expected_answer"]
                     data[-1][-1] = json.dumps(line_dict)
 
-                    predicted_answer = extract_answer(line_dict)
+                    predicted_answer = extract_answer(line_dict["generation"])
                     if (predicted_answer, gt_answer) in map_to_future:
                         continue
 
