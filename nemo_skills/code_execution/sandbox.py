@@ -329,9 +329,12 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     if not line_dict:  # can be empty for incomplete generations
                         continue
                     gt_answer = line_dict["expected_answer"]
+                    if 'predicted_answer' not in line_dict:
+                        line_dict["predicted_answer"] = extract_answer(line_dict["generation"])
+
                     data[-1][-1] = json.dumps(line_dict)
 
-                    predicted_answer = extract_answer(line_dict["generation"])
+                    predicted_answer = line_dict["predicted_answer"]
                     if (predicted_answer, gt_answer) in map_to_future:
                         continue
 
