@@ -16,7 +16,7 @@ import abc
 import json
 import logging
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import zip_longest
 from pathlib import Path
 
@@ -151,19 +151,57 @@ class CodeEval(BaseEval):
 
 
 class IFEval(BaseEval):
+    # loosely adapted from
+    # https://github.com/google-research/google-research/blob/master/instruction_following_eval/evaluation_main.py
+
+    required_keys = ['follow_instruction_list', 'instruction_id_list']
+
     def __init__(self):
         self.reset()
 
     def fill_up_missing(self):
-        return {'loose_eval': {'follow_all_instructions': False}, 'strict_eval': {'follow_all_instructions': False}}
+        return {
+            'loose_eval': {key: [] for key in self.required_keys},
+            'strict_eval': {key: [] for key in self.required_keys},
+        }
 
     def is_incomplete(self, elem):
         incomplete = 'loose_eval' not in elem or 'strict_eval' not in elem
         if incomplete:
-            return False
-        return (
-            'follow_all_instructions' not in elem['loose_eval'] or 'follow_all_instructions' not in elem['strict_eval']
-        )
+            return True
+
+        if any([key not in elem['loose_eval'] for key in self.required_keys]):
+            return True
+
+        if any([key not in elem['strict_eval'] for key in self.required_keys]):
+            return True
+
+        return False
+
+    def _update_single_stat(self, stats_dict, elems):
+        """Will update using the pass@k strategy (just pass a single-element list to get greedy)."""
+        # has to be the same across all elements as they are solutions for the same question
+        instruction_id_list = elems[0]['instruction_id_list']
+        # computing "pass@k" score
+        follow_instruction_list = elems[0]['follow_instruction_list']
+        for elem in elems:
+            follow_instruction_list = [
+                follow_instruction_list[i] or elem['follow_instruction_list'][i]
+                for i in range(len(follow_instruction_list))
+            ]
+
+        stats_dict['prompt']['total'] += 1
+        if all(follow_instruction_list):
+            stats_dict['prompt']['correct'] += 1
+
+        stats_dict['instruction']['total'] += len(instruction_id_list)
+        stats_dict['instruction']['correct'] += sum(follow_instruction_list)
+
+        for instruction_id, followed_or_not in zip(instruction_id_list, follow_instruction_list):
+            instruction_id = instruction_id.split(":")[0]
+            stats_dict['tier0']['total'][instruction_id] += 1
+            if followed_or_not:
+                stats_dict['tier0']['correct'][instruction_id] += 1
 
     def update(self, predictions, aggregation_mode):
         """Updating the evaluation results with the current element.
@@ -175,27 +213,40 @@ class IFEval(BaseEval):
         """
         # this shouldn't do any heavy calculation, but just read the metric from existing json entry
         # all the heavy lifting should be done in the evaluation script
-        self.total += 1
         if aggregation_mode == "best":
-            self.total_correct_loose += any([elem['loose_eval']['follow_all_instructions'] for elem in predictions])
-            self.total_correct_strict += any([elem['strict_eval']['follow_all_instructions'] for elem in predictions])
+            self._update_single_stat(self.strict_stats, [pred['strict_eval'] for pred in predictions])
+            self._update_single_stat(self.loose_stats, [pred['loose_eval'] for pred in predictions])
         elif aggregation_mode == "first":
-            self.total_correct_loose += predictions[0]['loose_eval']['follow_all_instructions']
-            self.total_correct_strict += predictions[0]['strict_eval']['follow_all_instructions']
+            self._update_single_stat(self.strict_stats, [predictions[0]['strict_eval']])
+            self._update_single_stat(self.loose_stats, [predictions[0]['loose_eval']])
         else:
             raise ValueError(f"Unsupported mode {aggregation_mode}")
 
     def get_metrics(self):
+        prompt_total = self.strict_stats['prompt']['total']
+        inst_total = self.strict_stats['instruction']['total']
         return {
-            "num_entries": self.total,
-            "strict_accuracy": self.total_correct_strict / self.total * 100.0,
-            "loose_accuracy": self.total_correct_loose / self.total * 100.0,
+            "num_prompts": prompt_total,
+            "num_instructions": inst_total,
+            "prompt_strict_accuracy": self.strict_stats['prompt']['correct'] / prompt_total * 100.0,
+            "instruction_strict_accuracy": self.strict_stats['instruction']['correct'] / inst_total * 100.0,
+            "prompt_loose_accuracy": self.loose_stats['prompt']['correct'] / prompt_total * 100.0,
+            "instruction_loose_accuracy": self.loose_stats['instruction']['correct'] / inst_total * 100.0,
         }
 
     def reset(self):
-        self.total_correct_loose = 0
-        self.total_correct_strict = 0
-        self.total = 0
+        # the original code also has a deeper breakdown into tier1 scores,
+        # but that's probably too much for us to track at this stage
+        self.strict_stats = {
+            "prompt": {"total": 0, "correct": 0},
+            "instruction": {"total": 0, "correct": 0},
+            "tier0": {"total": defaultdict(int), "correct": defaultdict(int)},
+        }
+        self.loose_stats = {
+            "prompt": {"total": 0, "correct": 0},
+            "instruction": {"total": 0, "correct": 0},
+            "tier0": {"total": defaultdict(int), "correct": defaultdict(int)},
+        }
 
 
 class ArenaEval(BaseEval):
