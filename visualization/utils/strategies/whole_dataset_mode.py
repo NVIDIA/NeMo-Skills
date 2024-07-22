@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+from io import StringIO
 from typing import Dict, List
 
 import dash_bootstrap_components as dbc
@@ -59,7 +60,6 @@ class WholeDatasetModeStrategy(ModeStrategies):
             for key, value in utils.items()
             if key != RETRIEVAL and key not in RETRIEVAL_FIELDS
         }
-        logging.info(f"Whole dataset mode utils: {utils}")
         examples_type = utils.pop("examples_type", None)
         example_dicts = get_examples().get(
             examples_type,
@@ -70,10 +70,10 @@ class WholeDatasetModeStrategy(ModeStrategies):
         runs_storage = get_available_models()
         config = current_app.config['data_explorer']
         results_path = config['visualization_params']['results_path']
-        run_index = len(runs_storage)
+        generation_name = utils['generation_name'] or str(len(runs_storage))
         metrics_directory = os.path.join(
             results_path,
-            str(run_index),
+            generation_name,
         )
         random_seed_start = utils['start_random_seed'] if params['range_random_mode'] else utils['random_seed']
         random_seed_end = utils['end_random_seed'] if params['range_random_mode'] else utils['random_seed'] + 1
@@ -97,9 +97,20 @@ class WholeDatasetModeStrategy(ModeStrategies):
             utils,
             get_settings(),
         )
-
-        for random_seed in range(random_seed_start, random_seed_end):
-            file_name = GREEDY if utils['temperature'] == 0 else "rs" + str(random_seed)
+        greedy_params = ['greedy'] if params['range_random_mode'] or utils['temperature'] == 0 else []
+        rs_params = (
+            list(range(random_seed_start, random_seed_end))
+            if params['range_random_mode'] or utils['temperature'] != 0
+            else []
+        )
+        for random_seed in greedy_params + rs_params:
+            if random_seed == 'greedy':
+                generate_solutions_config.inference.temperature = 0
+                random_seed = 0
+                file_name = GREEDY
+            else:
+                generate_solutions_config.inference.temperature = utils['temperature']
+                file_name = "rs" + str(random_seed)
             output_file = os.path.join(
                 metrics_directory,
                 OUTPUT_PATH.format(
@@ -127,29 +138,31 @@ class WholeDatasetModeStrategy(ModeStrategies):
         logging.info("Summarize results")
         summarize_results = summarize_results_template.format(
             results_path=results_path,
-            benchmarks=str(run_index),
+            benchmarks=generation_name,
         )
 
-        _, errors, success = run_subprocess(summarize_results)
+        result, errors, success = run_subprocess(summarize_results)
+
         if not success:
             return html.Pre(f"Something went wrong\n{errors}")
 
-        runs_storage[str(run_index)] = {
+        runs_storage[generation_name] = {
             "utils": utils,
             "examples": example_dicts,
         }
 
         with open(PARAMETERS_FILE_NAME, "w") as f:
             f.write(json.dumps(runs_storage))
-
-        df = pd.read_csv(os.path.join(results_path, "results.csv"))
+        csv_data = StringIO('\n'.join(result.split('\n')[1:-1]).strip())
+        df = pd.read_csv(csv_data, sep='|', skipinitialspace=True)
+        df.columns = df.columns.str.strip()
         for statistic in STATISTICS_FOR_WHOLE_DATASET:
             df[statistic] = df[statistic].map(lambda x: '{:.2f}%'.format(x))
         return html.Div(
             [
                 html.Div(
                     [
-                        html.Pre(f'Done. Results are in folder\n{metrics_directory}'),
+                        html.Pre(f'Done. The results are in the folder\n{metrics_directory}'),
                         dash_table.DataTable(
                             id='table',
                             columns=[{"name": i, "id": i} for i in df.columns],

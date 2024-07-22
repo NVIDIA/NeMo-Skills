@@ -21,7 +21,6 @@ from callbacks import app
 from dash import ALL, callback_context, html, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from flask import current_app
 from layouts import (
     get_detailed_answer_column,
     get_filter_answers_layout,
@@ -39,20 +38,24 @@ from settings.constants import (
     CHOOSE_LABEL,
     CHOOSE_MODEL,
     DELETE,
+    EDIT_ICON_PATH,
     ERROR_MESSAGE_TEMPLATE,
     EXTRA_FIELDS,
+    FILE_NAME,
     FILES_FILTERING,
     GENERAL_STATS,
     LABEL,
     LABEL_SELECTOR_ID,
     MODEL_SELECTOR_ID,
     QUESTIONS_FILTERING,
+    SAVE_ICON_PATH,
 )
 from utils.common import (
     calculate_metrics_for_whole_data,
     get_available_models,
     get_custom_stats,
     get_deleted_stats,
+    get_editable_rows,
     get_excluded_row,
     get_filtered_files,
     get_general_custom_stats,
@@ -84,51 +87,51 @@ def choose_base_model(
 
 
 @app.callback(
-    [
-        Output("save_dataset_modal", "children", allow_duplicate=True),
-        Output("save_dataset_modal", "is_open"),
-    ],
-    [
-        Input("save_dataset", "n_clicks"),
-    ],
-    [State("base_model_answers_selector", "value")],
+    Output("save_dataset_modal", "is_open", allow_duplicate=True),
+    Input("save_dataset", "n_clicks"),
     prevent_initial_call=True,
 )
-def save_dataset(n_click: int, base_model: str) -> Tuple[List, bool]:
-    if (
-        not n_click
-        or not current_app.config['data_explorer']['visualization_params']['save_generations_path']
-        or not base_model
-    ):
+def open_save_dataset_modal(n1: int) -> bool:
+    ctx = callback_context
+    if not ctx.triggered:
         return no_update
-    path = current_app.config['data_explorer']['visualization_params']['save_generations_path']
-    if not os.path.exists(path):
-        os.mkdir(path)
 
-    if not os.path.exists(os.path.join(path, base_model)):
-        path = os.path.join(path, base_model)
-    else:
-        i = 0
-        while os.path.exists(os.path.join(path, f'{base_model}_{i}')):
-            i += 1
-        path = os.path.join(path, f'{base_model}_{i}')
+    return True
 
-    os.mkdir(path)
+
+@app.callback(
+    [Output("save_dataset_modal", "is_open", allow_duplicate=True), Output('error_message', 'children')],
+    Input("save_dataset_button", "n_clicks"),
+    [
+        State("base_model_answers_selector", "value"),
+        State("save_path", "value"),
+    ],
+    prevent_initial_call=True,
+)
+def save_dataset(n_click: int, base_model: str, save_path: str) -> Tuple[List, bool]:
+    if not n_click or not save_path or not base_model:
+        return no_update, no_update
+
+    if not os.path.exists(save_path):
+        try:
+            os.mkdir(save_path)
+        except:
+            return True, html.Pre(f'could not save generations by path {save_path}')
 
     new_data = {}
 
     for data in get_table_data():
         for file_data in data[base_model]:
-            file_name = file_data['file_name']
+            file_name = file_data[FILE_NAME]
             if file_name not in new_data:
                 new_data[file_name] = []
             new_data[file_name].append({key: value for key, value in file_data.items() if key not in EXTRA_FIELDS})
 
     for file_name, data in new_data.items():
-        with open(os.path.join(path, file_name + '.jsonl'), 'w') as file:
+        with open(os.path.join(save_path, file_name + '.jsonl'), 'w') as file:
             file.write("\n".join([json.dumps(line) for line in data]))
 
-    return f'dataset is saved into {path}', True
+    return False, ''
 
 
 @app.callback(
@@ -439,14 +442,129 @@ def del_row(
 
 
 @app.callback(
+    [
+        Output("js_container", "children", allow_duplicate=True),
+        Output("js_trigger", "children", allow_duplicate=True),
+    ],
+    Input({"type": "editable_row", "id": ALL, "model_name": ALL}, 'value'),
+    [
+        State({"type": "model_selector", "id": ALL}, "value"),
+        State('datatable', 'selected_rows'),
+        State('datatable', "page_current"),
+        State('datatable', "page_size"),
+        State({"type": "editable_row", "id": ALL, "model_name": ALL}, 'id'),
+        State({"type": 'file_selector', "id": ALL}, 'value'),
+        State("js_trigger", "children"),
+    ],
+    prevent_initial_call=True,
+)
+def update_data_table(
+    new_rows_values: List[str],
+    models: List[str],
+    idx: List[int],
+    current_page: int,
+    page_size: int,
+    new_rows_ids: List[str],
+    file_names: List[str],
+    js_trigger: str,
+) -> None:
+    ctx = callback_context
+    if not ctx.triggered or not idx:
+        return no_update, no_update
+
+    file_ids = {}
+    question_id = current_page * page_size + idx[0]
+    for model_id, name in enumerate(file_names):
+        for file_id, file in enumerate(
+            get_table_data()[question_id][models[model_id]] if len(get_table_data()) else []
+        ):
+            if file[FILE_NAME] == name:
+                file_ids[models[model_id]] = file_id
+
+    for new_rows_id, new_rows_value in zip(new_rows_ids, new_rows_values):
+        updated_field = new_rows_id['id']
+        updated_model = new_rows_id['model_name']
+        get_table_data()[question_id][updated_model][file_ids[updated_model]][updated_field] = new_rows_value
+
+    return '', js_trigger + ' '
+
+
+@app.callback(
+    [
+        Output(
+            "dummy_output",
+            'children',
+            allow_duplicate=True,
+        ),
+        Output({"type": "edit_row_image", "id": ALL}, "src"),
+    ],
+    Input({"type": "edit_row_button", "id": ALL}, "n_clicks"),
+    [
+        State({"type": "row_name", "id": ALL}, "children"),
+        State({"type": "edit_row_image", "id": ALL}, "id"),
+        State({"type": "edit_row_image", "id": ALL}, "src"),
+        State({"type": "model_selector", "id": ALL}, "value"),
+        State('datatable', 'selected_rows'),
+        State('datatable', "page_current"),
+        State('datatable', "page_size"),
+        State({"type": 'file_selector', "id": ALL}, 'value'),
+        State(
+            "dummy_output",
+            'children',
+        ),
+    ],
+    prevent_initial_call=True,
+)
+def edit_row(
+    n_clicks: List[int],
+    rows: List[str],
+    button_ids: List[Dict],
+    edit_row_labels: List[str],
+    models: List[str],
+    idx: List[int],
+    current_page: int,
+    page_size: int,
+    file_names: List[str],
+    dummy_data: str,
+) -> None:
+    ctx = callback_context
+    if not ctx.triggered or not n_clicks or not idx:
+        return no_update, [no_update] * len(button_ids)
+    button_id = json.loads(ctx.triggered[0]['prop_id'].split('.')[0])['id']
+    row_index = 0
+    for i, current_button_id in enumerate(button_ids):
+        if current_button_id['id'] == button_id:
+            row_index = i
+            break
+    file_ids = [0] * len(models)
+    question_id = current_page * page_size + idx[0]
+    for model_id, name in enumerate(file_names):
+        for file_id, file in enumerate(
+            get_table_data()[question_id][models[model_id]] if len(get_table_data()) else []
+        ):
+            if file[FILE_NAME] == name:
+                file_ids[model_id] = file_id
+
+    if not n_clicks[row_index]:
+        return no_update, [no_update] * len(button_ids)
+
+    if rows[row_index] in get_editable_rows():
+        edit_row_labels[row_index] = EDIT_ICON_PATH
+        get_editable_rows().remove(rows[row_index])
+    else:
+        get_editable_rows().add(rows[row_index])
+        edit_row_labels[row_index] = SAVE_ICON_PATH
+
+    return dummy_data + '1', edit_row_labels
+
+
+@app.callback(
     Output('datatable', 'data'),
     [
         Input('datatable', "page_current"),
         Input('datatable', "page_size"),
     ],
-    [
-        State("base_model_answers_selector", "value"),
-    ],
+    State("base_model_answers_selector", "value"),
 )
 def change_page(page_current: int, page_size: int, base_model: str) -> List[Dict]:
     if not get_table_data():
@@ -519,7 +637,7 @@ def show_item(
         for file_id, file in enumerate(
             get_table_data()[question_id][models[model_id]] if len(get_table_data()) else []
         ):
-            if file['file_name'] == name:
+            if file[FILE_NAME] == name:
                 file_ids[model_id] = file_id
     return [
         get_table_detailed_inner_data(
@@ -661,7 +779,7 @@ def change_label(
             options = (
                 current_file_options
                 if button_id != 0
-                else [{'value': file['file_name']} for file in get_table_data()[question_id][model]]
+                else [{'value': file[FILE_NAME]} for file in get_table_data()[question_id][model]]
             )
             for file in options:
                 if not apply_for_all_files and not file['value'] == current_file:
@@ -669,7 +787,7 @@ def change_label(
 
                 file_id = 0
                 for i, model_file in enumerate(get_table_data()[question_id][model]):
-                    if model_file['file_name'] == file['value']:
+                    if model_file[FILE_NAME] == file['value']:
                         file_id = i
                         break
 
@@ -743,7 +861,7 @@ def change_file(
             file_names[button_id]['value'] if isinstance(file_names[button_id], Dict) else file_names[button_id]
         )
         for i, file_data in enumerate(get_table_data()[question_id][model]):
-            if file_data['file_name'] == file_name:
+            if file_data[FILE_NAME] == file_name:
                 file_id = i
                 break
 
@@ -982,13 +1100,13 @@ def change_files_order(
         if not apply_on_filtered_data or not apply_on_filtered_data[button_id]
         else list(
             filter(
-                lambda data: data['file_name'] in [file_name['label'] for file_name in file_selector_options],
+                lambda data: data[FILE_NAME] in [file_name['label'] for file_name in file_selector_options],
                 get_table_data()[question_id][model],
             )
         )
     )
     file_selector_options[button_id] = [
-        {'label': data['file_name'], 'value': data['file_name']}
+        {'label': data[FILE_NAME], 'value': data[FILE_NAME]}
         for data in get_filtered_files(
             filter_functions[button_id + 1],
             sorting_functions[button_id + 1],

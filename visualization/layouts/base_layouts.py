@@ -173,10 +173,12 @@ def get_text_modes_layout(id: str, is_formatted: bool = True):
     )
 
 
-def get_results_content_layout(text: str, content: str = None, style: Dict = {}) -> html.Div:
+def get_results_content_layout(
+    text: str, content: str = None, style: Dict = {}, is_formatted: bool = False
+) -> html.Div:
     return html.Div(
         [
-            get_text_modes_layout("results_content", False),
+            get_text_modes_layout("results_content", is_formatted),
             html.Pre(
                 content if content else text,
                 id="results_content_text",

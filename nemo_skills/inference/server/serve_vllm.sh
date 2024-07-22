@@ -72,6 +72,14 @@ else
       MAX_SEQUENCE_LENGTH=""
 fi
 
+# Check VLLM_GPU_MEMORY
+if [ -n "$VLLM_GPU_MEMORY" ]
+then
+      VLLM_GPU_MEMORY="--gpu-memory-utilization ${VLLM_GPU_MEMORY}"
+else
+      VLLM_GPU_MEMORY="--gpu-memory-utilization 0.9"
+fi
+
 
 # Select server
 # Start OpenAI Server
@@ -87,6 +95,6 @@ python -m vllm.entrypoints.openai.api_server \
   --served-model-name "${MODEL_NAME}" \
   --tensor-parallel-size=${NUM_GPUS} \
   --max-num-seqs=1024 \
-  --gpu-memory-utilization 0.99 \
   --enforce-eager \
-  --disable-log-requests $QUANTIZATION $MAX_SEQUENCE_LENGTH
+  --disable-log-requests \
+  $VLLM_GPU_MEMORY $QUANTIZATION $MAX_SEQUENCE_LENGTH

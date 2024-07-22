@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import Dict, List
 
 import dash_bootstrap_components as dbc
 from dash import dcc, html
+from flask import current_app
 from layouts.base_layouts import get_selector_layout, get_switch_layout
 from layouts.table_layouts import get_change_label_layout, get_filter_layout, get_sorting_layout
 from settings.constants import CHOOSE_MODEL, DELETE, GENERAL_STATS
@@ -108,7 +110,33 @@ def get_save_dataset_layout() -> html.Div:
             dbc.Modal(
                 [
                     dbc.ModalBody(
-                        "dataset saved",
+                        [
+                            dbc.InputGroup(
+                                [
+                                    dbc.InputGroupText('save_path'),
+                                    dbc.Input(
+                                        value=os.path.join(
+                                            current_app.config['data_explorer']['visualization_params'][
+                                                'save_generations_path'
+                                            ],
+                                            'default_name',
+                                        ),
+                                        id='save_path',
+                                        type='text',
+                                    ),
+                                ],
+                                className="mb-3",
+                            ),
+                            dbc.Container(id="error_message"),
+                        ]
+                    ),
+                    dbc.ModalFooter(
+                        dbc.Button(
+                            "Save",
+                            id="save_dataset_button",
+                            className="ms-auto",
+                            n_clicks=0,
+                        )
                     ),
                 ],
                 id="save_dataset_modal",

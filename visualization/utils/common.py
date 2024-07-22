@@ -31,6 +31,7 @@ from joblib import Parallel, delayed
 from settings.constants import (
     ANSWER_FIELD,
     ERROR_MESSAGE_TEMPLATE,
+    FILE_NAME,
     OUTPUT,
     PARAMETERS_FILE_NAME,
     PARAMS_TO_REMOVE,
@@ -52,6 +53,11 @@ default_examples = deepcopy(examples_map)
 general_custom_stats = {}
 deleted_stats = set()
 excluded_rows = set()
+editable_rows = set()
+
+
+def get_editable_rows() -> Set:
+    return editable_rows
 
 
 def get_excluded_row() -> Set:
@@ -373,7 +379,7 @@ def get_data_from_files(cache_indicator=None) -> List:
                 answers = map(json.loads, f)
                 for question_index, answer in enumerate(answers):
                     result = {
-                        "file_name": file_name,
+                        FILE_NAME: file_name,
                         **(dataset[question_index] if dataset and len(dataset) > question_index else {}),
                         "question_index": question_index + 1,
                         "page_index": file_id,
@@ -425,8 +431,8 @@ def get_filtered_files(
     ]
 
     filtered_data = list(filter(lambda data: data != [], filtered_data))
-    filtered_data = filtered_data[0] if len(filtered_data) > 0 else [{"file_name": ""}]
-    if sorting_function and filtered_data != [{"file_name": ""}]:
+    filtered_data = filtered_data[0] if len(filtered_data) > 0 else [{FILE_NAME: ""}]
+    if sorting_function and filtered_data != [{FILE_NAME: ""}]:
         sorting_lambda_function = get_eval_function(sorting_function.strip())
         filtered_data.sort(key=lambda data: catch_eval_exception(available_models, sorting_lambda_function, data, 0))
 

@@ -29,9 +29,12 @@ from settings.constants import (
     ANSI,
     CODE,
     DATA_PAGE_SIZE,
+    EDIT_ICON_PATH,
     ERROR_MESSAGE_TEMPLATE,
+    FILE_NAME,
     FILES_FILTERING,
     FILES_ONLY,
+    LABEL,
     LATEX,
     MODEL_SELECTOR_ID,
     NAME_FOR_BASE_MODEL,
@@ -43,6 +46,7 @@ from utils.common import (
     custom_deepcopy,
     get_available_models,
     get_data_from_files,
+    get_editable_rows,
     get_eval_function,
     get_excluded_row,
     get_filtered_files,
@@ -487,6 +491,27 @@ def get_detailed_answers_rows(keys: List[str], colums_number: int) -> List[dbc.R
                                     style={"display": "inline-block"},
                                 ),
                                 dbc.Button(
+                                    html.Img(
+                                        src=EDIT_ICON_PATH,
+                                        id={"type": "edit_row_image", "id": i},
+                                        style={
+                                            "height": "15px",
+                                            "display": "inline-block",
+                                        },
+                                    ),
+                                    id={"type": "edit_row_button", "id": i},
+                                    outline=True,
+                                    color="primary",
+                                    className="me-1",
+                                    style={
+                                        "border": "none",
+                                        "line-height": "1.2",
+                                        "display": "inline-block",
+                                        "margin-left": "1px",
+                                        "display": "none" if key in (FILE_NAME, LABEL) else "inline-block",
+                                    },
+                                ),
+                                dbc.Button(
                                     "-",
                                     id={"type": "del_row", "id": i},
                                     outline=True,
@@ -495,6 +520,7 @@ def get_detailed_answers_rows(keys: List[str], colums_number: int) -> List[dbc.R
                                     style={
                                         "border": "none",
                                         "display": "inline-block",
+                                        "margin-left": "-3px",
                                     },
                                 ),
                             ],
@@ -531,7 +557,7 @@ def get_row_detailed_inner_data(
     table_data = get_table_data()[question_id].get(model, [])
     row_data = []
     empty_list = False
-    if table_data[file_id].get('file_name', None) not in files_names:
+    if table_data[file_id].get(FILE_NAME, None) not in files_names:
         empty_list = True
     for key in filter(
         lambda key: is_detailed_answers_rows_key(key),
@@ -539,7 +565,7 @@ def get_row_detailed_inner_data(
     ):
         if file_id < 0 or len(table_data) <= file_id or key in get_excluded_row():
             value = ""
-        elif key == 'file_name':
+        elif key == FILE_NAME:
             value = get_selector_layout(
                 files_names,
                 {"type": "file_selector", "id": col_id},
@@ -547,9 +573,15 @@ def get_row_detailed_inner_data(
             )
         elif empty_list:
             value = ""
+        elif key in get_editable_rows():
+            value = str(table_data[file_id].get(key, None))
         else:
             value = get_single_prompt_output_layout(str(table_data[file_id].get(key, None)), text_modes)
-        row_data.append(value)
+        row_data.append(
+            value
+            if key not in get_editable_rows()
+            else dbc.Textarea(id={"type": "editable_row", "id": key, "model_name": model}, value=value)
+        )
     return row_data
 
 
@@ -573,7 +605,7 @@ def get_table_detailed_inner_data(
             model=model,
             rows_names=rows_names,
             files_names=[
-                file['file_name']
+                file[FILE_NAME]
                 for file in get_filtered_files(
                     filter_function,
                     sorting_function,
@@ -612,7 +644,7 @@ def get_general_stats_layout(
         "generations per sample": (overall_samples / dataset_size if dataset_size else 0),
         **custom_stats,
     }
-    return [html.Div([html.Div(f'{name}: {value}') for name, value in stats.items()])]
+    return [html.Div([html.Pre(f'{name}: {value}') for name, value in stats.items()])]
 
 
 def get_sorting_answers_layout(base_model: str, sorting_function: str, models: List[str]) -> List[html.Tr]:
