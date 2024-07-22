@@ -452,6 +452,7 @@ def update_random_seed_mode(
         State("run_mode_options", "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
+        State({"type": "query_store", "id": ALL}, "data"),
         State("loading_container", "children"),
     ],
     prevent_initial_call=True,
@@ -463,6 +464,7 @@ def get_run_test_results(
     run_mode: str,
     query_params: List[str],
     query_params_ids: List[Dict],
+    query_store: List[Dict[str, str]],
     loading_container: str,
 ) -> Union[Tuple[html.Div, str], Tuple[NoUpdate, NoUpdate]]:
     if n_clicks is None:
@@ -472,13 +474,16 @@ def get_run_test_results(
     if "examples_type" in utils and utils["examples_type"] is None:
         utils["examples_type"] = ""
 
+    if None not in query_params:
+        query_store = [extract_query_params(query_params_ids, query_params)]
+
     return (
         RunPromptStrategyMaker(run_mode)
         .get_strategy()
         .run(
             utils,
             {
-                **extract_query_params(query_params_ids, query_params),
+                **query_store[0],
                 "range_random_mode": range_random_mode,
             },
         ),
@@ -513,7 +518,7 @@ def change_mode(run_mode: str, utils: List[Dict], js_trigger: str) -> Tuple[List
 @app.callback(
     [
         Output("query_input_children", "children", allow_duplicate=True),
-        Output("query_store", "data", allow_duplicate=True),
+        Output({"type": "query_store", "id": ALL}, "data", allow_duplicate=True),
         Output("js_container", "children", allow_duplicate=True),
         Output("js_trigger", "children", allow_duplicate=True),
     ],
@@ -551,7 +556,7 @@ def prompt_search(
             query_data,
             text_modes,
         ),
-        query_data,
+        [query_data],
         "",
         js_trigger + " ",
     )
@@ -560,7 +565,7 @@ def prompt_search(
 @app.callback(
     [
         Output("query_input_children", "children", allow_duplicate=True),
-        Output("query_store", "data", allow_duplicate=True),
+        Output({"type": "query_store", "id": ALL}, "data", allow_duplicate=True),
         Output("js_container", "children", allow_duplicate=True),
         Output("js_trigger", "children", allow_duplicate=True),
     ],
@@ -574,7 +579,7 @@ def prompt_search(
         ),
     ],
     [
-        State("query_store", "data"),
+        State({"type": "query_store", "id": ALL}, "data"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
         State("js_trigger", "children"),
@@ -583,19 +588,19 @@ def prompt_search(
 )
 def change_prompt_search_mode(
     text_modes: List[str],
-    query_store: Dict[str, str],
+    query_store: List[Dict[str, str]],
     query_params: List[str],
     query_params_ids: List[int],
     js_trigger: str,
 ) -> Tuple[Union[List[str], NoUpdate]]:
     if None not in query_params:
-        query_store = extract_query_params(query_params_ids, query_params)
+        query_store = [extract_query_params(query_params_ids, query_params)]
 
     return (
         RunPromptStrategyMaker()
         .get_strategy()
         .get_query_input_children_layout(
-            query_store,
+            query_store[0],
             text_modes,
         ),
         query_store,
@@ -612,6 +617,7 @@ def change_prompt_search_mode(
         State("utils_group", "children"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
+        State({"type": "query_store", "id": ALL}, "data"),
     ],
     prevent_initial_call=True,
 )
@@ -621,14 +627,14 @@ def preview(
     utils: List[Dict],
     query_params: List[str],
     query_params_ids: List[int],
+    query_store: List[Dict[str, str]],
 ) -> html.Pre:
+    if None not in query_params:
+        query_store = [extract_query_params(query_params_ids, query_params)]
+
     utils = get_values_from_input_group(utils)
 
-    prompt = (
-        RunPromptStrategyMaker(run_mode)
-        .get_strategy()
-        .get_prompt(utils, extract_query_params(query_params_ids, query_params))
-    )
+    prompt = RunPromptStrategyMaker(run_mode).get_strategy().get_prompt(utils, query_store[0])
     return get_results_content_layout(str(prompt))
 
 

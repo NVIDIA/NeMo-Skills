@@ -101,7 +101,7 @@ def get_detection_functions(text, index) -> tuple[
 
 
 def proccess_plain_text(text: str) -> str:
-    special_chars = r'*_{}[]()#+-.!'
+    special_chars = r'*_{}[]()#+-.!`'
     for character in special_chars:
         text = text.replace(character, '\\' + character)
     return text

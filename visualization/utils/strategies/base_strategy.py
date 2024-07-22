@@ -130,7 +130,7 @@ class ModeStrategies:
                 id="query_input_children",
             )
         ]
-        query_store = [dcc.Store(id="query_store", data=query_data)]
+        query_store = [dcc.Store(id={"type": "query_store", "id": 1}, data=query_data)]
         return [
             dbc.AccordionItem(
                 html.Div(
@@ -248,7 +248,7 @@ class ModeStrategies:
                         outputs[0]['generation'],
                     ),
                     style={"border": f"2px solid {color}"},
-                    switch_is_active=True,
+                    is_formatted=True,
                 ),
                 html.Div(
                     (

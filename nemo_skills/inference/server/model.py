@@ -73,6 +73,8 @@ class BaseModel(abc.ABC):
     ):
         self.server_host = host
         self.server_port = port
+        self.ssh_server = ssh_server
+        self.ssh_key_path = ssh_key_path
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
         if ssh_key_path is None:
