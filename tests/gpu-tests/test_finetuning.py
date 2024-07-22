@@ -58,5 +58,5 @@ python pipeline/run_pipeline.py \
 
     # only checking the total, since model is tiny
     for gen_file in ['gsm8k/output-greedy.jsonl', 'gsm8k/output-rs0.jsonl', 'math/output-greedy.jsonl']:
-        *_, total = compute_metrics([f"{output_path}/nemo-skills-exps/results/test/{gen_file}"], MathEval())
-        assert total == 4
+        metrics = compute_metrics([f"{output_path}/nemo-skills-exps/results/test/{gen_file}"], MathEval())
+        assert metrics['num_entries'] == 4
