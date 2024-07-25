@@ -12,35 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3
 
 # build an image that includes only the nemo dependencies, ensures that dependencies
 # are included first for optimal caching, and useful for building a development
 # image (by specifying build target as `nemo-deps`)
 FROM ${BASE_IMAGE} as vllm-deps
 
-# Ensure apt-get won't prompt for selecting options
-ENV DEBIAN_FRONTEND=noninteractive
-# libavdevice-dev rerquired for latest torchaudio
-RUN apt-get update && \
-  apt-get upgrade -y && \
-  rm -rf /var/lib/apt/lists/*
-
 # install vllm dependencies
 WORKDIR /workspace/
 
-# Hack to force vllm to build even though logic for the check is flawed in their setup.py
-ENV TORCH_CUDA_ARCH_LIST="8.0 8.6 9.0+PTX"
-
-# v0.4.2
-ARG VLLM_HASH=c7f2cf2b7f67bce5842fedfdba508440fe257375
+ARG VLLM_HASH=5448f67635570cee6fc23c7cd166e9d8f7595009
 
 RUN git clone https://github.com/vllm-project/vllm.git && \
   cd vllm && \
   git checkout ${VLLM_HASH} && \
-  pip3 install -e . && \
+  pip install -e . && \
   cd ..
-
 
 # Install requirements
 RUN pip install openai>=1.3 ray pydantic flufl.lock fire text_dedup wandb hydra-core geventhttpclient && \

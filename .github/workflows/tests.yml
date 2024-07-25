@@ -3,12 +3,17 @@ name: Unit tests
 on:
   pull_request:
     branches: [ "main" ]
+    types: [ "labeled" ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   unit-tests:
@@ -34,7 +39,7 @@ jobs:
         export NEMO_SKILLS_SANDBOX_HOST="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' `docker ps -a | grep local-sandbox  | awk '{print $1}'`)"
         echo $NEMO_SKILLS_SANDBOX_HOST
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
-        python -m pytest tests/ --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -vvv | tee pytest-coverage.txt
+        python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -vvv | tee pytest-coverage.txt
     - name: Check help message
       run: |
         NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml python tests/check_help.py --all
@@ -61,3 +66,33 @@ jobs:
     - name: Check datasets preparation
       run: |
         NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml pytest tests/test_datasets.py
+
+  gpu-tests:
+    runs-on: self-hosted-nemo-skills
+    if: ${{ github.event.label.name == 'run GPU tests' }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: ${{ github.run_id }}
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        cd ${{ github.run_id }}
+        python -m pip install --upgrade pip
+        pip install .
+        pip install -r datasets/requirements.txt
+        pip install pytest pytest-cov pytest-timeout
+        python datasets/prepare.py
+    - name: Run GPU tests
+      timeout-minutes: 120
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd ${{ github.run_id }}
+        nvidia-smi
+        export NEMO_SKILLS_CONFIG=cluster_configs/local.yaml
+        set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
+        ./tests/gpu-tests/run.sh /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B-Instruct

@@ -21,3 +21,8 @@ py_version = 310  # python 3.10 as a target version
 [tool.black]
 line_length = 119
 skip_string_normalization = true
+
+[tool.pytest.ini_options]
+markers = [
+    "gpu: tests that require a GPU to run",
+]

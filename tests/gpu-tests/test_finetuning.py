@@ -28,6 +28,7 @@ sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import MathEval, compute_metrics
 
 
+@pytest.mark.gpu
 def test_sft_pipeline():
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
@@ -42,7 +43,7 @@ python pipeline/run_pipeline.py \
       --expname test \
       --nemo_model {model_path} \
       --num_nodes 1 \
-      --num_gpus 2 \
+      --num_gpus 1 \
       --disable_wandb \
       --extra_eval_args "+prompt=openmathinstruct/sft ++max_samples=4 --benchmarks gsm8k:1 math:0 --num_jobs 1 --num_gpus 1" \
       ++model.data.train_ds.file_path=/data/gsm8k/validation-sft.jsonl \
@@ -50,7 +51,7 @@ python pipeline/run_pipeline.py \
       ++trainer.sft.val_check_interval=10 \
       ++trainer.sft.limit_val_batches=2 \
       ++model.data.train_ds.global_batch_size=4 \
-      ++model.tensor_model_parallel_size=2 \
+      ++model.tensor_model_parallel_size=1 \
       ++model.pipeline_model_parallel_size=1 \
       ++model.optim.lr=1e-6 \
 """
