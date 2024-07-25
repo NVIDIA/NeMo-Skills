@@ -25,6 +25,7 @@ sys.path.append(str(Path(__file__).absolute().parents[2] / 'pipeline'))
 from launcher import CLUSTER_CONFIG, NEMO_SKILLS_CODE, launch_job
 
 
+@pytest.mark.gpu
 def test_hf_trtllm_conversion():
     model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:
@@ -36,7 +37,7 @@ python nemo_skills/conversion/hf_to_trtllm.py \
     --model_dir /model \
     --output_dir /tmp/trtllm \
     --dtype float16 \
-    --tp_size 2 \
+    --tp_size 1 \
 && trtllm-build \
     --checkpoint_dir /tmp/trtllm \
     --output_dir /output/trtllm-model \
@@ -62,6 +63,7 @@ python nemo_skills/conversion/hf_to_trtllm.py \
     )
 
 
+@pytest.mark.gpu
 def test_hf_nemo_conversion():
     model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:
@@ -87,13 +89,16 @@ HF_TOKEN={os.environ['HF_TOKEN']} python nemo_skills/conversion/hf_to_nemo.py \
     )
 
 
+@pytest.mark.gpu
 def test_nemo_hf_conversion():
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
     output_path = os.getenv('NEMO_SKILLS_TEST_OUTPUT', '/tmp')
 
-    cmd = f"""cd /code && \
+    # there is a bug in transformers related to slurm, so unsetting the vars
+    # TODO: remove this once the bug is fixed
+    cmd = f"""cd /code && unset SLURM_PROCID && unset SLURM_LOCALID && \
 HF_TOKEN={os.environ['HF_TOKEN']} python nemo_skills/conversion/nemo_to_hf.py \
     --in-path /model \
     --out-path /output/hf-model \

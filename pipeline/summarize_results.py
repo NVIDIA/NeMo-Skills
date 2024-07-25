@@ -93,8 +93,7 @@ if __name__ == "__main__":
                         evaluator=evaluator,
                         aggregation_mode="best",
                     )
-
-        except subprocess.CalledProcessError as e:
+        except:
             print(f"Error running compute_metrics.py for {benchmark}: {e}")
 
     lines_to_write = []
