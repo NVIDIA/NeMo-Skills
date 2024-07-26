@@ -57,7 +57,7 @@ Alternatively, you can run all the steps separately.
 1. Run SFT
 
    ```
-   python pipeline/run_sft.py \
+   python pipeline/run_training.py \
       --expname <name for experiment> \
       --checkpoints_folder <where to save checkpoints>
       --nemo_model <path to the nemo model> \

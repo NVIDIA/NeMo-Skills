@@ -33,12 +33,11 @@ export WANDB_API_KEY={WANDB_API_KEY} \
 && export HYDRA_FULL_ERROR=1 \
 && echo "Starting training" \
 && export PYTHONPATH=$PYTHONPATH:/code \
-&& NVTE_APPLY_QK_LAYER_SCALING=1 python /code/nemo_skills/finetuning/start_sft.py \
+&& python /code/nemo_skills/finetuning/start_{training_algo}.py \
     --config-name={config_name} --config-path={config_path} \
-    model.tensor_model_parallel_size={num_gpus} \
+    ++model.tensor_model_parallel_size={num_gpus} \
     trainer.devices={num_gpus} \
     trainer.num_nodes={num_nodes} \
-    model.restore_from_path=/nemo_model \
     {logging_params} \
     exp_manager.name={expname} \
     exp_manager.explicit_log_dir=/results \
@@ -57,8 +56,9 @@ if __name__ == "__main__":
     parser.add_argument("--expname", required=True, help="Experiment name for logging purposes")
     parser.add_argument("--checkpoints_folder", required=True)
     parser.add_argument("--nemo_model", required=True)
+    parser.add_argument("--training_algo", default="sft", choices=["sft", "dpo"])
     # have to be handled explicitly since hydra requires these to be first arguments
-    parser.add_argument("--config-name", "-cn", default='sft_config')
+    parser.add_argument("--config-name", "-cn", required=False, help="If not specified will use (sft/dpo)_config")
     parser.add_argument("--config-path", "-cp", default='/code/nemo_skills/finetuning/')
     parser.add_argument(
         "--validation_dataset",
@@ -80,6 +80,15 @@ if __name__ == "__main__":
     )
     args, unknown = parser.parse_known_args()
 
+    if args.training_algo == "dpo" and args.config_name is None:
+        args.config_name = "dpo_config"
+
+    if args.training_algo == "sft" and args.config_name is None:
+        args.config_name = "sft_config"
+
+    if args.training_algo == "dpo" and args.chat_format:
+        raise ValueError("DPO does not support chat format")
+
     extra_arguments = f'{" ".join(unknown)}'
 
     if args.chat_format:
@@ -88,10 +97,21 @@ if __name__ == "__main__":
             f" model.data.validation_ds.file_path=/code/datasets/{args.validation_dataset}/validation-sft-chat.jsonl "
         ) + extra_arguments
     else:
-        extra_arguments = (
-            " ++model.data.chat=False "
-            f" model.data.validation_ds.file_path=/code/datasets/{args.validation_dataset}/validation-sft.jsonl "
-        ) + extra_arguments
+        if args.training_algo == "sft":
+            extra_arguments = (
+                " ++model.data.chat=False "
+                f" model.data.validation_ds.file_path=/code/datasets/{args.validation_dataset}/validation-sft.jsonl "
+            ) + extra_arguments
+
+    if args.training_algo == "dpo":
+        # TODO: for DPO currently user has to be explicit about validation/test sets
+        # ++model.data.data_prefix.train='[/data/paired_all_openmath.jsonl]' \
+        # ++model.data.data_prefix.validation='[/data/paired_val_openmath_train.jsonl]' \
+        # ++model.data.data_prefix.test='[/data/paired_val_openmath_train.jsonl]'
+
+        extra_arguments = (" pretrained_checkpoint.restore_from_path=/nemo_model ") + extra_arguments
+    else:
+        extra_arguments = (" model.restore_from_path=/nemo_model ") + extra_arguments
 
     args.checkpoints_folder = Path(args.checkpoints_folder).absolute()
     args.nemo_model = Path(args.nemo_model).absolute()
@@ -117,6 +137,7 @@ if __name__ == "__main__":
         "num_gpus": args.num_gpus,
         "extra_arguments": extra_arguments,
         "timeout": timeout,
+        "training_algo": args.training_algo,
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
         "HF_TOKEN": os.getenv("HF_TOKEN", ""),  # needed for some of the models, so making an option to pass it in
     }
