@@ -36,36 +36,51 @@ def start_job(extra_sbatch_args: str, cmd: str) -> int:
     return job_id
 
 
-def run_sft(
-    current_folder, results_folder, checkpoints_folder, args, extra_sft_arguments, inference_path, last_job_id=None
+def run_training(
+    current_folder,
+    results_folder,
+    checkpoints_folder,
+    args,
+    extra_training_args,
+    inference_path,
+    last_job_id=None,
+    stage=None,
 ):
     # launching SFT jobs
     dependency = f'--dependency=afterany:{last_job_id}' if last_job_id is not None else ''
     extra_sbatch_args = (
-        f'EXTRA_SBATCH_ARGS="--parsable --output={checkpoints_folder}/slurm_logs_sft1.txt {dependency}"'
+        f'EXTRA_SBATCH_ARGS="--parsable --output={checkpoints_folder}/slurm_logs_{stage}1.txt {dependency}"'
     )
     cmd = (
-        f'{sys.executable} {current_folder}/run_sft.py '
+        f'{sys.executable} {current_folder}/run_training.py '
         f'    --project {args.project} '
         f'    --expname {args.expname} '
         f'    --checkpoints_folder {checkpoints_folder}/training '
         f'    --nemo_model {args.nemo_model} '
         f'    --num_nodes {args.num_nodes} '
         f'    --num_gpus {args.num_gpus} '
-        f'    {extra_sft_arguments} '
+        f'    --training_algo {stage} '
+        f'    {extra_training_args} '
     )
     last_job_id = start_job(extra_sbatch_args, cmd)
-    for i in range(args.num_sft_jobs - 1):
+    for i in range(args.num_training_jobs - 1):
         extra_sbatch_args = (
             f'EXTRA_SBATCH_ARGS="--parsable --dependency=afterany:{last_job_id} '
-            f'--output={checkpoints_folder}/slurm_logs_sft{i + 2}.txt"'
+            f'--output={checkpoints_folder}/slurm_logs_{stage}{i + 2}.txt"'
         )
         last_job_id = start_job(extra_sbatch_args, cmd)
     return last_job_id
 
 
 def run_prepare_eval(
-    current_folder, results_folder, checkpoints_folder, args, extra_sft_arguments, inference_path, last_job_id=None
+    current_folder,
+    results_folder,
+    checkpoints_folder,
+    args,
+    extra_training_args,
+    inference_path,
+    last_job_id=None,
+    stage=None,
 ):
     # preparing checkpoint for evaluation
     dependency = f'--dependency=afterany:{last_job_id}' if last_job_id is not None else ''
@@ -86,7 +101,14 @@ def run_prepare_eval(
 
 
 def run_eval(
-    current_folder, results_folder, checkpoints_folder, args, extra_sft_arguments, inference_path, last_job_id=None
+    current_folder,
+    results_folder,
+    checkpoints_folder,
+    args,
+    extra_training_args,
+    inference_path,
+    last_job_id=None,
+    stage=None,
 ):
     # launching evaluation
     dependency = f'--dependency=afterany:{last_job_id}' if last_job_id is not None else ''
@@ -107,7 +129,8 @@ def run_eval(
 
 
 stages_map = {
-    'sft': run_sft,
+    'sft': run_training,
+    'dpo': run_training,
     'prepare_eval': run_prepare_eval,
     'eval': run_eval,
 }
@@ -122,15 +145,15 @@ if __name__ == "__main__":
     parser.add_argument("--nemo_model", required=True)
     parser.add_argument("--num_nodes", type=int, default=1)
     parser.add_argument("--num_gpus", type=int)
-    parser.add_argument("--num_sft_jobs", type=int, default=1)
+    parser.add_argument("--num_training_jobs", type=int, default=1)
     parser.add_argument("--server_type", choices=('nemo',), default='nemo')
     parser.add_argument("--stages", nargs="+", default=["sft", "prepare_eval", "eval"])
     parser.add_argument("--extra_eval_args", default="")
     parser.add_argument("--extra_prepare_eval_args", default="")
     args, unknown = parser.parse_known_args()
 
-    # these are the extra SFT arguments you can provide
-    extra_sft_arguments = f'{" ".join(unknown)}'
+    # these are the extra training arguments you can provide
+    extra_training_args = f'{" ".join(unknown)}'
 
     format_dict = {
         "NEMO_SKILLS_CODE": NEMO_SKILLS_CODE,
@@ -160,7 +183,8 @@ if __name__ == "__main__":
             results_folder,
             checkpoints_folder,
             args,
-            extra_sft_arguments,
+            extra_training_args,
             inference_path,
             last_job_id,
+            stage,
         )
