@@ -65,7 +65,7 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"], EVALUATOR_MAP['gsm8k']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (35, 60, 5)
+    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (40, 55, 5)
     assert metrics['num_entries'] == 20
 
 
@@ -167,7 +167,7 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/math/output-greedy.jsonl"], EVALUATOR_MAP['math']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (20, 65, 15)
+    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (10, 75, 15)
     assert metrics['num_entries'] == 20
 
 

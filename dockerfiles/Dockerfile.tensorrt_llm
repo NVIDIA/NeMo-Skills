@@ -14,7 +14,7 @@
 
 # copied from https://nvidia.github.io/TensorRT-LLM/installation/linux.html
 
-FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 # Install dependencies, TensorRT-LLM requires Python 3.10
 RUN apt-get update && apt-get -y install python3.10 python3-pip openmpi-bin libopenmpi-dev git git-lfs
@@ -23,7 +23,8 @@ RUN ["ln", "-sf", "/usr/bin/python3", "/usr/bin/python"]
 RUN ["ln", "-sf", "/usr/bin/pip3", "/usr/bin/pip"]
 
 # pinning to the tested version
-RUN pip install tensorrt_llm==0.10.0 --extra-index-url https://pypi.nvidia.com
+RUN pip install tensorrt_llm==0.12.0.dev2024072301 -U --pre --extra-index-url https://pypi.nvidia.com
+RUN pip install transformers==4.43.3
 
 # installing packages required for our server code
 RUN pip install flask flask_restful

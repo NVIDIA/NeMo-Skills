@@ -26,8 +26,9 @@ trtllm-build \
     --gemm_plugin <dtype from step above> \
     --context_fmha <"enable" on A100+ GPUs and "disable" otherwise> \
     --paged_kv_cache <"enable" on A100+ GPUs and "disable" otherwise> \
-    --max_input_len 4096 \
-    --max_output_len 512 \
+    --max_input_len 3584 \
+    --max_seq_len 4096 \
+    --max_num_tokens 4096 \
     --max_batch_size <desired batch size>
 
 cp <path to the HF folder>/tokenizer* <final path for the trtllm checkpoint>
