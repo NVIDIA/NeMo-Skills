@@ -384,7 +384,8 @@ class OpenAIModel(BaseModel):
                 seed=random_seed,
                 stop=stop_phrases,
                 messages=messages,
-            ).choices[0]
+            )
+            response = response.choices[0]
         except openai.BadRequestError as e:
             # this likely only works for Nvidia-hosted models
             if not reduce_generation_tokens_if_error:
@@ -410,6 +411,10 @@ class OpenAIModel(BaseModel):
                 ).choices[0]
             else:
                 raise
+        except AttributeError:
+            # sometimes response is a string?
+            LOG.error("Unexpected response from OpenAI API: %s", response)
+            raise
 
         output = response.message.content
         return output
@@ -435,7 +440,9 @@ class OpenAIModel(BaseModel):
             {"role": "user", "content": user_message},
         ]
         try:
-            messages.append({"role": "assistant", "content": generation_pattern.search(prompt).group(1)})
+            assistant_message = generation_pattern.search(prompt).group(1)
+            if assistant_message:
+                messages.append({"role": "assistant", "content": assistant_message})
         except AttributeError:
             pass
         return messages

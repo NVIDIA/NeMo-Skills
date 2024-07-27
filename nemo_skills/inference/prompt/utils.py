@@ -112,7 +112,7 @@ class PromptConfig:
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
     prompt_template: str = MISSING
     user: str = MISSING
-    system: str = MISSING
+    system: str = ""
     context_type: str = "empty"
     _context_template: Optional[str] = None  # cannot be set directly for now!
     stop_phrases: List[str] = field(default_factory=list)

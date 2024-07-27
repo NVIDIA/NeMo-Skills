@@ -35,10 +35,10 @@ class EvaluateResultsConfig:
     # e.g. "path/to/file1.jsonl path/to/file2.jsonl" or with regex
     # "test_folder/output-rs*.jsonl"
     prediction_jsonl_files: Any = MISSING
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
 
     eval_type: str = "math"
+    # the supported parameters are different depending on the eval configuration
+    # check graders.py for the supported eval types and their parameters
     eval_config: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -62,10 +62,8 @@ def evaluate_results(cfg: EvaluateResultsConfig):
     GRADING_MAP[cfg.eval_type](cfg)
 
 
-# TODO: sandbox should be inside the eval_config
 HELP_MESSAGE = get_help_message(
     EvaluateResultsConfig,
-    sandbox_params=sandbox_params(),
 )
 
 

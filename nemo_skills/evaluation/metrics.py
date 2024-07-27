@@ -51,14 +51,44 @@ class BaseEval(abc.ABC):
 
 
 class MathEval(BaseEval):
+    def setup(self, prediction_jsonl_files):
+        # checking if judgements are ready and fusing them with predictions
+        # might get permission errors when running locally, since original file
+        # is generated inside docker. Is there any way around that?
+        for jsonl_file in unroll_files(prediction_jsonl_files):
+            if Path(jsonl_file + '-batch-request-id').exists():
+                with open(jsonl_file + '-batch-request-id', 'rt', encoding='utf-8') as fin:
+                    request_id = json.load(fin)['request_id']
+                from nemo_skills.inference.server.model import get_model
+
+                llm = get_model(server_type='openai', model='gpt-4-1106-preview')
+                metadata, outputs = llm.get_batch_results(request_id)
+
+                if outputs is None:
+                    raise RuntimeError(f"Judgements are not ready yet! Current status: {metadata}")
+
+                with open(jsonl_file, 'rt', encoding='utf-8') as fin:
+                    predictions = [json.loads(line) for line in fin]
+
+                with open(jsonl_file, 'wt', encoding='utf-8') as fout:
+                    for prediction, output in zip(predictions, outputs):
+                        prediction['judgement'] = output['generation']
+                        fout.write(json.dumps(prediction) + '\n')
+
+                Path(jsonl_file + '-batch-request-id').unlink()
+
     def __init__(self):
         self.reset()
 
     def fill_up_missing(self):
+        # TODO: not clear how to fill up missing, since we don't know whether llm or sympy was used
         return {'predicted_answer': None, 'is_correct': False}
 
     def is_incomplete(self, elem):
-        return 'is_correct' not in elem or 'predicted_answer' not in elem
+        incomplete = 'predicted_answer' not in elem
+        if not incomplete:
+            incomplete = 'is_correct' not in elem and 'judgement' not in elem
+        return incomplete
 
     def update(self, predictions, aggregation_mode):
         """Updating the evaluation results with the current element.
@@ -71,40 +101,95 @@ class MathEval(BaseEval):
         # this shouldn't do any heavy calculation, but just read the metric from existing json entry
         # all the heavy lifting should be done in the evaluation script
         self.total += 1
+        # TODO: rename is_correc since it's only for sympy now?
+        if 'is_correct' in predictions[0]:
+            self.has_sympy = True
+        if 'judgement' in predictions[0]:
+            self.has_judge = True
+
+        current_correct_sympy = False
+        current_correct_judge = False
+
         if aggregation_mode == "best":
-            self.total_correct += any([elem['is_correct'] for elem in predictions])
+            if self.has_sympy:
+                current_correct_sympy = any([elem['is_correct'] for elem in predictions])
+            if self.has_judge:
+                current_correct_judge = any(["Yes" in elem['judgement'] for elem in predictions])
             if all([elem['predicted_answer'] is None for elem in predictions]):
-                self.total_no_answer += 1
+                self.no_answer += 1
         elif aggregation_mode == "majority":
             # TODO: currently majority does not take into account equivalent answers written in a different way
-            valid_answers_and_results = [
-                (elem['predicted_answer'], elem['is_correct'])
-                for elem in predictions
-                if elem['predicted_answer'] is not None
-            ]
-            if len(valid_answers_and_results) == 0:
-                self.total_no_answer += 1
-            else:
-                majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
-                self.total_correct += majority_result[1]
+            # TODO: DRY
+            if self.has_sympy:
+                valid_answers_and_results = [
+                    (elem['predicted_answer'], elem['is_correct'])
+                    for elem in predictions
+                    if elem['predicted_answer'] is not None
+                ]
+
+                if len(valid_answers_and_results) == 0:
+                    self.no_answer += 1
+                else:
+                    majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    current_correct_sympy = majority_result[1]
+            if self.has_judge:
+                valid_answers_and_results = [
+                    (elem['predicted_answer'], "Yes" in elem['judgement'])
+                    for elem in predictions
+                    if elem['predicted_answer'] is not None
+                ]
+
+                if len(valid_answers_and_results) == 0:
+                    self.no_answer += 1
+                else:
+                    majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    current_correct_judge = majority_result[1]
         elif aggregation_mode == "first":
-            self.total_correct += predictions[0]['is_correct']
-            self.total_no_answer += predictions[0]['predicted_answer'] is None
+            if self.has_sympy:
+                current_correct_sympy += predictions[0]['is_correct']
+            if self.has_judge:
+                current_correct_judge += "Yes" in predictions[0]['judgement']
+            self.no_answer += predictions[0]['predicted_answer'] is None
         else:
             raise ValueError(f"Unsupported mode {aggregation_mode}")
 
+        if self.has_sympy:
+            self.correct_sympy += current_correct_sympy
+        if self.has_judge:
+            self.correct_judge += current_correct_judge
+        if self.has_sympy and self.has_judge:
+            self.both_correct += current_correct_sympy and current_correct_judge
+            self.any_correct += current_correct_sympy or current_correct_judge
+            if current_correct_sympy != current_correct_judge:
+                LOG.debug(
+                    "Discrepancy between sympy (%s) and LLM checkers (%s).\nPredicted answer: %s\nExpected answer: %s",
+                    bool(current_correct_sympy),
+                    bool(current_correct_judge),
+                    predictions[0]['predicted_answer'],
+                    predictions[0]['expected_answer'],
+                )
+
     def get_metrics(self):
-        return {
-            "num_entries": self.total,
-            "correct_answer": self.total_correct / self.total * 100.0,
-            "wrong_answer": (self.total - self.total_correct - self.total_no_answer) / self.total * 100.0,
-            "no_answer": self.total_no_answer / self.total * 100.0,
-        }
+        metrics = {"num_entries": self.total}
+        if self.has_sympy:
+            metrics["sympy_correct"] = self.correct_sympy / self.total * 100.0
+        if self.has_judge:
+            metrics["judge_correct"] = self.correct_judge / self.total * 100.0
+        if self.has_sympy and self.has_judge:
+            metrics["both_correct"] = self.both_correct / self.total * 100.0
+            metrics["any_correct"] = self.any_correct / self.total * 100.0
+        metrics["no_answer"] = self.no_answer / self.total * 100.0
+        return metrics
 
     def reset(self):
-        self.total_correct = 0
-        self.total_no_answer = 0
+        self.correct_sympy = 0
+        self.correct_judge = 0
+        self.both_correct = 0
+        self.any_correct = 0
+        self.no_answer = 0
         self.total = 0
+        self.has_sympy = False
+        self.has_judge = False
 
 
 class CodeEval(BaseEval):
@@ -225,13 +310,18 @@ class IFEval(BaseEval):
     def get_metrics(self):
         prompt_total = self.strict_stats['prompt']['total']
         inst_total = self.strict_stats['instruction']['total']
+        prompt_strict = self.strict_stats['prompt']['correct'] / prompt_total * 100.0
+        inst_strict = self.strict_stats['instruction']['correct'] / inst_total * 100.0
+        prompt_loose = self.loose_stats['prompt']['correct'] / prompt_total * 100.0
+        inst_loose = self.loose_stats['instruction']['correct'] / inst_total * 100.0
         return {
             "num_prompts": prompt_total,
             "num_instructions": inst_total,
-            "prompt_strict_accuracy": self.strict_stats['prompt']['correct'] / prompt_total * 100.0,
-            "instruction_strict_accuracy": self.strict_stats['instruction']['correct'] / inst_total * 100.0,
-            "prompt_loose_accuracy": self.loose_stats['prompt']['correct'] / prompt_total * 100.0,
-            "instruction_loose_accuracy": self.loose_stats['instruction']['correct'] / inst_total * 100.0,
+            "average_score": (prompt_strict + inst_strict + prompt_loose + inst_loose) / 4,
+            "prompt_strict_accuracy": prompt_strict,
+            "instruction_strict_accuracy": inst_strict,
+            "prompt_loose_accuracy": prompt_loose,
+            "instruction_loose_accuracy": inst_loose,
         }
 
     def reset(self):
