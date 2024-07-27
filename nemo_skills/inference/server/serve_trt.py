@@ -204,99 +204,13 @@ def read_model_name(config):
     return name_map[name]
 
 
-def from_dir(
-    cls,
-    engine_dir: str,
-    *,
-    lora_dir: Optional[str] = None,
-    rank: int = 0,
-    max_batch_size: Optional[int] = None,
-    max_input_len: Optional[int] = None,
-    max_output_len: Optional[int] = None,
-    max_beam_width: Optional[int] = None,
-    max_attention_window_size: Optional[int] = None,
-    sink_token_length: Optional[int] = None,
-    free_gpu_memory_fraction: Optional[float] = None,
-    medusa_choices: list[list[int]] | None = None,
-    debug_mode: bool = False,
-    lora_ckpt_source: str = "hf",
-    gpu_weights_percent: float = 1,
-) -> 'ModelRunnerCpp':
-
-    config_path = Path(engine_dir) / "config.json"
-    json_config = GptJsonConfig.parse_file(config_path)
-    model_config = json_config.model_config
-
-    # Note: Parallel configuration will be fetched automatically from trtllm.Executor constructor
-    # by inspecting the json file. These lines serve the purpose of serving vocab_size_padded and
-    # num_layers properties.
-    tp_size = json_config.tensor_parallelism
-    pp_size = json_config.pipeline_parallelism
-    gpus_per_node = json_config.gpus_per_node
-    world_config = WorldConfig.mpi(
-        tensor_parallelism=tp_size, pipeline_parallelism=pp_size, gpus_per_node=gpus_per_node
-    )
-    assert rank == world_config.rank
-
-    profiler.start('load tensorrt_llm engine')
-
-    kv_cache_config = trtllm.KvCacheConfig(
-        free_gpu_memory_fraction=free_gpu_memory_fraction,
-        max_attention_window=max_attention_window_size,
-        sink_token_length=sink_token_length,
-        # TODO: there is an accuracy degradation because of this and no speed gain. Likely a bug in trtllm
-        # enable_block_reuse=True,
-    )
-
-    if max_batch_size is None:
-        max_batch_size = model_config.max_batch_size
-    else:
-        assert max_batch_size <= model_config.max_batch_size
-    if max_input_len is None:
-        max_input_len = model_config.max_input_len
-    else:
-        assert max_input_len <= model_config.max_input_len
-    if max_output_len is None:
-        max_seq_len = model_config.max_seq_len
-    else:
-        max_seq_len = max_input_len + max_output_len
-        assert max_seq_len <= model_config.max_seq_len
-    if max_beam_width is None:
-        max_beam_width = model_config.max_beam_width
-    else:
-        assert max_beam_width <= model_config.max_beam_width
-
-    executor = trtllm.Executor(
-        engine_dir,
-        trtllm.ModelType.DECODER_ONLY,
-        trtllm.ExecutorConfig(
-            max_beam_width=max_beam_width, kv_cache_config=kv_cache_config, medusa_choices=medusa_choices
-        ),
-    )
-
-    profiler.stop('load tensorrt_llm engine')
-
-    loading_time = profiler.elapsed_time_in_sec("load tensorrt_llm engine")
-    logging.info(f'Load engine takes: {loading_time} sec')
-
-    return cls(
-        executor,
-        max_batch_size=max_batch_size,
-        max_input_len=max_input_len,
-        max_seq_len=max_seq_len,
-        max_beam_width=max_beam_width,
-        model_config=model_config,
-        world_config=world_config,
-    )
-
-
 def generate(
     runner,
     batch_input_ids: List[torch.Tensor],
-    input_lengths,
     *,
+    encoder_input_ids: List[torch.Tensor] = None,
     sampling_config=None,
-    lora_uids=None,
+    lora_uids: Optional[list] = None,
     streaming: bool = False,
     stopping_criteria=None,
     logits_processor=None,
@@ -304,14 +218,16 @@ def generate(
     end_id: int | None = None,
     pad_id: int | None = None,
     bad_words_list: list[list[int]] | None = None,
-    tokenizer=None,
-    stop_words_list=None,
+    stop_words_list: list[list[int]] | None = None,
     return_dict: bool = False,
     output_sequence_lengths: bool = False,
     output_log_probs: bool = False,
     output_cum_log_probs: bool = False,
     prompt_table=None,
-    prompt_tasks=None,
+    prompt_tasks: Optional[str] = None,
+    return_all_generated_tokens: bool = False,
+    input_lengths=None,
+    tokenizer=None,
     **kwargs,
 ):
     """
@@ -338,6 +254,8 @@ def generate(
             Custom stopping criteria.
         logits_processor (LogitsProcessor):
             Custom logits processors.
+        return_all_generated_tokens (bool):
+            Whether the full output is returned at each streaming step
         kwargs (Dict[str, Any]:
             Ad hoc parametrization of sampling_config.
             The passed **kwargs matching the sampling_config's attributes will override them.
@@ -364,6 +282,7 @@ def generate(
 
     # Convert tensor input to plain lists
     batch_input_ids_list = [a.tolist() for a in batch_input_ids]
+    encoder_input_ids_list = [a.tolist() for a in encoder_input_ids] if encoder_input_ids else None
 
     if sampling_config is None:
         # Convert from old API of SamplingConfig
@@ -384,6 +303,7 @@ def generate(
             "frequency_penalty",
             "length_penalty",
             "early_stopping",
+            "no_repeat_ngram_size",
         ]
         rename_params = {"num_beams": "beam_width"}
         sampling_params = {k: v for k, v in kwargs.items() if k in accepted_parameters}
@@ -393,23 +313,13 @@ def generate(
         if "top_p" in sampling_params and sampling_params["top_p"] == 0.0:
             sampling_params["top_p"] = None
 
-        # To prevent numerical overflow when the temperature is set to 0.0
-        # Attributes of `trtllm.SamplingConfig` cannot be modified
-        if "temperature" in sampling_params and sampling_params["temperature"] == 0.0:
-            sampling_params['temperature'] = None
-            sampling_params['top_k'] = 1
-
         sampling_config = trtllm.SamplingConfig(**sampling_params)
     else:
         sampling_config = copy.deepcopy(sampling_config)
 
-        # To prevent numerical overflow when the temperature is set to 0.0
-        # Modify generation.SamplingConfig
-        if isinstance(sampling_config.temperature, float) and sampling_config.temperature == 0.0:
-            sampling_config.temperature = None
-            sampling_config.top_k = 1
-
-    runner._check_inputs(batch_input_ids_list, sampling_config, max_new_tokens)
+    runner._check_inputs(
+        encoder_input_ids_list if encoder_input_ids else batch_input_ids_list, sampling_config, max_new_tokens
+    )
 
     output_config = trtllm.OutputConfig(
         return_context_logits=runner.gather_context_logits,
@@ -417,62 +327,37 @@ def generate(
         return_log_probs=output_log_probs,
     )
 
-    prompt_tuning_configs = len(batch_input_ids_list) * [None]
-    if prompt_table is not None:
-        prompt_table_data = runner._prepare_embedding_table(prompt_table)
-        if prompt_tasks is not None:
-            task_indices = [int(t) for t in prompt_tasks.split(',')]
-            assert len(task_indices) == len(
-                batch_input_ids_list
-            ), f"Number of supplied tasks ({len(task_indices)}) must match input batch size ({len(batch_input_ids_list)})"
-            prompt_tuning_configs = [
-                trtllm.PromptTuningConfig(embedding_table=prompt_table_data[task_indices[i]])
-                for i in range(len(batch_input_ids_list))
-            ]
-        else:
-            prompt_tuning_configs = [
-                trtllm.PromptTuningConfig(embedding_table=prompt_table_data[0])
-                for _ in range(len(batch_input_ids_list))
-            ]
+    prompt_tuning_configs = runner._prepare_ptuning_executor(batch_input_ids_list, prompt_table, prompt_tasks)
+
+    # not letting trtllm handle stop words as this is only supported on a token-level
+    stop_words_list_none = runner._prepare_words_list(None, len(batch_input_ids_list))
+    bad_words_list = runner._prepare_words_list(bad_words_list, len(batch_input_ids_list))
 
     requests = [
         trtllm.Request(
             input_token_ids=input_ids,
+            encoder_input_token_ids=encoder_input_ids_list[i] if encoder_input_ids is not None else None,
             max_new_tokens=max_new_tokens,
             pad_id=pad_id,
             end_id=end_id,
-            # not letting trtllm handle stop words as this is only supported on a token-level
-            stop_words=None,
-            bad_words=bad_words_list,
+            stop_words=stop_words,
+            bad_words=bad_words,
             sampling_config=sampling_config,
             streaming=streaming,
             output_config=output_config,
-            prompt_tuning_config=prompt_tuning_configs[i],
+            prompt_tuning_config=prompt_tuning_config,
+            return_all_generated_tokens=return_all_generated_tokens,
         )
-        for i, input_ids in enumerate(batch_input_ids_list)
+        for i, (input_ids, stop_words, bad_words, prompt_tuning_config) in enumerate(
+            zip(batch_input_ids_list, stop_words_list_none, bad_words_list, prompt_tuning_configs)
+        )
     ]
 
     request_ids = runner.session.enqueue_requests(requests)
-    multi_responses = runner.session.await_responses(request_ids)
-
-    output_ids = [[] for _ in range(len(multi_responses))]
-    for responses in multi_responses:
-        for response in responses:
-            if not response.has_error():
-                reqid_pos = request_ids.index(response.request_id)
-                if not streaming:
-                    output_ids[reqid_pos] = [[] for _ in range(len(response.result.output_token_ids))]
-                else:
-                    output_ids[reqid_pos] = [
-                        copy.deepcopy(batch_input_ids_list[reqid_pos])
-                        for _ in range(len(response.result.output_token_ids))
-                    ]
 
     return _stream(
         runner,
         request_ids,
-        output_ids,
-        multi_responses,
         end_id,
         return_dict,
         output_sequence_lengths,
@@ -480,6 +365,8 @@ def generate(
         output_cum_log_probs,
         batch_input_ids,
         streaming,
+        batch_input_ids_list,
+        return_all_generated_tokens,
         stop_words_list,
         tokenizer,
         input_lengths,
@@ -489,8 +376,6 @@ def generate(
 def _stream(
     runner,
     request_ids,
-    output_ids,
-    multi_responses,
     end_id,
     return_dict,
     output_sequence_lengths,
@@ -498,72 +383,74 @@ def _stream(
     output_cum_log_probs,
     batch_input_ids,
     streaming,
+    batch_input_ids_list,
+    return_all_generated_tokens,
     stop_words_list,
     tokenizer,
     input_lengths,
 ):
     if stop_words_list is None:
         stop_words_list = []
-    active_reqids = copy.deepcopy(request_ids)
-    assert len(active_reqids) == 1
+    assert len(request_ids) == 1
+    output_ids = [[] for _ in range(len(request_ids))]
+    for reqid_pos in range(len(request_ids)):
+        output_ids[reqid_pos] = [copy.deepcopy(batch_input_ids_list[reqid_pos]) for _ in range(runner.max_beam_width)]
 
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
 
     idx = 0
-    while active_reqids:
-        for req_id, response in zip(active_reqids, multi_responses):
-            for r in response:
-                if r.result.is_final:
-                    active_reqids.remove(req_id)
+    finished_reqs = 0
+    while finished_reqs < len(request_ids):
+        multi_responses = runner.session.await_responses(request_ids)
+        responses = [response for responses in multi_responses for response in responses]
+        for response in responses:
+            if response.result.is_final:
+                finished_reqs += 1
 
-            output_ids = runner._process_response(multi_responses, output_ids, request_ids)
-            output = runner._fill_output(
-                multi_responses,
-                output_ids,
-                end_id,
-                return_dict,
-                output_sequence_lengths,
-                output_log_probs,
-                output_cum_log_probs,
-                batch_input_ids,
-                streaming,
-            )
+        output = runner._fill_output(
+            responses,
+            output_ids,
+            end_id,
+            return_dict,
+            output_sequence_lengths,
+            output_log_probs,
+            output_cum_log_probs,
+            batch_input_ids,
+            streaming,
+            request_ids,
+            return_all_generated_tokens,
+        )
 
-            matching_stop_word = None
-            # checking every half of the required tokens to have overlapping checks
-            if idx < num_tokens_to_check - 1 or idx % (num_tokens_to_check // 2) != 0:
-                continue
-            seq_length = output['sequence_lengths']
-            generation_suffix = output['output_ids'][0, 0, seq_length[0] - num_tokens_to_check : seq_length[0]]
-            output_string = get_output_single(generation_suffix, 0, num_tokens_to_check, tokenizer, end_id)
-            for stop_word in stop_words_list:
-                if stop_word in output_string:
-                    matching_stop_word = stop_word
-                    break
+        matching_stop_word = None
+        # checking every half of the required tokens to have overlapping checks
+        if idx < num_tokens_to_check - 1 or idx % (num_tokens_to_check // 2) != 0:
+            idx += 1
+            continue
 
-            if matching_stop_word is not None:
-                runner.session.cancel_request(req_id)
-                if req_id in active_reqids:
-                    active_reqids.remove(req_id)
+        seq_length = output['sequence_lengths']
+        generation_suffix = output['output_ids'][0, 0, seq_length[0] - num_tokens_to_check : seq_length[0]]
+        out_string = get_output_single(generation_suffix, 0, num_tokens_to_check, tokenizer, end_id)
+        for stop_word in stop_words_list:
+            if stop_word in out_string:
+                matching_stop_word = stop_word
                 break
 
-        if active_reqids:
-            multi_responses = runner.session.await_responses(active_reqids)
+        if matching_stop_word is not None:
+            runner.session.cancel_request(request_ids[0])
+            break
         idx += 1
 
-    output_string = get_output(output['output_ids'], input_lengths, output['sequence_lengths'][0], tokenizer, end_id)[
-        0
-    ]
+    out_string = get_output(output['output_ids'], input_lengths, output['sequence_lengths'][0], tokenizer, end_id)[0]
     for stop_word in stop_words_list:
-        if stop_word in output_string:
+        if stop_word in out_string:
             matching_stop_word = stop_word
             break
     if matching_stop_word is not None:
-        output_string = remove_stop_tokens(output_string, stop_words_list)
+        out_string = remove_stop_tokens(out_string, stop_words_list)
         # adding it back, since we only need to remove what's *after* the stop phrase
-        output_string += matching_stop_word
-    return output_string
+        out_string += matching_stop_word
+    return out_string
 
 
 class TensorRTLLM:
@@ -576,10 +463,6 @@ class TensorRTLLM:
         self.runner = ModelRunnerCpp.from_dir(
             engine_dir=model_path,
             rank=tensorrt_llm.mpi_rank(),
-            max_beam_width=config['build_config']['max_beam_width'],
-            max_input_len=config['build_config']['max_input_len'],
-            max_output_len=config['build_config']['max_output_len'],
-            max_batch_size=config['build_config']['max_batch_size'],
         )
         # TODO: what's the right number here? Does it matter?
         self.executor = ThreadPoolExecutor(max_workers=1024)
@@ -603,7 +486,6 @@ class TensorRTLLM:
             output = generate(
                 self.runner,
                 batch_input_ids[0],
-                input_lengths,
                 max_new_tokens=max_output_token,
                 end_id=self.end_id,
                 pad_id=self.pad_id,
@@ -618,6 +500,7 @@ class TensorRTLLM:
                 # overriden generate/stream functions above
                 tokenizer=self.tokenizer,
                 stop_words_list=stop_words_list,
+                input_lengths=input_lengths,
                 return_dict=True,
                 output_sequence_lengths=True,
                 streaming=True,

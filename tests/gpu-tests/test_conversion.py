@@ -36,18 +36,19 @@ def test_hf_trtllm_conversion():
 python nemo_skills/conversion/hf_to_trtllm.py \
     --model_dir /model \
     --output_dir /tmp/trtllm \
-    --dtype float16 \
+    --dtype bfloat16 \
     --tp_size 1 \
 && trtllm-build \
     --checkpoint_dir /tmp/trtllm \
     --output_dir /output/trtllm-model \
-    --gpt_attention_plugin float16 \
-    --gemm_plugin float16 \
+    --gpt_attention_plugin bfloat16 \
+    --gemm_plugin bfloat16 \
     --context_fmha "enable" \
     --paged_kv_cache "enable" \
     --use_paged_context_fmha "enable" \
     --max_input_len 3584 \
-    --max_output_len 512 \
+    --max_seq_len 4096 \
+    --max_num_tokens 4096 \
     --max_batch_size 8 \
 && cp /model/tokenizer* /output/trtllm-model/
 """
