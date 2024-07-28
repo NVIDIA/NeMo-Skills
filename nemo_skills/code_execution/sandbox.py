@@ -298,6 +298,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
         tolerance=1e-4,
         timeout=10.0,
         ignore_cache: bool = False,
+        extract_from_boxed: bool = True,
+        extract_regex: str = r"The final answer is (.+)$",
     ):
         """Will write if the results are correct back into the original files."""
         import tqdm
@@ -329,8 +331,11 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     if not line_dict:  # can be empty for incomplete generations
                         continue
                     gt_answer = line_dict["expected_answer"]
-                    if 'predicted_answer' not in line_dict:
-                        line_dict["predicted_answer"] = extract_answer(line_dict["generation"])
+                    line_dict["predicted_answer"] = extract_answer(
+                        line_dict["generation"],
+                        extract_from_boxed=extract_from_boxed,
+                        extract_regex=extract_regex,
+                    )
 
                     data[-1][-1] = json.dumps(line_dict)
 

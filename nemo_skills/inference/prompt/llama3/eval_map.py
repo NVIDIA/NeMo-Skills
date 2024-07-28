@@ -22,6 +22,9 @@ EVAL_MAP = {
     },
     'instruct': {  # llama3-instruct
         'default': 'llama3/instruct',
+        'gsm8k': 'llama3/gsm8k',
+        'math': 'llama3/math',
+        # TODO: put proper coding prompts here as well
         'human-eval': 'llama3/codegen',
         'mbpp': 'llama3/codegen',
         'mmlu': 'llama3/mmlu',
