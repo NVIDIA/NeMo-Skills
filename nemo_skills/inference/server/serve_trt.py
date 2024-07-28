@@ -464,6 +464,7 @@ class TensorRTLLM:
             engine_dir=model_path,
             rank=tensorrt_llm.mpi_rank(),
             enable_chunked_context=True,
+            kv_cache_enable_block_reuse=True,
         )
         # setting to the default max batch size in trtllm.
         # might need to adjust in the future
