@@ -463,9 +463,11 @@ class TensorRTLLM:
         self.runner = ModelRunnerCpp.from_dir(
             engine_dir=model_path,
             rank=tensorrt_llm.mpi_rank(),
+            enable_chunked_context=True,
         )
-        # TODO: what's the right number here? Does it matter?
-        self.executor = ThreadPoolExecutor(max_workers=1024)
+        # setting to the default max batch size in trtllm.
+        # might need to adjust in the future
+        self.executor = ThreadPoolExecutor(max_workers=256)
         self.requests = {}  # id to future
 
     def get_output(
