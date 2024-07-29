@@ -178,7 +178,6 @@ def load_tokenizer(tokenizer_dir: str, model_name: str):
     else:
         tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_dir,
-            tokenizer_type=model_name,
             legacy=False,
             padding_side='left',
             truncation_side='left',
@@ -196,12 +195,9 @@ def load_tokenizer(tokenizer_dir: str, model_name: str):
 def read_model_name(config):
     name = config['pretrained_config']['architecture'].lower()
     name_map = {
-        'MistralForCausalLM'.lower(): 'mistral',
-        'LlamaForCausalLM'.lower(): 'llama',
-        'MixtralForCausalLM'.lower(): 'mixtral',
         'GPTForCausalLM'.lower(): 'gpt-next',
     }
-    return name_map[name]
+    return name_map.get(name, None)
 
 
 def generate(
