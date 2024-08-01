@@ -77,7 +77,7 @@ def get_server_command(server_type: str, num_gpus: int, num_nodes: int, model_na
     else:
         # adding sleep to ensure the logs file exists
         # need this flag for stable Nemotron-4-340B deployment
-        server_start_cmd = f"python /code/nemo_skills/inference/server/serve_trt.py --model_path /model"
+        server_start_cmd = f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python /code/nemo_skills/inference/server/serve_trt.py --model_path /model"
         num_tasks = num_gpus
     if server_type == "vllm":
         server_wait_string = "Uvicorn running"

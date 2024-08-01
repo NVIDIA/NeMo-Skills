@@ -31,9 +31,15 @@ SLURM_CMD = """
 export WANDB_API_KEY={WANDB_API_KEY} \
 && export HF_TOKEN={HF_TOKEN} \
 && export HYDRA_FULL_ERROR=1 \
+&& export TRANSFORMERS_OFFLINE=0 \
+&& export TORCH_NCCL_AVOID_RECORD_STREAMS=1 \
+&& export NCCL_NVLS_ENABLE=0 \
+&& export NVTE_DP_AMAX_REDUCE_INTERVAL=0 \
+&& export NVTE_ASYNC_AMAX_REDUCTION=1 \
+&& export NVTE_FUSED_ATTN=0 \
 && echo "Starting training" \
 && export PYTHONPATH=$PYTHONPATH:/code \
-&& python /code/nemo_skills/finetuning/start_{training_algo}.py \
+&& CUDA_DEVICE_MAX_CONNECTIONS=1 python /code/nemo_skills/finetuning/start_{training_algo}.py \
     --config-name={config_name} --config-path={config_path} \
     ++model.tensor_model_parallel_size={num_gpus} \
     trainer.devices={num_gpus} \
@@ -124,7 +130,10 @@ if __name__ == "__main__":
         timeout = CLUSTER_CONFIG["timeouts"][args.partition or CLUSTER_CONFIG["partition"]]
         # subtracting 15 minutes to account for the time it takes to save the model
         # the format expected by nemo is days:hours:minutes:seconds
-        timeout = f'00:{datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")}'
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
 
     format_dict = {
         "project": args.project,

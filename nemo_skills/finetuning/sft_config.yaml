@@ -37,6 +37,7 @@ trainer:
   max_time: null
   max_epochs: ${.sft.max_epochs}
   max_steps: ${.sft.max_steps}
+  log_every_n_steps: 10
 
 exp_manager:
   explicit_log_dir: null
@@ -66,7 +67,31 @@ model:
   resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
   save_nemo_on_validation_end: True # Saves an inference ready .nemo file every time a checkpoint is saved during training.
   sync_batch_comm: False
+  overlap_p2p_comm: False
+  ub_tp_comm_overlap: False
+  tp_comm_atomic_ag: False
+  tp_comm_atomic_rs: False
   megatron_amp_O2: True
+  mcore_gpt: True
+  transformer_engine: True
+
+  get_attention_mask_from_fusion: True
+  apply_rope_fusion: True
+  bias_activation_fusion: True
+  bias_dropout_add_fusion: True
+  masked_softmax_fusion: True
+  gradient_accumulation_fusion: True
+  grad_div_ar_fusion: True
+
+  fp8: False
+  fp8_e4m3: False
+  fp8_hybrid: True
+  fp8_margin: 0
+  fp8_interval: 1
+  fp8_amax_history_len: 512
+  fp8_amax_compute_algo: max
+  fp8_wgrad: True
+
   encoder_seq_length: 4096  # the sequence length of the encoder model, it will be overwriten by loaded GPT model
 
   ## Sequence Parallelism
@@ -75,16 +100,16 @@ model:
   sequence_parallel: False
 
   ## Activation Checkpoint
-  activations_checkpoint_granularity: full # 'selective' or 'full'
-  activations_checkpoint_method: uniform # 'uniform', 'block', not used with 'selective'
+  activations_checkpoint_granularity: null  # 'selective' or 'full'
+  activations_checkpoint_method: null  # 'uniform', 'block', not used with 'selective'
   # 'uniform' divides the total number of transformer layers and checkpoints the input activation
   # of each chunk at the specified granularity
   # 'block' checkpoints the specified number of layers per pipeline stage at the specified granularity
-  activations_checkpoint_num_layers: 1 # not used with 'selective'
+  activations_checkpoint_num_layers: null  # not used with 'selective'
   activations_checkpoint_layers_per_pipeline: null
   # This feature is valid only when used with pipeline-model-parallelism. More details in megatron_gpt_config.yaml.
   answer_only_loss: True # not used right now
-  gradient_as_bucket_view: False
+  gradient_as_bucket_view: True
   seq_len_interpolation_factor: null # if not None, seq_len_interpolation_factor will match the base model's value
   use_flash_attention: null # if not None, will match the base model's value
 
@@ -116,7 +141,7 @@ model:
       end_of_name: "\x0A"  # \0x0A is '\n'
 
     sample: False # create the index mapping files for the sample data, so max_steps * global_batch_size can be larger than the dataset size
-    num_workers: 1
+    num_workers: 2
     dataloader_type: single  # only supports single
     train_ds:
       # Example of how to specify paths to multiple datasets
@@ -130,7 +155,7 @@ model:
       global_batch_size: 256
       micro_batch_size: 1
       shuffle: True
-      memmap_workers: null
+      memmap_workers: 2
       max_seq_length: 4096
       min_seq_length: 1
       drop_last: True
@@ -171,8 +196,10 @@ model:
     betas:
     - 0.9
     - 0.98
-    # sched:
-    #   name: CosineAnnealing
-    #   warmup_steps: 0
-    #   constant_steps: 0
-    #   min_lr: 1e-6
+    bucket_cap_mb: 50
+    dtype: bf16 # fp32 | bf16
+    grad_sync_dtype: bf16 # fp32 | bf16
+    overlap_grad_sync: True
+    overlap_param_sync: True
+    contiguous_grad_buffer: True
+    contiguous_param_buffer: True
