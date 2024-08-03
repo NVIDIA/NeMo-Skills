@@ -59,6 +59,7 @@ EXTRA_EVAL_ARGS = {
     'mbpp': '++eval_type=code ++eval_config.dataset=mbpp',
     'ifeval': '++eval_type=ifeval',
     'arena-hard': '++eval_type=arena',
+    'mmlu': '++eval_config.extract_from_boxed=False ++eval_config.extract_regex="The best answer is (.+)$"',
 }
 
 # TODO: better name?

@@ -1,0 +1,25 @@
+# Prompt for code generation with Llama models SFTed by us
+
+system: ""
+
+user: |- 
+  Here is the given problem for which you need to generate/complete code:
+  {question}
+
+  Please continue to complete the function with python programming language. You are not allowed to modify the given code and do the completion only.
+
+  The solution should be in the following format:
+  ```python
+  # Your code here
+  ```
+
+prompt_template: |-
+  <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+  
+  {system}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+  {user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+  {generation}
+  
+stop_phrases: ["<|eot_id|>"]

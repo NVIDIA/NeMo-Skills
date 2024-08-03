@@ -1,5 +1,4 @@
-# Prompt used by Llama-base/instruct models for MMLU benchmark 
-# https://huggingface.co/datasets/meta-llama/Meta-Llama-3.1-8B-Instruct-evals/viewer/Meta-Llama-3.1-8B-Instruct-evals__mmlu__0_shot__cot__details?row=0
+# Prompt for Nemotron-instruct for MMLU (adapted from Llama-instruct prompt for MMLU)
 
 system: ""
 
@@ -29,10 +28,11 @@ user: |-
   Let's think step by step.
 
 prompt_template: |-
-  <|begin_of_text|><|start_header_id|>user<|end_header_id|>
-
-  {user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
+  <extra_id_0>System
+  {system}
+  <extra_id_1>User
+  {user}
+  <extra_id_1>Assistant
   {generation}
 
-stop_phrases: ["<|eot_id|>"]
+stop_phrases: ["<extra_id_1>"]

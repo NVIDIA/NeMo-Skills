@@ -1,0 +1,32 @@
+# Prompt for code generation with Nemotron-instruct model
+
+system: ""
+
+user: |-
+  ### Instruction:
+  You are an exceptionally intelligent coding assistant that consistently delivers accurate and reliable responses to user instructions.
+
+  @@ Instruction
+  Here is the given code to do completion:
+  ```python
+  {question}
+  ```
+  Please continue to complete the function with python programming language. You are not allowed to modify the given code and do the completion only.
+
+  Please return all completed codes in one code block.
+  This code block should be in the following format:
+  ```python
+  # Your codes here
+  ```
+
+  @@ Response
+
+prompt_template: |-
+  <extra_id_0>System
+  {system}
+  <extra_id_1>User
+  {user}
+  <extra_id_1>Assistant
+  {generation}
+
+stop_phrases: ["<extra_id_1>"]

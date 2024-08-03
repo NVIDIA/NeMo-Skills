@@ -109,9 +109,7 @@ def test_llama3_instruct_prompt():
     config.few_shot_examples.num_few_shots = 2
     prompt = Prompt(config=config)
 
-    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-<|eot_id|><|start_header_id|>user<|end_header_id|>
+    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
 Here are some examples of questions and solutions followed by a new question that you need to solve.
 Make sure to put the answer (and only answer) inside \\boxed{}.
@@ -137,9 +135,7 @@ That's easy: 10!
 
 
 Question:
-2 + 2 = ?
-
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+2 + 2 = ?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
@@ -239,21 +235,20 @@ Assistant:
 
 
 def test_nemotron_zeroshot_prompt():
-    prompt = Prompt(config=get_prompt_config('nemotron/zeroshot'))
+    prompt = Prompt(config=get_prompt_config('nemotron/instruct'))
     expected_prompt = """<extra_id_0>System
 
 <extra_id_1>User
-You are an expert in math. Given the math question below, I want you to reason through the steps and then give a final answer.
+Help the user to solve the given problem.
 
-Your final answer should be inside \\boxed{}.
-
-2 + 2 = ?<extra_id_1>Assistant
+2 + 2 = ?
+<extra_id_1>Assistant
 """
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
 
 
 def test_nemotron_fewshot_prompt():
-    config = get_prompt_config('nemotron/fewshot')
+    config = get_prompt_config('nemotron/fewshot_instruct')
     config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!"},
@@ -265,7 +260,6 @@ def test_nemotron_fewshot_prompt():
 
 <extra_id_1>User
 Here are some examples of questions and solutions followed by a new question that you need to solve.
-Make sure to put the answer (and only answer) inside \\boxed{}.
 
 Example question:
 1 + 1 = ?
@@ -289,15 +283,13 @@ That's easy: 10!
 
 Question:
 2 + 2 = ?
-
-Don't forget that your final answer should be inside \\boxed{}!
 <extra_id_1>Assistant
 """
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
 
 
 def test_nemotron_fewshot_prompt_reference():
-    config = get_prompt_config('nemotron/fewshot')
+    config = get_prompt_config('nemotron/fewshot_instruct')
     config.few_shot_examples.example_dicts = [
         {'question': '1 + 1 = ?', 'generation': "That's easy: 2!", 'reference_solution': "Think hard - it's 2"},
         {'question': '5 + 5 = ?', 'generation': "That's easy: 10!", 'reference_solution': "Isn't it 10?"},
@@ -310,7 +302,6 @@ def test_nemotron_fewshot_prompt_reference():
 
 <extra_id_1>User
 Here are some examples of questions and solutions followed by a new question that you need to solve.
-Make sure to put the answer (and only answer) inside \\boxed{}.
 
 Example question:
 1 + 1 = ?
@@ -343,8 +334,6 @@ Question:
 
 Reference solution (do not copy it):
 What should I do??
-
-Don't forget that your final answer should be inside \\boxed{}!
 <extra_id_1>Assistant
 """
     assert (
@@ -356,7 +345,7 @@ def test_llama3_gsm8k_prompt():
     config = get_prompt_config('llama3/gsm8k')
     prompt = Prompt(config=config)
 
-    expected_prompt = """<|start_header_id|>user<|end_header_id|>
+    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
 Given the following problem, reason and give a final answer to the problem.
 Problem: There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?
@@ -425,7 +414,7 @@ def test_llama3_math_prompt():
     config = get_prompt_config('llama3/math')
     prompt = Prompt(config=config)
 
-    expected_prompt = """<|start_header_id|>user<|end_header_id|>
+    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
 Solve the following math problem efficiently and clearly:
 
@@ -452,17 +441,55 @@ Where [answer] is just the final number or expression that solves the problem.
 Problem: Find the sum of all complex values of $a,$ such that the polynomial $x^4 + (a^2 - 1) x^2 + a^3$ has exactly two distinct complex roots.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    print(
+    assert (
         prompt.build_string(
             {
                 'question': "Find the sum of all complex values of $a,$ such that the polynomial $x^4 + (a^2 - 1) x^2 + a^3$ has exactly two distinct complex roots."
             }
         )
+        == expected_prompt
     )
+
+
+def test_llama3_mmlu_prompt():
+    config = get_prompt_config('llama3/mmlu')
+    prompt = Prompt(config=config)
+
+    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+Given the following question and four candidate answers (A, B, C and D), choose the best answer.
+
+Question: A 26-year-old woman is brought to the emergency department because of an 8-hour history of severe back and abdominal pain and mild but persistent vaginal bleeding. Ultrasonography of the abdomen shows a 2-cm ectopic pregnancy in the ampulla. The ampulla has ruptured into the surrounding tissue. Fluid from this rupture will most likely be found in which of the following locations?
+A. Lesser peritoneal cavity
+B. Mesometrium
+C. Pouch of Douglas
+D. Uterine cavity
+
+- For simple problems:
+Directly provide the answer with minimal explanation.
+
+- For complex problems:
+Use this step-by-step format:
+## Step 1: [Concise description]
+[Brief explanation]
+## Step 2: [Concise description]
+[Brief explanation]
+
+Regardless of the approach, always conclude with:
+The best answer is [the_answer_letter].
+where the [the_answer_letter] is one of A, B, C or D.
+
+Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
     assert (
         prompt.build_string(
             {
-                'question': "Find the sum of all complex values of $a,$ such that the polynomial $x^4 + (a^2 - 1) x^2 + a^3$ has exactly two distinct complex roots."
+                'question': "A 26-year-old woman is brought to the emergency department because of an 8-hour history of severe back and abdominal pain and mild but persistent vaginal bleeding. Ultrasonography of the abdomen shows a 2-cm ectopic pregnancy in the ampulla. The ampulla has ruptured into the surrounding tissue. Fluid from this rupture will most likely be found in which of the following locations?",
+                'A': "Lesser peritoneal cavity",
+                'B': "Mesometrium",
+                'C': "Pouch of Douglas",
+                'D': "Uterine cavity",
             }
         )
         == expected_prompt

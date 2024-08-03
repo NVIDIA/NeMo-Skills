@@ -1,16 +1,15 @@
+# Generic prompt for Nemotron-instruct fewshot
+
 few_shot_examples:
   template: "Example question:\n{question}{context}\n\nExample solution:\n{generation}\n\n\n\n\n\n"
 
 system: ""
 
 user: |-
-    Here are some examples of questions and solutions followed by a new question that you need to solve.
-    Make sure to put the answer (and only answer) inside \boxed{{}}.
+  Here are some examples of questions and solutions followed by a new question that you need to solve.
 
-    {examples}Question:
-    {question}{context}
-
-    Don't forget that your final answer should be inside \boxed{{}}!
+  {examples}Question:
+  {question}{context}
 
 prompt_template: |-
   <extra_id_0>System
@@ -21,4 +20,3 @@ prompt_template: |-
   {generation}
 
 stop_phrases: ["\n\n\n\n\n\n", "<extra_id_1>"]
-

@@ -1,0 +1,15 @@
+# Generic prompt which can be used for SFTed models and also for evals where we don't want to supply any additional instruction
+
+system: ""
+
+user: "{question}{context}"
+
+prompt_template: |-
+  <extra_id_0>System
+  {system}
+  <extra_id_1>User
+  {user}
+  <extra_id_1>Assistant
+  {generation}
+
+stop_phrases: ["<extra_id_1>"]

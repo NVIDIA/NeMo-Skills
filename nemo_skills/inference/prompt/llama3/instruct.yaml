@@ -1,23 +1,21 @@
+# Generic prompt for Llama instruct
+
 few_shot_examples:
   template: "Question:\n{question}{context}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
 
 system: ""
 
 user: |-
-    Here are some examples of questions and solutions followed by a new question that you need to solve.
-    Make sure to put the answer (and only answer) inside \boxed{{}}.
+  Here are some examples of questions and solutions followed by a new question that you need to solve.
+  Make sure to put the answer (and only answer) inside \boxed{{}}.
 
-    {examples}Question:
-    {question}{context}
+  {examples}Question:
+  {question}{context}
 
 prompt_template: |-
-  <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+  <|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
-  {system}<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-  {user}
-
-  <|eot_id|><|start_header_id|>assistant<|end_header_id|>
+  {user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
   {generation}
 

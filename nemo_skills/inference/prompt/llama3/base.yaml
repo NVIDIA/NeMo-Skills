@@ -1,3 +1,5 @@
+# Generic prompt for Llama base
+
 few_shot_examples:
   template: "Question:\n{question}{context}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
 

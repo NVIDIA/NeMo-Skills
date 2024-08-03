@@ -190,12 +190,6 @@ model:
       output_original_text: True  # needed for the proper metrics support
 
   optim:
-    name: distributed_fused_adam # Supports distributed optimizer for memory savings. To enable, set to 'distributed_fused_adam'. Needs Apex to be built with specific args to work.
-    lr: 1e-6
-    weight_decay: 0.01
-    betas:
-    - 0.9
-    - 0.98
     bucket_cap_mb: 50
     dtype: bf16 # fp32 | bf16
     grad_sync_dtype: bf16 # fp32 | bf16
@@ -203,3 +197,14 @@ model:
     overlap_param_sync: True
     contiguous_grad_buffer: True
     contiguous_param_buffer: True
+    name: distributed_fused_adam # Supports distributed optimizer for memory savings. To enable, set to 'distributed_fused_adam'. Needs Apex to be built with specific args to work.
+    lr: 1e-6
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 0
+      constant_steps: 0
+      min_lr: ${model.optim.lr} # No interpolation happening if the min_lr is not set to be different from lr
