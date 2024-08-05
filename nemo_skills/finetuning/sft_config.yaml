@@ -67,31 +67,7 @@ model:
   resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
   save_nemo_on_validation_end: True # Saves an inference ready .nemo file every time a checkpoint is saved during training.
   sync_batch_comm: False
-  overlap_p2p_comm: False
-  ub_tp_comm_overlap: False
-  tp_comm_atomic_ag: False
-  tp_comm_atomic_rs: False
   megatron_amp_O2: True
-  mcore_gpt: True
-  transformer_engine: True
-
-  get_attention_mask_from_fusion: True
-  apply_rope_fusion: True
-  bias_activation_fusion: True
-  bias_dropout_add_fusion: True
-  masked_softmax_fusion: True
-  gradient_accumulation_fusion: True
-  grad_div_ar_fusion: True
-
-  fp8: False
-  fp8_e4m3: False
-  fp8_hybrid: True
-  fp8_margin: 0
-  fp8_interval: 1
-  fp8_amax_history_len: 512
-  fp8_amax_compute_algo: max
-  fp8_wgrad: True
-
   encoder_seq_length: 4096  # the sequence length of the encoder model, it will be overwriten by loaded GPT model
 
   ## Sequence Parallelism
@@ -190,13 +166,6 @@ model:
       output_original_text: True  # needed for the proper metrics support
 
   optim:
-    bucket_cap_mb: 50
-    dtype: bf16 # fp32 | bf16
-    grad_sync_dtype: bf16 # fp32 | bf16
-    overlap_grad_sync: True
-    overlap_param_sync: True
-    contiguous_grad_buffer: True
-    contiguous_param_buffer: True
     name: distributed_fused_adam # Supports distributed optimizer for memory savings. To enable, set to 'distributed_fused_adam'. Needs Apex to be built with specific args to work.
     lr: 1e-6
     weight_decay: 0.01
@@ -208,3 +177,5 @@ model:
       warmup_steps: 0
       constant_steps: 0
       min_lr: ${model.optim.lr} # No interpolation happening if the min_lr is not set to be different from lr
+
+
