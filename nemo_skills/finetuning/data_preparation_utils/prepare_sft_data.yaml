@@ -18,10 +18,10 @@ prompt_type: openmathinstruct/sft
 chat_format: false  # whether to use NeMo's chat format
 generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
-filters:
-  solution_key: generation  # key to filter solutions by
-  group_key: question  # key to group samples by before code_text_filter
+input_key: question
+output_key: generation
 
+filters:
   drop_multi_boxed: true
   drop_useless_code: false
   drop_broken_code: true
@@ -35,13 +35,15 @@ processors:
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.ReadData
     preprocessed_dataset_files: ${preprocessed_dataset_files}
     prediction_jsonl_files: ${prediction_jsonl_files}
+    input_key: ${input_key}
+    output_key: ${output_key}
     skip_first: ${skip_first}
     add_correct: ${add_correct}
     add_incorrect: ${add_incorrect}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropMultiBoxed
     should_run: ${filters.drop_multi_boxed}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
     test_cases:
       - {input: {generation: "He had \\boxed{3} 4090s and \\boxed{2} 4080s"}, output: null}
       - {input: {generation: "She had \\boxed{6} 4090s"}, output: {generation: "She had \\boxed{6} 4090s"}}
@@ -49,18 +51,18 @@ processors:
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropBrokenCode
     should_run: ${filters.drop_broken_code}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.TrimSolutions
     should_run: ${filters.trim_solutions}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
     test_cases:
       - {input: {generation: "Solution ends at \\boxed{0}\nThis line is useless."}, output: {generation: "Solution ends at \\boxed{0}"}}
       - {input: {generation: "Solution continues \\boxed{7} after boxed"}, output: {generation: "Solution continues \\boxed{7} after boxed"}}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.DropIncorrectArithmetic
     should_run: ${filters.drop_incorrect_arithmetic}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
     test_cases:
       - {input: {generation: "1 + 2 + 3 + 4 = 10"}, output: {generation: "1 + 2 + 3 + 4 = 10"}}
       # TODO: implement fractional arithmetic
@@ -70,18 +72,18 @@ processors:
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.SplitArithmetic
     should_run: ${filters.split_arithmetic}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
     test_cases:
       - {input: {generation: "1 + 2 + 3 + 4 = 10"}, output: {generation: "1 + 2 + 3 + 4 = 3 + 3 + 4 = 6 + 4 = 10"}}
       - {input: {generation: "1 + 7 * 19 = 134"}, output: {generation: "1 + 7 * 19 = 1 + 133 = 134"}}
       - {input: {generation: "3 * (1 + 7) / 4 = 6"}, output: {generation: "3 * (1 + 7) / 4 = 3 * 8 / 4 = 24 / 4 = 6"}}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.GroupSamples
-    group_key: ${filters.group_key}
+    group_key: ${input_key}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.CodeTextFilter
     filter_type: ${filters.code_text_filter}
-    solution_key: ${filters.solution_key}
+    solution_key: ${output_key}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
     num_samples: ${num_output_samples}
@@ -92,6 +94,8 @@ processors:
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}
     prompt_type: ${prompt_type}
+    input_key: ${input_key}
+    output_key: ${output_key}
     chat_format: ${chat_format}
     generation_suffix: ${generation_suffix}
     metadata: ${metadata}

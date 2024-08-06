@@ -67,3 +67,26 @@ def test_openmathinstruct():
     assert (
         expected_md5 == output_md5
     ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"
+
+
+def test_code_sft_data():
+    output_file = "tests/data/code_processed_output.jsonl"
+    subprocess.run(
+        [
+            "python",
+            "nemo_skills/finetuning/prepare_sft_data.py",
+            "--config-name=prepare_code_sft_data",
+            "preprocessed_dataset_files='tests/data/code-output.test'",
+            f"output_path={output_file}",
+            "filters.drop_incorrect_code_blocks=false",
+            "generation_suffix='\"<|eot_id|>\"'",
+        ],
+        check=True,
+    )
+
+    expected_md5 = "f9720122d0b7697715a3b8adb006083e"
+    output_md5 = compute_md5(output_file)
+
+    assert (
+        expected_md5 == output_md5
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"

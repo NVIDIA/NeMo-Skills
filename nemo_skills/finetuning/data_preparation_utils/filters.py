@@ -34,6 +34,8 @@ LOG = logging.getLogger(__file__)
 PATTERN_ANS = re.compile(r"\\boxed\{([^}]*)\}")
 PATTERN_CODE = re.compile(CODE_SEPARATORS[0])
 
+PATTERN_PYTHON_CODE = re.compile("```[pP]ython")
+
 
 class BaseFilter(BaseParallelProcessor):
     def __init__(self, **kwargs):
@@ -112,6 +114,17 @@ class DropBrokenCode(BaseFilter):
             if not (code_start_idx < code_end_idx < code_out_start_idx < code_out_end_idx):
                 return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
+        return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
+
+
+class DropIncorrectCodeBlocks(BaseFilter):
+    def __init__(self, solution_key: str = "generation", **kwargs):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        if len(PATTERN_PYTHON_CODE.findall(data_entry[self.solution_key])) != 1:
+            return [DataEntry(data=None, metrics=dict(num_removed=1))]
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
