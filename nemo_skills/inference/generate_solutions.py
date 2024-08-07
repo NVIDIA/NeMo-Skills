@@ -40,7 +40,7 @@ class InferenceConfig:
     top_k: int = 0
     top_p: float = 0.95
     random_seed: int = 0
-    tokens_to_generate: int = 512
+    tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
 
 
