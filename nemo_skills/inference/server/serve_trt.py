@@ -413,6 +413,7 @@ def _stream(
             output_log_probs,
             output_cum_log_probs,
             batch_input_ids,
+            batch_input_ids_list,
             streaming,
             request_ids,
             return_all_generated_tokens,
@@ -462,9 +463,8 @@ class TensorRTLLM:
             enable_chunked_context=True,
             kv_cache_enable_block_reuse=True,
         )
-        # setting to the default max batch size in trtllm.
         # might need to adjust in the future
-        self.executor = ThreadPoolExecutor(max_workers=256)
+        self.executor = ThreadPoolExecutor(max_workers=1024)
         self.requests = {}  # id to future
 
     def get_output(

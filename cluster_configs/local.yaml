@@ -15,7 +15,7 @@
 cluster: local
 
 containers:
-  tensorrt_llm: igitman/nemo-skills-trtllm:0.3.1
+  tensorrt_llm: igitman/nemo-skills-trtllm:0.3.2
   vllm: igitman/nemo-skills-vllm:0.3.1
   nemo: igitman/nemo-skills-sft:0.3.0
   # sandbox is always re-built locally

@@ -23,8 +23,7 @@ RUN ["ln", "-sf", "/usr/bin/python3", "/usr/bin/python"]
 RUN ["ln", "-sf", "/usr/bin/pip3", "/usr/bin/pip"]
 
 # pinning to the tested version
-RUN pip install tensorrt_llm==0.12.0.dev2024072301 -U --pre --extra-index-url https://pypi.nvidia.com
-RUN pip install transformers==4.43.3
+RUN pip install tensorrt_llm==0.12.0.dev2024080600 -U --pre --extra-index-url https://pypi.nvidia.com
 
 # installing packages required for our server code
 RUN pip install flask flask_restful

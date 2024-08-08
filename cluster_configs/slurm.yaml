@@ -23,8 +23,8 @@ extra_sandbox_args:
   - --overlap
 
 containers:
-  tensorrt_llm: igitman/nemo-skills-trtllm:0.3.0
-  vllm: igitman/nemo-skills-vllm:0.3.0
+  tensorrt_llm: igitman/nemo-skills-trtllm:0.3.2
+  vllm: igitman/nemo-skills-vllm:0.3.1
   nemo: igitman/nemo-skills-sft:0.3.0
   sandbox: igitman/nemo-skills-sandbox:0.3.0
 
@@ -34,16 +34,3 @@ containers:
 # timeouts:
 #   partition_name1: 06:00:00
 #   partition_name2: 01:30:00
-
-
-# make sure to specify the cpu count / max memory for the partitions to be able
-# to use sandbox (need to explicitly split cpu/memory between sandbox and main jobs)
-# to get this info run something like: sinfo -o "%50N  %10c  %20m  %30G"
-
-# max_cpus:
-#   partition_name1: 256
-#   partition_name2: 32
-
-# max_memory:
-#   partition_name1: 1048576
-#   partition_name2: 262144
