@@ -288,59 +288,6 @@ Question:
     assert prompt.build_string({'question': '2 + 2 = ?'}) == expected_prompt
 
 
-def test_nemotron_fewshot_prompt_reference():
-    config = get_prompt_config('nemotron/fewshot_instruct')
-    config.few_shot_examples.example_dicts = [
-        {'question': '1 + 1 = ?', 'generation': "That's easy: 2!", 'reference_solution': "Think hard - it's 2"},
-        {'question': '5 + 5 = ?', 'generation': "That's easy: 10!", 'reference_solution': "Isn't it 10?"},
-    ]
-    config.few_shot_examples.num_few_shots = 2
-    config.context_type = 'reference_solution'
-    prompt = Prompt(config=config)
-
-    expected_prompt = """<extra_id_0>System
-
-<extra_id_1>User
-Here are some examples of questions and solutions followed by a new question that you need to solve.
-
-Example question:
-1 + 1 = ?
-
-Reference solution (do not copy it):
-Think hard - it's 2
-
-Example solution:
-That's easy: 2!
-
-
-
-
-
-Example question:
-5 + 5 = ?
-
-Reference solution (do not copy it):
-Isn't it 10?
-
-Example solution:
-That's easy: 10!
-
-
-
-
-
-Question:
-2 + 2 = ?
-
-Reference solution (do not copy it):
-What should I do??
-<extra_id_1>Assistant
-"""
-    assert (
-        prompt.build_string({'question': '2 + 2 = ?', 'reference_solution': 'What should I do??'}) == expected_prompt
-    )
-
-
 def test_llama3_gsm8k_prompt():
     config = get_prompt_config('llama3/gsm8k')
     prompt = Prompt(config=config)

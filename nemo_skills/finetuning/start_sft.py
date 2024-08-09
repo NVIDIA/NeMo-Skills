@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import nemo.collections.nlp.data.language_modeling.megatron.gpt_sft_chat_dataset as gpt_sft_chat_dataset
 import torch.multiprocessing as mp
 from nemo.collections.nlp.data.language_modeling.megatron.gpt_sft_chat_dataset import get_prompt_template_example
 from nemo.core.config import hydra_runner
@@ -135,6 +136,12 @@ def main(cfg) -> None:
     with open_dict(cfg):
         # overwrite the model config with the config from the checkpoint
         cfg.model.encoder_seq_length = ptl_model.cfg.encoder_seq_length
+
+    # monkey-patching the system token to allow training with llama format
+    # TODO: remove when this is properly supported in nemo
+    if cfg.model.data.chat:
+        # not using default to avoid accidental errors by mistyping or misplacing this value in the config
+        gpt_sft_chat_dataset.SYSTEM_TOKEN = cfg.model.data["system_token"]
 
     # pull values from checkpoint
     trainer_restore_path = trainer.ckpt_path

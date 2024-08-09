@@ -15,7 +15,7 @@ do_shuffle: true
 num_output_samples: null
 
 prompt_type: openmathinstruct/sft
-chat_format: false  # whether to use NeMo's chat format
+chat_format: null  # null/nemotron/llama
 generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
 input_key: question

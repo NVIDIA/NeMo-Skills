@@ -1,5 +1,5 @@
 few_shot_examples:
-  template: "Question:\n{question}{context}\n\nWrite another question similar to this one:\n{augmented_question}\n\n\n\n\n\n"
+  template: "Question:\n{question}\n\nWrite another question similar to this one:\n{augmented_question}\n\n\n\n\n\n"
 
 system: ""
 
@@ -7,7 +7,7 @@ user: |-
   You are an AI assistant that excels at creating similar questions. Follow the given examples.
 
   {examples}Question:
-  {question}{context}
+  {question}
 
 prompt_template: |-
   {system}{user}

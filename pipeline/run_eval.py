@@ -53,7 +53,6 @@ def get_greedy_cmd(
     return f"""echo "Evaluating benchmark {benchmark}" && \
 python nemo_skills/inference/generate_solutions.py \
     server.server_type={{server_type}} \
-    prompt.context_type=empty \
     +dataset={benchmark} \
     output_file=/results/{benchmark}/{output_name} \
     {extra_arguments} && \

@@ -34,7 +34,7 @@ documentation to learn how to make inference more efficient.
 2. Convert the model to TensorRT-LLM format for fastest evaluation.
 
    ```
-   docker run --rm --gpus all --ipc=host -v <path to nemo-skills repo>:/code -v <path to OpenMath-Mistral-7B-v0.1-hf>:/model igitman/nemo-skills-trtllm:0.3.0 \
+   docker run --rm --gpus all --ipc=host -v <path to nemo-skills repo>:/code -v <path to OpenMath-Mistral-7B-v0.1-hf>:/model igitman/nemo-skills-trtllm:0.3.2 \
    bash -c ' \
    export PYTHONPATH=/code && cd /code && \
    python nemo_skills/conversion/hf_to_trtllm.py \
@@ -45,11 +45,11 @@ documentation to learn how to make inference more efficient.
    trtllm-build \
       --checkpoint_dir /tmp/trtllm \
       --output_dir /code/openmath-mistral-7b-trtllm \
-      --gpt_attention_plugin bfloat16 \
-      --gemm_plugin bfloat16 \
-      --context_fmha "enable" \
-      --max_input_len 4096 \
-      --max_output_len 512 \
+      --gpt_attention_plugin bfloat16
+      --use_paged_context_fmha enable
+      --max_input_len 3584 \
+      --max_seq_len 4096 \
+      --max_num_tokens 4096 \
       --max_batch_size 64 &&
    cp /model/tokenizer.model /code/openmath-mistral-7b-trtllm'
    ```
@@ -131,7 +131,6 @@ you can run the following:
      --num_runs 128 \
      +prompt=openmathinstruct/base \
      ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
-     ++prompt.context_type=empty \
      ++dataset=gsm8k \
      ++split_name=train_full
    ```
@@ -145,9 +144,8 @@ you can run the following:
      --output_dir ./synthetic-solutions/gsm8k-masked/ \
      --num_gpus 8 \
      --num_runs 128 \
-     +prompt=openmathinstruct/base \
+     +prompt=openmathinstruct/masked_solution \
      ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
-     ++prompt.context_type=masked_solution \
      ++dataset=gsm8k-masked \
      ++split_name=train_full
    ```

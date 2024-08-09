@@ -65,7 +65,7 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"], EVALUATOR_MAP['gsm8k']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (40, 55, 5)
+    assert (int(metrics['sympy_correct']), int(metrics['no_answer'])) == (40, 5)
     assert metrics['num_entries'] == 20
 
 
@@ -102,8 +102,7 @@ python pipeline/run_eval.py \
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/algebra222/output-greedy.jsonl"], EVALUATOR_MAP['algebra222']())
 
-    assert round(metrics['correct_answer'], 2) == 66.67
-    assert round(metrics['wrong_answer'], 2) == 31.98
+    assert round(metrics['sympy_correct'], 2) == 66.67
     assert round(metrics['no_answer'], 2) == 1.35
     assert metrics['num_entries'] == 222
 
@@ -126,8 +125,7 @@ python pipeline/run_eval.py \
     assert metrics['num_instructions'] == 601
 
     metrics = compute_metrics([f"{output_path}/mmlu/output-greedy.jsonl"], EVALUATOR_MAP['mmlu']())
-    assert round(metrics['correct_answer'], 2) == 58.75
-    assert round(metrics['wrong_answer'], 2) == 21.50
+    assert round(metrics['sympy_correct'], 2) == 58.75
     assert round(metrics['no_answer'], 2) == 19.75
     assert metrics['num_entries'] == 400
 
@@ -167,7 +165,7 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/math/output-greedy.jsonl"], EVALUATOR_MAP['math']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (10, 75, 15)
+    assert (int(metrics['sympy_correct']), int(metrics['no_answer'])) == (10, 15)
     assert metrics['num_entries'] == 20
 
 
@@ -207,7 +205,7 @@ python pipeline/run_labeling.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/output-rs0.jsonl"], EVALUATOR_MAP['gsm8k']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (30, 55, 15)
+    assert (int(metrics['sympy_correct']), int(metrics['no_answer'])) == (30, 15)
     assert metrics['num_entries'] == 20
 
 
@@ -246,5 +244,5 @@ python pipeline/run_eval.py \
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics([f"{output_path}/gsm8k/output-greedy.jsonl"], EVALUATOR_MAP['gsm8k']())
-    assert (int(metrics['correct_answer']), int(metrics['wrong_answer']), int(metrics['no_answer'])) == (90, 5, 5)
+    assert (int(metrics['sympy_correct']), int(metrics['no_answer'])) == (90, 5)
     assert metrics['num_entries'] == 20

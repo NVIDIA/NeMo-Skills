@@ -15,13 +15,13 @@ do_shuffle: true
 num_output_samples: null
 
 prompt_type: llama3/codegen_sft
-chat_format: false  # whether to use NeMo's chat format
+chat_format: null  # null/nemotron/llama
 generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
 input_key: input  # key to group samples by before code_text_filter
 output_key: output  # key to filter solutions by
 
-filters:  
+filters:
   drop_incorrect_code_blocks: false
 
 processors:
@@ -40,10 +40,14 @@ processors:
       - {input: {output: "Solution ```python\ndef hello()```"}, output: {output: "Solution ```python\ndef hello()```"}}
       - {input: {output: "She had python\ndef hello()```"}, output: null}
 
+  - _target_: sdp.processors.RenameFields
+    rename_fields:
+      input: question  # we need to match llama3/codegen_sft format which uses 'question' as input key
+
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}
     prompt_type: ${prompt_type}
-    input_key: ${input_key}
+    input_key: question
     output_key: ${output_key}
     chat_format: ${chat_format}
     generation_suffix: ${generation_suffix}

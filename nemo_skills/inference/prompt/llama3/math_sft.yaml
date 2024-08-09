@@ -1,19 +1,19 @@
-# Prompt for Llama models SFTed by us for math benchmarks 
+# Prompt for Llama models SFTed by us for math benchmarks
 
 system: ""
 
-user: |- 
+user: |-
   Help the user to solve the given math problem. Make sure to put the answer (and only answer) inside \boxed{{}}.
 
-  {question}{context}
+  {question}
 
 prompt_template: |-
   <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-  
+
   {system}<|eot_id|><|start_header_id|>user<|end_header_id|>
 
   {user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
   {generation}
-  
+
 stop_phrases: ["<|eot_id|>"]

@@ -2,7 +2,7 @@
 
 system: ""
 
-user: "{question}{context}"
+user: "{question}"
 
 prompt_template: |-
   <extra_id_0>System

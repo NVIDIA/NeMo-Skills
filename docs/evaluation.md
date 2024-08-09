@@ -98,7 +98,7 @@ the [quick start](#quick-start) section.
    If you want to use TensorRT-LLM server instead, you can run the following command
 
    ```
-   docker run --rm --gpus all --ipc=host -v `pwd`:/code -v <path to the trtllm model>:/model igitman/nemo-skills-trtllm:0.3.0 \
+   docker run --rm --gpus all --ipc=host -v `pwd`:/code -v <path to the trtllm model>:/model igitman/nemo-skills-trtllm:0.3.2 \
    bash -c 'export PYTHONPATH=/code && \
    mpirun -n <number of GPUs> --allow-run-as-root python /code/nemo_skills/inference/server/serve_trt.py --model_path=/model'
    ```
@@ -109,9 +109,6 @@ the [quick start](#quick-start) section.
    python nemo_skills/inference/generate_solutions.py \
      output_file=./test-results/gsm8k/output-greedy.jsonl \
      +prompt=openmathinstruct/sft \
-     ++prompt.few_shot_examples.examples_type=null \
-     ++prompt.few_shot_examples.num_few_shots=0 \
-     ++prompt.context_type=empty \
      ++dataset=gsm8k \
      ++split_name=test \
      ++server.server_type=nemo \

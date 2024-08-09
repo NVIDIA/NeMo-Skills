@@ -5,7 +5,7 @@ system: ""
 user: |-
   Help the user to solve the given problem.
 
-  {question}{context}
+  {question}
 
 prompt_template: |-
   <extra_id_0>System

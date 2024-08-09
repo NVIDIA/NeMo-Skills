@@ -7,7 +7,7 @@ system: |-
 
 user: |-
     Question:
-    {question}{context}
+    {question}
 
 # <..._start> and <..._end> are special tokens that are not directly visible to the model.
 # They are used to parse the prompt into parts in our inference pipeline.

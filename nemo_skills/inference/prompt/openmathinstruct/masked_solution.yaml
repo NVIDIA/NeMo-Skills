@@ -1,8 +1,5 @@
-# Generic prompt for Llama base
-
 few_shot_examples:
-  template: "Question:\n{question}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
-
+  template: "Question:\n{question}\n\nReference solution:\n{masked_reference_solution}\n\nMy solution:\n{generation}\n\n\n\n\n\n"
 system: ""
 user: |-
     Here are some examples of questions and solutions followed by a new question that you need to solve.
@@ -11,6 +8,8 @@ user: |-
     {examples}Question:
     {question}
 
-prompt_template: "<|begin_of_text|>{user}\n\nMy solution:\n{generation}"
+    Reference solution:
+    {masked_reference_solution}
 
+prompt_template: "{system}{user}\n\nMy solution:\n{generation}"
 stop_phrases: ["\n\n\n\n\n\n"]

@@ -237,9 +237,9 @@ class WriteFinalSftManifest(BaseProcessor):
     def __init__(
         self,
         prompt_type: str,
+        chat_format: str | None = None,  # nemotron/llama/None
         input_key: str = "input",
         output_key: str = "output",
-        chat_format: bool = False,
         generation_suffix: str = "",
         metadata: Optional[Dict] = None,
         **kwargs,
@@ -275,17 +275,34 @@ class WriteFinalSftManifest(BaseProcessor):
                     continue
                 seen_predictions[question].add(elem[self.output_key])
 
-                if self.chat_format:
+                if self.chat_format is None:
+                    generation = elem.pop(self.output_key)
+                    elem["input"] = prompt.build_string(input_dict=elem)
+                    elem["output"] = generation + self.generation_suffix
+                elif self.chat_format.lower() == "nemotron":
                     elem['conversations'] = [
-                        {'value': elem[self.input_key], 'from': 'User', 'canonical_form': ''},
+                        {'value': prompt_config.user.format(**elem), 'from': 'User', 'canonical_form': ''},
                         {'value': elem.pop(self.output_key), 'from': 'Assistant', 'canonical_form': ''},
                     ]
                     elem['system'] = prompt_config.system
                     elem['mask'] = 'User'
-                    elem['type'] = None
+                elif self.chat_format.lower() == "llama":
+                    elem['conversations'] = [
+                        {
+                            'value': prompt_config.user.format(**elem),
+                            'from': '<|start_header_id|>user<|end_header_id|>',
+                            'canonical_form': '',
+                        },
+                        {
+                            'value': elem.pop(self.output_key),
+                            'from': '<|start_header_id|>assistant<|end_header_id|>',
+                            'canonical_form': '',
+                        },
+                    ]
+                    elem['system'] = prompt_config.system
+                    elem['mask'] = '<|start_header_id|>user<|end_header_id|>'
                 else:
-                    elem["input"] = prompt.build_string(input_dict={"question": question})
-                    elem["output"] = elem.pop(self.output_key) + self.generation_suffix
+                    raise ValueError(f"Chat format {self.chat_format} is not supported")
                 elem.update(self.metadata)
                 fout.write(json.dumps(elem) + "\n")
                 samples_count += 1

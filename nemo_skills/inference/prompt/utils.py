@@ -113,13 +113,7 @@ class PromptConfig:
     prompt_template: str = MISSING
     user: str = MISSING
     system: str = ""
-    context_type: str = "empty"
-    _context_template: Optional[str] = None  # cannot be set directly for now!
     stop_phrases: List[str] = field(default_factory=list)
-
-    def __post_init__(self):
-        """Initialize context_template if not provided."""
-        self._context_template = context_templates[self.context_type]
 
 
 class Prompt:
@@ -128,15 +122,9 @@ class Prompt:
         # case some parameters were manually changed after the config was created
         self.config = PromptConfig(_init_nested=True, **asdict(config))
 
-    def build_context(self, example_dict: Dict[str, Any]) -> str:
-        """Builds the context string based on the example dictionary."""
-        context = self.config._context_template.format(**example_dict)
-        return context
-
     def build_filled_example(self, example_dict: Dict[str, Any]) -> str:
         """Builds a filled example string based on the example dictionary."""
-        context = self.build_context(example_dict)
-        return self.config.few_shot_examples.template.format(context=context, **example_dict)
+        return self.config.few_shot_examples.template.format(**example_dict)
 
     def build_examples_dict(self, input_dict):
         if self.config.few_shot_examples.num_few_shots == 0:
@@ -182,8 +170,7 @@ class Prompt:
 
         filled_examples = [self.build_filled_example(example) for example in example_dicts]
         examples = "".join(filled_examples)
-        context = self.build_context(input_dict)
-        user = self.config.user.format(examples=examples, context=context, **input_dict)
+        user = self.config.user.format(examples=examples, **input_dict)
         return user
 
     def build_string(self, input_dict: Dict[str, str]) -> str:
@@ -223,17 +210,3 @@ def get_prompt_config(prompt_type: str) -> PromptConfig:
     with open(config_path, "rt", encoding="utf-8") as fin:
         prompt_config = PromptConfig(_init_nested=True, **yaml.safe_load(fin))
         return prompt_config
-
-
-# this does not come from the config as it's coupled with few shot examples structure
-# and so most often will require changes to the code anyway
-context_templates = {
-    "empty": "",
-    "reference_solution": "\n\nReference solution (do not copy it):\n{reference_solution}",
-    "masked_solution": "\n\nReference solution:\n{masked_reference_solution}",
-    "table": "\n\nUse the following table to answer the question:\n{table}",
-    "table_solution": (
-        "\n\nUse the following table to answer the question:\n{table}\n"
-        "Reference solution (do not copy it):\n{reference_solution}"
-    ),
-}
