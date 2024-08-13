@@ -22,8 +22,8 @@ python nemo_skills/conversion/hf_to_trtllm.py \
 trtllm-build \
     --checkpoint_dir <tmp file for trtllm checkpoint> \
     --output_dir <final path for the trtllm checkpoint> \
-    --gpt_attention_plugin bfloat16
-    --use_paged_context_fmha enable
+    --gpt_attention_plugin bfloat16 \
+    --use_paged_context_fmha enable \
     --max_input_len 3584 \
     --max_seq_len 4096 \
     --max_num_tokens 4096 \
