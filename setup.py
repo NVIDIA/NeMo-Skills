@@ -23,9 +23,7 @@ def parse_requirements(filename):
 # Read the requirements from the requirements/main.txt file
 requirements = parse_requirements('requirements/main.txt')
 # sdp is not needed in docker containers, so not adding it to requirements/main.txt
-requirements.append(
-    "sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor@85de1595e3958b75150f20610abcbc7a603d7606"
-)
+requirements.append("sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor")
 
 setup(
     name="nemo_skills",
