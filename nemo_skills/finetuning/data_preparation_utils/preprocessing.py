@@ -268,7 +268,6 @@ class WriteFinalSftManifest(BaseProcessor):
             # only looping over the correct samples (unless asked for incorrect)
             for line in fin:
                 elem = json.loads(line)
-
                 question = elem[self.input_key]
                 # deduplication
                 if elem[self.output_key] in seen_predictions[question]:

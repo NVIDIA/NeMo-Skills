@@ -14,6 +14,11 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
+# length criteria
+min_solution_length: 0
+max_solution_length: 2048
+hf_model_name: "meta-llama/Meta-Llama-3.1-8B"
+
 prompt_type: openmathinstruct/sft
 chat_format: null  # null/nemotron/llama
 generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
@@ -28,6 +33,7 @@ filters:
   trim_solutions: true
   drop_incorrect_arithmetic: true
   split_arithmetic: true
+  remove_len_outlier_solutions: false
   code_text_filter: null
 
 
@@ -78,10 +84,18 @@ processors:
       - {input: {generation: "1 + 7 * 19 = 134"}, output: {generation: "1 + 7 * 19 = 1 + 133 = 134"}}
       - {input: {generation: "3 * (1 + 7) / 4 = 6"}, output: {generation: "3 * (1 + 7) / 4 = 3 * 8 / 4 = 24 / 4 = 6"}}
 
+  - _target_: nemo_skills.finetuning.data_preparation_utils.filters.RemoveLenOutlierSolutions
+    should_run: ${filters.remove_len_outlier_solutions}
+    solution_key: ${output_key}
+    min_length: ${min_solution_length}
+    max_length: ${max_solution_length}
+    hf_model_name: ${hf_model_name}
+
   - _target_: nemo_skills.finetuning.data_preparation_utils.preprocessing.GroupSamples
     group_key: ${input_key}
 
   - _target_: nemo_skills.finetuning.data_preparation_utils.filters.CodeTextFilter
+    should_run: ${filters.code_text_filter}
     filter_type: ${filters.code_text_filter}
     solution_key: ${output_key}
 
