@@ -23,8 +23,8 @@ from dash import Dash
 from flask import Flask
 from omegaconf import MISSING, DictConfig, OmegaConf
 from settings.constants import RETRIEVAL, RETRIEVAL_FIELDS, UNDEFINED
+from settings.inspector_config import InspectorConfig
 
-from nemo_inspector.settings.inspector_config import InspectorConfig
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
 from nemo_skills.inference.prompt.utils import get_prompt_config, prompt_types
 from nemo_skills.utils import setup_logging

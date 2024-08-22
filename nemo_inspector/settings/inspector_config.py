@@ -44,4 +44,4 @@ class InspectorConfig(GenerateSolutionsConfig):
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_Inspector_config", node=InspectorConfig)
+cs.store(name="base_inspector_config", node=InspectorConfig)

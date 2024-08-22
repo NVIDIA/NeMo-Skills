@@ -22,8 +22,7 @@ from dash import dcc, html
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import PythonLexer
-
-from nemo_inspector.settings.constants import ANSI, LATEX, MARKDOWN
+from settings.constants import ANSI, LATEX, MARKDOWN
 
 
 def get_starts_with_tag_function(tag: str, default_index_move: int) -> Callable[[str, int], Tuple[bool, int]]:

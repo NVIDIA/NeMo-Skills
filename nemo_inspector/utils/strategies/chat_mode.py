@@ -16,9 +16,8 @@ from typing import Dict, List
 
 import dash_bootstrap_components as dbc
 from flask import current_app
-
-from nemo_inspector.settings.constants import ANSWER_FIELD, ONE_SAMPLE_MODE, QUESTION_FIELD, SEPARATOR_ID
-from nemo_inspector.utils.strategies.base_strategy import ModeStrategies
+from settings.constants import ANSWER_FIELD, ONE_SAMPLE_MODE, QUESTION_FIELD, SEPARATOR_ID
+from utils.strategies.base_strategy import ModeStrategies
 
 
 class ChatModeStrategy(ModeStrategies):
