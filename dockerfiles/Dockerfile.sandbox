@@ -17,7 +17,7 @@ FROM tiangolo/uwsgi-nginx-flask:python3.10
 # registering local_sandbox_server.py as the starting point
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 # installing required packages
-COPY nemo_skills/requirements/code_execution.txt /app
+COPY requirements/code_execution.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
 ARG UWSGI_CHEAPER
