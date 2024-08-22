@@ -95,14 +95,14 @@ def parse_model_answer(answer: str) -> List[Dict]:
             - 'output': The output of the code block.
 
     """
-    config = current_app.config['data_explorer']
+    config = current_app.config['nemo_inspector']
     code_start, code_end = map(
         re.escape,
-        config["visualization_params"]["code_separators"],
+        config["inspector_params"]["code_separators"],
     )
     output_start, output_end = map(
         re.escape,
-        config["visualization_params"]["code_output_separators"],
+        config["inspector_params"]["code_output_separators"],
     )
     code_pattern = re.compile(fr'{code_start}(.*?){code_end}', re.DOTALL)
     code_output_pattern = re.compile(
@@ -353,7 +353,7 @@ def custom_deepcopy(data) -> List:
 def get_data_from_files(cache_indicator=None) -> List:
     if cache_indicator is not None:
         return []
-    base_config = current_app.config['data_explorer']
+    base_config = current_app.config['nemo_inspector']
     dataset = None
     if base_config['data_file'] != UNDEFINED:
         with open(base_config['data_file']) as f:
@@ -458,7 +458,7 @@ def get_available_models(cache_indicator=None) -> Dict:
     except FileNotFoundError:
         runs_storage = {}
     models = list(runs_storage.keys())
-    config = current_app.config["data_explorer"]["visualization_params"]
+    config = current_app.config["nemo_inspector"]["inspector_params"]
     for model_name in models:
         runs_storage[model_name]["file_paths"] = list(
             unroll_files([os.path.join(config["results_path"], model_name, f"{OUTPUT}*.jsonl")])
@@ -519,20 +519,20 @@ def get_settings():
                 settings = {**settings, **get_settings_helper(value)}
         return settings
 
-    return get_settings_helper(current_app.config['data_explorer'])
+    return get_settings_helper(current_app.config['nemo_inspector'])
 
 
 def get_utils_dict(name: Union[str, Dict], value: Union[str, int], id: Union[str, Dict] = None):
     if id is None:
         id = name
-    if name in current_app.config['data_explorer']['types'].keys():
+    if name in current_app.config['nemo_inspector']['types'].keys():
         template = {
             'props': {
                 'id': id,
                 'options': [
-                    {"label": value, "value": value} for value in current_app.config['data_explorer']['types'][name]
+                    {"label": value, "value": value} for value in current_app.config['nemo_inspector']['types'][name]
                 ],
-                'value': current_app.config['data_explorer']['types'][name][0],
+                'value': current_app.config['nemo_inspector']['types'][name][0],
             },
             'type': 'Select',
             'namespace': 'dash_bootstrap_components',

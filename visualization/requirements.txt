@@ -1,8 +1,0 @@
-ansi2html
-dash
-dash_bootstrap_components
-hydra-core
-joblib
-pandas
-pygments
-sshtunnel_requests

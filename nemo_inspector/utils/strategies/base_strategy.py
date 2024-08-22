@@ -54,7 +54,7 @@ class ModeStrategies:
     def sandbox_init(self):
         if self.sandbox is None:
             self.sandbox = get_sandbox(
-                **current_app.config['data_explorer']['sandbox'],
+                **current_app.config['nemo_inspector']['sandbox'],
             )
 
     def get_utils_input_layout(
@@ -63,7 +63,7 @@ class ModeStrategies:
         disabled: bool = False,
     ) -> List[dbc.AccordionItem]:
         utils = get_utils_from_config(
-            {key: value for key, value in current_app.config['data_explorer'].items() if key not in SETTING_PARAMS}
+            {key: value for key, value in current_app.config['nemo_inspector'].items() if key not in SETTING_PARAMS}
         ).items()
         input_group_layout = html.Div(
             (
@@ -76,7 +76,7 @@ class ModeStrategies:
                         utils,
                         key=lambda item: (
                             1
-                            if item[0].split(SEPARATOR_DISPLAY)[-1] in current_app.config['data_explorer']['types']
+                            if item[0].split(SEPARATOR_DISPLAY)[-1] in current_app.config['nemo_inspector']['types']
                             else 0 if not isinstance(item[1], str) else 2
                         ),
                     )
@@ -104,7 +104,7 @@ class ModeStrategies:
         return utils_group_layout
 
     def get_few_shots_input_layout(self) -> List[dbc.AccordionItem]:
-        config = current_app.config['data_explorer']
+        config = current_app.config['nemo_inspector']
         size = config["prompt"]["few_shot_examples"]["num_few_shots"]
         return [
             dbc.AccordionItem(
@@ -208,7 +208,7 @@ class ModeStrategies:
         utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in utils.items()}
         self.sandbox_init()
         llm = get_code_execution_model(
-            **current_app.config['data_explorer']['server'],
+            **current_app.config['nemo_inspector']['server'],
             sandbox=self.sandbox,
         )
 
@@ -219,7 +219,7 @@ class ModeStrategies:
         try:
             outputs = llm.generate(
                 prompts=params['prompts'],
-                stop_phrases=current_app.config['data_explorer']['prompt']['stop_phrases'],
+                stop_phrases=current_app.config['nemo_inspector']['prompt']['stop_phrases'],
                 **asdict(inference_cfg),
             )
         except requests.exceptions.ConnectionError as e:

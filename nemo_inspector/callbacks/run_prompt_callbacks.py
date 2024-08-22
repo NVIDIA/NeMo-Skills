@@ -57,7 +57,6 @@ from nemo_skills.inference.prompt.utils import (
     FewShotExamplesConfig,
     Prompt,
     PromptConfig,
-    context_templates,
     get_prompt_config,
     prompt_types,
 )
@@ -138,7 +137,7 @@ def update_examples_type(
             and os.path.isfile(data_file)
         ):
             with open(utils['retrieval_file'], 'r') as retrieval_file, open(data_file, 'r') as data_file:
-                types = current_app.config['data_explorer']['types']
+                types = current_app.config['nemo_inspector']['types']
                 sample = {
                     key: value
                     for key, value in json.loads(retrieval_file.readline()).items()
@@ -161,7 +160,7 @@ def update_examples_type(
                     data_file_index + 1,
                     get_utils_dict(
                         retrieval_field,
-                        current_app.config['data_explorer']['retrieval_fields'][retrieval_field],
+                        current_app.config['nemo_inspector']['retrieval_fields'][retrieval_field],
                         {"type": RETRIEVAL, "id": retrieval_field},
                     ),
                 )
@@ -381,37 +380,23 @@ def update_examples(
 )
 def update_prompt_type(prompt_type: str, js_trigger: str) -> Union[NoUpdate, dbc.AccordionItem]:
     if (
-        "used_prompt" in current_app.config['data_explorer']['prompt']
-        and prompt_type == current_app.config['data_explorer']['prompt']['used_prompt']
+        "used_prompt" in current_app.config['nemo_inspector']['prompt']
+        and prompt_type == current_app.config['nemo_inspector']['prompt']['used_prompt']
     ):
         output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))).keys())
         return [no_update] * (output_len + 2)
 
-    current_app.config['data_explorer']['prompt']['used_prompt'] = prompt_type
+    current_app.config['nemo_inspector']['prompt']['used_prompt'] = prompt_type
 
     if prompt_type not in map(lambda name: name.split('.')[0], prompt_types):
         output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))).keys())
         return [no_update] * (output_len + 2)
     prompt_config = get_prompt_config(prompt_type)
-    current_app.config['data_explorer']['prompt']['stop_phrases'] = list(prompt_config.stop_phrases)
+    current_app.config['nemo_inspector']['prompt']['stop_phrases'] = list(prompt_config.stop_phrases)
     return [
         get_utils_field_representation(value, key)
         for key, value in get_utils_from_config(asdict(prompt_config)).items()
     ] + ['', js_trigger + " "]
-
-
-@app.callback(
-    [
-        Output("context_template", "value", allow_duplicate=True),
-        Output("js_container", "children", allow_duplicate=True),
-        Output("js_trigger", "children", allow_duplicate=True),
-    ],
-    Input("context_type", "value"),
-    State("js_trigger", "children"),
-    prevent_initial_call=True,
-)
-def update_context_type(context_type: str, js_trigger: str) -> Union[NoUpdate, dbc.AccordionItem]:
-    return context_templates.get(context_type, no_update), "", js_trigger + " "
 
 
 @app.callback(

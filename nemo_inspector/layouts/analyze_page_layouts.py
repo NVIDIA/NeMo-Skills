@@ -116,7 +116,7 @@ def get_save_dataset_layout() -> html.Div:
                                     dbc.InputGroupText('save_path'),
                                     dbc.Input(
                                         value=os.path.join(
-                                            current_app.config['data_explorer']['visualization_params'][
+                                            current_app.config['nemo_inspector']['inspector_params'][
                                                 'save_generations_path'
                                             ],
                                             'default_name',

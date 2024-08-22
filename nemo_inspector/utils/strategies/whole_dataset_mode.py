@@ -68,8 +68,8 @@ class WholeDatasetModeStrategy(ModeStrategies):
         utils['num_few_shots'] = min(len(example_dicts), utils['num_few_shots'])
         self.sandbox_init()
         runs_storage = get_available_models()
-        config = current_app.config['data_explorer']
-        results_path = config['visualization_params']['results_path']
+        config = current_app.config['nemo_inspector']
+        results_path = config['inspector_params']['results_path']
         generation_name = utils['generation_name'] or str(len(runs_storage))
         metrics_directory = os.path.join(
             results_path,
@@ -125,7 +125,7 @@ class WholeDatasetModeStrategy(ModeStrategies):
                 generate_solutions(OmegaConf.structured(generate_solutions_config))
                 evaluate_results_config = EvaluateResultsConfig(
                     prediction_jsonl_files=output_file,
-                    sandbox=current_app.config['data_explorer']['sandbox'],
+                    sandbox=current_app.config['nemo_inspector']['sandbox'],
                 )
                 logging.info("Evaluate results")
                 evaluate_results(OmegaConf.structured(evaluate_results_config))

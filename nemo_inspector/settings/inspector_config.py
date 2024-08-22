@@ -23,13 +23,13 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 
 @nested_dataclass
-class BaseVisualizationConfig:
+class BaseInspectorConfig:
     model_prediction: Dict[str, str] = field(default_factory=dict)
 
     code_separators: Tuple[str, str] = CODE_SEPARATORS
     code_output_separators: Tuple[str, str] = CODE_OUTPUT_SEPARATORS
-    save_generations_path: str = "visualization/results/saved_generations"
-    results_path: str = "visualization/results/"
+    save_generations_path: str = "nemo_inspector/results/saved_generations"
+    results_path: str = "nemo_inspector/results/"
 
     def __post_init__(self):
         self.model_prediction = {
@@ -39,9 +39,9 @@ class BaseVisualizationConfig:
 
 
 @nested_dataclass
-class VisualizationConfig(GenerateSolutionsConfig):
-    visualization_params: BaseVisualizationConfig = field(default_factory=BaseVisualizationConfig)
+class InspectorConfig(GenerateSolutionsConfig):
+    inspector_params: BaseInspectorConfig = field(default_factory=BaseInspectorConfig)
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_visualization_config", node=VisualizationConfig)
+cs.store(name="base_Inspector_config", node=InspectorConfig)

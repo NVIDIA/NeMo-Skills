@@ -27,7 +27,7 @@ RUN pip install tensorrt_llm==0.12.0.dev2024080600 -U --pre --extra-index-url ht
 
 # installing packages required for our server code
 RUN pip install flask flask_restful
-COPY requirements.txt /opt/requirements.txt
+COPY requirements/main.txt /opt/requirements.txt
 RUN pip install -r /opt/requirements.txt
 
 # for ifeval benchmark

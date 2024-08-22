@@ -50,7 +50,7 @@ PARAMS_TO_REMOVE = [
     'retriever',
     '_context_template',
 ]
-PARAMETERS_FILE_NAME = "visualization/results/parameters.json"
+PARAMETERS_FILE_NAME = "nemo_inspector/results/parameters.json"
 RETRIEVAL = 'retrieval'
 RETRIEVAL_FIELDS = [
     'max_retrieved_chars_field',
@@ -66,7 +66,14 @@ STATS_KEYS = [
 ]
 SEPARATOR_DISPLAY = '.'
 SEPARATOR_ID = '->'
-SETTING_PARAMS = ['server', 'sandbox', 'output_file', 'visualization_params', 'types', 'stop_phrases']
+SETTING_PARAMS = [
+    'server',
+    'sandbox',
+    'output_file',
+    'inspector_params',
+    'types',
+    'stop_phrases',
+]
 STATISTICS_FOR_WHOLE_DATASET = ["correct_answer", "wrong_answer", "no_answer"]
 UNDEFINED = "undefined"
 WHOLE_DATASET_MODE = "whole_dataset"

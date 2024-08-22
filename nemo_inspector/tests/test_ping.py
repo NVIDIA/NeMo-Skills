@@ -23,7 +23,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.os_manager import ChromeType
 
 sys.path.append(str(Path(__file__).parents[2]))
 sys.path.append(str(Path(__file__).parents[1]))
@@ -37,13 +40,13 @@ def mock_set_config():
 @pytest.fixture
 def dash_app():
     with patch('hydra.main', lambda *args, **kwargs: lambda func: mock_set_config):
-        from visualization.data_explorer import app
-        from visualization.layouts import get_main_page_layout
+        from nemo_inspector.layouts import get_main_page_layout
+        from nemo_inspector.nemo_inspector import app
 
-        app.title = "Data Explorer"
+        app.title = "NeMo Inspector"
         app.layout = get_main_page_layout()
         config = {
-            'data_explorer': {
+            'nemo_inspector': {
                 'prompt': {
                     'prompt_type': '',
                     'context_template': '',
@@ -57,8 +60,9 @@ def dash_app():
                     'retrieval_field': [''],
                 },
                 'data_file': 'mock_data_file',
-                'visualization_params': {
+                'inspector_params': {
                     'model_prediction': {},
+                    'save_generations_path': 'mock_save_generations_path',
                 },
                 'server': {},
                 'sandbox': {},
@@ -73,17 +77,23 @@ def dash_app():
 
 @pytest.fixture
 def chrome_driver():
-    chrome_driver_path = ChromeDriverManager().install()
+    chrome_driver_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
     options = Options()
+    options.page_load_strategy = 'normal'
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
-    service = Service(chrome_driver_path)
-    driver = webdriver.Chrome(
-        service=service,
-        options=options,
-    )
-    os.environ['PATH'] += os.pathsep + '/'.join(chrome_driver_path.split("/")[:-1])
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
+    if 'GITHUB_ACTIONS' in os.environ:
+        # Running in GitHub Actions
+        driver = webdriver.Chrome(options=options)
+    else:
+        # Running locally
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+
+    os.environ['PATH'] += os.pathsep + '/'.join(chrome_driver_path.split("/")[:-1])
     yield driver
     driver.quit()
 
@@ -93,16 +103,17 @@ def chrome_driver():
     [('run_button', "/"), ('add_model', "/analyze")],
 )
 def test_dash_app_launch(chrome_driver, dash_duo, dash_app, element_id, url):
-
     dash_duo.start_server(dash_app)
 
     server_url = dash_duo.server_url
     full_url = f"{server_url}{url}"
 
-    dash_duo.driver.get(full_url)
     chrome_driver.get(full_url)
 
-    dash_duo.wait_for_element(f'#{element_id}', timeout=5)
-
-    element = chrome_driver.find_element(By.ID, element_id)
-    assert element.is_displayed()
+    try:
+        element = WebDriverWait(chrome_driver, 10).until(EC.presence_of_element_located((By.ID, element_id)))
+        assert element.is_displayed()
+    except Exception as e:
+        print(f"Error: {e}")
+        print(f"Page source: {chrome_driver.page_source}")
+        raise

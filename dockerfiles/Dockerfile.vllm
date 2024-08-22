@@ -45,7 +45,7 @@ ENV TRANSFORMERS_CACHE=/cache/huggingface/transformers
 ENV HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
 ENV HF_DATASETS_CACHE=/cache/huggingface/datasets
 
-COPY requirements.txt /opt/requirements.txt
+COPY requirements/main.txt /opt/requirements.txt
 RUN pip install -r /opt/requirements.txt
 
 # for ifeval benchmark

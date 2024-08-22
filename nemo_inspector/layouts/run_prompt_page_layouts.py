@@ -83,7 +83,7 @@ def get_run_test_layout() -> html.Div:
         [
             get_run_mode_layout(),
             dbc.Accordion(
-                get_query_params_layout(dataset=current_app.config['data_explorer']['data_file']),
+                get_query_params_layout(dataset=current_app.config['nemo_inspector']['data_file']),
                 start_collapsed=True,
                 always_open=True,
                 id="prompt_params_input",

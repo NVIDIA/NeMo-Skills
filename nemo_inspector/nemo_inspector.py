@@ -26,7 +26,7 @@ signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 
 if __name__ == "__main__":
-    app.title = "Data Explorer"
+    app.title = "NeMo Inspector"
     app.layout = get_main_page_layout()
     app.run(
         host='localhost',

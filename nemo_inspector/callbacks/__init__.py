@@ -23,10 +23,10 @@ from dash import Dash
 from flask import Flask
 from omegaconf import MISSING, DictConfig, OmegaConf
 from settings.constants import RETRIEVAL, RETRIEVAL_FIELDS, UNDEFINED
-from settings.visualization_config import VisualizationConfig
 
+from nemo_inspector.settings.inspector_config import InspectorConfig
 from nemo_skills.inference.prompt.few_shot_examples import examples_map
-from nemo_skills.inference.prompt.utils import context_templates, get_prompt_config, prompt_types
+from nemo_skills.inference.prompt.utils import get_prompt_config, prompt_types
 from nemo_skills.utils import setup_logging
 
 setup_logging()
@@ -35,8 +35,8 @@ config_path = os.path.join(os.path.abspath(Path(__file__).parents[1]), "settings
 config = {}
 
 
-@hydra.main(version_base=None, config_path=config_path, config_name="visualization_config")
-def set_config(cfg: VisualizationConfig) -> None:
+@hydra.main(version_base=None, config_path=config_path, config_name="inspector_config")
+def set_config(cfg: InspectorConfig) -> None:
     global config
 
     prompt_type = UNDEFINED  # TODO detect prompt_type
@@ -80,31 +80,26 @@ def set_config(cfg: VisualizationConfig) -> None:
 
     cfg.prompt = set_undefined(OmegaConf.to_container(cfg.prompt), cfg.prompt)
 
-    config['data_explorer'] = asdict(OmegaConf.to_object(cfg))
+    config['nemo_inspector'] = asdict(OmegaConf.to_object(cfg))
     if examples_type == RETRIEVAL:
-        config['data_explorer']['prompt']['few_shot_examples']['examples_type'] = examples_type
+        config['nemo_inspector']['prompt']['few_shot_examples']['examples_type'] = examples_type
 
     for param in ['host', 'ssh_server', 'ssh_key_path']:
-        if param not in config['data_explorer']['sandbox'] and param in config['data_explorer']['server']:
-            config['data_explorer']['sandbox'][param] = config['data_explorer']['server'][param]
+        if param not in config['nemo_inspector']['sandbox'] and param in config['nemo_inspector']['server']:
+            config['nemo_inspector']['sandbox'][param] = config['nemo_inspector']['server'][param]
 
-    config['data_explorer']['prompt']['prompt_type'] = prompt_type
+    config['nemo_inspector']['prompt']['prompt_type'] = prompt_type
 
-    config['data_explorer']['prompt']['context_template'] = context_templates[
-        config['data_explorer']["prompt"]["context_type"]
-    ]
-
-    config['data_explorer']['types'] = {
+    config['nemo_inspector']['types'] = {
         "prompt_type": [UNDEFINED] + prompt_types_without_extension,
         "examples_type": [UNDEFINED, RETRIEVAL] + examples_types,
-        "context_type": [UNDEFINED] + list(context_templates.keys()),
         "retrieval_field": [""],
     }
 
-    config['data_explorer']['retrieval_fields'] = get_specific_fields(config['data_explorer'], RETRIEVAL_FIELDS)
+    config['nemo_inspector']['retrieval_fields'] = get_specific_fields(config['nemo_inspector'], RETRIEVAL_FIELDS)
 
-    config['data_explorer']['data_file'] = str(config['data_explorer']['data_file'])
-    config['data_explorer']['generation_name'] = 'default_name'
+    config['nemo_inspector']['data_file'] = str(config['nemo_inspector']['data_file'])
+    config['nemo_inspector']['generation_name'] = 'default_name'
 
 
 set_config()

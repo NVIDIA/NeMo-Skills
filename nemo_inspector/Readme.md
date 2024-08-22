@@ -1,25 +1,25 @@
-# Data Explorer tool
+# NeMo Inspector tool
 
 ## Demo
 This is a tool for data analysis, consisting of two pages: "Inference" and "Analyze".
 
 ### Overview of the tool
-[![Demo of the tool](/visualization/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE)
+[![Demo of the tool](/nemo_inspector/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE)
 
 ### Demo of the Inference Page
-[![Demo of the inference page](/visualization/images/inference_page.png)](https://www.youtube.com/watch?v=6utSkPCdNks)
+[![Demo of the inference page](/nemo_inspector/images/inference_page.png)](https://www.youtube.com/watch?v=6utSkPCdNks)
 
 ### Demo of the Analyze Page
-[![Demo of the analyze page](/visualization/images/analyze_page.png)](https://www.youtube.com/watch?v=cnPyDlDmQXg)
+[![Demo of the analyze page](/nemo_inspector/images/analyze_page.png)](https://www.youtube.com/watch?v=cnPyDlDmQXg)
 
 ## Getting Started
 Before using this tool, follow the instructions in [prerequisites.md](/docs/prerequisites.md), and install requirements:
 ```shell
-pip install -r visualization/requirements.txt
+pip install -r requirements/inspector.txt
 ```
-You can adjust parameters in the [visualization_config.yaml](/visualization/settings/visualization_config.yaml) file or via the command line. Use the following command to launch the program (all parameters are optional):
+You can adjust parameters in the [inspector_config.yaml](/nemo_inspector/settings/inspector_config.yaml) file or via the command line. Use the following command to launch the program (all parameters are optional):
 ```shell
-python visualization/data_explorer.py \
+python nemo_inspector/nemo_inspector.py \
 ++server.host=<host>
 ```
 For the "Inference" page, launch the server with the model (see [inference.md](/docs/inference.md)), specify `host` and, if necessary, `ssh_key` and `ssh_server`.
@@ -29,13 +29,13 @@ This page enables the analysis of model answers based on different parameters. I
 
 - **Chat** mode facilitates a conversation with the model and requires minimal parameter setup.
 - **Run one sample** mode allows you to send a single question to the model. It can be a question from the dataset (with parameters `data_file` or `dataset` and `split_name`) or a custom question. The answer is validated by comparing it with the `expected_answer` field.
-- **Run whole dataset** mode lets you launch the generation with chosen parameters on the entire dataset. Results are saved in `visualization/results/output-greedy.jsonl` and `visualization/results/metrics-greedy.jsonl`. If the "use random seed range" flag is enabled, each answer will be sampled with multiple random seeds in the range from `start_random_seed` to `end_random_seed`. After generation is done, you can review the results on the "Analyze" page. The parameters used for the generation are also recorded in the `visualization/results/parameters.jsonl` file and displayed on the "Analyze" page.
+- **Run whole dataset** mode lets you launch the generation with chosen parameters on the entire dataset. Results are saved in `nemo_inspector/results/{generation_name}` folder. If the "use random seed range" flag is enabled, each answer will be sampled with multiple random seeds in the range from `start_random_seed` to `end_random_seed`. After generation is done, you can review the results on the "Analyze" page. The parameters used for the generation are also recorded in the `nemo_inspector/results/parameters.jsonl` file and displayed on the "Analyze" page.
 
 ## Analyze page
-To use the Analyze page, specify paths to the generations you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++visualization_params.model_prediction.generation1='/some_path/generation1/output-greedy.jsonl'` or add them in an additional config file.
+To use the Analyze page, specify paths to the generations you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++inspector_params.model_prediction.generation1='/some_path/generation1/output-greedy.jsonl'` or add them in an additional config file.
 
 ```yaml
-visualization_params:
+inspector_params:
   model_prediction:
     generation1: /some_path/generation1/output-greedy.jsonl
     generation2: /some_path/generation2/output-rs*.jsonl
@@ -106,7 +106,7 @@ custom_sorting_function(data['generated_solution'])
 ### Statistics
 There are two types of statistics: "Custom Statistics" and "General Custom Statistics". Custom statistics apply to different samples of a single question. There are some default custom statistics: "correct_responses", "wrong_responses", and "no_responses". General Custom Statistics apply to each sample across all questions. Default general custom statistics - "dataset size", "overall number of samples" and "generations per sample"
 
-![stats](/visualization/images/stats.png)
+![stats](/nemo_inspector/images/stats.png)
 
 You can define your own Custom and General Custom Statistics functions. For Custom Statistics, the function should take an array of JSONs from each file. For General Custom Statistics, the function should take a list of lists of dictionaries, where the first dimension corresponds to the question index and the second dimension to the file index.
 

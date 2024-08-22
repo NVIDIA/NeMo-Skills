@@ -17,8 +17,8 @@ from typing import Dict, List
 import dash_bootstrap_components as dbc
 from flask import current_app
 
-from visualization.settings.constants import ANSWER_FIELD, ONE_SAMPLE_MODE, QUESTION_FIELD, SEPARATOR_ID
-from visualization.utils.strategies.base_strategy import ModeStrategies
+from nemo_inspector.settings.constants import ANSWER_FIELD, ONE_SAMPLE_MODE, QUESTION_FIELD, SEPARATOR_ID
+from nemo_inspector.utils.strategies.base_strategy import ModeStrategies
 
 
 class ChatModeStrategy(ModeStrategies):
@@ -28,7 +28,7 @@ class ChatModeStrategy(ModeStrategies):
         super().__init__()
 
     def get_utils_input_layout(self) -> List[dbc.AccordionItem]:
-        config = current_app.config['data_explorer']
+        config = current_app.config['nemo_inspector']
         return super().get_utils_input_layout(
             lambda key, value: key in config['inference'].keys(),
             True,

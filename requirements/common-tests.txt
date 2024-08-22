@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM tiangolo/uwsgi-nginx-flask:python3.10
-
-# registering local_sandbox_server.py as the starting point
-COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
-# installing required packages
-COPY nemo_skills/requirements/code_execution.txt /app
-RUN pip install -r /app/requirements.txt
-
-ARG UWSGI_CHEAPER
-ENV UWSGI_CHEAPER $UWSGI_CHEAPER
-
-ARG UWSGI_PROCESSES
-ENV UWSGI_PROCESSES $UWSGI_PROCESSES
-
-ENV LISTEN_PORT 6000
-
-EXPOSE 6000
+pytest
+pytest-cov
+pytest-timeout

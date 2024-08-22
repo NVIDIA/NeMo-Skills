@@ -40,7 +40,7 @@ def get_main_page_layout() -> html.Div:
             dcc.Location(id="url", refresh=False),
             dbc.NavbarSimple(
                 children=nav_items,
-                brand="Data Explorer",
+                brand="NeMo Inspector",
                 sticky="top",
                 color="blue",
                 dark=True,
@@ -214,10 +214,10 @@ def get_input_group_layout(name: str, value: Union[str, int, float, bool]) -> db
         },
         "debounce": True,
     }
-    if name.split(SEPARATOR_DISPLAY)[-1] in current_app.config['data_explorer']['types'].keys():
+    if name.split(SEPARATOR_DISPLAY)[-1] in current_app.config['nemo_inspector']['types'].keys():
         input_function = get_selector_layout
         additional_params = {
-            "options": current_app.config['data_explorer']['types'][name.split(SEPARATOR_DISPLAY)[-1]],
+            "options": current_app.config['nemo_inspector']['types'][name.split(SEPARATOR_DISPLAY)[-1]],
         }
         if value is None:
             value = UNDEFINED
@@ -242,6 +242,6 @@ def get_input_group_layout(name: str, value: Union[str, int, float, bool]) -> db
 def get_utils_field_representation(value: Union[str, int, float, bool], key: str = "") -> str:
     return (
         UNDEFINED
-        if value is None and key.split(SEPARATOR_ID)[-1] in current_app.config['data_explorer']['types']
+        if value is None and key.split(SEPARATOR_ID)[-1] in current_app.config['nemo_inspector']['types']
         else value if value == "" or str(value).strip() != "" else repr(value)[1:-1]
     )
