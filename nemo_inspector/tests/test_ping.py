@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import os
+import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-from flask import Flask
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -28,51 +27,27 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
-sys.path.append(str(Path(__file__).parents[2]))
-sys.path.append(str(Path(__file__).parents[1]))
+project_root = str(Path(__file__).parents[2])
+sys.path.remove(str(Path(__file__).parents[0]))
 
 
-# Mocking the set_config function
-def mock_set_config():
-    pass
+@pytest.fixture(scope="module")
+def nemo_inspector_process():
+    # Start the NeMo Inspector as a subprocess
 
+    process = subprocess.Popen(
+        ["python", "nemo_inspector/nemo_inspector.py"],
+        cwd=project_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
-@pytest.fixture
-def dash_app():
-    with patch('hydra.main', lambda *args, **kwargs: lambda func: mock_set_config):
-        from nemo_inspector.layouts import get_main_page_layout
-        from nemo_inspector.nemo_inspector import app
+    yield process
 
-        app.title = "NeMo Inspector"
-        app.layout = get_main_page_layout()
-        config = {
-            'nemo_inspector': {
-                'prompt': {
-                    'prompt_type': '',
-                    'context_template': '',
-                    'context_type': '',
-                    'few_shot_examples': {'examples_type': '', 'num_few_shots': 0},
-                },
-                'types': {
-                    'prompt_type': [],
-                    'examples_type': [],
-                    'context_type': [],
-                    'retrieval_field': [''],
-                },
-                'data_file': 'mock_data_file',
-                'inspector_params': {
-                    'model_prediction': {},
-                    'save_generations_path': 'mock_save_generations_path',
-                },
-                'server': {},
-                'sandbox': {},
-            }
-        }
-        server = Flask(__name__)
-        server.config.update(config)
-        app.server.config.update(config)
-
-        return app
+    # Terminate the process after the tests
+    process.terminate()
+    process.wait()
 
 
 @pytest.fixture
@@ -85,14 +60,8 @@ def chrome_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    if 'GITHUB_ACTIONS' in os.environ:
-        # Running in GitHub Actions
-        driver = webdriver.Chrome(options=options)
-    else:
-        # Running locally
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-
+    service = Service(chrome_driver_path)
+    driver = webdriver.Chrome(service=service, options=options)
     os.environ['PATH'] += os.pathsep + '/'.join(chrome_driver_path.split("/")[:-1])
     yield driver
     driver.quit()
@@ -102,18 +71,10 @@ def chrome_driver():
     ("element_id", "url"),
     [('run_button', "/"), ('add_model', "/analyze")],
 )
-def test_dash_app_launch(chrome_driver, dash_duo, dash_app, element_id, url):
-    dash_duo.start_server(dash_app)
-
-    server_url = dash_duo.server_url
-    full_url = f"{server_url}{url}"
+def test_dash_app_launch(chrome_driver, nemo_inspector_process, element_id, url):
+    full_url = f"http://localhost:8080{url}"
 
     chrome_driver.get(full_url)
 
-    try:
-        element = WebDriverWait(chrome_driver, 10).until(EC.presence_of_element_located((By.ID, element_id)))
-        assert element.is_displayed()
-    except Exception as e:
-        print(f"Error: {e}")
-        print(f"Page source: {chrome_driver.page_source}")
-        raise
+    element = WebDriverWait(chrome_driver, 10).until(EC.presence_of_element_located((By.ID, element_id)))
+    assert element.is_displayed()

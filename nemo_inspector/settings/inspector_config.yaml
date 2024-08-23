@@ -6,4 +6,4 @@ defaults:
 
 hydra:
   searchpath:
-    - file://nemo_skills/inference
+    - file://${oc.env:config_dir}

@@ -34,6 +34,9 @@ config_path = os.path.join(os.path.abspath(Path(__file__).parents[1]), "settings
 
 config = {}
 
+generation_config_dir = Path(__file__).resolve().parents[2].joinpath("nemo_skills", "inference").resolve()
+os.environ["config_dir"] = str(generation_config_dir)
+
 
 @hydra.main(version_base=None, config_path=config_path, config_name="inspector_config")
 def set_config(cfg: InspectorConfig) -> None:
