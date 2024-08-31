@@ -31,7 +31,9 @@ def remove_stop_phrases(text: str, stop_phrases: list[str]) -> str:
     """Removes everything after the last stop token."""
     if not stop_phrases:
         return text
-    return re.split("|".join([sp.replace('|', '\\|') for sp in stop_phrases]), text, maxsplit=1)[0]
+    # Escape all special characters in stop phrases
+    escaped_stop_phrases = [re.escape(sp) for sp in stop_phrases]
+    return re.split("|".join(escaped_stop_phrases), text, maxsplit=1)[0]
 
 
 def preprocess_request(request: dict):
