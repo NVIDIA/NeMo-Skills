@@ -149,7 +149,11 @@ if __name__ == "__main__":
     for url in links:
         question = get_question_or_solution(url, choice='question')
         solution, expected_answer = get_question_or_solution(url, choice='solution')
+        expected_answer = expected_answer.lstrip('0')
         new_entry = {}
+
+        if url.endswith("2024_AIME_I_Problems/Problem_12"):
+            expected_answer = '385'
 
         new_entry["question"] = question
         new_entry["expected_answer"] = expected_answer
