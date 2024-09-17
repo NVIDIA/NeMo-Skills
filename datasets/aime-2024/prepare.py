@@ -132,8 +132,8 @@ def get_question_or_solution(url, choice):
         exact_answer = find_exact_answer(solution)
         return solution, exact_answer
     elif choice == 'question':
-        filtered_elements = [ele for ele in elements if not ele.startswith('[asy]')]
-        question = ' '.join(filtered_elements)
+
+        question = ' '.join(elements)
         return question
 
 
