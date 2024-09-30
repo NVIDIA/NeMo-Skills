@@ -1,0 +1,16 @@
+# prompt that can be used with base models (or instruct models with base template)
+
+few_shot_examples:
+  prefix: "Here are some examples of questions and solutions followed by a new question that you need to solve. Make sure to put the answer (and only answer) inside \\boxed{}.\n\n"
+  template: "Problem:\n{problem}\n\nSolution:\n{solution}\n\n\n\n\n\n"
+  suffix: "Problem:\n"
+  # this is built as <prefix>{template.format(example1)}{template.format(example2)}...{template.format(exampleN)}<suffix>
+  # and available as {examples} key in the final prompt
+  # if examples_type is not specified, then {examples} will be empty
+  # by default there are no examples, but can be changed from code/cmd
+
+system: ""
+
+user: "{examples}{problem}\n\nSolution:\n"
+  
+
