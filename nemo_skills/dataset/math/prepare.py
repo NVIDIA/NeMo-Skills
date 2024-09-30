@@ -100,7 +100,6 @@ def save_data(split, random_seed, validation_size):
     output_dir = Path(__file__).absolute().parent
     output_dir.mkdir(exist_ok=True)
     actual_split = "test" if split == "test" else "train"
-
     with tempfile.TemporaryDirectory() as temp_dir:
         archive_filename = os.path.join(temp_dir, "temp.tar")
         urllib.request.urlretrieve(DOWNLOAD_LINK, archive_filename)
@@ -153,7 +152,7 @@ def save_data(split, random_seed, validation_size):
                 split_instances_dict[eval_set].append(content)
 
         assert len(split_instances_dict) == 1
-        for split, instances in split_instances_dict.items():
+        for instances in split_instances_dict.values():
             # always shuffling to make it easier to get validation/train out of train_full
             if split != "test":
                 random.seed(random_seed)
@@ -164,7 +163,6 @@ def save_data(split, random_seed, validation_size):
                 data = instances[validation_size:]
             else:
                 data = instances
-
             output_file = os.path.join(output_dir, f"{split}.jsonl")
             with open(output_file, "wt", encoding="utf-8") as writer_f:
                 for instance in data:

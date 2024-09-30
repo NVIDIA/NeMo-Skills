@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  integration-tests:
+  inspector-tests:
     runs-on: ubuntu-latest
 
     steps:
