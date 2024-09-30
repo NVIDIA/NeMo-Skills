@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import logging
-from copy import deepcopy
-from dataclasses import asdict, fields
+from dataclasses import asdict
 from typing import Callable, Dict, List, Union
 
 import dash_bootstrap_components as dbc
@@ -36,15 +35,15 @@ from settings.constants import (
     RETRIEVAL_FIELDS,
     SEPARATOR_DISPLAY,
     SEPARATOR_ID,
-    SETTING_PARAMS,
 )
-from utils.common import get_config, get_examples, get_settings, get_utils_from_config
+from utils.common import get_config, get_settings, get_utils_from_config
 
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.inference.generate_solutions import InferenceConfig
-from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, Prompt, PromptConfig
+from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model
+from nemo_skills.prompt.few_shot_examples import examples_map
+from nemo_skills.prompt.utils import FewShotExamplesConfig, Prompt, PromptConfig
 
 
 class ModeStrategies:
@@ -62,9 +61,7 @@ class ModeStrategies:
         condition: Callable[[str, Union[str, int, float, bool]], bool] = lambda key, value: True,
         disabled: bool = False,
     ) -> List[dbc.AccordionItem]:
-        utils = get_utils_from_config(
-            {key: value for key, value in current_app.config['nemo_inspector'].items() if key not in SETTING_PARAMS}
-        ).items()
+        utils = get_utils_from_config(current_app.config['nemo_inspector']).items()
         input_group_layout = html.Div(
             (
                 [
@@ -89,12 +86,6 @@ class ModeStrategies:
             dbc.AccordionItem(
                 html.Div(
                     [
-                        get_switch_layout(
-                            id="range_random_seed_mode",
-                            labels=["use random seed range"],
-                            disabled=[disabled],
-                            additional_params={'switch': True},
-                        ),
                         input_group_layout,
                     ]
                 ),
@@ -105,7 +96,7 @@ class ModeStrategies:
 
     def get_few_shots_input_layout(self) -> List[dbc.AccordionItem]:
         config = current_app.config['nemo_inspector']
-        size = config["prompt"]["few_shot_examples"]["num_few_shots"]
+        size = len(examples_map.get(config["examples_type"], []))
         return [
             dbc.AccordionItem(
                 self.get_few_shots_div_layout(size),
@@ -172,31 +163,7 @@ class ModeStrategies:
                             max_value=size,
                             active_page=1,
                         ),
-                        dbc.Button(
-                            "add example",
-                            id="add_example_button",
-                            outline=True,
-                            size="sm",
-                            color="primary",
-                            className="me-1",
-                        ),
-                        dbc.Button(
-                            "delete current example",
-                            id="del_example_button",
-                            outline=True,
-                            size="sm",
-                            color="primary",
-                            className="me-1",
-                        ),
-                        dbc.Button(
-                            "retrieve",
-                            id="retrieve_button",
-                            outline=True,
-                            size="sm",
-                            color="primary",
-                            className="me-1",
-                        ),
-                        get_text_modes_layout(FEW_SHOTS_INPUT, False),
+                        get_text_modes_layout(FEW_SHOTS_INPUT, True),
                     ]
                 ),
                 dbc.Container(id="few_shots_pagination_content"),
@@ -268,12 +235,11 @@ class ModeStrategies:
             if key != RETRIEVAL and key not in RETRIEVAL_FIELDS
         }
         examples_type = utils.pop('examples_type', None)
-        utils["example_dicts"] = get_examples().get(
+        utils["example_dicts"] = examples_map.get(
             examples_type,
             [],
-        )[: utils.get('num_few_shots', -1)]
+        )
         len_example_dicts = len(utils["example_dicts"])
-        utils['num_few_shots'] = min(len_example_dicts, utils.get('num_few_shots', len_example_dicts))
         prompt_config = get_config(PromptConfig, utils, get_settings())
 
         prompt_config.few_shot_examples = get_config(
@@ -283,7 +249,7 @@ class ModeStrategies:
         )
 
         prompt = Prompt(config=prompt_config)
-        return prompt.build_string(input_dict)
+        return prompt.fill(input_dict)
 
     def _get_search_prompt_layout(self) -> dbc.InputGroup:
         return dbc.InputGroup(

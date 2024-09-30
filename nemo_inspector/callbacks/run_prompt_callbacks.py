@@ -14,13 +14,12 @@
 
 import json
 import os
-from copy import deepcopy
 from dataclasses import asdict
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import dash_bootstrap_components as dbc
 from callbacks import app
-from dash import ALL, callback_context, html, no_update
+from dash import ALL, html, no_update
 from dash._callback import NoUpdate
 from dash.dependencies import Input, Output, State
 from flask import current_app
@@ -32,34 +31,28 @@ from layouts import (
     get_utils_field_representation,
 )
 from settings.constants import (
+    CONFIGS_FOLDER,
     FEW_SHOTS_INPUT,
     QUERY_INPUT_TYPE,
     RETRIEVAL,
     RETRIEVAL_FIELDS,
     SEPARATOR_DISPLAY,
     SEPARATOR_ID,
+    TEMPLATES_FOLDER,
     UNDEFINED,
 )
 from utils.common import (
-    default_examples,
     extract_query_params,
-    get_config,
-    get_examples,
-    get_settings,
     get_test_data,
     get_utils_dict,
     get_utils_from_config,
     get_values_from_input_group,
+    initialize_default,
 )
 from utils.strategies.strategy_maker import RunPromptStrategyMaker
 
-from nemo_skills.inference.prompt.utils import (
-    FewShotExamplesConfig,
-    Prompt,
-    PromptConfig,
-    get_prompt_config,
-    prompt_types,
-)
+from nemo_skills.prompt.few_shot_examples import examples_map
+from nemo_skills.prompt.utils import PromptConfig, get_prompt
 
 
 @app.callback(
@@ -84,64 +77,50 @@ def trigger_js(active_item: str, js_trigger: str) -> Tuple[str, str]:
     ],
     [
         Input("examples_type", "value"),
-        Input("num_few_shots", "value"),
-        Input('data_file', 'value'),
-        Input('retrieve_button', 'n_clicks'),
+        Input('input_file', 'value'),
         Input({"type": RETRIEVAL, "id": ALL}, "value"),
     ],
     [
         State("js_trigger", "children"),
         State('utils_group', 'children'),
-        State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
-        State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
     ],
     prevent_initial_call=True,
 )
 def update_examples_type(
     examples_type: str,
-    num_few_shots: int,
-    data_file: str,
-    retrieve_n_click: int,
+    input_file: str,
     retrieval_fields: List,
     js_trigger: str,
     raw_utils: List[Dict],
-    query_params: List[str],
-    query_params_ids: List[Dict],
 ) -> Union[NoUpdate, dbc.AccordionItem]:
     if not examples_type:
         examples_type = ""
-    if retrieve_n_click:
-        for key, value in default_examples.items():
-            if key == examples_type:
-                get_examples()[examples_type] = deepcopy(value)
-                break
-    data_file_index = 0
+    input_file_index = 0
     retrieval_field_index = -1
 
     for retrieval_index, util in enumerate(raw_utils):
         name = util['props']['children'][0]['props']['children']
-        if name == 'data_file':
-            data_file_index = retrieval_index
+        if name == 'input_file':
+            input_file_index = retrieval_index
         if name == 'retrieval_field':
             retrieval_field_index = retrieval_index
 
     if examples_type == RETRIEVAL:
         utils = {key.split(SEPARATOR_ID)[-1]: value for key, value in get_values_from_input_group(raw_utils).items()}
         utils.pop('examples_type', None)
-        prompt_config = get_config(PromptConfig, utils, get_settings())
 
         if (
             'retrieval_file' in utils
             and utils['retrieval_file']
             and os.path.isfile(utils['retrieval_file'])
-            and os.path.isfile(data_file)
+            and os.path.isfile(input_file)
         ):
-            with open(utils['retrieval_file'], 'r') as retrieval_file, open(data_file, 'r') as data_file:
+            with open(utils['retrieval_file'], 'r') as retrieval_file, open(input_file, 'r') as input_file:
                 types = current_app.config['nemo_inspector']['types']
                 sample = {
                     key: value
                     for key, value in json.loads(retrieval_file.readline()).items()
-                    if key in json.loads(data_file.readline())
+                    if key in json.loads(input_file.readline())
                 }
             types['retrieval_field'] = list(filter(lambda key: isinstance(sample[key], str), sample.keys()))
             if retrieval_field_index != -1:
@@ -154,46 +133,28 @@ def update_examples_type(
                     retrieval_field['value'] = types['retrieval_field'][0]
                 utils["retrieval_field"] = retrieval_field['value']
 
-        if raw_utils[data_file_index + 1]['props']['children'][0]['props']['children'] not in RETRIEVAL_FIELDS:
+        if raw_utils[input_file_index + 1]['props']['children'][0]['props']['children'] not in RETRIEVAL_FIELDS:
             for retrieval_field in RETRIEVAL_FIELDS:
                 raw_utils.insert(
-                    data_file_index + 1,
+                    input_file_index + 1,
                     get_utils_dict(
                         retrieval_field,
                         current_app.config['nemo_inspector']['retrieval_fields'][retrieval_field],
                         {"type": RETRIEVAL, "id": retrieval_field},
                     ),
                 )
-        try:
-            prompt_config.few_shot_examples = get_config(
-                FewShotExamplesConfig,
-                utils,
-                get_settings(),
-            )
-
-            prompt = Prompt(config=prompt_config)
-            get_examples()[examples_type] = prompt.build_examples_dict(
-                extract_query_params(query_params_ids, query_params)
-            )
-        except (ValueError, KeyError, FileNotFoundError) as e:
-            get_examples()[examples_type] = []
 
     else:
         while (
-            data_file_index + 1 < len(raw_utils)
-            and raw_utils[data_file_index + 1]['props']['children'][0]['props']['children'] in RETRIEVAL_FIELDS
+            input_file_index + 1 < len(raw_utils)
+            and raw_utils[input_file_index + 1]['props']['children'][0]['props']['children'] in RETRIEVAL_FIELDS
         ):
-            raw_utils.pop(data_file_index + 1)
+            raw_utils.pop(input_file_index + 1)
 
-    size = len(
-        get_examples().get(
-            examples_type,
-            [],
-        )
-    )
+    size = len(examples_map.get(examples_type, []))
     return (
         raw_utils,
-        RunPromptStrategyMaker().get_strategy().get_few_shots_div_layout(min(num_few_shots, size)),
+        RunPromptStrategyMaker().get_strategy().get_few_shots_div_layout(size),
         "",
         js_trigger + " ",
     )
@@ -217,7 +178,6 @@ def update_examples_type(
         Input("dummy_output", "children"),
     ],
     State('examples_type', "value"),
-    State("num_few_shots", "value"),
     State("js_trigger", "children"),
     prevent_initial_call=True,
 )
@@ -226,137 +186,15 @@ def change_examples_page(
     text_modes: List[str],
     dummy_output: str,
     examples_type: str,
-    num_few_shots: int,
     js_trigger: str,
 ) -> Tuple[Tuple[html.Div], int]:
     if not examples_type:
         examples_type = ""
     return (
-        get_few_shots_by_id_layout(page, examples_type, num_few_shots, text_modes),
+        get_few_shots_by_id_layout(page, examples_type, text_modes),
         '',
         js_trigger + '',
     )
-
-
-@app.callback(
-    [
-        Output("few_shots_pagination", "max_value", allow_duplicate=True),
-        Output("few_shots_pagination", "active_page", allow_duplicate=True),
-    ],
-    Input("add_example_button", "n_clicks"),
-    [
-        State('examples_type', "value"),
-        State("few_shots_pagination", "max_value"),
-    ],
-    prevent_initial_call=True,
-)
-def add_example(n_clicks: int, examples_type: str, last_page: int) -> Tuple[int, int, int]:
-    if not examples_type:
-        examples_type = ""
-    if examples_type not in get_examples():
-        get_examples()[examples_type] = []
-    examples_type_keys = list(get_examples().keys())[0] if not len(get_examples()[examples_type]) else examples_type
-    get_examples()[examples_type].append({key: "" for key in get_examples()[examples_type_keys][0].keys()})
-    return (last_page + 1, last_page + 1)
-
-
-@app.callback(
-    [
-        Output("few_shots_pagination", "max_value", allow_duplicate=True),
-        Output("few_shots_pagination", "active_page", allow_duplicate=True),
-        Output("few_shots_pagination_content", "children", allow_duplicate=True),
-        Output("js_container", "children", allow_duplicate=True),
-        Output("js_trigger", "children", allow_duplicate=True),
-    ],
-    Input("del_example_button", "n_clicks"),
-    [
-        State("few_shots_pagination", "active_page"),
-        State('examples_type', "value"),
-        State("few_shots_pagination", "max_value"),
-        State(
-            {
-                "type": "text_modes",
-                "id": FEW_SHOTS_INPUT,
-            },
-            "value",
-        ),
-        State("js_trigger", "children"),
-    ],
-    prevent_initial_call=True,
-)
-def del_example(
-    n_clicks: int,
-    page: int,
-    examples_type: str,
-    last_page: int,
-    text_modes: List[str],
-    js_trigger: str,
-) -> Tuple[
-    Union[int, NoUpdate],
-    Union[int, NoUpdate],
-    Union[Tuple[html.Div], NoUpdate],
-    Union[int, NoUpdate],
-]:
-    if not n_clicks:
-        return no_update, no_update, no_update, no_update, no_update
-    if not examples_type:
-        examples_type = ""
-    if examples_type not in get_examples():
-        get_examples()[examples_type] = []
-    if last_page:
-        prev_pagination_page = page if page < last_page else page - 1
-        get_examples()[examples_type].pop(page - 1)
-        return (
-            last_page - 1,
-            prev_pagination_page,
-            get_few_shots_by_id_layout(prev_pagination_page, examples_type, last_page - 1, text_modes),
-            '',
-            js_trigger + ' ',
-        )
-    return no_update, no_update, no_update, no_update, no_update
-
-
-@app.callback(
-    Output(
-        "dummy_output",
-        'children',
-        allow_duplicate=True,
-    ),
-    Input({"type": FEW_SHOTS_INPUT, "id": ALL}, "value"),
-    [
-        State({"type": FEW_SHOTS_INPUT, "id": ALL}, "id"),
-        State("few_shots_pagination", "active_page"),
-        State('examples_type', "value"),
-        State(
-            {
-                "type": "text_modes",
-                "id": FEW_SHOTS_INPUT,
-            },
-            "value",
-        ),
-    ],
-    prevent_initial_call=True,
-)
-def update_examples(
-    page_content: Optional[List[str]],
-    page_content_ids: List[int],
-    page: int,
-    examples_type: str,
-    text_modes: List[str],
-) -> NoUpdate:
-    if text_modes and len(text_modes) or not page_content:
-        return no_update
-
-    if not examples_type:
-        examples_type = ""
-    if examples_type not in get_examples():
-        get_examples()[examples_type] = []
-    last_page = len(get_examples()[examples_type])
-    if last_page:
-        get_examples()[examples_type][page - 1 if page else 0] = {
-            key["id"]: value for key, value in zip(page_content_ids, page_content)
-        }
-    return no_update
 
 
 @app.callback(
@@ -366,63 +204,39 @@ def update_examples(
             "value",
             allow_duplicate=True,
         )
-        for field in get_utils_from_config(
-            {"prompt": asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))}
-        ).keys()
+        for field in get_utils_from_config({"prompt": asdict(initialize_default(PromptConfig))}).keys()
     ]
     + [
         Output("js_container", "children", allow_duplicate=True),
         Output("js_trigger", "children", allow_duplicate=True),
     ],
-    Input("prompt_type", "value"),
+    [Input("prompt_config", "value"), Input("prompt_template", "value")],
     State("js_trigger", "children"),
     prevent_initial_call=True,
 )
-def update_prompt_type(prompt_type: str, js_trigger: str) -> Union[NoUpdate, dbc.AccordionItem]:
+def update_prompt_type(
+    prompt_config: str, prompt_template: str, js_trigger: str
+) -> Union[NoUpdate, dbc.AccordionItem]:
+    config_path = os.path.join(CONFIGS_FOLDER, prompt_config)
+    template_path = os.path.join(TEMPLATES_FOLDER, prompt_template)
     if (
         "used_prompt" in current_app.config['nemo_inspector']['prompt']
-        and prompt_type == current_app.config['nemo_inspector']['prompt']['used_prompt']
+        and config_path == current_app.config['nemo_inspector']['prompt']['used_prompt']
     ):
-        output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))).keys())
+        output_len = len(get_utils_from_config(asdict(initialize_default(PromptConfig))).keys())
         return [no_update] * (output_len + 2)
 
-    current_app.config['nemo_inspector']['prompt']['used_prompt'] = prompt_type
-
-    if prompt_type not in map(lambda name: name.split('.')[0], prompt_types):
-        output_len = len(get_utils_from_config(asdict(PromptConfig(few_shot_examples=FewShotExamplesConfig()))).keys())
+    current_app.config['nemo_inspector']['prompt']['used_prompt'] = config_path
+    if not os.path.isfile(config_path):
+        output_len = len(get_utils_from_config(asdict(initialize_default(PromptConfig))).keys())
         return [no_update] * (output_len + 2)
-    prompt_config = get_prompt_config(prompt_type)
-    current_app.config['nemo_inspector']['prompt']['stop_phrases'] = list(prompt_config.stop_phrases)
+    if not os.path.isfile(template_path):
+        template_path = None
+    prompt_config = get_prompt(config_path, template_path)
     return [
         get_utils_field_representation(value, key)
-        for key, value in get_utils_from_config(asdict(prompt_config)).items()
+        for key, value in get_utils_from_config(asdict(prompt_config.config)).items()
     ] + ['', js_trigger + " "]
-
-
-@app.callback(
-    Output("utils_group", "children"),
-    Input("range_random_seed_mode", "value"),
-    State("utils_group", "children"),
-)
-def update_random_seed_mode(
-    range_random_mode: List[int],
-    utils: List[Dict],
-) -> List[Dict]:
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update
-    for i, util in enumerate(utils):
-        name = util['props']['children'][0]['props']['children']
-        if name in ("random_seed", "start_random_seed", "end_random_seed"):
-            break
-    value = utils[i]['props']['children'][1]['props']['value']
-    if range_random_mode:
-        utils[i] = get_utils_dict("start_random_seed", value)
-        utils.insert(i + 1, get_utils_dict("end_random_seed", value + 1))
-    else:
-        utils[i] = get_utils_dict("random_seed", value)
-        utils.pop(i + 1)
-    return utils
 
 
 @app.callback(
@@ -493,7 +307,7 @@ def get_run_test_results(
 def change_mode(run_mode: str, utils: List[Dict], js_trigger: str) -> Tuple[List[dbc.AccordionItem], None]:
     utils = get_values_from_input_group(utils)
     return (
-        get_query_params_layout(run_mode, utils.get('data_file', UNDEFINED)),
+        get_query_params_layout(run_mode, utils.get('input_file', UNDEFINED)),
         "",
         js_trigger + ' ',
         None,
@@ -509,7 +323,7 @@ def change_mode(run_mode: str, utils: List[Dict], js_trigger: str) -> Tuple[List
     ],
     [
         Input("query_search_button", "n_clicks"),
-        Input("data_file", "value"),
+        Input("input_file", "value"),
         Input("run_mode_options", "value"),
     ],
     [
@@ -527,13 +341,13 @@ def change_mode(run_mode: str, utils: List[Dict], js_trigger: str) -> Tuple[List
 )
 def prompt_search(
     n_clicks: int,
-    data_file: str,
+    input_file: str,
     run_mode: str,
     index: int,
     text_modes: List[str],
     js_trigger: str,
 ) -> Tuple[Union[List[str], NoUpdate]]:
-    query_data = get_test_data(index, data_file)[0]
+    query_data = get_test_data(index, input_file)[0]
     return (
         RunPromptStrategyMaker()
         .get_strategy()

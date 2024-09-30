@@ -1,78 +1,45 @@
 # Checkpoint conversion
 
-Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
+Make sure to complete [prerequisites](/docs/prerequisites.md).
 
-## HuggingFace to TensorRT-LLM
+We support 3 common model formats. Here are some recommendations on when each format should be used.
+- [HuggingFace (via vLLM)](https://github.com/vllm-project/vllm)
 
-The instructions to convert from HuggingFace to TensorRT-LLM checkpoint format
-can be found in [TensorRT-LLM repository](https://github.com/NVIDIA/TensorRT-LLM/) (they are model-specific).
-Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we put the corresponding
-conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
+  If you want to run a small-scale generation quickly or play with models, it's most convenient
+  to use HF format directly via a vllm server.
 
-Convert the model in 3 steps. Note that you need to explicitly specify input/output length, batch size and number of GPUs.
-Make sure to run the commands inside TensorRT-LLM docker container, e.g. you can use `igitman/nemo-skills-trtllm:0.3.2`
+- [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
 
-```
-python nemo_skills/conversion/hf_to_trtllm.py \
-    --model_dir <path to the HF folder> \
-    --output_dir <tmp file for trtllm checkpoint> \
-    --dtype bfloat16 \
-    --tp_size <number of GPUs>
+  If you want to run a large-scale generation, it's highly recommended to use TensoRT-LLM format.
+  The time it takes to convert the checkpoint will be more than offset by a much faster generation
+  than either vLLM or NeMo.
 
-trtllm-build \
-    --checkpoint_dir <tmp file for trtllm checkpoint> \
-    --output_dir <final path for the trtllm checkpoint> \
-    --gpt_attention_plugin bfloat16 \
-    --use_paged_context_fmha enable \
-    --max_input_len 3584 \
-    --max_seq_len 4096 \
-    --max_num_tokens 4096 \
-    --max_batch_size 128
+- [NeMo](https://github.com/NVIDIA/NeMo)
 
-cp <path to the HF folder>/tokenizer* <final path for the trtllm checkpoint>
-```
+  NeMo is the only supported format for training, so you need to use it with the
+  [training pipeline](/docs/training.md). We don't recommend running inference in NeMo
+  as it is much slower than both vLLM and TensorRT-LLM servers.
 
-Please note that these are just example parameters and we refer you to the
-[TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM/) to learn
-how to configure conversion for your exact use-case.
-
-## NeMo to HuggingFace
-
-Most of the conversion scripts from NeMo to HuggingFace format can be found in
-[NeMo repository](https://github.com/NVIDIA/NeMo/tree/main/scripts/nlp_language_modeling).
-Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we put the corresponding
-conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
-
-To convert Llama-based model you can use the following command.
-Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.3.0`
+To convert the checkpoint from one format to another use a command like this
 
 ```
-python nemo_skills/conversion/nemo_to_hf.py \
-    --in-path <nemo path> \
-    --out-path <where to save HF checkpoint> \
-    --hf-model-name <HF name of the reference model, e.g. codellama/CodeLlama-7b-Python-hf> \
-    --precision bf16 \
-    --max-shard-size 10GB
+python -m nemo_skills.pipeline.convert \
+    --cluster=slurm \
+    --input_model=/hf_models/Meta-Llama-3.1-70B-Instruct \
+    --output_model=/trt_models/llama3.1-70b-instruct \
+    --convert_from=hf \
+    --convert_to=trtllm \
+    --num_gpus=8 \
+    --hf_model_name=meta-llama/Meta-Llama-3.1-70B-Instruct
 ```
 
-## HuggingFace to Nemo
+You can provide any extra arguments that will be passed directly to the underlying conversion scripts.
+Here are a few things to keep in mind
 
-Most of the conversion scripts from HuggingFace to NeMo format can be found in
-[NeMo repository](https://github.com/NVIDIA/NeMo/tree/main/scripts/nlp_language_modeling).
-Since we mostly work with Llama-based models (Llama2, CodeLlama, Mistral), we put the corresponding
-conversion script in this repo for convenience. But please refer to the original repo for any other model's conversion.
-
-To convert Llama-based model you can use the following command.
-Make sure to run it inside NeMo docker container, e.g. you can use `igitman/nemo-skills-sft:0.3.0`
-
-```
-python nemo_skills/conversion/hf_to_nemo.py \
-    --in-path <HF folder path> \
-    --out-path <where-to-save.nemo> \
-    --hf-model-name <HF name of the reference model, e.g. codellama/CodeLlama-7b-Python-hf> \
-    --precision bf16
-```
-
-## NeMo to TensorRT-LLM
-
-The support for direct conversion from NeMo to TensorRT-LLM is coming soon! For now you can do NeMo -> HuggingFace -> TensorRT-LLM instead.
+- We currently only support Llama-based and Qwen-based models (enable with `--model_type qwen`). The other kinds
+  of models are most likely easy to add, we just didn't have a use-case for them yet (please open an issue if the
+  model you want to use is not supported).
+- You cannot convert from trtllm format, only to it.
+- You cannot convert from nemo to trtllm directly and need to do it in 2 stages, to nemo->hf and then hf->trtllm.
+- Please check [NeMo](https://github.com/NVIDIA/NeMo) and [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
+  documentation to learn best recommended parameters for converting each specific model.

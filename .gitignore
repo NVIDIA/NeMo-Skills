@@ -29,3 +29,6 @@ build
 
 __pycache__
 .ipynb_checkpoints
+
+cluster_configs/*
+!cluster_configs/example-*.yaml

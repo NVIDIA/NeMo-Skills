@@ -12,10 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.code_execution.utils import (
-    CODE_OUTPUT_SEPARATORS,
-    CODE_SEPARATORS,
-    extract_code_output,
-    extract_code_to_execute,
-    extract_error_message,
-)
+from nemo_skills.code_execution.utils import extract_code_output, extract_code_to_execute, format_code_output

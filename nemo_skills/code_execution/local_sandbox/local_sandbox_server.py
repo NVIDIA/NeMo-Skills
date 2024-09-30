@@ -49,6 +49,5 @@ def execute():
     process.join(timeout=timeout)
     if process.is_alive():  # didn't finish successfully
         process.kill()
-        # TODO: ideally need to use Sandbox.TimeoutError, but need to move code over to docker just for that
-        return '{"result": null, "error_message": "timeout"}'
+        return '{"process_status": "timeout", "stdout": "Timed out", "stderr": "Timed out"}'
     return queue.get()

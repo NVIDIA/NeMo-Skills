@@ -22,12 +22,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union
 
+import openai
 import requests
 
 LOG = logging.getLogger(__name__)
 
 
-def remove_stop_phrases(text: str, stop_phrases: list[str]) -> str:
+def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
     """Removes everything after the last stop token."""
     if not stop_phrases:
         return text
@@ -49,7 +50,7 @@ def preprocess_request(request: dict):
 def postprocess_output(outputs: list[dict], stop_phrases: list[str]):
     """Post-processes the outputs of the model."""
     for output in outputs:
-        output['generation'] = remove_stop_phrases(output['generation'], stop_phrases)
+        output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
 
 class BaseModel(abc.ABC):
@@ -92,7 +93,7 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -105,7 +106,7 @@ class BaseModel(abc.ABC):
         pass
 
 
-class TensorRTLLMModel(BaseModel):
+class TRTLLMModel(BaseModel):
     """Note that the current implementation supports inflight-batching so
     to make the most use of it, you should submit a large number of prompts
     at the same time.
@@ -115,7 +116,7 @@ class TensorRTLLMModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -125,6 +126,8 @@ class TensorRTLLMModel(BaseModel):
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
@@ -152,6 +155,7 @@ class TensorRTLLMModel(BaseModel):
 
         outputs = [None] * len(generation_ids)
         finished_count = 0
+        last_time = time.time()
         while finished_count < len(generation_ids):
             time.sleep(0.1)
             for pos, generation_id in enumerate(generation_ids):
@@ -165,6 +169,11 @@ class TensorRTLLMModel(BaseModel):
                 if result is not None:
                     finished_count += 1
                     outputs[pos] = {'generation': result}
+                    last_time = time.time()
+            # a hack to make sure we never hang indefinitely and
+            # always abort the job if something is stuck in trt engine
+            if time.time() - last_time > 300:
+                raise RuntimeError("TRTLLM server is stuck, aborting the job. Please report this!")
         if remove_stop_phrases:
             postprocess_output(outputs, stop_phrases)
         return outputs
@@ -173,7 +182,7 @@ class TensorRTLLMModel(BaseModel):
 class NemoModel(BaseModel):
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -183,6 +192,8 @@ class NemoModel(BaseModel):
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
@@ -248,7 +259,7 @@ class OpenAIModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -259,6 +270,8 @@ class OpenAIModel(BaseModel):
         reduce_generation_tokens_if_error: bool = True,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if isinstance(prompts[0], str):
+            raise NotImplementedError("OpenAI server requires \"messages\" dicts as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         if top_k != 0:
@@ -282,7 +295,6 @@ class OpenAIModel(BaseModel):
                 )
 
         outputs = [{'generation': future.result()} for future in futures]
-
         if remove_stop_phrases:
             postprocess_output(outputs, stop_phrases)
 
@@ -316,7 +328,7 @@ class OpenAIModel(BaseModel):
                             "url": "/v1/chat/completions",
                             "body": {
                                 "model": self.model,
-                                "messages": self._parse_prompt(prompt),
+                                "messages": prompt,
                                 "max_tokens": tokens_to_generate,
                                 "temperature": temperature,
                                 "top_p": top_p,
@@ -375,7 +387,7 @@ class OpenAIModel(BaseModel):
     ) -> str:
         import openai
 
-        messages = self._parse_prompt(prompt)
+        messages = prompt
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -421,34 +433,6 @@ class OpenAIModel(BaseModel):
         output = response.message.content
         return output
 
-    def _parse_prompt(self, prompt: str) -> dict:
-        """
-        OpenAI chat API requires a structured input, so we need to parse the prompt
-        into a structured list of messages.
-        """
-        system_pattern = re.compile(r"<system_start>(.*?)<system_end>", re.DOTALL)
-        user_pattern = re.compile(r"<user_start>(.*?)<user_end>", re.DOTALL)
-        generation_pattern = re.compile(r"<assistant_start>(.*)", re.DOTALL)
-        try:
-            system_message = system_pattern.search(prompt).group(1)
-        except AttributeError:
-            system_message = ""
-        try:
-            user_message = user_pattern.search(prompt).group(1)
-        except AttributeError:
-            user_message = prompt
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message},
-        ]
-        try:
-            assistant_message = generation_pattern.search(prompt).group(1)
-            if assistant_message:
-                messages.append({"role": "assistant", "content": assistant_message})
-        except AttributeError:
-            pass
-        return messages
-
 
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
@@ -457,18 +441,16 @@ class VLLMModel(BaseModel):
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
-        self.server_type = "openai"
-        self.oai_client = None
-        self.oai_client = self.prepare_openai(self.server_host, self.server_port)  # type: openai.OpenAI
+        self.oai_client = openai.OpenAI(
+            api_key="EMPTY", base_url=f"http://{self.server_host}:{self.server_port}/v1", timeout=None
+        )
 
         self.model_name_server = self.get_model_name_from_server()
         self.model = self.model_name_server
 
-        LOG.info("Model hosted by %s server: %s", self.server_type, self.model)
-
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -478,6 +460,8 @@ class VLLMModel(BaseModel):
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
@@ -519,7 +503,7 @@ class VLLMModel(BaseModel):
         logit_bias: dict = None,
         seed: int = None,
         parse_response: bool = True,
-    ) -> Union[list[str], "openai.types.Completion"]:
+    ) -> Union[list[str], openai.types.Completion]:
         if top_k == 0:
             top_k = 1
 
@@ -569,26 +553,14 @@ class VLLMModel(BaseModel):
                 responses.append(output)
         return responses
 
-    @staticmethod
-    def prepare_openai(host: str, port: str = "5000") -> "OpenAI":
-        import openai
-
-        # Update global config of openai
-        openai.api_key = "EMPTY"
-        openai.base_url = f"http://{host}:{port}/v1"
-
-        # Create local client with no timeout
-        client = openai.OpenAI(api_key="EMPTY", base_url=f"http://{host}:{port}/v1", timeout=None)
-        return client
-
-    def get_model_name_from_server(self) -> str:
+    def get_model_name_from_server(self):
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
 
 
 models = {
-    'tensorrt_llm': TensorRTLLMModel,
+    'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,

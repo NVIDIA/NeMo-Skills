@@ -530,6 +530,9 @@ def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: 
             return match.group(1)
         return None
 
+    if "\\boxed" not in string:
+        return None
+
     idx = string.rfind("\\boxed")
     if idx < 0:
         idx = string.rfind("\\fbox")

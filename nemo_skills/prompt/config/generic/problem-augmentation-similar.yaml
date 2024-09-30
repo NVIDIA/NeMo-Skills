@@ -1,0 +1,18 @@
+few_shot_examples:
+  prefix: "Here are some examples of how to complete this task.\n\n"
+  template: "Original problem:\n{problem}\n\nNew problem:\n{augmented_problem}\n\n\n\n\n\n"
+  suffix: ""
+  # if examples_type is not specified, then {examples} will be empty
+  # by default there are no examples, but can be changed from code/cmd
+
+system: ""
+
+user: |-
+  Write a new math problem similar to a given one. Make the new problem reasonable and solvable.
+
+  {examples}Original problem:
+  {problem}
+
+  Write another problem similar to this one.
+  Start directly with the problem statement and DO NOT include any phrases such as "Here is a new math problem similar to a given one".
+  After the problem is completed finish your response right away.

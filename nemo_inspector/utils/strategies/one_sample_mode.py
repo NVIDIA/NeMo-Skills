@@ -16,7 +16,7 @@ from typing import Dict, List
 
 import dash_bootstrap_components as dbc
 from dash import html
-from settings.constants import ONE_SAMPLE_MODE, PARAMS_FOR_WHOLE_DATASET_ONLY, SEPARATOR_ID
+from settings.constants import ONE_SAMPLE_MODE, SEPARATOR_ID
 from utils.common import get_test_data
 from utils.strategies.base_strategy import ModeStrategies
 
@@ -28,7 +28,7 @@ class OneTestModeStrategy(ModeStrategies):
         super().__init__()
 
     def get_utils_input_layout(self) -> List[dbc.AccordionItem]:
-        return super().get_utils_input_layout(lambda key, value: key not in PARAMS_FOR_WHOLE_DATASET_ONLY, True)
+        return super().get_utils_input_layout(disabled=True)
 
     def get_query_input_layout(self, dataset: str) -> List[dbc.AccordionItem]:
         return super().get_query_input_layout(get_test_data(0, dataset)[0])

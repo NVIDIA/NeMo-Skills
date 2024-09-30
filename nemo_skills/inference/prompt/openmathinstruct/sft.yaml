@@ -1,9 +1,0 @@
-system: >-  # no line breaks!
-  You're an expert Python programmer and mathematician.
-  Help the user to solve this problem using code when necessary.
-  Make sure to put the answer (and only answer) inside \boxed{}.
-
-user: "{question}"
-
-prompt_template: "System:\n{system}\n\nUser:\n{user}\n\nAssistant:\n{generation}"
-stop_phrases: []

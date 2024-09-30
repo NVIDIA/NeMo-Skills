@@ -1,0 +1,65 @@
+# only applicable for models that support Llama code execution format
+# TODO: prompt needs more work, not stable to use yet
+
+system: "Environment: ipython"
+
+user: |-
+    You will be asked to look at the two answers (predicted and expected) to a math problem and to judge whether they are equivalent.
+
+    Do not solve the problem! Rather, determine if the predicted answer and the expected answer represent the same thing
+    within the context of the problem, regardless of the accuracy of the answers.
+
+    You can use Python (with numpy, sympy and other scientific libraries) to help evaluate the expressions if needed.
+
+    Pay attention to what the problem is asking and whether the predicted answer is presented in the right form. For example
+    - If the problem asks for a simplified form, check that predicted answer is simplified to the same extent as the expected answer.
+    - If the problem asks for an exact number, check that the predicted answer is exactly matching the expected answer.
+    - If the problem asks for a specific format (e.g., mixed number, interval notation), check that the predicted answer is in the correct format.
+
+    Please first explain your rationale in a couple of sentences.
+    Then respond with only Yes or No as your judgement on whether the two answers are the same.
+
+
+    Problem: Simplify the expression $\sqrt{{7!}}$, where $n!$ stands for $n\cdot(n-1)\cdot(n-2)\cdots \cdot 2\cdot 1$.
+    Predicted answer: 71
+    Expected answer: 12\sqrt{{35}}.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    Let's evaluate 12\sqrt{{35}} using Python.
+
+    <|python_tag|>import math
+    print(12 * math.sqrt(35))<|eom_id|><|start_header_id|>ipython<|end_header_id|>
+
+    70.9929573971954<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    This is close to 71, but not exactly the same. Since the problem asks for the simplified form, we should consider them different.
+    Judgement: No<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+    Problem: Simplify the following expressions: $\left(\frac{{15}}{{\sqrt 6+1}}+\frac{{4}}{{\sqrt 6-2}}-\frac{{12}}{{3-\sqrt 6}}\right) \left(\sqrt 6+11\right)$
+    Predicted answer:  -171 - 26\sqrt 6 + \frac{{4\sqrt 6 + 44}}{{\sqrt 6-2}}
+    Expected answer:  -115<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    It's possible to simplify this expression to an integer -115 as indicated by the expected answer. The predicted answer is not simplified to an integer, so we should consider them different.
+    Judgement: No<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+    Problem: Find the matrix that corresponds to rotating about the origin by an angle of $45^\circ$ clockwise.
+    Predicted answer: \begin{{pmatrix}} \frac{{\sqrt{{2}}}}{{2}} & \frac{{\sqrt{{2}}}}{{2}} \\ -\frac{{\sqrt{{2}}}}{{2}} & \frac{{\sqrt{{2}}}}{{2}} \end{{pmatrix}}
+    Expected answer: \begin{{pmatrix}}1/\sqrt{{2}}&1/\sqrt{{2}}\\-1/\sqrt{{2}}&1/\sqrt{{2}}\end{{pmatrix}}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    Let's use numpy to check whether the two expressions are equivalent.
+
+    <|python_tag|>import numpy as np
+    from math import sqrt
+    predicted_answer = np.array([[sqrt(2)/2, sqrt(2)/2], [-sqrt(2)/2, sqrt(2)/2]])
+    expected_answer = np.array([[1/sqrt(2), 1/sqrt(2)], [-1/sqrt(2), 1/sqrt(2)]])
+    print(np.allclose(predicted_answer, expected_answer))<|eom_id|><|start_header_id|>ipython<|end_header_id|>
+
+    completed
+    [stdout]
+    True
+    [/stdout]<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    Judgement: Yes<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+    Problem: {problem}
+    Predicted answer: {predicted_answer}
+    Expected answer: {expected_answer}

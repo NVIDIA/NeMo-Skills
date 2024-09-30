@@ -12,61 +12,77 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib
 import subprocess
 from pathlib import Path
 
+# tuple of dataset name, available splits and prepared sft files
+DATASETS = [
+    ('aime24', ['test']),
+    ('amc23', ['test']),
+    ('omni-math', ['test']),
+    ('algebra222', ['test']),
+    ('arena-hard', ['test']),
+    ('asdiv', ['test']),
+    ('gsm-hard', ['test', 'test_rounded']),
+    ('gsm-ic-2step', ['test']),
+    ('gsm-ic-mstep', ['test']),
+    ('gsm-plus', ['test', 'test_rounded']),
+    ('gsm8k', ['train', 'train_full', 'validation', 'test']),
+    ('human-eval', ['test']),
+    ('ifeval', ['test']),
+    ('math', ['train', 'train_full', 'validation', 'test']),
+    ('math-odyssey', ['test']),
+    ('mawps', ['test']),
+    ('mbpp', ['test']),
+    ('mmlu', ['test', 'dev', 'val']),
+    ('svamp', ['test']),
+    ('tabmwp', ['train', 'validation', 'test']),
+]
 
-def test_data_scripts():
-    subprocess.run(
-        f'python {Path(__file__).absolute().parents[1] / "datasets" / "prepare.py"}', shell=True, check=True
-    )
+
+def test_dataset_scripts():
+    # test dataset groups
+    dataset_groups = ["math", "code", "chat", "multichoice"]
+    prepared_datasets = set()
+    for group in dataset_groups:
+        result = subprocess.run(
+            f'python {Path(__file__).absolute().parents[1] / "nemo_skills" / "dataset" / "prepare.py"} --dataset_groups {group}',
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"Preparation of {group} dataset group failed"
+
+        group_datasets = set(line.split()[1] for line in result.stdout.split('\n') if line.startswith("Preparing"))
+        prepared_datasets.update(group_datasets)
+
+        # Check if at least one dataset from the group was prepared
+        assert len(group_datasets) > 0, f"No datasets were prepared for group {group}"
+
+    all_datasets = set(dataset for dataset, _ in DATASETS)
+    assert (
+        prepared_datasets == all_datasets
+    ), f"Not all datasets were covered. Missing: {all_datasets - prepared_datasets}"
 
     # checking that all expected files are created
-    expected_files = [
-        'algebra222/test.jsonl',
-        'asdiv/test.jsonl',
-        'gsm-hard/test.jsonl',
-        'gsm-hard/test_rounded.jsonl',
-        'mawps/test.jsonl',
-        'svamp/test.jsonl',
-        'tabmwp/train.jsonl',
-        'tabmwp/validation.jsonl',
-        'tabmwp/test.jsonl',
-        'gsm8k/train.jsonl',
-        'gsm8k/train_full.jsonl',
-        'gsm8k/validation.jsonl',
-        'gsm8k/validation-sft.jsonl',
-        'gsm8k/validation-sft-chat.jsonl',
-        'gsm8k/test.jsonl',
-        'gsm-plus/test.jsonl',
-        'gsm-plus/test_rounded.jsonl',
-        'gsm-ic-2step/test.jsonl',
-        'gsm-ic-mstep/test.jsonl',
-        'functional/test.jsonl',
-        'math/train.jsonl',
-        'math/train_full.jsonl',
-        'math/validation.jsonl',
-        'math/validation-sft.jsonl',
-        'math/validation-sft-chat.jsonl',
-        'math/test.jsonl',
-        'gsm8k-masked/train.jsonl',
-        'gsm8k-masked/train_full.jsonl',
-        'gsm8k-masked/validation.jsonl',
-        'gsm8k-masked/validation-sft.jsonl',
-        'gsm8k-masked/validation-sft-chat.jsonl',
-        'math-masked/train.jsonl',
-        'math-masked/train_full.jsonl',
-        'math-masked/validation.jsonl',
-        'math-masked/validation-sft.jsonl',
-        'math-masked/validation-sft-chat.jsonl',
-        'human-eval/test.jsonl',
-        'mbpp/test.jsonl',
-        'mmlu/test.jsonl',
-        'mmlu/dev.jsonl',
-        'mmlu/val.jsonl',
-        'ifeval/test.jsonl',
-        'math-odyssey/test.jsonl',
-        'aime-2024/test.jsonl',
-    ]
+    expected_files = []
+    for dataset, splits in DATASETS:
+        for split in splits:
+            expected_files.append(f"{dataset}/{split}.jsonl")
+
     for file in expected_files:
-        assert (Path(__file__).absolute().parents[1] / "datasets" / file).exists()
+        assert (Path(__file__).absolute().parents[1] / "nemo_skills" / "dataset" / file).exists()
+
+
+def test_dataset_init_defaults():
+    for dataset, _ in DATASETS:
+        dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
+        assert hasattr(dataset_module, 'PROMPT_CONFIG'), f"{dataset} is missing PROMPT_CONFIG attribute"
+        assert hasattr(dataset_module, 'DATASET_GROUP'), f"{dataset} is missing DATASET_GROUP attribute"
+        assert dataset_module.DATASET_GROUP in [
+            "math",
+            "code",
+            "chat",
+            "multichoice",
+        ], f"{dataset} has invalid DATASET_GROUP"

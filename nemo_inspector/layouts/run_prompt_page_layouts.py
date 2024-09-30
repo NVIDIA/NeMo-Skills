@@ -18,18 +18,14 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import current_app
 from layouts.base_layouts import get_text_area_layout
-from settings.constants import CHAT_MODE, FEW_SHOTS_INPUT, ONE_SAMPLE_MODE, WHOLE_DATASET_MODE
-from utils.common import get_examples
+from settings.constants import CHAT_MODE, FEW_SHOTS_INPUT, ONE_SAMPLE_MODE
 from utils.strategies.strategy_maker import RunPromptStrategyMaker
 
+from nemo_skills.prompt.few_shot_examples import examples_map
 
-def get_few_shots_by_id_layout(
-    page: int, examples_type: str, num_few_shots: int, text_modes: List[str]
-) -> Tuple[html.Div]:
-    examples_list = get_examples().get(
-        examples_type,
-        [{}],
-    )[:num_few_shots]
+
+def get_few_shots_by_id_layout(page: int, examples_type: str, text_modes: List[str]) -> Tuple[html.Div]:
+    examples_list = examples_map.get(examples_type, [{}])
     if not page or len(examples_list) < page:
         return html.Div()
     return (
@@ -69,7 +65,6 @@ def get_run_mode_layout() -> html.Div:
                 options=[
                     {"label": "Chat", "value": CHAT_MODE},
                     {"label": "Run one sample", "value": ONE_SAMPLE_MODE},
-                    {"label": "Run whole dataset", "value": WHOLE_DATASET_MODE},
                 ],
                 value=ONE_SAMPLE_MODE,
             ),
@@ -83,7 +78,7 @@ def get_run_test_layout() -> html.Div:
         [
             get_run_mode_layout(),
             dbc.Accordion(
-                get_query_params_layout(dataset=current_app.config['nemo_inspector']['data_file']),
+                get_query_params_layout(dataset=current_app.config['nemo_inspector']['input_file']),
                 start_collapsed=True,
                 always_open=True,
                 id="prompt_params_input",

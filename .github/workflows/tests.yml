@@ -28,40 +28,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install .
-        pip install -r requirements/datasets.txt
         pip install -r requirements/common-tests.txt
     - name: Run all tests
       run: |
         ./nemo_skills/code_execution/local_sandbox/start_local_sandbox.sh &
         sleep 120
-        export NEMO_SKILLS_CONFIG=cluster_configs/local.yaml
-        export NEMO_SKILLS_SANDBOX_HOST="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' `docker ps -a | grep local-sandbox  | awk '{print $1}'`)"
-        echo $NEMO_SKILLS_SANDBOX_HOST
+        export NEMO_SKILLS_SANDBOX_HOST="127.0.0.1"
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -vvv | tee pytest-coverage.txt
-    - name: Check help message
-      run: |
-        NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml python tests/check_help.py --all
-
-  cluster-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    # we want to be more conservative with python version here as some clusters might have older installed
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.8"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements/datasets.txt
-        # testing cluster environment where no other packages should be required
-        pip install -r requirements/common-tests.txt
-    - name: Run help
-      run: |
-        NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml python tests/check_help.py
-    - name: Check datasets preparation
-      run: |
-        NEMO_SKILLS_CONFIG=cluster_configs/slurm.yaml pytest tests/test_datasets.py

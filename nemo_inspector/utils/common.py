@@ -20,9 +20,9 @@ import os
 import re
 import subprocess
 from collections import defaultdict
-from copy import deepcopy
-from dataclasses import fields
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from dataclasses import fields, is_dataclass
+from types import NoneType
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union, get_args, get_origin, get_type_hints
 
 from dash import html
 from flask import current_app
@@ -42,13 +42,11 @@ from settings.constants import (
     UNDEFINED,
 )
 
-from nemo_skills.inference.generate_solutions import GenerateSolutionsConfig, InferenceConfig
-from nemo_skills.inference.prompt.few_shot_examples import examples_map
-from nemo_skills.inference.prompt.utils import FewShotExamplesConfig, PromptConfig
+from nemo_skills.inference.generate import GenerateSolutionsConfig, InferenceConfig
+from nemo_skills.prompt.utils import FewShotExamplesConfig, PromptConfig, PromptTemplate
 from nemo_skills.utils import unroll_files
 
 custom_stats = {}
-default_examples = deepcopy(examples_map)
 general_custom_stats = {}
 deleted_stats = set()
 excluded_rows = set()
@@ -73,10 +71,6 @@ def get_custom_stats() -> Dict:
 
 def get_general_custom_stats() -> Dict:
     return general_custom_stats
-
-
-def get_examples() -> Dict:
-    return examples_map
 
 
 def parse_model_answer(answer: str) -> List[Dict]:
@@ -576,3 +570,24 @@ def get_utils_dict(name: Union[str, Dict], value: Union[str, int], id: Union[str
         'type': 'InputGroup',
         'namespace': 'dash_bootstrap_components',
     }
+
+
+def initialize_default(
+    cls: Union[PromptTemplate, PromptConfig], specification={}
+) -> Union[PromptTemplate, PromptConfig]:
+    def get_default(field, specification={}):
+        _type = get_type_hints(cls)[field.name]
+        if field.name in specification:
+            return specification[field.name]
+        if is_dataclass(_type):
+            return initialize_default(_type, specification)
+        else:
+            args = get_args(_type)
+            if len(args):
+                if NoneType in args:
+                    return None
+                else:
+                    return args[0]()
+            return (get_origin(_type) or _type)()
+
+    return cls(**{field.name: get_default(field, specification) for field in fields(cls)})

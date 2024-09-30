@@ -32,9 +32,8 @@ jobs:
         cd ${{ github.run_id }}
         python -m pip install --upgrade pip
         pip install .
-        pip install -r requirements/datasets.txt
         pip install -r requirements/common-tests.txt
-        python datasets/prepare.py
+        python nemo_skills/dataset/prepare.py
     - name: Run GPU tests
       timeout-minutes: 120
       env:
@@ -42,6 +41,5 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         nvidia-smi
-        export NEMO_SKILLS_CONFIG=cluster_configs/local.yaml
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
-        ./tests/gpu-tests/run.sh /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B-Instruct
+        ./tests/gpu-tests/run.sh

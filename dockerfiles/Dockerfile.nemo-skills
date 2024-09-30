@@ -1,0 +1,15 @@
+FROM python:3.10
+
+RUN apt-get update && apt-get -y install curl git
+
+# for ifeval benchmark
+# TODO: can we get just a single dir?
+RUN mkdir /opt/benchmarks
+RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1 && \
+    pip install langdetect absl-py immutabledict nltk && \
+    python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
+
+RUN mkdir -p /opt/NeMo-Skills/requirements
+COPY nemo_skills setup.py README.md /opt/NeMo-Skills/
+COPY requirements/main.txt /opt/NeMo-Skills/requirements/
+RUN cd /opt/NeMo-Skills && pip install .

@@ -1,1 +1,2 @@
-include nemo_skills/inference/prompt/**/*.yaml
+include nemo_skills/prompt/template/**/*.yaml
+include nemo_skills/prompt/config/**/*.yaml

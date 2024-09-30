@@ -1,48 +1,35 @@
 # will run all tests starting from only a HF checkpoint. Only requires 1 GPU.
 # also need to define HF_TOKEN for some of the tests
-# example: HF_TOKEN=<> ./tests/gpu-tests/run.sh /mnt/datadrive/models/Meta-Llama-3-8B /mnt/datadrive/models/Meta-Llama-3-8B-Instruct
+# model needs to be inside /mnt/datadrive/nemo-skills-test-data/Meta-Llama-3.1-8B-Instruct
+# if you need to place it in a different location, modify test-local.yaml config
+# example: HF_TOKEN=<> ./tests/gpu-tests/run.sh
 set -e
 
-if [ $# -eq 0 ] ; then
-    echo 'Provide llama3-base HF model folder as the first argument'
-    exit 1
-fi
-
-export NEMO_SKILLS_TEST_HF_MODEL=$1
-export NEMO_SKILLS_TEST_OUTPUT=/tmp/nemo_skills_test_output
-mkdir -p $NEMO_SKILLS_TEST_OUTPUT
+export NEMO_SKILLS_TEST_HF_MODEL=/mnt/datadrive/nemo-skills-test-data/Meta-Llama-3.1-8B-Instruct
 
 # first running the conversion tests
-pytest tests/gpu-tests/test_conversion.py -k test_hf_trtllm_conversion -s
-export NEMO_SKILLS_TEST_TRTLLM_MODEL=$NEMO_SKILLS_TEST_OUTPUT/trtllm-model
-pytest tests/gpu-tests/test_conversion.py -k test_hf_nemo_conversion -s
-export NEMO_SKILLS_TEST_NEMO_MODEL=$NEMO_SKILLS_TEST_OUTPUT/model.nemo
-pytest tests/gpu-tests/test_conversion.py -k test_nemo_hf_conversion -s
+pytest tests/gpu-tests/test_convert.py -k test_hf_trtllm_conversion -s -x
+export NEMO_SKILLS_TEST_TRTLLM_MODEL=/tmp/nemo-skills-tests/conversion/hf-to-trtllm/model
+pytest tests/gpu-tests/test_convert.py -k test_hf_nemo_conversion -s -x
+export NEMO_SKILLS_TEST_NEMO_MODEL=/tmp/nemo-skills-tests/conversion/hf-to-nemo/model
+pytest tests/gpu-tests/test_convert.py -k test_nemo_hf_conversion -s -x
 # using the back-converted model to check that it's reasonable
-export NEMO_SKILLS_TEST_HF_MODEL=$NEMO_SKILLS_TEST_OUTPUT/hf-model
+export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/conversion/nemo-to-hf/model
 
-export LLAMA3_8B_BASE_TRTLLM=$NEMO_SKILLS_TEST_TRTLLM_MODEL
-export LLAMA3_8B_BASE_NEMO=$NEMO_SKILLS_TEST_NEMO_MODEL
-export LLAMA3_8B_BASE_HF=$NEMO_SKILLS_TEST_HF_MODEL
-export LLAMA3_8B_INSTRUCT_HF=$2
-
-# then running the rest of the tests
-pytest tests/gpu-tests/test_generation.py -s
+# generation/evaluation tests
+pytest tests/gpu-tests/test_eval.py -s -x
+pytest tests/gpu-tests/test_generate.py -s -x
 
 # for sft we are using the tiny random llama model to run much faster
-python pipeline/launcher.py \
-    --cmd "HF_TOKEN=$HF_TOKEN python /code/tests/gpu-tests/make_tiny_llama.py" \
-    --tasks_per_node 1 \
-    --job_name make_llama \
-    --container igitman/nemo-skills-sft:0.3.0 \
-    --mounts $NEMO_SKILLS_TEST_OUTPUT:/output,`pwd`:/code
+docker run --rm \
+    -e HF_TOKEN=$HF_TOKEN \
+    -v /tmp:/tmp \
+    -v `pwd`:/nemo_run/code \
+    igitman/nemo-skills-nemo:0.4.1 \
+    python /nemo_run/code/tests/gpu-tests/make_tiny_llama.py
 
 # converting the model through test
-export NEMO_SKILLS_TEST_HF_MODEL=$NEMO_SKILLS_TEST_OUTPUT/tiny-llama
-pytest tests/gpu-tests/test_conversion.py -k test_hf_nemo_conversion -s
-# untarring model which is required for checkpoint averaging
-mkdir -p $NEMO_SKILLS_TEST_OUTPUT/untarred_nemo
-tar xvf $NEMO_SKILLS_TEST_OUTPUT/model.nemo -C $NEMO_SKILLS_TEST_OUTPUT/untarred_nemo
-export NEMO_SKILLS_TEST_NEMO_MODEL=$NEMO_SKILLS_TEST_OUTPUT/untarred_nemo
-# running finetuning
-pytest tests/gpu-tests/test_finetuning.py -s
+export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/tiny-llama-hf
+pytest tests/gpu-tests/test_convert.py -k test_hf_nemo_conversion -s -x
+# training tests
+pytest tests/gpu-tests/test_train.py -s -x

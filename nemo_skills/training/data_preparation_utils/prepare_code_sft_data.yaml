@@ -1,0 +1,57 @@
+# Code SFT data preparation script
+
+processors_to_run: all
+
+preprocessed_dataset_files: null  # can specify multiple patters separated by space
+input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
+output_path: ???
+
+exclude_optional_keys: true # exclude keys other than input, output and expected_answer from the final manifest
+metadata: null  # can provide additional metadata to store (e.g. dataset or generation_type)
+skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
+
+downsampling_method: null  # fair, random or null
+random_seed: 42
+do_shuffle: true
+num_output_samples: null
+
+prompt_config: null
+prompt_template: null
+chat_format: null  # null/nemotron/llama
+generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
+
+input_key: input  # key to group samples by before code_text_filter
+output_key: output  # key to filter solutions by
+
+filters:
+  drop_incorrect_code_blocks: false
+
+processors:
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ReadData
+    preprocessed_dataset_files: ${preprocessed_dataset_files}
+    input_files: ${input_files}
+    input_key: ${input_key}
+    output_key: ${output_key}
+    skip_first: ${skip_first}
+
+  - _target_: nemo_skills.training.data_preparation_utils.filters.DropIncorrectCodeBlocks
+    should_run: ${filters.drop_incorrect_code_blocks}
+    output_key: ${output_key}
+    test_cases:
+      - {input: {output: "Solution ```python\ndef hello()``` Second code ```python\n"}, output: null}
+      - {input: {output: "Solution ```python\ndef hello()```"}, output: {output: "Solution ```python\ndef hello()```"}}
+      - {input: {output: "She had python\ndef hello()```"}, output: null}
+
+  - _target_: sdp.processors.RenameFields
+    rename_fields:
+      input: question  # we need to match llama3/codegen_sft format which uses 'question' as input key
+
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalSftManifest
+    output_manifest_file: ${output_path}
+    prompt_config: ${prompt_config}
+    prompt_template: ${prompt_template}
+    input_key: question
+    output_key: ${output_key}
+    chat_format: ${chat_format}
+    generation_suffix: ${generation_suffix}
+    metadata: ${metadata}

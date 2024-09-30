@@ -17,11 +17,14 @@ bs4
 evalplus @ git+https://github.com/evalplus/evalplus@c91370f
 huggingface_hub
 hydra-core
+nemo_run @ git+https://github.com/NVIDIA/NeMo-Run.git
 numpy
 openai
 pyyaml
 rank_bm25
 requests
 scikit-learn
+sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor
 sympy
 tqdm
+typer

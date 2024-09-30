@@ -1,3 +1,17 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import hashlib
 import subprocess
 
@@ -10,83 +24,81 @@ def compute_md5(file_path):
     return hash_md5.hexdigest()
 
 
-def test_code_files():
-    output_file = "tests/data/processed_output.jsonl"
+def test_multiple_files():
+    output_file = "tests/data/processed_multifile_output.jsonl"
     subprocess.run(
-        [
-            "python",
-            "nemo_skills/finetuning/prepare_sft_data.py",
-            "prediction_jsonl_files='tests/data/output-rs*.test'",
-            f"output_path={output_file}",
-            "filters.drop_multi_boxed=true",
-            "filters.drop_broken_code=true",
-            "filters.trim_solutions=true",
-            "filters.drop_incorrect_arithmetic=false",
-            "filters.split_arithmetic=false",
-            "filters.code_text_filter=null",
-            "num_output_samples=null",
-            "downsampling_method=null",
-            "do_shuffle=false",
-        ],
+        "python -m nemo_skills.training.prepare_sft_data "
+        f"    ++input_files='tests/data/output-rs*.test' "
+        f"    ++output_path={output_file} "
+        f"    ++prompt_config=generic/math "
+        f"    ++prompt_template=llama3-instruct "
+        f"    ++exclude_optional_keys=false "
+        f"    ++filters.drop_multi_boxed=true "
+        f"    ++filters.trim_solutions=true "
+        f"    ++filters.drop_incorrect_arithmetic=false "
+        f"    ++filters.split_arithmetic=false "
+        f"    ++num_output_samples=32 "
+        f"    ++downsampling_method=fair "
+        f"    ++do_shuffle=false ",
         check=True,
+        shell=True,
     )
 
-    expected_md5 = "5feef230065b71b0ee4debe54fde62bd"
+    expected_md5 = "3971b33e2dd9ed28b2edc323eac19a1f"
     output_md5 = compute_md5(output_file)
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_sft_data.py"
 
 
-def test_openmathinstruct():
-    output_file = "tests/data/processed_output.jsonl"
-
+def test_exclude_keys():
+    output_file = "tests/data/processed_compact_output.jsonl"
     subprocess.run(
-        [
-            "python",
-            "nemo_skills/finetuning/prepare_sft_data.py",
-            "preprocessed_dataset_files='tests/data/openmathinstruct.test'",
-            f"output_path={output_file}",
-            "filters.drop_multi_boxed=true",
-            "filters.drop_broken_code=true",
-            "filters.trim_solutions=true",
-            "filters.drop_incorrect_arithmetic=false",
-            "filters.split_arithmetic=false",
-            "filters.code_text_filter=any_code",
-            "num_output_samples=32",
-            "downsampling_method=fair",
-            "do_shuffle=true",
-        ],
+        "python -m nemo_skills.training.prepare_sft_data "
+        f"    ++input_files='tests/data/output-rs*.test' "
+        f"    ++output_path={output_file} "
+        f"    ++prompt_config=generic/math "
+        f"    ++prompt_template=llama3-instruct "
+        f"    ++exclude_optional_keys=true "
+        f"    ++filters.drop_multi_boxed=true "
+        f"    ++filters.trim_solutions=true "
+        f"    ++filters.drop_incorrect_arithmetic=false "
+        f"    ++filters.split_arithmetic=false "
+        f"    ++num_output_samples=32 "
+        f"    ++downsampling_method=fair "
+        f"    ++do_shuffle=false ",
         check=True,
+        shell=True,
     )
 
-    expected_md5 = "31378960fd2857876b6d14f5bd762db6"
+    expected_md5 = "7144c098a6e75ffd01c29e714552db24"
     output_md5 = compute_md5(output_file)
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_sft_data.py"
 
 
 def test_code_sft_data():
     output_file = "tests/data/code_processed_output.jsonl"
     subprocess.run(
-        [
-            "python",
-            "nemo_skills/finetuning/prepare_sft_data.py",
-            "--config-name=prepare_code_sft_data",
-            "preprocessed_dataset_files='tests/data/code-output.test'",
-            f"output_path={output_file}",
-            "filters.drop_incorrect_code_blocks=false",
-            "generation_suffix='\"<|eot_id|>\"'",
-        ],
+        "python -m nemo_skills.training.prepare_sft_data "
+        f"    --config-name=prepare_code_sft_data "
+        f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
+        f"    ++output_path={output_file} "
+        f"    ++prompt_config=generic/codegen "
+        f"    ++prompt_template=llama3-instruct "
+        f"    ++exclude_optional_keys=false "
+        f"    ++filters.drop_incorrect_code_blocks=false "
+        f"    ++generation_suffix='\"<|eot_id|>\"' ",
         check=True,
+        shell=True,
     )
 
-    expected_md5 = "51ad8f704b8c550ddf2027bf9984e154"
+    expected_md5 = "a830a174291795cc7db0d1c3ee39de25"
     output_md5 = compute_md5(output_file)
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_sft_data.py"

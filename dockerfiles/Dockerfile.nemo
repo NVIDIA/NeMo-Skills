@@ -15,17 +15,18 @@
 # copied from https://github.com/NVIDIA/NeMo-Aligner/blob/main/Dockerfile
 # with pinned NeMo-Aligner version for reproducibility
 
-# CUDA 12.3
-FROM nvcr.io/nvidia/pytorch:24.02-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:24.03-py3
 
-### config tags
-ARG APEX_TAG=810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c
-ARG TE_TAG=a51ff542dcb1f605aa54f9b0e1aaadb132acd53d
-ARG MLM_TAG=core_r0.7.0
-ARG NEMO_TAG=r2.0.0rc0
-ARG PYTRITON_VERSION=0.5.5
+FROM ${BASE_IMAGE}
+ARG APEX_TAG=59b80ee8df79cec125794949327f29913c328746
+ARG TE_TAG=7d576ed25266a17a7b651f2c12e8498f67e0baea
+ARG MLM_TAG=a3fe0c75df82218901fa2c3a7c9e389aa5f53182  # On: core_r0.8.0
+ARG NEMO_TAG=e033481e26e6ae32764d3e2b3f16afed00dc7218  # On: r2.0.0rc1
+ARG ALIGNER_COMMIT=da3f5f8ae903083beeff011bd225169d571975a6
+
+ARG PYTRITON_VERSION=0.5.10
 ARG PROTOBUF_VERSION=4.24.4
-ARG ALIGNER_COMMIT=b0da1efcbdc450725dff6d6727748dbbe1407032
+ARG TRTLLM_VERSION=v0.10.0
 
 # if you get errors building TE or Apex, decrease this to 4
 ARG MAX_JOBS=8
@@ -54,7 +55,7 @@ RUN pip uninstall -y apex && \
         git fetch origin $APEX_TAG && \
         git checkout FETCH_HEAD; \
     fi && \
-    pip install install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
+    pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
 
 # place any util pkgs here
 RUN pip install --upgrade-strategy only-if-needed nvidia-pytriton==$PYTRITON_VERSION
@@ -94,14 +95,26 @@ RUN git clone https://github.com/NVIDIA/NeMo-Aligner.git && \
     fi && \
     pip install --no-deps -e .
 
-COPY requirements/main.txt /opt/requirements.txt
-RUN pip install -r /opt/requirements.txt
+# Git LFS
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
+    apt-get install git-lfs && \
+    git lfs install
 
-# for ifeval benchmark
-# TODO: can we get just a single folder?
-RUN mkdir /opt/benchmarks
-RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1 && \
-    pip install langdetect absl-py immutabledict nltk && \
-    python -c "import nltk; nltk.download('punkt')"
+# TRTLLM
+RUN git clone https://github.com/NVIDIA/TensorRT-LLM.git && \
+    cd TensorRT-LLM && \
+    git checkout ${TRTLLM_VERSION} && \
+    patch -p1 < ../NeMo-Aligner/setup/trtllm.patch && \
+    . docker/common/install_tensorrt.sh && \
+    python3 ./scripts/build_wheel.py --trt_root /usr/local/tensorrt
 
-WORKDIR /workspace
+RUN cd TensorRT-LLM && \
+    pip install ./build/tensorrt_llm*.whl
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12/compat/lib.real/
+
+# WAR(0.4.0): The pin of NeMo requires a higher nvidia-modelopt version than
+#             TRT-LLM allows. This installation must follow TRT-LLM and is
+#             only necessary when NeMo 2.0.0rc1 is installed with TRT-LLM v10.
+RUN pip install --upgrade-strategy only-if-needed nvidia-modelopt==0.13.0
+# patching transformers as it has a bug for conversion. backoff shouldn't be needed?
+RUN pip install transformers==4.44.2 backoff

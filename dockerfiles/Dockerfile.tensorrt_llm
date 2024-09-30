@@ -14,7 +14,7 @@
 
 # copied from https://nvidia.github.io/TensorRT-LLM/installation/linux.html
 
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
 
 # Install dependencies, TensorRT-LLM requires Python 3.10
 RUN apt-get update && apt-get -y install python3.10 python3-pip openmpi-bin libopenmpi-dev git git-lfs
@@ -23,16 +23,8 @@ RUN ["ln", "-sf", "/usr/bin/python3", "/usr/bin/python"]
 RUN ["ln", "-sf", "/usr/bin/pip3", "/usr/bin/pip"]
 
 # pinning to the tested version
-RUN pip install tensorrt_llm==0.12.0.dev2024080600 -U --pre --extra-index-url https://pypi.nvidia.com
+RUN pip install tensorrt_llm==0.12.0 -U --extra-index-url https://pypi.nvidia.com
 
 # installing packages required for our server code
 RUN pip install flask flask_restful
-COPY requirements/main.txt /opt/requirements.txt
-RUN pip install -r /opt/requirements.txt
-
-# for ifeval benchmark
-# TODO: can we get just a single folder?
-RUN mkdir /opt/benchmarks
-RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1 && \
-    pip install langdetect absl-py immutabledict nltk && \
-    python -c "import nltk; nltk.download('punkt')"
+RUN pip install transformers==4.44.2

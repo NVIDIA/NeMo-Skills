@@ -22,13 +22,14 @@ import torch
 from megatron.core import parallel_state
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
 from nemo.collections.nlp.modules.common.text_generation_server import MegatronServer
+
+# explicitly adding a strategy to avoid failing imports
+from nemo.collections.nlp.modules.common.text_generation_strategy import GPTModelTextGenerationStrategy
 from nemo.collections.nlp.modules.common.text_generation_utils import generate
 from nemo.collections.nlp.parts.nlp_overrides import CustomProgressBar, NLPDDPStrategy, NLPSaveRestoreConnector
 from nemo.core.config import hydra_runner
 from omegaconf import OmegaConf, open_dict
 from pytorch_lightning.trainer.trainer import Trainer
-
-from nemo_skills.inference.inference_strategy import CodeExecutionStrategy
 
 """
 This is the script to run GPT text generation.
@@ -132,7 +133,7 @@ def main(cfg) -> None:
     except AttributeError:
         pass
 
-    inference_strategy = CodeExecutionStrategy(sandbox_cfg=cfg.sandbox, model=model, **cfg.get('code_execution', {}))
+    inference_strategy = GPTModelTextGenerationStrategy(model=model)
 
     if parallel_state.is_pipeline_first_stage() and parallel_state.get_tensor_model_parallel_rank() == 0:
         server = MegatronServer(model.cuda(), inference_strategy=inference_strategy)

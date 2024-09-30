@@ -16,8 +16,8 @@
 
 from transformers import LlamaConfig, LlamaForCausalLM
 
-mname_from = "meta-llama/Meta-Llama-3-8B"
-mname_tiny = "/output/tiny-llama"
+mname_from = "meta-llama/Meta-Llama-3.1-8B"
+mname_tiny = "/tmp/nemo-skills-tests/tiny-llama-hf"
 
 config = LlamaConfig.from_pretrained(mname_from)
 config.update(

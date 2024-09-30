@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -21,12 +22,13 @@ import dash_bootstrap_components as dbc
 import hydra
 from dash import Dash
 from flask import Flask
-from omegaconf import MISSING, DictConfig, OmegaConf
-from settings.constants import RETRIEVAL, RETRIEVAL_FIELDS, UNDEFINED
+from omegaconf import DictConfig, OmegaConf, open_dict
+from settings.constants import CONFIGS_FOLDER, CUSTOM, RETRIEVAL, RETRIEVAL_FIELDS, TEMPLATES_FOLDER, UNDEFINED
 from settings.inspector_config import InspectorConfig
+from utils.common import initialize_default
 
-from nemo_skills.inference.prompt.few_shot_examples import examples_map
-from nemo_skills.inference.prompt.utils import get_prompt_config, prompt_types
+from nemo_skills.prompt.few_shot_examples import examples_map
+from nemo_skills.prompt.utils import PromptConfig
 from nemo_skills.utils import setup_logging
 
 setup_logging()
@@ -38,71 +40,59 @@ generation_config_dir = Path(__file__).resolve().parents[2].joinpath("nemo_skill
 os.environ["config_dir"] = str(generation_config_dir)
 
 
+def list_yaml_files(folder_path):
+    yaml_files = glob.glob(os.path.join(folder_path, '**', '*.yaml'), recursive=True)
+
+    yaml_files_relative = [os.path.relpath(file, folder_path) for file in yaml_files]
+
+    return yaml_files_relative
+
+
+def get_specific_fields(dict_cfg: Dict, fields: List[Dict]) -> Dict:
+    retrieved_values = {}
+    for key, value in dict_cfg.items():
+        if key in fields:
+            retrieved_values[key] = value
+        if isinstance(value, Dict):
+            retrieved_values = {
+                **retrieved_values,
+                **get_specific_fields(value, fields),
+            }
+    return retrieved_values
+
+
 @hydra.main(version_base=None, config_path=config_path, config_name="inspector_config")
 def set_config(cfg: InspectorConfig) -> None:
     global config
-
-    prompt_type = UNDEFINED  # TODO detect prompt_type
-
-    prompt_types_without_extension = list(map(lambda name: name.split('.')[0], prompt_types))
-
-    for name in prompt_types_without_extension:
-        if asdict(get_prompt_config(name)) == cfg.prompt:
-            prompt_type = name
-            break
-
-    if not cfg.data_file and not cfg.dataset and not cfg.split_name:
-        cfg.data_file = UNDEFINED
+    if not cfg.input_file and not cfg.dataset and not cfg.split:
+        cfg.input_file = UNDEFINED
 
     cfg.output_file = UNDEFINED
 
-    def set_undefined(dict_cfg: Dict, cfg: DictConfig):
-        for key, value in dict_cfg.items():
-            if isinstance(value, Dict):
-                setattr(cfg, key, set_undefined(value, getattr(cfg, key)))
-            if value == MISSING:
-                setattr(cfg, key, UNDEFINED)
-        return cfg
-
-    def get_specific_fields(dict_cfg: Dict, fields: List[Dict]) -> Dict:
-        retrieved_values = {}
-        for key, value in dict_cfg.items():
-            if key in fields:
-                retrieved_values[key] = value
-            if isinstance(value, Dict):
-                retrieved_values = {
-                    **retrieved_values,
-                    **get_specific_fields(value, fields),
-                }
-        return retrieved_values
-
     examples_types = list(examples_map.keys())
-    examples_type = cfg.prompt.few_shot_examples.examples_type
-    if examples_type == RETRIEVAL:
-        cfg.prompt.few_shot_examples.examples_type = examples_types[0]
 
-    cfg.prompt = set_undefined(OmegaConf.to_container(cfg.prompt), cfg.prompt)
+    if "server_type" not in cfg.server:
+        if not isinstance(cfg.server, DictConfig):
+            cfg.server = OmegaConf.create(cfg.server)
 
-    config['nemo_inspector'] = asdict(OmegaConf.to_object(cfg))
-    if examples_type == RETRIEVAL:
-        config['nemo_inspector']['prompt']['few_shot_examples']['examples_type'] = examples_type
+        with open_dict(cfg.server):
+            cfg.server.server_type = UNDEFINED
 
-    for param in ['host', 'ssh_server', 'ssh_key_path']:
-        if param not in config['nemo_inspector']['sandbox'] and param in config['nemo_inspector']['server']:
-            config['nemo_inspector']['sandbox'][param] = config['nemo_inspector']['server'][param]
-
-    config['nemo_inspector']['prompt']['prompt_type'] = prompt_type
+    config['nemo_inspector'] = OmegaConf.to_container(cfg, resolve=True)
 
     config['nemo_inspector']['types'] = {
-        "prompt_type": [UNDEFINED] + prompt_types_without_extension,
+        "prompt_config": [UNDEFINED, CUSTOM] + list_yaml_files(os.path.join(CONFIGS_FOLDER)),
+        "prompt_template": [UNDEFINED, CUSTOM] + list_yaml_files(os.path.join(TEMPLATES_FOLDER)),
         "examples_type": [UNDEFINED, RETRIEVAL] + examples_types,
         "retrieval_field": [""],
     }
 
+    config['nemo_inspector']['prompt'] = asdict(initialize_default(PromptConfig))
     config['nemo_inspector']['retrieval_fields'] = get_specific_fields(config['nemo_inspector'], RETRIEVAL_FIELDS)
 
-    config['nemo_inspector']['data_file'] = str(config['nemo_inspector']['data_file'])
-    config['nemo_inspector']['generation_name'] = 'default_name'
+    config['nemo_inspector']['input_file'] = str(config['nemo_inspector']['input_file'])
+    for name in ['offset', 'max_samples', 'batch_size']:
+        config['nemo_inspector'].pop(name)
 
 
 set_config()
@@ -121,4 +111,4 @@ app = Dash(
 
 from callbacks.analyze_callbacks import choose_base_model
 from callbacks.base_callback import nav_click
-from callbacks.run_prompt_callbacks import add_example
+from callbacks.run_prompt_callbacks import preview

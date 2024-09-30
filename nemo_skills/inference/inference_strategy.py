@@ -21,7 +21,7 @@ from nemo.collections.nlp.modules.common.text_generation_strategy import GPTMode
 
 class CodeExecutionStrategy(GPTModelTextGenerationStrategy):
     def __init__(
-        self, sandbox_cfg: Dict, timeout=10.0, max_code_output_characters=1000, stop_on_code_error=True, **kwargs
+        self, sandbox_cfg: Dict, timeout=10.0, max_code_output_characters=1000, stop_on_code_error=False, **kwargs
     ):
         from nemo_skills.code_execution.sandbox import get_sandbox
 
@@ -40,7 +40,12 @@ class CodeExecutionStrategy(GPTModelTextGenerationStrategy):
             new_token (torch.Tensor): sampled new token id
             context_length (int): the new token position in the tokens
         """
-        from nemo_skills.code_execution import CODE_OUTPUT_SEPARATORS, CODE_SEPARATORS, extract_code_to_execute
+        from nemo_skills.code_execution import (
+            CODE_OUTPUT_SEPARATORS,
+            CODE_SEPARATORS,
+            extract_code_to_execute,
+            format_code_output,
+        )
 
         if self.execution_state is None:
             self.execution_state = [
@@ -59,24 +64,21 @@ class CodeExecutionStrategy(GPTModelTextGenerationStrategy):
                 generated_text = self.model.tokenizer.ids_to_text(elem_tokens[: context_length + 1].tolist())
                 code_to_execute = extract_code_to_execute(generated_text)
                 if torch.distributed.get_rank() == parallel_state.get_tensor_model_parallel_src_rank():
-                    result, self.execution_state[idx]['session_id'] = self.sandbox.execute_code(
+                    execution_dict, self.execution_state[idx]['session_id'] = self.sandbox.execute_code(
                         code_to_execute,
                         timeout=self.timeout,
                         max_output_characters=self.max_code_output_characters,
                         session_id=self.execution_state[idx]['session_id'],
                     )
-                    if result['error_message']:
-                        result['result'] = result['error_message']
 
-                    if self.stop_on_code_error and result['error_message']:
+                    if self.stop_on_code_error and execution_dict['stderr']:
                         self.execution_state[idx]['should_stop'] = torch.tensor(True, dtype=torch.bool, device='cuda')
                     else:
                         self.execution_state[idx]['should_stop'] = torch.tensor(False, dtype=torch.bool, device='cuda')
-                    code_output = f'\n{CODE_OUTPUT_SEPARATORS[0]}\n{result["result"]}\n{CODE_OUTPUT_SEPARATORS[1]}\n'
 
                     # adding [1:] to skip the first " " token that's somehow always added
                     self.execution_state[idx]['execution_output'] = torch.tensor(
-                        self.model.tokenizer.text_to_ids(code_output)[1:],
+                        self.model.tokenizer.text_to_ids(format_code_output(execution_dict))[1:],
                         dtype=torch.int32,
                         device='cuda',
                     )

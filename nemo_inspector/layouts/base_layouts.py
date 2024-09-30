@@ -97,12 +97,8 @@ def get_selector_layout(options: Iterable, id: str, value: str = "") -> dbc.Sele
 
 
 def get_text_area_layout(id: str, value: str, text_modes: bool = False) -> Union[dbc.Textarea, html.Pre]:
-    component = dbc.Textarea
-    if text_modes:
-        component = html.Pre
-
-    return component(
-        **({'children': get_single_prompt_output_layout(value, text_modes)} if text_modes else {"value": value}),
+    return html.Pre(
+        get_single_prompt_output_layout(value, text_modes),
         id=id,
         style={
             'width': '100%',

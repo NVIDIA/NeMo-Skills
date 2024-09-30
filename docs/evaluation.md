@@ -1,137 +1,132 @@
 # Model evaluation
 
-## Quick start
+Make sure to complete [prerequisites](/docs/prerequisites.md).
 
-Make sure to complete [prerequisites](/docs/prerequisites.md) before proceeding.
-Please note that ~1% difference in accuracy is expected when running inference on
-different GPU types or with different inference frameworks.
-
-1. Download one of [our models](https://huggingface.co/collections/nvidia/openmath-65c5619de2ba059be0775014) or get some other checkpoint.
-2. [Convert the model to the right format](/docs/checkpoint-conversion.md) if required.
-3. Run the evaluation (assuming one of our finetuned models, nemo inference, gsm8k greedy decoding)
-
-   ```
-   python pipeline/run_eval.py \
-     --model_path <path to .nemo> \
-     --server_type nemo \
-     --output_dir ./test-results \
-     --benchmarks gsm8k:0 \
-     --num_gpus <number of GPUs on your machine/cluster node> \
-     --num_jobs 1 \
-     +prompt=openmathinstruct/sft \
-     ++prompt.few_shot_examples.num_few_shots=0 \
-     ++split_name=test
-   ```
-
-   If you want to evaluate a model that was not finetuned through our pipeline, but still
-   allow it to use Python interpreter, you can show it a couple of few-shot examples
-
-   ```
-   +prompt=openmathinstruct/base \
-   ++prompt.few_shot_examples.examples_type=gsm8k_text_with_code \
-   ++prompt.few_shot_examples.num_few_shots=5
-   ```
-
-   If you need to, change the batch size with `batch_size=<X>` argument.
-
-4. Compute metrics
-
-   ```
-   python pipeline/compute_metrics.py \
-     --prediction_jsonl_files ./test-results/gsm8k/output-greedy.jsonl \
-     --benchmark gsm8k
-   ```
-
-   If you evaluated multiple benchmarks or used multiple samples per benchmark, you can also run the following script
-   to summarize all available metrics.
-
-   ```
-   python pipeline/summarize_results.py ./test-results
-   ```
-
-Read on to learn details about how evaluation works!
-
-## Details
-
-Let's break down what [pipeline/run_eval.py](/pipeline/run_eval.py) is doing.
-
-- Starts a local [sandbox](/docs/sandbox.md) which will handle code execution requests.
-- Starts an LLM server in a docker container (defined in the `NEMO_SKILLS_CONFIG` file).
-- Waits for the sandbox and server to start.
-- Runs [nemo_skills/inference/generate_solutions.py](/nemo_skills/inference/generate_solutions.py) to
-  generate solutions for all benchmarks requested (potentially running multiple samples per benchmark).
-- Runs [nemo_skills/evaluation/evaluate_results.py](/nemo_skills/evaluation/evaluate_results.py) on each
-  of the generated output files.
-- If running in a Slurm cluster, you can parallelize evaluation across multiple nodes. You can also
-  customize any of the parameters of evaluation - all extra arguments of the
-  run_eval.py will be passed directly to the generate_solutions.py script.
-
-Here is an example of how to manually reproduce the call to run_eval.py script from
-the [quick start](#quick-start) section.
-
-1. Start a sandbox. This will block your shell, so either run in the background or make sure you can open another shell on the same machine:
-
-   ```
-   ./nemo_skills/code_execution/local_sandbox/start_local_sandbox.sh
-   ```
-
-   Get the IP of the sandbox by running
-
-   ```
-   docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' `docker ps -a | grep local-sandbox  | awk '{print $1}'`
-   ```
-
-2. Start an LLM server. The commands differ based on the server type. Here is an example for starting NeMo-based inference server.
-   Make sure to run this from the root of the repository. Same as above, this will block your shell.
-
-   ```
-   docker run --rm --gpus all --ipc=host -v `pwd`:/code -v <path to the .nemo model>:/model igitman/nemo-skills-sft:0.3.0 \
-   bash -c 'PYTHONPATH=/code python /code/nemo_skills/inference/server/serve_nemo.py \
-     gpt_model_file=/model \
-     trainer.devices=<number of GPUs> \
-     tensor_model_parallel_size=<number of GPUs> \
-     ++sandbox.host=<Sandbox IP from the step above>'
-   ```
-
-   Wait until you see "Running on <ip address>" message and make a note of this IP.
-
-   If you want to use TensorRT-LLM server instead, you can run the following command
-
-   ```
-   docker run --rm --gpus all --ipc=host -v `pwd`:/code -v <path to the trtllm model>:/model igitman/nemo-skills-trtllm:0.3.2 \
-   bash -c 'export PYTHONPATH=/code && \
-   mpirun -n <number of GPUs> --allow-run-as-root python /code/nemo_skills/inference/server/serve_trt.py --model_path=/model'
-   ```
-
-3. Run the generation command. Customize as necessary (running with `--help` will show the details)
-
-   ```
-   python nemo_skills/inference/generate_solutions.py \
-     output_file=./test-results/gsm8k/output-greedy.jsonl \
-     +prompt=openmathinstruct/sft \
-     ++dataset=gsm8k \
-     ++split_name=test \
-     ++server.server_type=nemo \
-     ++server.host=<IP from the step above> \
-     ++sandbox.host=<Sandbox IP from the sandbox launch step>
-   ```
-
-4. Run the evaluation command. Note that you need to provide a sandbox IP, because evaluation is running in the sandbox.
-
-   ```
-   python nemo_skills/evaluation/evaluate_results.py \
-     prediction_jsonl_files=./test-results/gsm8k/output-greedy.jsonl \
-     ++sandbox.host=<Sandbox IP>
-   ```
-
-After this you would typically follow up with the same command to compute metrics as in the [quick start](#quick-start).
+Please refer to the following docs if you have questions about:
+- [Prompt format](/docs/prompt-format.md)
+- [Generation parameters](/docs/common-parameters.md)
+- [How to self-host models](/docs/generation.md)
 
 
-## Typical customizations
+We support many popular benchmarks and it's easy to add new in the future. E.g. we support
 
-To customize the prompt template for the model, create a new .yaml file inside
-[nemo_skills/inference/prompt](/nemo_skills/inference/prompt) folder. Have a look
-at the existing templates there for an example.
+- Math problem solving: gsm8k, math, amc23, aime24 (and many more)
+- Coding skills: human-eval, mbpp
+- Chat/instruction following: ifeval, arena-hard
+- General knowledge: mmlu (generative)
 
-You can run `python nemo_skills/inference/generate_solutions.py --help`
-to see other available customization options.
+See [nemo_skills/dataset](/nemo_skills/dataset) where each folder is a benchmark we support.
+
+Here is how to run evaluation (using API model as an example,
+but same command works with self-hosted models both locally and on slurm).
+Make sure that `/workspace` is mounted inside of your
+[cluster config](/docs/prerequisites.md#general-information).
+
+```
+python -m nemo_skills.pipeline.eval \
+    --cluster local \
+    --server_type openai \
+    --model meta/llama-3.1-8b-instruct \
+    --server_address https://integrate.api.nvidia.com/v1 \
+    --benchmarks gsm8k:0,human-eval:0 \
+    --output_dir /workspace/test-eval
+```
+
+This will run evaluation on gsm8k and human-eval for Llama 3.1 8B model. If you're running
+on slurm by default each benchmark is run in a separate job, but you can control this with
+`--num_jobs` parameter.
+
+After the evaluation is done, you can get metric by calling
+
+```
+python -m nemo_skills.pipeline.summarize_results --cluster local /workspace/test-eval
+```
+
+Which should print the following
+
+```
+------------------------- gsm8k -------------------------
+evaluation_mode | num_entries | symbolic_correct | no_answer
+greedy          | 1319        | 82.34         | 0.91
+
+
+------------------------------ human-eval -----------------------------
+evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
+greedy          | 164         | 67.68              | 62.20
+```
+
+The summarize_results script will fetch the results from cluster automatically if you ran the job there.
+
+> **_NOTE:_** The numbers above don't match reported numbers for Llama 3.1 because we are not using
+> the same prompts by default. You would need to modify the prompt config for each specific benchmark
+> to match the results exactly. E.g. to match gsm8k numbers add `++prompt_config=llama3/gsm8k`
+> (but we didn't include all the prompts used for Llama3 evaluation, only a small subset as an example).
+
+The `:0` part after benchmark name means that we only want to run
+greedy decoding, but if you set `:4` it will run greedy + 4 samples with high temperature
+that can be used for majority voting or estimating pass@k. E.g. if we run with
+
+```
+python -m nemo_skills.pipeline.eval \
+    --cluster=local \
+    --server_type=openai \
+    --model=meta/llama-3.1-8b-instruct \
+    --server_address=https://integrate.api.nvidia.com/v1 \
+    --benchmarks gsm8k:4,human-eval:4 \
+    --output_dir=/workspace/test-eval
+```
+
+you will see the following output after summarizing results
+
+```
+-------------------------- gsm8k ---------------------------
+evaluation_mode | num_entries | symbolic_correct | no_answer
+greedy          | 1319        | 82.34            | 0.91
+majority@4      | 1319        | 87.95            | 0.00
+pass@4          | 1319        | 93.78            | 0.00
+
+
+------------------------------ human-eval -----------------------------
+evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
+greedy          | 164         | 67.68              | 62.20
+pass@4          | 164         | 78.66              | 72.56
+```
+
+## How the benchmarks are defined
+
+Each benchmark exists as a separate folder inside [nemo_skills/dataset](/nemo_skills/dataset). Inside
+those folders there needs to be `prepare.py` script which can be run to download and format benchmark
+data into a .jsonl input file (or files if it supports train/validation besides a test split) that
+our scripts can understand. There also needs to be an `__init__.py` that defines some default variables
+for that benchmark, such as prompt config, evaluation type, metrics class and a few more.
+
+This information is than used inside eval pipeline to initialize default setup (but all arguments can
+be changed from the command line).
+
+Let's look at gsm8k to understand a bit more how each part of the evaluation works.
+
+Inside [nemo_skills/dataset/gsm8k/__init__.py](/nemo_skills/dataset/gsm8k/__init__.py) we see the following
+
+```
+from nemo_skills.evaluation.metrics import MathMetrics
+
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+PROMPT_CONFIG = 'generic/math'
+DATASET_GROUP = 'math'
+METRICS_CLASS = MathMetrics
+DEFAULT_EVAL_ARGS = "++eval_type=math"
+DEFAULT_GENERATION_ARGS = ""
+```
+
+The prompt config and default generation arguments are passed to the
+[nemo_skills/inference/generate.py](/nemo_skills/inference/generate.py) and
+the default eval args are passed to the
+[nemo_skills/evaluation/evaluate_results.py](/nemo_skills/evaluation/evaluate_results.py).
+The dataset group is used by [nemo_skills/dataset/prepare.py](/nemo_skills/dataset/prepare.py)
+to help download only benchmarks from a particular group if `--dataset_groups` parameter is used.
+Finally, the metrics class is used by [nemo_skills/evaluation/metrics.py](/nemo_skills/evaluation/metrics.py)
+which is called when you run summarize results pipeline.
+
+To create a new benchmark in most cases you only need to add a new prepare script and the corresponding
+default prompt. If the new benchmark needs some not-supported post-processing or metric summarization
+you'd need to also add a new evaluation type and a new metrics class.

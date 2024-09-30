@@ -59,8 +59,8 @@ def nested_dataclass(*args, **kwargs):
     return wrapper(args[0]) if args else wrapper
 
 
-def unroll_files(prediction_jsonl_files):
-    for file_pattern in prediction_jsonl_files:
+def unroll_files(input_files):
+    for file_pattern in input_files:
         for file in sorted(glob.glob(file_pattern, recursive=True)):
             yield file
 
@@ -72,6 +72,7 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     formatter = logging.Formatter('%(asctime)s %(levelname)s  %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
 
     if disable_hydra_logs:
         # hacking the arguments to always disable hydra's output

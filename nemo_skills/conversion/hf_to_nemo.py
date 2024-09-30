@@ -16,6 +16,7 @@
 
 
 import os
+import shutil
 from argparse import ArgumentParser
 from collections import OrderedDict
 
@@ -44,14 +45,17 @@ def get_args():
         required=True,
         help="Path to Huggingface LLaMA checkpoints",
     )
-    parser.add_argument("--out-path", type=str, default=None, required=True, help="Path to output .nemo file.")
+    parser.add_argument(
+        "--out-path", type=str, default=None, required=True, help="Path to output nemo folder (untarred)."
+    )
     parser.add_argument("--precision", type=str, default="16", help="Model precision")
     parser.add_argument(
-        # this is required for Llama3 tokenizer loading as it's not in the checkpoint folder
+        # this is required for Llama3 tokenizer loading as it's not in the checkpoint dir
         '--hf-model-name',
         required=False,
         help="Name of HF model we are converting to (e.g. mistralai/Mistral-7B-v0.1)",
     )
+    parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
     args = parser.parse_args()
     return args
 
@@ -91,18 +95,22 @@ def load_config(llama_config):
         nemo_config.tokenizer = tokenizer_dict
 
     if llama_config['rope_scaling'] is not None:
-        if llama_config['rope_scaling']['type'] == 'linear':
-            nemo_config['seq_len_interpolation_factor'] = llama_config['rope_scaling']['factor']
+        rope_type = llama_config['rope_scaling'].get('rope_type')
+        if rope_type is None:
+            rope_type = llama_config['rope_scaling'].get('type')
+        if rope_type in ('linear', 'llama3'):
+            # TODO: some bug with that parameter?
+            # nemo_config['seq_len_interpolation_factor'] = llama_config['rope_scaling']['factor']
+            if rope_type == 'llama3':
+                nemo_config.scale_positional_embedding = True
         else:
             raise ValueError("Only linear rope scaling type is supported now")
-    if llama_config['rope_theta'] is not None:
-        nemo_config['rotary_base'] = llama_config['rope_theta']
 
     base = 128
     while llama_config['vocab_size'] % base != 0:
         base //= 2
     nemo_config.make_vocab_size_divisible_by = base
-
+    nemo_config.dist_ckpt_format = 'zarr'
     return nemo_config
 
 
@@ -310,21 +318,19 @@ def convert(args):
 
     model._save_restore_connector = NLPSaveRestoreConnector()
 
-    # We make sure that the tokenizer can be instantiated later regardless of args.input_name_or_path
-    if 'tokenizer_model' not in hf_config:
-        if hf_config['num_hidden_layers'] == 32:
-            model.cfg.tokenizer.update(type='meta-llama/Meta-Llama-3-8B')
-        elif hf_config['num_hidden_layers'] == 80:
-            model.cfg.tokenizer.update(type='meta-llama/Meta-Llama-3-70B')
-        else:
-            logging.warning("Unexpected model config for Llama3. Tokenizer config has not been modified.")
-
     # cast to target precision and disable cpu init
     dtype = torch_dtype_from_precision(precision)
     model = model.to(dtype=dtype)
     model.cfg.use_cpu_initialization = False
-
-    model.save_to(args.out_path)
+    model._save_restore_connector.pack_nemo_file = False
+    # removing out_path if it exists to avoid error
+    if args.override:
+        try:
+            shutil.rmtree(args.out_path)
+        except FileNotFoundError:
+            pass
+    # Adding a dummy model filename here conforms with SaveRestoreConnector's convention
+    model.save_to(os.path.join(args.out_path, 'model.nemo'))
     logging.info(f'NeMo model saved to: {args.out_path}')
 
 
