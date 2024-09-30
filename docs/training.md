@@ -41,7 +41,7 @@ so you can check their documentation to learn about all supported parameters.
 
 Here is an example of how to run a training job.
 
-python -m nemo_skills.pipeline.train \
+ns train \
     --cluster=slurm \
     --expname=my-training-job \
     --output_dir=/workspace/my-training-job/checkpoints \
@@ -83,7 +83,7 @@ an evaluation job right away by providing a `--run_after=my-training-job` argume
 which will appropriately set slurm dependencies.
 
 ```
-python -m nemo_skills.pipeline.eval \
+ns eval \
     --cluster=slurm \
     --model=/workspace/my-training-job/checkpoints/model-averaged-nemo \
     --server_type=nemo \

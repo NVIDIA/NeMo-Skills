@@ -14,7 +14,7 @@ Make sure to complete [prerequisites](/docs/prerequisites.md).
 3. Start the server hosting your model. Here is an example (make sure the `/hf_models` mount is defined in your cluster config).
 
    ```
-   python -m nemo_skills.pipeline.start_server \
+   ns start_server \
        --cluster local \
        --model /hf_models/Meta-Llama-3.1-8B-Instruct \
        --server_type vllm \

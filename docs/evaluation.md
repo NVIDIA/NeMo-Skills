@@ -23,7 +23,7 @@ Make sure that `/workspace` is mounted inside of your
 [cluster config](/docs/prerequisites.md#general-information).
 
 ```
-python -m nemo_skills.pipeline.eval \
+ns eval \
     --cluster local \
     --server_type openai \
     --model meta/llama-3.1-8b-instruct \
@@ -39,7 +39,7 @@ on slurm by default each benchmark is run in a separate job, but you can control
 After the evaluation is done, you can get metric by calling
 
 ```
-python -m nemo_skills.pipeline.summarize_results --cluster local /workspace/test-eval
+ns summarize_results --cluster local /workspace/test-eval
 ```
 
 Which should print the following
@@ -67,7 +67,7 @@ greedy decoding, but if you set `:4` it will run greedy + 4 samples with high te
 that can be used for majority voting or estimating pass@k. E.g. if we run with
 
 ```
-python -m nemo_skills.pipeline.eval \
+ns eval \
     --cluster=local \
     --server_type=openai \
     --model=meta/llama-3.1-8b-instruct \

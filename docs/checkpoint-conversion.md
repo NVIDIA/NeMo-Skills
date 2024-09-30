@@ -23,7 +23,7 @@ We support 3 common model formats. Here are some recommendations on when each fo
 To convert the checkpoint from one format to another use a command like this
 
 ```
-python -m nemo_skills.pipeline.convert \
+ns convert \
     --cluster=slurm \
     --input_model=/hf_models/Meta-Llama-3.1-70B-Instruct \
     --output_model=/trt_models/llama3.1-70b-instruct \

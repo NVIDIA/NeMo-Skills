@@ -48,7 +48,7 @@ Let's say you just want to generate greedy predictions for some data. Here is ho
    Here is an example for an API call:
 
    ```
-   python -m nemo_skills.pipeline.generate \
+   ns generate \
        --cluster=local \
        --server_type=openai \
        --model=meta/llama-3.1-8b-instruct \
@@ -61,7 +61,7 @@ Let's say you just want to generate greedy predictions for some data. Here is ho
    Here is an example of a self-hosted model call:
 
    ```
-   python -m nemo_skills.pipeline.generate \
+   ns generate \
        --cluster=local \
        --server_type=vllm \
        --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
@@ -99,7 +99,7 @@ many times with high temperature and then pick all solutions that lead to the ri
 Here is how you can do this with our generation pipeline.
 
 ```
-python -m nemo_skills.pipeline.generate \
+ns generate \
        --cluster=slurm \
        --server_type=trtllm \
        --model=/trt_models/llama-3.1-405b-instruct \
