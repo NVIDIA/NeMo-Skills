@@ -92,13 +92,21 @@ def get_selector_layout(options: Iterable, id: str, value: str = "") -> dbc.Sele
             }
             for value in options
         ],
-        value=value,
+        value=str(value),
     )
 
 
-def get_text_area_layout(id: str, value: str, text_modes: bool = False) -> Union[dbc.Textarea, html.Pre]:
-    return html.Pre(
-        get_single_prompt_output_layout(value, text_modes),
+def get_text_area_layout(
+    id: str, value: str, text_modes: List[str] = [], editable: bool = False
+) -> Union[dbc.Textarea, html.Pre]:
+    if editable and text_modes == []:
+        component = dbc.Textarea
+        children = {"value": value}
+    else:
+        component = html.Pre
+        children = {"children": get_single_prompt_output_layout(value, text_modes)}
+    return component(
+        **children,
         id=id,
         style={
             'width': '100%',
@@ -217,7 +225,10 @@ def get_input_group_layout(name: str, value: Union[str, int, float, bool]) -> db
         }
         if value is None:
             value = UNDEFINED
-    elif isinstance(value, (float, int, bool)):
+    elif isinstance(value, bool):
+        input_function = get_selector_layout
+        additional_params = {"options": [True, False]}
+    elif isinstance(value, (float, int)):
         input_function = dbc.Input
         additional_params = validation_parameters(name, value)
         additional_params["debounce"] = True

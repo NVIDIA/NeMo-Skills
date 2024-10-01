@@ -21,6 +21,12 @@ EXTRA_FIELDS = ["page_index", "file_name"]
 CHAT_MODE = "chat_mode"
 CHOOSE_MODEL = "choose generation"
 CODE = "code"
+CODE_SEPARATORS = {
+    "code_begin": '<llm-code>',
+    "code_end": '</llm-code>',
+    "code_output_begin": '<llm-code-output>',
+    "code_output_end": '</llm-code-output>',
+}
 CUSTOM = 'custom'
 DATA_PAGE_SIZE = 10
 EDIT_ICON_PATH = "assets/images/edit_icon.png"
@@ -30,11 +36,12 @@ FEW_SHOTS_INPUT = "few_shots_input"
 FILE_NAME = 'file_name'
 FILES_ONLY = "files_only"
 FILES_FILTERING = "add_files_filtering"
-QUESTIONS_FILTERING = "questions_filtering"
 GREEDY = "greedy"
+IGNORE_FIELDS = ['stop_phrases', 'used_prompt', 'server_type']
+QUESTIONS_FILTERING = "questions_filtering"
 QUERY_INPUT_TYPE = "query_input"
 QUERY_INPUT_ID = '{{"type": "{}", "id": "{}"}}'
-QUESTION_FIELD = "question"
+QUESTION_FIELD = "problem"
 ONE_SAMPLE_MODE = "one_sample"
 METRICS = "metrics"
 OUTPUT = "output"
@@ -63,7 +70,7 @@ RETRIEVAL_FIELDS = [
 ]
 STATS_KEYS = [
     'question_index',
-    'question',
+    'problem',
 ]
 SEPARATOR_DISPLAY = '.'
 SEPARATOR_ID = '->'

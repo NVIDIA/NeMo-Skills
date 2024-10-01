@@ -31,6 +31,7 @@ from settings.constants import (
     ANSWER_FIELD,
     ERROR_MESSAGE_TEMPLATE,
     FILE_NAME,
+    IGNORE_FIELDS,
     OUTPUT,
     PARAMETERS_FILE_NAME,
     PARAMS_TO_REMOVE,
@@ -199,7 +200,7 @@ def get_values_from_input_group(children: Iterable) -> Dict:
 
 
 def extract_query_params(query_params_ids: List[Dict], query_params: List[Dict]) -> Dict:
-    default_answer = {"question": "", "expected_answer": ""}
+    default_answer = {QUESTION_FIELD: "", "expected_answer": ""}
     try:
         query_params_extracted = {param_id['id']: param for param_id, param in zip(query_params_ids, query_params)}
     except ValueError:
@@ -211,7 +212,7 @@ def extract_query_params(query_params_ids: List[Dict], query_params: List[Dict])
 def get_utils_from_config_helper(cfg: Dict, display_path: bool = True) -> Dict:
     config = {}
     for key, value in sorted(cfg.items()):
-        if key in PARAMS_TO_REMOVE:
+        if key in PARAMS_TO_REMOVE or key in SETTING_PARAMS:
             continue
         elif isinstance(value, Dict):
             config = {
@@ -230,7 +231,7 @@ def get_utils_from_config(cfg: Dict, display_path: bool = True) -> Dict:
     return {
         SEPARATOR_DISPLAY.join(key.split(SEPARATOR_DISPLAY)[1:]) or key: value
         for key, value in get_utils_from_config_helper(cfg, display_path).items()
-        if key not in RETRIEVAL_FIELDS
+        if key not in RETRIEVAL_FIELDS + IGNORE_FIELDS
     }
 
 
@@ -573,14 +574,29 @@ def get_utils_dict(name: Union[str, Dict], value: Union[str, int], id: Union[str
 
 
 def initialize_default(
-    cls: Union[PromptTemplate, PromptConfig], specification={}
+    cls: Union[PromptTemplate, PromptConfig], specification: Dict = {}
 ) -> Union[PromptTemplate, PromptConfig]:
-    def get_default(field, specification={}):
+    if not specification:
+        specification = {}
+
+    def get_default(field, specification: Dict = None):
+        if not specification:
+            specification = {}
         _type = get_type_hints(cls)[field.name]
-        if field.name in specification:
-            return specification[field.name]
         if is_dataclass(_type):
-            return initialize_default(_type, specification)
+            return initialize_default(
+                _type,
+                {
+                    **specification,
+                    **(
+                        specification.get(field.name, {})
+                        if isinstance(specification.get(field.name, {}), Dict)
+                        else {}
+                    ),
+                },
+            )
+        if isinstance(specification, Dict) and field.name in specification:
+            return specification[field.name]
         else:
             args = get_args(_type)
             if len(args):

@@ -52,7 +52,7 @@ from utils.common import (
 from utils.strategies.strategy_maker import RunPromptStrategyMaker
 
 from nemo_skills.prompt.few_shot_examples import examples_map
-from nemo_skills.prompt.utils import PromptConfig, get_prompt
+from nemo_skills.prompt.utils import PromptConfig, get_prompt, load_config
 
 
 @app.callback(
@@ -210,7 +210,10 @@ def change_examples_page(
         Output("js_container", "children", allow_duplicate=True),
         Output("js_trigger", "children", allow_duplicate=True),
     ],
-    [Input("prompt_config", "value"), Input("prompt_template", "value")],
+    [
+        Input("prompt_config", "value"),
+        Input("prompt_template", "value"),
+    ],
     State("js_trigger", "children"),
     prevent_initial_call=True,
 )
@@ -221,22 +224,54 @@ def update_prompt_type(
     template_path = os.path.join(TEMPLATES_FOLDER, prompt_template)
     if (
         "used_prompt" in current_app.config['nemo_inspector']['prompt']
-        and config_path == current_app.config['nemo_inspector']['prompt']['used_prompt']
+        and (config_path, template_path) == current_app.config['nemo_inspector']['prompt']['used_prompt']
     ):
         output_len = len(get_utils_from_config(asdict(initialize_default(PromptConfig))).keys())
         return [no_update] * (output_len + 2)
 
-    current_app.config['nemo_inspector']['prompt']['used_prompt'] = config_path
-    if not os.path.isfile(config_path):
+    current_app.config['nemo_inspector']['prompt']['used_prompt'] = (config_path, template_path)
+    if not os.path.isfile(config_path) and not os.path.isfile(template_path):
         output_len = len(get_utils_from_config(asdict(initialize_default(PromptConfig))).keys())
         return [no_update] * (output_len + 2)
-    if not os.path.isfile(template_path):
-        template_path = None
-    prompt_config = get_prompt(config_path, template_path)
+    elif not os.path.isfile(config_path):
+        prompt_config = initialize_default(PromptConfig, load_config(template_path))
+    elif not os.path.isfile(template_path):
+        prompt_config = initialize_default(PromptConfig, asdict(get_prompt(config_path).config))
+    else:
+        prompt_config = initialize_default(PromptConfig, asdict(get_prompt(config_path, template_path).config))
+
+    current_app.config['nemo_inspector']['prompt']['stop_phrases'] = prompt_config.template.stop_phrases
+
     return [
         get_utils_field_representation(value, key)
-        for key, value in get_utils_from_config(asdict(prompt_config.config)).items()
+        for key, value in get_utils_from_config(asdict(prompt_config)).items()
     ] + ['', js_trigger + " "]
+
+
+@app.callback(
+    Output("dummy_output", "children", allow_duplicate=True),
+    [
+        Input("code_begin", "value"),
+        Input("code_end", "value"),
+        Input("code_output_begin", "value"),
+        Input("code_output_end", "value"),
+    ],
+    State(
+        "dummy_output",
+        'children',
+    ),
+    prevent_initial_call=True,
+)
+def update_code_separators(
+    code_begin: str, code_end: str, code_output_begin: str, code_output_end: str, dummy_data: str
+) -> Union[NoUpdate, dbc.AccordionItem]:
+    current_app.config['nemo_inspector']['inspector_params']['code_separators'] = (code_begin, code_end)
+    current_app.config['nemo_inspector']['inspector_params']['code_output_separators'] = (
+        code_output_begin,
+        code_output_end,
+    )
+
+    return dummy_data + " "
 
 
 @app.callback(
@@ -247,7 +282,6 @@ def update_prompt_type(
     Input("run_button", "n_clicks"),
     [
         State("utils_group", "children"),
-        State("range_random_seed_mode", "value"),
         State("run_mode_options", "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "value"),
         State({"type": QUERY_INPUT_TYPE, "id": ALL}, "id"),
@@ -259,7 +293,6 @@ def update_prompt_type(
 def get_run_test_results(
     n_clicks: int,
     utils: List[Dict],
-    range_random_mode: List[int],
     run_mode: str,
     query_params: List[str],
     query_params_ids: List[Dict],
@@ -281,10 +314,7 @@ def get_run_test_results(
         .get_strategy()
         .run(
             utils,
-            {
-                **query_store[0],
-                "range_random_mode": range_random_mode,
-            },
+            query_store[0],
         ),
         loading_container + " ",
     )

@@ -23,12 +23,19 @@ import hydra
 from dash import Dash
 from flask import Flask
 from omegaconf import DictConfig, OmegaConf, open_dict
-from settings.constants import CONFIGS_FOLDER, CUSTOM, RETRIEVAL, RETRIEVAL_FIELDS, TEMPLATES_FOLDER, UNDEFINED
+from settings.constants import (
+    CODE_SEPARATORS,
+    CONFIGS_FOLDER,
+    RETRIEVAL,
+    RETRIEVAL_FIELDS,
+    TEMPLATES_FOLDER,
+    UNDEFINED,
+)
 from settings.inspector_config import InspectorConfig
 from utils.common import initialize_default
 
 from nemo_skills.prompt.few_shot_examples import examples_map
-from nemo_skills.prompt.utils import PromptConfig
+from nemo_skills.prompt.utils import PromptConfig, get_prompt, load_config
 from nemo_skills.utils import setup_logging
 
 setup_logging()
@@ -81,17 +88,42 @@ def set_config(cfg: InspectorConfig) -> None:
     config['nemo_inspector'] = OmegaConf.to_container(cfg, resolve=True)
 
     config['nemo_inspector']['types'] = {
-        "prompt_config": [UNDEFINED, CUSTOM] + list_yaml_files(os.path.join(CONFIGS_FOLDER)),
-        "prompt_template": [UNDEFINED, CUSTOM] + list_yaml_files(os.path.join(TEMPLATES_FOLDER)),
+        "prompt_config": [UNDEFINED] + list_yaml_files(os.path.join(CONFIGS_FOLDER)),
+        "prompt_template": [UNDEFINED] + list_yaml_files(os.path.join(TEMPLATES_FOLDER)),
         "examples_type": [UNDEFINED, RETRIEVAL] + examples_types,
         "retrieval_field": [""],
     }
+    conf_path = config['nemo_inspector']['prompt_config'] if config['nemo_inspector']['prompt_config'] else ""
+    template_path = config['nemo_inspector']['prompt_template'] if config['nemo_inspector']['prompt_config'] else ""
+
+    if not os.path.isfile(conf_path) and not os.path.isfile(template_path):
+        prompt_config = initialize_default(PromptConfig)
+    elif not os.path.isfile(conf_path):
+        prompt_config = initialize_default(PromptConfig, load_config(template_path))
+    elif not os.path.isfile(template_path):
+        prompt_config = initialize_default(PromptConfig, asdict(get_prompt(config_path).config))
+    else:
+        prompt_config = initialize_default(PromptConfig, asdict(get_prompt(config_path, template_path).config))
+
+    config['nemo_inspector']['prompt'] = asdict(prompt_config)
+    for separator_type, separator in CODE_SEPARATORS.items():
+        if not config['nemo_inspector']['prompt']['template'][separator_type]:
+            config['nemo_inspector']['prompt']['template'][separator_type] = separator
+
+    config['nemo_inspector']['inspector_params']['code_separators'] = (
+        config['nemo_inspector']['prompt']['template']['code_begin'],
+        config['nemo_inspector']['prompt']['template']['code_end'],
+    )
+    config['nemo_inspector']['inspector_params']['code_output_separators'] = (
+        config['nemo_inspector']['prompt']['template']['code_output_begin'],
+        config['nemo_inspector']['prompt']['template']['code_output_end'],
+    )
 
     config['nemo_inspector']['prompt'] = asdict(initialize_default(PromptConfig))
     config['nemo_inspector']['retrieval_fields'] = get_specific_fields(config['nemo_inspector'], RETRIEVAL_FIELDS)
 
     config['nemo_inspector']['input_file'] = str(config['nemo_inspector']['input_file'])
-    for name in ['offset', 'max_samples', 'batch_size']:
+    for name in ['offset', 'max_samples', 'batch_size', 'skip_filled', 'dry_run']:
         config['nemo_inspector'].pop(name)
 
 
