@@ -59,8 +59,12 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
 @typer_unpacker
 def generate(
     ctx: typer.Context,
-    config_dir: str = typer.Option(None, help="Path to the cluster_configs dir"),
-    cluster: str = typer.Option(..., help="One of the configs inside cluster_configs"),
+    cluster: str = typer.Option(
+        None,
+        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
+    ),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API"),

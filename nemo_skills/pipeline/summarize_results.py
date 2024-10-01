@@ -38,12 +38,13 @@ def summarize_results(
         help="Path to the dir with results. Needs to contain <benchmark> dirs inside. "
         "If cluster is specified, will fetch the results from there.",
     ),
-    cluster: Optional[str] = typer.Option(
+    cluster: str = typer.Option(
         None,
-        help="Cluster configuration to take results from. If 'local' is explicitly specified, "
-        "we assume the location is relative to one of the mounted dirs.",
+        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument. "
+        "If not specified, will assume the results are in the local filesystem.",
     ),
-    config_dir: Optional[str] = typer.Option(None, help="Path to the cluster_configs dir."),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     benchmarks: Optional[str] = typer.Option(
         None,
         help="Specify benchmarks to run (comma separated). "
@@ -53,6 +54,8 @@ def summarize_results(
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
+
+    cluster = cluster or os.environ.get("NEMO_SKILLS_CONFIG")
 
     # copying results from the cluster if necessary
     if cluster is not None:

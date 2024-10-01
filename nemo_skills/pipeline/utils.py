@@ -19,7 +19,6 @@ import shlex
 import subprocess
 import tarfile
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 import nemo_run as run
@@ -170,58 +169,62 @@ class CustomJobDetails(SlurmJobDetails):
     def srun_stderr(self) -> Path:
         return Path(self.folder) / f"{self.log_prefix}_srun.log"
 
+    @property
+    def ls_term(self) -> str:
+        """This term will be used to fetch the logs.
 
-# a very hacky way to cache cluster config - is there a better way to do this?
-class hashabledict(dict):
-    def __hash__(self):
-        return hash(frozenset(self))
+        The command used to list the files is ls -1 {ls_term} 2> /dev/null
+        """
+        assert self.folder
+        return os.path.join(self.folder, "*_srun.log")
 
 
-def get_cluster_config(cluster, config_dir=None):
+def read_config(config_file):
+    with open(config_file, "rt", encoding="utf-8") as fin:
+        cluster_config = yaml.safe_load(fin)
+
+    return cluster_config
+
+
+def get_cluster_config(cluster=None, config_dir=None):
     """Trying to find an appropriate cluster config.
 
     Will search in the following order:
-    1. NEMO_SKILLS_CONFIG_DIR environment variable
-    2. config_dir parameter
+    1. config_dir parameter
+    2. NEMO_SKILLS_CONFIG_DIR environment variable
     3. Current folder / cluster_configs
     4. This file folder / ../../cluster_configs
 
-    If NEMO_SKILLS_CONFIG is provided, it will be used as a full path to the config file
+    If NEMO_SKILLS_CONFIG is provided and cluster is None,
+    it will be used as a full path to the config file
     and NEMO_SKILLS_CONFIG_DIR will be ignored.
     """
-    config_file = None
+    # if cluster is provided, we try to find it in one of the folders
+    if cluster is not None:
+        # either using the provided config_dir or getting from env var
+        config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
+        if config_dir:
+            return read_config(Path(config_dir) / f"{cluster}.yaml")
 
-    # First check if NEMO_SKILLS_CONFIG is provided as a full path
-    if 'NEMO_SKILLS_CONFIG' in os.environ:
-        config_file = Path(os.environ['NEMO_SKILLS_CONFIG'])
-        config_dir = config_file.parent
+        # if it's not defined we are trying to find locally
+        if (Path.cwd() / 'cluster_configs' / f"{cluster}.yaml").exists():
+            return read_config(Path.cwd() / 'cluster_configs' / f"{cluster}.yaml")
 
-    # Then check if NEMO_SKILLS_CONFIG_DIR is provided
-    elif 'NEMO_SKILLS_CONFIG_DIR' in os.environ:
-        config_dir = Path(os.environ['NEMO_SKILLS_CONFIG_DIR'])
+        if (Path(__file__).parents[2] / 'cluster_configs' / f"{cluster}.yaml").exists():
+            return read_config(Path(__file__).parents[2] / 'cluster_configs' / f"{cluster}.yaml")
 
-    # If config_dir was provided, or one of the above env variables was set
-    if config_dir is not None:
-        config_dir = Path(str(config_dir))
-    else:
-        # If no config_dir was provided, we will try to find the config in the current or parent folder
-        if (Path.cwd() / 'cluster_configs').is_dir():
-            config_dir = Path.cwd() / 'cluster_configs'
-        else:
-            config_dir = Path(__file__).parents[2] / 'cluster_configs'
+        raise ValueError(f"Cluster config {cluster} not found in any of the supported folders.")
 
-    # If config_file is not already resolved, concatenate the config_dir with the cluster name
-    if config_file is None:
-        config_file = config_dir / f'{cluster}.yaml'
+    config_file = os.environ.get("NEMO_SKILLS_CONFIG")
+    if not config_file:
+        raise ValueError("Either cluster or NEMO_SKILLS_CONFIG must be provided.")
 
-    # Read the config
-    with open(str(config_file), "rt", encoding="utf-8") as fin:
-        cluster_config = yaml.safe_load(fin)
+    if not Path(config_file).exists():
+        raise ValueError(f"Cluster config {config_file} not found.")
 
-    return hashabledict(cluster_config)
+    return read_config(config_file)
 
 
-@lru_cache
 def get_tunnel(cluster_config):
     return run.SSHTunnel(**cluster_config["ssh_tunnel"])
 
@@ -252,7 +255,6 @@ def cluster_download(tunnel, remote_dir, local_dir):
     os.remove(local_tar)
 
 
-@lru_cache
 def get_packager():
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     try:
@@ -386,7 +388,6 @@ def get_mounts_from_config(cluster_config: dict, env_vars: dict = None):
     return mounts
 
 
-@lru_cache
 def get_executor(
     cluster_config,
     container,

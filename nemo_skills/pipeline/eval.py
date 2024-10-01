@@ -68,7 +68,12 @@ class SupportedServers(str, Enum):
 @typer_unpacker
 def eval(
     ctx: typer.Context,
-    cluster: str = typer.Option(..., help="One of the configs inside ./cluster_configs or NEMO_SKILLS_CONFIG_DIR"),
+    cluster: str = typer.Option(
+        None,
+        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
+    ),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     output_dir: str = typer.Option(..., help="Where to store evaluation results"),
     benchmarks: str = typer.Option(
         ...,
@@ -76,7 +81,6 @@ def eval(
         "Use <benchmark>:0 to only run greedy decoding. Has to be comma-separated "
         "if providing multiple benchmarks. E.g. gsm8k:4,human-eval:0",
     ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     expname: str = typer.Option("eval", help="Name of the experiment"),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),

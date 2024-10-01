@@ -30,13 +30,17 @@ class SupportedServers(str, Enum):
 @app.command()
 @typer_unpacker
 def start_server(
-    cluster: str = typer.Option(..., help="One of the configs inside cluster_configs"),
+    cluster: str = typer.Option(
+        None,
+        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
+    ),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     model: str = typer.Option(..., help="Path to the model"),
     server_type: SupportedServers = typer.Option('trtllm', help="Type of server to use"),
     server_gpus: int = typer.Option(..., help="Number of GPUs to use for hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
-    config_dir: str = typer.Option(None, help="Path to the cluster_configs dir"),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     with_sandbox: bool = typer.Option(False, help="Enables local sandbox if code execution is required"),
@@ -66,7 +70,7 @@ def start_server(
         add_task(
             exp,
             cmd="",  # not running anything except the server
-            task_name=f'server-{model.replace("/", "-")}',
+            task_name='server',
             log_dir=log_dir,
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
@@ -77,7 +81,6 @@ def start_server(
         # we don't want to detach in this case even on slurm, so not using run_exp
         exp.run(detach=False, tail_logs=True)
         # TODO: seems like not being killed? If nemorun doesn't do this, we can catch the signal and kill the server ourselves
-        # TODO: logs not streamed, probably a bug with custom log path
 
 
 if __name__ == "__main__":

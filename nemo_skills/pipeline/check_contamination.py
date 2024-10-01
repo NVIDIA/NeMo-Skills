@@ -42,9 +42,13 @@ class SupportedServers(str, Enum):
 @typer_unpacker
 def check_contamination(
     ctx: typer.Context,
-    config_dir: str = typer.Option(None, help="Path to the cluster_configs dir"),
+    cluster: str = typer.Option(
+        None,
+        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
+    ),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs"),
-    cluster: str = typer.Option(..., help="One of the configs inside cluster_configs"),
     input_file: str = typer.Option(
         ..., help="Input file with the data to check for contamination. An output of the retrieve_similar.py script."
     ),
