@@ -22,7 +22,7 @@ import nemo_run as run
 import typer
 from typer.models import ParameterInfo
 
-from nemo_skills.pipeline.utils import get_mounts_from_config
+from nemo_skills.pipeline.utils import get_mounts_from_config, get_tunnel
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -88,7 +88,11 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
         if ssh_tunnel_config is None:
             raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
 
-        tunnel = run.SSHTunnel(job_dir=directory[0], **ssh_tunnel_config)
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = directory[0]
+
+        tunnel = get_tunnel(cluster_config)
         for dir_path in directory:
             tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
             logging.info(f"Created directory: {dir_path} on remote cluster.")
@@ -111,37 +115,54 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         tunnel = run.LocalTunnel(job_dir=None)
 
         all_dirs_exist = True
+        missing_source_locations = []
         for directory in directories:
             result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
 
             if "Directory Exists" not in result.stdout:
-                logging.info(f"`{directory}` DOES NOT exist at the source location for mounting !!")
-                all_dirs_exist = False
+                missing_source_locations.append(directory)
 
         tunnel.cleanup()
 
-        if not all_dirs_exist and exit_on_failure:
-            exit(1)
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
 
     elif cluster_config.get('executor') == 'slurm':
         ssh_tunnel_config = cluster_config.get('ssh_tunnel', None)
         if ssh_tunnel_config is None:
             raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
 
-        tunnel = run.SSHTunnel(job_dir=os.getcwd(), **ssh_tunnel_config)
-        all_dirs_exist = True
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = os.getcwd()
+
+        tunnel = get_tunnel(cluster_config)
+        missing_source_locations = []
 
         for directory in directories:
             result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
 
             if "Directory Exists" not in result.stdout:
-                logging.info(f"`{directory}` DOES NOT exist at the source location for mounting !!")
-                all_dirs_exist = False
+                missing_source_locations.append(directory)
 
         tunnel.cleanup()
 
-        if not all_dirs_exist and exit_on_failure:
-            exit(1)
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
 
     else:
         raise ValueError(f"Unsupported executor: {cluster_config.get('executor')}")
