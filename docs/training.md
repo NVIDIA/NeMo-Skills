@@ -41,6 +41,7 @@ so you can check their documentation to learn about all supported parameters.
 
 Here is an example of how to run a training job.
 
+```
 ns train \
     --cluster=slurm \
     --expname=my-training-job \
@@ -50,6 +51,7 @@ ns train \
     --num_gpus=8 \
     --num_training_jobs=4 \
     --training_data=/data/sft-data.jsonl
+```
 
 This will run training on 8 nodes of 8 GPUs, using 4 dependent slurm jobs.
 By default we are training for 2 epochs, saving checkpoints every 1000 steps,

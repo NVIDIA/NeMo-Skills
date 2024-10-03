@@ -16,6 +16,7 @@
 
 import json
 import logging
+import os
 import sys
 from typing import Any
 
@@ -80,6 +81,8 @@ cs.store(name="base_retrieve_similar_conifg", node=RetrieveSimilarConfig)
 def retrieve_similar(cfg: RetrieveSimilarConfig):
     cfg = RetrieveSimilarConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
+
+    os.makedirs(os.path.dirname(cfg.output_file), exist_ok=True)
 
     model = SentenceTransformer(cfg.model)
 

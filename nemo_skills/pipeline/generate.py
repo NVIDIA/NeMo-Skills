@@ -64,7 +64,6 @@ def generate(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API"),
@@ -89,6 +88,8 @@ def generate(
     run_after: str = typer.Option(
         None, help="Can specify an expname that needs to be completed before this one starts"
     ),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
     """Generate LLM completions for a given input file."""
     setup_logging(disable_hydra_logs=False)
@@ -101,6 +102,10 @@ def generate(
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
+    if log_dir:
+        check_if_mounted(cluster_config, log_dir)
+    else:
+        log_dir = f"{output_dir}/generation-logs"
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
@@ -134,7 +139,7 @@ def generate(
                     exp,
                     cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
                     task_name=f'generate-rs{seed}',
-                    log_dir=f"{output_dir}/generation-logs",
+                    log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
                     partition=partition,
@@ -154,7 +159,7 @@ def generate(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
                 task_name="generate",
-                log_dir=f"{output_dir}/generation-logs",
+                log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 partition=partition,

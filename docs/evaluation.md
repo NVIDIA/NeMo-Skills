@@ -24,12 +24,12 @@ Make sure that `/workspace` is mounted inside of your
 
 ```
 ns eval \
-    --cluster local \
-    --server_type openai \
-    --model meta/llama-3.1-8b-instruct \
-    --server_address https://integrate.api.nvidia.com/v1 \
-    --benchmarks gsm8k:0,human-eval:0 \
-    --output_dir /workspace/test-eval
+    --cluster=local \
+    --server_type=openai \
+    --model=meta/llama-3.1-8b-instruct \
+    --server_address=https://integrate.api.nvidia.com/v1 \
+    --benchmarks=gsm8k:0,human-eval:0 \
+    --output_dir=/workspace/test-eval
 ```
 
 This will run evaluation on gsm8k and human-eval for Llama 3.1 8B model. If you're running

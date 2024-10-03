@@ -38,9 +38,9 @@ using Llama-405B from Nvidia API catalog, but you can replace it with OpenAI mod
 
 ```
 ns check_contamination \
-    --cluster local \
-    --input_file /workspace/NeMo-Skills/math-contamination-retrieved.jsonl \
-    --output_file /workspace/NeMo-Skills/math-contamination-results.jsonl \
+    --cluster=local \
+    --input_file=/workspace/NeMo-Skills/math-contamination-retrieved.jsonl \
+    --output_file=/workspace/NeMo-Skills/math-contamination-results.jsonl \
     --server_type=openai \
     --model=meta/llama-3.1-405b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1

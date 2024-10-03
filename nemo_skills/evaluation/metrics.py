@@ -168,7 +168,7 @@ class MathMetrics(BaseMetrics):
             self.any_correct += current_correct_sympy or current_correct_judge
             if current_correct_sympy != current_correct_judge:
                 LOG.debug(
-                    "Discrepancy between sympy (%s) and LLM checkers (%s).\n"
+                    "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
                     "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
                     bool(current_correct_sympy),
                     bool(current_correct_judge),

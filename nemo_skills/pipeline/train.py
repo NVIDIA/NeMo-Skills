@@ -144,7 +144,6 @@ def train(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     output_dir: str = typer.Option(..., help="Where to put results"),
     final_nemo_path: str = typer.Option(None, help="Where to put the final checkpoint"),
     expname: str = typer.Option(..., help="Experiment name"),
@@ -163,6 +162,8 @@ def train(
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     average_steps: list[int] = typer.Option(None, help="List of checkpoint steps to average"),
     run_after: str = typer.Option(None, help="Experiment to run after"),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
     """Train (SFT or DPO) an LLM model."""
     setup_logging(disable_hydra_logs=False)
@@ -178,6 +179,10 @@ def train(
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
     check_if_mounted(cluster_config, nemo_model)
+    if log_dir:
+        check_if_mounted(cluster_config, log_dir)
+    else:
+        log_dir = output_dir
 
     if num_training_jobs > 0:
         if training_data is None:
@@ -215,7 +220,7 @@ def train(
                 exp,
                 cmd=train_cmd,
                 task_name=f'{training_algo}-{job_id}',
-                log_dir=f"{output_dir}/training-logs",
+                log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["nemo"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
@@ -237,7 +242,7 @@ def train(
             exp,
             cmd=cmd,
             task_name="prepare-eval",
-            log_dir=f"{output_dir}/prepare-eval-logs",
+            log_dir=f"{log_dir}/prepare-eval-logs",
             container=cluster_config["containers"]['nemo'],
             cluster_config=cluster_config,
             partition=partition,

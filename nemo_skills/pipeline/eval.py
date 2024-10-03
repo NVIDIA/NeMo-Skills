@@ -73,7 +73,6 @@ def eval(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     output_dir: str = typer.Option(..., help="Where to store evaluation results"),
     benchmarks: str = typer.Option(
         ...,
@@ -95,6 +94,8 @@ def eval(
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
     run_after: str = typer.Option(None, help="Task to run after the evaluation"),
+    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -112,6 +113,10 @@ def eval(
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
+    if log_dir:
+        check_if_mounted(cluster_config, log_dir)
+    else:
+        log_dir = f"{output_dir}/eval-logs"
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
@@ -172,7 +177,7 @@ def eval(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=eval_cmd),
                 task_name=f'eval-{idx}',
-                log_dir=f"{output_dir}/eval-logs",
+                log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 partition=partition,
