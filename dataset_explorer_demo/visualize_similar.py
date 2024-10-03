@@ -16,17 +16,20 @@ import json
 import os
 import random
 import re
+from functools import lru_cache
 
 import gradio as gr
 from latex2mathml.converter import convert
 from latex2mathml.exceptions import NoAvailableTokensError
 
 
+@lru_cache(maxsize=1000)
 def load_jsonl(file_path):
     with open(file_path, 'r') as f:
         return [json.loads(line) for line in f]
 
 
+@lru_cache(maxsize=10000)
 def render_latex(text):
     def replace_matrix(match):
         matrix_content = match.group(1)
@@ -91,12 +94,19 @@ def render_latex(text):
     return text
 
 
-def display_entry(index, data_openmath2, data_math_train, current_test_set):
+@lru_cache(maxsize=1000)
+def display_entry(index, test_set):
+    data_openmath2, data_math_train = load_test_sets(f"{test_set}.jsonl")
+
+    # Check if the index is valid
+    if index < 0 or index >= len(data_openmath2):
+        return f"Error: Invalid index. Please enter a number between 0 and {len(data_openmath2) - 1}."
+
     entry_openmath2 = data_openmath2[index]
     entry_math_train = data_math_train[index]
 
     # Check if the current test set is GSM8K
-    if current_test_set == "gsm8k":
+    if test_set == "gsm8k":
         test_problem = entry_openmath2['problem']
         similar_openmath2 = entry_openmath2['similar_items']
         similar_math_train = entry_math_train['similar_items']
@@ -128,6 +138,7 @@ def random_entry(data):
     return random.randint(0, len(data) - 1)
 
 
+@lru_cache(maxsize=10)
 def load_test_sets(test_set):
     file_path_openmath2 = f'./similar-retrieved-openmath2/{test_set}'
     file_path_math_train = f'./similar-retrieved-math-train/{test_set}'
@@ -177,45 +188,49 @@ with gr.Blocks() as demo:
 
     output = gr.HTML()
 
-    data_openmath2 = gr.State(load_test_sets(test_sets[0])[0])
-    data_math_train = gr.State(load_test_sets(test_sets[0])[1])
     current_test_set = gr.State(test_set_names[0])
 
     def update_test_set(test_set):
-        new_data_openmath2, new_data_math_train = load_test_sets(f"{test_set}.jsonl")
+        data_openmath2, data_math_train = load_test_sets(f"{test_set}.jsonl")
         warning = ""
         warning_visible = False
         if test_set == "omni-math":
             warning = "⚠️ Since Omni-Math benchmarks was released after we finished training of our models, we didn't perform decontamination with it and some of the problems might match exactly!"
             warning_visible = True
         return (
-            new_data_openmath2,
-            new_data_math_train,
             0,
-            display_entry(0, new_data_openmath2, new_data_math_train, test_set),
+            display_entry(0, test_set),
             warning,
             gr.update(visible=warning_visible),
             test_set,
+            gr.update(maximum=len(data_openmath2) - 1),  # Update the maximum allowed index
         )
 
-    def display_entry_wrapper(index, data_openmath2, data_math_train, current_test_set):
-        return display_entry(index, data_openmath2, data_math_train, current_test_set)
+    def display_entry_wrapper(index, current_test_set):
+        data_openmath2, _ = load_test_sets(f"{current_test_set}.jsonl")
+        # Ensure the index is within bounds
+        index = max(0, min(int(index), len(data_openmath2) - 1))
+        return display_entry(index, current_test_set)
 
-    def random_entry_wrapper(data_openmath2):
+    def random_entry_wrapper(current_test_set):
+        data_openmath2, _ = load_test_sets(f"{current_test_set}.jsonl")
         return random_entry(data_openmath2)
 
     test_set_dropdown.change(
         update_test_set,
         inputs=[test_set_dropdown],
-        outputs=[data_openmath2, data_math_train, index_input, output, warning_box, warning_box, current_test_set],
+        outputs=[
+            index_input,
+            output,
+            warning_box,
+            warning_box,
+            current_test_set,
+            index_input,
+        ],
     )
-    index_input.change(
-        display_entry_wrapper, inputs=[index_input, data_openmath2, data_math_train, current_test_set], outputs=output
-    )
-    random_button.click(random_entry_wrapper, inputs=[data_openmath2], outputs=index_input)
+    index_input.change(display_entry_wrapper, inputs=[index_input, current_test_set], outputs=output)
+    random_button.click(random_entry_wrapper, inputs=[current_test_set], outputs=index_input)
 
-    demo.load(
-        display_entry_wrapper, inputs=[index_input, data_openmath2, data_math_train, current_test_set], outputs=output
-    )
+    demo.load(display_entry_wrapper, inputs=[index_input, current_test_set], outputs=output)
 
 demo.launch(debug=False, server_name='0.0.0.0', server_port=5005)

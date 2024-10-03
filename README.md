@@ -25,8 +25,9 @@ commands and their options.
 
 ## OpenMathInstruct-2
 
-Using our pipelines we created [OpenMathInstruct-2 dataset](TBD) which consists of 14M question-solution pairs
-(> 600K unique questions), making it nearly eight times larger than the previous largest open-source math reasoning dataset.
+Using our pipelines we created [OpenMathInstruct-2 dataset](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2)
+which consists of 14M question-solution pairs (600K unique questions), making it nearly eight times larger
+than the previous largest open-source math reasoning dataset.
 
 The models trained on this dataset achieve strong results on common mathematical benchmarks.
 
@@ -48,7 +49,7 @@ The models trained on this dataset achieve strong results on common mathematical
     <td style="text-align: center;">12.7</td>
   </tr>
   <tr>
-    <td style="text-align: right;">OpenMath2-Llama3.1-8B (<a href="TBD">nemo</a> | <a href="TBD">HF</a>)</td>
+    <td style="text-align: right;">OpenMath2-Llama3.1-8B (<a href="https://huggingface.co/nvidia/OpenMath2-Llama3.1-8B-nemo">nemo</a> | <a href="https://huggingface.co/nvidia/OpenMath2-Llama3.1-8B">HF</a>)</td>
     <td style="text-align: center;">91.7</td>
     <td style="text-align: center;">67.8</td>
     <td style="text-align: center;">16/40</td>
@@ -72,7 +73,7 @@ The models trained on this dataset achieve strong results on common mathematical
     <td style="text-align: center;">19.0</td>
   </tr>
   <tr>
-    <td style="text-align: right;">OpenMath2-Llama3.1-70B (<a href="TBD">nemo</a> | <a href="TBD">HF</a>)</td>
+    <td style="text-align: right;">OpenMath2-Llama3.1-70B (<a href="https://huggingface.co/nvidia/OpenMath2-Llama3.1-70B-nemo">nemo</a> | <a href="https://huggingface.co/nvidia/OpenMath2-Llama3.1-70B">HF</a>)</td>
     <td style="text-align: center;">94.9</td>
     <td style="text-align: center;">71.9</td>
     <td style="text-align: center;">20/40</td>
@@ -91,6 +92,8 @@ The models trained on this dataset achieve strong results on common mathematical
 
 We provide all instructions to [fully reproduce our results](/docs/reproducing-results.md).
 
+See our [paper](https://arxiv.org/abs/2410.01560) for ablations studies and more details!
+
 ## Nemo Inspector
 
 We also provide a convenient [tool](/nemo_inspector/Readme.md) for visualizing inference and data analysis
@@ -103,7 +106,14 @@ We also provide a convenient [tool](/nemo_inspector/Readme.md) for visualizing i
 
 If you find our work useful, please consider citing us!
 
-New paper TBD
+```bibtex
+@article{toshniwal2024openmath,
+  title   = {OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data},
+  author  = {Shubham Toshniwal and Wei Du and Ivan Moshkov and Branislav Kisacanin and Alexan Ayrapetyan and Igor Gitman},
+  year    = {2024},
+  journal = {arXiv preprint arXiv: Arxiv-2410.01560}
+}
+```
 
 ```bibtex
 @article{toshniwal2024openmath,

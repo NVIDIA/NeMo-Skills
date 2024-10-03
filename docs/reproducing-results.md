@@ -10,7 +10,7 @@ git checkout v0.1.1
 ```
 
 Below are the instructions for reproducing
-[OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data](TBD).
+[OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data](https://arxiv.org/abs/2410.01560).
 
 Please note that unless you have an access to a large GPU cluster, it might take a very long time
 for some of the commands to complete!
