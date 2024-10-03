@@ -112,7 +112,7 @@ output_dir = f"/workspace/{expname}/checkpoints"
 
 train(
     ctx=wrap_arguments(""),
-    clustercluster,
+    cluster=cluster,
     expname=expname,
     output_dir=output_dir,
     nemo_model="/nemo_models/llama3.1-8b-base",
