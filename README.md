@@ -107,7 +107,7 @@ We also provide a convenient [tool](/nemo_inspector/Readme.md) for visualizing i
 If you find our work useful, please consider citing us!
 
 ```bibtex
-@article{toshniwal2024openmath,
+@article{toshniwal2024openmathinstruct2,
   title   = {OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data},
   author  = {Shubham Toshniwal and Wei Du and Ivan Moshkov and Branislav Kisacanin and Alexan Ayrapetyan and Igor Gitman},
   year    = {2024},
@@ -116,7 +116,7 @@ If you find our work useful, please consider citing us!
 ```
 
 ```bibtex
-@article{toshniwal2024openmath,
+@article{toshniwal2024openmathinstruct1,
   title   = {OpenMathInstruct-1: A 1.8 Million Math Instruction Tuning Dataset},
   author  = {Shubham Toshniwal and Ivan Moshkov and Sean Narenthiran and Daria Gitman and Fei Jia and Igor Gitman},
   year    = {2024},
