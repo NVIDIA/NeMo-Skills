@@ -174,9 +174,9 @@ if running on slurm or using different paths.
 
 ## Dataset construction
 
-TBD
+Coming in a few days!
 
 
 ## Model training
 
-TBD
+Coming in a few days!
