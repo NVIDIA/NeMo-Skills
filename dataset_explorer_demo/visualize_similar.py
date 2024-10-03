@@ -176,7 +176,15 @@ if "math.jsonl" in test_sets:
 with gr.Blocks() as demo:
     gr.Markdown("# OpenMathInstruct-2 test set contamination explorer")
     gr.Markdown(
-        "See our full dataset at HuggingFace: [OpenMathInstruct-2](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2)"
+        "During construction of OpenMathInstruct-2 we generated many synthetic problems. "
+        "We did a very thorough decontamination to remove exact duplicates (including rephrases) with popular benchmarks.<br>"
+        "Still our dataset contains many questions that are very similar to test sets. "
+        "To make things more transparent we created this demo, that you can use to explore "
+        "most similar questions from our data for each of the test set problems.<br>"
+        "We also provide closest examples from MATH training set, since it was used as seed data "
+        "to create our dataset and in most cases that training set already contains very similar questions to the test sets!<br>"
+        "See our full dataset at HuggingFace: [OpenMathInstruct-2](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2)<br>"
+        "And read our [paper](https://arxiv.org/abs/2410.01560) to learn more about the decontamination process and how we retrieve similar questions."
     )
 
     warning_box = gr.Markdown(visible=False)

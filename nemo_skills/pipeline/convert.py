@@ -147,7 +147,10 @@ def convert(
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
-    """Convert a checkpoint from one format to another."""
+    """Convert a checkpoint from one format to another.
+
+    All extra arguments are passed directly to the underlying conversion script (see their docs).
+    """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting conversion job")

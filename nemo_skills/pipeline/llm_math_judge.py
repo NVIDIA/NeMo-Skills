@@ -69,7 +69,11 @@ def llm_math_judge(
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
-    """Judge LLM math outputs using another LLM."""
+    """Judge LLM math outputs using another LLM.
+
+    Run `python -m nemo_skills.inference.llm_math_judge --help` for other supported arguments
+    (need to be prefixed with ++, since we use Hydra for that script).
+    """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting LLM math judge job")

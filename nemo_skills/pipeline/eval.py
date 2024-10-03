@@ -99,7 +99,8 @@ def eval(
 ):
     """Evaluate a model on specified benchmarks.
 
-    Any extra arguments will be directly passed to nemo_skills.inference.generate
+    Run `python -m nemo_skills.inference.generate --help` for other supported arguments
+    (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'

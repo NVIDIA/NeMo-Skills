@@ -91,7 +91,11 @@ def generate(
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
-    """Generate LLM completions for a given input file."""
+    """Generate LLM completions for a given input file.
+
+    Run `python -m nemo_skills.inference.generate --help` for other supported arguments
+    (need to be prefixed with ++, since we use Hydra for that script).
+    """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 

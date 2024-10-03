@@ -180,3 +180,8 @@ Coming in a few days!
 ## Model training
 
 Coming in a few days!
+
+
+## Dataset contamination explorer
+
+To reproduce our dataset contamination explorer demo refer to [dataset_explorer_demo/README.md](/dataset_explorer_demo/README.md)

@@ -165,7 +165,11 @@ def train(
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
-    """Train (SFT or DPO) an LLM model."""
+    """Train (SFT or DPO) an LLM model.
+
+    All extra arguments are passed directly to the training script
+    (need to be prefixed with ++, since NeMo uses Hydra).
+    """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")

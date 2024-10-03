@@ -74,7 +74,11 @@ def check_contamination(
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
 ):
-    """Check contamination between train/test via an LLM call."""
+    """Check contamination between train/test via an LLM call.
+
+    Run `python -m nemo_skills.inference.check_contamination --help` for other supported arguments
+    (need to be prefixed with ++, since we use Hydra for that script).
+    """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 
