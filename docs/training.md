@@ -94,7 +94,7 @@ ns eval \
     --server_gpus=8 \
     --run_after=my-training-job \
     ++prompt_template=llama3-instruct \
-    ++batch_size=128
+    ++batch_size=512
 ```
 
 In general we don't recommend to run inference using NeMo checkpoints as it is
@@ -148,7 +148,7 @@ convert(
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=llama3-instruct ++batch_size=128"),
+    ctx=wrap_arguments("++prompt_template=llama3-instruct ++batch_size=512"),
     cluster=cluster,
     model=f"{output_dir}/model-averaged-trtllm",
     server_type="trtllm",
