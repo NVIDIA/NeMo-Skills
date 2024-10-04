@@ -50,7 +50,10 @@ def get_unmounted_path(cluster_config, path):
     raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
 
 
-def _get_latest_dir(path) -> str:
+def _get_latest_dir(path, expname, job_id) -> str:
+    if job_id is not None:
+        return os.path.join(path, f"{expname}_{job_id}")
+
     dirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
     latest_dir = max(dirs, key=lambda d: os.path.getctime(os.path.join(path, d)))
     return os.path.join(path, latest_dir)
@@ -58,8 +61,15 @@ def _get_latest_dir(path) -> str:
 
 def get_exp_handles(expname):
     # TODO: remove this after we can properly use .from_title api
+    if "_" in expname:
+        try:
+            job_id = int(expname.split("_")[-1])
+            expname = expname[: expname.rfind("_")]
+        except:
+            job_id = None
+
     parent_dir = os.path.join(NEMORUN_HOME, "experiments", expname)
-    exp_dir = _get_latest_dir(parent_dir)
+    exp_dir = _get_latest_dir(parent_dir, expname, job_id)
 
     with open(os.path.join(exp_dir, '_TASKS')) as f:
         serialized_jobs = json.load(f)
@@ -67,7 +77,13 @@ def get_exp_handles(expname):
     serializer = ZlibJSONSerializer()
     handles = []
     for job in serialized_jobs:
-        handles.append(serializer.deserialize(job[0]).handle)
+        obj = serializer.deserialize(job[0])
+        if hasattr(obj, 'handle'):
+            handles.append(obj.handle)
+        elif hasattr(obj, 'handles'):
+            handles.extend(obj.handles)
+        else:
+            raise ValueError(f"Object {obj} does not have a handle or handles attribute.")
     return handles
 
 
