@@ -94,10 +94,10 @@ class GenerateSolutionsConfig:
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
 
-        if self.server.server_type != "openai" and self.prompt_template is None:
+        if self.server["server_type"] != "openai" and self.prompt_template is None:
             raise ValueError("Prompt template is required for non-OpenAI servers")
 
-        if self.server.server_type == "openai" and self.prompt_template is not None:
+        if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
 
