@@ -505,7 +505,7 @@ class VLLMModel(BaseModel):
         parse_response: bool = True,
     ) -> Union[list[str], openai.types.Completion]:
         if top_k == 0:
-            top_k = 1
+            top_k = -1
 
         # Process top_k
         extra_body = {
