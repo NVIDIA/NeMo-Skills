@@ -97,6 +97,8 @@ ns eval \
     ++batch_size=512
 ```
 
+## Python API
+
 In general we don't recommend to run inference using NeMo checkpoints as it is
 much slower than other server formats. Here is how you can chain the commands
 to schedule checkpoint conversion and evaluation after training

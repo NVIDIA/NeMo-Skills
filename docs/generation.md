@@ -110,7 +110,7 @@ ns generate \
        --eval_args="++eval_type=math" \
        ++dataset=math \
        ++split=train_full \
-       ++prompt_config=generic/math \
+       ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++prompt_template=llama3-base
 ```

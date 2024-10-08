@@ -24,8 +24,8 @@ trainer:
     max_epochs: 2
     max_steps: -1
 
-    val_check_interval: 1000  # TODO: currently float values are not supported
-    save_interval: ${.val_check_interval}
+    val_check_interval: ${.save_interval}
+    save_interval: 1000
 
     limit_val_batches: 1  # since loss is not meaningful by default we are limiting the validation batches to 1
     gradient_clip_val: null
@@ -52,7 +52,7 @@ exp_manager:
   create_checkpoint_callback: True
   checkpoint_callback_params:
     monitor: val_loss
-    save_top_k: 8
+    save_top_k: 50
     mode: min
     save_nemo_on_train_end: False
     filename: 'megatron_gpt_sft--{${exp_manager.checkpoint_callback_params.monitor}:.3f}-{step}-{consumed_samples}-{epoch}'

@@ -1437,6 +1437,7 @@ examples_map = {
     "math_standard_few_shot": math_standard_few_shot,
     "math_text_with_code": math_text_with_code,
     "math_text_detailed": math_text_detailed,
+    "math_problem_augmentation": math_problem_augmentation,
     # 7 subjects
     "math_text_with_code_algebra": math_text_with_code_algebra,
     "math_text_with_code_probability": math_text_with_code_probability,
@@ -1445,5 +1446,4 @@ examples_map = {
     "math_text_with_code_geometry": math_text_with_code_geometry,
     "math_text_with_code_precalculus": math_text_with_code_precalculus,
     "math_text_with_code_prealgebra": math_text_with_code_prealgebra,
-    "math_problem_augmentation": math_problem_augmentation,
 }

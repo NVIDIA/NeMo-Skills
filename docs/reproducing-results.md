@@ -3,7 +3,8 @@
 Make sure to complete [prerequisites](/docs/prerequisites.md).
 
 If you want to reproduce results for [OpenMathInstruct-1: A 1.8 Million Math Instruction Tuning Dataset](https://arxiv.org/abs/2402.10176)
-please check out v0.1.1 branch of the repository and read the instructions in there.
+please check out [v0.1.1](https://github.com/Kipok/NeMo-Skills/blob/v0.1.1/docs/reproducing-results.md)
+branch of the repository and read the instructions in there.
 
 ```bash
 git checkout v0.1.1
@@ -48,7 +49,13 @@ if running on slurm or using different paths.
 
    Change the number of GPUs if you have more than 1 (required for 70B model).
 
-3. Run greedy decoding.
+3. Prepare the data.
+
+   ```
+   python -m nemo_skills.dataset.prepare gsm8k math amc23 aime24 omni-math
+   ```
+
+4. Run greedy decoding.
 
    ```
    ns eval \
@@ -116,7 +123,7 @@ if running on slurm or using different paths.
 
    The numbers may vary by 1-2% depending on the server type, number of GPUs and batch size used.
 
-4. Run majority voting.
+5. Run majority voting.
 
    ```
    ns eval \
@@ -174,12 +181,294 @@ if running on slurm or using different paths.
 
 ## Dataset construction
 
-Coming in a few days!
+Here are the commands you can run to re-create [OpenMathInstruct-2 dataset](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2).
+We assume you have `/workspace` defined in your cluster config and are running
+all commands on a slurm cluster. Change the commands accordingly if running locally
+(but it's going to take a lot of time).
+We also assume you have the [Llama3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct)
+on that cluster inside `/trt_models/llama-3.1-405b-instruct` (should be mounted in your config)
+that's been [converted](/docs/checkpoint-conversion.md) to TensorRT-LLM format.
+See [generation docs](/docs/generation.md) for how you can change the below commands to instead
+run inference through Nvidia NIM API.
+
+1. Prepare the data
+
+   ```
+   python -m nemo_skills.dataset.prepare gsm8k math
+   ```
+
+2. Solution augmentation.
+   We generate multiple new solutions for each of the original training set problems.
+
+   MATH dataset.
+
+   ```
+   ns generate \
+       --cluster=slurm \
+       --server_type=trtllm \
+       --model=/trt_models/llama-3.1-405b-instruct \
+       --server_gpus=8 \
+       --server_nodes=2 \
+       --num_random_seeds=512 \
+       --output_dir=/workspace/solution-augmentation/math \
+       --eval_args="++eval_type=math" \
+       ++dataset=math \
+       ++split=train_full \
+       ++prompt_config=generic/math-base \
+       ++examples_type=math_text_detailed \
+       ++prompt_template=llama3-base
+   ```
+
+   GSM8K dataset.
+
+   ```
+   ns generate \
+       --cluster=slurm \
+       --server_type=trtllm \
+       --model=/trt_models/llama-3.1-405b-instruct \
+       --server_gpus=8 \
+       --server_nodes=2 \
+       --num_random_seeds=64 \
+       --output_dir=/workspace/solution-augmentation/gsm8k \
+       --eval_args="++eval_type=math" \
+       ++dataset=gsm8k \
+       ++split=train_full \
+       ++prompt_config=generic/math-base \
+       ++examples_type=gsm8k_text_detailed \
+       ++prompt_template=llama3-base
+   ```
+
+3. Problem augmentation.
+   We generate new problems using the problems from the training sets as a "seed".
+
+   MATH dataset.
+
+   ```
+   ns generate \
+       --cluster=slurm \
+       --server_type=trtllm \
+       --model=/trt_models/llama-3.1-405b-instruct \
+       --server_gpus=8 \
+       --server_nodes=2 \
+       --num_random_seeds=80 \
+       --output_dir=/workspace/problem-augmentation/math \
+       ++dataset=math \
+       ++split=train_full \
+       ++prompt_config=generic/problem-augmentation \
+       ++examples_type=math_problem_augmentation \
+       ++prompt_template=llama3-instruct
+   ```
+
+   GSM8K dataset.
+
+   ```
+   ns generate \
+       --cluster=slurm \
+       --server_type=trtllm \
+       --model=/trt_models/llama-3.1-405b-instruct \
+       --server_gpus=8 \
+       --server_nodes=2 \
+       --num_random_seeds=10 \
+       --output_dir=/workspace/problem-augmentation/gsm8k \
+       ++dataset=gsm8k \
+       ++split=train_full \
+       ++prompt_config=generic/problem-augmentation-similar \
+       ++examples_type=gsm8k_problem_augmentation \
+       ++prompt_template=llama3-instruct
+   ```
+
+4. Solution augmentation for the newly generated problems.
+   We generate 32 solutions for each of the new problems.
+
+   We use the Python API in commands below.
+
+   MATH dataset.
+
+   ```python
+   from nemo_skills.pipeline import wrap_arguments
+   from nemo_skills.pipeline.cli import generate
+
+   # we generated 80 new problems from each original seed problem, so we have a loop
+   # to now generate 32 solutions for each of those 80 new data files
+   for i in range(80):
+       generate(
+           cluster="slurm",
+           server_type="trtllm",
+           model="/trt_models/llama-3.1-405b-instruct",
+           server_gpus=8,
+           server_nodes=2,
+           num_random_seeds=32,
+           output_dir=f"/workspace/new-problems-solution-augmentation/math/problem-set{i}",
+           ctx=wrap_arguments(
+               f"++input_file=/workspace/solution-augmentation/math/generation/output-rs{i} "
+               f"++prompt_config=generic/math-base "
+               f"++examples_type=math_text_detailed "
+               f"++prompt_template=llama3-base "
+           ),
+       )
+   ```
+
+   GSM8K dataset.
+
+   ```python
+   from nemo_skills.pipeline import wrap_arguments
+   from nemo_skills.pipeline.cli import generate
+
+   # we generated 10 new problems from each original seed problem, so we have a loop
+   # to now generate 32 solutions for each of those 10 new data files
+   for i in range(10):
+       generate(
+           cluster="slurm",
+           server_type="trtllm",
+           model="/trt_models/llama-3.1-405b-instruct",
+           server_gpus=8,
+           server_nodes=2,
+           num_random_seeds=32,
+           output_dir=f"/workspace/new-problems-solution-augmentation/gsm8k/problem-set{i}",
+           ctx=wrap_arguments(
+               f"++input_file=/workspace/solution-augmentation/gsm8k/generation/output-rs{i} "
+               f"++prompt_config=generic/math-base "
+               f"++examples_type=gsm8k_text_detailed "
+               f"++prompt_template=llama3-base "
+           ),
+       )
+   ```
+
+5. Add majority answer as the ground-truth answer.
+   Either copy the data locally or run this command on a slurm node.
+   You also need to specify the full path to where `/workspace` is mounted
+   (we will make it more convenient in the near future by providing the same
+   Python/cmdline API as for other scripts).
+
+   ```python
+   import subprocess
+
+   # for MATH
+   data_folder = "<path to where /workspace is>/new-problems-solution-augmentation/math"
+   for i in range(80):
+       cmd = (
+           f'python -m nemo_skills.evaluation.fill_majority_answer '
+           f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
+       )
+       subprocess.run(cmd, shell=True, check=True)
+
+   # for GSM8K
+   data_folder = "<path to where /workspace is>/new-problems-solution-augmentation/gsm8k"
+   for i in range(10):
+       cmd = (
+           f'python -m nemo_skills.evaluation.fill_majority_answer '
+           f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
+       )
+       subprocess.run(cmd, shell=True, check=True)
+   ```
+
+6. Now all the data is generated and you can follow up by converting it to the SFT format.
+
+   TBD
 
 
 ## Model training
 
-Coming in a few days!
+We assume you have `/workspace` defined in your cluster config and are
+executing all commands from that folder locally. Change all commands accordingly
+if running on slurm or using different paths.
+
+1. Get the data from [HuggingFace](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2).
+   This might take 20-30 minutes (or more depending on your network connection) and will use ~20Gb of RAM.
+
+   ```python
+   import json
+
+   from datasets import load_dataset
+   from tqdm import tqdm
+
+   dataset = load_dataset('nvidia/OpenMathInstruct-2', split='train')
+
+   print("Converting dataset to jsonl format")
+   output_file = "openmathinstruct2.jsonl"
+   with open(output_file, 'w', encoding='utf-8') as f:
+       for item in tqdm(dataset):
+           f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+   print(f"Conversion complete. Output saved as {output_file}")
+   ```
+
+   You can also download a subset of the data by using e.g. `split='train_5M'` that we used to train 70B model.
+   See the dataset page for more details about this.
+
+2. Convert the data into the SFT format that NeMo-Aligner understands.
+
+   TBD
+
+3. Download the base model and convert it to NeMo format. The instructions below are for Llama3.1-8B, but the same
+   commands should work for 70B model as well.
+
+   ```
+   pip install -U "huggingface_hub[cli]"
+   huggingface-cli download meta-llama/Llama-3.1-8B --local-dir Llama-3.1-8B
+
+   ns convert \
+       --cluster=local \
+       --input_model=/workspace/Llama-3.1-8B \
+       --output_model=/workspace/llama3.1-8b-nemo \
+       --convert_from=hf \
+       --convert_to=nemo \
+       --num_gpus=1 \
+       --hf_model_name=meta-llama/Llama-3.1-8B
+   ```
+
+4. Run the training (assuming slurm configuration here with the same folder structure). If your cluster has strict
+   timeout policy, you can run multiple dependent jobs with `--num_training_jobs=N`.
+
+   ```
+   ns train \
+       --cluster=slurm \
+       --expname=openmathinstruct2-repro-8b \
+       --output_dir=/workspace/openmathinstruct2-repro/checkpoints \
+       --nemo_model=/workspace/llama3.1-8b-nemo \
+       --num_nodes=8 \
+       --num_gpus=8 \
+       --average_steps 10000 20000 30000 40000 50000 60000 \
+       --training_data=/workspace/openmathinstruct2-sft.jsonl \
+       ++model.data.train_ds.micro_batch_size=4 \
+       ++model.tensor_model_parallel_size=4 \
+       ++model.pipeline_model_parallel_size=1 \
+       ++model.optim.lr=2e-5 \
+       ++trainer.sft.save_interval=10000 \
+       ++trainer.sft.max_steps=60000 \
+       ++trainer.sft.max_epochs=-1
+   ```
+
+   For 70B model, we used 5M data subset and the following parameters, but training
+   it longer is likely going to improve results.
+
+   ```
+   ns train \
+       --cluster=slurm \
+       --expname=openmathinstruct2-repro-70b \
+       --output_dir=/workspace/openmathinstruct2-repro-70b/checkpoints \
+       --nemo_model=/workspace/llama3.1-70b-nemo \
+       --num_nodes=32 \
+       --num_gpus=8 \
+       --average_steps 3330 6660 9990 13320 16650 20000 \
+       --training_data=/workspace/openmathinstruct2-sft-5M.jsonl \
+       ++model.data.train_ds.micro_batch_size=1 \
+       ++model.tensor_model_parallel_size=8 \
+       ++model.pipeline_model_parallel_size=2 \
+       ++model.optim.lr=1e-5 \
+       ++trainer.sft.save_interval=3330 \
+       ++trainer.sft.max_steps=20000 \
+       ++trainer.sft.max_epochs=-1
+   ```
+
+   If you have a job timeout, it's necessary to set the maximum time per run to 40 minutes
+   before the timeout to allow for the final checkpoint to be saved. E.g. if your timeout is 4 hours,
+   add `++exp_manager.max_time_per_run=00:03:20:00`
+
+
+If you want to follow up with checkpoint conversion and evaluation, see
+[training docs](/docs/training.md#python-api) for an example of how to do it
+through a convenient Python API.
 
 
 ## Dataset contamination explorer
