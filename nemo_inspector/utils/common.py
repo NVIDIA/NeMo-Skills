@@ -438,7 +438,7 @@ def is_detailed_answers_rows_key(key: str) -> bool:
         key not in get_deleted_stats()
         and 'index' not in key
         and key not in STATS_KEYS + list(get_metrics([]).keys())
-        or key == 'question'
+        or key == QUESTION_FIELD
     )
 
 
