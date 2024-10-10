@@ -17,7 +17,9 @@ from typing import Tuple
 from callbacks import app
 from dash import html
 from dash.dependencies import Input, Output
+from flask import current_app
 from layouts import get_compare_test_layout, get_run_test_layout
+from settings.constants import CODE_BEGIN, CODE_END, CODE_OUTPUT_BEGIN, CODE_OUTPUT_END
 from utils.common import get_available_models, get_data_from_files, get_height_adjustment
 
 
@@ -33,6 +35,15 @@ def nav_click(url: str) -> Tuple[html.Div, bool, bool]:
     if url == "/":
         return get_run_test_layout(), True, False
     elif url == "/analyze":
+        config = current_app.config['nemo_inspector']
+        config['inspector_params']['code_separators'] = (
+            config['prompt']['template'][CODE_BEGIN],
+            config['prompt']['template'][CODE_END],
+        )
+        config['inspector_params']['code_output_separators'] = (
+            config['prompt']['template'][CODE_OUTPUT_BEGIN],
+            config['prompt']['template'][CODE_OUTPUT_END],
+        )
         get_data_from_files(datetime.now())
         get_available_models(datetime.now())
         return get_compare_test_layout(), False, True

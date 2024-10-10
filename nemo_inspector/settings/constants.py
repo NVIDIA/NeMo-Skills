@@ -20,6 +20,7 @@ NAME_FOR_BASE_MODEL = "base_generation"
 EXTRA_FIELDS = ["page_index", "file_name"]
 CHAT_MODE = "chat_mode"
 CHOOSE_MODEL = "choose generation"
+CHOOSE_LABEL = "choose label"
 CODE = "code"
 CODE_SEPARATORS = {
     "code_begin": '<llm-code>',
@@ -28,6 +29,7 @@ CODE_SEPARATORS = {
     "code_output_end": '</llm-code-output>',
 }
 CUSTOM = 'custom'
+DELETE = "delete"
 DATA_PAGE_SIZE = 10
 EDIT_ICON_PATH = "assets/images/edit_icon.png"
 SAVE_ICON_PATH = "assets/images/save_icon.png"
@@ -36,6 +38,12 @@ FEW_SHOTS_INPUT = "few_shots_input"
 FILE_NAME = 'file_name'
 FILES_ONLY = "files_only"
 FILES_FILTERING = "add_files_filtering"
+GENERAL_STATS = "general_stats"
+CODE_BEGIN = 'code_begin'
+CODE_END = 'code_end'
+CODE_OUTPUT_BEGIN = 'code_output_begin'
+CODE_OUTPUT_END = 'code_output_end'
+CONFIGS_FOLDER = os.path.join(Path(__file__).parents[2].absolute(), 'nemo_skills/prompt/config')
 GREEDY = "greedy"
 IGNORE_FIELDS = ['stop_phrases', 'used_prompt', 'server_type']
 QUESTIONS_FILTERING = "questions_filtering"
@@ -57,7 +65,6 @@ PARAMS_TO_REMOVE = [
 ]
 PARAMETERS_FILE_NAME = "nemo_inspector/results/parameters.json"
 TEMPLATES_FOLDER = os.path.join(Path(__file__).parents[2].absolute(), 'nemo_skills/prompt/template')
-CONFIGS_FOLDER = os.path.join(Path(__file__).parents[2].absolute(), 'nemo_skills/prompt/config')
 RETRIEVAL = 'retrieval'
 RETRIEVAL_FIELDS = [
     'max_retrieved_chars_field',
@@ -89,6 +96,3 @@ MODEL_SELECTOR_ID = '{{"type": "model_selector", "id": {}}}'
 LABEL_SELECTOR_ID = '{{"type": "label_selector", "id": {}}}'
 LABEL = "labels"
 LATEX = "latex"
-CHOOSE_LABEL = "choose label"
-DELETE = "delete"
-GENERAL_STATS = "general_stats"

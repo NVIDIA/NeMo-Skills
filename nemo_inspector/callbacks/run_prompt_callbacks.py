@@ -31,6 +31,10 @@ from layouts import (
     get_utils_field_representation,
 )
 from settings.constants import (
+    CODE_BEGIN,
+    CODE_END,
+    CODE_OUTPUT_BEGIN,
+    CODE_OUTPUT_END,
     CONFIGS_FOLDER,
     FEW_SHOTS_INPUT,
     QUERY_INPUT_TYPE,
@@ -251,10 +255,10 @@ def update_prompt_type(
 @app.callback(
     Output("dummy_output", "children", allow_duplicate=True),
     [
-        Input("code_begin", "value"),
-        Input("code_end", "value"),
-        Input("code_output_begin", "value"),
-        Input("code_output_end", "value"),
+        Input(CODE_BEGIN, "value"),
+        Input(CODE_END, "value"),
+        Input(CODE_OUTPUT_BEGIN, "value"),
+        Input(CODE_OUTPUT_END, "value"),
     ],
     State(
         "dummy_output",
