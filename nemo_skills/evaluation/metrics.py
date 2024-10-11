@@ -469,6 +469,78 @@ class ArenaMetrics(BaseMetrics):
         self.total = 0
 
 
+class AnswerJudgementMetrics(BaseMetrics):
+    def __init__(self):
+        self.reset()
+
+    def fill_up_missing(self):
+        return {'judgement': "Judgement: No", 'expected_judgement': "Judgement: No"}
+
+    def is_incomplete(self, elem):
+        return 'judgement' not in elem or 'expected_judgement' not in elem
+
+    def update(self, predictions, aggregation_mode):
+        """Updating the evaluation results with the current element.
+
+        Args:
+            predictions (list[dict]): aggregated predictions across all generations.
+                The content of the file is benchmark specific.
+            aggregation_mode (str): "best", "majority", "first", etc. Might vary by benchmark.
+        """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
+        self.total += 1
+        if aggregation_mode == "best":
+            is_correct = any(
+                [
+                    is_correct_judgement(elem['judgement']) == is_correct_judgement(elem['expected_judgement'])
+                    for elem in predictions
+                ]
+            )
+            self.total_correct += is_correct
+            if not is_correct:
+                if is_correct_judgement(predictions[0]['judgement']):
+                    self.fp_count += 1
+                else:
+                    self.fn_count += 1
+        elif aggregation_mode == "majority":
+            answers = [is_correct_judgement(elem['judgement']) for elem in predictions]
+            majority_judgement = Counter(answers).most_common(1)[0]
+            is_correct = majority_judgement == is_correct_judgement(predictions[0]['expected_judgement'])
+            self.total_correct += is_correct
+            if not is_correct:
+                if majority_judgement:
+                    self.fp_count += 1
+                else:
+                    self.fn_count += 1
+        elif aggregation_mode == "first":
+            is_correct = is_correct_judgement(predictions[0]['judgement']) == is_correct_judgement(
+                predictions[0]['expected_judgement']
+            )
+            self.total_correct += is_correct
+            if not is_correct:
+                if is_correct_judgement(predictions[0]['judgement']):
+                    self.fp_count += 1
+                else:
+                    self.fn_count += 1
+        else:
+            raise ValueError(f"Unsupported mode {aggregation_mode}")
+
+    def get_metrics(self):
+        return {
+            "num_entries": self.total,
+            "correct_judgements": self.total_correct / self.total * 100.0,
+            "false_positives": self.fp_count / self.total * 100.0,
+            "false_negatives": self.fn_count / self.total * 100.0,
+        }
+
+    def reset(self):
+        self.total_correct = 0
+        self.fp_count = 0
+        self.fn_count = 0
+        self.total = 0
+
+
 def read_predictions(predictions, evaluator, allow_incomplete=False):
     data = []
     for prediction in predictions:

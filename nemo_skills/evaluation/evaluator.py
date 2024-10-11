@@ -262,11 +262,16 @@ def eval_arena(cfg):
             Path(output_file).unlink()
 
 
+def dummy_eval(cfg):
+    return
+
+
 EVALUATOR_MAP = {
     'math': eval_math,
     'code': eval_code,
     'if': eval_if,
     'arena': eval_arena,
+    'answer_judgement': dummy_eval,
 }
 
 

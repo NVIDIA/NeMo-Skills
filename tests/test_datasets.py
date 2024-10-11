@@ -38,6 +38,7 @@ DATASETS = [
     ('mmlu', ['test', 'dev', 'val']),
     ('svamp', ['test']),
     ('tabmwp', ['train', 'validation', 'test']),
+    ('answer-judge', ['test']),
 ]
 
 
