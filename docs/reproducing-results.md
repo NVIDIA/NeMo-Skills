@@ -76,7 +76,8 @@ if running on slurm or using different paths.
    in the conversion command.
 
    After the generation is done, we want to run LLM-as-a-judge evaluation to get more
-   accurate numbers than symbolic comparison.
+   accurate numbers than symbolic comparison. You need to define `OPENAI_API_KEY` for
+   the command below to work.
 
    ```
    ns llm_math_judge \
@@ -161,7 +162,7 @@ if running on slurm or using different paths.
    ```
 
    Repeat the above steps for all benchmarks. Now we are ready to run the judge pipeline and summarize results
-   after it is finished.
+   after it is finished. You need to define `OPENAI_API_KEY` for the command below to work.
 
    ```
    ns llm_math_judge \

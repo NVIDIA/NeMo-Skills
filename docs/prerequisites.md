@@ -30,6 +30,8 @@ You might also need define the following environment variables in your `~/.bashr
 ```
 export WANDB_API_KEY=<your wandb api key if you want to use it for logging (can opt-out with --disable_wandb)>
 export HF_TOKEN=<if you plan to use gated models such as llama3>
+export OPENAI_API_KEY=<your openai key if you plan to use openai models>
+export NVIDIA_API_KEY=<your Nvidia api key if you plan to use Nvidia-hosted models>
 ```
 
 Finally, you will typically need to create an appropriate "cluster config" where you define how you want to run
