@@ -102,3 +102,32 @@ def test_code_sft_data():
     assert (
         expected_md5 == output_md5
     ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_sft_data.py"
+
+
+def test_openmathinstruct2():
+    output_file = "tests/data/openmathinstruct2-sft.jsonl"
+
+    subprocess.run(
+        "python -m nemo_skills.training.prepare_sft_data "
+        "++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
+        f"output_path={output_file} "
+        "++prompt_template=llama3-instruct "
+        "++prompt_config=generic/math "
+        "++output_key=generated_solution "
+        "++output_path='tests/data/openmathinstruct2-sft.jsonl' "
+        "++filters.drop_multi_boxed=false "
+        "++filters.trim_prefix=false "
+        "++filters.trim_solutions=false "
+        "++filters.drop_incorrect_arithmetic=false "
+        "++filters.split_arithmetic=false "
+        "++generation_suffix='\"<|eot_id|>\"'",
+        check=True,
+        shell=True,
+    )
+
+    expected_md5 = "981e11051436be68cdc45953888a5685"
+    output_md5 = compute_md5(output_file)
+
+    assert (
+        expected_md5 == output_md5
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_sft_data.py"

@@ -363,9 +363,88 @@ run inference through Nvidia NIM API.
        subprocess.run(cmd, shell=True, check=True)
    ```
 
-6. Now all the data is generated and you can follow up by converting it to the SFT format.
+6. Check for test set contamination.
+   We test against GSM8K, MATH, AMC 2023, and AIME 2024.  
+ 
+   Retrieve top-5 similar items from the test sets
+   ```
+   python -m nemo_skills.inference.retrieve_similar \
+      ++retrieve_from="./nemo_skills/dataset/gsm8k/test.jsonl ./nemo_skills/dataset/math/test.jsonl ./nemo_skills/dataset/amc23/test.jsonl ./nemo_skills/dataset/aime24/test.jsonl" \
+      ++compare_to="<path to workspace>/new-problems-solution-augmentation/**/output-rs0.jsonl" \
+      ++output_file=<path to workspace>/new-problems-solution-augmentation/contamination-retrieved.jsonl \
+      ++top_k=5
+   ```
+   > **_NOTE:_** Currently the above command doesn't run inside docker, so you will need to install additional packages.
 
-   TBD
+   Next, you need to run LLM inference to check those closest found problems from the output file. We use the Llama3.1-405B-Instruct model for this, and here's one way of doing it via Nvidia API catalog.
+
+    ```
+    ns check_contamination \
+        --cluster=local \
+        --input_file=/workspace/new-problems-solution-augmentation/contamination-retrieved.jsonl \
+        --output_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl \
+        --server_type=openai \
+        --model=meta/llama-3.1-405b-instruct \
+        --server_address=https://integrate.api.nvidia.com/v1 \
+        ++check_both_ways=True
+    ```
+    
+   Identify all the problems for which the `contaminated` key has the output True. 
+   Add the entry `"contaminated": True` in all the generation files in `<path to workspace>/new-problems-solution-augmentation/`. Here is a sample python script for this:
+
+    ```python
+    def load_contaminated_problems(jsonl_file):
+        contaminated_problems = set()
+        with open(jsonl_file, 'r') as f:
+            for line in f:
+                data = json.loads(line)
+                if data['contaminated']:
+                    contaminated_problems.add(data['problem'])
+        return contaminated_problems
+
+    def update_output_files(directory, contaminated_problems):
+        file_pattern = str(Path(directory) / '**' / 'output-rs*.jsonl')
+        for file_path in glob.glob(file_pattern, recursive=True):
+            temp_file_path = Path(file_path).with_suffix('.temp')
+            
+            with open(file_path, 'r') as input_file, open(temp_file_path, 'w') as output_file:
+                for line in input_file:
+                    data = json.loads(line)
+                    if data['problem'] in contaminated_problems:
+                        data['contaminated'] = True
+                    json.dump(data, output_file)
+                    output_file.write('\n')
+            
+            # Replace the original file with the updated one
+            temp_file_path.replace(file_path)
+            print(f"Updated file: {file_path}")
+
+    contaminated_problems = load_contaminated_problems("<path to workspace>/new-problems-solution-augmentation/contamination-llm.jsonl")
+
+    update_output_files("<path to workspace>/new-problems-solution-augmentation/", contaminated_problems)
+
+    ``` 
+
+
+
+7. Now all the data is generated and you can follow up by converting it to the SFT format.
+   We remove the problems marked as contaminated. 
+   We also remove solutions with length > 1024 Llama tokens.
+   To avoid the models from generating extremely short solutions, we remove solutions shorter than 200 characters.    
+   ```
+   python -m nemo_skills.training.prepare_sft_data \
+      ++prompt_template=llama3-instruct \
+      ++prompt_config=generic/math \
+      ++input_files="/workspace/solution-augmentation/**/output-rs*.jsonl /workspace/new-problems-solution-augmentation/**/output-rs*.jsonl" \
+      ++output_path=/workspace/sft_data.jsonl \
+      ++filters.remove_contamindated=true \
+      ++filters.remove_len_outlier_solutions=true \
+      ++use_chars_for_min_length=true \
+      ++min_solution_length=200 \
+      ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
+      ++max_solution_length=1024 \
+      ++generation_suffix='"<|eot_id|>"'
+   ```
 
 
 ## Model training
@@ -399,10 +478,22 @@ if running on slurm or using different paths.
 
 2. Convert the data into the SFT format that NeMo-Aligner understands.
 
-   TBD
+   ```
+    python -m nemo_skills.training.prepare_sft_data \
+       ++prompt_template=llama3-instruct \
+       ++prompt_config=generic/math \
+       ++preprocessed_dataset_files=/workspace/openmathinstruct2.jsonl \
+       ++output_key=generated_solution \
+       ++output_path=/workspace/openmathinstruct2-sft.jsonl \
+       ++filters.drop_multi_boxed=false \
+       ++filters.trim_prefix=false \
+       ++filters.trim_solutions=false \
+       ++filters.drop_incorrect_arithmetic=false \
+       ++filters.split_arithmetic=false \
+       ++generation_suffix='"<|eot_id|>"';
+   ```
 
-3. Download the base model and convert it to NeMo format. The instructions below are for Llama3.1-8B, but the same
-   commands should work for 70B model as well.
+3. Download the base model and convert it to NeMo format. The instructions below are for Llama3.1-8B, but the same commands should work for 70B model as well.
 
    ```
    pip install -U "huggingface_hub[cli]"

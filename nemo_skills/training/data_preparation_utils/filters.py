@@ -19,12 +19,14 @@ import re
 import warnings
 from itertools import chain
 from math import isclose
+from pathlib import Path
 from typing import List
 
 import tqdm
 from sdp.processors.base_processor import BaseParallelProcessor, DataEntry
 from tqdm.contrib.concurrent import process_map
 
+from nemo_skills.prompt.utils import load_config
 from nemo_skills.training.data_preparation_utils.arithmetic_utils import (
     extract_expressions,
     merge_solution_steps,
@@ -33,6 +35,7 @@ from nemo_skills.training.data_preparation_utils.arithmetic_utils import (
 
 LOG = logging.getLogger(__file__)
 
+PREFIX_SOLN = "My solution:\n"
 PATTERN_ANS = re.compile(r"\\boxed\{([^}]*)\}")
 PATTERN_PYTHON_CODE = re.compile("```[pP]ython")
 
@@ -61,7 +64,6 @@ class BaseFilter(BaseParallelProcessor):
 
 
 class DropMultiBoxed(BaseFilter):
-
     def __init__(self, solution_key: str = "generation", **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
@@ -83,87 +85,7 @@ class DropIncorrectCodeBlocks(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
-class MajorityFilter(BaseFilter):
-    def __init__(
-        self,
-        min_majority_votes: int = 0,
-        min_majority_percentage: int = 0.0,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.min_majority_votes = min_majority_votes
-        self.min_majority_percentage = min_majority_percentage
-
-    def process_dataset_entry(self, data_entry) -> List:
-        majority_votes = data_entry.get("majority_votes", None)
-        total_votes = data_entry.get("total_votes", None)
-        if majority_votes is None or total_votes is None:
-            return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
-        if majority_votes < self.min_majority_votes or majority_votes < total_votes * self.min_majority_percentage:
-            return [DataEntry(data=None, metrics=dict(num_removed=1))]
-
-        return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
-
-
-class RemoveLenOutlierSolutions(BaseFilter):
-    def __init__(
-        self,
-        solution_key: str = "generation",
-        min_length: int = 0,
-        max_length: int = None,
-        hf_model_name: str = None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.solution_key = solution_key
-        self.max_length = max_length
-        self.min_length = min_length
-
-        from transformers import AutoTokenizer
-
-        self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
-
-    def process_dataset_entry(self, data_entry):
-        solution = data_entry[self.solution_key]
-        solution_len = len(self.tokenizer.encode(solution, add_special_tokens=False))
-
-        if self.min_length <= solution_len <= self.max_length:
-            return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
-        else:
-            return [DataEntry(data=None, metrics=dict(num_removed=1))]
-
-
-class TrimSolutions(BaseFilter):
-
-    def __init__(self, solution_key: str = "generation", **kwargs):
-        super().__init__(**kwargs)
-        self.solution_key = solution_key
-
-    def process_dataset_entry(self, data_entry) -> List:
-        output_lines = data_entry[self.solution_key].split("\n")
-
-        stop_idx = 0
-        for idx, soln_line in enumerate(output_lines):
-            if PATTERN_ANS.findall(soln_line):
-                stop_idx = idx
-                break
-
-        if stop_idx < len(output_lines) - 1 and (
-            "\\end{align" in output_lines[stop_idx + 1]
-            or "\]" in output_lines[stop_idx + 1]
-            or "$$" in output_lines[stop_idx + 1]
-        ):
-            stop_idx = stop_idx + 1
-
-        trimmed_output = "\n".join(output_lines[: stop_idx + 1])
-        is_modified = trimmed_output != data_entry[self.solution_key]
-        data_entry[self.solution_key] = trimmed_output
-
-        return [DataEntry(data=data_entry, metrics=dict(num_modified=int(is_modified)))]
-
-
 class DropIncorrectArithmetic(BaseFilter):
-
     def __init__(self, solution_key: str = "generation", tolerance=1e-4, **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
@@ -192,8 +114,125 @@ class DropIncorrectArithmetic(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
-class SplitArithmetic(BaseFilter):
+class MajorityFilter(BaseFilter):
+    def __init__(
+        self,
+        min_majority_votes: int = 0,
+        min_majority_percentage: int = 0.0,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.min_majority_votes = min_majority_votes
+        self.min_majority_percentage = min_majority_percentage
 
+    def process_dataset_entry(self, data_entry) -> List:
+        majority_votes = data_entry.get("majority_votes", None)
+        total_votes = data_entry.get("total_votes", None)
+        if majority_votes is None or total_votes is None:
+            return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
+        if majority_votes < self.min_majority_votes or majority_votes < total_votes * self.min_majority_percentage:
+            return [DataEntry(data=None, metrics=dict(num_removed=1))]
+
+        return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
+
+
+class RemoveContaminated(BaseFilter):
+    def __init__(self, contamination_key: str = "contaminated", **kwargs):
+        super().__init__(**kwargs)
+        self.contamination_key = contamination_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        if self.contamination_key in data_entry and data_entry[self.contamination_key]:
+            return [DataEntry(data=None, metrics=dict(num_removed=1))]
+
+        return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
+
+
+class RemoveLenOutlierSolutions(BaseFilter):
+    """Remove solutions based on minimum and maximum lengths."""
+
+    def __init__(
+        self,
+        solution_key: str = "generation",
+        min_length: int = 0,
+        max_length: int = None,
+        hf_model_name: str = None,
+        use_chars_for_min_length: bool = False,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+        self.max_length = max_length
+        self.min_length = min_length
+        self.use_chars_for_min_length = use_chars_for_min_length
+
+        from transformers import AutoTokenizer
+
+        self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
+
+    def process_dataset_entry(self, data_entry):
+        solution = data_entry[self.solution_key]
+        solution_len = len(self.tokenizer.encode(solution, add_special_tokens=False))
+
+        if self.use_chars_for_min_length:
+            if len(solution) < self.min_length:
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+        else:
+            if solution_len < self.min_length:
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+
+        if solution_len > self.max_length:
+            return [DataEntry(data=None, metrics=dict(num_removed=1))]
+
+        return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
+
+
+class TrimPrefix(BaseFilter):
+    """Remove common prefix from solutions."""
+
+    def __init__(self, solution_key: str = "generation", **kwargs):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        if data_entry[self.solution_key].startswith(PREFIX_SOLN):
+            data_entry[self.solution_key] = data_entry[self.solution_key][len(PREFIX_SOLN) :]
+            return [DataEntry(data=data_entry, metrics=dict(num_modified=1))]
+
+        return [DataEntry(data=data_entry, metrics=dict(num_modified=0))]
+
+
+class TrimSolutions(BaseFilter):
+    """Filter for trimming solutions till the last line with the answer in \\boxed{}."""
+
+    def __init__(self, solution_key: str = "generation", **kwargs):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        output_lines = data_entry[self.solution_key].split("\n")
+
+        stop_idx = 0
+        for idx, soln_line in enumerate(output_lines):
+            if PATTERN_ANS.findall(soln_line):
+                stop_idx = idx
+                break
+
+        if stop_idx < len(output_lines) - 1 and (
+            "\\end{align" in output_lines[stop_idx + 1]
+            or "\]" in output_lines[stop_idx + 1]
+            or "$$" in output_lines[stop_idx + 1]
+        ):
+            stop_idx = stop_idx + 1
+
+        trimmed_output = "\n".join(output_lines[: stop_idx + 1])
+        is_modified = trimmed_output != data_entry[self.solution_key]
+        data_entry[self.solution_key] = trimmed_output
+
+        return [DataEntry(data=data_entry, metrics=dict(num_modified=int(is_modified)))]
+
+
+class SplitArithmetic(BaseFilter):
     def __init__(self, solution_key: str = "generation", **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
@@ -250,20 +289,21 @@ class SplitArithmetic(BaseFilter):
 
 
 class CodeTextFilter(BaseParallelProcessor):
-    def __init__(self, filter_type, solution_key='generation', **kwargs):
+    def __init__(self, filter_type, prompt_template, solution_key='generation', **kwargs):
         if 'in_memory_chunksize' not in kwargs:
             kwargs['in_memory_chunksize'] = 100000000
         if 'chunksize' not in kwargs:
             kwargs['chunksize'] = 100000
         super().__init__(**kwargs)
+        self.prompt_template = prompt_template
         self.text_filter_type = filter_type
         self.solution_key = solution_key
 
-    def process_dataset_entry(self, grouped_samples: List):
+    def process_dataset_entry(self, grouped_samples: List, code_begin_token: str):
         code_solns = []
         text_solns = []
         for sample in grouped_samples:
-            if CODE_SEPARATORS[0] in sample[self.solution_key]:
+            if code_begin_token in sample[self.solution_key]:
                 code_solns.append(sample)
             else:
                 text_solns.append(sample)
@@ -298,6 +338,8 @@ class CodeTextFilter(BaseParallelProcessor):
         self.prepare()
         os.makedirs(os.path.dirname(self.output_manifest_file), exist_ok=True)
         metrics = []
+        prompt = load_config(self.prompt_template, Path(__file__).absolute().parents[2] / 'prompt' / 'template')
+        code_begin_token = prompt.config.template.code_begin
 
         with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
             for manifest_chunk in self._chunk_manifest():
@@ -306,6 +348,7 @@ class CodeTextFilter(BaseParallelProcessor):
                     *process_map(
                         self.process_dataset_entry,
                         manifest_chunk,
+                        code_begin_token,
                         max_workers=self.max_workers,
                         chunksize=self.chunksize,
                     )
