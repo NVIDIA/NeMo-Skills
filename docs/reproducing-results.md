@@ -257,7 +257,8 @@ run inference through Nvidia NIM API.
        ++split=train_full \
        ++prompt_config=generic/problem-augmentation \
        ++examples_type=math_problem_augmentation \
-       ++prompt_template=llama3-instruct
+       ++prompt_template=llama3-instruct \
+       ++generation_key=problem
    ```
 
    GSM8K dataset.
@@ -275,7 +276,8 @@ run inference through Nvidia NIM API.
        ++split=train_full \
        ++prompt_config=generic/problem-augmentation-similar \
        ++examples_type=gsm8k_problem_augmentation \
-       ++prompt_template=llama3-instruct
+       ++prompt_template=llama3-instruct \
+       ++generation_key=problem
    ```
 
 4. Solution augmentation for the newly generated problems.
@@ -364,8 +366,8 @@ run inference through Nvidia NIM API.
    ```
 
 6. Check for test set contamination.
-   We test against GSM8K, MATH, AMC 2023, and AIME 2024.  
- 
+   We test against GSM8K, MATH, AMC 2023, and AIME 2024.
+
    Retrieve top-5 similar items from the test sets
    ```
    python -m nemo_skills.inference.retrieve_similar \
@@ -388,8 +390,8 @@ run inference through Nvidia NIM API.
         --server_address=https://integrate.api.nvidia.com/v1 \
         ++check_both_ways=True
     ```
-    
-   Identify all the problems for which the `contaminated` key has the output True. 
+
+   Identify all the problems for which the `contaminated` key has the output True.
    Add the entry `"contaminated": True` in all the generation files in `<path to workspace>/new-problems-solution-augmentation/`. Here is a sample python script for this:
 
     ```python
@@ -406,7 +408,7 @@ run inference through Nvidia NIM API.
         file_pattern = str(Path(directory) / '**' / 'output-rs*.jsonl')
         for file_path in glob.glob(file_pattern, recursive=True):
             temp_file_path = Path(file_path).with_suffix('.temp')
-            
+
             with open(file_path, 'r') as input_file, open(temp_file_path, 'w') as output_file:
                 for line in input_file:
                     data = json.loads(line)
@@ -414,7 +416,7 @@ run inference through Nvidia NIM API.
                         data['contaminated'] = True
                     json.dump(data, output_file)
                     output_file.write('\n')
-            
+
             # Replace the original file with the updated one
             temp_file_path.replace(file_path)
             print(f"Updated file: {file_path}")
@@ -423,14 +425,14 @@ run inference through Nvidia NIM API.
 
     update_output_files("<path to workspace>/new-problems-solution-augmentation/", contaminated_problems)
 
-    ``` 
+    ```
 
 
 
 7. Now all the data is generated and you can follow up by converting it to the SFT format.
-   We remove the problems marked as contaminated. 
+   We remove the problems marked as contaminated.
    We also remove solutions with length > 1024 Llama tokens.
-   To avoid the models from generating extremely short solutions, we remove solutions shorter than 200 characters.    
+   To avoid the models from generating extremely short solutions, we remove solutions shorter than 200 characters.
    ```
    python -m nemo_skills.training.prepare_sft_data \
       ++prompt_template=llama3-instruct \

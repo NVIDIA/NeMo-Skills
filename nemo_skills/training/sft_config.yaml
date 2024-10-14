@@ -178,5 +178,3 @@ model:
       warmup_steps: 0
       constant_steps: 0
       min_lr: ${model.optim.lr} # No interpolation happening if the min_lr is not set to be different from lr
-
-
