@@ -132,17 +132,41 @@ def generate(
     with run.Experiment(expname) as exp:
         if num_random_seeds:
             for seed in range(starting_seed, starting_seed + num_random_seeds):
-                assert dependent_jobs == 0
                 cmd = get_cmd(
                     random_seed=seed,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                 )
-                add_task(
+                prev_tasks = None
+                for _ in range(dependent_jobs):
+                    new_task = add_task(
+                        exp,
+                        cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
+                        task_name=f'generate-rs{seed}',
+                        log_dir=log_dir,
+                        container=cluster_config["containers"]["nemo-skills"],
+                        cluster_config=cluster_config,
+                        partition=partition,
+                        server_config=server_config,
+                        with_sandbox=True,
+                        run_after=run_after,
+                        task_dependencies=prev_tasks,
+                    )
+                    prev_tasks = [new_task]
+        else:
+            cmd = get_cmd(
+                random_seed=None,
+                output_dir=output_dir,
+                extra_arguments=extra_arguments,
+                eval_args=eval_args,
+            )
+            prev_tasks = None
+            for _ in range(dependent_jobs):
+                task = add_task(
                     exp,
                     cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
-                    task_name=f'generate-rs{seed}',
+                    task_name="generate",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
@@ -150,27 +174,9 @@ def generate(
                     server_config=server_config,
                     with_sandbox=True,
                     run_after=run_after,
+                    task_dependencies=prev_tasks,
                 )
-        else:
-            assert dependent_jobs == 0
-            cmd = get_cmd(
-                random_seed=None,
-                output_dir=output_dir,
-                extra_arguments=extra_arguments,
-                eval_args=eval_args,
-            )
-            add_task(
-                exp,
-                cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
-                task_name="generate",
-                log_dir=log_dir,
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-                partition=partition,
-                server_config=server_config,
-                with_sandbox=True,
-                run_after=run_after,
-            )
+                prev_tasks = [new_task]
         run_exp(exp, cluster_config)
 
 
