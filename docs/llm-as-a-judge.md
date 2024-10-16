@@ -45,7 +45,7 @@ greedy          | 30          | 20.00            | 20.00         | 20.00        
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
 greedy          | 1319        | 95.00            | 95.75         | 95.00        | 95.75       | 0.00
 
-                                                                                                                                                      -------------------------------------------------- math -------------------------------------------------
+------------------------------------------------- math -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
 greedy          | 5000        | 67.32            | 67.88         | 67.02        | 68.18       | 2.64
 
