@@ -32,6 +32,7 @@ def test_hf_trtllm_conversion():
         f"    --output_model /tmp/nemo-skills-tests/conversion/hf-to-trtllm/model "
         f"    --convert_from hf "
         f"    --convert_to trtllm "
+        f"    --model_type llama "
         f"    --num_gpus 1 "
         f"    --hf_model_name meta-llama/Meta-Llama-3.1-8B-Instruct "
     )
@@ -53,6 +54,7 @@ def test_hf_nemo_conversion():
         f"    --output_model /tmp/nemo-skills-tests/conversion/hf-to-nemo/model "
         f"    --convert_from hf "
         f"    --convert_to nemo "
+        f"    --model_type llama "
         f"    --num_gpus 1 "
         f"    --hf_model_name meta-llama/Meta-Llama-3.1-8B-Instruct "
         f"    --override "
@@ -75,6 +77,7 @@ def test_nemo_hf_conversion():
         f"    --output_model /tmp/nemo-skills-tests/conversion/nemo-to-hf/model "
         f"    --convert_from nemo "
         f"    --convert_to hf "
+        f"    --model_type llama "
         f"    --num_gpus 1 "
         f"    --hf_model_name meta-llama/Meta-Llama-3.1-8B-Instruct "
     )

@@ -61,7 +61,7 @@ def get_args():
 
 
 def load_config(llama_config):
-    nemo_config = OmegaConf.load(os.path.join(os.path.dirname(__file__), 'nemo_config.yaml')).model
+    nemo_config = OmegaConf.load(os.path.join(os.path.dirname(__file__), 'nemo_config_llama.yaml')).model
     if llama_config.get('rope_theta', None):
         nemo_config['rotary_base'] = llama_config['rope_theta']
     nemo_config.encoder_seq_length = llama_config['max_position_embeddings']

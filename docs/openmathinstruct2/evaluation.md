@@ -29,6 +29,7 @@ ns convert \
     --output_model=/workspace/openmath2-llama3.1-8b-trtllm \
     --convert_from=hf \
     --convert_to=trtllm \
+    --model_type=llama \
     --num_gpus=1 \
     --hf_model_name=nvidia/OpenMath2-Llama3.1-8B
 ```

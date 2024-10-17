@@ -25,6 +25,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
+        exclude: ^mkdocs\.yml$
       - id: check-case-conflict
       - id: detect-private-key
       - id: check-added-large-files

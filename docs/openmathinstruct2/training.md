@@ -63,6 +63,7 @@ ns convert \
     --output_model=/workspace/llama3.1-8b-nemo \
     --convert_from=hf \
     --convert_to=nemo \
+    --model_type=llama \
     --num_gpus=1 \
     --hf_model_name=meta-llama/Llama-3.1-8B
 ```

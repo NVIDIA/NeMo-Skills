@@ -7,14 +7,16 @@
     All extra parameters are passed to one of the following scripts
 
     * For conversion to NeMo:
-        - Default: [nemo_skills/conversion/hf_to_nemo.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/  hf_to_nemo.py)
-        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_nemo_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/  nemo_skills/conversion/hf_to_nemo_qwen.py)
+        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_nemo_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_nemo_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_qwen.py)
 
     * For conversion to TensorRT-LLM:
-        - Default: [nemo_skills/conversion/hf_to_trtllm.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/  hf_to_trtllm.py)
-        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_trtllm_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/  nemo_skills/conversion/hf_to_trtllm_qwen.py)
+        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_trtllm_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_trtllm_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
 
-    * For conversion to HuggingFace: [nemo_skills/conversion/nemo_to_hf.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf.py)
+    * For conversion to HuggingFace:
+        - If `--model_type=llama`: [nemo_skills/conversion/nemo_to_hf_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/nemo_to_hf_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_qwen.py)
 
 
 We support 3 common model formats. Here are some recommendations on when each format should be used.
@@ -42,6 +44,7 @@ ns convert \
     --output_model=/trt_models/llama3.1-70b-instruct \
     --convert_from=hf \
     --convert_to=trtllm \
+    --model_type=llama \
     --num_gpus=8 \
     --hf_model_name=meta-llama/Meta-Llama-3.1-70B-Instruct
 ```

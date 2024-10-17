@@ -33,7 +33,7 @@ def get_nemo_to_hf_cmd(
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export HF_TOKEN={get_token()} && "
         f"cd /nemo_run/code && "
-        f"python -m nemo_skills.conversion.nemo_to_hf "
+        f"python -m nemo_skills.conversion.nemo_to_hf_{model_type} "
         f"    --in-path {input_model} "
         f"    --out-path {output_model} "
         f"    --hf-model-name {hf_model_name} "
@@ -52,12 +52,11 @@ def get_hf_to_trtllm_cmd(
         "fp16": "float16",
         "fp32": "float32",
     }[dtype]
-    script = "hf_to_trtllm" if model_type == "llama" else "hf_to_trtllm_qwen"
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export HF_TOKEN={get_token()} && "
         f"cd /nemo_run/code && "
-        f"python -m nemo_skills.conversion.{script} "
+        f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
         f"    --model_dir {input_model} "
         f"    --output_dir {output_model}-tmp "
         f"    --dtype {dtype} "
@@ -84,12 +83,11 @@ def get_hf_to_nemo_cmd(
 ):
     # Check if the model_type is "nemo"
 
-    script = "hf_to_nemo" if model_type == "llama" else "hf_to_nemo_qwen"
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export HF_TOKEN={get_token()} && "
         f"cd /nemo_run/code && "
-        f"python -m nemo_skills.conversion.{script} "  # Use the appropriate command based on the model_type
+        f"python -m nemo_skills.conversion.hf_to_nemo_{model_type} "
         f"    --in-path {input_model} "
         f"    --out-path {output_model} "
         f"    --hf-model-name {hf_model_name} "
@@ -132,7 +130,7 @@ def convert(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     input_model: str = typer.Option(...),
-    model_type: SupportedTypes = typer.Option("llama", help="Type of the model"),
+    model_type: SupportedTypes = typer.Option(..., help="Type of the model"),
     output_model: str = typer.Option(..., help="Where to put the final model"),
     convert_from: SupportedFormatsFrom = typer.Option(..., help="Format of the input model"),
     convert_to: SupportedFormatsTo = typer.Option(..., help="Format of the output model"),
@@ -167,11 +165,6 @@ def convert(
         dtype = dtype.value
     except AttributeError:
         pass
-
-    # TODO: add support for qwen nemo conversion
-    if model_type == "qwen":
-        if convert_from == "nemo":
-            raise ValueError("NeMo conversion for Qwen models from nemo to hf format is not supported yet")
 
     # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
     if convert_from == "nemo" and convert_to == "trtllm":

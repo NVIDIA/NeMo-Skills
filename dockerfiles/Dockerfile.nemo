@@ -116,5 +116,5 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12/compat/lib.real/
 #             TRT-LLM allows. This installation must follow TRT-LLM and is
 #             only necessary when NeMo 2.0.0rc1 is installed with TRT-LLM v10.
 RUN pip install --upgrade-strategy only-if-needed nvidia-modelopt==0.13.0
-# patching transformers as it has a bug for conversion. backoff shouldn't be needed?
-RUN pip install transformers==4.44.2 backoff
+# patching transformers as it has a bug for conversion
+RUN pip install --upgrade transformers>=4.45.2
