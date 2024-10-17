@@ -268,14 +268,14 @@ def update_prompt_type(
 )
 def update_code_separators(
     code_begin: str, code_end: str, code_output_begin: str, code_output_end: str, dummy_data: str
-) -> Union[NoUpdate, dbc.AccordionItem]:
+) -> str:
     current_app.config['nemo_inspector']['inspector_params']['code_separators'] = (code_begin, code_end)
     current_app.config['nemo_inspector']['inspector_params']['code_output_separators'] = (
         code_output_begin,
         code_output_end,
     )
 
-    return dummy_data + " "
+    return dummy_data + "1"
 
 
 @app.callback(

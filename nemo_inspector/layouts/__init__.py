@@ -52,4 +52,5 @@ from layouts.table_layouts import (
     get_stats_layout,
     get_table_data,
     get_table_detailed_inner_data,
+    get_update_dataset_layout,
 )

@@ -18,9 +18,9 @@ from typing import Dict, Iterable, List, Optional, Union
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import current_app
-from settings.constants import ANSI, CODE, LATEX, MARKDOWN, SEPARATOR_DISPLAY, SEPARATOR_ID, UNDEFINED
+from settings.constants import ANSI, CODE, COMPARE, LATEX, MARKDOWN, SEPARATOR_DISPLAY, SEPARATOR_ID, UNDEFINED
 from utils.common import parse_model_answer
-from utils.decoration import design_text_output, highlight_code
+from utils.decoration import color_text_diff, design_text_output, highlight_code
 
 
 def get_main_page_layout() -> html.Div:
@@ -75,7 +75,7 @@ def get_switch_layout(
             }
             for label, value, is_disabled in itertools.zip_longest(labels, values, disabled, fillvalue=False)
         ],
-        value=(chosen_values if chosen_values is not None else [values[0]] if is_active else []),
+        value=(chosen_values if chosen_values else [values[0]] if is_active else []),
         **additional_params,
     )
 
@@ -115,47 +115,62 @@ def get_text_area_layout(
     )
 
 
-def get_single_prompt_output_layout(answer: str, text_modes: List[str] = [CODE, LATEX, ANSI]) -> List[html.Div]:
+def get_single_prompt_output_layout(
+    answer: str, text_modes: List[str] = [CODE, LATEX, ANSI], compare_to: str = ""
+) -> List[html.Div]:
     parsed_answers = (
         parse_model_answer(answer) if CODE in text_modes else [{"explanation": answer, "code": None, "output": None}]
     )
-    return [
-        item
-        for parsed_answer in parsed_answers
-        for item in [
-            design_text_output(text=parsed_answer["explanation"], text_modes=text_modes),
-            (
-                highlight_code(
-                    parsed_answer["code"],
+    parsed_compared_answers = (
+        (
+            parse_model_answer(compare_to)
+            if CODE in text_modes
+            else [{"explanation": compare_to, "code": None, "output": None}]
+        )
+        if COMPARE in text_modes
+        else parsed_answers
+    )
+
+    items = []
+    styles = {
+        "explanation": {'default': {}, 'wrong': {}},
+        "code": {'default': {}, 'wrong': {}},
+        "output": {
+            "default": {
+                "border": "1px solid black",
+                "background-color": "#cdd4f1c8",
+                "marginBottom": "10px",
+                "marginTop": "-6px",
+            },
+            'wrong': {
+                "border": "1px solid red",
+                "marginBottom": "10px",
+                "marginTop": "-6px",
+            },
+        },
+    }
+
+    functions = {"explanation": design_text_output, "code": highlight_code, "output": design_text_output}
+
+    def check_existence(array: List[Dict[str, str]], i: int, key: str):
+        return i < len(array) and key in array[i] and array[i][key]
+
+    for i in range(max(len(parsed_answers), len(parsed_compared_answers))):
+        for key in ["explanation", "code", "output"]:
+            if check_existence(parsed_answers, i, key) or check_existence(parsed_compared_answers, i, key):
+                diff = color_text_diff(
+                    parsed_answers[i][key] if check_existence(parsed_answers, i, key) else "",
+                    parsed_compared_answers[i][key] if check_existence(parsed_compared_answers, i, key) else "",
                 )
-                if parsed_answer["code"]
-                else ""
-            ),
-            (
-                design_text_output(
-                    text=parsed_answer["output"],
-                    style=(
-                        {
-                            "border": "1px solid black",
-                            "background-color": "#cdd4f1c8",
-                            "marginBottom": "10px",
-                            "marginTop": "-6px",
-                        }
-                        if 'wrong_code_block' not in parsed_answer
-                        else {
-                            "border": "1px solid red",
-                            "marginBottom": "10px",
-                            "marginTop": "-6px",
-                        }
-                    ),
-                    text_modes=text_modes,
+                style_type = (
+                    'default'
+                    if not check_existence(parsed_answers, i, key) or 'wrong_code_block' not in parsed_answers[i][key]
+                    else 'wrong'
                 )
-                if parsed_answer["output"] is not None
-                else ""
-            ),
-        ]
-        if item != ""
-    ]
+                style = styles[key][style_type]
+                item = functions[key](diff, style=style, text_modes=text_modes)
+                items.append(item)
+    return items
 
 
 def get_text_modes_layout(id: str, is_formatted: bool = True):

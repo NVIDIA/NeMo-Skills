@@ -15,7 +15,7 @@
 import json
 import logging
 import math
-from typing import List
+from typing import Dict, List
 
 import dash_bootstrap_components as dbc
 from dash import dash_table, html
@@ -28,6 +28,8 @@ from layouts.base_layouts import (
 from settings.constants import (
     ANSI,
     CODE,
+    COMPARE,
+    COMPARE_ICON_PATH,
     DATA_PAGE_SIZE,
     EDIT_ICON_PATH,
     ERROR_MESSAGE_TEMPLATE,
@@ -45,6 +47,7 @@ from utils.common import (
     catch_eval_exception,
     custom_deepcopy,
     get_available_models,
+    get_compared_rows,
     get_data_from_files,
     get_editable_rows,
     get_eval_function,
@@ -512,6 +515,27 @@ def get_detailed_answers_rows(keys: List[str], colums_number: int) -> List[dbc.R
                                     },
                                 ),
                                 dbc.Button(
+                                    html.Img(
+                                        src=COMPARE_ICON_PATH,
+                                        id={"type": "compare_texts", "id": i},
+                                        style={
+                                            "height": "15px",
+                                            "display": "inline-block",
+                                        },
+                                    ),
+                                    id={"type": "compare_texts_button", "id": i},
+                                    outline=True,
+                                    color="primary",
+                                    className="me-1",
+                                    style={
+                                        "border": "none",
+                                        "line-height": "1.2",
+                                        "display": "inline-block",
+                                        "margin-left": "-10px" if key != LABEL else "1px",
+                                        "display": "none" if key == FILE_NAME else "inline-block",
+                                    },
+                                ),
+                                dbc.Button(
                                     "-",
                                     id={"type": "del_row", "id": i},
                                     outline=True,
@@ -520,7 +544,7 @@ def get_detailed_answers_rows(keys: List[str], colums_number: int) -> List[dbc.R
                                     style={
                                         "border": "none",
                                         "display": "inline-block",
-                                        "margin-left": "-3px",
+                                        "margin-left": "-9px" if key != FILE_NAME else "1px",
                                     },
                                 ),
                             ],
@@ -552,6 +576,7 @@ def get_row_detailed_inner_data(
     files_names: List[str],
     file_id: int,
     col_id: int,
+    compare_to: Dict = {},
     text_modes: List[str] = [CODE, LATEX, ANSI],
 ) -> List:
     table_data = get_table_data()[question_id].get(model, [])
@@ -576,7 +601,11 @@ def get_row_detailed_inner_data(
         elif key in get_editable_rows():
             value = str(table_data[file_id].get(key, None))
         else:
-            value = get_single_prompt_output_layout(str(table_data[file_id].get(key, None)), text_modes)
+            value = get_single_prompt_output_layout(
+                str(table_data[file_id].get(key, None)),
+                text_modes + ([COMPARE] if key in get_compared_rows() else []),
+                str(compare_to.get(key, "")),
+            )
         row_data.append(
             value
             if key not in get_editable_rows()
@@ -592,14 +621,12 @@ def get_table_detailed_inner_data(
     files_id: List[int],
     filter_functions: List[str],
     sorting_functions: List[str],
+    text_modes: List[List[str]],
 ) -> List:
     table_data = []
-    for col_id, (
-        model,
-        file_id,
-        filter_function,
-        sorting_function,
-    ) in enumerate(zip(models, files_id, filter_functions, sorting_functions)):
+    for col_id, (model, file_id, filter_function, sorting_function, modes) in enumerate(
+        zip(models, files_id, filter_functions, sorting_functions, text_modes)
+    ):
         row_data = get_row_detailed_inner_data(
             question_id=question_id,
             model=model,
@@ -614,6 +641,8 @@ def get_table_detailed_inner_data(
             ],
             file_id=file_id,
             col_id=col_id,
+            text_modes=modes,
+            compare_to=get_table_data()[question_id][models[0]][files_id[0]],
         )
         table_data.extend(row_data)
     return table_data
@@ -645,6 +674,59 @@ def get_general_stats_layout(
         **custom_stats,
     }
     return [html.Div([html.Pre(f'{name}: {value}') for name, value in stats.items()])]
+
+
+def get_update_dataset_layout(base_model: str, update_function: str, models: List[str]) -> List[html.Tr]:
+    errors_dict = {}
+    global table_data
+    if update_function:
+        update_eval_function = get_eval_function(update_function.strip())
+        available_models = {
+            model_name: model_info["file_paths"] for model_name, model_info in get_available_models().items()
+        }
+
+        for question_id in range(len(table_data)):
+            new_dicts = list(
+                map(
+                    lambda data: catch_eval_exception(
+                        available_models,
+                        update_eval_function,
+                        data,
+                        data,
+                        errors_dict,
+                    ),
+                    table_data[question_id][base_model],
+                )
+            )
+            for i, new_dict in enumerate(new_dicts):
+                for key, value in new_dict.items():
+                    table_data[question_id][base_model][i][key] = value
+
+                keys = list(table_data[question_id][base_model][i].keys())
+                for key in keys:
+                    if key not in new_dict:
+                        table_data[question_id][base_model][i].pop(key)
+
+    if len(errors_dict):
+        logging.error(ERROR_MESSAGE_TEMPLATE.format("update_dataset", errors_dict))
+
+    return (
+        get_stats_layout()
+        + get_general_stats_layout(base_model)
+        + get_table_answers_detailed_data_layout(
+            models,
+            list(
+                filter(
+                    is_detailed_answers_rows_key,
+                    (
+                        table_data[0][base_model][0].keys()
+                        if len(table_data) and len(table_data[0][base_model])
+                        else []
+                    ),
+                )
+            ),
+        )
+    )
 
 
 def get_sorting_answers_layout(base_model: str, sorting_function: str, models: List[str]) -> List[html.Tr]:
