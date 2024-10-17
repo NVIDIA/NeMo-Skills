@@ -1,37 +1,45 @@
 # Training an LLM
 
-Make sure to complete [prerequisites](/docs/prerequisites.md).
+!!! info
 
-Please refer to the following docs if you have questions about:
-- [Prompt format](/docs/prompt-format.md)
-- [Checkpoint conversion](/docs/checkpoint-conversion.md)
-- [Evaluation](/docs/evaluation.md)
+    This pipeline starting script is [nemo_skills/pipeline/train.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/train.py)
+
+    All extra parameters are passed to either [nemo_skills/training/start_sft.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/training/start_sft.py) or [nemo_skills/training/start_dpo.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/training/start_dpo.py)
+
 
 ## Preparing the data
 
 Before running the training we need to prepare the data in the right format. Here is an example command
 
-```
+```bash
 python -m nemo_skills.training.prepare_sft_data \
-    ++input_files="<path to the generated synthetic data>/output-rs*.jsonl <you can have multiple paths as well>" \
+    ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
     ++prompt_template=llama3-instruct \
     ++generation_suffix='\"<|eot_id|>\"'
 ```
 
+!!! tip
+
+    Many scripts access `++input_files` argument. You can use any glob patterns there and also
+    reference multiple files/patterns separated by space.
+
 Note that unlike most other scripts, this one doesn't accept a `--cluster` parameter and you can currently only run
 it locally (this will be changed soon).
 
 You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
-that data preparation script supports which you can see [here](/nemo_skills/training/data_preparation_utils/prepare_sft_data.yaml).
+that data preparation script supports which you can see
+[here](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/prepare_sft_data.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
 a good idea to check their documentation to understand how this config is structured.
 
-> **_NOTE:_** Even though we support both SFT and DPO training, the data preparation is currently only implemented
-> for SFT jobs. For DPO, you'd need to manually prepare the data according to the
-> [NeMo-Aligner documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/modelalignment/dpo.html#dpo-model-training).
-> We will add a proper support for DPO data preparation in the near future.
+!!! note
+
+    Even though we support both SFT and DPO training, the data preparation is currently only implemented
+    for SFT jobs. For DPO, you'd need to manually prepare the data according to the
+    [NeMo-Aligner documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/modelalignment/dpo.html#dpo-model-training).
+    We will add a proper support for DPO data preparation in the near future.
 
 
 ## Running training
@@ -41,7 +49,7 @@ so you can check their documentation to learn about all supported parameters.
 
 Here is an example of how to run a training job.
 
-```
+```bash
 ns train \
     --cluster=slurm \
     --expname=my-training-job \
@@ -59,7 +67,7 @@ but you can adjust these values. It's also recommended to tune micro batch size
 and tensor parallel parameters for optimal performance. E.g. these are good
 defaults for an 8B model size
 
-```
+```bash
     ++model.data.train_ds.micro_batch_size=4 \
     ++model.tensor_model_parallel_size=4
 ```
@@ -67,7 +75,7 @@ defaults for an 8B model size
 You can customize any of the SFT parameters by directly providing them, e.g.
 to disable wandb logging and add dropout use
 
-```
+```bash
    --disable_wandb \
    ++model.ffn_dropout=0.1 \
    ++model.attention_dropout=0.1 \
@@ -84,7 +92,7 @@ Typically after training we want to follow up with evaluation. You can schedule
 an evaluation job right away by providing a `--run_after=my-training-job` argument
 which will appropriately set slurm dependencies.
 
-```
+```bash
 ns eval \
     --cluster=slurm \
     --model=/workspace/my-training-job/checkpoints/model-averaged-nemo \
@@ -97,7 +105,7 @@ ns eval \
     ++batch_size=512
 ```
 
-## Python API
+## Chaining pipelines with Python
 
 In general we don't recommend to run inference using NeMo checkpoints as it is
 much slower than other server formats. Here is how you can chain the commands

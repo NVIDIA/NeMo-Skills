@@ -1,16 +1,15 @@
 # LLM-based data decontamination
 
-Make sure to complete [prerequisites](/docs/prerequisites.md).
+!!! info
 
-Please refer to the following docs if you have questions about:
-- [Prompt format](/docs/prompt-format.md)
-- [Generation parameters](/docs/common-parameters.md)
-- [How to self-host models](/docs/generation.md)
+    This pipeline starting script is [nemo_skills/pipeline/check_contamination.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/check_contamination.py)
+
+    All extra parameters are passed to [nemo_skills/inference/check_contamination.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/check_contamination.py)
 
 We implemented an LLM-based data decontamination pipeline following
 [lmsys methodology](https://lmsys.org/blog/2023-11-14-llm-decontaminator/).
 
-There are two main ways how you can use this pipeline - to check existing dataset
+There are two main ways how you can use this pipeline: to check existing dataset
 for contamination and to decontaminate the training dataset by removing all
 contaminated questions.
 
@@ -30,8 +29,10 @@ python -m nemo_skills.inference.retrieve_similar \
     ++top_k=1
 ```
 
-> **_NOTE:_** Currently the above command doesn't run inside docker, so you will need to install additional packages.
-> We will fix it soon by providing the same "pipeline" interface.
+!!! note
+
+    Currently the above command doesn't run inside docker, so you will need to install additional packages.
+    We will fix it soon by providing the same "pipeline" interface.
 
 Next, you need to run LLM inference to check those closest found questions from the output file. Here is an example
 using Llama-405B from Nvidia API catalog, but you can replace it with OpenAI models or self-hosted models.
@@ -53,6 +54,6 @@ looks like this
 Contamination portion: 13.91% (705/5070)
 ```
 
-## To decontamination the training data
+## To decontaminate training data
 
 TBD

@@ -7,7 +7,7 @@ we provide a basic sandbox that we use to execute code and validate the correctn
 ## Local sandbox
 
 The default sandbox option used in our pipeline is a local docker container.
-Check out [nemo_skills/code_execution/local_sandbox](/nemo_skills/code_execution/local_sandbox)
+Check out [nemo_skills/code_execution/local_sandbox](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/code_execution/local_sandbox)
 for implementation details.
 
 Please note that our provided sandbox is not fully secure and you are strongly encouraged to
@@ -20,7 +20,7 @@ A better alternative is to host a [Piston server](https://github.com/engineer-ma
 in a properly configured VM. If you're using a Piston server (you need to host it yourself),
 add the following parameters to the relevant scripts
 
-```
+```bash
 ++sandbox_type=piston
 ++sandbox.host=<where your server is hosted, e.g. https://emkc.org/api/v2/piston>
 ```

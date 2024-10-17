@@ -1,19 +1,16 @@
 # Generation
 
-Make sure to complete [prerequisites](/docs/prerequisites.md).
+!!! info
 
-Please refer to the following docs if you have questions about:
-- [Prompt format](/docs/prompt-format.md)
-- [Generation parameters](/docs/common-parameters.md)
+    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
 
-[nemo_skills/pipeline/generate.py](/nemo_skills/pipeline/generate.py) can be used for large-scale data generation
+    All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
+
+Generation pipeline can be used for large-scale data generation
 using LLMs. You provide an input jsonl file as well as the prompt config/template and we run LLM for each line
 of the input using the dictionary there to format the prompt. You input file keys need to match the prompt config
-but otherwise there is no restrictions on what data you use for input. See [prompt format](/docs/prompt-format.md)
-for more details on how to create new prompts.
-
-> **_NOTE:_** Before running the generation we always print the first prompt that we are about to send to an LLM.
-> It's a good idea to inspect that and make sure it's formatted properly.
+but otherwise there is no restrictions on what data you can use for input. See [prompt format](../basics/prompt-format.md)
+documentation for more details on how to create new prompts.
 
 Here are a few typical use-cases of the generation pipeline.
 
@@ -21,73 +18,86 @@ Here are a few typical use-cases of the generation pipeline.
 
 Let's say you just want to generate greedy predictions for some data. Here is how you do it.
 
-1. Create your data file. E.g. let's say you have the following in `/workspace/input.jsonl` (the `/workspace` needs
-   to be mounted inside of your [cluster config](/docs/prerequisites.md#general-information))
 
-   ```jsonl
-   {"prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
-   {"prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
-   {"prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
-   ```
+### Preparing data
 
-2. Create your [prompt config](/docs/prompt-format.md). It needs to match the data file.
-   E.g. you might have the following in `/workspace/prompt.yaml`
+Create your data file. E.g. let's say you have the following in `/workspace/input.jsonl` (the `/workspace` needs
+to be mounted inside of your [cluster config](../basics/prerequisites.md#cluster-configs)).
 
-   ```yaml
-   system: "When answering a question always mention NeMo-Skills repo in a funny way."
+```jsonl
+{"prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+```
 
-   user: |-
-      Question: {prompt}
+### Create prompt config
 
-      Option A: {option_a}
-      Option B: {option_b}
-   ```
+Create your [prompt config](../basics/prompt-format.md). It needs to match the data file.
+E.g. you might have the following in `/workspace/prompt.yaml`
 
-3. Run the generation with either self-hosted or an API model.
+```yaml
+system: "When answering a question always mention NeMo-Skills repo in a funny way."
 
-   Here is an example for an API call:
+user: |-
+   Question: {prompt}
+   Option A: {option_a}
+   Option B: {option_b}
+```
 
-   ```
-   ns generate \
-       --cluster=local \
-       --server_type=openai \
-       --model=meta/llama-3.1-8b-instruct \
-       --server_address=https://integrate.api.nvidia.com/v1 \
-       --output_dir=/workspace/test-generate \
-       ++input_file=/workspace/input.jsonl \
-       ++prompt_config=/workspace/prompt.yaml
-   ```
+### Run generation
 
-   Here is an example of a self-hosted model call:
+Run the generation with either self-hosted or an API model.
 
-   ```
-   ns generate \
-       --cluster=local \
-       --server_type=vllm \
-       --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
-       --server_gpus=1 \
-       --output_dir=/workspace/test-generate \
-       ++input_file=/workspace/input.jsonl \
-       ++prompt_config=/workspace/prompt.yaml \
-       ++prompt_template=llama3-instruct \
-       ++skip_filled=False
-   ```
+Here is an example for an API call:
 
-   Note the `++skip_filled=False` which you need to add if you're rerunning some generation and don't want
-   to reuse existing output. And since we are hosting the model ourselves, we need to specify the template
-   to use ([llama3-instruct](/nemo_skills/prompt/template/llama3-instruct.yaml) in this case). You can have
-   a custom template as well if you need to (just reference a full path to it same as we do with config above).
+```bash
+ns generate \
+    --cluster=local \
+    --server_type=openai \
+    --model=meta/llama-3.1-8b-instruct \
+    --server_address=https://integrate.api.nvidia.com/v1 \
+    --output_dir=/workspace/test-generate \
+    ++input_file=/workspace/input.jsonl \
+    ++prompt_config=/workspace/prompt.yaml
+```
 
-   Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
+Here is an example of a self-hosted model call:
 
-   ```jsonl
-   {"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the NeMo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
-   {"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the NeMo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
-   {"generation": "You know, I'm feeling a little \"NeMo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
-   ```
+```bash
+ns generate \
+    --cluster=local \
+    --server_type=vllm \
+    --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
+    --server_gpus=1 \
+    --output_dir=/workspace/test-generate \
+    ++input_file=/workspace/input.jsonl \
+    ++prompt_config=/workspace/prompt.yaml \
+    ++prompt_template=llama3-instruct \
+    ++skip_filled=False
+```
 
-   You can customize batch size, temperature, number of generation tokens and many more things.
-   See [here](/nemo_skills/inferece/generate.py) for all supported parameters.
+Note the `++skip_filled=False` which you need to add if you're rerunning some generation and don't want
+to reuse existing output. And since we are hosting the model ourselves, we need to specify the template
+to use ([llama3-instruct](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-instruct.yaml)
+in this case). You can have
+a custom template as well if you need to (just reference a full path to it same as we do with config above).
+
+Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
+
+```jsonl
+{"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the NeMo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the NeMo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"generation": "You know, I'm feeling a little \"NeMo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+```
+
+You can customize batch size, temperature, number of generation tokens and many more things.
+See [nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py) for all supported parameters.
+
+
+!!! tip
+
+    Before running the generation we always print the first prompt that we are about to send to an LLM.
+    It's a good idea to inspect that and make sure it's formatted properly.
 
 
 ## Sampling multiple generations
@@ -96,9 +106,18 @@ We commonly need to sample multiple outputs to the same prompt and then pick the
 E.g. when synthetically generating solutions to math problems, we would run the same inference
 many times with high temperature and then pick all solutions that lead to the right answer.
 
-Here is how you can do this with our generation pipeline.
+Here is how you can do this with our generation pipeline using [MATH](https://github.com/hendrycks/math) training set
+as an example.
 
+First, let's prepare the data if you have not done so yet.
+
+```bash
+python -m nemo_skills.dataset.prepare math
 ```
+
+Then we can run the generation
+
+```bash
 ns generate \
        --cluster=slurm \
        --server_type=trtllm \
@@ -117,16 +136,16 @@ ns generate \
 
 In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B
 in the TensorRT-LLM format (highly recommended for large-scale inference).
-See [checkpoint conversion](/docs/checkpoint-conversion.md) to learn more about how to convert
+See [checkpoint conversion](../pipelines/checkpoint-conversion.md) to learn more about how to convert
 models to different formats.
 
 Note that in this case we do not pass an input file, but instead specify a dataset and
-a split, which will pick a prepared input from `nemo_skills/dataset/math/train_full.jsonl`
-(you need to run `python -m nemo_skills.dataset.prepare math` to get that file).
-We are using a [generic/math](/nemo_skills/prompt/config/generic/math.yaml) config
-and a [template for the base model](/nemo_skills/prompt/template/llama3-base.yaml)
+a split, which will pick a prepared input from `nemo_skills/dataset/math/train_full.jsonl`.
+We are using a [generic/math](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
+and a [template for the base model](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
 (we found Llama 3.1 follows few-shots much better without chat tokens).
-Finally, we are specifying few shot examples which come from [here](/nemo_skills/prompt/few_shot_examples/math.py)
+Finally, we are specifying few shot examples which come from
+[here](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)
 and asking the script to evaluate the generated solutions by providing `--eval_args`.
 
 An example prompt (printed by the generate script) for that job is below.
@@ -185,16 +204,16 @@ Given that $f(x)$ is odd, let's find $f(f(-x))$ and see how it relates to $f(f(x
 1. Substitute $-x$ into the function $f(x)$:
 \[ f(-x) \]
 
-2. Since $f(x)$ is odd, apply the definition of an odd function:
+1. Since $f(x)$ is odd, apply the definition of an odd function:
 \[ f(-x) = -f(x) \]
 
-3. Now substitute $-f(x)$ into the function $f$:
+1. Now substitute $-f(x)$ into the function $f$:
 \[ f(f(-x)) = f(-f(x)) \]
 
-4. Again, using the fact that $f(x)$ is odd, apply the definition:
+1. Again, using the fact that $f(x)$ is odd, apply the definition:
 \[ f(-f(x)) = -f(f(x)) \]
 
-5. We have found that:
+1. We have found that:
 \[ f(f(-x)) = -f(f(x)) \]
 
 This matches the definition of an odd function.
@@ -281,8 +300,8 @@ After the jobs are finished, you will see `/workspace/synthetic-math-solutions/g
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
 key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
-[symbolic comparison](/nemo_skills/code_execution/math_grader.py).
+[symbolic comparison](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/code_execution/math_grader.py).
 
 To get a more robust assessment of whether the solutions are correct you can follow up with an
-[LLM-as-a-judge evaluation](/docs/llm-as-a-judge.md) and then
-[prepare the data for training](/docs/training.md#preparing-the-data).
+[LLM-as-a-judge evaluation](../pipelines/llm-as-a-judge.md) and then
+[prepare the data for training](../pipelines/training.md#preparing-the-data).

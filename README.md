@@ -1,27 +1,19 @@
 # NeMo Skills
 
-In this repository we provide pipelines to improve "skills" of large language models (LLMs).
-Currently we focus on the ability to solve mathematical problems, but you can use our pipelines for many other tasks as well.
-
+NeMo-Skills is a collection of pipelines to improve "skills" of large language models.
+We mainly focus on the ability to solve mathematical problems, but you can use our pipelines for many other tasks as well.
 Here are some of the things we support.
 
-- Easily [convert](/docs/checkpoint-conversion.md) models between [NeMo](https://github.com/NVIDIA/NeMo),
-  [vLLM](https://github.com/vllm-project/vllm) and [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) formats.
-- Host the server in any of the above formats to run [large-scale synthetic data generation](/docs/generation.md).
-  You can also call Nvidia NIM API or OpenAI API with the same interface, so it's easy to switch from quick prototyping
-  to large-scale slurm jobs.
-- [Evaluate your models](/docs/evaluation.md) on many popular benchmarks (it's easy to add new benchmarks or customize
-  existing settings). The following benchmarks are supported out-of-the-box
-    - Math problem solving: gsm8k, math, amc23, aime24 (and many more)
+- [Flexible inference](basics/inference.md): Seamlessly switch between API providers, local server and large-scale slurm jobs for LLM inference.
+- [Multiple formats](pipelines/checkpoint-conversion.md): Use any of the [NeMo](https://github.com/NVIDIA/NeMo), [vLLM](https://github.com/vllm-project/vllm)
+  and [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) servers and easily convert checkpoints from one format to another.
+- [Model evaluation](pipelines/evaluation.md): Evaluate your models on many popular benchmarks
+    - Math problem solving: gsm8k, math, amc23, aime24, omni-math (and many more)
     - Coding skills: human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard
     - General knowledge: mmlu (generative)
-- [Train models](/docs/training.md) using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
-- We support other pipelines as well, such as [LLM-based dataset decontamination](/docs/decontamination.md)
-  or using [LLM-as-a-judge](/docs/llm-as-a-judge.md). And it's easy to add new workflows!
+- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
-To get started, follow the [prerequisites](/docs/prerequisites.md) and then run `ns --help` to see all available
-commands and their options.
 
 ## OpenMathInstruct-2
 

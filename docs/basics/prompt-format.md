@@ -1,8 +1,10 @@
 # Prompt utilities
 
-> **_NOTE:_** While some of the sections below mention multi-turn prompts, we don't actually
-> support them at the moment. This is mainly because we don't have a real use-case for multi-turn
-> conversations in our work, But happy to add a support if there is a need. Please open an issue to request this
+!!! note
+
+    While some of the sections below mention multi-turn prompts, we don't actually
+    support them at the moment. This is mainly because we don't have a real use-case for multi-turn
+    conversations in our work. Please open an issue if you need to use multi-turn prompts.
 
 Our prompts are configured via two input yaml files: prompt template and prompt config.
 
@@ -10,10 +12,12 @@ Our prompts are configured via two input yaml files: prompt template and prompt 
 
 The template file defines model-specific special tokens, e.g. bos, turn tokens,
 user/assistant/system message, special tokens for code execution, etc. All of the
-templates that we support by default are available in [nemo_skills/prompt/template](/nemo_skills/prompt/template)
-folder. Here is an example for [Llama3.1 models](/nemo_skills/prompt/template):
+templates that we support by default are available in
+[nemo_skills/prompt/template](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template)
+folder. Here is an example template for
+[llama3-instruct](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) models:
 
-```
+```yaml
 # Prompt specification for the original Llama3-instruct model
 
 # these tokens are always used to construct a prompt like this
@@ -49,18 +53,22 @@ You can specify a particular template with `++prompt_template=...`. If you don't
 `++prompt_template=llama3-instruct`), we assume you want to use one of the existing templates and will search
 in the included folder. If you provide a full path, we will take the file you specify instead.
 
-> **_NOTE:_** If you're using OpenAI server type (models are hosted elsewhere), you cannot provide the template
-> as we cannot add any special tokens and have to send the user/assistant messages following the OpenAI API.
-> For all self-hosted models, the template is required.
+!!! note
+
+    If you're using OpenAI server type (models are hosted elsewhere), you cannot provide the template
+    as we cannot add any special tokens and have to send the user/assistant messages following the OpenAI API.
+    For all self-hosted models, the template is required.
 
 ## Prompt config
 
 The prompt config contains user and system messages with placeholders for keys from a data file.
 The configs are model independent (any model can be used with any config).
-All of the configs that we support by default are available in [nemo_skills/prompt/config](/nemo_skills/prompt/config)
-folder. Here is an example prompt for [math evaluations](/nemo_skills/prompt/config/generic/math.yaml):
+All of the configs that we support by default are available in
+[nemo_skills/prompt/config](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config)
+folder. Here is an example prompt for
+[math evaluations](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/math.yaml):
 
-```
+```yaml
 # default prompt for all math benchmarks (e.g. gsm8k, math)
 
 few_shot_examples:
@@ -82,21 +90,23 @@ user: |-
 
 Note that we use `{problem}`, `{solution}` and `{examples}` format strings here. The `{examples}` is a special
 key that will be used to include few shot examples you specify above (it's empty unless you add `++examples_type` or
-specify it in the config like e.g. in [llama3-gsm8k prompt](/nemo_skills/prompt/config/llama3-instruct/gsm8k.yaml)).
+specify it in the config like e.g. in
+[llama3-gsm8k prompt](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/gsm8k.yaml)).
 All other keys will need to be specified when you call `prompt.fill`
 (more on that in the [prompt-api section](#prompt-api)) so that we can replace placeholders with actual input.
 
 The input for few shot examples always comes from one of the available example types in
-[here](/nemo_skills/prompt/few_shot_examples/__init__.py). E.g. in the
-[llama3-gsm8k prompt](/nemo_skills/prompt/config/llama3-instruct/gsm8k.yaml) the `gsm8k_standard_few_shot` examples from
-[here](/nemo_skills/prompt/few_shot_examples/gsm8k.py) are used.
+[here](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/__init__.py). E.g. in the
+[llama3-gnstruct/gsm8k](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/llama3-instruct/gsm8k.yaml)
+prompt the `gsm8k_standard_few_shot` examples from
+[here](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/gsm8k.py) are used.
 
 
 ## Prompt API
 
 If you're running one of the pipeline scripts, you can control the prompt by using
 
-```
+```bash
 ++prompt_template=...
 ++prompt_config=...
 ++examples_type=...
@@ -104,33 +114,47 @@ If you're running one of the pipeline scripts, you can control the prompt by usi
 
 If you're implementing a new script, you can use the following code to create a prompt and then use it
 
-```
+```python
 from nemo_skills.prompt.utils import get_prompt
 
 prompt = get_prompt('generic/math', 'llama3-instruct')
 print(prompt.fill({'problem': "What's 2 + 2?"}))
 ```
-```
->>> <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+which outputs
+
+```python-console
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{}.
 
 What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
 ```
 
 Or if you want to skip the template and use OpenAI API
 
-```
+```python
 from nemo_skills.prompt.utils import get_prompt
 
 prompt = get_prompt('generic/math')
 print(prompt.fill({'problem': "What's 2 + 2?"}))
 ```
-```
->>> [{'role': 'system', 'content': ''}, {'role': 'user', 'content': "Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.\n\nWhat's 2 + 2?"}]
+
+which outputs
+
+```python-console
+[
+  {
+    'role': 'system',
+    'content': ''
+  },
+  {
+    'role': 'user',
+    'content': "Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.\n\nWhat's 2 + 2?"
+  }
+]
 ```
 
-You can also have a look at [tests](/tests/test_prompts.py) to see more examples of using our prompt API.
+You can also have a look at the [tests](https://github.com/Kipok/NeMo-Skills/tests/test_prompts.py) to see more examples of using our prompt API.
