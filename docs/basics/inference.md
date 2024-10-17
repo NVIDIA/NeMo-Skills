@@ -2,8 +2,6 @@
 
 Here are the instructions on how to run inference with our repo.
 
-Make sure to complete [prerequisites](prerequisites.md).
-
 ## Download/convert the model
 
 Get the model you want to use. You can use any model that's supported by vLLM, TensorRT-LLM or NeMo.
