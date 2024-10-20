@@ -62,7 +62,7 @@ def _get_latest_dir(path, expname, job_id) -> str:
 def get_exp_handles(expname):
     # TODO: remove this after we can properly use .from_title api
     job_id = None
-    if "_" in expname:
+    if "_" in expname and expname.split("_")[-1].isdigit():
         job_id = int(expname.split("_")[-1])
         expname = expname[: expname.rfind("_")]
 
