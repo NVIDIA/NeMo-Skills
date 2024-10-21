@@ -12,14 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Use the base image: tiangolo/uwsgi-nginx-flask with Python 3.10
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
-# registering local_sandbox_server.py as the starting point
+# Copy the main application code to /app
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
-# installing required packages
+
+# Copy the Python requirements file and install Python dependencies
 COPY requirements/code_execution.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
+# Install dependencies for Lean 4
+RUN apt-get update && \
+    apt-get install -y curl git && \
+    curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y && \
+    /root/.elan/bin/elan default stable && \
+    /root/.elan/bin/elan toolchain install stable && \
+    /root/.elan/bin/elan self update && \
+    /root/.elan/bin/elan --version
+
+# Set environment variables to include Lean and elan/lake in the PATH
+ENV PATH="/root/.elan/bin:$PATH"
+
+# Create a new Lean project with Mathlib4 support
+RUN mkdir /lean4 && cd /lean4 && /root/.elan/bin/lake new my_project && cd my_project
+RUN echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4"' >> /lean4/my_project/lakefile.lean
+RUN cd /lean4/my_project && \
+    curl https://raw.githubusercontent.com/leanprover-community/mathlib4/master/lean-toolchain -o lean-toolchain
+
+# Download and cache Mathlib4 to avoid recompiling
+RUN cd /lean4/my_project && /root/.elan/bin/lake exe cache get && /root/.elan/bin/lake build
+
+# Set environment variables to include Lean project in the PATH
+ENV LEAN_PATH="/lean4/my_project"
+ENV PATH="/lean4/my_project:$PATH"
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Expose ports for the Flask app and Lean 4 project
 ARG UWSGI_CHEAPER
 ENV UWSGI_CHEAPER=$UWSGI_CHEAPER
 
@@ -28,4 +59,5 @@ ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 
 ENV LISTEN_PORT=6000
 
+# Expose the Flask app port (6000)
 EXPOSE 6000

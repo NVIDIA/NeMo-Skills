@@ -11,13 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.prompt.few_shot_examples.gsm8k import examples_map as examples_gsm8k
-from nemo_skills.prompt.few_shot_examples.math import examples_map as examples_math
-from nemo_skills.prompt.few_shot_examples.minif2f import examples_map as examples_minif2f
 
-examples_map = examples_gsm8k.copy()
-examples_map.update(examples_math)
-examples_map.update(examples_minif2f)
-assert len(examples_map) == len(examples_gsm8k) + len(examples_math) + len(
-    examples_minif2f
-), "Duplicate keys in examples!"
+text_begin: "<｜begin▁of▁sentence｜>"
+system_begin: ""
+system_end: ""
+user_begin: ""
+user_end: ""
+assistant_begin: ""
+assistant_end: ""
+code_begin: '<llm-code>'
+code_end: '</llm-code>'
+code_output_begin: '<llm-code-output>'
+code_output_end: '</llm-code-output>'
+stop_phrases: ["<|EOT|>", "<｜end▁of▁sentence｜>"]

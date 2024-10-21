@@ -446,7 +446,9 @@ class VLLMModel(BaseModel):
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
         self.oai_client = openai.OpenAI(
-            api_key="EMPTY", base_url=f"http://{self.server_host}:{self.server_port}/v1", timeout=None
+            api_key="EMPTY",
+            base_url=f"http://{self.server_host}:{self.server_port}/v1",
+            timeout=None,
         )
 
         self.model_name_server = self.get_model_name_from_server()

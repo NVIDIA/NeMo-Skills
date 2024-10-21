@@ -132,7 +132,10 @@ class Prompt:
                 "{code_output_end}", self.config.template.code_output_end
             )
 
-        return self.config.few_shot_examples.template.format(**example_dict, **asdict(self.config.template))
+        if self.config.template:
+            return self.config.few_shot_examples.template.format(**example_dict, **asdict(self.config.template))
+        else:
+            return self.config.few_shot_examples.template.format(**example_dict)
 
     def build_examples_dict(self, input_dict):
         if self.config.few_shot_examples.examples_type:

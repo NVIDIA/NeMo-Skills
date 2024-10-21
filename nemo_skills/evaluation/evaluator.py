@@ -20,6 +20,11 @@ from argparse import Namespace
 from dataclasses import asdict, field
 from pathlib import Path
 
+from tqdm import tqdm
+
+from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.inference.server.model import get_model
+from nemo_skills.prompt.utils import Prompt, get_prompt
 from nemo_skills.utils import nested_dataclass, unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -45,7 +50,6 @@ class MathEvaluatorConfig:
 
 def eval_math(cfg):
     eval_config = MathEvaluatorConfig(**cfg.eval_config)
-    from nemo_skills.code_execution.sandbox import get_sandbox
 
     sandbox = get_sandbox(**eval_config.sandbox)
     eval_config = asdict(eval_config)
@@ -146,11 +150,6 @@ class LlmEvaluatorConfig:
 
 # TODO: this needs to be moved into a separate job as we might need to host the server
 def eval_arena(cfg):
-    from tqdm import tqdm
-
-    from nemo_skills.inference.server.model import get_model
-    from nemo_skills.prompt.utils import Prompt, get_prompt_config
-
     eval_config = LlmEvaluatorConfig(**cfg.eval_config)
     assert eval_config.batch_size % 2 == 0  # required due to how everything is implement, can fix later
 
@@ -162,7 +161,7 @@ def eval_arena(cfg):
         base_url=eval_config.base_url,
         model=eval_config.judge_model,
     )
-    prompt = Prompt(config=get_prompt_config('openai/arena-judge'))
+    prompt = Prompt(config=get_prompt('openai/arena-judge'))
 
     # assuming everything fits in memory for simplicity
     for jsonl_file in unroll_files(cfg.input_files):
@@ -266,12 +265,35 @@ def dummy_eval(cfg):
     return
 
 
+@nested_dataclass(kw_only=True)
+class LeanEvaluatorConfig:
+    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
+    num_parallel_requests: int = 10
+    in_memory_lines: int = 500
+    timeout: float = 30.0
+    ignore_cache: bool = False
+
+
+def eval_lean4(cfg):
+    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
+
+    sandbox = get_sandbox(**eval_config.sandbox)
+    eval_config_dict = asdict(eval_config)
+    eval_config_dict.pop('sandbox')
+    sandbox.batch_evaluate_results(
+        input_files=cfg.input_files,
+        answer_format='lean',
+        **eval_config_dict,
+    )
+
+
 EVALUATOR_MAP = {
     'math': eval_math,
     'code': eval_code,
     'if': eval_if,
     'arena': eval_arena,
     'answer_judgement': dummy_eval,
+    'lean4': eval_lean4,
 }
 
 

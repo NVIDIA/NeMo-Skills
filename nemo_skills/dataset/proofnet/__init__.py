@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: needs to run from the root of the repo!
+from nemo_skills.evaluation.metrics import Lean4Metrics
 
-SANDBOX_NAME=${1:-'local-sandbox'}
-
-docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((`nproc --all` * 10))" --build-arg="UWSGI_CHEAPER=`nproc --all`" -f dockerfiles/Dockerfile.sandbox .
-
-docker run --network=host --rm --name=local-sandbox ${SANDBOX_NAME} 
+# Default evaluation and generation settings for the minif2f dataset
+PROMPT_CONFIG = 'generic/lean4'
+DATASET_GROUP = 'lean4'
+METRICS_CLASS = Lean4Metrics
+DEFAULT_EVAL_ARGS = "++eval_type=lean4"
+DEFAULT_GENERATION_ARGS = ""

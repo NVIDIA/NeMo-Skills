@@ -20,6 +20,7 @@ from collections import Counter, defaultdict
 from itertools import zip_longest
 from pathlib import Path
 
+from nemo_skills.inference.server.model import get_model
 from nemo_skills.utils import unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -66,7 +67,6 @@ class MathMetrics(BaseMetrics):
             if Path(jsonl_file + '-batch-request-id').exists():
                 with open(jsonl_file + '-batch-request-id', 'rt', encoding='utf-8') as fin:
                     request_id = json.load(fin)['request_id']
-                from nemo_skills.inference.server.model import get_model
 
                 llm = get_model(server_type='openai', model='gpt-4-1106-preview')
                 metadata, outputs = llm.get_batch_results(request_id)
@@ -360,7 +360,6 @@ class ArenaMetrics(BaseMetrics):
             if Path(jsonl_file + '-batch-request-id').exists():
                 with open(jsonl_file + '-batch-request-id', 'rt', encoding='utf-8') as fin:
                     request_id = json.load(fin)['request_id']
-                from nemo_skills.inference.server.model import get_model
 
                 llm = get_model(server_type='openai', model='gpt-4-1106-preview')
                 metadata, outputs = llm.get_batch_results(request_id)
@@ -466,6 +465,56 @@ class ArenaMetrics(BaseMetrics):
     def reset(self):
         self.scores = []  # list of lists
         self.lengths = 0
+        self.total = 0
+
+
+class Lean4Metrics(BaseMetrics):
+    def setup(self, input_files):
+        pass
+
+    def __init__(self):
+        self.reset()
+
+    def fill_up_missing(self):
+        return {'predicted_answer': None, 'proof_status': "failed"}
+
+    def is_incomplete(self, elem):
+        incomplete = 'predicted_answer' not in elem
+        if not incomplete:
+            incomplete = 'proof_status' not in elem
+        return incomplete
+
+    def update(self, predictions, aggregation_mode):
+        """Updating the evaluation results with the current element.
+
+        Args:
+            predictions (list[dict]): aggregated predictions across all generations.
+                The content of the file is benchmark specific.
+            aggregation_mode (str): "best", "first", etc. Might vary by benchmark.
+        """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
+        self.total += 1
+
+        if aggregation_mode == "best":
+            self.correct_proof += any([elem['proof_status'] == "completed" for elem in predictions])
+            if all([elem['proof_status'] == "timeout" for elem in predictions]):
+                self.timeout_error += 1
+        elif aggregation_mode == "first":
+            self.correct_proof += predictions[0]['proof_status'] == "completed"
+            self.timeout_error += predictions[0]['proof_status'] == "timeout"
+        else:
+            raise ValueError(f"Unsupported mode {aggregation_mode}")
+
+    def get_metrics(self):
+        metrics = {"num_entries": self.total}
+        metrics["lean4_correct"] = self.correct_proof / self.total * 100.0
+        metrics["timeout_error"] = self.timeout_error / self.total * 100.0
+        return metrics
+
+    def reset(self):
+        self.correct_proof = 0
+        self.timeout_error = 0
         self.total = 0
 
 

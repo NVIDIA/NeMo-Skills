@@ -678,3 +678,183 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
         )
         == expected_prompt
     )
+
+
+def test_generic_lean4_prompt():
+    prompt = get_prompt('generic/lean4', 'deepseek-prover')
+
+    expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
+
+```lean4
+import Mathlib
+import Aesop
+
+set_option maxHeartbeats 0
+
+open BigOperators Real Nat Topology Rat
+
+/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/
+theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))
+    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by
+"""
+
+    assert (
+        prompt.fill(
+            {
+                "header": "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n",
+                "informal_prefix": "/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/\n",
+                "formal_statement": "theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))\n    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by\n",
+            }
+        )
+        == expected_prompt
+    )
+
+
+def test_generic_lean4_fewshot_prompt():
+    prompt = get_prompt('generic/lean4', 'deepseek-prover', 'minif2f_deepseek_fewshot')
+
+    expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
+
+Here are some examples of Lean4 statements and corresponding proofs you can refer to.
+
+Lean 4 statement:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+/-- Expand the following expression: $7(3y+2)$ Show that it is 21y+14.-/
+theorem mathd_algebra_182 (y : ℂ) : 7 * (3 * y + 2) = 21 * y + 14 := by
+
+Expected response with the proof:
+  /- We apply the distributive property to get\\begin{align*}
+  7(3y+2) &= 7\cdot 3y+7\cdot 2\\\\
+  &= 21y+14.
+  \end{align*}
+  -/
+  ring```
+
+
+
+
+
+Lean 4 statement:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+/-- For what real value of $k$ is $\\frac{13-\sqrt{131}}{4}$ a root of $2x^2-13x+k$? Show that it is $\\frac{19}{4}$.-/
+theorem mathd_algebra_116 (k x : ℝ) (h₀ : x = (13 - Real.sqrt 131) / 4)
+    (h₁ : 2 * x ^ 2 - 13 * x + k = 0) : k = 19 / 4 := by
+
+Expected response with the proof:
+  /- We could substitute $(13-\sqrt{131})/4$ for $x$ in the equation, but the quadratic formula suggests a quicker approach. Substituting $2$, $-13$, and $k$ into the quadratic formula gives  \[
+  \\frac{-(-13)\pm\sqrt{(-13)^2-4(2)(k)}}{2(2)}= \\frac{13\pm\sqrt{169-8k}}{4}.
+  \]Setting $(13+\sqrt{169-8k})/4$ and $(13-\sqrt{169-8k})/4$ equal to $(13-\sqrt{131})/4$, we find no solution in the first case and $169-8k=131$ in the second case.  Solving yields $k=(169-131)/8=38/8=\\frac{19}{4}$.
+  -/
+  rw [h₀] at h₁
+  rw [eq_comm.mp (add_eq_zero_iff_neg_eq.mp h₁)]
+  norm_num
+  rw [pow_two]
+  rw [mul_sub]
+  rw [sub_mul, sub_mul]
+  rw [Real.mul_self_sqrt _]
+  ring
+  linarith```
+
+
+
+
+
+Lean 4 statement:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+/-- What is the greatest common factor of $20 !$ and $200,\!000$?  (Reminder: If $n$ is a positive integer, then $n!$ stands for the product $1\cdot 2\cdot 3\cdot \cdots \cdot (n-1)\cdot n$.) Show that it is 40,\!000.-/
+theorem mathd_numbertheory_169 : Nat.gcd 20! 200000 = 40000 := by
+
+Expected response with the proof:
+  /- The prime factorization of $200,000$ is $2^6 \cdot 5^5$. Then count the number of factors of $2$ and $5$ in $20!$. Since there are $10$ even numbers, there are more than $6$ factors of $2$. There are $4$ factors of $5$. So the greatest common factor is $2^6 \cdot 5^4=40,\!000$.
+  -/
+  apply Eq.refl```
+
+
+
+
+
+Lean 4 statement:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+/-- A group of $N$ students, where $N < 50$, is on a field trip. If their teacher puts them in groups of 8, the last group has 5 students. If their teacher instead puts them in groups of 6, the last group has 3 students. What is the sum of all possible values of $N$? Show that it is 66.-/
+theorem mathd_numbertheory_149 :
+  (∑ k in Finset.filter (fun x => x % 8 = 5 ∧ x % 6 = 3) (Finset.range 50), k) = 66 := by
+
+Expected response with the proof:
+  /- We are given that $N\equiv 5\pmod{8}$ and $N\equiv 3\pmod{6}$.  We begin checking numbers which are 5 more than a multiple of 8, and we find that 5 and 13 are not 3 more than a multiple of 6, but 21 is 3 more than a multiple of 6. Thus 21 is one possible value of $N$. By the Chinese Remainder Theorem, the integers $x$ satisfying $x\equiv 5\pmod{8}$ and $x\equiv 3\pmod{6}$ are those of the form $x=21+\\text{lcm}(6,8)k = 21 + 24 k$, where $k$ is an integer. Thus the 2 solutions less than $50$ are 21 and $21+24(1) = 45$, and their sum is $21+45=66$.
+  -/
+  apply Eq.refl```
+
+
+
+
+
+Lean 4 statement:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+/-- Evaluate: $\left( \\frac{1}{2} + \\frac{1}{3} \\right) \left( \\frac{1}{2} - \\frac{1}{3} \\right)$ Show that it is \\frac{5}{36}.-/
+theorem mathd_algebra_462 : ((1 : ℚ) / 2 + 1 / 3) * (1 / 2 - 1 / 3) = 5 / 36 := by
+
+Expected response with the proof:
+  /- For any $x$ and $y$, $(x+y)(x-y)=x^2-y^2+xy-xy=x^2-y^2$, so \\begin{align*}
+  \left( \\frac{1}{2} + \\frac{1}{3} \\right) \left( \\frac{1}{2} - \\frac{1}{3} \\right)&=\left(\\frac12\\right)^2-\left(\\frac13\\right)^2\\\\
+  &=\\frac14-\\frac19\\\\
+  &=\\frac{9}{36}-\\frac{4}{36}\\\\
+  &=\\frac{5}{36}
+  \end{align*}
+  -/
+  simp_all only [one_div]
+  norm_num```
+
+
+
+
+
+Here is the the statement that you need to complete with the proof. Start with the Lean code right away and DO NOT repeat the given statement.
+
+```lean4
+import Mathlib
+import Aesop
+
+set_option maxHeartbeats 0
+
+open BigOperators Real Nat Topology Rat
+
+/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/
+theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁ : v = 1 / 3 * (b * h))
+    (h₂ : b = 30) (h₃ : h = 13 / 2) : v = 65 := by
+"""
+
+    assert (
+        prompt.fill(
+            {
+                "header": "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n",
+                "informal_prefix": "/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/\n",
+                "formal_statement": "theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))\n    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by\n",
+            }
+        )
+        == expected_prompt
+    )
