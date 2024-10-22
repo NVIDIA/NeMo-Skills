@@ -139,7 +139,7 @@ def generate(
                     eval_args=eval_args,
                 )
                 prev_tasks = None
-                for _ in range(dependent_jobs):
+                for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
                         cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
@@ -162,8 +162,8 @@ def generate(
                 eval_args=eval_args,
             )
             prev_tasks = None
-            for _ in range(dependent_jobs):
-                task = add_task(
+            for _ in range(dependent_jobs + 1):
+                new_task = add_task(
                     exp,
                     cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
                     task_name="generate",
