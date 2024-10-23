@@ -81,7 +81,7 @@ ns train \
     --nemo_model=/workspace/llama3.1-8b-nemo \
     --num_nodes=8 \
     --num_gpus=8 \
-    --average_steps 10000 20000 30000 40000 50000 60000 \
+    --average_steps=10000,20000,30000,40000,50000,60000 \
     --training_data=/workspace/openmathinstruct2-sft.jsonl \
     ++model.data.train_ds.micro_batch_size=4 \
     ++model.tensor_model_parallel_size=4 \
@@ -103,7 +103,7 @@ ns train \
     --nemo_model=/workspace/llama3.1-70b-nemo \
     --num_nodes=32 \
     --num_gpus=8 \
-    --average_steps 3330 6660 9990 13320 16650 20000 \
+    --average_steps=3330,6660,9990,13320,16650,20000 \
     --training_data=/workspace/openmathinstruct2-sft-5M.jsonl \
     ++model.data.train_ds.micro_batch_size=1 \
     ++model.tensor_model_parallel_size=8 \

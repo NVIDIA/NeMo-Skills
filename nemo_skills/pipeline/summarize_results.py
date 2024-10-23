@@ -55,6 +55,9 @@ def summarize_results(
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
 
+    if " " in str(benchmarks):
+        raise ValueError("benchmarks should be separated with commas")
+
     cluster = cluster or os.environ.get("NEMO_SKILLS_CONFIG")
 
     # copying results from the cluster if necessary
