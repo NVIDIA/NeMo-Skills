@@ -219,8 +219,9 @@ def train(
     )
 
     with run.Experiment(expname) as exp:
+        prev_task = None
         for job_id in range(num_training_jobs):
-            add_task(
+            prev_task = add_task(
                 exp,
                 cmd=train_cmd,
                 task_name=f'{training_algo}-{job_id}',
@@ -233,6 +234,7 @@ def train(
                 partition=partition,
                 with_sandbox=with_sandbox,
                 run_after=run_after,
+                task_dependencies=[prev_task] if prev_task is not None else None,
             )
 
         cmd = get_avg_checkpoints_cmd(
@@ -254,9 +256,10 @@ def train(
             num_tasks=1,
             num_gpus=num_gpus,
             run_after=run_after,
+            task_dependencies=[prev_task] if prev_task is not None else None,
         )
 
-        run_exp(exp, cluster_config, sequential=True)
+        run_exp(exp, cluster_config)
 
 
 if __name__ == "__main__":
