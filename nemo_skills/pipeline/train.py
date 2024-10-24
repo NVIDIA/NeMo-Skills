@@ -264,7 +264,8 @@ def train(
             task_dependencies=[prev_task] if prev_task is not None else None,
         )
 
-        run_exp(exp, cluster_config)
+        # explicitly setting sequential to False since we set dependencies directly
+        run_exp(exp, cluster_config, sequential=False)
 
 
 if __name__ == "__main__":

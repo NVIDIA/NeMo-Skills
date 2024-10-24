@@ -15,11 +15,11 @@
 executor: slurm
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.4.1
-  vllm: igitman/nemo-skills-vllm:0.4.1
+  trtllm: igitman/nemo-skills-trtllm:0.4.2
+  vllm: igitman/nemo-skills-vllm:0.4.2
   nemo: igitman/nemo-skills-nemo:0.4.2
   sandbox: igitman/nemo-skills-sandbox:0.4.2
-  nemo-skills: igitman/nemo-skills:0.4.1
+  nemo-skills: igitman/nemo-skills:0.4.2
 
 job_name_prefix: "nemo_skills:"
 

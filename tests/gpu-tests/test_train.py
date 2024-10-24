@@ -99,7 +99,7 @@ def test_dpo():
             "++trainer.dpo.max_steps=3 "
             "++trainer.dpo.max_epochs=10 "
             "++model.data.train_ds.add_eos=False "
-            "++model.global_batch_size=1 "
+            "++model.global_batch_size=2 "
             "++model.micro_batch_size=1 "
             "++model.optim.lr=1e-6 "
             "++model.optim.sched.warmup_steps=0 "

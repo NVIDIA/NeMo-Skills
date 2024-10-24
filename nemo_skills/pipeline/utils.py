@@ -93,7 +93,7 @@ def get_generation_command(server_address, generation_commands):
         f"export NVIDIA_API_KEY={os.getenv('NVIDIA_API_KEY', '')} && "
         f"export OPENAI_API_KEY={os.getenv('OPENAI_API_KEY', '')} && "
         # this will try to handshake in a loop and unblock when the server responds
-        f"echo 'Waiting for the server to start' && "
+        f"echo 'Waiting for the server to start at {server_address}' && "
         f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
         # will run in a single task always (no need to check mpi env vars)
         f"{generation_commands}"
@@ -591,9 +591,12 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=False):
+def run_exp(exp, cluster_config, sequential=None):
+    """If sequential is not specified, using True locally and False otherwise.
+
+    If it is specified, it will be used as is.
+    """
     if cluster_config['executor'] == 'local':
-        # locally we are always running sequentially - does that need to be changed?
-        exp.run(detach=False, tail_logs=True, sequential=True)
+        exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
-        exp.run(detach=True, sequential=sequential)
+        exp.run(detach=True, sequential=False if sequential is None else sequential)

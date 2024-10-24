@@ -22,7 +22,7 @@ FROM ${BASE_IMAGE} AS vllm-deps
 # install vllm dependencies
 WORKDIR /opt
 
-ARG VLLM_HASH=v0.6.1.post2
+ARG VLLM_HASH=v0.6.3.post1
 
 RUN git clone https://github.com/vllm-project/vllm.git && \
   cd vllm && \
@@ -38,7 +38,7 @@ RUN pip install $FLASHINFER_URL
 
 
 # Install requirements
-RUN pip install geventhttpclient outlines sentencepiece transformers>=4.40 sentence-transformers>=2.2.2 && \
+RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sentence-transformers>=2.2.2 && \
     pip install "megablocks==0.5.1"
 
 WORKDIR /opt
@@ -51,9 +51,6 @@ ENV HF_HOME=/cache/huggingface
 ENV TRANSFORMERS_CACHE=/cache/huggingface/transformers
 ENV HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
 ENV HF_DATASETS_CACHE=/cache/huggingface/datasets
-
-# temporary workaround for some vllm bug
-RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
 
 # Expose port for vLLM API
 EXPOSE 5000

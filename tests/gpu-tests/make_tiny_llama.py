@@ -16,18 +16,17 @@
 
 from transformers import LlamaConfig, LlamaForCausalLM
 
-mname_from = "meta-llama/Meta-Llama-3.1-8B"
+mname_from = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 mname_tiny = "/tmp/nemo-skills-tests/tiny-llama-hf"
 
 config = LlamaConfig.from_pretrained(mname_from)
 config.update(
     dict(
-        hidden_size=16,
+        hidden_size=64,
+        head_dim=2,
         intermediate_size=64,
-        num_attention_heads=4,
         num_hidden_layers=2,
         max_position_embeddings=256,
-        num_key_value_heads=4,
     )
 )
 print("new config", config)

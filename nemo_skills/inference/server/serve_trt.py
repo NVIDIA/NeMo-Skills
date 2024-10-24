@@ -300,7 +300,7 @@ def generate(
             "early_stopping",
             "no_repeat_ngram_size",
         ]
-        rename_params = {"num_beams": "beam_width"}
+        rename_params = {"num_beams": "beam_width", "random_seed": "seed"}
         sampling_params = {k: v for k, v in kwargs.items() if k in accepted_parameters}
         for k, v in rename_params.items():
             if k in sampling_params:
@@ -332,7 +332,7 @@ def generate(
         trtllm.Request(
             input_token_ids=input_ids,
             encoder_input_token_ids=encoder_input_ids_list[i] if encoder_input_ids is not None else None,
-            max_new_tokens=max_new_tokens,
+            max_tokens=max_new_tokens,
             pad_id=pad_id,
             end_id=end_id,
             stop_words=stop_words,
@@ -365,6 +365,7 @@ def generate(
         stop_words_list,
         tokenizer,
         input_lengths,
+        max_new_tokens=max_new_tokens,
     )
 
 
@@ -383,6 +384,8 @@ def _stream(
     stop_words_list,
     tokenizer,
     input_lengths,
+    max_new_tokens: int,
+    num_return_sequences: int = 1,
 ):
     if stop_words_list is None:
         stop_words_list = []
@@ -416,6 +419,8 @@ def _stream(
             streaming,
             request_ids,
             return_all_generated_tokens,
+            max_new_tokens,
+            num_return_sequences,
         )
 
         matching_stop_word = None

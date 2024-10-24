@@ -273,7 +273,8 @@ class WriteFinalSftManifest(BaseProcessor):
                 if elem[self.output_key] in seen_predictions[question]:
                     continue
                 seen_predictions[question].add(elem[self.output_key])
-
+                if 'expected_answer' in elem:
+                    elem['expected_answer'] = str(elem['expected_answer'])
                 # take only required keys from the input if exclude_optional_keys is True
                 output_sample = {}
                 if not self.exclude_optional_keys:

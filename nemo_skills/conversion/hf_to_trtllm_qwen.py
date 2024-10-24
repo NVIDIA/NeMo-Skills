@@ -25,7 +25,6 @@ from tensorrt_llm._utils import release_gc
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models import QWenForCausalLM
 from tensorrt_llm.models.modeling_utils import QuantConfig
-from tensorrt_llm.models.qwen.convert import load_hf_qwen
 from tensorrt_llm.quantization import QuantAlgo
 
 
@@ -195,7 +194,6 @@ def args_to_build_options(args):
 
 def convert_and_save_hf(args):
     model_dir = args.model_dir
-    load_model_on_cpu = args.load_model_on_cpu
     world_size = args.tp_size * args.pp_size
     # Need to convert the cli args to the kay-value pairs and override them in the generate config dict.
     # Ideally these fields will be moved out of the config and pass them into build API, keep them here for compatibility purpose for now,
@@ -225,9 +223,6 @@ def convert_and_save_hf(args):
             **override_fields,
         )
     else:
-        # When not loading by shard, preload one complete model and then slice per rank weights from this
-        # this saves the disk reloading time
-        hf_model = load_hf_qwen(model_dir, load_model_on_cpu)
 
         def convert_and_save_rank(args, rank):
             mapping = Mapping(
@@ -239,7 +234,7 @@ def convert_and_save_hf(args):
                 moe_ep_size=args.moe_ep_size,
             )
             qwen = QWenForCausalLM.from_hugging_face(
-                model_dir if hf_model is None else hf_model,
+                model_dir,
                 args.dtype,
                 mapping=mapping,
                 quant_config=quant_config,

@@ -14,7 +14,6 @@
 
 # copied from https://github.com/NVIDIA/TensorRT-LLM/blob/main/examples/llama/convert_checkpoint.py
 
-
 import argparse
 import json
 import os
@@ -27,9 +26,7 @@ from tensorrt_llm._utils import release_gc
 from tensorrt_llm.layers import MoeConfig
 from tensorrt_llm.logger import logger
 from tensorrt_llm.mapping import Mapping
-from tensorrt_llm.models import LLaMAConfig, LLaMAForCausalLM
-from tensorrt_llm.models.convert_utils import has_safetensors
-from tensorrt_llm.models.llama.convert import load_hf_llama, load_weights_from_gptq
+from tensorrt_llm.models import LLaMAForCausalLM
 from tensorrt_llm.models.modeling_utils import QuantConfig
 from tensorrt_llm.quantization import QuantAlgo
 from transformers import AutoConfig
@@ -85,7 +82,7 @@ def parse_arguments():
         type=str,
         nargs='?',
         default='int8',
-        choices=['int8', 'int4', 'int4_gptq'],
+        choices=['int8', 'int4', 'int4_gptq', 'int4_awq'],
         help='Define the precision for the weights when using weight-only quantization.'
         'You must also use --use_weight_only for that argument to have an impact.',
     )
@@ -135,6 +132,7 @@ def parse_arguments():
     parser.add_argument(
         '--quant_ckpt_path', type=str, default=None, help='Path of a quantized model checkpoint in .safetensors format'
     )
+    parser.add_argument("--use_fp8", action="store_true", default=False, help="Enable FP8 per-tensor quantization")
     parser.add_argument(
         "--use_fp8_rowwise", action="store_true", default=False, help="Enable Fp8 per-token per-channel quantization"
     )
@@ -230,6 +228,8 @@ def args_to_quant_config(args: argparse.Namespace) -> QuantConfig:
             quant_config.quant_algo = QuantAlgo.W8A16
         elif args.weight_only_precision == 'int4':
             quant_config.quant_algo = QuantAlgo.W4A16
+    elif args.use_fp8:
+        quant_config.quant_algo = QuantAlgo.FP8
     elif args.smoothquant:
         quant_config.smoothquant_val = args.smoothquant
         if args.per_channel:
@@ -258,6 +258,12 @@ def args_to_quant_config(args: argparse.Namespace) -> QuantConfig:
         quant_config.has_zero_point = True
         quant_config.pre_quant_scale = False
         quant_config.quant_algo = QuantAlgo.W4A16_GPTQ
+
+    if args.weight_only_precision == 'int4_awq':
+        quant_config.group_size = args.group_size
+        quant_config.has_zero_point = False
+        quant_config.pre_quant_scale = True
+        quant_config.quant_algo = QuantAlgo.W4A16_AWQ
 
     return quant_config
 
@@ -301,6 +307,8 @@ def args_to_build_options(args):
         'share_embedding_table': args.use_embedding_sharing,
         'disable_weight_only_quant_plugin': args.disable_weight_only_quant_plugin,
         'remove_duplicated_kv_heads': args.remove_duplicated_kv_heads,
+        'quant_ckpt_path': args.quant_ckpt_path,
+        'load_model_on_cpu': args.load_model_on_cpu,
     }
 
 
@@ -343,7 +351,6 @@ def from_cli_args(args):
 
 def convert_and_save_hf(args):
     model_dir = args.model_dir
-    load_model_on_cpu = args.load_model_on_cpu
     load_by_shard = args.load_by_shard
     world_size = args.tp_size * args.pp_size
     # Need to convert the cli args to the kay-value pairs and override them in the generate config dict.
@@ -367,7 +374,6 @@ def convert_and_save_hf(args):
         ), "When using quantization, TRT-LLM needs to load the whole HF model, thus load by shard not supported"
         mapping = Mapping(
             world_size=world_size,
-            rank=-1,  # intentinoally make -1 to avoid mistake
             tp_size=args.tp_size,
             pp_size=args.pp_size,
             moe_tp_size=args.moe_tp_size,
@@ -387,13 +393,6 @@ def convert_and_save_hf(args):
     else:
         # When not loading by shard, preload one complete model and then slice per rank weights from this
         # this saves the disk reloading time
-
-        hf_model = None
-        if "vila" in model_dir or "llava" in model_dir:
-            hf_model = load_hf_llama(model_dir, load_model_on_cpu)
-        elif not (args.load_by_shard or (has_safetensors(model_dir) and not quant_config.quant_mode.has_any_quant())):
-            hf_model = load_hf_llama(model_dir, load_model_on_cpu)
-
         def convert_and_save_rank(args, rank):
             mapping = Mapping(
                 world_size=world_size,
@@ -403,33 +402,23 @@ def convert_and_save_hf(args):
                 moe_tp_size=args.moe_tp_size,
                 moe_ep_size=args.moe_ep_size,
             )
+            tik = time.time()
             llama = LLaMAForCausalLM.from_hugging_face(
-                model_dir if hf_model is None else hf_model,
+                model_dir,
                 args.dtype,
                 mapping=mapping,
                 quant_config=quant_config,
                 load_by_shard=load_by_shard,
                 **override_fields,
             )
+            print(f'Total time of reading and converting {time.time()-tik} s')
+            tik = time.time()
             llama.save_checkpoint(args.output_dir, save_config=(rank == 0))
             del llama
+            print(f'Total time of saving checkpoint {time.time()-tik} s')
 
         execute(args.workers, [convert_and_save_rank] * world_size, args)
         release_gc()
-
-
-def convert_and_save_gptq(args, rank):
-    mapping = Mapping(world_size=args.tp_size * args.pp_size, tp_size=args.tp_size, rank=rank, pp_size=args.pp_size)
-    config = LLaMAConfig.from_hugging_face(
-        args.model_dir,
-        args.dtype,
-        mapping=mapping,
-        quant_config=args_to_quant_config(args),
-    )
-    model = LLaMAForCausalLM(config)
-    weights = load_weights_from_gptq(args.quant_ckpt_path, config)
-    model.load(weights)
-    model.save_checkpoint(args.output_dir, rank == 0)
 
 
 def execute(workers, func, args):
@@ -476,13 +465,11 @@ def main():
     elif args.meta_ckpt_dir is not None:
         assert args.model_dir is None, "Shall not specify both meta checkpoint dir and hugging face dir"
         execute(args.workers, [convert_and_save_meta] * world_size, args)
-    elif args.weight_only_precision == 'int4_gptq':
+    else:  # all other paths from hf model
         assert args.model_dir is not None
-        assert args.quant_ckpt_path is not None
-        execute(args.workers, [convert_and_save_gptq] * world_size, args)
-    else:  # all other non-gptq paths from hf model
-        assert args.model_dir is not None
-        assert args.quant_ckpt_path is None, "only gptq weights only needs this option"
+        assert (
+            args.quant_ckpt_path is not None and args.weight_only_precision == 'int4_gptq'
+        ) or args.quant_ckpt_path is None, "only gptq weights only needs this option"
         convert_and_save_hf(args)
 
     tok = time.time()

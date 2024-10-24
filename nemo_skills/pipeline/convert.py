@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 from enum import Enum
+from functools import partial
 from pathlib import Path
 
 import nemo_run as run
@@ -45,29 +46,47 @@ def get_nemo_to_hf_cmd(
 
 
 def get_hf_to_trtllm_cmd(
-    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
+    input_model,
+    output_model,
+    model_type,
+    hf_model_name,
+    dtype,
+    num_gpus,
+    num_nodes,
+    extra_arguments,
+    trt_prepare_args,
+    trt_reuse_tmp_engine,
 ):
     dtype = {
         "bf16": "bfloat16",
         "fp16": "float16",
         "fp32": "float32",
     }[dtype]
-    cmd = (
+
+    tmp_engine_dir = f"{output_model}-tmp"
+
+    setup_cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export HF_TOKEN={get_token()} && "
         f"cd /nemo_run/code && "
+    )
+
+    hf_to_trtllm_cmd = (
         f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
         f"    --model_dir {input_model} "
-        f"    --output_dir {output_model}-tmp "
+        f"    --output_dir {tmp_engine_dir} "
         f"    --dtype {dtype} "
         f"    --tp_size {num_gpus} "
-        f"    --pp_size {num_nodes} && "
+        f"    --pp_size {num_nodes} "
+        f"    {trt_prepare_args} "
+    )
+
+    trtllm_build_cmd = (
         f"trtllm-build "
-        f"    --checkpoint_dir {output_model}-tmp "
+        f"    --checkpoint_dir {tmp_engine_dir} "
         f"    --output_dir {output_model} "
         f"    --gpt_attention_plugin {dtype} "
         f"    --use_paged_context_fmha enable "
-        # some decent defaults, but each model needs different values for best performance
         f"    --max_input_len 4096 "
         f"    --max_seq_len 8192 "
         f"    --max_num_tokens 8192 "
@@ -75,6 +94,12 @@ def get_hf_to_trtllm_cmd(
         f"    {extra_arguments} && "
         f"cp {input_model}/tokenizer* {output_model} "
     )
+
+    if trt_reuse_tmp_engine:
+        cmd = setup_cmd + f"if [ ! -d {tmp_engine_dir} ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
+    else:
+        cmd = setup_cmd + hf_to_trtllm_cmd + " && " + trtllm_build_cmd
+
     return cmd
 
 
@@ -134,6 +159,10 @@ def convert(
     output_model: str = typer.Option(..., help="Where to put the final model"),
     convert_from: SupportedFormatsFrom = typer.Option(..., help="Format of the input model"),
     convert_to: SupportedFormatsTo = typer.Option(..., help="Format of the output model"),
+    trt_prepare_args: str = typer.Option(
+        "", help="Arguments to pass to the first step of trtllm conversion (that builds tmp engine)"
+    ),
+    trt_reuse_tmp_engine: bool = typer.Option(True, help="Whether to reuse the tmp engine for the final conversion"),
     hf_model_name: str = typer.Option(None, help="Name of the model on Hugging Face Hub to convert to/from"),
     dtype: SupportedDtypes = typer.Option("bf16", help="Data type"),
     expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
@@ -184,7 +213,11 @@ def convert(
     conversion_cmd_map = {
         ("nemo", "hf"): get_nemo_to_hf_cmd,
         ("hf", "nemo"): get_hf_to_nemo_cmd,
-        ("hf", "trtllm"): get_hf_to_trtllm_cmd,
+        ("hf", "trtllm"): partial(
+            get_hf_to_trtllm_cmd,
+            trt_prepare_args=trt_prepare_args,
+            trt_reuse_tmp_engine=trt_reuse_tmp_engine,
+        ),
     }
     container_map = {
         ("nemo", "hf"): cluster_config["containers"]["nemo"],
