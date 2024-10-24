@@ -89,7 +89,7 @@ ns train \
     ++model.optim.lr=2e-5 \
     ++trainer.sft.save_interval=10000 \
     ++trainer.sft.max_steps=60000 \
-    ++trainer.sft.max_epochs=-1
+    ++trainer.sft.max_epochs=100
 ```
 
 For 70B model, we used 5M data subset and the following parameters, but training
@@ -111,7 +111,7 @@ ns train \
     ++model.optim.lr=1e-5 \
     ++trainer.sft.save_interval=3330 \
     ++trainer.sft.max_steps=20000 \
-    ++trainer.sft.max_epochs=-1
+    ++trainer.sft.max_epochs=100
 ```
 
 If you have a job timeout, it's necessary to set the maximum time per run to 40 minutes
