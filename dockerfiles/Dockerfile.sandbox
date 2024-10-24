@@ -27,11 +27,14 @@ RUN apt-get update && \
 # Set environment variables to include Lean and elan/lake in the PATH
 ENV PATH="/root/.elan/bin:$PATH"
 
-# Create a new Lean project with Mathlib4 support
+# Create a new Lean project with Mathlib4 v4.12.0 support
 RUN mkdir /lean4 && cd /lean4 && /root/.elan/bin/lake new my_project && cd my_project
-RUN echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4"' >> /lean4/my_project/lakefile.lean
-RUN cd /lean4/my_project && \
-    curl https://raw.githubusercontent.com/leanprover-community/mathlib4/master/lean-toolchain -o lean-toolchain
+
+# Update lean-toolchain to use Lean v4.12.0
+RUN echo 'leanprover/lean4:v4.12.0' > /lean4/my_project/lean-toolchain
+
+# Specify Mathlib4 version 4.12.0 in the lakefile
+RUN echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "v4.12.0"' >> /lean4/my_project/lakefile.lean
 
 # Download and cache Mathlib4 to avoid recompiling
 RUN cd /lean4/my_project && /root/.elan/bin/lake exe cache get && /root/.elan/bin/lake build
@@ -61,3 +64,4 @@ ENV LISTEN_PORT=6000
 
 # Expose the Flask app port (6000)
 EXPOSE 6000
+

@@ -295,3 +295,44 @@ def test_lean4_code_execution_failure(sandbox_type):
     assert (
         "unexpected token '#eval" in error_output["stdout"].lower()
     ), "Expected the error output to mention an unexpected token '#eval"
+
+
+@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
+def test_lean4_few_shots(sandbox_type):
+    sandbox = _get_sandbox(sandbox_type)
+
+    from nemo_skills.prompt.few_shot_examples.minif2f import minif2f_deepseek_fewshot
+
+    # Test case for Lean4 code with syntax error
+    session_id_list = []
+    process_status_list = []
+    stdout_list = []
+    stderr_list = []
+
+    for i, entry in enumerate(minif2f_deepseek_fewshot):
+        code = entry["header"] + entry["informal_prefix"] + entry["formal_statement"] + entry["formal_proof"]
+
+        output, session_id = sandbox.execute_code(code, language="lean4")
+
+        if session_id is not None:
+            session_id_list.append(i)
+        if output["process_status"] != 'completed':
+            process_status_list.append(i)
+        if output["stdout"] != "":
+            stdout_list.append(i)
+        if output["stderr"] != "":
+            stderr_list.append(i)
+
+    # Assertions for the correct code
+    assert (
+        not session_id_list
+    ), f"Expected session_id to be None for all test cases, but got session_ids for few shots at indices {session_id_list}."
+    assert (
+        not process_status_list
+    ), f"Expected process_status to be 'completed' for all test cases, but these few shots did not complete successfully: indices {process_status_list}."
+    assert (
+        not stdout_list
+    ), f"Expected the stdout to match the expected output for all test cases, but mismatches were found at indices {stdout_list}."
+    assert (
+        not stderr_list
+    ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."

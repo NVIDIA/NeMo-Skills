@@ -728,12 +728,12 @@ open scoped BigOperators Topology
 theorem mathd_algebra_182 (y : ℂ) : 7 * (3 * y + 2) = 21 * y + 14 := by
 
 Expected response with the proof:
-  /- We apply the distributive property to get\\begin{align*}
+/- We apply the distributive property to get\\begin{align*}
   7(3y+2) &= 7\cdot 3y+7\cdot 2\\\\
   &= 21y+14.
   \end{align*}
   -/
-  ring```
+ring```
 
 
 
@@ -746,24 +746,13 @@ import Mathlib
 open Complex Filter Function Metric Finset
 open scoped BigOperators Topology
 
-/-- For what real value of $k$ is $\\frac{13-\sqrt{131}}{4}$ a root of $2x^2-13x+k$? Show that it is $\\frac{19}{4}$.-/
-theorem mathd_algebra_116 (k x : ℝ) (h₀ : x = (13 - Real.sqrt 131) / 4)
-    (h₁ : 2 * x ^ 2 - 13 * x + k = 0) : k = 19 / 4 := by
+/-- What is the units digit of $19^{19}+99^{99}$? Show that it is 8.-/
+theorem mathd_numbertheory_202 : (19 ^ 19 + 99 ^ 99) % 10 = 8 := by
 
 Expected response with the proof:
-  /- We could substitute $(13-\sqrt{131})/4$ for $x$ in the equation, but the quadratic formula suggests a quicker approach. Substituting $2$, $-13$, and $k$ into the quadratic formula gives  \[
-  \\frac{-(-13)\pm\sqrt{(-13)^2-4(2)(k)}}{2(2)}= \\frac{13\pm\sqrt{169-8k}}{4}.
-  \]Setting $(13+\sqrt{169-8k})/4$ and $(13-\sqrt{169-8k})/4$ equal to $(13-\sqrt{131})/4$, we find no solution in the first case and $169-8k=131$ in the second case.  Solving yields $k=(169-131)/8=38/8=\\frac{19}{4}$.
+/- The units digit of a power of an integer is determined by the units digit of the integer; that is, the tens digit, hundreds digit, etc... of the integer have no effect on the units digit of the result. In this problem, the units digit of $19^{19}$ is the units digit of $9^{19}$. Note that $9^1=9$ ends in 9, $9^2=81$ ends in 1, $9^3=729$ ends in 9, and, in general, the units digit of odd powers of 9 is 9, whereas the units digit of even powers of 9 is 1. Since both exponents are odd, the sum of their units digits is $9+9=18$, the units digit of which is $8.$
   -/
-  rw [h₀] at h₁
-  rw [eq_comm.mp (add_eq_zero_iff_neg_eq.mp h₁)]
-  norm_num
-  rw [pow_two]
-  rw [mul_sub]
-  rw [sub_mul, sub_mul]
-  rw [Real.mul_self_sqrt _]
-  ring
-  linarith```
+apply Eq.refl```
 
 
 
@@ -776,13 +765,13 @@ import Mathlib
 open Complex Filter Function Metric Finset
 open scoped BigOperators Topology
 
-/-- What is the greatest common factor of $20 !$ and $200,\!000$?  (Reminder: If $n$ is a positive integer, then $n!$ stands for the product $1\cdot 2\cdot 3\cdot \cdots \cdot (n-1)\cdot n$.) Show that it is 40,\!000.-/
-theorem mathd_numbertheory_169 : Nat.gcd 20! 200000 = 40000 := by
+/-- At each basketball practice last week, Jenny made twice as many free throws as she made at the previous practice.  At her fifth practice she made 48 free throws.  How many free throws did she make at the first practice? Show that it is 3.-/
+theorem mathd_algebra_455 (x : ℝ) (h₀ : 2 * (2 * (2 * (2 * x))) = 48) : x = 3 := by
 
 Expected response with the proof:
-  /- The prime factorization of $200,000$ is $2^6 \cdot 5^5$. Then count the number of factors of $2$ and $5$ in $20!$. Since there are $10$ even numbers, there are more than $6$ factors of $2$. There are $4$ factors of $5$. So the greatest common factor is $2^6 \cdot 5^4=40,\!000$.
+/- At Jenny's fourth practice she made $\\frac{1}{2}(48)=24$ free throws. At her third practice she made 12, at her second practice she made 6, and at her first practice she made $3$.
   -/
-  apply Eq.refl```
+linarith```
 
 
 
@@ -800,9 +789,9 @@ theorem mathd_numbertheory_149 :
   (∑ k in Finset.filter (fun x => x % 8 = 5 ∧ x % 6 = 3) (Finset.range 50), k) = 66 := by
 
 Expected response with the proof:
-  /- We are given that $N\equiv 5\pmod{8}$ and $N\equiv 3\pmod{6}$.  We begin checking numbers which are 5 more than a multiple of 8, and we find that 5 and 13 are not 3 more than a multiple of 6, but 21 is 3 more than a multiple of 6. Thus 21 is one possible value of $N$. By the Chinese Remainder Theorem, the integers $x$ satisfying $x\equiv 5\pmod{8}$ and $x\equiv 3\pmod{6}$ are those of the form $x=21+\\text{lcm}(6,8)k = 21 + 24 k$, where $k$ is an integer. Thus the 2 solutions less than $50$ are 21 and $21+24(1) = 45$, and their sum is $21+45=66$.
+/- We are given that $N\equiv 5\pmod{8}$ and $N\equiv 3\pmod{6}$.  We begin checking numbers which are 5 more than a multiple of 8, and we find that 5 and 13 are not 3 more than a multiple of 6, but 21 is 3 more than a multiple of 6. Thus 21 is one possible value of $N$. By the Chinese Remainder Theorem, the integers $x$ satisfying $x\equiv 5\pmod{8}$ and $x\equiv 3\pmod{6}$ are those of the form $x=21+\\text{lcm}(6,8)k = 21 + 24 k$, where $k$ is an integer. Thus the 2 solutions less than $50$ are 21 and $21+24(1) = 45$, and their sum is $21+45=66$.
   -/
-  apply Eq.refl```
+apply Eq.refl```
 
 
 
@@ -819,15 +808,15 @@ open scoped BigOperators Topology
 theorem mathd_algebra_462 : ((1 : ℚ) / 2 + 1 / 3) * (1 / 2 - 1 / 3) = 5 / 36 := by
 
 Expected response with the proof:
-  /- For any $x$ and $y$, $(x+y)(x-y)=x^2-y^2+xy-xy=x^2-y^2$, so \\begin{align*}
+/- For any $x$ and $y$, $(x+y)(x-y)=x^2-y^2+xy-xy=x^2-y^2$, so \\begin{align*}
   \left( \\frac{1}{2} + \\frac{1}{3} \\right) \left( \\frac{1}{2} - \\frac{1}{3} \\right)&=\left(\\frac12\\right)^2-\left(\\frac13\\right)^2\\\\
   &=\\frac14-\\frac19\\\\
   &=\\frac{9}{36}-\\frac{4}{36}\\\\
   &=\\frac{5}{36}
   \end{align*}
   -/
-  simp_all only [one_div]
-  norm_num```
+simp_all only [one_div]
+norm_num```
 
 
 
