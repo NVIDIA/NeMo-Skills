@@ -50,6 +50,7 @@ def summarize_results(
         help="Specify benchmarks to run (comma separated). "
         "If not specified, all benchmarks in the results_dir will be used.",
     ),
+    remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
     max_samples: int = typer.Option(-1, help="limit metric computation only to first `max_samples`"),
 ):
@@ -72,7 +73,12 @@ def summarize_results(
         temp_dir = tempfile.mkdtemp()
         print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
         os.makedirs(temp_dir, exist_ok=True)
-        cluster_download(tunnel, get_unmounted_path(cluster_config, results_dir), temp_dir)
+        cluster_download(
+            tunnel,
+            get_unmounted_path(cluster_config, results_dir),
+            temp_dir,
+            remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
+        )
         tunnel.cleanup()
         results_dir = Path(temp_dir) / Path(results_dir).name
 
