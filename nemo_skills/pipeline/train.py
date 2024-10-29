@@ -14,8 +14,10 @@
 
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Callable
 
 import nemo_run as run
 import typer
@@ -31,6 +33,79 @@ LOG = logging.getLogger(__file__)
 class TrainingAlgo(str, Enum):
     sft = "sft"
     dpo = "dpo"
+    rm = "rm"
+
+
+@dataclass
+class TrainingParams:
+    training_script: str
+    config_params: str
+    nemo_model: str
+    output_dir: str
+    training_data: str
+    validation_data: str
+    num_gpus: int
+    num_nodes: int
+    expname: str
+    training_algo: TrainingAlgo
+    disable_wandb: bool
+    wandb_project: str
+    timeout: str
+    extra_arguments: str = ""
+    logging_params: str = ""
+
+    def __post_init__(self):
+        self.extra_arguments = get_extra_arguments[self.training_algo](self)
+
+
+def get_cmd(params: TrainingParams) -> str:
+    cmd = (
+        f"export WANDB_API_KEY={os.getenv('WANDB_API_KEY', '')} && "
+        f"export HF_TOKEN={get_token()} && "
+        f"export HYDRA_FULL_ERROR=1 && "
+        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"cd /nemo_run/code && "
+        f"echo 'Starting training' && "
+        f"{params.training_script} "
+        f"    {params.config_params}"
+        f"    ++model.tensor_model_parallel_size={params.num_gpus} "
+        f"    trainer.devices={params.num_gpus} "
+        f"    trainer.num_nodes={params.num_nodes} "
+        f"    {params.logging_params} "
+        f"    exp_manager.name={params.expname} "
+        f"    exp_manager.explicit_log_dir={params.output_dir}/training "
+        f"    exp_manager.exp_dir={params.output_dir}/training "
+        f"    ++exp_manager.max_time_per_run={params.timeout} "
+        f"    {params.extra_arguments} "
+    )
+    return cmd
+
+
+configs = {
+    TrainingAlgo.sft: "sft_config",
+    TrainingAlgo.dpo: "dpo_config",
+    TrainingAlgo.rm: "rm_config",
+}
+
+get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
+    TrainingAlgo.sft: lambda params: (
+        f" ++model.data.train_ds.file_path='{params.training_data}' "
+        f" ++model.data.validation_ds.file_path='{params.validation_data}' "
+        f" model.restore_from_path={params.nemo_model} " + params.extra_arguments
+    ),
+    TrainingAlgo.dpo: lambda params: (
+        f" ++model.data.data_prefix.train='[{params.training_data}]' "
+        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+    ),
+    TrainingAlgo.rm: lambda params: (
+        f" ++model.data.data_prefix.train='[{params.training_data}]' "
+        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+    ),
+}
 
 
 def get_training_cmd(
@@ -50,27 +125,8 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
 ):
-    if training_algo == "dpo" and config_name is None:
-        config_name = "dpo_config"
-    if training_algo == "sft" and config_name is None:
-        config_name = "sft_config"
-
     if validation_data is None:
         validation_data = training_data
-
-    if training_algo == "dpo":
-        extra_arguments = (
-            f" ++model.data.data_prefix.train='[{training_data}]' "
-            f" ++model.data.data_prefix.validation='[{validation_data}]' "
-            f" ++model.data.data_prefix.test='[{validation_data}]' "
-            f" pretrained_checkpoint.restore_from_path={nemo_model} " + extra_arguments
-        )
-    else:
-        extra_arguments = (
-            f" ++model.data.train_ds.file_path='{training_data}' "
-            f" ++model.data.validation_ds.file_path='{validation_data}' "
-            f" model.restore_from_path={nemo_model} " + extra_arguments
-        )
 
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
@@ -84,6 +140,36 @@ def get_training_cmd(
             f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
         )
 
+    logging_params = get_logging_params(expname, disable_wandb, wandb_project)
+
+    if config_name is None:
+        config_name = configs[training_algo]
+    config_params = f"--config-name={config_name} --config-path={config_path} "
+
+    training_script = f"python -m nemo_skills.training.start_{training_algo}"
+
+    training_params = TrainingParams(
+        training_script=training_script,
+        config_params=config_params,
+        nemo_model=nemo_model,
+        output_dir=output_dir,
+        training_data=training_data,
+        validation_data=validation_data,
+        num_gpus=num_gpus,
+        num_nodes=num_nodes,
+        expname=expname,
+        training_algo=training_algo,
+        disable_wandb=disable_wandb,
+        wandb_project=wandb_project,
+        timeout=timeout,
+        extra_arguments=extra_arguments,
+        logging_params=logging_params,
+    )
+
+    return get_cmd(training_params)
+
+
+def get_logging_params(expname, disable_wandb, wandb_project):
     if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
@@ -96,28 +182,7 @@ def get_training_cmd(
         )
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
-
-    cmd = (
-        f"export WANDB_API_KEY={os.getenv('WANDB_API_KEY', '')} && "
-        f"export HF_TOKEN={get_token()} && "
-        f"export HYDRA_FULL_ERROR=1 && "
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"cd /nemo_run/code && "
-        f"echo 'Starting training' && "
-        f"python -m nemo_skills.training.start_{training_algo} "
-        f"    --config-name={config_name} --config-path={config_path} "
-        f"    ++model.tensor_model_parallel_size={num_gpus} "
-        f"    trainer.devices={num_gpus} "
-        f"    trainer.num_nodes={num_nodes} "
-        f"    {logging_params} "
-        f"    exp_manager.name={expname} "
-        f"    exp_manager.explicit_log_dir={output_dir}/training "
-        f"    exp_manager.exp_dir={output_dir}/training "
-        f"    ++exp_manager.max_time_per_run={timeout} "
-        f"    {extra_arguments} "
-    )
-
-    return cmd
+    return logging_params
 
 
 def get_avg_checkpoints_cmd(nemo_model, output_dir, final_nemo_path, average_steps):

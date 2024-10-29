@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# copied from https://github.com/NVIDIA/NeMo-Aligner/blob/main/examples/nlp/gpt/conf/gpt_dpo.yaml
+# copied and edited from: https://github.com/NVIDIA/NeMo-Aligner/blob/main/examples/nlp/gpt/conf/training_rm.yaml
 
 defaults:
   - optional tp_overlap@model.ub_tp_comm_overlap_cfg:
@@ -23,16 +23,17 @@ trainer:
   accelerator: gpu
   precision: bf16
 
-  # dpo specific args
-  dpo:
+  # rm specific args
+  rm:
     max_epochs: 1
     max_steps: -1
-    val_check_interval: 0.5
+    val_check_interval: 100
     save_interval: 100
-    limit_train_batches: 1.0
 
     # how many GBS we loop over
-    limit_val_batches: 1
+    # set to float for a percentage
+    # of the validation dataset
+    limit_val_batches: 1.0
     gradient_clip_val: 1.0
 
   # do not change these
@@ -40,11 +41,11 @@ trainer:
   enable_checkpointing: False
   use_distributed_sampler: False
   max_time: null
-  max_epochs: ${.dpo.max_epochs}
-  max_steps: ${.dpo.max_steps}
+  max_epochs: ${.rm.max_epochs}
+  max_steps: ${.rm.max_steps}
 
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: /results
   exp_dir: null
   name: megatron_gpt
   max_time_per_run: ${trainer.max_time}
@@ -52,6 +53,7 @@ exp_manager:
   wandb_logger_kwargs:
     project: null
     name: null
+  resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
   resume_if_exists: True
   resume_ignore_no_checkpoint: True
   create_checkpoint_callback: True
@@ -69,48 +71,33 @@ pretrained_checkpoint:
 
 model:
   mcore_gpt: True
+  share_embeddings_and_output_weights: False
+
+  reward_model_type: binary_ranking # ["binary_ranking, "regression"]
+  regression:
+    num_attributes: 1 # dimension of regression head
+    merge_attributes: False # whether to merge multiple attributes into a scalar
+    attribute_weights: null # apply these weights to each attributes when merging them into a scalar
+    loss_mask_val: -100 #  mask dimensions with this value when calculating MSE loss
+  output_sequence: False  # Whether to output a single scalar or a sequence of scalars.
+  use_avg_pool: False  # Whether to use avg pool to sum across the sequence dim in reward model
+  force_head_dtype: float32  # enforce specific dtype for the final projection in the model head
   micro_batch_size: 1
-  global_batch_size: 256
+  global_batch_size: 512
   megatron_amp_O2: True
-  precision: bf16
-  sequence_parallel: False
-  dist_ckpt_format: zarr
 
-  dpo:
-    # This default value ensures there are no numeric differences beween trained and reference policies when computing log probs.
-    # A higher value can be used to speed-up log probs computations, but may cause numeric differences.
-    log_prob_forward_micro_batch_size: ${multiply:${model.micro_batch_size}, 2}
-    ref_policy_kl_penalty: 0.2
-    preference_average_log_probs: False # whether normalizing log probs according to the sequence length in preference_loss
-    sft_average_log_probs: ${.preference_average_log_probs} # whether normalizing log probs according to the sequence length in sft_loss
-    gt_reward_scale: 1. # the scale of the rewards in RPO
-    preference_loss: dpo # the preference loss, we support dpo, ipo, rpo_sq, rpo_bwd_kl, rpo_fwd_kl
-    preference_loss_weight: 1 # the coefficient of the preference loss
-    sft_loss_weight: 0 # the coefficient of the SFT loss
+  # if there is ever a need to run inference
+  # then this flag will control the batch size
+  # we run inference on. The model will take a potentially
+  # large inference batch, cut it into micro batches
+  # of size forward_micro_batch_size and then run inference
+  forward_micro_batch_size: ${.micro_batch_size}
 
-  #encoder_seq_length: 4096
-  #max_position_embeddings: ${model.encoder_seq_length}
+  encoder_seq_length: 4096
+  max_position_embeddings: ${model.encoder_seq_length}
 
   # miscellaneous
   seed: 1234
-
-  #peft
-  peft:
-    peft_scheme: "none"  # ["lora", "none"]
-    restore_from_path: null
-    restore_from_ckpt:
-      checkpoint_dir: null
-      checkpoint_name: null
-
-    lora_tuning:
-      target_modules: ['attention_qkv'] # this can either be 'attention_qkv','attention_dense','mlp_fc1','mlp_fc2', 'attention' (qkv & dense), 'mlp' (fc1 & fc2), 'all'
-      adapter_dim: 32
-      adapter_dropout: 0.0
-      column_init_method: 'xavier' # IGNORED if linear_adapter is used, options: xavier, zero or normal
-      row_init_method: 'zero' # IGNORED if linear_adapter is used, options: xavier, zero or normal
-      layer_selection:  null  # selects in which layers to add lora adapters. e.g. [1,12] will add lora to layer 1 (lowest) and 12. null will apply adapters to all layers
-      weight_tying: False
-      position_embedding_strategy: null # used only when weight_tying is True
 
   optim:
     name: distributed_fused_adam
@@ -124,9 +111,9 @@ model:
     - 0.98
     sched:
       name: CosineAnnealing
-      warmup_steps: 10
-      constant_steps: 1000
-      min_lr: 9e-7
+      warmup_steps: 0
+      constant_steps: 0
+      min_lr: ${model.optim.lr} # No interpolation happening if the min_lr is not set to be different from lr
 
   data:
     data_impl: jsonl
@@ -134,21 +121,15 @@ model:
     seq_length: ${model.encoder_seq_length}
     skip_warmup: True
     num_workers: 0
-    dataloader_type: single # cyclic
     reset_position_ids: False # Reset position ids after end-of-document token
     reset_attention_mask: False # Reset attention mask after end-of-document token
     eod_mask_loss: False # Mask loss for the end of document tokens
     index_mapping_dir: null # path to save index mapping .npy files, by default will save in the same location as data_prefix
-    default_chosen_reward: 1. # the default reward for the chosen response in RPO
-    default_rejected_reward: 0. # the default reward for the rejected response in RPO
-    data_prefix:
-      train: ???
-      validation: ???
-      test: ???
+    data_prefix: null
+
+  precision: ${trainer.precision}
 
   # define fields from the base model's config that should be ignored when merging with this config.
   overwrite_base_config:
-    data:
-      data_prefix: True
-
-precision: ${trainer.precision}
+      data:
+        data_prefix: True

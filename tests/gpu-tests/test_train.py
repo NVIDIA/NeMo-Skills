@@ -140,3 +140,40 @@ def test_dpo():
     )
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
+
+
+@pytest.mark.gpu
+def test_rm():
+    model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
+
+    train(
+        ctx=wrap_arguments(
+            "++trainer.rm.val_check_interval=1 "
+            "++trainer.rm.save_interval=1 "
+            "++trainer.rm.limit_val_batches=1 "
+            "++trainer.rm.max_steps=3 "
+            "++trainer.rm.max_epochs=10 "
+            "++model.data.train_ds.add_eos=False "
+            "++model.global_batch_size=2 "
+            "++model.micro_batch_size=1 "
+            "++model.optim.lr=1e-6 "
+            "++model.optim.sched.warmup_steps=0 "
+            "++model.tensor_model_parallel_size=1 "
+            "++model.pipeline_model_parallel_size=1 "
+        ),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        expname="test-rm",
+        training_algo="rm",
+        output_dir="/tmp/nemo-skills-tests/test-rm",
+        nemo_model=model_path,
+        num_nodes=1,
+        num_gpus=1,
+        num_training_jobs=1,
+        training_data="/nemo_run/code/tests/data/small-rm-data.test",
+        disable_wandb=True,
+    )
+
+    assert os.path.exists("/tmp/nemo-skills-tests/test-rm/model-averaged-nemo")
