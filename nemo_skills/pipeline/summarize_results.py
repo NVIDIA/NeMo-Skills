@@ -179,19 +179,21 @@ def summarize_results(
 
         print('\n')
 
-    with open(Path(results_dir) / 'metrics.json', 'wt', encoding='utf-8') as fout:
-        json.dump(results, fout, indent=2)
-
-    if upload_path is not None:
-        cluster_upload(
-            tunnel,
-            Path(results_dir) / 'metrics.json',
-            Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
-        )
-        print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
-        tunnel.cleanup()
-    else:
-        print("Metrics are saved to", str(Path(results_dir) / 'metrics.json'))
+    try:
+        with open(Path(results_dir) / 'metrics.json', 'wt', encoding='utf-8') as fout:
+            json.dump(results, fout, indent=2)
+        if upload_path is not None:
+            cluster_upload(
+                tunnel,
+                Path(results_dir) / 'metrics.json',
+                Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
+            )
+            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
+            tunnel.cleanup()
+        else:
+            print("Metrics are saved to", str(Path(results_dir) / 'metrics.json'))
+    except PermissionError:
+        print(f"Could not save metrics.json to {Path(results_dir) / 'metrics.json'}. Please check the permissions.")
 
 
 if __name__ == "__main__":
