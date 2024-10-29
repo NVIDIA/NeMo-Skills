@@ -247,6 +247,27 @@ def get_tunnel(cluster_config):
     return run.SSHTunnel(**cluster_config["ssh_tunnel"])
 
 
+# Helper class and function to support streaming updates
+class OutputWatcher(StreamWatcher):
+    """Class for streaming remote tar/compression process."""
+
+    # TODO: Current solution prints the progress on a new line. Can we make it in place?
+    def submit(self, stream):
+        print(stream)
+        return []
+
+
+def progress_callback(transferred: int, total: int) -> None:
+    """Display SFTP transfer progress."""
+    percent = (transferred / total) * 100
+    bar = '=' * int(percent / 2) + '>'
+    sys.stdout.write(
+        f'\rFile Transfer Progress: [{bar:<50}] {percent:.1f}% '
+        f'({transferred/1024/1024:.1f}MB/{total/1024/1024:.1f}MB)'
+    )
+    sys.stdout.flush()
+
+
 def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None):
     """
     Downloads a directory from a remote cluster by creating a tar archive and transferring it.
@@ -257,25 +278,6 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
         local_dir: Local path to save the downloaded directory
         remote_tar_dir: Optional directory for temporary tar file creation
     """
-
-    # Helper class and function to support streaming updates
-    class OutputWatcher(StreamWatcher):
-        """Class for streaming remote tar/compression process."""
-
-        # TODO: Current solution prints the progress on a new line. Can we make it in place?
-        def submit(self, stream):
-            print(stream)
-            return []
-
-    def progress_callback(transferred: int, total: int) -> None:
-        """Display SFTP transfer progress."""
-        percent = (transferred / total) * 100
-        bar = '=' * int(percent / 2) + '>'
-        sys.stdout.write(
-            f'\rFile Transfer Progress: [{bar:<50}] {percent:.1f}% '
-            f'({transferred/1024/1024:.1f}MB/{total/1024/1024:.1f}MB)'
-        )
-        sys.stdout.flush()
 
     remote_dir = remote_dir.rstrip('/')
     remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
@@ -320,6 +322,21 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
 
     # Clean up the local tarball
     os.remove(local_tar)
+
+
+def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
+    """
+    Uploads a file to cluster.
+    TODO: extend to a folder.
+
+    Args:
+        tunnel: SSHTunnel connection
+        local_file: Path to the local file to upload
+        remote_dir: Cluster path where to save the file
+    """
+    sftp = tunnel.session.client.open_sftp()
+    sftp.put(str(local_file), str(remote_dir), callback=progress_callback)
+    print(f"\nTransfer complete")
 
 
 def get_packager():

@@ -17,6 +17,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     cluster_download,
+    cluster_upload,
     get_cluster_config,
     get_generation_command,
     get_tunnel,
