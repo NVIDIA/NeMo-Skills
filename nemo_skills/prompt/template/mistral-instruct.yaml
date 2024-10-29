@@ -21,8 +21,9 @@ assistant_end: "</s>"
 stop_phrases: ["</s>"]
 
 # used to execute code within these tags
-code_begin: '<llm-code>'
-code_end: '</llm-code>'
+code_begin: '<llm-code>\n'
+code_end: '</llm-code>\n'
 # used to extract the code output
-code_output_begin: '<llm-code-output>'
-code_output_end: '</llm-code-output>'
+code_output_begin: '<llm-code-output>\n'
+code_output_end: '</llm-code-output>\n'
+code_output_format: "qwen"

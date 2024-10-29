@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 
 import pytest
 
@@ -192,18 +193,29 @@ x
 
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
-    "code_begin,code_end,code_output_begin,code_output_end",
+    "code_begin,code_end,code_output_begin,code_output_end,code_output_format",
     [
-        # ('<llm-code>', '</llm-code>', '<llm-code-output>', '</llm-code-output>'),
+        ('<llm-code>\n', '</llm-code>\n', '<llm-code-output>\n', '</llm-code-output>\n', 'qwen'),
         (
             '<|python_tag|>',
             '<|eom_id|>',
             '<|start_header_id|>ipython<|end_header_id|>',
             '<|eot_id|><|start_header_id|>assistant<|end_header_id|>',
+            'llama',
         ),
     ],
 )
-def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_output_end):
+def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_output_end, code_output_format):
+    def replace_code_output(match):
+        code_output = match.group(2)
+        formatted_output = format_code_output(
+            execution_dict={"process_status": "completed", "stdout": code_output, "stderr": ""},
+            code_output_begin=code_output_begin,
+            code_output_end=code_output_end,
+            code_output_format=code_output_format,
+        )
+        return formatted_output
+
     sandbox = _get_sandbox(sandbox_type)
 
     for example_name, example_list in examples_map.items():
@@ -211,22 +223,41 @@ def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_o
             if 'solution' not in example:
                 continue
             example = example.copy()
+
+            pattern = r'({code_output_begin}\n)(.*?)(\n{code_output_end})'
+            example["solution"] = re.sub(pattern, replace_code_output, example["solution"], flags=re.DOTALL)
             example["solution"] = example["solution"].replace("{code_begin}", code_begin)
             example["solution"] = example["solution"].replace("{code_end}", code_end)
-            example["solution"] = example["solution"].replace("{code_output_begin}", code_output_begin)
-            example["solution"] = example["solution"].replace("{code_output_end}", code_output_end)
+            example["solution"] = example["solution"].replace("{code_output_begin}", "")
+            example["solution"] = example["solution"].replace("{code_output_end}", "")
+
             if len(extract_code_to_execute(example['solution'], code_begin, code_end, extract_all=True)) > 0:
                 code_snippets = extract_code_to_execute(example['solution'], code_begin, code_end, extract_all=True)
-                expected_outputs = extract_code_output(
-                    example['solution'], code_output_begin, code_output_end, extract_all=True
-                )
+                if code_output_format == 'qwen':
+                    expected_outputs = extract_code_output(
+                        example['solution'], code_output_begin, code_output_end, extract_all=True
+                    )
+                    expected_outputs = [(output, None) for output in expected_outputs]
+                elif code_output_format == 'llama':
+                    pattern = r'\[stdout\]\n(.*?)\[/stdout\]|\[stderr\]\n(.*?)\[/stderr\]'
+                    expected_outputs = re.findall(pattern, example['solution'], re.DOTALL)
                 session_id = None
-                for code_snippet, expected_output in zip(code_snippets, expected_outputs):
+                for code_snippet, (expected_output, expected_error) in zip(code_snippets, expected_outputs):
+                    if not expected_error:
+                        expected_error = None
                     output, session_id = sandbox.execute_code(code_snippet, session_id=session_id)
-                    generated_output = format_code_output(output, code_output_begin, code_output_end)
-                    assert (
-                        generated_output == code_output_begin + expected_output + code_output_end + '\n\n'
-                    ), f"{example_name} few shots are failing"
+                    execution_dict = {
+                        "process_status": "completed",
+                        "stdout": expected_output,
+                        "stderr": expected_error,
+                    }
+                    generated_output = format_code_output(
+                        output, code_output_begin, code_output_end, code_output_format
+                    )
+                    extracted_output = format_code_output(
+                        execution_dict, code_output_begin, code_output_end, code_output_format
+                    )
+                    assert generated_output == extracted_output, f"{example_name} few shots are failing"
 
 
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])

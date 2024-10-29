@@ -164,6 +164,7 @@ def generate(cfg: GenerateSolutionsConfig):
             "code_end": prompt.config.template.code_end,
             "code_output_begin": prompt.config.template.code_output_begin,
             "code_output_end": prompt.config.template.code_output_end,
+            "code_output_format": prompt.config.template.code_output_format,
         }
     else:
         extra_generate_params = {}

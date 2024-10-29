@@ -58,8 +58,7 @@ gsm8k_text_with_code = [
 Missy started with some amount of money in the first year.
 She was then doubling the amount of money every year for 4 years and ended up with $450.
 Let's write down an equation for this problem and solve it using sympy.
-{code_begin}
-from sympy import solve, symbols
+{code_begin}from sympy import solve, symbols
 first_year_money = symbols('first_year_money')
 second_year_money = 2 * first_year_money
 third_year_money = 2 * second_year_money
@@ -67,14 +66,9 @@ fourth_year_money = 2 * third_year_money
 # Solve for first year money given that the combined saving is 450
 result = solve(first_year_money + second_year_money + third_year_money + fourth_year_money - 450, first_year_money)[0]
 result
-{code_end}
-{code_output_begin}
-
-completed
-[stdout]
+{code_end}{code_output_begin}
 30
-[/stdout]{code_output_end}
-
+{code_output_end}
 Thus Missy put \\boxed{30} dollars in the bank the first year.
 """.strip(),
     },
@@ -90,18 +84,13 @@ Subtracting 1 hour and 30 minutes from 09:00 hours we get \\boxed{07:30} hours.
         "problem": "Mark deposited $88 in a bank. Bryan deposited $40 less than five times as much as Mark. How much did Bryan deposit in the bank?",
         "solution": """
 Let's solve this problem using Python code.
-{code_begin}
-mark_deposit = 88
+{code_begin}mark_deposit = 88
 five_times_mark_deposit = 5 * mark_deposit
 bryan_deposit = five_times_mark_deposit - 40
 bryan_deposit
 {code_end}{code_output_begin}
-
-completed
-[stdout]
 400
-[/stdout]{code_output_end}
-
+{code_output_end}
 So Bryan deposited \\boxed{400} dollars in the bank.
 """.strip(),
     },
@@ -109,20 +98,15 @@ So Bryan deposited \\boxed{400} dollars in the bank.
         "problem": "A department store displays a 20% discount on all fixtures. What will be the new price of a 25 cm high bedside lamp that was worth $120?",
         "solution": """
 Let's solve this problem using Python code.
-{code_begin}
-discount_percent = 20
+{code_begin}discount_percent = 20
 price_before_discount = 120
 discount_portion = discount_percent / 100
 discount_amount = price_before_discount * discount_portion
 price_after_discount = price_before_discount - discount_amount
 price_after_discount
 {code_end}{code_output_begin}
-
-completed
-[stdout]
 96.0
-[/stdout]{code_output_end}
-
+{code_output_end}
 So the new price of the lamp is \\boxed{96} dollars.
 """.strip(),
     },
@@ -130,8 +114,7 @@ So the new price of the lamp is \\boxed{96} dollars.
         "problem": "James opens up a flower shop.  He needs to pay rent of $1200 a week with an additional 20% of rent to pay for utilities and he has 2 employees per shift with the store open 16 hours a day for 5 days a week.  If he pays each employee $12.50 an hour, what are his weekly expenses to run the store?",
         "solution": """
 The cost consists of rent, utilities, and employee salaries. Let's compute each of them separately and then add them up.
-{code_begin}
-# rent cost
+{code_begin}# rent cost
 rent_per_week = 1200
 # utility cost
 utility_per_week = rent_per_week * 20 / 100
@@ -146,12 +129,8 @@ employees_cost_per_week = number_of_employees * employee_work_hours_per_week * e
 cost_per_week = rent_per_week + utility_per_week + employees_cost_per_week
 cost_per_week
 {code_end}{code_output_begin}
-
-completed
-[stdout]
 3440.0
-[/stdout]{code_output_end}
-
+{code_output_end}
 Thus James's weekly expenses add up to \\boxed{3440} dollars.
 """.strip(),
     },

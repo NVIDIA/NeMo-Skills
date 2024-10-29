@@ -15,12 +15,14 @@
 import json
 import logging
 import random
+import re
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
 
+from nemo_skills.code_execution.utils import format_code_output
 from nemo_skills.prompt.few_shot_examples import examples_map
 from nemo_skills.utils import nested_dataclass
 
@@ -96,6 +98,7 @@ class PromptTemplate:
     # used to extract the code output
     code_output_begin: str = '<llm-code-output>'
     code_output_end: str = '</llm-code-output>'
+    code_output_format: str = 'qwen'
 
 
 @nested_dataclass(kw_only=True)
@@ -121,16 +124,26 @@ class Prompt:
         # replacing code/code-output separators in the examples if present
         example_dict = example_dict.copy()
         if 'solution' in example_dict:
+
+            def replace_code_output(match):
+                code_output = match.group(2)
+                formatted_output = format_code_output(
+                    execution_dict={"process_status": "completed", "stdout": code_output, "stderr": ""},
+                    code_output_begin=self.config.template.code_output_begin,
+                    code_output_end=self.config.template.code_output_end,
+                    code_output_format=self.config.template.code_output_format,
+                )
+                return formatted_output
+
+            pattern = r'({code_output_begin}\n)(.*?)({code_output_end})'
+            example_dict["solution"] = re.sub(pattern, replace_code_output, example_dict["solution"], flags=re.DOTALL)
+
             example_dict["solution"] = example_dict["solution"].replace(
                 "{code_begin}", self.config.template.code_begin
             )
             example_dict["solution"] = example_dict["solution"].replace("{code_end}", self.config.template.code_end)
-            example_dict["solution"] = example_dict["solution"].replace(
-                "{code_output_begin}", self.config.template.code_output_begin
-            )
-            example_dict["solution"] = example_dict["solution"].replace(
-                "{code_output_end}", self.config.template.code_output_end
-            )
+            example_dict["solution"] = example_dict["solution"].replace("{code_output_begin}", "")
+            example_dict["solution"] = example_dict["solution"].replace("{code_output_end}", "")
 
         if self.config.template:
             return self.config.few_shot_examples.template.format(**example_dict, **asdict(self.config.template))

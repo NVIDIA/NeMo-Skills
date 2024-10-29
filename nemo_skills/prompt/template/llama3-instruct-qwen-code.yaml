@@ -22,9 +22,11 @@ assistant_end: "<|eot_id|>"
 stop_phrases: ["<|eot_id|>"]
 
 # used to execute code within these tags
-code_begin: '<|python_tag|>'
-code_end: '<|eom_id|>'
+code_begin: "```python\n"
+code_end: "```\n"
 # used to extract the code output
-code_output_begin: '<|start_header_id|>ipython<|end_header_id|>'
-code_output_end: '<|eot_id|><|start_header_id|>assistant<|end_header_id|>'
-code_output_format: "llama"
+code_output_begin: "```output\n"
+code_output_end: "```\n"
+# used to post-process code output
+# choices: llama, qwen
+code_output_format: "qwen"
