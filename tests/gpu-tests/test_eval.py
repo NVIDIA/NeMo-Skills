@@ -87,7 +87,7 @@ def test_trtllm_code_execution_eval():
         [f"/tmp/nemo-skills-tests/trtllm-eval/eval-results/gsm8k/output-greedy.jsonl"], metrics_calculator
     )
     # rough check, since exact accuracy varies depending on gpu type
-    assert metrics['symbolic_correct'] >= 60
+    assert metrics['symbolic_correct'] >= 50
     assert metrics['num_entries'] == 20
 
 

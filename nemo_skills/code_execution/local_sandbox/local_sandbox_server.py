@@ -35,7 +35,7 @@ def execute_python(generated_code, timeout):
 
     if process.is_alive():  # didn't finish successfully
         process.kill()
-        return {"process_status": "timeout", "stdout": "Timed out", "stderr": "Timed out"}
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
     return queue.get()
 
@@ -68,10 +68,10 @@ def execute_lean4(generated_code, timeout):
         }
 
     except subprocess.TimeoutExpired:
-        return {"process_status": "timeout", "stdout": "Timed out", "stderr": "Timed out"}
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {"process_status": "error", "stdout": "", "stderr": str(e)}
+        return {"process_status": "error", "stdout": "", "stderr": str(e) + "\n"}
     finally:
         # Safely remove the temporary file if it was created
         if temp_file_name and os.path.exists(temp_file_name):
@@ -93,7 +93,7 @@ def execute_code_subprocess(generated_code, queue):
         queue.put(sys.stdout.getvalue())
     except Exception as e:
         print(f"Error: {str(e)}")
-        queue.put({"process_status": "error", "stdout": "", "stderr": str(e)})
+        queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
 
 
 # Main Flask endpoint to handle execution requests
