@@ -176,6 +176,8 @@ def main():
     )
     for file in glob.glob(f"{args.untarred_nemo_dir}/*.model"):
         shutil.copy(file, os.path.join(ckpt_name, os.path.basename(file)))
+    for file in glob.glob(f"{args.untarred_nemo_dir}/*.json"):
+        shutil.copy(file, os.path.join(ckpt_name, os.path.basename(file)))
 
     logging.info(f"Averaged distributed checkpoint saved as: {ckpt_name}")
 
