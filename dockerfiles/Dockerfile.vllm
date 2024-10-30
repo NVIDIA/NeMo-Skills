@@ -22,7 +22,11 @@ FROM ${BASE_IMAGE} AS vllm-deps
 # install vllm dependencies
 WORKDIR /opt
 
-ARG VLLM_HASH=v0.6.3.post1
+# https://github.com/vllm-project/vllm/pull/8896
+# https://github.com/vllm-project/vllm/commit/bc2ef1f77c1578612198f60ec392731efb3847c5
+# Bug introduced in future PRs have made us revert to this commit
+# See discussion on bug here - https://github.com/vllm-project/vllm/pull/9090
+ARG VLLM_HASH=bc2ef1f77c1578612198f60ec392731efb3847c5
 
 RUN git clone https://github.com/vllm-project/vllm.git && \
   cd vllm && \
