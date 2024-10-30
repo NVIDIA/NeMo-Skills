@@ -148,12 +148,12 @@ class RemoveContaminated(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
-class RemoveLenOutlierSolutions(BaseFilter):
-    """Remove solutions based on minimum and maximum lengths."""
+class RemoveLenOutliers(BaseFilter):
+    """Remove instance based on minimum and maximum lengths for a given property."""
 
     def __init__(
         self,
-        solution_key: str = "generation",
+        property_key: str = "generation",
         min_length: int = 0,
         max_length: int = None,
         hf_model_name: str = None,
@@ -161,7 +161,7 @@ class RemoveLenOutlierSolutions(BaseFilter):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.solution_key = solution_key
+        self.property_key = property_key
         self.max_length = max_length
         self.min_length = min_length
         self.use_chars_for_min_length = use_chars_for_min_length
@@ -171,17 +171,17 @@ class RemoveLenOutlierSolutions(BaseFilter):
         self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
 
     def process_dataset_entry(self, data_entry):
-        solution = data_entry[self.solution_key]
-        solution_len = len(self.tokenizer.encode(solution, add_special_tokens=False))
+        property_val = data_entry[self.property_key]
+        property_len = len(self.tokenizer.encode(property_val, add_special_tokens=False))
 
         if self.use_chars_for_min_length:
-            if len(solution) < self.min_length:
+            if len(property_val) < self.min_length:
                 return [DataEntry(data=None, metrics=dict(num_removed=1))]
         else:
-            if solution_len < self.min_length:
+            if property_len < self.min_length:
                 return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
-        if solution_len > self.max_length:
+        if property_len > self.max_length:
             return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]

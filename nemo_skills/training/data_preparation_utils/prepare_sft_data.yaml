@@ -18,10 +18,17 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
-# length criteria
+# Params for length-based filtering
+# Unit of length - Tokens
+hf_model_name: "meta-llama/Meta-Llama-3.1-8B"
+
+# Problem params
+min_problem_length: 0
+max_problem_length: 1024
+
+# Solution params
 min_solution_length: 0
 max_solution_length: 2048
-hf_model_name: "meta-llama/Meta-Llama-3.1-8B"
 use_chars_for_min_length: false
 
 chat_format: null  # null/nemotron/llama
@@ -47,6 +54,7 @@ filters:
   trim_solutions: true
   drop_incorrect_arithmetic: true
   split_arithmetic: true
+  remove_len_outlier_problems: false
   remove_len_outlier_solutions: false
   code_text_filter: null
 
@@ -109,9 +117,16 @@ processors:
       - {input: {generation: "1 + 7 * 19 = 134"}, output: {generation: "1 + 7 * 19 = 1 + 133 = 134"}}
       - {input: {generation: "3 * (1 + 7) / 4 = 6"}, output: {generation: "3 * (1 + 7) / 4 = 3 * 8 / 4 = 24 / 4 = 6"}}
 
-  - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutlierSolutions
+  - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
+    should_run: ${filters.remove_len_outlier_problems}
+    property_key: ${input_key}
+    min_length: ${min_problem_length}
+    max_length: ${max_problem_length}
+    hf_model_name: ${hf_model_name}
+
+  - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
     should_run: ${filters.remove_len_outlier_solutions}
-    solution_key: ${output_key}
+    property_key: ${output_key}
     min_length: ${min_solution_length}
     max_length: ${max_solution_length}
     hf_model_name: ${hf_model_name}
