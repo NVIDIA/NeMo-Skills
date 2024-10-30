@@ -14,17 +14,29 @@
 
 # adapted from https://huggingface.co/stas/tiny-random-llama-2/blob/main/make_tiny_model.py
 
-from transformers import LlamaConfig, LlamaForCausalLM
+import argparse
 
-mname_from = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-mname_tiny = "/tmp/nemo-skills-tests/tiny-llama-hf"
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-config = LlamaConfig.from_pretrained(mname_from)
+parser = argparse.ArgumentParser(description="Create a tiny model for testing.")
+parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama"))
+args = parser.parse_args()
+
+if args.model_type == 'qwen':
+    model_name = "Qwen/Qwen2.5-Math-7B"
+    output_dir = "/tmp/nemo-skills-tests/qwen/tiny-model-hf"
+    hidden_dim = 56
+else:
+    model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    output_dir = "/tmp/nemo-skills-tests/llama/tiny-model-hf"
+    hidden_dim = 64
+
+config = AutoConfig.from_pretrained(model_name)
 config.update(
     dict(
-        hidden_size=64,
+        hidden_size=hidden_dim,
         head_dim=2,
-        intermediate_size=64,
+        intermediate_size=hidden_dim,
         num_hidden_layers=2,
         max_position_embeddings=256,
     )
@@ -32,9 +44,12 @@ config.update(
 print("new config", config)
 
 # create a tiny random model
-tiny_model = LlamaForCausalLM(config)
+tiny_model = AutoModelForCausalLM.from_config(config)
 print(f"num of params {tiny_model.num_parameters()}")
 
 # shrink it more and save
 tiny_model.bfloat16()  # half-size
-tiny_model.save_pretrained(mname_tiny)
+tiny_model.save_pretrained(output_dir)
+
+hf_tokenizer = AutoTokenizer.from_pretrained(model_name)
+hf_tokenizer.save_pretrained(output_dir)

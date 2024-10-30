@@ -366,10 +366,11 @@ def get_packager():
             include_pattern = str(Path(__file__).absolute().parents[1] / "dataset/**/*.jsonl")
         include_pattern_relative_path = str(Path(__file__).absolute().parents[2])
 
+        check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
         return run.GitArchivePackager(
             include_pattern=include_pattern,
             include_pattern_relative_path=include_pattern_relative_path,
-            check_uncommitted_changes=True,
+            check_uncommitted_changes=check_uncommited_changes,
         )
     except subprocess.CalledProcessError:
         logging.warning(

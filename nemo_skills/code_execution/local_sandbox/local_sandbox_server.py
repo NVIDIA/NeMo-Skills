@@ -107,3 +107,7 @@ def execute():
         return execute_python(generated_code, timeout)
     elif language == 'lean4':
         return execute_lean4(generated_code, timeout)
+
+
+if __name__ == '__main__':
+    app.run(port=6000)
