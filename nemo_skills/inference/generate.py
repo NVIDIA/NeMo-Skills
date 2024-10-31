@@ -21,6 +21,7 @@ from dataclasses import asdict, field
 from pathlib import Path
 
 import hydra
+from omegaconf import open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -103,8 +104,15 @@ class GenerateSolutionsConfig:
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
 
-        if self.server["server_type"] != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
+        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
+            # TODO: fix that
+            raise ValueError("Prompt template is required for trtllm servers")
+
+        if self.server["server_type"] == "nemo" and self.prompt_template is not None:
+            LOG.warning(
+                "NeMo implementation of openai chat completions api doesn't support batching and thus is very slow. "
+                "Until this is fixed, we highly recommend that you provide prompt template explicitly."
+            )
 
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
@@ -119,6 +127,16 @@ def generate(cfg: GenerateSolutionsConfig):
     cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
 
     LOG.info("Config used: %s", cfg)
+
+    if cfg.prompt_template is None and cfg.server["server_type"] != "openai":
+        # TODO: handle this explicitly in model.py clients
+        # switching to OpenAI client always if prompt template is not provided
+        with open_dict(cfg.server):
+            cfg.server["server_type"] = "openai"
+            cfg.server["model"] = "model"
+        if cfg.code_execution:
+            raise ValueError("Code execution is not supported for OpenAI server")
+
     if cfg.code_execution:
         sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
         llm = get_code_execution_model(**cfg.server, sandbox=sandbox)

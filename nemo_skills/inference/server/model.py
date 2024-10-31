@@ -234,10 +234,12 @@ class NemoModel(BaseModel):
 class OpenAIModel(BaseModel):
     def __init__(
         self,
+        host: str = '127.0.0.1',
+        port: str = '5000',
         model=None,
         base_url=None,
         api_key=None,
-        max_parallel_requests: int = 100,  # can adjust to avoid rate-limiting
+        max_parallel_requests: int = 1000,  # can adjust to avoid rate-limiting
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -249,14 +251,15 @@ class OpenAIModel(BaseModel):
                 raise ValueError("model argument is required for OpenAI model.")
 
         if base_url is None:
-            base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL")
+            # if not provided, we assume it's served on host/port
+            base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
             if base_url is not None and 'api.nvidia.com' in base_url:
                 api_key = os.getenv("NVIDIA_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
-            else:
+            elif base_url is not None and 'api.openai.com' in base_url:
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
