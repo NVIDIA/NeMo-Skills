@@ -102,6 +102,7 @@ def summarize_results(
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
 
     results = defaultdict(dict)
+    max_metrics_to_print = {}
     for benchmark_path in benchmarks_paths:
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
@@ -110,6 +111,7 @@ def summarize_results(
             benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
             metrics_calculator = benchmark_module.METRICS_CLASS()
             results[benchmark] = {}
+            max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
             # TODO: we should just return all available aggregations from compute_metrics directly
             if not isinstance(metrics_calculator, MathMetrics):
                 if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
@@ -157,7 +159,9 @@ def summarize_results(
         max_widths = {}
         max_widths['evaluation_mode'] = len('evaluation_mode')
         for eval_mode, metrics in benchmark_results.items():
-            for metric_key, metric_value in metrics.items():
+            if max_metrics_to_print[benchmark] is None:
+                max_metrics_to_print[benchmark] = len(metrics)
+            for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
                 max_widths[metric_key] = max(
                     max_widths.get(metric_key, len(metric_key)),
                     len(f"{metric_value:.2f}" if isinstance(metric_value, float) else str(metric_value)),
@@ -166,12 +170,14 @@ def summarize_results(
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(list(benchmark_results.values())[0].keys())
+        headers = ['evaluation_mode'] + list(list(benchmark_results.values())[0].keys())[
+            : max_metrics_to_print[benchmark]
+        ]
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
         for eval_mode, metrics in benchmark_results.items():
             values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
-            for metric_key, metric_value in metrics.items():
+            for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
                 if isinstance(metric_value, float):
                     metric_value = f"{metric_value:.2f}"
                 values.append(f'{str(metric_value):<{max_widths[metric_key]}}')

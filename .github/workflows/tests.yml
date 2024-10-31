@@ -30,10 +30,12 @@ jobs:
         pip install -e .
         pip install -r requirements/common-tests.txt
     - name: Run all tests
+      env:
+        NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
       run: |
-        ./nemo_skills/code_execution/local_sandbox/start_local_sandbox.sh &
+        docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.4.2 &
         sleep 120
-        export NEMO_SKILLS_SANDBOX_HOST="127.0.0.1"
+        export NEMO_SKILLS_SANDBOX_HOST=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' local-sandbox`
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         python -m nemo_skills.dataset.prepare
         python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -vvv | tee pytest-coverage.txt

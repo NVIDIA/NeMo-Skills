@@ -557,7 +557,7 @@ def add_task(
     cluster_config,
     container,
     num_tasks=1,
-    num_gpus=1,
+    num_gpus=None,
     num_nodes=1,
     log_dir=None,
     partition=None,

@@ -110,8 +110,9 @@ class PromptConfig:
 
 
 class Prompt:
-    # TODO: multiturn
-    FORMAT = "{text_begin}{system_begin}{system}{system_end}{user_begin}{user}{user_end}{assistant_begin}{generation}"
+    SYSTEM_FORMAT = "{text_begin}{system_begin}{system}{system_end}"
+    TURN_BEGIN_FORMAT = "{user_begin}{user}{user_end}{assistant_begin}"
+    TURN_END_FORMAT = "{assistant}{assistant_end}"
 
     def __init__(self, config):
         # rebuilding prompt config to make sure post init is called again in
@@ -200,7 +201,9 @@ class Prompt:
         user = self.config.user.format(examples=examples, **input_dict)
         return user
 
-    def fill(self, input_dict: Dict[str, str], include_generation: bool = False) -> str | List[dict]:
+    def fill(
+        self, input_dict: Dict[str, str], include_generation: bool = False, multi_turn_key: str | None = None
+    ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
         Operates in two modes:
@@ -210,33 +213,59 @@ class Prompt:
         Args:
             input_dict: The input dictionary to fill the prompt with.
             include_generation: Whether to include the generation in the prompt.
+            multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
+                and use it to construct the prompt. You input_dict should also have "assistant" key in all
+                turns except last containing assistant reply.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
         """
+        # TODO: this function has too many cases, can we simplify this?
+        # TODO: some error message for multi-turn + few-shots (it doesn't work well now)
         if include_generation:
             generation = input_dict.get("generation", "")
         else:
             generation = ""
 
         if self.config.template:
-            prompt = Prompt.FORMAT.format(
-                system=self.config.system,
-                user=self.build_user_message(input_dict),
-                generation=generation,
-                **asdict(self.config.template),
-            )
-
-            return prompt
-
+            if multi_turn_key is None:
+                format_string = self.SYSTEM_FORMAT + self.TURN_BEGIN_FORMAT + "{generation}"
+                prompt_string = format_string.format(
+                    system=self.config.system,
+                    user=self.build_user_message(input_dict),
+                    generation=generation,
+                    **asdict(self.config.template),
+                )
+            else:
+                prompt_string = self.SYSTEM_FORMAT.format(system=self.config.system, **asdict(self.config.template))
+                for turn in input_dict[multi_turn_key][:-1]:
+                    prompt_string += self.TURN_BEGIN_FORMAT.format(
+                        user=self.build_user_message(turn), **asdict(self.config.template)
+                    )
+                    prompt_string += self.TURN_END_FORMAT.format(
+                        assistant=turn["assistant"], **asdict(self.config.template)
+                    )
+                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
+                )
+                prompt_string += generation
+            return prompt_string
         else:
-            messages = [
-                {"role": "system", "content": self.config.system},
-                {"role": "user", "content": self.build_user_message(input_dict)},
-            ]
-            if generation and include_generation:
-                messages.append({"role": "assistant", "content": generation})
-
+            if multi_turn_key is None:
+                messages = [
+                    {"role": "system", "content": self.config.system},
+                    {"role": "user", "content": self.build_user_message(input_dict)},
+                ]
+                if generation and include_generation:
+                    messages.append({"role": "assistant", "content": generation})
+            else:
+                messages = [{"role": "system", "content": self.config.system}]
+                for turn in input_dict[multi_turn_key][:-1]:
+                    messages.append({"role": "user", "content": self.build_user_message(turn)})
+                    messages.append({"role": "assistant", "content": turn["assistant"]})
+                messages.append({"role": "user", "content": self.build_user_message(input_dict[multi_turn_key][-1])})
+                if include_generation:  # optionally adding generation as the last assistant reply
+                    messages.append({"role": "assistant", "content": turn["assistant"]})
             return messages
 
     @property

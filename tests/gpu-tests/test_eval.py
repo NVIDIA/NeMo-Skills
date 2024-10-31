@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import importlib
-import json
 import os
 import subprocess
 import sys

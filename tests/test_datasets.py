@@ -23,6 +23,7 @@ DATASETS = [
     ('omni-math', ['test']),
     ('algebra222', ['test']),
     ('arena-hard', ['test']),
+    ('mt-bench', ['test']),
     ('asdiv', ['test']),
     ('gsm-hard', ['test', 'test_rounded']),
     ('gsm-ic-2step', ['test']),
