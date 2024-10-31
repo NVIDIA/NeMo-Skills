@@ -92,8 +92,18 @@ class CodeExecutionWrapper:
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
-            "remove_stop_phrases": False,  # we need to see where the model stopped
         }
+        list_args = set()
+        for key, value in request.items():
+            is_list = False
+            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
+                is_list = True
+            if key != 'stop_phrases' and isinstance(value, list):
+                is_list = True
+            if is_list and len(value) != len(prompts):
+                raise ValueError(f"Length of {key} should match the number of prompts.")
+            if is_list:
+                list_args.add(key)
 
         # making requests to LLM and iterating on prompts that produce code tokens
         # after executing code and getting result back into the prompt
@@ -112,8 +122,15 @@ class CodeExecutionWrapper:
         with ThreadPoolExecutor(max_workers=32) as executor:
             while len(remaining_ids) > 0:
                 num_executions += 1
-                request["prompts"] = [new_outputs[idx]['prompt'] for idx in remaining_ids]
-                outputs = [self._handle_stop_words(output['generation']) for output in self.model.generate(**request)]
+                cur_request = {key: value for key, value in request.items() if key != 'prompts'}
+                for key, value in cur_request.items():
+                    if key in list_args:
+                        cur_request[key] = [value[idx] for idx in remaining_ids]
+                cur_request["prompts"] = [new_outputs[idx]['prompt'] for idx in remaining_ids]
+                outputs = [
+                    self._handle_stop_words(output['generation'])
+                    for output in self.model.generate(**cur_request, remove_stop_phrases=False)
+                ]
                 new_ids = []
                 # checking if any of the outputs need code execution and submitting requests in parallel
                 futures = [None] * len(prompts)

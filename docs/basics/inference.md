@@ -139,6 +139,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
         "code_end": prompt.config.template.code_end,
         "code_output_begin": prompt.config.template.code_output_begin,
         "code_output_end": prompt.config.template.code_output_end,
+        "code_output_format": prompt.config.template.code_output_format,
     }
     outputs = llm.generate(prompts=prompts, **code_tokens)
     print(outputs[0]["generation"]) # (4)!

@@ -40,6 +40,7 @@ def main():
         f'    --max-num-seqs=256 '
         f'    --enforce-eager '
         f'    --disable-log-requests '
+        f'    --disable-log-stats '
         f'    {extra_arguments} '
     )
 
