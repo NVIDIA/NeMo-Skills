@@ -91,6 +91,7 @@ get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
         f" ++model.data.train_ds.file_path='{params.training_data}' "
         f" ++model.data.validation_ds.file_path='{params.validation_data}' "
+        f" ++model.data.train_ds.index_mapping_dir='{os.path.dirname(os.path.abspath(params.training_data))}' "
         f" model.restore_from_path={params.nemo_model} " + params.extra_arguments
     ),
     TrainingAlgo.dpo: lambda params: (
