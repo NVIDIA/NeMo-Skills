@@ -254,7 +254,7 @@ update_output_files("<path to workspace>/new-problems-solution-augmentation/", c
 
 Now all the data is generated and you can follow up by converting it to the SFT format.
 We remove the problems marked as contaminated.
-We also remove solutions with length > 1024 Llama tokens.
+We also remove problems and solutions with length > 1024 Llama tokens. 
 To avoid the models from generating extremely short solutions, we remove solutions shorter than 200 characters.
 
 ```bash
@@ -264,6 +264,8 @@ python -m nemo_skills.training.prepare_sft_data \
     ++input_files="<path to workspace>/solution-augmentation/**/output-rs*.jsonl <path to workspace>/new-problems-solution-augmentation/**/output-rs*.jsonl" \
     ++output_path=<path to workspace>/sft_data.jsonl \
     ++filters.remove_contamindated=true \
+    ++filters.remove_len_outlier_problems=true \
+    ++max_problem_length=1024 \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \
     ++min_solution_length=200 \

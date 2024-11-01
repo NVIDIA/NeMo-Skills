@@ -83,7 +83,7 @@ ns train \
     --num_gpus=8 \
     --average_steps=10000,20000,30000,40000,50000,60000 \
     --training_data=/workspace/openmathinstruct2-sft.jsonl \
-    ++model.data.train_ds.micro_batch_size=4 \
+    ++model.data.train_ds.micro_batch_size=8 \
     ++model.tensor_model_parallel_size=4 \
     ++model.pipeline_model_parallel_size=1 \
     ++model.optim.lr=2e-5 \
