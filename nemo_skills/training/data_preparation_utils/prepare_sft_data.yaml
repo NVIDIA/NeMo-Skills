@@ -20,7 +20,7 @@ num_output_samples: null
 
 # Params for length-based filtering
 # Unit of length - Tokens
-hf_model_name: "meta-llama/Meta-Llama-3.1-8B"
+hf_model_name: null
 
 # Problem params
 min_problem_length: 0
@@ -54,7 +54,7 @@ filters:
   trim_solutions: true
   drop_incorrect_arithmetic: true
   split_arithmetic: true
-  remove_len_outlier_problems: false
+  remove_len_outlier_problems: true
   remove_len_outlier_solutions: false
   code_text_filter: null
 

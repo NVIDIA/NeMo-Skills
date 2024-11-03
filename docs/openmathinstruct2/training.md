@@ -40,6 +40,7 @@ python -m nemo_skills.training.prepare_sft_data \
     ++preprocessed_dataset_files=<path to workspace>/openmathinstruct2.jsonl \
     ++output_key=generated_solution \
     ++output_path=<path to workspace>/openmathinstruct2-sft.jsonl \
+    ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
     ++filters.drop_multi_boxed=false \
     ++filters.trim_prefix=false \
     ++filters.trim_solutions=false \

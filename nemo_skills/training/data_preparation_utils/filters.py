@@ -166,6 +166,8 @@ class RemoveLenOutliers(BaseFilter):
         self.min_length = min_length
         self.use_chars_for_min_length = use_chars_for_min_length
 
+        if hf_model_name is None:
+            raise ValueError("Specify 'hf_model_name' for length-based filtering")
         from transformers import AutoTokenizer
 
         self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
