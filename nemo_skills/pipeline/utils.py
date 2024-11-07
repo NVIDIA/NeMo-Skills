@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -294,16 +295,31 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
     # Get the directory size
     result = tunnel.run(f'du -sb {remote_dir} | cut -f1')
     total_size = int(result.stdout.strip())
-    # Command for streaming the compression progress
-    command = (
-        f'cd {remote_dir_parent} && '
-        f'tar -cf - {remote_dir_name} | '
-        f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
-        f'gzip > {remote_tar}'
-    )
 
-    # Run the remote compression command and stream the progress
-    result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=False)
+    # Check if result directory compression is streamable
+    streaming_possible = False
+    try:
+        # Check whether the command pv is present on the remote system or not.
+        # Certain systems may not have the `pv` command
+        result = tunnel.run('which pv', warn=True)
+        streaming_possible = result.exited == 0
+    except Exception:
+        streaming_possible = False
+
+    if streaming_possible:
+        # We can do streaming compression
+        # Command for streaming the compression progress
+        command = (
+            f'cd {remote_dir_parent} && '
+            f'tar -cf - {remote_dir_name} | '
+            f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
+            f'gzip > {remote_tar}'
+        )
+        # Run the remote compression command and stream the progress
+        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=False)
+    else:
+        command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
+        result = tunnel.run(command, hide=False)
 
     # Get SFTP client from tunnel's session's underlying client
     sftp = tunnel.session.client.open_sftp()
