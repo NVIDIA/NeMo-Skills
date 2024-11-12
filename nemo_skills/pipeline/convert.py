@@ -96,7 +96,9 @@ def get_hf_to_trtllm_cmd(
     )
 
     if trt_reuse_tmp_engine:
-        cmd = setup_cmd + f"if [ ! -d {tmp_engine_dir} ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
+        cmd = (
+            setup_cmd + f"if [ ! -f {tmp_engine_dir}/config.json ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
+        )
     else:
         cmd = setup_cmd + hf_to_trtllm_cmd + " && " + trtllm_build_cmd
 
