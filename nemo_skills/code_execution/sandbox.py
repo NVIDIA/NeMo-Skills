@@ -202,14 +202,14 @@ try:
             exec_result = shell.run_cell(code)
     stdout = captured.stdout.replace("Out[1]: ", "").strip()
     stderr = captured.stderr.replace("Out[1]: ", "").strip()
-    if stdout:
-        stdout += "\\n"
-    if stderr:
-        stderr += "\\n"
     if len(stdout) > {max_output_characters}:
         stdout = stdout[:{max_output_characters}] + "<output cut>"
     if len(stderr) > {max_output_characters}:
         stderr = stderr[:{max_output_characters}] + "<output cut>"
+    if stdout:
+        stdout += "\\n"
+    if stderr:
+        stderr += "\\n"
     to_return = {{"process_status": "completed", "stdout": stdout, "stderr": stderr}}
 except Exception:
     # removing useless prefix from traceback
