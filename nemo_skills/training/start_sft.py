@@ -16,6 +16,11 @@
 import nemo.collections.nlp.data.language_modeling.megatron.gpt_sft_chat_dataset as gpt_sft_chat_dataset
 import torch.multiprocessing as mp
 from nemo.collections.nlp.data.language_modeling.megatron.gpt_sft_chat_dataset import get_prompt_template_example
+from nemo.collections.nlp.data.language_modeling.megatron.megatron_batch_samplers import (
+    MegatronPretrainingBatchSampler,
+)
+from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
+from nemo.collections.nlp.parts.megatron_trainer_builder import MegatronTrainerBuilder
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from nemo.utils.exp_manager import exp_manager
@@ -46,7 +51,7 @@ mp.set_start_method("spawn", force=True)
 
 def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
     """
-    This function modifies the original gpt pre-training config (gpt_cfg) with attributes from the training config (cfg).
+    This function modifies the original gpt pre-training config (gpt_cfg) with attributes from the finetuning config (cfg).
     The `add_cfg_to_tree` arg adds `cfg` to the top of the yaml tree which is needed for all `hparams.yaml` files when passed as an arg to `load_from_checkpoint()`.
     """
     OmegaConf.set_struct(gpt_cfg, True)
@@ -97,6 +102,9 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         if cfg.model.get("seq_len_interpolation_factor", None) is not None:
             gpt_cfg.seq_len_interpolation_factor = cfg.model.seq_len_interpolation_factor
 
+        if cfg.model.get("dist_ckpt_load_strictness", None) is not None:
+            gpt_cfg.dist_ckpt_load_strictness = cfg.model.dist_ckpt_load_strictness
+
         gpt_cfg.inference = cfg.model.get("inference", {})
 
         # This is needed when modifying a hparam file directly to load `.ckpt` files.
@@ -104,7 +112,9 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         if add_cfg_to_tree:
             OmegaConf.resolve(gpt_cfg)
             gpt_cfg.cfg = gpt_cfg
-        gpt_cfg.dist_ckpt_format = 'zarr'
+
+        # OVERRRIDE: set the dist_ckpt_format to zarr explicitly unless specified in the config
+        gpt_cfg.dist_ckpt_format = cfg.model.get("dist_ckpt_format", "zarr")
     return gpt_cfg
 
 
@@ -219,7 +229,7 @@ def main(cfg) -> None:
     ckpt_callback = add_custom_checkpoint_callback(trainer, ptl_model)
 
     logger.log_hyperparams(OmegaConf.to_container(cfg))
-    timer = Timer(cfg.exp_manager.get("max_time_per_run"))
+    timer = Timer(cfg.exp_manager.get("max_time_per_run") if cfg.exp_manager else None)
 
     sft_trainer = SupervisedTrainer(
         cfg=cfg.trainer.sft,
