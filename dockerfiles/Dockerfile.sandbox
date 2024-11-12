@@ -12,48 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Use the base image: tiangolo/uwsgi-nginx-flask with Python 3.10
+# Use the base image with Python 3.10 and Flask
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
-# Install dependencies for Lean 4
+# Install dependencies required for Lean 4 and other tools
 RUN apt-get update && \
     apt-get install -y curl git && \
     curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y && \
-    /root/.elan/bin/elan default stable && \
-    /root/.elan/bin/elan toolchain install stable && \
-    /root/.elan/bin/elan self update && \
-    /root/.elan/bin/elan --version
+    /root/.elan/bin/elan toolchain install leanprover/lean4:v4.12.0 && \
+    /root/.elan/bin/elan default leanprover/lean4:v4.12.0 && \
+    /root/.elan/bin/elan self update
 
 # Set environment variables to include Lean and elan/lake in the PATH
 ENV PATH="/root/.elan/bin:$PATH"
 
-# Create a new Lean project with Mathlib4 v4.12.0 support
-RUN mkdir /lean4 && cd /lean4 && /root/.elan/bin/lake new my_project && cd my_project
+# Create Lean project directory and initialize a new Lean project with Mathlib4
+RUN mkdir -p /lean4 && cd /lean4 && \
+    /root/.elan/bin/lake new my_project && \
+    cd my_project && \
+    echo 'leanprover/lean4:v4.12.0' > lean-toolchain && \
+    echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "v4.12.0"' >> lakefile.lean
 
-# Update lean-toolchain to use Lean v4.12.0
-RUN echo 'leanprover/lean4:v4.12.0' > /lean4/my_project/lean-toolchain
+# Download and cache Mathlib4 to avoid recompiling, then build the project
+RUN cd /lean4/my_project && \
+    /root/.elan/bin/lake exe cache get && \
+    /root/.elan/bin/lake build
 
-# Specify Mathlib4 version 4.12.0 in the lakefile
-RUN echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "v4.12.0"' >> /lean4/my_project/lakefile.lean
-
-# Download and cache Mathlib4 to avoid recompiling
-RUN cd /lean4/my_project && /root/.elan/bin/lake exe cache get && /root/.elan/bin/lake build
-
-# Set environment variables to include Lean project in the PATH
+# Set environment variables to include Lean project path
 ENV LEAN_PATH="/lean4/my_project"
 ENV PATH="/lean4/my_project:$PATH"
 
-# Copy the main application code to /app
+# Set up application code and install Python dependencies
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
-
-# Copy the Python requirements file and install Python dependencies
 COPY requirements/code_execution.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Set the working directory to /app
 WORKDIR /app
 
-# Expose ports for the Flask app and Lean 4 project
+# Set Flask app environment variables and ports
 ARG UWSGI_CHEAPER
 ENV UWSGI_CHEAPER=$UWSGI_CHEAPER
 
@@ -62,6 +59,5 @@ ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 
 ENV LISTEN_PORT=6000
 
-# Expose the Flask app port (6000)
+# Expose the necessary port for the Flask app
 EXPOSE 6000
-
