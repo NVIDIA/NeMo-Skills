@@ -84,7 +84,6 @@ def execute_code_subprocess(generated_code, queue):
     limit = 1024 * 1024 * 1024 * 10  # 10gb - somehow with a smaller limit the server dies when numpy is used
     resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
     resource.setrlimit(resource.RLIMIT_DATA, (limit, limit))
-    resource.setrlimit(resource.RLIMIT_STACK, (limit, limit))
 
     # this can be overriden inside generated code, so it's not a guaranteed protection
     sys.stdout = StringIO()
