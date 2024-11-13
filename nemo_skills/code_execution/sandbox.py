@@ -169,9 +169,6 @@ class Sandbox(abc.ABC):
         if session_id is None and language == "python":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
-        generated_code = generated_code.replace('"""', r'\"\"\"')
-        while generated_code.endswith('\\'):
-            generated_code = generated_code[:-1]
 
         if session_id is not None:
             self.sessions[session_id].append(generated_code)
@@ -191,7 +188,7 @@ from IPython.utils import io
 code_snippets = []
 """
             for code_snippet in self.sessions[session_id]:
-                TO_EXECUTE += f'\ncode_snippets.append("""{code_snippet}""")\n'
+                TO_EXECUTE += f'\ncode_snippets.append({repr(code_snippet)})\n'
 
             # we do `strip() + \\n` below to ensure that `print(res)` and `res` return the same output
             TO_EXECUTE += f"""
@@ -256,6 +253,16 @@ print(json.dumps(to_return))
             while gt_output.endswith('\\'):
                 gt_output = gt_output[:-1]
 
+        math_equal_call = f"""
+    output = math_equal(
+        {repr(str(pred_output))},
+        {repr(str(gt_output))},
+        {include_percentage},
+        {tolerance},
+        {timeout},
+    )
+"""
+
         TO_EXECUTE = f"""
 import os
 import sys
@@ -269,13 +276,7 @@ stdout = sys.stdout
 # removing all output to not capture that
 sys.stdout = sys.stderr = StringIO()
 try:
-    output = math_equal(
-        r'''{pred_output}''',
-        r'''{gt_output}''',
-        {include_percentage},
-        {tolerance},
-        {timeout},
-    )
+    {math_equal_call}
     error_message = ""
 except Exception as e:
     output = False
@@ -293,10 +294,22 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
 
         if output.get('error_message', 'internal error!'):
             # logging the error
-            LOG.warning("Error during correctness check: %s", output['error_message'])
+            LOG.error(
+                "Error during correctness check:\noutput dict: %s\npred_output: %s\ngt_output: %s\nmath_equal_call: %s",
+                output,
+                pred_output,
+                gt_output,
+                math_equal_call,
+            )
 
         if 'result' not in output:
-            LOG.error("Unexpected output: %s", output)
+            LOG.error(
+                "Unexpected output:\noutput dict: %s\npred_output: %s\ngt_output: %s\nmath_equal_call: %s",
+                output,
+                pred_output,
+                gt_output,
+                math_equal_call,
+            )
             return False
 
         return output['result']
