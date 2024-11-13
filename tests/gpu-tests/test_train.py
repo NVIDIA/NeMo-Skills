@@ -13,16 +13,52 @@
 # limitations under the License.
 
 import importlib
+import json
 import os
 import sys
 from pathlib import Path
 
+import docker
 import pytest
+import yaml
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import compute_metrics
 from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import eval, train
+from nemo_skills.pipeline.cli import eval, generate, train
+
+
+def docker_run(image_name, volume_paths, command):
+    client = docker.from_env()
+
+    try:
+        # Process volume paths
+        volumes = {}
+        for path in volume_paths:
+            src, dst = path.split(':')
+            volumes[os.path.abspath(src)] = {'bind': dst, 'mode': 'rw'}
+
+        # Run the container
+        full_command = f"/bin/bash -c '{command}'"
+        result = client.containers.run(
+            image_name,
+            command=full_command,
+            volumes=volumes,
+            remove=True,
+            detach=False,
+        )
+        logs = result.decode('utf-8')
+        print("Operation completed.")
+        print("Container logs:", logs)
+    except docker.errors.ContainerError as e:
+        print(f"Container exited with non-zero status code: {e.exit_status}")
+        print(f"Container logs: {e.stderr.decode('utf-8')}")
+        raise
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        raise  # Re-raise the exception after printing
+    finally:
+        client.close()
 
 
 @pytest.mark.gpu
@@ -146,13 +182,41 @@ def test_dpo():
 
 
 @pytest.mark.gpu
-def test_rm():
+@pytest.mark.parametrize("test_mode", ["unit", "integration"])
+def test_rm(test_mode):
+    seeds_supported_models = ['llama']
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+
+    if test_mode == "unit":
+        input_dir_seeds = "/nemo_run/code/tests/data/score_rm_inputs"
+        input_dir_greedy = "/nemo_run/code/tests/data/score_rm_inputs"
+        expected_scores_per_file = 5
+    else:  # test_mode == "integration"
+        input_dir_greedy = os.getenv('NEMO_SKILLS_TEST_RM_INPUTS_GREEDY')
+        if not input_dir_greedy:
+            pytest.skip("Define NEMO_SKILLS_TEST_RM_INPUTS_SEEDS_GREEDY to run this test")
+        if model_type in seeds_supported_models:
+            input_dir_seeds = os.getenv('NEMO_SKILLS_TEST_RM_INPUTS_SEEDS')
+            if not input_dir_seeds:
+                pytest.skip("Define NEMO_SKILLS_TEST_RM_INPUTS_SEEDS to run this test")
+        expected_scores_per_file = int(os.getenv('NEMO_SKILLS_TEST_RM_EXPECTED_SCORES_PER_FILE'))
+        if not expected_scores_per_file:
+            pytest.skip("Define NEMO_SKILLS_TEST_RM_EXPECTED_SCORES_PER_FILE to run this test")
+
+    test_config_path = Path(__file__).absolute().parent / "test-local.yaml"
+    config = yaml.safe_load(open(test_config_path).read())
+    volumes = config['mounts']
+    container = config['containers']['nemo-skills']
+    docker_run(
+        image_name=container,
+        volume_paths=volumes,
+        command=f'rm -rf /tmp/nemo-skills-tests/{model_type}/test-rm/{{training,score,model-averaged-nemo}}',
+    )
 
     train(
         ctx=wrap_arguments(
@@ -183,3 +247,58 @@ def test_rm():
     )
 
     assert os.path.exists(f"/tmp/nemo-skills-tests/{model_type}/test-rm/model-averaged-nemo")
+
+    generate(
+        ctx=wrap_arguments(
+            f"++batch_size=2 "
+            f"++input_dir={input_dir_greedy} "
+            f"++prompt_config=generic/math-base "
+            f"++prompt_template=llama3-base "
+        ),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        output_dir=f"/tmp/nemo-skills-tests/{model_type}/test-rm/score",
+        server_type="nemo",
+        generation_type="reward",
+        expname="test-rm",
+        model=f"/tmp/nemo-skills-tests/{model_type}/test-rm/model-averaged-nemo",
+        server_gpus=1,
+        server_nodes=1,
+        partition="interactive",
+        num_random_seeds=None,
+    )
+
+    assert os.path.exists(f"/tmp/nemo-skills-tests/{model_type}/test-rm/score/output.jsonl")
+    rm_output = [json.loads(line) for line in open(f"/tmp/nemo-skills-tests/{model_type}/test-rm/score/output.jsonl")]
+    assert len(rm_output) == expected_scores_per_file
+    assert all("reward_model_score" in line for line in rm_output)
+
+    if model_type in seeds_supported_models:
+        generate(
+            ctx=wrap_arguments(
+                f"++batch_size=2 "
+                f"++input_dir={input_dir_seeds} "
+                f"++prompt_config=generic/math-base "
+                f"++prompt_template=llama3-base "
+            ),
+            cluster="test-local",
+            config_dir=Path(__file__).absolute().parent,
+            output_dir=f"/tmp/nemo-skills-tests/{model_type}/test-rm/score",
+            server_type="nemo",
+            generation_type="reward",
+            expname="test-rm",
+            model=f"/tmp/nemo-skills-tests/{model_type}/test-rm/model-averaged-nemo",
+            server_gpus=1,
+            server_nodes=1,
+            partition="interactive",
+            num_random_seeds=3,
+        )
+
+        for rs in range(3):
+            assert os.path.exists(f"/tmp/nemo-skills-tests/{model_type}/test-rm/score/output-rs{rs}.jsonl")
+            rm_output = [
+                json.loads(line)
+                for line in open(f"/tmp/nemo-skills-tests/{model_type}/test-rm/score/output-rs{rs}.jsonl")
+            ]
+            assert len(rm_output) == expected_scores_per_file
+            assert all("reward_model_score" in line for line in rm_output)

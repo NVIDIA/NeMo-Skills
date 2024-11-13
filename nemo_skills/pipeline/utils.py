@@ -106,8 +106,68 @@ def get_generation_command(server_address, generation_commands):
     return cmd
 
 
+def get_reward_server_command(
+    server_type: str,
+    num_gpus: int,
+    num_nodes: int,
+    model_path: str,
+    cluster_config: dict,
+    server_args: str = "",
+):
+    num_tasks = num_gpus
+
+    # check if the model path is mounted if not vllm;
+    # vllm can also pass model name as "model_path" so we need special processing
+    if server_type != "vllm":
+        check_if_mounted(cluster_config, model_path)
+
+    # the model path will be mounted, so generally it will start with /
+    elif server_type == "vllm" and model_path.startswith("/"):
+        check_if_mounted(cluster_config, model_path)
+
+    if server_type == 'nemo':
+        server_start_cmd = (
+            # Note: The order of the two commands is important as the reward model server
+            # needs to be the first command so it can get the HF_TOKEN from the environment
+            f"python -m nemo_skills.inference.server.serve_nemo_aligner_reward_model "
+            f"    ++rm_model_file={model_path} "
+            f"    trainer.devices={num_gpus} "
+            f"    trainer.num_nodes={num_nodes} "
+            f"    +tensor_model_parallel_size={num_gpus} "
+            f"    +pipeline_model_parallel_size={num_nodes} "
+            # This port could be configurable, but is hard coded to reduce
+            # the divergence of the server command parameters from pipeline/generate.py
+            f"    inference.port=5001 "
+            f"    {server_args} & "
+            f"python -m nemo_skills.inference.server.serve_nemo_reward_model "
+            # These ports could be configurable, but is hard coded to reduce
+            # the divergence of the server command parameters from pipeline/generate.py
+            f" inference_port=5000  triton_server_address=localhost:5001 "
+        )
+
+        # somehow on slurm nemo needs multiple tasks, but locally only 1
+        if cluster_config["executor"] == "local":
+            num_tasks = 1
+    else:
+        raise ValueError(f"Server type '{server_type}' not supported for reward model.")
+
+    server_cmd = (
+        f"nvidia-smi && "
+        f"cd /nemo_run/code && "
+        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"export HF_TOKEN={get_token()} && "
+        f"{server_start_cmd} "
+    )
+    return server_cmd, num_tasks
+
+
 def get_server_command(
-    server_type: str, num_gpus: int, num_nodes: int, model_path: str, cluster_config: dict, server_args: str = ""
+    server_type: str,
+    num_gpus: int,
+    num_nodes: int,
+    model_path: str,
+    cluster_config: dict,
+    server_args: str = "",
 ):
     num_tasks = num_gpus
 
@@ -130,6 +190,7 @@ def get_server_command(
             f"    pipeline_model_parallel_size={num_nodes} "
             f"    {server_args} "
         )
+
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if cluster_config["executor"] == "local":
             num_tasks = 1
@@ -581,6 +642,7 @@ def add_task(
     server_config=None,
     task_dependencies: list[str] = None,
     run_after=None,
+    get_server_command=get_server_command,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 

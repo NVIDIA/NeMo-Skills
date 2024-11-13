@@ -20,6 +20,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import get_reward_server_command, get_server_command
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -55,6 +56,31 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
+def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    cmd = (
+        f"python -m nemo_skills.inference.reward_model ++skip_filled=True "
+        f"++output_dir={output_dir} ++random_seed={random_seed} "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd
+
+
+class GenerationType(str, Enum):
+    generate = "generate"
+    reward = "reward"
+
+
+server_command_factories = {
+    GenerationType.generate: get_server_command,
+    GenerationType.reward: get_reward_server_command,
+}
+
+client_command_factories = {
+    GenerationType.generate: get_cmd,
+    GenerationType.reward: get_rm_cmd,
+}
+
+
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def generate(
@@ -70,6 +96,7 @@ def generate(
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
+    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
     server_type: SupportedServers = typer.Option(help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
@@ -113,6 +140,8 @@ def generate(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        # Note: for reward models, the port is hard-coded to 5000 in the
+        # get_reward_server_command function
         server_address = "localhost:5000"
 
         server_config = {
@@ -128,6 +157,9 @@ def generate(
         extra_arguments += (
             f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
         )
+
+    get_server_command = server_command_factories[generation_type]
+    get_cmd = client_command_factories[generation_type]
 
     with run.Experiment(expname) as exp:
         if num_random_seeds:
@@ -152,6 +184,7 @@ def generate(
                         with_sandbox=True,
                         run_after=run_after,
                         task_dependencies=prev_tasks,
+                        get_server_command=get_server_command,
                     )
                     prev_tasks = [new_task]
         else:
@@ -175,6 +208,7 @@ def generate(
                     with_sandbox=True,
                     run_after=run_after,
                     task_dependencies=prev_tasks,
+                    get_server_command=get_server_command,
                 )
                 prev_tasks = [new_task]
         run_exp(exp, cluster_config)
