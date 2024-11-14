@@ -15,6 +15,7 @@
 import itertools
 from typing import Dict, Iterable, List, Optional, Union
 
+import dash_ace
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import current_app
@@ -266,4 +267,17 @@ def get_utils_field_representation(value: Union[str, int, float, bool], key: str
         UNDEFINED
         if value is None and key.split(SEPARATOR_ID)[-1] in current_app.config['nemo_inspector']['types']
         else value if value == "" or str(value).strip() != "" else repr(value)[1:-1]
+    )
+
+
+def get_code_text_area_layout(id):
+    return dash_ace.DashAceEditor(
+        id=id,
+        theme='tomorrow_night',
+        mode='python',
+        tabSize=4,
+        enableBasicAutocompletion=True,
+        enableLiveAutocompletion=True,
+        placeholder='Write your code here...',
+        style={'width': '100%', 'height': '300px'},
     )

@@ -489,7 +489,7 @@ def del_row(
     button_ids: List[Dict],
     del_row_labels: List[str],
     dummy_data: str,
-) -> None:
+) -> Tuple[str, List[str]]:
     ctx = callback_context
     if not ctx.triggered or not n_clicks:
         return no_update, [no_update] * len(button_ids)
@@ -537,7 +537,7 @@ def update_data_table(
     new_rows_ids: List[str],
     file_names: List[str],
     js_trigger: str,
-) -> None:
+) -> Tuple[str, str]:
     ctx = callback_context
     if not ctx.triggered or not idx:
         return no_update, no_update
@@ -576,7 +576,7 @@ def update_data_table(
 def compare(n_clicks: List[int], dummy_data: str, row_names: str, button_ids: List[str]):
     ctx = callback_context
     if not ctx.triggered or not n_clicks:
-        return no_update, [no_update] * len(button_ids)
+        return no_update
     button_id = json.loads(ctx.triggered[0]['prop_id'].split('.')[0])['id']
     if row_names[button_id] not in get_compared_rows():
         get_compared_rows().add(row_names[button_id])
@@ -622,7 +622,7 @@ def edit_row(
     page_size: int,
     file_names: List[str],
     dummy_data: str,
-) -> None:
+) -> Tuple[str, List[str]]:
     ctx = callback_context
     if not ctx.triggered or not n_clicks or not idx:
         return no_update, [no_update] * len(button_ids)
@@ -795,13 +795,11 @@ def change_filter_mode(modes: List[str], js_trigger: str) -> str:
 
 
 @app.callback(
-    [
-        Output(
-            "dummy_output",
-            'children',
-            allow_duplicate=True,
-        ),
-    ],
+    Output(
+        "dummy_output",
+        'children',
+        allow_duplicate=True,
+    ),
     [
         Input({"type": "apply_label_button", "id": ALL}, "n_clicks"),
         Input({"type": "delete_label_button", "id": ALL}, "n_clicks"),
@@ -844,14 +842,14 @@ def change_label(
 ) -> List[List[str]]:
     ctx = callback_context
     if not ctx.triggered:
-        return [no_update]
+        return no_update
 
     button_id = label_ids.index(
         json.loads(LABEL_SELECTOR_ID.format(json.loads(ctx.triggered[-1]['prop_id'].split('.')[0])['id']))
     )
     is_apply = json.loads(ctx.triggered[-1]['prop_id'].split('.')[0])['type'] == "apply_label_button"
     if not ctx.triggered[0]['value'] or labels[button_id] == CHOOSE_LABEL:
-        return [no_update]
+        return no_update
 
     ALL_FILES = "ALL_FILES"
     if button_id == 0:
@@ -862,7 +860,7 @@ def change_label(
         question_ids = list(range(len(get_table_data())))
     else:
         if not idx:
-            return [no_update]
+            return no_update
         models_to_process = [
             (
                 models[button_id - 1],
@@ -897,7 +895,7 @@ def change_label(
                 elif not is_apply:
                     get_table_data()[question_id][model][file_id][LABEL].remove(labels[button_id])
 
-    return [dummy_data + "1"]
+    return dummy_data + "1"
 
 
 @app.callback(
@@ -951,7 +949,7 @@ def change_file(
 
     ctx = callback_context
     if not ctx.triggered:
-        return [no_update] * len(table_data)
+        return [no_update] * len(table_data), no_update
 
     question_id = page_size * current_page + idx[0]
     for trigger in ctx.triggered:

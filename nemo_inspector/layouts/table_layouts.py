@@ -20,6 +20,7 @@ from typing import Dict, List
 import dash_bootstrap_components as dbc
 from dash import dash_table, html
 from layouts.base_layouts import (
+    get_code_text_area_layout,
     get_selector_layout,
     get_single_prompt_output_layout,
     get_switch_layout,
@@ -147,7 +148,7 @@ def get_filter_layout(id: int = -1, available_filters: List[str] = [], mode: str
         html.Div(
             [
                 html.Pre(text, id={"type": "filter_text", "id": id}),
-                dbc.Textarea(
+                get_code_text_area_layout(
                     id={
                         "type": "filter_function_input",
                         "id": id,
@@ -217,7 +218,7 @@ def get_sorting_layout(id: int = -1, available_params: List[str] = []) -> html.D
         html.Div(
             [
                 html.Pre(text),
-                dbc.Textarea(
+                get_code_text_area_layout(
                     id={
                         "type": "sorting_function_input",
                         "id": id,

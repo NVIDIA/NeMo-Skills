@@ -18,7 +18,7 @@ from typing import Dict, List
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import current_app
-from layouts.base_layouts import get_selector_layout, get_switch_layout
+from layouts.base_layouts import get_code_text_area_layout, get_selector_layout, get_switch_layout
 from layouts.table_layouts import get_change_label_layout, get_filter_layout, get_sorting_layout
 from settings.constants import CHOOSE_MODEL, CUSTOM, DELETE, GENERAL_STATS, INLINE_STATS
 from utils.common import get_available_models, get_custom_stats, get_general_custom_stats, get_stats_raw
@@ -117,7 +117,7 @@ def get_update_dataset_modal_layout() -> html.Div:
         html.Div(
             [
                 html.Pre(text),
-                dbc.Textarea(
+                get_code_text_area_layout(
                     id="update_dataset_input",
                 ),
             ],
@@ -302,7 +302,10 @@ def get_stats_input(modes: List[str] = []) -> List:
     else:
         mode = GENERAL_STATS if GENERAL_STATS in modes else INLINE_STATS
         extractor_options = list(get_stats_raw()[mode].keys())
-        body += [get_selector_layout(extractor_options, "stats_extractor", CUSTOM), dbc.Textarea(id="stats_input")]
+        body += [
+            get_selector_layout(extractor_options, "stats_extractor", CUSTOM),
+            get_code_text_area_layout(id="stats_input"),
+        ]
     return [
         html.Pre(get_stats_text(GENERAL_STATS in modes, DELETE in modes), id="stats_text"),
     ] + body
