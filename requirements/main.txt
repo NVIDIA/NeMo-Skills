@@ -27,4 +27,5 @@ scikit-learn
 sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor
 sympy
 tqdm
+transformers
 typer

@@ -38,4 +38,4 @@ jobs:
         export NEMO_SKILLS_SANDBOX_HOST=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' local-sandbox`
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         python -m nemo_skills.dataset.prepare
-        python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -vvv | tee pytest-coverage.txt
+        python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -s -vvv

@@ -95,8 +95,6 @@ def get_generation_command(server_address, generation_commands):
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
         # might be required if we are not hosting server ourselves
-        f"export NVIDIA_API_KEY={os.getenv('NVIDIA_API_KEY', '')} && "
-        f"export OPENAI_API_KEY={os.getenv('OPENAI_API_KEY', '')} && "
         # this will try to handshake in a loop and unblock when the server responds
         f"echo 'Waiting for the server to start at {server_address}' && "
         f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
@@ -155,7 +153,6 @@ def get_reward_server_command(
         f"nvidia-smi && "
         f"cd /nemo_run/code && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export HF_TOKEN={get_token()} && "
         f"{server_start_cmd} "
     )
     return server_cmd, num_tasks
@@ -219,7 +216,6 @@ def get_server_command(
         f"nvidia-smi && "
         f"cd /nemo_run/code && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export HF_TOKEN={get_token()} && "
         f"{server_start_cmd} "
     )
     return server_cmd, num_tasks
@@ -468,6 +464,8 @@ def get_env_variables(cluster_config):
     - `required_env_vars` - list of required environment variables
     - `env_vars` - list of optional environment variables
 
+    NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
+
     Args:
         cluster_config: cluster config dictionary
 
@@ -484,12 +482,22 @@ def get_env_variables(cluster_config):
         env_vars[env_var] = os.environ[env_var]
         logging.info(f"Adding required environment variable {env_var} (value={os.environ[env_var]})")
 
+    # It is fine to have these as always optional even if they are required for some configs
+    # Assume it is required, then this will override the value set above with the same
+    # value, assuming it has not been updated externally between these two calls
+    always_optional_env_vars = ["NVIDIA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"]
+    default_factories = {
+        "HF_TOKEN": get_token,
+    }
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
-    for env_var in optional_env_vars:
+    for env_var in optional_env_vars + always_optional_env_vars:
         if env_var in os.environ:
-            logging.info(f"Adding optional environment variable {env_var} (value={os.environ[env_var]})")
+            logging.info(f"Adding optional environment variable {env_var} from environment")
             env_vars[env_var] = os.environ[env_var]
+        elif env_var in default_factories:
+            env_vars[env_var] = default_factories[env_var]()
+            logging.info(f"Adding optional environment variable {env_var} from environment")
         else:
             logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
 
@@ -661,6 +669,10 @@ def add_task(
         dependencies = tuple(get_exp_handles(run_after))
     else:
         dependencies = None
+
+    if num_gpus is None and cluster_config['executor'] == "slurm":
+        num_gpus = 1
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
