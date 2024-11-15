@@ -24,12 +24,7 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
-from nemo_skills.inference.server.code_execution_model import (
-    ErrorRecoveryConfig,
-    get_code_execution_model,
-    get_model,
-    server_params,
-)
+from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging, unroll_files
 
@@ -41,7 +36,7 @@ class LlmMathJudgeConfig:
     """Top-level parameters for the script"""
 
     input_files: Any  # will update them with judgements
-    # Inference server configuration {server_params} {error_recovery_params}
+    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
@@ -106,13 +101,7 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
 
     # if using code execution, we need some extra parameters for generate call
     if cfg.code_execution:
-        extra_generate_params = {
-            "code_begin": prompt.config.template.code_begin,
-            "code_end": prompt.config.template.code_end,
-            "code_output_begin": prompt.config.template.code_output_begin,
-            "code_output_end": prompt.config.template.code_output_end,
-            "code_output_format": prompt.config.template.code_output_format,
-        }
+        extra_generate_params = prompt.get_code_execution_args()
     else:
         extra_generate_params = {}
 
@@ -190,18 +179,10 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         Path(output_file).replace(jsonl_file)
 
 
-error_recovery_params = '\n' + get_fields_docstring(
-    ErrorRecoveryConfig,
-    prefix='server.error_recovery.',
-    level=2,
-)
-
-
 HELP_MESSAGE = get_help_message(
     LlmMathJudgeConfig,
     server_params=server_params(),
     sandbox_params=sandbox_params(),
-    error_recovery_params=error_recovery_params,
 )
 
 

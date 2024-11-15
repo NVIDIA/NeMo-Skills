@@ -28,4 +28,4 @@ sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor
 sympy
 tqdm
 transformers
-typer
+typer >= 0.13

@@ -73,7 +73,7 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
-
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     if disable_hydra_logs:
         # hacking the arguments to always disable hydra's output
         sys.argv.extend(

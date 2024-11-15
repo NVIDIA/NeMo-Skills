@@ -134,15 +134,8 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     )
     prompts = [prompt.fill({'question': "What's 2 + 2?"})]
     print(prompts[0]) # (3)!
-    code_tokens = {
-        "code_begin": prompt.config.template.code_begin,
-        "code_end": prompt.config.template.code_end,
-        "code_output_begin": prompt.config.template.code_output_begin,
-        "code_output_end": prompt.config.template.code_output_end,
-        "code_output_format": prompt.config.template.code_output_format,
-    }
-    outputs = llm.generate(prompts=prompts, **code_tokens)
-    print(outputs[0]["generation"]) # (4)!
+    outputs = llm.generate(prompts=prompts, **prompt.get_code_execution_args()) # (4)!
+    print(outputs[0]["generation"]) # (5)!
     ```
 
     1.   Here we use [generic/default](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
@@ -170,7 +163,12 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          If you don't want to use our prompt class, just create this string yourself
 
-    4.   This should print
+    4.   `prompt.get_code_execution_args()` simply returns a dictionary with start/stop tokens,
+         so that we know when to stop LLM generation and how to format the output.
+
+         If you don't want to use our prompt class, just define those parameters directly.
+
+    5.   This should print
          ```python-console
          >>> print(outputs[0]["generation"])
          <|python_tag|>print(2 + 2)<|eom_id|><|start_header_id|>ipython<|end_header_id|>

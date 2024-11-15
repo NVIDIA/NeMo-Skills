@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import re
 from typing import Dict, Tuple
+
+LOG = logging.getLogger(__name__)
 
 
 def format_code_output(
@@ -34,7 +37,7 @@ def format_code_output(
         if execution_dict['stderr']:
             output += f"{execution_dict['stderr']}"
         if execution_dict['stderr'] and execution_dict['stdout']:
-            raise ValueError("Both stdout and stderr are not empty.")
+            LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
         output = f"{code_output_begin}{output}{code_output_end}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")

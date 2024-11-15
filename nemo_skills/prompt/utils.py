@@ -201,6 +201,16 @@ class Prompt:
         user = self.config.user.format(examples=examples, **input_dict)
         return user
 
+    def get_code_execution_args(self):
+        """Returns the code execution arguments."""
+        return {
+            "code_begin": self.config.template.code_begin,
+            "code_end": self.config.template.code_end,
+            "code_output_begin": self.config.template.code_output_begin,
+            "code_output_end": self.config.template.code_output_end,
+            "code_output_format": self.config.template.code_output_format,
+        }
+
     def fill(
         self, input_dict: Dict[str, str], include_generation: bool = False, multi_turn_key: str | None = None
     ) -> str | List[dict]:

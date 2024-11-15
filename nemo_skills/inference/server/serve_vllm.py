@@ -41,7 +41,7 @@ def main():
         f'    --enforce-eager '
         f'    --disable-log-requests '
         f'    --disable-log-stats '
-        f'    {extra_arguments} '
+        f'    {extra_arguments} | grep -v "200 OK"'
     )
 
     subprocess.run(cmd, shell=True, check=True)
