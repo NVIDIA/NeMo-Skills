@@ -18,7 +18,6 @@ import json
 import logging
 import os
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 import openai
@@ -77,14 +76,14 @@ class BaseModel(abc.ABC):
     def _generate_single(
         self,
         prompt: str | dict,
-        tokens_to_generate: int | list[int] = 512,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-    ) -> list[dict]:
+        tokens_to_generate: int | list[int],
+        temperature: float | list[float],
+        top_p: float | list[float],
+        top_k: int | list[int],
+        repetition_penalty: float | list[float],
+        random_seed: int | list[int],
+        stop_phrases: list[str] | list[list[str]] | None,
+    ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
         We will call it in threads on the list of prompts.
@@ -186,17 +185,18 @@ class TRTLLMModel(BaseModel):
             "stop_words_list": stop_phrases,
         }
         try:
-            output = self.requests_lib.put(
+            output_dict = self.requests_lib.put(
                 url="http://{}:{}/generate".format(self.server_host, self.server_port),
                 data=json.dumps(request),
                 headers={"Content-Type": "application/json"},
-                timeout=300,  # to make sure we never hand indefinitely and abort the job if something is stuck in trtllm
+                # to make sure we never hand indefinitely and abort the job if something is stuck in trtllm
+                timeout=300,
             ).json()
         except requests.exceptions.Timeout:
             LOG.error("Please report this! Request timed out for prompt: %s", prompt)
             raise
 
-        return {'generation': output}
+        return output_dict
 
 
 class NemoModel(BaseModel):
@@ -290,6 +290,8 @@ class NemoModel(BaseModel):
         if remove_stop_phrases:
             for output in outputs:
                 output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+        # TODO: return num_generated_tokens as well
         return outputs
 
 
@@ -519,24 +521,21 @@ class VLLMModel(BaseModel):
             },
         )
 
-        response = self.parse_openai_response(response)
+        output, num_generated_tokens = self.parse_openai_response(response)
 
-        return {'generation': response[0]}
+        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> list[str]:
-        responses = []
-        if not isinstance(response, list):
-            response = [response]
-
-        for resp in response:
-            for choice in resp.choices:
-                output = choice.text
-                # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-                if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-                    output += choice.stop_reason
-                responses.append(output)
-        return responses
+    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+        assert not isinstance(response, list)
+        assert len(response.choices) == 1
+        choice = response.choices[0]
+        output = choice.text
+        # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
+            output += choice.stop_reason
+        num_generated_tokens = response.usage.completion_tokens
+        return output, num_generated_tokens
 
     def get_model_name_from_server(self):
         model_list = self.oai_client.models.list()

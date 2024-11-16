@@ -74,10 +74,19 @@ class CodeExecutionWrapper:
             "stop_phrases": stop_phrases + [code_end],
         }
         session_id = None
-
-        for _ in range(self.config.max_code_executions):
-            output = self.model._generate_single(**request)['generation']
+        # adding plus one to make sure there is always some completion after the last requested code block
+        for generation_index in range(self.config.max_code_executions + 1):
+            output_dict = self.model._generate_single(**request)
+            output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             request['prompt'] += output
+            # if it's the extra iteration, we don't execute the code block and just finish
+            if generation_index == self.config.max_code_executions:
+                break
+            # adjusting requested tokens to account for what has been generated already
+            request['tokens_to_generate'] -= num_generated_tokens
+            # TODO: currently we don't account for tokens in the code output that we add to the prompt
+            #       in most cases the output should be small though
+
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
@@ -91,7 +100,7 @@ class CodeExecutionWrapper:
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format
                 )
-            else:  # if not code was generated, we need to finish
+            else:  # if no code was generated, we need to finish
                 break
 
         # removing original prompt
