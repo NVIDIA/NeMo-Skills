@@ -487,7 +487,7 @@ def get_env_variables(cluster_config):
     # value, assuming it has not been updated externally between these two calls
     always_optional_env_vars = ["NVIDIA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"]
     default_factories = {
-        "HF_TOKEN": get_token,
+        "HF_TOKEN": lambda: str(get_token()),
     }
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
