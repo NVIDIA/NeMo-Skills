@@ -26,16 +26,8 @@ from nemo_skills.utils import setup_logging
 LOG = logging.getLogger(__file__)
 
 
-def get_cmd(module, script, extra_arguments):
-    if module is not None and script is not None:
-        raise ValueError("Cannot specify both --module and --script")
-
-    if module is None:
-        cmd = f"python /nemo_run/code/{script} "
-    else:
-        cmd = f"python -m {module} "
-
-    cmd += f" {extra_arguments} "
+def get_cmd(extra_arguments):
+    cmd = f"{extra_arguments} "
     cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && {cmd}"
     return cmd
 
@@ -52,21 +44,6 @@ def run_cmd(
     expname: str = typer.Option("script", help="Nemo run experiment name"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
-    ),
-    module: str = typer.Option(
-        None,
-        help=(
-            "Searches sys.path in the NeMo-Skills Container for the named module and runs the "
-            "corresponding .py file as a script."
-        ),
-    ),
-    script: str = typer.Option(
-        None,
-        help=(
-            "Path to the python script to run. The script must be in the git index "
-            "of the directory where this command is run. The relative path to the script "
-            "from the current working directory should be provided."
-        ),
     ),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     run_after: str = typer.Option(
@@ -85,7 +62,7 @@ def run_cmd(
     with run.Experiment(expname) as exp:
         add_task(
             exp,
-            cmd=get_cmd(module=module, script=script, extra_arguments=extra_arguments),
+            cmd=get_cmd(extra_arguments=extra_arguments),
             task_name="script",
             log_dir=log_dir,
             container=cluster_config["containers"]["nemo-skills"],

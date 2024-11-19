@@ -52,11 +52,11 @@ def test_multiple_files():
     output_file = f"/tmp/nemo-skills-tests/data/processed_multifile_output.jsonl"
     docker_rm_and_mkdir(output_file)
     run_cmd(
-        module="nemo_skills.training.prepare_sft_data ",
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_multiple_files',
         ctx=wrap_arguments(
+            "python -m nemo_skills.training.prepare_sft_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -85,11 +85,11 @@ def test_exclude_keys():
     output_file = f"/tmp/nemo-skills-tests/data/processed_compact_output.jsonl"
     docker_rm_and_mkdir(output_file)
     run_cmd(
-        module="nemo_skills.training.prepare_sft_data ",
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_exclude_keys',
         ctx=wrap_arguments(
+            "python -m nemo_skills.training.prepare_sft_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -118,11 +118,11 @@ def test_code_sft_data():
     output_file = f"/tmp/nemo-skills-tests/data/code_processed_output.jsonl"
     docker_rm_and_mkdir(output_file)
     run_cmd(
-        module="nemo_skills.training.prepare_sft_data ",
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_code_sft_data',
         ctx=wrap_arguments(
+            "python -m nemo_skills.training.prepare_sft_data "
             f"    --config-name=prepare_code_sft_data "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
             f"    ++output_path={output_file} "
@@ -146,11 +146,11 @@ def test_openmathinstruct2():
     output_file = f"/tmp/nemo-skills-tests/data/openmathinstruct2-sft.jsonl"
     docker_rm_and_mkdir(output_file)
     run_cmd(
-        module="nemo_skills.training.prepare_sft_data ",
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_openmathinstruct2',
         ctx=wrap_arguments(
+            "python -m nemo_skills.training.prepare_sft_data "
             "++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
             f"++output_path={output_file} "
             "++prompt_template=llama3-instruct "
