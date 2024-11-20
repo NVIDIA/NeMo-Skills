@@ -2,21 +2,21 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/convert.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/convert.py)
+    This pipeline starting script is [nemo_skills/pipeline/convert.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/convert.py)
 
     All extra parameters are passed to one of the following scripts
 
     * For conversion to NeMo:
-        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_nemo_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_llama.py)
-        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_nemo_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_qwen.py)
+        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_nemo_llama.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_nemo_qwen.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_nemo_qwen.py)
 
     * For conversion to TensorRT-LLM:
-        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_trtllm_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_llama.py)
-        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_trtllm_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
+        - If `--model_type=llama`: [nemo_skills/conversion/hf_to_trtllm_llama.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/hf_to_trtllm_qwen.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
 
     * For conversion to HuggingFace:
-        - If `--model_type=llama`: [nemo_skills/conversion/nemo_to_hf_llama.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_llama.py)
-        - If `--model_type=qwen`: [nemo_skills/conversion/nemo_to_hf_qwen.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_qwen.py)
+        - If `--model_type=llama`: [nemo_skills/conversion/nemo_to_hf_llama.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_llama.py)
+        - If `--model_type=qwen`: [nemo_skills/conversion/nemo_to_hf_qwen.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/conversion/nemo_to_hf_qwen.py)
 
 
 We support 3 common model formats. Here are some recommendations on when each format should be used.

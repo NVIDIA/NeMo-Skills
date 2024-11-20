@@ -5,7 +5,7 @@
 To get started first install the repo (python 3.10+). Either clone and run `pip install -e .` or install directly with
 
 ```bash
-pip install git+https://github.com/Kipok/NeMo-Skills.git
+pip install git+https://github.com/NVIDIA/NeMo-Skills.git
 ```
 
 ## Environment variables
@@ -48,9 +48,9 @@ python -c "import nemo_skills; print(nemo_skills.__path__)"
 
 ## Cluster configs
 
-All of the [pipeline scripts](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/pipeline) accept `--cluster` argument which you can use
+All of the [pipeline scripts](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/pipeline) accept `--cluster` argument which you can use
 to control where the job gets executed. That argument picks up one of the configs inside your local
-[cluster_configs](https://github.com/Kipok/NeMo-Skills/tree/main/cluster_configs)
+[cluster_configs](https://github.com/NVIDIA/NeMo-Skills/tree/main/cluster_configs)
 folder by default, but you can specify another location with `--config_dir` or set it in `NEMO_SKILLS_CONFIG_DIR` env variable.
 You can also use `NEMO_SKILLS_CONFIG` env variable instead of the `--cluster` parameter.
 The cluster config defines an executor (local or slurm), mounts for data/model access and (slurm-only) various parameters
@@ -78,7 +78,7 @@ all other parameters are directly passed into the underlying `nemo_skills/...` s
 
 ## Running pipelines
 
-All of the [pipeline scripts](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/pipeline) can be called in 3 equivalent ways.
+All of the [pipeline scripts](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/pipeline) can be called in 3 equivalent ways.
 As an example let's see how to run [evaluation](../pipelines/evaluation.md) on 10 samples from gsm8k and math benchmarks
 
 ```bash title="ns command-line entrypoint"
@@ -132,7 +132,7 @@ set up on your machine.
 
 All of our scripts assume that data or models are mounted inside the appropriate container so before running any
 commands make sure to modify
-[cluster_configs/example-local.yaml](https://github.com/Kipok/NeMo-Skills/tree/main/cluster_configs/example-local.yaml).
+[cluster_configs/example-local.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/cluster_configs/example-local.yaml).
 It's convenient to rename it to local.yaml (so you can use `--cluster local`) after you defined necessary mounts.
 
 Most of our containers are quite heavy, so the first time you run a job that requires a large container, it will take
@@ -144,5 +144,5 @@ to cache them.
 If you're running on slurm, you need to define some additional information inside cluster config.
 
 Populate the commented out fields inside
-[cluster_configs/example-slurm.yaml](https://github.com/Kipok/NeMo-Skills/tree/main/cluster_configs/example-slurm.yaml).
+[cluster_configs/example-slurm.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/cluster_configs/example-slurm.yaml).
 It's convenient to rename it to slurm.yaml (so you can use `--cluster slurm`) or a cluster name if you use multiple slurm clusters.

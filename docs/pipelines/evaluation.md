@@ -2,9 +2,9 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/eval.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/eval.py)
+    This pipeline starting script is [nemo_skills/pipeline/eval.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/eval.py)
 
-    All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
+    All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
 
 
 We support many popular benchmarks and it's easy to add new in the future. E.g. we support
@@ -14,7 +14,7 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 - Chat/instruction following: ifeval, arena-hard
 - General knowledge: mmlu (generative)
 
-See [nemo_skills/dataset](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
+See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
 Here is how to run evaluation (using API model as an example,
 but same command works with self-hosted models both locally and on slurm).
@@ -56,7 +56,7 @@ evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
 greedy          | 164         | 67.68              | 62.20
 ```
 
-The [summarize_results](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/summarize_results.py) script
+The [summarize_results](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/summarize_results.py) script
 will fetch the results from cluster automatically if you ran the job there.
 
 !!! note
@@ -101,7 +101,7 @@ pass@4          | 164         | 78.66              | 72.56
 ## How the benchmarks are defined
 
 Each benchmark exists as a separate folder inside
-[nemo_skills/dataset](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/dataset). Inside
+[nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset). Inside
 those folders there needs to be `prepare.py` script which can be run to download and format benchmark
 data into a .jsonl input file (or files if it supports train/validation besides a test split) that
 our scripts can understand. There also needs to be an `__init__.py` that defines some default variables
@@ -112,7 +112,7 @@ be changed from the command line).
 
 Let's look at gsm8k to understand a bit more how each part of the evaluation works.
 
-Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/dataset/gsm8k/__init__.py) we see the following
+Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/gsm8k/__init__.py) we see the following
 
 ```python
 from nemo_skills.evaluation.metrics import MathMetrics
@@ -126,12 +126,12 @@ DEFAULT_GENERATION_ARGS = ""
 ```
 
 The prompt config and default generation arguments are passed to the
-[nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py) and
+[nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py) and
 the default eval args are passed to the
-[nemo_skills/evaluation/evaluate_results.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/evaluation/evaluate_results.py).
-The dataset group is used by [nemo_skills/dataset/prepare.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/dataset/prepare.py)
+[nemo_skills/evaluation/evaluate_results.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/evaluate_results.py).
+The dataset group is used by [nemo_skills/dataset/prepare.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/prepare.py)
 to help download only benchmarks from a particular group if `--dataset_groups` parameter is used.
-Finally, the metrics class is used by [nemo_skills/evaluation/metrics.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/evaluation/metrics.py)
+Finally, the metrics class is used by [nemo_skills/evaluation/metrics.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/metrics.py)
 which is called when you run summarize results pipeline.
 
 To create a new benchmark in most cases you only need to add a new prepare script and the corresponding

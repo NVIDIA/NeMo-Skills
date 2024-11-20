@@ -272,7 +272,7 @@ class ModeStrategies:
                     "Could not connect to the server. Please check that the server is running (look at ",
                     html.A(
                         "inference.md",
-                        href="https://github.com/Kipok/NeMo-Skills/blob/main/docs/inference.md",
+                        href="https://github.com/NVIDIA/NeMo-Skills/blob/main/docs/inference.md",
                     ),
                     " for more information). ",
                     "Also check that you have provided correct host, ssh_key_path and ssh_server parameters",

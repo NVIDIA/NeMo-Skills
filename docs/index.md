@@ -4,7 +4,7 @@ hide:
   - toc
 ---
 
-[NeMo-Skills](https://github.com/Kipok/NeMo-Skills) is a collection of pipelines to improve "skills" of large language models.
+[NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) is a collection of pipelines to improve "skills" of large language models.
 We mainly focus on the ability to solve mathematical problems, but you can use our pipelines for many other tasks as well.
 Here are some of the things we support.
 

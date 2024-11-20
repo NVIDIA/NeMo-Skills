@@ -30,7 +30,7 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     license="Apache License, Version 2.0",
-    url="https://github.com/Kipok/NeMo-Skills",
+    url="https://github.com/NVIDIA/NeMo-Skills",
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=requirements,

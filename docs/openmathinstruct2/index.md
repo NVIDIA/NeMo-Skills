@@ -13,6 +13,6 @@ for some of the commands to complete!
 !!! note
 
     If you want to reproduce results for [OpenMathInstruct-1: A 1.8 Million Math Instruction Tuning Dataset](https://arxiv.org/abs/2402.10176)
-    please check out [v0.1.1](https://github.com/Kipok/NeMo-Skills/blob/v0.1.1/docs/reproducing-results.md)
-    branch of the [NeMo-Skills](https://github.com/Kipok/NeMo-Skills) repo and read the instructions in there.
+    please check out [v0.1.1](https://github.com/NVIDIA/NeMo-Skills/blob/v0.1.1/docs/reproducing-results.md)
+    branch of the [NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) repo and read the instructions in there.
 

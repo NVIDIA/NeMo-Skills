@@ -13,9 +13,9 @@ Our prompts are configured via two input yaml files: prompt template and prompt 
 The template file defines model-specific special tokens, e.g. bos, turn tokens,
 user/assistant/system message, special tokens for code execution, etc. All of the
 templates that we support by default are available in
-[nemo_skills/prompt/template](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template)
+[nemo_skills/prompt/template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template)
 folder. Here is an example template for
-[llama3-instruct](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) models:
+[llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) models:
 
 ```yaml
 # Prompt specification for the original Llama3-instruct model
@@ -64,9 +64,9 @@ in the included folder. If you provide a full path, we will take the file you sp
 The prompt config contains user and system messages with placeholders for keys from a data file.
 The configs are model independent (any model can be used with any config).
 All of the configs that we support by default are available in
-[nemo_skills/prompt/config](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config)
+[nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config)
 folder. Here is an example prompt for
-[math evaluations](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/math.yaml):
+[math evaluations](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/math.yaml):
 
 ```yaml
 # default prompt for all math benchmarks (e.g. gsm8k, math)
@@ -91,15 +91,15 @@ user: |-
 Note that we use `{problem}`, `{solution}` and `{examples}` format strings here. The `{examples}` is a special
 key that will be used to include few shot examples you specify above (it's empty unless you add `++examples_type` or
 specify it in the config like e.g. in
-[llama3-gsm8k prompt](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/gsm8k.yaml)).
+[llama3-gsm8k prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/gsm8k.yaml)).
 All other keys will need to be specified when you call `prompt.fill`
 (more on that in the [prompt-api section](#prompt-api)) so that we can replace placeholders with actual input.
 
 The input for few shot examples always comes from one of the available example types in
-[here](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/__init__.py). E.g. in the
-[llama3-gnstruct/gsm8k](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/llama3-instruct/gsm8k.yaml)
+[here](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/__init__.py). E.g. in the
+[llama3-gnstruct/gsm8k](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/llama3-instruct/gsm8k.yaml)
 prompt the `gsm8k_standard_few_shot` examples from
-[here](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/gsm8k.py) are used.
+[here](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/gsm8k.py) are used.
 
 
 ## Prompt API
@@ -157,4 +157,4 @@ which outputs
 ]
 ```
 
-You can also have a look at the [tests](https://github.com/Kipok/NeMo-Skills/tests/test_prompts.py) to see more examples of using our prompt API.
+You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tests/test_prompts.py) to see more examples of using our prompt API.

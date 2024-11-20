@@ -2,9 +2,9 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
+    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
 
-    All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
+    All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
 
 Generation pipeline can be used for large-scale data generation
 using LLMs. You provide an input jsonl file as well as the prompt config/template and we run LLM for each line
@@ -78,7 +78,7 @@ ns generate \
 
 Note the `++skip_filled=False` which you need to add if you're rerunning some generation and don't want
 to reuse existing output. And since we are hosting the model ourselves, we need to specify the template
-to use ([llama3-instruct](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-instruct.yaml)
+to use ([llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-instruct.yaml)
 in this case). You can have
 a custom template as well if you need to (just reference a full path to it same as we do with config above).
 
@@ -91,7 +91,7 @@ Both of those calls should produce roughly the same result inside `/workspace/te
 ```
 
 You can customize batch size, temperature, number of generation tokens and many more things.
-See [nemo_skills/inference/generate.py](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/inference/generate.py) for all supported parameters.
+See [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py) for all supported parameters.
 
 
 !!! tip
@@ -141,11 +141,11 @@ models to different formats.
 
 Note that in this case we do not pass an input file, but instead specify a dataset and
 a split, which will pick a prepared input from `nemo_skills/dataset/math/train_full.jsonl`.
-We are using a [generic/math](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
-and a [template for the base model](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
+We are using a [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
+and a [template for the base model](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
 (we found Llama 3.1 follows few-shots much better without chat tokens).
 Finally, we are specifying few shot examples which come from
-[here](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)
+[here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)
 and asking the script to evaluate the generated solutions by providing `--eval_args`.
 
 An example prompt (printed by the generate script) for that job is below.
@@ -300,7 +300,7 @@ After the jobs are finished, you will see `/workspace/synthetic-math-solutions/g
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
 key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
-[symbolic comparison](https://github.com/Kipok/NeMo-Skills/blob/main/nemo_skills/code_execution/math_grader.py).
+[symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/code_execution/math_grader.py).
 
 To get a more robust assessment of whether the solutions are correct you can follow up with an
 [LLM-as-a-judge evaluation](../pipelines/llm-as-a-judge.md) and then

@@ -46,10 +46,10 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     print(outputs[0]["generation"]) # (3)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
+         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
 
-         See [nemo_skills/prompt](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
          or [create your own prompts](prompt-format.md)
 
 
@@ -96,10 +96,10 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          To use OpenAI models, use `OPENAI_API_KEY` and set `base_url=https://api.openai.com/v1`.
 
-    2.   Here we use [generic/default](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
+    2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
          Note that with API models we can't add special tokens, so prompt template is not specified.
 
-         See [nemo_skills/prompt](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
          or [create your own prompts](prompt-format.md)
 
 
@@ -138,12 +138,12 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     print(outputs[0]["generation"]) # (5)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
+         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
 
          Note how we are updating system message on the next line (you can also include it in the config directly).
 
-         See [nemo_skills/prompt](https://github.com/Kipok/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
          or [create your own prompts](prompt-format.md)
 
     2.   8B model doesn't always follow these instructions, so using 70B or 405B for code execution is recommended.
