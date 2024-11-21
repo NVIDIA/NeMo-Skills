@@ -116,7 +116,11 @@ class Sandbox(abc.ABC):
     ):
         self.host = host
         self.port = port
-        self.http_session = requests.Session()
+        session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+        self.http_session = session
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
         # will keep state of code sessions
@@ -144,6 +148,9 @@ class Sandbox(abc.ABC):
                 timeout=timeout,
                 headers={"Content-Type": "application/json"},
             )
+        # retrying 502 errors
+        if output.status_code == 502:
+            raise requests.exceptions.Timeout
         return self._parse_request_output(output)
 
     @abc.abstractmethod
@@ -446,7 +453,11 @@ class LocalSandbox(Sandbox):
         return f"http://{self.host}:{self.port}/execute"
 
     def _parse_request_output(self, output):
-        return output.json()
+        try:
+            return output.json()
+        except json.JSONDecodeError:
+            LOG.error("Error during parsing output: %s", output.text)
+            return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
     def _prepare_request(self, generated_code, timeout, language='python'):
         return {

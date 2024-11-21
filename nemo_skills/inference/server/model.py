@@ -20,8 +20,10 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 
+import httpx
 import openai
 import requests
+from openai import DefaultHttpxClient
 
 LOG = logging.getLogger(__name__)
 
@@ -70,7 +72,12 @@ class BaseModel(abc.ABC):
 
             self.requests_lib = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
         else:
-            self.requests_lib = requests
+            # TODO: switch to httpx
+            session = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
+            self.requests_lib = session
 
     @abc.abstractmethod
     def _generate_single(
@@ -195,7 +202,6 @@ class TRTLLMModel(BaseModel):
         except requests.exceptions.Timeout:
             LOG.error("Please report this! Request timed out for prompt: %s", prompt)
             raise
-
         return output_dict
 
 
@@ -473,10 +479,16 @@ class VLLMModel(BaseModel):
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
         self.oai_client = openai.OpenAI(
             api_key="EMPTY",
             base_url=f"http://{self.server_host}:{self.server_port}/v1",
             timeout=None,
+            http_client=http_client,
         )
 
         self.model_name_server = self.get_model_name_from_server()

@@ -26,5 +26,5 @@ RUN ["ln", "-sf", "/usr/bin/pip3", "/usr/bin/pip"]
 RUN pip install tensorrt_llm==0.13.0 -U --extra-index-url https://pypi.nvidia.com
 
 # installing packages required for our server code
-RUN pip install flask flask_restful
+RUN pip install uvicorn fastapi
 RUN pip install --upgrade transformers>=4.45.2
