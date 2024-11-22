@@ -62,6 +62,7 @@ def llm_math_judge(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: str = typer.Option(
         None,
         help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
@@ -121,6 +122,7 @@ def llm_math_judge(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
             partition=partition,
+            time_min=time_min,
             server_config=server_config,
             with_sandbox=True,
             run_after=run_after,

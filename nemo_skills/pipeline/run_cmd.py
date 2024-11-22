@@ -45,6 +45,7 @@ def run_cmd(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     run_after: str = typer.Option(
         None, help="Can specify an expname that needs to be completed before this one starts"
@@ -68,6 +69,7 @@ def run_cmd(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
             partition=partition,
+            time_min=time_min,
             run_after=run_after,
             num_gpus=num_gpus,
         )

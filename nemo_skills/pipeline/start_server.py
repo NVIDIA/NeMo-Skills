@@ -41,6 +41,7 @@ def start_server(
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
+    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
@@ -81,6 +82,7 @@ def start_server(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
             partition=partition,
+            time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
         )

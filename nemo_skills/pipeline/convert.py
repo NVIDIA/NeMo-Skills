@@ -167,6 +167,7 @@ def convert(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: str = typer.Option(
         None,
         help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
@@ -243,6 +244,7 @@ def convert(
             num_tasks=1,
             cluster_config=cluster_config,
             partition=partition,
+            time_min=time_min,
             run_after=run_after,
         )
         run_exp(exp, cluster_config)

@@ -225,6 +225,7 @@ def train(
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
+    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
         None, help="List of commas separated checkpoint steps to average. E.g 1000,5000"
     ),
@@ -302,6 +303,7 @@ def train(
                 num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
                 cluster_config=cluster_config,
                 partition=partition,
+                time_min=time_min,
                 with_sandbox=with_sandbox,
                 run_after=run_after,
                 task_dependencies=[prev_task] if prev_task is not None else None,
@@ -322,6 +324,7 @@ def train(
             container=cluster_config["containers"]['nemo'],
             cluster_config=cluster_config,
             partition=partition,
+            time_min=time_min,
             num_nodes=1,
             num_tasks=1,
             num_gpus=num_gpus,
