@@ -15,8 +15,8 @@
 from nemo_skills.evaluation.metrics import Lean4Metrics
 
 # Default evaluation and generation settings for the minif2f dataset
-PROMPT_CONFIG = 'generic/lean4'
+PROMPT_CONFIG = 'lean4/formal-proof'
 DATASET_GROUP = 'lean4'
 METRICS_CLASS = Lean4Metrics
-DEFAULT_EVAL_ARGS = "++eval_type=lean4"
+DEFAULT_EVAL_ARGS = "++eval_type=lean4-proof"
 DEFAULT_GENERATION_ARGS = ""
