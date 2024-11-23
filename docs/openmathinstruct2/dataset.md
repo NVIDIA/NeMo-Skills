@@ -270,8 +270,7 @@ python -m nemo_skills.training.prepare_sft_data \
     ++use_chars_for_min_length=true \
     ++min_solution_length=200 \
     ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
-    ++max_solution_length=1024 \
-    ++generation_suffix='"<|eot_id|>"'
+    ++max_solution_length=1024
 ```
 
 ## Dataset contamination explorer

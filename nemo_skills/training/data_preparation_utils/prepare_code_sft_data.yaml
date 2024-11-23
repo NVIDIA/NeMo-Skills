@@ -18,7 +18,6 @@ num_output_samples: null
 prompt_config: null
 prompt_template: null
 chat_format: null  # null/nemotron/llama
-generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
 input_key: input  # key to group samples by before code_text_filter
 output_key: output  # key to filter solutions by
@@ -53,5 +52,4 @@ processors:
     input_key: question
     output_key: ${output_key}
     chat_format: ${chat_format}
-    generation_suffix: ${generation_suffix}
     metadata: ${metadata}

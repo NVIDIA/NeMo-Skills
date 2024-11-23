@@ -73,7 +73,7 @@ def test_multiple_files():
         ),
     )
 
-    expected_md5 = "3971b33e2dd9ed28b2edc323eac19a1f"
+    expected_md5 = "8fce1c6a4abc47e82eec4e781909469b"
     output_md5 = compute_md5(output_file)
 
     assert (
@@ -106,7 +106,7 @@ def test_exclude_keys():
         ),
     )
 
-    expected_md5 = "7144c098a6e75ffd01c29e714552db24"
+    expected_md5 = "08c9b228faa1065825b68c0c994fcdb4"
     output_md5 = compute_md5(output_file)
 
     assert (
@@ -130,7 +130,6 @@ def test_code_sft_data():
             f"    ++prompt_template=llama3-instruct "
             f"    ++exclude_optional_keys=false "
             f"    ++filters.drop_incorrect_code_blocks=false "
-            f"    ++generation_suffix='\"<|eot_id|>\"' ",
         ),
     )
 
@@ -162,7 +161,6 @@ def test_openmathinstruct2():
             "++filters.trim_solutions=false "
             "++filters.drop_incorrect_arithmetic=false "
             "++filters.split_arithmetic=false "
-            "++generation_suffix='\"<|eot_id|>\"'",
         ),
     )
 

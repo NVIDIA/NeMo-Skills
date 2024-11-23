@@ -234,28 +234,30 @@ class WriteFinalSftManifest(BaseProcessor):
         chat_format: str | None = None,  # nemotron/llama/None
         input_key: str = "input",
         output_key: str = "output",
-        generation_suffix: str = "",
         metadata: Optional[Dict] = None,
         exclude_optional_keys: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.prompt_config = prompt_config
-        self.prompt_template = prompt_template
         self.input_key = input_key
         self.output_key = output_key
         self.chat_format = chat_format
         self.metadata = metadata
         self.exclude_optional_keys = exclude_optional_keys
-        self.generation_suffix = generation_suffix
-        if self.generation_suffix and self.chat_format:
-            raise ValueError("generation_suffix can only be used with chat_format=False")
-        if self.prompt_config is None:
-            raise ValueError("`prompt_config` should be provided")
-        if self.prompt_template is None:
-            raise ValueError("`prompt_template` should be provided")
         if not self.metadata:
             self.metadata = {}
+
+        self.prompt = None
+        if prompt_config and prompt_template:
+            self.prompt = get_prompt(prompt_config, prompt_template)
+        else:
+            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if self.chat_format and self.prompt is None:
+            error_str = ""
+            error_str += "prompt_config is missing! " if prompt_config is None else ""
+            error_str += "prompt_template is missing!" if prompt_template is None else ""
+            raise ValueError(f"chat_format requires prompt information: {error_str}")
 
     def process(self):
         samples_count = 0
@@ -264,7 +266,6 @@ class WriteFinalSftManifest(BaseProcessor):
             open(self.input_manifest_file, "rt", encoding="utf-8") as fin,
             open(self.output_manifest_file, "wt", encoding="utf-8") as fout,
         ):
-            prompt = get_prompt(self.prompt_config, self.prompt_template)
             # only looping over the correct samples (unless asked for incorrect)
             for line in fin:
                 elem = json.loads(line)
@@ -284,8 +285,12 @@ class WriteFinalSftManifest(BaseProcessor):
 
                 if self.chat_format is None:
                     generation = elem.pop(self.output_key)
-                    output_sample["input"] = prompt.fill(input_dict=elem)
-                    output_sample["output"] = generation + self.generation_suffix
+                    if self.prompt:
+                        output_sample["input"] = self.prompt.fill(input_dict=elem)
+                        output_sample["output"] = generation + self.prompt.config.template.assistant_end
+                    else:
+                        output_sample["input"] = elem[self.input_key]
+
                 elif self.chat_format.lower() == "nemotron":
                     output_sample['conversations'] = [
                         {'value': self.prompt.config.user.format(**elem), 'from': 'User', 'canonical_form': ''},

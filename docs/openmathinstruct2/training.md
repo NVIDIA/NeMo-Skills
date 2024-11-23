@@ -45,8 +45,7 @@ python -m nemo_skills.training.prepare_sft_data \
     ++filters.trim_prefix=false \
     ++filters.trim_solutions=false \
     ++filters.drop_incorrect_arithmetic=false \
-    ++filters.split_arithmetic=false \
-    ++generation_suffix='"<|eot_id|>"';
+    ++filters.split_arithmetic=false
 ```
 
 ## Prepare base model

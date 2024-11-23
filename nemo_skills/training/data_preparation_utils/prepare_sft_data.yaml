@@ -1,8 +1,8 @@
 processors_to_run: all
 
 output_path: ???
-prompt_config: ???
-prompt_template: ???
+prompt_config: null
+prompt_template: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
 input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
@@ -32,7 +32,6 @@ max_solution_length: 2048
 use_chars_for_min_length: false
 
 chat_format: null  # null/nemotron/llama
-generation_suffix: ""  # suffix to add to the end of expected response (e.g. <|eot_id|>)
 
 input_key: problem
 output_key: generation
@@ -154,6 +153,5 @@ processors:
     input_key: ${input_key}
     output_key: ${output_key}
     chat_format: ${chat_format}
-    generation_suffix: ${generation_suffix}
     metadata: ${metadata}
     exclude_optional_keys: ${exclude_optional_keys}

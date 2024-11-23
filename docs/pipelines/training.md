@@ -16,8 +16,7 @@ python -m nemo_skills.training.prepare_sft_data \
     ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
-    ++prompt_template=llama3-instruct \
-    ++generation_suffix='\"<|eot_id|>\"'
+    ++prompt_template=llama3-instruct
 ```
 
 !!! tip
