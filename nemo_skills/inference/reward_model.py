@@ -157,8 +157,7 @@ def generate(cfg: RewardModelConfig):
                     # all of the ground-truth data to the output file alongside the generated solutions
                     result = output.pop('reward_model_score')
                     output[cfg.reward_model_score_key] = result
-                    # Note: this implies that if the key is already present in the original data point, it will
-                    # not be overwritten.
+                    original_data_point.pop(cfg.reward_model_score_key, None)
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []
