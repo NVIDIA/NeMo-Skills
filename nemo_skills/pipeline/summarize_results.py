@@ -138,18 +138,13 @@ def summarize_results(
 
                 sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
                 if len(sampling_outputs) > 0:
-                    results[benchmark][f'majority@{len(sampling_outputs)}'] = compute_metrics(
+                    metrics_dict = compute_metrics(
                         input_files=sampling_outputs,
                         metrics_calculator=metrics_calculator,
-                        aggregation_mode="majority",
                         max_samples=max_samples,
                     )
-                    results[benchmark][f'pass@{len(sampling_outputs)}'] = compute_metrics(
-                        input_files=sampling_outputs,
-                        metrics_calculator=metrics_calculator,
-                        aggregation_mode="best",
-                        max_samples=max_samples,
-                    )
+                    for key in metrics_dict.keys():
+                        results[benchmark][f'{key}@{len(sampling_outputs)}'] = metrics_dict[key]
         except Exception as e:
             print(f"Error running compute_metrics.py for {benchmark}: {e}")
 
