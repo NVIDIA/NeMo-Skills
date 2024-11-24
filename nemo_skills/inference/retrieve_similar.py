@@ -74,10 +74,10 @@ class RetrieveSimilarConfig:
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_retrieve_similar_conifg", node=RetrieveSimilarConfig)
+cs.store(name="base_retrieve_similar_config", node=RetrieveSimilarConfig)
 
 
-@hydra.main(version_base=None, config_name="base_retrieve_similar_conifg")
+@hydra.main(version_base=None, config_name="base_retrieve_similar_config")
 def retrieve_similar(cfg: RetrieveSimilarConfig):
     cfg = RetrieveSimilarConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)

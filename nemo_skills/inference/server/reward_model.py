@@ -13,9 +13,13 @@
 # limitations under the License.
 
 import abc
+import math
 import os
 
+import httpx
+import openai
 import requests
+from openai import DefaultHttpxClient
 
 
 class BaseModel(abc.ABC):
@@ -79,8 +83,43 @@ class NemoRewardModel(BaseModel):
         return outputs
 
 
+class VLLMRewardModel(BaseModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        if self.ssh_server and self.ssh_key_path:
+            raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
+
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
+        self.oai_client = openai.OpenAI(
+            api_key="EMPTY",
+            base_url=f"http://{self.server_host}:{self.server_port}/v1",
+            timeout=None,
+            http_client=http_client,
+        )
+
+        model_list = self.oai_client.models.list()
+        self.model = model_list.data[0].id
+
+    def score(self, prompts: list[str]) -> list[float]:
+        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
+        # Once VLLM officially adds the support, change the API.
+        responses = self.oai_client.embeddings.create(input=prompts, model=self.model)
+        outputs = []
+        for data in responses.data:
+            raw_score = data.embedding[-1]
+            score = 1 / (1 + math.exp(-raw_score))
+            outputs.append({"reward_model_score": score})
+        return outputs
+
+
 models = {
     'nemo': NemoRewardModel,
+    'vllm': VLLMRewardModel,
 }
 
 

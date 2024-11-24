@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -146,6 +145,18 @@ def get_reward_server_command(
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if cluster_config["executor"] == "local":
             num_tasks = 1
+
+    elif server_type == "vllm":
+        if num_nodes > 1:
+            raise ValueError("VLLM server does not support multi-node execution")
+
+        server_start_cmd = (
+            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    {server_args} "
+        )
+        num_tasks = 1
     else:
         raise ValueError(f"Server type '{server_type}' not supported for reward model.")
 
