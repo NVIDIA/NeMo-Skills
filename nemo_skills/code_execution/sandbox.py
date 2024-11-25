@@ -396,7 +396,11 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            # TODO Temp solution to be changes
+
+                            generation = re.sub(r"^\s*(<\uff5cbegin\u2581of\u2581sentence\uff5c>)?\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+
+                            # generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
                             line_dict["predicted_proof"] = line_dict["header"] + line_dict["formal_statement"] + generation
 
                         else:
@@ -407,9 +411,10 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-statement":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^```(lean4)?\s*|\s*```$", "", line_dict["generation"])
-                            header = "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n"
-                            line_dict["predicted_proof"] = header + generation + "sorry"
+                            generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            # header = "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n"
+                            # line_dict["predicted_proof"] = header + generation + "sorry"
+                            line_dict["predicted_proof"] = generation + "sorry"
                         else:
                             if "predicted_proof" not in line_dict:
                                 raise ValueError(

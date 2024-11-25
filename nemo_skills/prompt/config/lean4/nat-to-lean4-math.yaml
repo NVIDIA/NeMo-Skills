@@ -25,9 +25,9 @@ user: |-
   Answer is: {expected_answer}
   ```lean4
   import Mathlib
-
-  open Complex Filter Function Metric Finset
-  open scoped BigOperators Topology
+  
+  open Topology Filter Real Complex TopologicalSpace Finset Function Metric
+  open scoped BigOperators
   
 
 
