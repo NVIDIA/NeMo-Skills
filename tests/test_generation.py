@@ -78,7 +78,7 @@ def test_eval_mtbench_api():
         f"ns eval "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=meta/llama-3.1-405b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=mt-bench:0 "
         f"    --output_dir=/tmp/nemo-skills-tests/mtbench-api "
