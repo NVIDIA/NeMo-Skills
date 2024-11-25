@@ -56,10 +56,10 @@ class FillMajorityAnswerConfig:
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_fill_majority_answer_conifg", node=FillMajorityAnswerConfig)
+cs.store(name="base_fill_majority_answer_config", node=FillMajorityAnswerConfig)
 
 
-@hydra.main(version_base=None, config_name="base_fill_majority_answer_conifg")
+@hydra.main(version_base=None, config_name="base_fill_majority_answer_config")
 def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     cfg = FillMajorityAnswerConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
