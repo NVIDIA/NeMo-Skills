@@ -114,9 +114,9 @@ def summarize_results(
             max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
             # TODO: we should just return all available aggregations from compute_metrics directly
             if not isinstance(metrics_calculator, MathMetrics):
-                if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
+                if Path(f'{benchmark_path}/output.jsonl').exists():
                     results[benchmark]['greedy'] = compute_metrics(
-                        input_files=[f"{benchmark_path}/output-greedy.jsonl"],
+                        input_files=[f"{benchmark_path}/output.jsonl"],
                         metrics_calculator=metrics_calculator,
                         max_samples=max_samples,
                     )
@@ -129,9 +129,9 @@ def summarize_results(
                         max_samples=max_samples,
                     )
             else:
-                if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
+                if Path(f'{benchmark_path}/output.jsonl').exists():
                     results[benchmark]['greedy'] = compute_metrics(
-                        input_files=[f"{benchmark_path}/output-greedy.jsonl"],
+                        input_files=[f"{benchmark_path}/output.jsonl"],
                         metrics_calculator=metrics_calculator,
                         max_samples=max_samples,
                     )

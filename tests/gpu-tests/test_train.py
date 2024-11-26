@@ -113,7 +113,7 @@ def test_sft():
     )
 
     metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/test-sft/evaluation/eval-results/gsm8k/output-greedy.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/test-sft/evaluation/eval-results/gsm8k/output.jsonl"],
         importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS(),
     )
     # only checking the total, since model is tiny
@@ -174,7 +174,7 @@ def test_dpo():
     )
 
     metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/test-dpo/evaluation/eval-results/gsm8k/output-greedy.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/test-dpo/evaluation/eval-results/gsm8k/output.jsonl"],
         importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS(),
     )
     # only checking the total, since model is tiny

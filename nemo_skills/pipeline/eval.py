@@ -25,9 +25,7 @@ from nemo_skills.utils import setup_logging
 LOG = logging.getLogger(__file__)
 
 
-def get_greedy_cmd(
-    benchmark, split, output_dir, output_name='output-greedy.jsonl', extra_eval_args="", extra_arguments=""
-):
+def get_greedy_cmd(benchmark, split, output_dir, output_name='output.jsonl', extra_eval_args="", extra_arguments=""):
     benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
 
     extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"

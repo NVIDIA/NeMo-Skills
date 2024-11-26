@@ -98,7 +98,7 @@ def test_eval_mtbench_api():
 
     # running compute_metrics to check that results are expected
     metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output-greedy.jsonl"],
+        [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output.jsonl"],
         importlib.import_module('nemo_skills.dataset.mt-bench').METRICS_CLASS(),
     )
 
