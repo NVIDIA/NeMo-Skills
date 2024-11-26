@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import importlib
 import logging
+import os
 from enum import Enum
+from pathlib import Path
 
 import nemo_run as run
 import typer
 
+from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import setup_logging
@@ -25,17 +27,28 @@ from nemo_skills.utils import setup_logging
 LOG = logging.getLogger(__file__)
 
 
-def get_greedy_cmd(benchmark, split, output_dir, output_name='output.jsonl', extra_eval_args="", extra_arguments=""):
-    benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
+def get_greedy_cmd(
+    benchmark,
+    split,
+    output_dir,
+    output_name='output.jsonl',
+    extra_eval_args="",
+    extra_arguments="",
+    extra_datasets=None,
+):
+    benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
+    if found_in_extra:
+        data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
+    else:
+        data_parameters = f"++dataset={benchmark} ++split={split}"
 
     extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
     extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
     cmd = (
         f'echo "Evaluating benchmark {benchmark}" && '
         f'python -m nemo_skills.inference.generate '
-        f'    ++dataset={benchmark} '
-        f'    ++split={split} '
         f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
+        f'    {data_parameters} '
         f'    {extra_arguments} && '
         f'python -m nemo_skills.evaluation.evaluate_results '
         f'    ++input_files={output_dir}/eval-results/{benchmark}/{output_name} {extra_eval_args}'
@@ -43,7 +56,9 @@ def get_greedy_cmd(benchmark, split, output_dir, output_name='output.jsonl', ext
     return cmd
 
 
-def get_sampling_cmd(benchmark, split, output_dir, random_seed, extra_eval_args="", extra_arguments=""):
+def get_sampling_cmd(
+    benchmark, split, output_dir, random_seed, extra_eval_args="", extra_arguments="", extra_datasets=None
+):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
     return get_greedy_cmd(
         benchmark=benchmark,
@@ -52,6 +67,7 @@ def get_sampling_cmd(benchmark, split, output_dir, random_seed, extra_eval_args=
         output_name=f"output-rs{random_seed}.jsonl",
         extra_eval_args=extra_eval_args,
         extra_arguments=extra_arguments,
+        extra_datasets=extra_datasets,
     )
 
 
@@ -94,7 +110,12 @@ def eval(
     skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
     run_after: str = typer.Option(None, help="Task to run after the evaluation"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    extra_datasets: str = typer.Option(
+        None,
+        help="Path to a custom dataset folder that will be searched in addition to the main one. "
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -141,6 +162,8 @@ def eval(
 
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
 
+    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
+
     eval_cmds = (
         [
             get_greedy_cmd(
@@ -149,6 +172,7 @@ def eval(
                 output_dir,
                 extra_eval_args=extra_eval_args,
                 extra_arguments=extra_arguments,
+                extra_datasets=extra_datasets,
             )
             for benchmark in benchmarks.keys()
         ]
@@ -163,6 +187,7 @@ def eval(
             rs,
             extra_eval_args=extra_eval_args,
             extra_arguments=extra_arguments,
+            extra_datasets=extra_datasets,
         )
         for benchmark, rs_num in benchmarks.items()
         for rs in range(starting_seed, starting_seed + rs_num)
@@ -188,6 +213,7 @@ def eval(
                 server_config=server_config,
                 with_sandbox=True,
                 run_after=run_after,
+                extra_package_dirs=[extra_datasets] if extra_datasets else None,
             )
         run_exp(exp, cluster_config)
 

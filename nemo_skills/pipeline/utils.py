@@ -425,8 +425,17 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
     print(f"\nTransfer complete")
 
 
-def get_packager():
+def get_packager(extra_package_dirs: list[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
+    nemo_skills_dir = Path(__file__).absolute().parents[1]
+
+    if extra_package_dirs:
+        include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
+        include_pattern_relative_paths = [str(Path(d).parent) for d in extra_package_dirs]
+    else:
+        include_patterns = []
+        include_pattern_relative_paths = []
+
     try:
         # are we in a git repo? If yes, we are uploading the current code
         repo_path = (
@@ -444,28 +453,31 @@ def get_packager():
             logging.warning(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
-                str(Path(__file__).absolute().parents[1] / '*'),
+                str(nemo_skills_dir / '*'),
             )
-            include_pattern = str(Path(__file__).absolute().parents[1] / '*')
+            include_patterns.append(str(nemo_skills_dir / '*'))
         else:
             # picking up local dataset files if we are in the right repo
-            include_pattern = str(Path(__file__).absolute().parents[1] / "dataset/**/*.jsonl")
-        include_pattern_relative_path = str(Path(__file__).absolute().parents[2])
+            include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
+        include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
         check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
         return run.GitArchivePackager(
-            include_pattern=include_pattern,
-            include_pattern_relative_path=include_pattern_relative_path,
+            include_pattern=include_patterns,
+            include_pattern_relative_path=include_pattern_relative_paths,
             check_uncommitted_changes=check_uncommited_changes,
         )
     except subprocess.CalledProcessError:
         logging.warning(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
-            str(Path(__file__).absolute().parents[1] / '*'),
+            str(nemo_skills_dir / '*'),
         )
+        include_patterns.append(str(nemo_skills_dir / '*'))
+        include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
+
         return run.PatternPackager(
-            include_pattern=str(Path(__file__).absolute().parents[1] / '*'),
-            relative_path=str(Path(__file__).absolute().parents[2]),
+            include_pattern=include_patterns,
+            relative_path=include_pattern_relative_paths,
         )
 
 
@@ -591,12 +603,13 @@ def get_executor(
     partition=None,
     time_min=None,
     dependencies=None,
+    extra_package_dirs: list[str] | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config, env_vars)
 
     mounts = mounts or config_mounts
-    packager = get_packager()
+    packager = get_packager(extra_package_dirs=extra_package_dirs)
     if cluster_config["executor"] == "local":
         if num_nodes > 1:
             raise ValueError("Local executor does not support multi-node execution")
@@ -675,6 +688,7 @@ def add_task(
     task_dependencies: list[str] = None,
     run_after=None,
     get_server_command=get_server_command,
+    extra_package_dirs: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -716,6 +730,7 @@ def add_task(
             job_name=task_name,
             log_dir=log_dir,
             log_prefix="server",
+            extra_package_dirs=extra_package_dirs,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -740,6 +755,7 @@ def add_task(
                 job_name=task_name,
                 log_dir=log_dir,
                 log_prefix="main",
+                extra_package_dirs=extra_package_dirs,
             )
         )
 
@@ -758,6 +774,7 @@ def add_task(
             job_name=task_name,
             log_dir=log_dir,
             log_prefix="sandbox",
+            extra_package_dirs=extra_package_dirs,
         )
         commands.append(get_sandox_command())
         executors.append(sandbox_executor)

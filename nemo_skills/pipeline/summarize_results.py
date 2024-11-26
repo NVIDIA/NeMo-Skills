@@ -24,6 +24,7 @@ from typing import List, Optional
 
 import typer
 
+from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.evaluation.metrics import MathMetrics
 from nemo_skills.pipeline import (
     check_if_mounted,
@@ -61,6 +62,11 @@ def summarize_results(
     remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
     max_samples: int = typer.Option(-1, help="Limit metric computation only to first `max_samples`"),
+    extra_datasets: str = typer.Option(
+        None,
+        help="Path to a custom dataset folder that will be searched in addition to the main one. "
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
@@ -108,7 +114,7 @@ def summarize_results(
         if not Path(benchmark_path).is_dir():
             continue
         try:
-            benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
+            benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
             metrics_calculator = benchmark_module.METRICS_CLASS()
             results[benchmark] = {}
             max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
