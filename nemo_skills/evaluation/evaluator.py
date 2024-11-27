@@ -406,6 +406,18 @@ def eval_lean4_statement(cfg):
         **eval_config_dict,
     )
 
+def eval_lean4_statement_with_header(cfg):
+    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
+
+    sandbox = get_sandbox(**eval_config.sandbox)
+    eval_config_dict = asdict(eval_config)
+    eval_config_dict.pop('sandbox')
+    sandbox.batch_evaluate_results(
+        input_files=cfg.input_files,
+        answer_format='lean4-statement-with-header',
+        **eval_config_dict,
+    )
+
 
 EVALUATOR_MAP = {
     'math': eval_math,
@@ -415,7 +427,8 @@ EVALUATOR_MAP = {
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
     'lean4-proof': eval_lean4_proof,
-    'lean4-statement': eval_lean4_statement
+    'lean4-statement': eval_lean4_statement,
+    'lean4-statement-with-header': eval_lean4_statement_with_header,
 }
 
 

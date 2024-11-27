@@ -24,7 +24,7 @@ from typing import List, Optional
 
 import typer
 
-from nemo_skills.evaluation.metrics import MathMetrics
+from nemo_skills.evaluation.metrics import map_metrics, MathMetrics
 from nemo_skills.pipeline import (
     check_if_mounted,
     cluster_download,
@@ -61,11 +61,15 @@ def summarize_results(
     remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
     max_samples: int = typer.Option(-1, help="Limit metric computation only to first `max_samples`"),
+    eval_type: Optional[str] = typer.Option(
+        None,
+        help="Specify evaluation type to use a specific metrics calculator.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
 
-    if " " in str(benchmarks):
+    if benchmarks and " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
     cluster = cluster or os.environ.get("NEMO_SKILLS_CONFIG")
@@ -91,9 +95,12 @@ def summarize_results(
         )
         results_dir = Path(temp_dir) / Path(results_dir).name
 
-    # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
+    # running compute_metrics.py to get results
     # Check if there is an eval-results dir inside the results_dir
-    eval_results_dir = Path(results_dir) / 'eval-results'
+    if eval_type: 
+        eval_results_dir = Path(results_dir) / 'eval-results'
+    else:
+        eval_results_dir = Path(results_dir)
     if eval_results_dir.exists() and eval_results_dir.is_dir():
         results_dir = eval_results_dir
     benchmarks_paths = glob.glob(f'{results_dir}/*')
@@ -108,8 +115,14 @@ def summarize_results(
         if not Path(benchmark_path).is_dir():
             continue
         try:
-            benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
-            metrics_calculator = benchmark_module.METRICS_CLASS()
+            # Use the specified metrics calculator if eval_type is provided
+            if eval_type is not None:
+                if eval_type not in map_metrics:
+                    raise ValueError(f"Unknown eval_type: {eval_type}")
+                metrics_calculator = map_metrics[eval_type]
+            else:
+                benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
+                metrics_calculator = benchmark_module.METRICS_CLASS()
             results[benchmark] = {}
             max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
             # TODO: we should just return all available aggregations from compute_metrics directly
@@ -117,6 +130,12 @@ def summarize_results(
                 if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
                     results[benchmark]['greedy'] = compute_metrics(
                         input_files=[f"{benchmark_path}/output-greedy.jsonl"],
+                        metrics_calculator=metrics_calculator,
+                        max_samples=max_samples,
+                    )
+                elif Path(f'{benchmark_path}/output.jsonl').exists():
+                    results[benchmark]['greedy'] = compute_metrics(
+                        input_files=[f"{benchmark_path}/output.jsonl"],
                         metrics_calculator=metrics_calculator,
                         max_samples=max_samples,
                     )

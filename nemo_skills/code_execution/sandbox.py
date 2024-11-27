@@ -357,7 +357,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                 line_dict["is_correct"] = map_to_future[
                     (line_dict["predicted_answer"], line_dict["expected_answer"])
                 ].result()
-            elif answer_format == "lean4-proof" or answer_format == "lean4-statement":
+            elif answer_format == "lean4-proof" or answer_format == "lean4-statement" or anwer_format == "lean4-statement-with-header":
                 line_dict["proof_status"] = map_to_future[(line_dict["predicted_proof"])].result()
 
         data = []
@@ -396,9 +396,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
                             line_dict["predicted_proof"] = line_dict["header"] + line_dict["formal_statement"] + generation
-
                         else:
                             if "predicted_proof" not in line_dict:
                                 raise ValueError(
@@ -407,8 +406,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-statement":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^```(lean4)?\s*|\s*```$", "", line_dict["generation"])
-                            header = "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n"
+                            generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            header = "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n"
                             line_dict["predicted_proof"] = header + generation + "sorry"
                         else:
                             if "predicted_proof" not in line_dict:
@@ -416,7 +415,17 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                     "predicted_proof key not found in the line_dict. "
                                     "Set use_predicted_proof_key=False to re-combine"
                                 )
-                    
+                    elif answer_format == "lean4-statement-with-header": 
+                        if not use_predicted_proof_key:
+                            generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            line_dict["predicted_proof"] = generation + "sorry"
+                        else:
+                            if "predicted_proof" not in line_dict:
+                                raise ValueError(
+                                    "predicted_proof key not found in the line_dict. "
+                                    "Set use_predicted_proof_key=False to re-combine"
+                                )
+
 
                     data[-1][-1] = json.dumps(line_dict)
 
@@ -424,13 +433,13 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     predicted_proof = line_dict["predicted_proof"]
                     if answer_format == "natural_language" and (predicted_answer, gt_answer) in map_to_future:
                         continue
-                    elif (answer_format == "lean4-proof" or answer_format == "lean4-statement") and predicted_proof in map_to_future:
+                    elif (answer_format == "lean4-proof" or answer_format == "lean4-statement" or answer_format == "lean4-statement-with-header") and predicted_proof in map_to_future:
                         continue
 
                     if (
                         ignore_cache
                         or (line_dict.get("is_correct") is None and answer_format == "natural_language")
-                        or (line_dict.get("proof_status") is None and (answer_format == "lean4-proof" or answer_format == "lean4-statement"))
+                        or (line_dict.get("proof_status") is None and (answer_format == "lean4-proof" or answer_format == "lean4-statement" or answer_format == "lean4-statement-with-header"))
                     ):
                         if answer_format == "natural_language":
                             map_to_future[(predicted_answer, gt_answer)] = executor.submit(
@@ -441,7 +450,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 tolerance=tolerance,
                                 timeout=timeout,
                             )
-                        elif answer_format == "lean4-proof" or answer_format == "lean4-statement":
+                        elif answer_format == "lean4-proof" or answer_format == "lean4-statement" or answer_format == "lean4-statement-with-header":
                             map_to_future[predicted_proof] = executor.submit(
                                 self.is_proof_correct,
                                 predicted_proof,
@@ -450,7 +459,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     else:
                         if answer_format == "natural_language":
                             map_to_future[(predicted_answer, gt_answer)] = DummyFuture(line_dict["is_correct"])
-                        elif answer_format == "lean4-proof" or answer_format == "lean4-statement":
+                        elif answer_format == "lean4-proof" or answer_format == "lean4-statement" or answer_format == "lean4-statement-with-header":
                             map_to_future[predicted_proof] = DummyFuture(line_dict["proof_status"])
 
             for file_handle in file_handles:

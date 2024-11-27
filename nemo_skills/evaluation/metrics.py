@@ -586,10 +586,10 @@ class Lean4Metrics(BaseMetrics):
         self.reset()
 
     def fill_up_missing(self):
-        return {'predicted_answer': None, 'proof_status': "failed"}
+        return {'predicted_proof': None, 'proof_status': "failed"}
 
     def is_incomplete(self, elem):
-        incomplete = 'predicted_answer' not in elem
+        incomplete = 'predicted_proof' not in elem
         if not incomplete:
             incomplete = 'proof_status' not in elem
         return incomplete
@@ -716,6 +716,8 @@ def read_predictions(predictions, evaluator, allow_incomplete=False):
             continue
         if evaluator.is_incomplete(prediction_dict):
             if not allow_incomplete:
+                print("Incomplete prediction_dict:", prediction_dict)
+                print("evaluator:", evaluator)
                 raise RuntimeError("Some data is missing!")
             data.append(evaluator.fill_up_missing())
             continue
@@ -745,3 +747,16 @@ def compute_metrics(
         file_handle.close()
 
     return metrics_calculator.get_metrics()
+
+
+
+map_metrics = {
+    "math": MathMetrics(),
+    "lean4-proof": Lean4Metrics(),
+    "lean4-statement": Lean4Metrics(),
+    "answer_judgement": AnswerJudgementMetrics(),
+    "arena": ArenaMetrics(),
+    "code": CodeMetrics(),
+    "if": IFMetrics(),
+    "mt-bench": MtBenchMetrics(),
+}
