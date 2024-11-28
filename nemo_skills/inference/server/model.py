@@ -197,7 +197,7 @@ class TRTLLMModel(BaseModel):
                 data=json.dumps(request),
                 headers={"Content-Type": "application/json"},
                 # to make sure we never hand indefinitely and abort the job if something is stuck in trtllm
-                timeout=300,
+                timeout=1800,
             ).json()
         except requests.exceptions.Timeout:
             LOG.error("Please report this! Request timed out for prompt: %s", prompt)
