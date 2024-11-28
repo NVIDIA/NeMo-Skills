@@ -23,7 +23,7 @@ import pytest
 import yaml
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
-from nemo_skills.evaluation.metrics import compute_metrics
+from nemo_skills.evaluation.metrics import ComputeMetrics
 from nemo_skills.pipeline import wrap_arguments
 from nemo_skills.pipeline.cli import eval, generate, train
 
@@ -112,10 +112,9 @@ def test_sft():
         partition="interactive",
     )
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/test-sft/evaluation/eval-results/gsm8k/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS(),
-    )
+    )["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -173,10 +172,9 @@ def test_dpo():
         partition="interactive",
     )
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/test-dpo/evaluation/eval-results/gsm8k/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS(),
-    )
+    )["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 

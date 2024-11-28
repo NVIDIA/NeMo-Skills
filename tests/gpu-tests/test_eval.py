@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
-from nemo_skills.evaluation.metrics import compute_metrics
+from nemo_skills.evaluation.metrics import ComputeMetrics
 
 
 @pytest.mark.gpu
@@ -51,10 +51,9 @@ def test_trtllm_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics_calculator = importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS()
-    metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"], metrics_calculator
-    )
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"]
+    )["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -93,10 +92,9 @@ def test_trtllm_code_execution_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics_calculator = importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS()
-    metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"], metrics_calculator
-    )
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"]
+    )["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -145,34 +143,30 @@ def test_vllm_eval():
     )
 
     # running compute_metrics to check that results are expected
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='algebra222').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/algebra222/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.math').METRICS_CLASS(),
-    )
+    )["greedy"]
 
     assert metrics['symbolic_correct'] >= 80
     assert metrics['num_entries'] == 222
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/human-eval/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.human-eval').METRICS_CLASS(),
-    )
+    )["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='mbpp').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mbpp/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.mbpp').METRICS_CLASS(),
-    )
+    )["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 378
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/ifeval/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.ifeval').METRICS_CLASS(),
-    )
+    )["greedy"]
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
     assert metrics['prompt_loose_accuracy'] >= 60
@@ -180,10 +174,9 @@ def test_vllm_eval():
     assert metrics['num_prompts'] == 400
     assert metrics['num_instructions'] == 601
 
-    metrics = compute_metrics(
+    metrics = ComputeMetrics(benchmark='mmlu').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mmlu/output.jsonl"],
-        importlib.import_module('nemo_skills.dataset.mmlu').METRICS_CLASS(),
-    )
+    )["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 400
 
@@ -215,10 +208,9 @@ def test_nemo_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics_calculator = importlib.import_module('nemo_skills.dataset.gsm8k').METRICS_CLASS()
-    metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/nemo-eval/eval-results/gsm8k/output.jsonl"], metrics_calculator
-    )
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"/tmp/nemo-skills-tests/{model_type}/nemo-eval/eval-results/gsm8k/output.jsonl"]
+    )["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
