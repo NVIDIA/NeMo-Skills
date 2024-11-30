@@ -71,3 +71,30 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_qwen.sh
+  
+  gpu-tests-rm:
+    runs-on: self-hosted-nemo-skills
+    if: ${{ github.event.label.name == 'run GPU tests' }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: ${{ github.run_id }}
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        cd ${{ github.run_id }}
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements/common-tests.txt
+    - name: Run GPU tests
+      timeout-minutes: 120
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd ${{ github.run_id }}
+        nvidia-smi
+        set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
+        ./tests/gpu-tests/run_rm.sh

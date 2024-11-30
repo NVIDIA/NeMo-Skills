@@ -12,24 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*.json
-*.tar.gz
-*.tar
-*.npy
-*.info
-*.jsonl
-*.csv
-nemo_experiments
-build
-.hypothesis
-*.zip
-*.egg-info
-*.xml
-*.DS_Store
-.coverage
+import abc
 
-__pycache__
-.ipynb_checkpoints
+# Base class for metrics computation
+class BaseMetrics(abc.ABC):
+    @abc.abstractmethod
+    def fill_up_missing(self):
+        pass
 
-cluster_configs/*
-!cluster_configs/example-*.yaml
+    @abc.abstractmethod
+    def is_incomplete(self, elem):
+        pass
+
+    @abc.abstractmethod
+    def update(self, predictions):
+        pass
+
+    @abc.abstractmethod
+    def get_metrics(self):
+        pass
+
+    @abc.abstractmethod
+    def reset(self):
+        pass
+
+    def setup(self, input_files):
+        pass
+
+    def max_metrics_to_print(self):
+        """No limit by default."""
+        return None
+
+

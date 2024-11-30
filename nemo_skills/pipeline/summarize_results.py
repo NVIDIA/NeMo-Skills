@@ -24,7 +24,7 @@ from typing import List, Optional
 
 import typer
 
-from nemo_skills.evaluation.metrics import MathMetrics
+from nemo_skills.evaluation.metrics import ComputeMetrics
 from nemo_skills.pipeline import (
     check_if_mounted,
     cluster_download,
@@ -34,7 +34,6 @@ from nemo_skills.pipeline import (
     get_unmounted_path,
 )
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.compute_metrics import compute_metrics
 from nemo_skills.utils import setup_logging
 
 
@@ -61,6 +60,15 @@ def summarize_results(
     remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
     max_samples: int = typer.Option(-1, help="Limit metric computation only to first `max_samples`"),
+    extra_datasets: str = typer.Option(
+        None,
+        help="Path to a custom dataset folder that will be searched in addition to the main one. "
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
+    ),
+    metric_type: Optional[str] = typer.Option(
+        None,
+        help="Specify metric type to use a specific metric calculator.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
@@ -96,7 +104,7 @@ def summarize_results(
     eval_results_dir = Path(results_dir) / 'eval-results'
     if eval_results_dir.exists() and eval_results_dir.is_dir():
         results_dir = eval_results_dir
-    benchmarks_paths = glob.glob(f'{results_dir}/*')
+    benchmarks_paths = [path for path in glob.glob(f'{results_dir}/*') if '-logs' not in os.path.basename(path)]
 
     if benchmarks:
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
@@ -108,48 +116,22 @@ def summarize_results(
         if not Path(benchmark_path).is_dir():
             continue
         try:
-            benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
-            metrics_calculator = benchmark_module.METRICS_CLASS()
+            if metric_type is not None:
+                metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+            else:
+                metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
+
             results[benchmark] = {}
             max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
-            # TODO: we should just return all available aggregations from compute_metrics directly
-            if not isinstance(metrics_calculator, MathMetrics):
-                if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
-                    results[benchmark]['greedy'] = compute_metrics(
-                        input_files=[f"{benchmark_path}/output-greedy.jsonl"],
-                        metrics_calculator=metrics_calculator,
-                        max_samples=max_samples,
-                    )
-                sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
-                if len(sampling_outputs) > 0:
-                    results[benchmark][f'pass@{len(sampling_outputs)}'] = compute_metrics(
-                        input_files=sampling_outputs,
-                        metrics_calculator=metrics_calculator,
-                        aggregation_mode="best",
-                        max_samples=max_samples,
-                    )
-            else:
-                if Path(f'{benchmark_path}/output-greedy.jsonl').exists():
-                    results[benchmark]['greedy'] = compute_metrics(
-                        input_files=[f"{benchmark_path}/output-greedy.jsonl"],
-                        metrics_calculator=metrics_calculator,
-                        max_samples=max_samples,
-                    )
 
-                sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
-                if len(sampling_outputs) > 0:
-                    results[benchmark][f'majority@{len(sampling_outputs)}'] = compute_metrics(
-                        input_files=sampling_outputs,
-                        metrics_calculator=metrics_calculator,
-                        aggregation_mode="majority",
-                        max_samples=max_samples,
-                    )
-                    results[benchmark][f'pass@{len(sampling_outputs)}'] = compute_metrics(
-                        input_files=sampling_outputs,
-                        metrics_calculator=metrics_calculator,
-                        aggregation_mode="best",
-                        max_samples=max_samples,
-                    )
+            if Path(f'{benchmark_path}/output.jsonl').exists():
+                results[benchmark].update(
+                    metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
+                )
+
+            sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
+            if len(sampling_outputs) > 0:
+                results[benchmark].update(metrics_calculator.compute_metrics(input_files=sampling_outputs))
         except Exception as e:
             print(f"Error running compute_metrics.py for {benchmark}: {e}")
 

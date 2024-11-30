@@ -115,12 +115,11 @@ Let's look at gsm8k to understand a bit more how each part of the evaluation wor
 Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/gsm8k/__init__.py) we see the following
 
 ```python
-from nemo_skills.evaluation.metrics import MathMetrics
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
-METRICS_CLASS = MathMetrics
+METRICS_TYPE = "math"
 DEFAULT_EVAL_ARGS = "++eval_type=math"
 DEFAULT_GENERATION_ARGS = ""
 ```

@@ -391,18 +391,29 @@ def _stream(
 
 
 class TensorRTLLM:
-    def __init__(self, model_path: str):
+    def __init__(
+        self,
+        model_path: str,
+        max_batch_size: Optional[int] = None,
+        kv_cache_free_gpu_memory_fraction: Optional[float] = None,
+    ):
         with open(Path(model_path) / "config.json", 'r') as f:
             config = json.load(f)
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(
             tokenizer_dir=model_path, model_name=read_model_name(config)
         )
-        self.runner = ModelRunnerCpp.from_dir(
+
+        runner_kwargs = dict(
             engine_dir=model_path,
             rank=tensorrt_llm.mpi_rank(),
+            max_batch_size=max_batch_size,
+            kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
             enable_chunked_context=True,
             kv_cache_enable_block_reuse=True,
         )
+
+        self.runner = ModelRunnerCpp.from_dir(**runner_kwargs)
+
         self.active_generations = {}
         self.executor = ThreadPoolExecutor(max_workers=1024)
 
@@ -502,10 +513,19 @@ class GenerationResponse(BaseModel):
 
 
 class MPIWrapper:
-    def __init__(self, model_path: str):
+    def __init__(
+        self,
+        model_path: str,
+        max_batch_size: Optional[int] = None,
+        kv_cache_free_gpu_memory_fraction: Optional[float] = None,
+    ):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
-        self.model = TensorRTLLM(model_path=model_path)
+        self.model = TensorRTLLM(
+            model_path=model_path,
+            max_batch_size=max_batch_size,
+            kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
+        )
         self.app = None
         if self.rank == 0:
             self.app = self._create_app()
@@ -563,9 +583,17 @@ def main():
     parser.add_argument("--model_path", required=True)
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=5000)
+    parser.add_argument("--max_batch_size", type=int, default=None, help="Maximum batch size")
+    parser.add_argument(
+        "--kv_cache_free_gpu_memory_fraction", type=float, default=None, help="Free GPU memory fraction for cache"
+    )
     args = parser.parse_args()
 
-    wrapper = MPIWrapper(model_path=args.model_path)
+    wrapper = MPIWrapper(
+        model_path=args.model_path,
+        max_batch_size=args.max_batch_size,
+        kv_cache_free_gpu_memory_fraction=args.kv_cache_free_gpu_memory_fraction,
+    )
     wrapper.run(host=args.host, port=args.port)
 
 

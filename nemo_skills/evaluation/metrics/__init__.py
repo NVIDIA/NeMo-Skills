@@ -12,24 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*.json
-*.tar.gz
-*.tar
-*.npy
-*.info
-*.jsonl
-*.csv
-nemo_experiments
-build
-.hypothesis
-*.zip
-*.egg-info
-*.xml
-*.DS_Store
-.coverage
-
-__pycache__
-.ipynb_checkpoints
-
-cluster_configs/*
-!cluster_configs/example-*.yaml
+from nemo_skills.evaluation.metrics.compute_metrics import ComputeMetrics
+from nemo_skills.evaluation.metrics.utils import read_predictions
+from nemo_skills.evaluation.metrics.map_metrics import get_metrics

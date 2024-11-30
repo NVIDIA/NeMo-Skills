@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.evaluation.metrics import CodeMetrics
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'generic/codegen'
 DATASET_GROUP = 'code'
-METRICS_CLASS = CodeMetrics
+METRICS_TYPE = "code"
 DEFAULT_EVAL_ARGS = "++eval_type=code ++eval_config.dataset=mbpp"
 DEFAULT_GENERATION_ARGS = ""

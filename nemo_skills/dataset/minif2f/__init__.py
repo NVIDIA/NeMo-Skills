@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.evaluation.metrics import Lean4Metrics
 
 # Default evaluation and generation settings for the minif2f dataset
 PROMPT_CONFIG = 'lean4/formal-proof'
 DATASET_GROUP = 'lean4'
+<<<<<<< HEAD
 METRICS_CLASS = Lean4Metrics
 DEFAULT_EVAL_ARGS = "++eval_type=lean4-proof"
+=======
+METRICS_TYPE = "lean4-proof"
+DEFAULT_EVAL_ARGS = "++eval_type=lean4"
+>>>>>>> 6748cc397545d43a9152ceed908165e1904214f3
 DEFAULT_GENERATION_ARGS = ""
