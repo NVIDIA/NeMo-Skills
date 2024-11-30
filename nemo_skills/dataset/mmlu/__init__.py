@@ -11,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.evaluation.metrics import MathMetrics
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'generic/multichoice'
 DATASET_GROUP = 'multichoice'
-METRICS_CLASS = MathMetrics  # TODO: update this?
+METRICS_TYPE = "math" # TODO: update this? 
 DEFAULT_EVAL_ARGS = (
     "++eval_type=math " "++eval_config.extract_from_boxed=False " "'++eval_config.extract_regex=\"Answer: (.+)$\"'"
 )

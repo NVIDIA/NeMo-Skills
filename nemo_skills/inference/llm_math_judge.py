@@ -139,7 +139,6 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         # saving to a tmp file to avoid corrupting original generation in case something goes wrong
         with open(output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
             for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
-                data_point.pop(cfg.generation_key, None)
                 judgement = prefill_judgement(data_point)
                 if judgement is None:
                     data_points.append(data_point)
@@ -167,6 +166,7 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                         else:
                             output = outputs[generated_idx]
                             output[cfg.generation_key] = output.pop("generation")
+                            data_points[generated_idx].pop(cfg.generation_key, None)
                             output.update(data_points[generated_idx])
                             fout.write(json.dumps(output) + "\n")
                             generated_idx += 1

@@ -24,7 +24,7 @@ from typer.models import ParameterInfo
 
 from nemo_skills.pipeline.utils import get_mounts_from_config, get_tunnel
 
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 
 
 def wrap_arguments(arguments: str):

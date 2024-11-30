@@ -25,9 +25,12 @@ user: |-
   Answer is: {expected_answer}
   ```lean4
   import Mathlib
+  import Aesop
 
-  open Complex Filter Function Metric Finset
-  open scoped BigOperators Topology
+  set_option maxHeartbeats 0
+
+  open Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat
+  open scoped BigOperators Matrix
   
 
 
