@@ -13,7 +13,6 @@
 
 import json
 
-
 def read_predictions(predictions, evaluator, allow_incomplete=False):
     data = []
     for prediction in predictions:

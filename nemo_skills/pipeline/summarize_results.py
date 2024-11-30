@@ -24,8 +24,7 @@ from typing import List, Optional
 
 import typer
 
-from nemo_skills.dataset.utils import get_dataset_module
-from nemo_skills.evaluation.metrics import ComputeMetrics, MathMetrics
+from nemo_skills.evaluation.metrics import ComputeMetrics
 from nemo_skills.pipeline import (
     check_if_mounted,
     cluster_download,
@@ -66,6 +65,10 @@ def summarize_results(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
+    metric_type: Optional[str] = typer.Option(
+        None,
+        help="Specify metric type to use a specific metric calculator.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
@@ -101,7 +104,7 @@ def summarize_results(
     eval_results_dir = Path(results_dir) / 'eval-results'
     if eval_results_dir.exists() and eval_results_dir.is_dir():
         results_dir = eval_results_dir
-    benchmarks_paths = glob.glob(f'{results_dir}/*')
+    benchmarks_paths = [path for path in glob.glob(f'{results_dir}/*') if '-logs' not in os.path.basename(path)]
 
     if benchmarks:
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
@@ -113,7 +116,10 @@ def summarize_results(
         if not Path(benchmark_path).is_dir():
             continue
         try:
-            metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
+            if metric_type is not None:
+                metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+            else:
+                metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
 
             results[benchmark] = {}
             max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()

@@ -23,7 +23,8 @@ import hydra
 from omegaconf import MISSING
 from tqdm import tqdm
 
-from nemo_skills.evaluation.metrics import MathMetrics, read_predictions
+from nemo_skills.evaluation.metrics import get_metrics, read_predictions
+
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -67,7 +68,7 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     file_handles = [open(file, "rt", encoding="utf-8") for file in unroll_files(cfg.input_files)]
 
     # currently majority is only defined for math evals
-    evaluator = MathMetrics()
+    evaluator = get_metrics("math")
 
     majority_answers = []
     all_predictions = []

@@ -23,7 +23,7 @@ class Lean4Metrics(BaseMetrics):
         return {'predicted_answer': None, 'proof_status': "failed"}
 
     def is_incomplete(self, elem):
-        incomplete = 'predicted_answer' not in elem
+        incomplete = 'proof_status' not in elem
         if not incomplete:
             incomplete = 'proof_status' not in elem
         return incomplete

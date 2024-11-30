@@ -13,14 +13,6 @@
 # limitations under the License.
 
 import abc
-import importlib
-from contextlib import ExitStack
-from itertools import zip_longest
-
-from nemo_skills.dataset.utils import get_dataset_module
-from nemo_skills.evaluation.metrics.utils import read_predictions
-from nemo_skills.utils import unroll_files
-
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
@@ -52,34 +44,3 @@ class BaseMetrics(abc.ABC):
         return None
 
 
-class ComputeMetrics:
-    def __init__(self, benchmark, extra_datasets=None, max_samples=-1):
-        self.benchmark = benchmark
-
-        # Setup metrics calculator
-        benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-        self.metrics_calculator = benchmark_module.METRICS_CLASS()
-
-        self.max_samples = max_samples
-
-    def compute_metrics(self, input_files, allow_incomplete=False):
-        self.metrics_calculator.setup(input_files)
-        self.metrics_calculator.reset()
-
-        with ExitStack() as stack:
-            file_handles = [
-                stack.enter_context(open(file, "rt", encoding="utf-8")) for file in unroll_files(input_files)
-            ]
-
-            for idx, predictions in enumerate(zip_longest(*file_handles)):
-                if idx == self.max_samples:
-                    break
-                data = read_predictions(predictions, self.metrics_calculator, allow_incomplete)
-                self.metrics_calculator.update(data)
-
-            metrics_dict = self.metrics_calculator.get_metrics()
-
-        return metrics_dict
-
-    def max_metrics_to_print(self):
-        return self.metrics_calculator.max_metrics_to_print()

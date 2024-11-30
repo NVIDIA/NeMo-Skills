@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.evaluation.metrics.answer_judgement_metrics import AnswerJudgementMetrics
-from nemo_skills.evaluation.metrics.arena_metrics import ArenaMetrics
-from nemo_skills.evaluation.metrics.base import ComputeMetrics
-from nemo_skills.evaluation.metrics.code_metrics import CodeMetrics
-from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
-from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
-from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
-from nemo_skills.evaluation.metrics.mtbench_metrics import MtBenchMetrics
+from nemo_skills.evaluation.metrics.compute_metrics import ComputeMetrics
 from nemo_skills.evaluation.metrics.utils import read_predictions
+from nemo_skills.evaluation.metrics.map_metrics import get_metrics
