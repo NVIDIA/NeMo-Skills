@@ -13,25 +13,11 @@
 
 import json
 
-def read_predictions(predictions, evaluator, allow_incomplete=False):
+
+def read_predictions(predictions):
     data = []
     for prediction in predictions:
-        if not prediction:  # could have missing predictions
-            if not allow_incomplete:
-                raise RuntimeError("Some data is missing!")
-            data.append(evaluator.fill_up_missing())
-            continue
         prediction_dict = json.loads(prediction)
-        if not prediction_dict:
-            if not allow_incomplete:
-                raise RuntimeError("Some data is missing!")
-            data.append(evaluator.fill_up_missing())
-            continue
-        if evaluator.is_incomplete(prediction_dict):
-            if not allow_incomplete:
-                raise RuntimeError("Some data is missing!")
-            data.append(evaluator.fill_up_missing())
-            continue
         data.append(prediction_dict)
 
     return data

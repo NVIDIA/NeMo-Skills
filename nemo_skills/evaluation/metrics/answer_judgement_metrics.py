@@ -22,12 +22,6 @@ class AnswerJudgementMetrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def fill_up_missing(self):
-        return {'judgement': "Judgement: No", 'expected_judgement': "Judgement: No"}
-
-    def is_incomplete(self, elem):
-        return 'judgement' not in elem or 'expected_judgement' not in elem
-
     def update_perf_dict(self, perf_dict, is_correct, is_fp, is_fn):
         perf_dict["total_correct"] += int(is_correct)
         perf_dict["fp_count"] += int(is_fp)

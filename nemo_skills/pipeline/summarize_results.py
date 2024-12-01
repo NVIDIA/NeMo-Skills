@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import glob
-import importlib
 import json
 import logging
 import os
@@ -69,9 +68,10 @@ def summarize_results(
         None,
         help="Specify metric type to use a specific metric calculator.",
     ),
+    verbose: bool = typer.Option(True, help="Print download/upload progress"),
 ):
     """Summarize results of an evaluation job."""
-    setup_logging(disable_hydra_logs=False, log_level=logging.INFO if not debug else logging.DEBUG)
+    setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
@@ -96,6 +96,7 @@ def summarize_results(
             get_unmounted_path(cluster_config, results_dir),
             temp_dir,
             remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
+            verbose=verbose,
         )
         results_dir = Path(temp_dir) / Path(results_dir).name
 
@@ -109,8 +110,9 @@ def summarize_results(
     if benchmarks:
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
 
-    results = defaultdict(dict)
+    results = defaultdict(lambda: defaultdict(dict))
     max_metrics_to_print = {}
+    max_aggregations_to_print = {}
     for benchmark_path in benchmarks_paths:
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
@@ -121,26 +123,50 @@ def summarize_results(
             else:
                 metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
 
-            results[benchmark] = {}
-            max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
+            metrics = {}
+            # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
+            #       an extra aggregation to print
+            has_greedy = False
 
             if Path(f'{benchmark_path}/output.jsonl').exists():
-                results[benchmark].update(
-                    metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
-                )
+                has_greedy = True
+                metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
+                if len(metrics) > 1:  # has subsets
+                    for subset, subset_metrics in metrics.items():
+                        results[f"{benchmark}-{subset}"].update(subset_metrics)
+                else:
+                    results[benchmark].update(metrics['all'])
 
             sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
             if len(sampling_outputs) > 0:
-                results[benchmark].update(metrics_calculator.compute_metrics(input_files=sampling_outputs))
+                metrics = metrics_calculator.compute_metrics(input_files=sampling_outputs)
+                if len(metrics) > 1:  # has subsets
+                    for subset, subset_metrics in metrics.items():
+                        results[f"{benchmark}-{subset}"].update(subset_metrics)
+                else:
+                    results[benchmark].update(metrics['all'])
+
+            if len(metrics) > 1:
+                for subset, subset_metrics in metrics.items():
+                    max_metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_metrics_to_print()
+                    max_aggregations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_aggregations_to_print()
+                    if max_aggregations_to_print[f"{benchmark}-{subset}"] is not None:
+                        max_aggregations_to_print[f"{benchmark}-{subset}"] += has_greedy
+            else:
+                max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
+                max_aggregations_to_print[benchmark] = metrics_calculator.max_aggregations_to_print()
+                if max_aggregations_to_print[benchmark] is not None:
+                    max_aggregations_to_print[benchmark] += has_greedy
+
         except Exception as e:
-            print(f"Error running compute_metrics.py for {benchmark}: {e}")
+            logging.exception(f"Error computing metrics for {benchmark}: {e}")
 
     for benchmark, benchmark_results in results.items():
         if not benchmark_results:
             continue
         max_widths = {}
         max_widths['evaluation_mode'] = len('evaluation_mode')
-        for eval_mode, metrics in benchmark_results.items():
+        for eval_mode, metrics in list(benchmark_results.items())[: max_aggregations_to_print[benchmark]]:
             if max_metrics_to_print[benchmark] is None:
                 max_metrics_to_print[benchmark] = len(metrics)
             for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
@@ -157,11 +183,11 @@ def summarize_results(
         ]
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
-        for eval_mode, metrics in benchmark_results.items():
+        for eval_mode, metrics in list(benchmark_results.items())[: max_aggregations_to_print[benchmark]]:
             values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
             for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
                 if isinstance(metric_value, float):
-                    metric_value = f"{metric_value:.2f}"
+                    metric_value = f"{metric_value:.2f}%"
                 values.append(f'{str(metric_value):<{max_widths[metric_key]}}')
             print(' | '.join(values))
 
@@ -175,6 +201,7 @@ def summarize_results(
                 tunnel,
                 Path(results_dir) / 'metrics.json',
                 Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
+                verbose=verbose,
             )
             print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
             tunnel.cleanup()

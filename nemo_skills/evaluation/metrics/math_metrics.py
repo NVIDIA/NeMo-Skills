@@ -55,16 +55,6 @@ class MathMetrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def fill_up_missing(self):
-        # TODO: not clear how to fill up missing, since we don't know whether llm or sympy was used
-        return {'predicted_answer': None, 'is_correct': False}
-
-    def is_incomplete(self, elem):
-        incomplete = 'predicted_answer' not in elem
-        if not incomplete:
-            incomplete = 'is_correct' not in elem and 'judgement' not in elem
-        return incomplete
-
     def update_comb_metric(self, perf_dict, current_correct_sympy, current_correct_judge, no_answer):
         perf_dict["correct_sympy"] += int(current_correct_sympy)
         perf_dict["correct_judge"] += int(current_correct_judge)
@@ -95,6 +85,7 @@ class MathMetrics(BaseMetrics):
         current_correct_sympy, current_correct_judge, no_answer = False, False, False
 
         if len(predictions) == 1:
+            self.num_decoding = 1
             # Single decoding
             if self.has_sympy:
                 current_correct_sympy = predictions[0]['is_correct']
@@ -121,154 +112,159 @@ class MathMetrics(BaseMetrics):
                     )
         else:
             # Multiple decodings - pass/majority
-
-            # Initialize local vars for tracking prediction correctness
-            current_correct_sympy, current_correct_judge, no_answer = False, False, False
-            valid_answers = [elem['predicted_answer'] for elem in predictions if elem['predicted_answer'] is not None]
-            if not len(valid_answers):
-                # Consider the answer to be incorrect if no valid answer among predictions
-                self.update_comb_metric(
-                    self.agg_mode_dict[f"pass@{len(predictions)}"],
-                    current_correct_sympy,
-                    current_correct_judge,
-                    no_answer,
-                )
-                self.update_comb_metric(
-                    self.agg_mode_dict[f"majority@{len(predictions)}"],
-                    current_correct_sympy,
-                    current_correct_judge,
-                    no_answer,
-                )
-                self.update_comb_metric(
-                    self.agg_mode_dict[f"rm_best@{len(predictions)}"],
-                    current_correct_sympy,
-                    current_correct_judge,
-                    no_answer,
-                )
-                self.update_comb_metric(
-                    self.agg_mode_dict[f"rm_majority@{len(predictions)}"],
-                    current_correct_sympy,
-                    current_correct_judge,
-                    no_answer,
-                )
-
-                return
-
-            # Majority@K
-            # TODO: currently majority does not take into account equivalent answers written in a different way
-            # Reinitialize local vars for tracking prediction correctness
-            current_correct_sympy, current_correct_judge, no_answer = False, False, False
-
-            def get_majority_result(predictions, result_extractor):
-                valid_answers_and_results = [
-                    (elem['predicted_answer'], result_extractor(elem))
-                    for elem in predictions
-                    if elem['predicted_answer'] is not None
+            # getting metrics for all k up to len(predictions). Starting from last to make sure it's printed
+            for k in range(len(predictions), 0, -1):
+                # Initialize local vars for tracking prediction correctness
+                current_correct_sympy, current_correct_judge, no_answer = False, False, False
+                valid_answers = [
+                    elem['predicted_answer'] for elem in predictions[:k] if elem['predicted_answer'] is not None
                 ]
+                if not len(valid_answers):
+                    # Consider the answer to be incorrect if no valid answer among predictions
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"pass@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"majority@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"rm_best@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"rm_majority@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
 
-                majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
-                return majority_result[1], False
+                    return
 
-            if self.has_sympy:
-                current_correct_sympy, no_answer = get_majority_result(predictions, lambda elem: elem['is_correct'])
-
-            if self.has_judge:
-                current_correct_judge, no_answer = get_majority_result(
-                    predictions, lambda elem: is_correct_judgement(elem['judgement'])
-                )
-
-            self.update_comb_metric(
-                self.agg_mode_dict[f"majority@{len(predictions)}"],
-                current_correct_sympy,
-                current_correct_judge,
-                no_answer,
-            )
-
-            # Reward Models
-            if self.has_reward:
+                # Majority@K
+                # TODO: currently majority does not take into account equivalent answers written in a different way
                 # Reinitialize local vars for tracking prediction correctness
                 current_correct_sympy, current_correct_judge, no_answer = False, False, False
 
-                def get_reward_best_result(predictions, result_extractor):
+                def get_majority_result(predictions, result_extractor):
                     valid_answers_and_results = [
-                        (elem['predicted_answer'], result_extractor(elem), elem['reward_model_score'])
+                        (elem['predicted_answer'], result_extractor(elem))
                         for elem in predictions
                         if elem['predicted_answer'] is not None
                     ]
 
-                    # Answer is the top-scoring reward
-                    current_correct = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
-                    return current_correct, False
+                    majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    return majority_result[1], False
 
                 if self.has_sympy:
-                    current_correct_sympy, no_answer = get_reward_best_result(
-                        predictions, lambda elem: elem['is_correct']
+                    current_correct_sympy, no_answer = get_majority_result(
+                        predictions[:k], lambda elem: elem['is_correct']
                     )
 
                 if self.has_judge:
-                    current_correct_judge, no_answer = get_reward_best_result(
-                        predictions, lambda elem: is_correct_judgement(elem['judgement'])
+                    current_correct_judge, no_answer = get_majority_result(
+                        predictions[:k], lambda elem: is_correct_judgement(elem['judgement'])
                     )
 
                 self.update_comb_metric(
-                    self.agg_mode_dict[f"rm_best@{len(predictions)}"],
+                    self.agg_mode_dict[f"majority@{k}"],
                     current_correct_sympy,
                     current_correct_judge,
                     no_answer,
                 )
 
+                # Reward Models
+                if self.has_reward:
+                    # Reinitialize local vars for tracking prediction correctness
+                    current_correct_sympy, current_correct_judge, no_answer = False, False, False
+
+                    def get_reward_best_result(predictions, result_extractor):
+                        valid_answers_and_results = [
+                            (elem['predicted_answer'], result_extractor(elem), elem['reward_model_score'])
+                            for elem in predictions
+                            if elem['predicted_answer'] is not None
+                        ]
+
+                        # Answer is the top-scoring reward
+                        current_correct = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
+                        return current_correct, False
+
+                    if self.has_sympy:
+                        current_correct_sympy, no_answer = get_reward_best_result(
+                            predictions[:k], lambda elem: elem['is_correct']
+                        )
+
+                    if self.has_judge:
+                        current_correct_judge, no_answer = get_reward_best_result(
+                            predictions[:k], lambda elem: is_correct_judgement(elem['judgement'])
+                        )
+
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"rm_best@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+
+                    # Reinitialize local vars for tracking prediction correctness
+                    current_correct_sympy, current_correct_judge, no_answer = False, False, False
+
+                    def get_majority_reward_result(predictions, result_extractor):
+                        valid_answers_and_results = [
+                            (elem['predicted_answer'], result_extractor(elem), elem['reward_model_score'])
+                            for elem in predictions
+                            if elem['predicted_answer'] is not None
+                        ]
+
+                        answer_to_score_dict = defaultdict(float)
+                        answer_to_correctness_dict = {}
+                        for predicted_answer, is_correct, reward_score in valid_answers_and_results:
+                            answer_to_score_dict[predicted_answer] += reward_score
+                            answer_to_correctness_dict[predicted_answer] = is_correct
+
+                        top_cum_reward_answer = sorted(
+                            list(answer_to_score_dict.items()), key=lambda x: x[1], reverse=True
+                        )[0][0]
+                        current_correct = answer_to_correctness_dict[top_cum_reward_answer]
+                        return current_correct, False
+
+                    if self.has_sympy:
+                        current_correct_sympy, no_answer = get_majority_reward_result(
+                            predictions[:k], lambda elem: elem['is_correct']
+                        )
+
+                    if self.has_judge:
+                        current_correct_judge, no_answer = get_majority_reward_result(
+                            predictions[:k], lambda elem: is_correct_judgement(elem['judgement'])
+                        )
+
+                    self.update_comb_metric(
+                        self.agg_mode_dict[f"rm_majority@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+
+                # Pass@K
                 # Reinitialize local vars for tracking prediction correctness
                 current_correct_sympy, current_correct_judge, no_answer = False, False, False
-
-                def get_majority_reward_result(predictions, result_extractor):
-                    valid_answers_and_results = [
-                        (elem['predicted_answer'], result_extractor(elem), elem['reward_model_score'])
-                        for elem in predictions
-                        if elem['predicted_answer'] is not None
-                    ]
-
-                    answer_to_score_dict = defaultdict(float)
-                    answer_to_correctness_dict = {}
-                    for predicted_answer, is_correct, reward_score in valid_answers_and_results:
-                        answer_to_score_dict[predicted_answer] += reward_score
-                        answer_to_correctness_dict[predicted_answer] = is_correct
-
-                    top_cum_reward_answer = sorted(
-                        list(answer_to_score_dict.items()), key=lambda x: x[1], reverse=True
-                    )[0][0]
-                    current_correct = answer_to_correctness_dict[top_cum_reward_answer]
-                    return current_correct, False
-
                 if self.has_sympy:
-                    current_correct_sympy, no_answer = get_majority_reward_result(
-                        predictions, lambda elem: elem['is_correct']
-                    )
-
+                    current_correct_sympy = any([elem['is_correct'] for elem in predictions[:k]])
                 if self.has_judge:
-                    current_correct_judge, no_answer = get_majority_reward_result(
-                        predictions, lambda elem: is_correct_judgement(elem['judgement'])
-                    )
+                    current_correct_judge = any([is_correct_judgement(elem['judgement']) for elem in predictions[:k]])
+                if all([elem['predicted_answer'] is None for elem in predictions[:k]]):
+                    no_answer = True
 
                 self.update_comb_metric(
-                    self.agg_mode_dict[f"rm_majority@{len(predictions)}"],
-                    current_correct_sympy,
-                    current_correct_judge,
-                    no_answer,
+                    self.agg_mode_dict[f"pass@{k}"], current_correct_sympy, current_correct_judge, no_answer
                 )
-
-            # Pass@K
-            # Reinitialize local vars for tracking prediction correctness
-            current_correct_sympy, current_correct_judge, no_answer = False, False, False
-            if self.has_sympy:
-                current_correct_sympy = any([elem['is_correct'] for elem in predictions])
-            if self.has_judge:
-                current_correct_judge = any([is_correct_judgement(elem['judgement']) for elem in predictions])
-            if all([elem['predicted_answer'] is None for elem in predictions]):
-                no_answer = True
-
-            self.update_comb_metric(
-                self.agg_mode_dict[f"pass@{len(predictions)}"], current_correct_sympy, current_correct_judge, no_answer
-            )
 
     def get_metrics(self):
         metrics_dict = {}
@@ -292,3 +288,8 @@ class MathMetrics(BaseMetrics):
         self.has_reward = False
         self.total = 0
         self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
+
+    def max_aggregations_to_print(self):
+        """We will log all majority/rm/pass up to k, but only report the kth one."""
+        # majority + pass + 2xRM
+        return 2 * (1 + self.has_reward)

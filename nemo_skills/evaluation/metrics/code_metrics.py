@@ -21,12 +21,6 @@ class CodeMetrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def fill_up_missing(self):
-        return {'is_correct': False, 'is_correct-plus': False}
-
-    def is_incomplete(self, elem):
-        return 'is_correct' not in elem or 'is_correct-plus' not in elem
-
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

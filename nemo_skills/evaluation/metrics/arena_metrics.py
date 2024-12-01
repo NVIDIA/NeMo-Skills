@@ -67,12 +67,6 @@ class ArenaMetrics(BaseMetrics):
         else:
             return None
 
-    def fill_up_missing(self):
-        return {'judgement-gen-base': '', 'judgement-base-gen': '', 'generation': ''}
-
-    def is_incomplete(self, elem):
-        return 'judgement-gen-base' not in elem or 'judgement-base-gen' not in elem or 'generation' not in elem
-
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

@@ -53,7 +53,7 @@ def test_trtllm_eval():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"]
-    )["greedy"]
+    )["all"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -94,7 +94,7 @@ def test_trtllm_code_execution_eval():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval/eval-results/gsm8k/output.jsonl"]
-    )["greedy"]
+    )["all"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -145,28 +145,28 @@ def test_vllm_eval():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='algebra222').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/algebra222/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
 
     assert metrics['symbolic_correct'] >= 80
     assert metrics['num_entries'] == 222
 
     metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/human-eval/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
     metrics = ComputeMetrics(benchmark='mbpp').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mbpp/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 378
 
     metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/ifeval/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
     assert metrics['prompt_loose_accuracy'] >= 60
@@ -176,7 +176,7 @@ def test_vllm_eval():
 
     metrics = ComputeMetrics(benchmark='mmlu').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mmlu/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 400
 
@@ -210,7 +210,7 @@ def test_nemo_eval():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/nemo-eval/eval-results/gsm8k/output.jsonl"]
-    )["greedy"]
+    )["all"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50

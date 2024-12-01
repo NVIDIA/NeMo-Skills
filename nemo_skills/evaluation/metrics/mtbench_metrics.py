@@ -56,12 +56,6 @@ class MtBenchMetrics(BaseMetrics):
 
                 Path(jsonl_file + '-batch-request-id').unlink()
 
-    def fill_up_missing(self):
-        return {'judgement-turn1': '', 'judgement-turn2': ''}
-
-    def is_incomplete(self, elem):
-        return 'judgement-turn1' not in elem or 'judgement-turn2' not in elem
-
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 
