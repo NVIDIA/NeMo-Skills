@@ -21,7 +21,7 @@ from dataclasses import asdict, field
 from pathlib import Path
 
 import hydra
-from omegaconf import open_dict
+from omegaconf import open_dict, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -86,6 +86,9 @@ class GenerateSolutionsConfig:
 
     # set to True if code execution needs to be supported
     code_execution: bool = False
+
+    # extra stop phrases for llms
+    extra_stop_phrases: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         if self.input_file is not None:
@@ -201,6 +204,8 @@ def generate(cfg: GenerateSolutionsConfig):
     else:
         extra_generate_params = {}
 
+    extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
+
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         data_points = []
@@ -213,10 +218,11 @@ def generate(cfg: GenerateSolutionsConfig):
                 if cfg.multi_turn_key is None:
                     outputs = llm.generate(
                         prompts=[prompt.fill(dp) for dp in data_points],
-                        stop_phrases=prompt.stop_phrases,
+                        stop_phrases = (prompt.stop_phrases if prompt.stop_phrases is None else (prompt.stop_phrases + extra_stop_phrases)),
                         **asdict(cfg.inference),
                         **extra_generate_params,
                     )
+
                 else:
                     # TODO: this will not be efficient if different elements have different number of turns
                     # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
@@ -242,7 +248,7 @@ def generate(cfg: GenerateSolutionsConfig):
                                 prompt.fill(turn_data_points[dp_index], multi_turn_key=cfg.multi_turn_key)
                                 for dp_index in dp_indices
                             ],
-                            stop_phrases=prompt.stop_phrases,
+                            stop_phrases = (prompt.stop_phrases if prompt.stop_phrases is None else (prompt.stop_phrases + extra_stop_phrases)),
                             **asdict(cfg.inference),
                             **extra_generate_params,
                         )
