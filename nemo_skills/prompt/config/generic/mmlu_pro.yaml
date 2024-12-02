@@ -1,0 +1,21 @@
+few_shot_examples:
+  prefix: ""
+  template: |-
+    Given the following question and candidate answers, choose the best answer.
+    Question: {question}
+    {options}
+
+    Your response should end with "The best answer is [the_answer_letter]." where [the_answer_letter] is a letter from the provided choices.
+
+    Let's think step by step.{user_end}{assistant_begin}{solution}{assistant_end}{user_begin}
+  suffix: ""
+
+
+user: |-
+  {examples}Given the following question and candidate answers, choose the best answer.
+  Question: {question}
+  {options}
+
+  Your response should end with "The best answer is [the_answer_letter]." where [the_answer_letter] is a letter from the provided choices.
+
+  Let's think step by step.
