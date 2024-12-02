@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-backoff
 bs4
 evalplus @ git+https://github.com/evalplus/evalplus@c91370f
 huggingface_hub

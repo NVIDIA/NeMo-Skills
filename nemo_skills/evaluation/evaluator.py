@@ -49,6 +49,7 @@ class MathEvaluatorConfig:
     extract_from_boxed: bool = True
     # only used if extract_from_boxed is False
     extract_regex: str = r"The final answer is (.+)$"
+    take_modulo: int | None = None  # will take modulo of the gt and predicted answers if not None
 
 
 def eval_math(cfg):

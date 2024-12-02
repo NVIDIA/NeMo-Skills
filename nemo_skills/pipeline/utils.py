@@ -339,7 +339,9 @@ def progress_callback(transferred: int, total: int) -> None:
     sys.stdout.flush()
 
 
-def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None):
+def cluster_download(
+    tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
+):
     """
     Downloads a directory from a remote cluster by creating a tar archive and transferring it.
 
@@ -348,6 +350,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
         remote_dir: Path to the directory on remote server
         local_dir: Local path to save the downloaded directory
         remote_tar_dir: Optional directory for temporary tar file creation
+        verbose: Print download progress
     """
 
     remote_dir = remote_dir.rstrip('/')
@@ -376,7 +379,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
     except Exception:
         streaming_possible = False
 
-    if streaming_possible:
+    if streaming_possible and verbose:
         # We can do streaming compression
         # Command for streaming the compression progress
         command = (
@@ -386,16 +389,16 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
             f'gzip > {remote_tar}'
         )
         # Run the remote compression command and stream the progress
-        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=False)
+        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=(not verbose))
     else:
         command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
-        result = tunnel.run(command, hide=False)
+        result = tunnel.run(command, hide=(not verbose))
 
     # Get SFTP client from tunnel's session's underlying client
     sftp = tunnel.session.client.open_sftp()
 
     # Use SFTP's get with callback
-    sftp.get(remote_tar, local_tar, callback=progress_callback)
+    sftp.get(remote_tar, local_tar, callback=progress_callback if verbose else None)
     print(f"\nTransfer complete: {local_tar}")
 
     # Extract the tarball locally
@@ -410,7 +413,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
     os.remove(local_tar)
 
 
-def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
+def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose: bool = True):
     """
     Uploads a file to cluster.
     TODO: extend to a folder.
@@ -419,9 +422,10 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
         tunnel: SSHTunnel connection
         local_file: Path to the local file to upload
         remote_dir: Cluster path where to save the file
+        verbose: Print upload progress
     """
     sftp = tunnel.session.client.open_sftp()
-    sftp.put(str(local_file), str(remote_dir), callback=progress_callback)
+    sftp.put(str(local_file), str(remote_dir), callback=progress_callback if verbose else None)
     print(f"\nTransfer complete")
 
 

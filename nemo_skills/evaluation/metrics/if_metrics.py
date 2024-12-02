@@ -26,25 +26,6 @@ class IFMetrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def fill_up_missing(self):
-        return {
-            'loose_eval': {key: [] for key in self.required_keys},
-            'strict_eval': {key: [] for key in self.required_keys},
-        }
-
-    def is_incomplete(self, elem):
-        incomplete = 'loose_eval' not in elem or 'strict_eval' not in elem
-        if incomplete:
-            return True
-
-        if any([key not in elem['loose_eval'] for key in self.required_keys]):
-            return True
-
-        if any([key not in elem['strict_eval'] for key in self.required_keys]):
-            return True
-
-        return False
-
     def _update_single_stat(self, stats_dict, elems):
         """Will update using the pass@k strategy (just pass a single-element list to get greedy)."""
         # has to be the same across all elements as they are solutions for the same question

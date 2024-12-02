@@ -99,7 +99,7 @@ def test_eval_mtbench_api():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
         [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
 
     # not having other categories since we just ran with 2 samples
     assert metrics['average'] >= 7

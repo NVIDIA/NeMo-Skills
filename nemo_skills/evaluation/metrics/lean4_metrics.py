@@ -19,15 +19,6 @@ class Lean4Metrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def fill_up_missing(self):
-        return {'predicted_answer': None, 'proof_status': "failed"}
-
-    def is_incomplete(self, elem):
-        incomplete = 'proof_status' not in elem
-        if not incomplete:
-            incomplete = 'proof_status' not in elem
-        return incomplete
-
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

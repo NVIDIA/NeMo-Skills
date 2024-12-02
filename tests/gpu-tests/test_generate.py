@@ -109,7 +109,7 @@ def test_vllm_generate_seeds():
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='math').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation/output-rs*.jsonl"],
-    )["majority@3"]
+    )["all"]["majority@3"]
     # rough check, since exact accuracy varies depending on gpu type
     assert metrics['symbolic_correct'] >= 20
     assert metrics['num_entries'] == 10

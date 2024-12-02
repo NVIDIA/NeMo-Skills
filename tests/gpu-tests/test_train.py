@@ -114,7 +114,7 @@ def test_sft():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/test-sft/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -174,7 +174,7 @@ def test_dpo():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/test-dpo/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["greedy"]
+    )["all"]["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
