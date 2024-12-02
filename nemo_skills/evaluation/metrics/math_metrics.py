@@ -133,18 +133,19 @@ class MathMetrics(BaseMetrics):
                         current_correct_judge,
                         no_answer,
                     )
-                    self.update_comb_metric(
-                        self.agg_mode_dict[f"rm_best@{k}"],
-                        current_correct_sympy,
-                        current_correct_judge,
-                        no_answer,
-                    )
-                    self.update_comb_metric(
-                        self.agg_mode_dict[f"rm_majority@{k}"],
-                        current_correct_sympy,
-                        current_correct_judge,
-                        no_answer,
-                    )
+                    if self.has_reward:
+                        self.update_comb_metric(
+                            self.agg_mode_dict[f"rm_best@{k}"],
+                            current_correct_sympy,
+                            current_correct_judge,
+                            no_answer,
+                        )
+                        self.update_comb_metric(
+                            self.agg_mode_dict[f"rm_majority@{k}"],
+                            current_correct_sympy,
+                            current_correct_judge,
+                            no_answer,
+                        )
 
                     return
 
