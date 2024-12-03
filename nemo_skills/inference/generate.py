@@ -21,7 +21,7 @@ from dataclasses import asdict, field
 from pathlib import Path
 
 import hydra
-from omegaconf import open_dict
+from omegaconf import open_dict, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -87,6 +87,9 @@ class GenerateSolutionsConfig:
     # set to True if code execution needs to be supported
     code_execution: bool = False
 
+    # extra stop phrases for llms
+    extra_stop_phrases: list[str] = field(default_factory=list)
+
     def __post_init__(self):
         if self.input_file is not None:
             if self.dataset is not None or self.split is not None:
@@ -116,6 +119,14 @@ class GenerateSolutionsConfig:
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
 
+def combine_stop_phrases(prompt_phrases, extra_phrases):
+    if prompt_phrases is None and extra_phrases is None:
+        return None
+    if prompt_phrases is None:
+        return extra_phrases
+    if extra_phrases is None:
+        return prompt_phrases
+    return prompt_phrases + extra_phrases
 
 @hydra.main(version_base=None, config_name='base_generation_config')
 def generate(cfg: GenerateSolutionsConfig):
@@ -201,6 +212,8 @@ def generate(cfg: GenerateSolutionsConfig):
     else:
         extra_generate_params = {}
 
+    extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
+
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         data_points = []
@@ -213,10 +226,11 @@ def generate(cfg: GenerateSolutionsConfig):
                 if cfg.multi_turn_key is None:
                     outputs = llm.generate(
                         prompts=[prompt.fill(dp) for dp in data_points],
-                        stop_phrases=prompt.stop_phrases,
+                        stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                         **asdict(cfg.inference),
                         **extra_generate_params,
                     )
+
                 else:
                     # TODO: this will not be efficient if different elements have different number of turns
                     # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
@@ -242,7 +256,7 @@ def generate(cfg: GenerateSolutionsConfig):
                                 prompt.fill(turn_data_points[dp_index], multi_turn_key=cfg.multi_turn_key)
                                 for dp_index in dp_indices
                             ],
-                            stop_phrases=prompt.stop_phrases,
+                            stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                             **asdict(cfg.inference),
                             **extra_generate_params,
                         )
