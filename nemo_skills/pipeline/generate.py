@@ -65,6 +65,14 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd):
+    if preprocess_cmd:
+        cmd = f" {preprocess_cmd} && {cmd} "
+    if postprocess_cmd:
+        cmd = f" {cmd} && {postprocess_cmd} "
+    return cmd
+
+
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
@@ -106,6 +114,8 @@ def generate(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -170,12 +180,18 @@ def generate(
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
+                    preprocess_cmd=preprocess_cmd,
+                    postprocess_cmd=postprocess_cmd,
                 )
                 prev_tasks = None
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
-                        cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
+                        cmd=wrap_cmd(
+                            get_generation_command(server_address=server_address, generation_commands=cmd),
+                            preprocess_cmd,
+                            postprocess_cmd,
+                        ),
                         task_name=f'generate-rs{seed}',
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
@@ -200,7 +216,11 @@ def generate(
             for _ in range(dependent_jobs + 1):
                 new_task = add_task(
                     exp,
-                    cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
+                    cmd=wrap_cmd(
+                        get_generation_command(server_address=server_address, generation_commands=cmd),
+                        preprocess_cmd,
+                        postprocess_cmd,
+                    ),
                     task_name="generate",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
