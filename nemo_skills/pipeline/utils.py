@@ -139,7 +139,8 @@ def get_reward_server_command(
             f"python -m nemo_skills.inference.server.serve_nemo_reward_model "
             # These ports could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f" inference_port=5000  triton_server_address=localhost:5001 "
+            f"    inference_port=5000  "
+            f"    triton_server_address=localhost:5001 "
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
