@@ -1031,8 +1031,8 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
     )
 
 
-def test_generic_lean4_prompt():
-    prompt = get_prompt('generic/lean4', 'deepseek-prover')
+def test_generic_formal_proof_prompt():
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1061,8 +1061,8 @@ theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 
     )
 
 
-def test_generic_lean4_fewshot_prompt():
-    prompt = get_prompt('generic/lean4', 'deepseek-prover', 'minif2f_deepseek_fewshot')
+def test_minif2f_deepseek_fewshot_prompt():
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', 'minif2f_deepseek_fewshot')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1331,3 +1331,142 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     }
     print(prompt.fill(inputs))
     assert prompt.fill(inputs) == expected_prompt
+def test_generic_nat_to_lean4_prompt():
+    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
+
+    expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
+
+If $\sqrt{5+n}=7$, then what is the value of $n$?
+Answer is: 44
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology"""
+
+    assert (
+        prompt.fill(
+            {
+                "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
+                "predicted_answer": "44",
+                "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
+            }
+        )
+        == expected_prompt
+    )
+
+
+
+
+def test_minif2f_deepseek_fewshot_prompt():
+    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover', 'math_to_lean4_fewshot')
+
+    expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
+
+Here are some examples of problems and their corresponding Lean 4 translation, including theorems proof placeholders `sorry` and `user_theorem` as the theorem name. Use them as a guide.
+
+Problem:
+What is the following value when expressed as a common fraction: $$\\frac{1}{2^{1}}+\\frac{1}{2^{2}}+\\frac{1}{2^{3}}+\\cdots + \\frac{1}{2^{8}}+\\frac{1}{2^{9}}+\\frac{1}{2^{10}}?$$
+Answer is: \\frac{1023}{1024}
+Expected Lean 4 translation:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+theorem user_theorem : (∑ k in Finset.range 10, (1 / (2 ^ (k + 1)))) = 1023 / 1024 := by
+sorry```
+
+
+
+
+
+Problem:
+Evaluate $24-(2x-y)$ if $x=4$ and $y=3$.
+Answer is: 19
+Expected Lean 4 translation:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+theorem user_theorem : 24 - (2 * 4 - 3) = 19 := by
+sorry```
+
+
+
+
+
+Problem:
+If $x+y=12$ and $x-y=8$, what is the value of $2x-xy$?
+Answer is: 0
+Expected Lean 4 translation:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+theorem user_theorem (x y : ℝ) (h₀ : x + y = 12) (h₁ : x - y = 8) : 2 * x - x * y = 0 := by
+sorry```
+
+
+
+
+
+Problem:
+A parabola with equation $y=x^2+bx+c$ passes through the points $(2,3)$ and $(4,3)$. What is $c$?
+Answer is: 11
+Expected Lean 4 translation:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+theorem user_theorem (b c : ℝ) (h₁ : 3 = 2 ^ 2 + 2 * b + c) (h₂ : 3 = 4 ^ 2 + 4 * b + c) : c = 11 := by
+sorry```
+
+
+
+
+
+Problem:
+Two standard six-faced dice are rolled. Jean wins if the product of the two numbers rolled is odd or a multiple of three, otherwise Allen wins. What is the probability that Jean wins? Express your answer as a common fraction.
+Answer is: \\frac{2}{3}
+Expected Lean 4 translation:
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+theorem user_theorem : ((Finset.filter (fun x => (x.1 * x.2) % 2 = 1 ∨ (x.1 * x.2) % 3 = 0) (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6))).card : ℚ) / (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6)).card = (2 : ℚ) / 3 := by
+sorry```
+
+
+
+
+
+Here is the problem you need to translate into a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the theorem proof and `user_theorem` as the theorem name.
+
+If $\\sqrt{5+n}=7$, then what is the value of $n$?
+Answer is: 44
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology"""
+
+    assert (
+        prompt.fill(
+            {
+                "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
+                "predicted_answer": "44",
+                "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
+            }
+        )
+        == expected_prompt
+    )
