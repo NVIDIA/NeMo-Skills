@@ -277,7 +277,6 @@ def generate(cfg: GenerateSolutionsConfig):
                     output[cfg.generation_key] = output.pop("generation")
                     original_data_point.pop(cfg.generation_key, None)
                     output.update(original_data_point)
-
                     fout.write(json.dumps(output) + "\n")
                 data_points = []
 

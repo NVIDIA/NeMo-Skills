@@ -1,0 +1,19 @@
+few_shot_examples:
+  prefix: ""
+  template: |-
+
+    Question: {question}
+    Options: {options}
+    {user_end}{assistant_begin}Answer: Let's think step by step.{solution}{assistant_end}{user_begin}
+
+  suffix: ""
+
+
+user: |-
+  The following are multiple choice questions (with answers) about {topic}. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+
+  {examples}
+
+
+  Question: {question}
+  Options: {options}
