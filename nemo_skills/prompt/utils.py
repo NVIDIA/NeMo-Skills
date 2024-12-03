@@ -153,7 +153,7 @@ class Prompt:
 
     def build_examples_dict(self, input_dict):
         if self.config.few_shot_examples.examples_type:
-            return examples_map[self.config.few_shot_examples.examples_type]
+            return examples_map[self.config.few_shot_examples.examples_type.format(**input_dict)]
 
         if self.config.few_shot_examples.retriever is None:
             return []
