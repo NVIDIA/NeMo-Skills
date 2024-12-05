@@ -102,7 +102,7 @@ def parse_model_answer(answer: str) -> List[Dict]:
             - 'output': The output of the code block.
 
     """
-    config = current_app.config['nemo_inspector']
+    config = current_app.config["nemo_inspector"]
     code_start, code_end = map(
         re.escape,
         config["inspector_params"]["code_separators"],
@@ -111,9 +111,9 @@ def parse_model_answer(answer: str) -> List[Dict]:
         re.escape,
         config["inspector_params"]["code_output_separators"],
     )
-    code_pattern = re.compile(fr'{code_start}(.*?){code_end}', re.DOTALL)
+    code_pattern = re.compile(rf"{code_start}(.*?){code_end}", re.DOTALL)
     code_output_pattern = re.compile(
-        fr'{code_start}((?:(?!{code_end}).)*){code_end}\s*\n\s*{output_start}((?:(?!{output_end}).)*){output_end}',
+        rf"{code_start}(.*?){code_end}\s*{output_start}(.*?){output_end}",
         re.DOTALL,
     )
     code_matches = list(code_pattern.finditer(answer))
@@ -129,9 +129,9 @@ def parse_model_answer(answer: str) -> List[Dict]:
             output_text = output_match.group(2).strip()
         parsed_results.append(
             {
-                'explanation': explanation,
-                'code': code_text,
-                'output': output_text,
+                "explanation": explanation,
+                "code": code_text,
+                "output": output_text,
             }
         )
         last_index = code_match.end()
@@ -143,15 +143,15 @@ def parse_model_answer(answer: str) -> List[Dict]:
             code_start_index = trailing_text.find(code_start.replace("\\", ""))
             parsed_results.append(
                 {
-                    'explanation': trailing_text[0:code_start_index].strip(),
-                    'code': trailing_text[code_start_index + len(code_start.replace("\\", "")) :],
-                    'output': "code_block was not finished",
-                    'wrong_code_block': True,
+                    "explanation": trailing_text[0:code_start_index].strip(),
+                    "code": trailing_text[code_start_index + len(code_start.replace("\\", "")) :],
+                    "output": "code_block was not finished",
+                    "wrong_code_block": True,
                 }
             )
             trailing_text = None
         if trailing_text:
-            parsed_results.append({'explanation': trailing_text, 'code': None, 'output': None})
+            parsed_results.append({"explanation": trailing_text, "code": None, "output": None})
     return parsed_results
 
 

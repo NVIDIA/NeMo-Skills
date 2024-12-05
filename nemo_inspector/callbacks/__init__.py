@@ -72,6 +72,16 @@ def get_specific_fields(dict_cfg: Dict, fields: List[Dict]) -> Dict:
     return retrieved_values
 
 
+def update_nested_dict(dict1, dict2):
+    for key, value in dict2.items():
+        # If the value is a dictionary, call the function recursively
+        if isinstance(value, dict) and key in dict1 and isinstance(dict1[key], dict):
+            update_nested_dict(dict1[key], value)
+        else:
+            # Otherwise, directly update the value
+            dict1[key] = value
+
+
 @hydra.main(version_base=None, config_path=config_path, config_name="inspector_config")
 def set_config(cfg: InspectorConfig) -> None:
     global config
@@ -97,8 +107,16 @@ def set_config(cfg: InspectorConfig) -> None:
         "examples_type": [UNDEFINED, RETRIEVAL] + examples_types,
         "retrieval_field": [""],
     }
-    conf_path = config['nemo_inspector']['prompt_config'] if config['nemo_inspector']['prompt_config'] else ""
-    template_path = config['nemo_inspector']['prompt_template'] if config['nemo_inspector']['prompt_config'] else ""
+    conf_path = (
+        config['nemo_inspector']['prompt_config']
+        if os.path.isfile(str(config['nemo_inspector']['prompt_config']))
+        else os.path.join(CONFIGS_FOLDER, f"{config['nemo_inspector']['prompt_config']}.yaml")
+    )
+    template_path = (
+        config['nemo_inspector']['prompt_template']
+        if os.path.isfile(str(config['nemo_inspector']['prompt_template']))
+        else os.path.join(TEMPLATES_FOLDER, f"{config['nemo_inspector']['prompt_template']}.yaml")
+    )
 
     if not os.path.isfile(conf_path) and not os.path.isfile(template_path):
         prompt_config = initialize_default(PromptConfig)
@@ -110,6 +128,8 @@ def set_config(cfg: InspectorConfig) -> None:
         prompt_config = initialize_default(PromptConfig, asdict(get_prompt(config_path, template_path).config))
 
     config['nemo_inspector']['prompt'] = asdict(prompt_config)
+    update_nested_dict(config['nemo_inspector']['prompt'], OmegaConf.to_container(cfg).get('prompt', {}))
+
     for separator_type, separator in CODE_SEPARATORS.items():
         if not config['nemo_inspector']['prompt']['template'][separator_type]:
             config['nemo_inspector']['prompt']['template'][separator_type] = separator
