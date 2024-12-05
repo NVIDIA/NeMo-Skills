@@ -20,6 +20,9 @@ jobs:
     runs-on: self-hosted-nemo-skills
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
     - uses: actions/checkout@v3
       with:
         path: ${{ github.run_id }}
@@ -48,6 +51,9 @@ jobs:
     runs-on: self-hosted-nemo-skills
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
     - uses: actions/checkout@v3
       with:
         path: ${{ github.run_id }}
@@ -76,6 +82,9 @@ jobs:
     runs-on: self-hosted-nemo-skills
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
     - uses: actions/checkout@v3
       with:
         path: ${{ github.run_id }}
