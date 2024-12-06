@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import logging
-import os
-from pathlib import Path
 
 import nemo_run as run
 import typer
@@ -51,14 +49,19 @@ def run_cmd(
         None, help="Can specify an expname that needs to be completed before this one starts"
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(help="Specify a custom location for slurm logs. "),
+    log_dir: str = typer.Option(
+        None,
+        help="Can specify a custom location for slurm logs. "
+        "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
+    ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, log_dir)
+    if log_dir:
+        check_if_mounted(cluster_config, log_dir)
 
     with run.Experiment(expname) as exp:
         add_task(

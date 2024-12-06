@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -140,12 +139,25 @@ def get_reward_server_command(
             f"python -m nemo_skills.inference.server.serve_nemo_reward_model "
             # These ports could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f" inference_port=5000  triton_server_address=localhost:5001 "
+            f"    inference_port=5000  "
+            f"    triton_server_address=localhost:5001 "
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if cluster_config["executor"] == "local":
             num_tasks = 1
+
+    elif server_type == "vllm":
+        if num_nodes > 1:
+            raise ValueError("VLLM server does not support multi-node execution")
+
+        server_start_cmd = (
+            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    {server_args} "
+        )
+        num_tasks = 1
     else:
         raise ValueError(f"Server type '{server_type}' not supported for reward model.")
 
@@ -328,7 +340,9 @@ def progress_callback(transferred: int, total: int) -> None:
     sys.stdout.flush()
 
 
-def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None):
+def cluster_download(
+    tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
+):
     """
     Downloads a directory from a remote cluster by creating a tar archive and transferring it.
 
@@ -337,6 +351,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
         remote_dir: Path to the directory on remote server
         local_dir: Local path to save the downloaded directory
         remote_tar_dir: Optional directory for temporary tar file creation
+        verbose: Print download progress
     """
 
     remote_dir = remote_dir.rstrip('/')
@@ -365,7 +380,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
     except Exception:
         streaming_possible = False
 
-    if streaming_possible:
+    if streaming_possible and verbose:
         # We can do streaming compression
         # Command for streaming the compression progress
         command = (
@@ -375,16 +390,16 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
             f'gzip > {remote_tar}'
         )
         # Run the remote compression command and stream the progress
-        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=False)
+        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=(not verbose))
     else:
         command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
-        result = tunnel.run(command, hide=False)
+        result = tunnel.run(command, hide=(not verbose))
 
     # Get SFTP client from tunnel's session's underlying client
     sftp = tunnel.session.client.open_sftp()
 
     # Use SFTP's get with callback
-    sftp.get(remote_tar, local_tar, callback=progress_callback)
+    sftp.get(remote_tar, local_tar, callback=progress_callback if verbose else None)
     print(f"\nTransfer complete: {local_tar}")
 
     # Extract the tarball locally
@@ -399,7 +414,7 @@ def cluster_download(tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_
     os.remove(local_tar)
 
 
-def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
+def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose: bool = True):
     """
     Uploads a file to cluster.
     TODO: extend to a folder.
@@ -408,14 +423,24 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str):
         tunnel: SSHTunnel connection
         local_file: Path to the local file to upload
         remote_dir: Cluster path where to save the file
+        verbose: Print upload progress
     """
     sftp = tunnel.session.client.open_sftp()
-    sftp.put(str(local_file), str(remote_dir), callback=progress_callback)
+    sftp.put(str(local_file), str(remote_dir), callback=progress_callback if verbose else None)
     print(f"\nTransfer complete")
 
 
-def get_packager():
+def get_packager(extra_package_dirs: list[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
+    nemo_skills_dir = Path(__file__).absolute().parents[1]
+
+    if extra_package_dirs:
+        include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
+        include_pattern_relative_paths = [str(Path(d).parent) for d in extra_package_dirs]
+    else:
+        include_patterns = []
+        include_pattern_relative_paths = []
+
     try:
         # are we in a git repo? If yes, we are uploading the current code
         repo_path = (
@@ -433,28 +458,31 @@ def get_packager():
             logging.warning(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
-                str(Path(__file__).absolute().parents[1] / '*'),
+                str(nemo_skills_dir / '*'),
             )
-            include_pattern = str(Path(__file__).absolute().parents[1] / '*')
+            include_patterns.append(str(nemo_skills_dir / '*'))
         else:
             # picking up local dataset files if we are in the right repo
-            include_pattern = str(Path(__file__).absolute().parents[1] / "dataset/**/*.jsonl")
-        include_pattern_relative_path = str(Path(__file__).absolute().parents[2])
+            include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
+        include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
         check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
         return run.GitArchivePackager(
-            include_pattern=include_pattern,
-            include_pattern_relative_path=include_pattern_relative_path,
+            include_pattern=include_patterns,
+            include_pattern_relative_path=include_pattern_relative_paths,
             check_uncommitted_changes=check_uncommited_changes,
         )
     except subprocess.CalledProcessError:
         logging.warning(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
-            str(Path(__file__).absolute().parents[1] / '*'),
+            str(nemo_skills_dir / '*'),
         )
+        include_patterns.append(str(nemo_skills_dir / '*'))
+        include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
+
         return run.PatternPackager(
-            include_pattern=str(Path(__file__).absolute().parents[1] / '*'),
-            relative_path=str(Path(__file__).absolute().parents[2]),
+            include_pattern=include_patterns,
+            relative_path=include_pattern_relative_paths,
         )
 
 
@@ -580,12 +608,13 @@ def get_executor(
     partition=None,
     time_min=None,
     dependencies=None,
+    extra_package_dirs: list[str] | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config, env_vars)
 
     mounts = mounts or config_mounts
-    packager = get_packager()
+    packager = get_packager(extra_package_dirs=extra_package_dirs)
     if cluster_config["executor"] == "local":
         if num_nodes > 1:
             raise ValueError("Local executor does not support multi-node execution")
@@ -664,6 +693,7 @@ def add_task(
     task_dependencies: list[str] = None,
     run_after=None,
     get_server_command=get_server_command,
+    extra_package_dirs: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -705,6 +735,7 @@ def add_task(
             job_name=task_name,
             log_dir=log_dir,
             log_prefix="server",
+            extra_package_dirs=extra_package_dirs,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -729,6 +760,7 @@ def add_task(
                 job_name=task_name,
                 log_dir=log_dir,
                 log_prefix="main",
+                extra_package_dirs=extra_package_dirs,
             )
         )
 
@@ -747,6 +779,7 @@ def add_task(
             job_name=task_name,
             log_dir=log_dir,
             log_prefix="sandbox",
+            extra_package_dirs=extra_package_dirs,
         )
         commands.append(get_sandox_command())
         executors.append(sandbox_executor)

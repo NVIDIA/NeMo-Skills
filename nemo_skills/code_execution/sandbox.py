@@ -23,7 +23,6 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import backoff
 import requests
 import tqdm
 
@@ -129,7 +128,6 @@ class Sandbox(abc.ABC):
     def clear_session(self, session_id):
         del self.sessions[session_id]
 
-    @backoff.on_exception(backoff.constant, requests.exceptions.Timeout, interval=1, max_tries=3)
     def _send_request(self, request, timeout):
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel_requests
@@ -244,7 +242,15 @@ print(json.dumps(to_return))
                 self.sessions[session_id] = self.sessions[session_id][:-1]
         return output, session_id
 
-    def is_output_correct(self, pred_output, gt_output, include_percentage=True, tolerance=1e-4, timeout=10.0):
+    def is_output_correct(
+        self,
+        pred_output,
+        gt_output,
+        take_modulo: int | None = None,
+        include_percentage=True,
+        tolerance=1e-4,
+        timeout=10.0,
+    ):
         # embedding the full math grader code here to send to server for execution
         with open(Path(__file__).absolute().parent / "math_grader.py", "rt") as fin:
             math_grader_code = fin.read()
@@ -259,6 +265,15 @@ print(json.dumps(to_return))
             gt_output = gt_output.replace("'''", r'\'\'\'')
             while gt_output.endswith('\\'):
                 gt_output = gt_output[:-1]
+
+        if take_modulo is not None:
+            gt_output = int(gt_output) % take_modulo
+            try:
+                pred_output = int(pred_output) % take_modulo
+            except:
+                pred_output = None
+            # no need to simpy call in this case
+            return pred_output == gt_output
 
         math_equal_call = f"""
     output = math_equal(
@@ -339,6 +354,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
         include_percentage=True,
         tolerance=1e-4,
         timeout=10.0,
+        take_modulo=None,
         answer_format="natural_language",
         ignore_cache: bool = False,
         use_predicted_answer_key: bool = False,
@@ -424,6 +440,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 include_percentage=include_percentage,
                                 tolerance=tolerance,
                                 timeout=timeout,
+                                take_modulo=take_modulo,
                             )
                         elif answer_format == "lean":
                             map_to_future[predicted_answer] = executor.submit(

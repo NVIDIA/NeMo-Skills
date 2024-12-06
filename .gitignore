@@ -20,12 +20,14 @@
 *.jsonl
 *.csv
 nemo_experiments
+wandb
 build
 .hypothesis
 *.zip
 *.egg-info
 *.xml
 *.DS_Store
+.coverage
 
 __pycache__
 .ipynb_checkpoints

@@ -153,7 +153,7 @@ class Prompt:
 
     def build_examples_dict(self, input_dict):
         if self.config.few_shot_examples.examples_type:
-            return examples_map[self.config.few_shot_examples.examples_type]
+            return examples_map[self.config.few_shot_examples.examples_type.format(**input_dict)]
 
         if self.config.few_shot_examples.retriever is None:
             return []
@@ -239,15 +239,19 @@ class Prompt:
 
         if self.config.template:
             if multi_turn_key is None:
-                format_string = self.SYSTEM_FORMAT + self.TURN_BEGIN_FORMAT + "{generation}"
-                prompt_string = format_string.format(
-                    system=self.config.system,
-                    user=self.build_user_message(input_dict),
-                    generation=generation,
-                    **asdict(self.config.template),
+                prompt_string = self.SYSTEM_FORMAT.format(
+                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
                 )
+                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    user=self.build_user_message(input_dict), **asdict(self.config.template)
+                )
+                if generation:
+                    # Generation can be part of the input in cases such as reward models
+                    prompt_string += self.TURN_END_FORMAT.format(assistant=generation, **asdict(self.config.template))
             else:
-                prompt_string = self.SYSTEM_FORMAT.format(system=self.config.system, **asdict(self.config.template))
+                prompt_string = self.SYSTEM_FORMAT.format(
+                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
+                )
                 for turn in input_dict[multi_turn_key][:-1]:
                     prompt_string += self.TURN_BEGIN_FORMAT.format(
                         user=self.build_user_message(turn), **asdict(self.config.template)
