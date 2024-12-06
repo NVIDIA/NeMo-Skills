@@ -570,8 +570,7 @@ class VLLMModel(BaseModel):
             },
         )
 
-        output, num_generated_tokens = self.parse_openai_response(response)
-        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
+        return self.parse_openai_response(response)
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
