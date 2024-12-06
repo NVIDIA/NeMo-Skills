@@ -63,6 +63,7 @@ def get_cmd(params: TrainingParams) -> str:
         f"export WANDB_API_KEY={os.getenv('WANDB_API_KEY', '')} && "
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
         f"cd /nemo_run/code && "
         f"echo 'Starting training' && "
         f"{params.training_script} "
