@@ -24,7 +24,7 @@ import pytest
 from test_datasets import DATASETS
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
-from nemo_skills.evaluation.metrics import compute_metrics
+from nemo_skills.evaluation.metrics import ComputeMetrics
 
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
@@ -78,7 +78,7 @@ def test_eval_mtbench_api():
         f"ns eval "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=meta/llama-3.1-405b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=mt-bench:0 "
         f"    --output_dir=/tmp/nemo-skills-tests/mtbench-api "
@@ -97,10 +97,9 @@ def test_eval_mtbench_api():
     )
 
     # running compute_metrics to check that results are expected
-    metrics = compute_metrics(
-        [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output-greedy.jsonl"],
-        importlib.import_module('nemo_skills.dataset.mt-bench').METRICS_CLASS(),
-    )
+    metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
+        [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output.jsonl"],
+    )["all"]["greedy"]
 
     # not having other categories since we just ran with 2 samples
     assert metrics['average'] >= 7

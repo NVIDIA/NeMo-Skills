@@ -134,7 +134,9 @@ def generate(cfg: RewardModelConfig):
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
+    LOG.info(
+        "Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0], include_generation=True)
+    )
 
     if cfg.dry_run:
         return
@@ -157,8 +159,7 @@ def generate(cfg: RewardModelConfig):
                     # all of the ground-truth data to the output file alongside the generated solutions
                     result = output.pop('reward_model_score')
                     output[cfg.reward_model_score_key] = result
-                    # Note: this implies that if the key is already present in the original data point, it will
-                    # not be overwritten.
+                    original_data_point.pop(cfg.reward_model_score_key, None)
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []

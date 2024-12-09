@@ -69,6 +69,7 @@ def check_contamination(
         help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+    dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -82,7 +83,8 @@ def check_contamination(
     """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
-
+    if dependent_jobs > 0:
+        extra_arguments += " ++skip_filled=True "
     try:
         server_type = server_type.value
     except AttributeError:
@@ -113,21 +115,24 @@ def check_contamination(
         )
 
     with run.Experiment(expname) as exp:
-        add_task(
-            exp,
-            cmd=get_generation_command(
-                server_address=server_address,
-                generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
-            ),
-            task_name="check-contamination",
-            log_dir=log_dir,
-            container=cluster_config["containers"]["nemo-skills"],
-            cluster_config=cluster_config,
-            partition=partition,
-            time_min=time_min,
-            server_config=server_config,
-            run_after=run_after,
-        )
+        prev_tasks = None
+        for _ in range(dependent_jobs + 1):
+            new_task = add_task(
+                exp,
+                cmd=get_generation_command(
+                    server_address=server_address,
+                    generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
+                ),
+                task_name="check-contamination",
+                log_dir=log_dir,
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                partition=partition,
+                server_config=server_config,
+                task_dependencies=prev_tasks,
+                run_after=run_after,
+            )
+            prev_tasks = [new_task]
         run_exp(exp, cluster_config)
 
 

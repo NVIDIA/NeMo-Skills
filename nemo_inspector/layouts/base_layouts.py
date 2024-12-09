@@ -276,6 +276,7 @@ def get_code_text_area_layout(id):
         theme='tomorrow_night',
         mode='python',
         tabSize=4,
+        value="",
         enableBasicAutocompletion=True,
         enableLiveAutocompletion=True,
         placeholder='Write your code here...',

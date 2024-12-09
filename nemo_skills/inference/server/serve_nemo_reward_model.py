@@ -28,6 +28,7 @@ from dataclasses import dataclass
 import hydra
 import numpy as np
 from flask import Flask, jsonify, request
+from mpi4py import MPI
 from pytriton.client import ModelClient
 
 LOG = logging.getLogger(__file__)
@@ -45,21 +46,28 @@ cs.store(name="base_reward_model_generation_config", node=RewardModelGenerationC
 
 @hydra.main(version_base=None, config_name="base_reward_model_generation_config")
 def proxy_rm(cfg: RewardModelGenerationConfig) -> None:
-    app = Flask(__name__)
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
 
-    client = ModelClient(cfg.triton_server_address, "reward_model")
+    if rank == 0:
+        app = Flask(__name__)
 
-    @app.route('/score', methods=['POST'])
-    def infer():
-        data = request.json
-        input_data = np.array([[obj.encode('utf-8')] for obj in data['prompts']], dtype=np.bytes_)
+        client = ModelClient(cfg.triton_server_address, "reward_model")
 
-        result = client.infer_batch(sentences=input_data)
+        @app.route('/score', methods=['POST'])
+        def infer():
+            data = request.json
+            input_data = np.array([[obj.encode('utf-8')] for obj in data['prompts']], dtype=np.bytes_)
 
-        json_output = jsonify({'rewards': result['rewards'].tolist()})
-        return json_output
+            result = client.infer_batch(sentences=input_data)
 
-    app.run(host='127.0.0.1', port=cfg.inference_port, threaded=False)
+            json_output = jsonify({'rewards': result['rewards'].tolist()})
+            return json_output
+
+        app.run(host='127.0.0.1', port=cfg.inference_port, threaded=False)
+
+    # Wait for all ranks
+    comm.barrier()
 
 
 if __name__ == "__main__":

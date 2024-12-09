@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import nested_dataclass, unroll_files
@@ -48,6 +49,7 @@ class MathEvaluatorConfig:
     extract_from_boxed: bool = True
     # only used if extract_from_boxed is False
     extract_regex: str = r"The final answer is (.+)$"
+    take_modulo: int | None = None  # will take modulo of the gt and predicted answers if not None
 
 
 def eval_math(cfg):
@@ -145,7 +147,7 @@ class LlmEvaluatorConfig:
     tokens_to_generate: int = 4096  # will auto-lower to max possible for NGC models
     use_batch_api: bool = True  # only supported for OpenAI models!
     base_url: str = "https://api.openai.com/v1"
-    judge_model: str = "gpt-4-1106-preview"
+    judge_model: str = JUDGE_MODEL
     # defaults to True to avoid regenerating judgements unless necessary
     skip_filled: bool = True
 

@@ -31,12 +31,12 @@ This page enables the analysis of model answers based on different parameters. I
 - **Run one sample** mode allows you to send a single question to the model. It can be a question from the dataset (with parameters `input_file` or `dataset` and `split`) or a custom question. The answer is validated by comparing it with the `expected_answer` field.
 
 ## Analyze page
-To use the Analyze page, specify paths to the generations you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++inspector_params.model_prediction.generation1='/some_path/generation1/output-greedy.jsonl'` or add them in an additional config file.
+To use the Analyze page, specify paths to the generations you want to use (if not obtained through the "Inference" page). You can pass parameters via the command line with `++inspector_params.model_prediction.generation1='/some_path/generation1/output.jsonl'` or add them in an additional config file.
 
 ```yaml
 inspector_params:
   model_prediction:
-    generation1: /some_path/generation1/output-greedy.jsonl
+    generation1: /some_path/generation1/output.jsonl
     generation2: /some_path/generation2/output-rs*.jsonl
 ```
 

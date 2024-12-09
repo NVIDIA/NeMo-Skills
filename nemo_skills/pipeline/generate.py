@@ -65,6 +65,14 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd):
+    if preprocess_cmd:
+        cmd = f" {preprocess_cmd} && {cmd} "
+    if postprocess_cmd:
+        cmd = f" {cmd} && {postprocess_cmd} "
+    return cmd
+
+
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
@@ -106,6 +114,8 @@ def generate(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -142,8 +152,13 @@ def generate(
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
         # Note: for reward models, the port is hard-coded to 5000 in the
-        # get_reward_server_command function
-        server_address = "localhost:5000"
+        # get_reward_server_command function. Since RM has a proxy server on 5000
+        # and an actual GPU is being loaded on port 5001, we need to wait for 5001
+        # to come online before sending requests
+        if generation_type == GenerationType.reward:
+            server_address = "localhost:5001"
+        else:
+            server_address = "localhost:5000"
 
         server_config = {
             "model_path": model,
@@ -175,7 +190,11 @@ def generate(
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
-                        cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
+                        cmd=wrap_cmd(
+                            get_generation_command(server_address=server_address, generation_commands=cmd),
+                            preprocess_cmd,
+                            postprocess_cmd,
+                        ),
                         task_name=f'generate-rs{seed}',
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
@@ -200,7 +219,11 @@ def generate(
             for _ in range(dependent_jobs + 1):
                 new_task = add_task(
                     exp,
-                    cmd=get_generation_command(server_address=server_address, generation_commands=cmd),
+                    cmd=wrap_cmd(
+                        get_generation_command(server_address=server_address, generation_commands=cmd),
+                        preprocess_cmd,
+                        postprocess_cmd,
+                    ),
                     task_name="generate",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],

@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.evaluation.metrics import AnswerJudgementMetrics
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'judge/math'
 DATASET_GROUP = 'math'
-METRICS_CLASS = AnswerJudgementMetrics
+METRICS_TYPE = "answer-judgement"
 DEFAULT_EVAL_ARGS = "++eval_type=answer_judgement"
 DEFAULT_GENERATION_ARGS = "++generation_key=judgement"

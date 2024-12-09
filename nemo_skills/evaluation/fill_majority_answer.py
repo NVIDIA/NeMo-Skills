@@ -23,7 +23,7 @@ import hydra
 from omegaconf import MISSING
 from tqdm import tqdm
 
-from nemo_skills.evaluation.metrics import MathMetrics, read_predictions
+from nemo_skills.evaluation.metrics import read_predictions
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
@@ -39,9 +39,6 @@ class FillMajorityAnswerConfig:
     # "test_dir/output-rs*.jsonl"
     input_files: Any = MISSING
 
-    # if set to True will error if any responses/data is missing
-    allow_incomplete: bool = False
-
     # where to put the majority answer. By default replacing the expected_answer (assuming it's unknown)
     # but change to predicted_answer, to follow up with a judge evaluation
     fill_key: str = "expected_answer"
@@ -56,23 +53,20 @@ class FillMajorityAnswerConfig:
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_fill_majority_answer_conifg", node=FillMajorityAnswerConfig)
+cs.store(name="base_fill_majority_answer_config", node=FillMajorityAnswerConfig)
 
 
-@hydra.main(version_base=None, config_name="base_fill_majority_answer_conifg")
+@hydra.main(version_base=None, config_name="base_fill_majority_answer_config")
 def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     cfg = FillMajorityAnswerConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
     file_handles = [open(file, "rt", encoding="utf-8") for file in unroll_files(cfg.input_files)]
 
-    # currently majority is only defined for math evals
-    evaluator = MathMetrics()
-
     majority_answers = []
     all_predictions = []
     for idx, predictions in enumerate(tqdm(zip_longest(*file_handles))):
-        data = read_predictions(predictions, evaluator, cfg.allow_incomplete)
+        data = read_predictions(predictions)
         all_predictions.append(data)
         # TODO: currently majority does not take into account equivalent answers written in a different way
         valid_answers_and_results = [

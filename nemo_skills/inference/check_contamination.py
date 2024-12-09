@@ -115,7 +115,6 @@ def check_contamination(cfg: CheckContaminationConfig):
 
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
-            data_point.pop(cfg.generation_key, None)
             data_points.append(data_point)
 
             if len(data_points) == cfg.batch_size or idx == len(data) - 1:
@@ -157,6 +156,8 @@ def check_contamination(cfg: CheckContaminationConfig):
                         num_contaminated += 1
                     total += 1
                     elem["all_generations"] = all_generations
+                    original_data_point.pop(cfg.generation_key, None)
+                    original_data_point.pop("all_generations", None)
                     elem.update(original_data_point)
                     fout.write(json.dumps(elem) + '\n')
                 data_points = []
