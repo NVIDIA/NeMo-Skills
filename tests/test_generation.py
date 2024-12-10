@@ -78,13 +78,13 @@ def test_eval_mtbench_api():
         f"ns eval "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-405b-instruct "
+        f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=mt-bench:0 "
         f"    --output_dir=/tmp/nemo-skills-tests/mtbench-api "
         f"    --extra_eval_args=\"++eval_config.use_batch_api=False "
         f"                        ++eval_config.base_url=https://integrate.api.nvidia.com/v1 "
-        f"                        ++eval_config.judge_model=meta/llama-3.1-405b-instruct\" "
+        f"                        ++eval_config.judge_model=meta/llama-3.1-8b-instruct\" "
         f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)

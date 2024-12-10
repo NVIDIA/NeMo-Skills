@@ -242,13 +242,13 @@ def summarize_results(
                     k = int(k_match.group(1))
                     base_name = eval_mode.rsplit('@', 1)[0]
 
-                    # Store k and corresponding values for each metric
-                    for metric_key, metric_value in metrics.items():
-                        if metric_key != "num_entries":
-                            k_metrics[metric_key][base_name]["k"].append(k)
-                            k_metrics[metric_key][base_name]["value"].append(metric_value)
+                # Store k and corresponding values for each metric, but log everything
+                for metric_key, metric_value in metrics.items():
+                    if k_match and metric_key != "num_entries":
+                        k_metrics[metric_key][base_name]["k"].append(k)
+                        k_metrics[metric_key][base_name]["value"].append(metric_value)
 
-                        run.summary.update({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
+                    run.summary.update({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
 
             # Create combined plot per metric key (line series)
             for metric_key, eval_modes in k_metrics.items():
