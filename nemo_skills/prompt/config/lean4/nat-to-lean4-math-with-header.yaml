@@ -13,16 +13,18 @@
 # limitations under the License.
 
 # Configuration for translating natural language (nat) to Lean 4 code, 
-# with a predefined Lean 4 header. 
+# including the generation of a Lean 4 header. 
+# Fields are optimized for "math" dataset.
 few_shot_examples:
   prefix: "Here are some examples of problems and their corresponding Lean 4 translation, including theorems proof placeholders `sorry` and `user_theorem` as the theorem name. Use them as a guide.\n\n"
-  template: "Problem:\n{problem}\nAnswer is: {predicted_answer}\nExpected Lean 4 translation:\n```lean4\n{header}{formal_statement}{formal_proof}```\n\n\n\n\n\n"
+  template: "Problem:\n{problem}\nAnswer is: {predicted_answer}\nLean 4 translation:\n```lean4\n{header}{formal_statement}{formal_proof}```\n\n\n\n\n\n"
   suffix: "Here is the problem you need to translate into a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the theorem proof and `user_theorem` as the theorem name.\n\n"
 
 user: |-
   Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
 
-  {examples}{problem}
-  Answer is: {predicted_answer}
-  ```lean4
-  {header}
+  {examples}Problem:
+  {problem}
+  Answer is: {expected_answer}
+  Lean 4 translation:
+  

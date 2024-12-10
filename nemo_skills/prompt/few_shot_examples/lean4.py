@@ -73,8 +73,53 @@ math_to_lean4_fewshot = [
         "formal_proof": "sorry",
     },
 ]
+math_to_lean4_predict_header_fewshot = [
+    {
+        "header": "import Mathlib\n\nopen Finset\nopen scoped BigOperators\n\n",
+        "problem": "What is the following value when expressed as a common fraction: $$\\frac{1}{2^{1}}+\\frac{1}{2^{2}}+\\frac{1}{2^{3}}+\\cdots + \\frac{1}{2^{8}}+\\frac{1}{2^{9}}+\\frac{1}{2^{10}}?$$",
+        "predicted_answer": "\\frac{1023}{1024}",
+        "formal_statement": "theorem user_theorem : (\u2211 k in Finset.range 10, (1 / (2 ^ (k + 1)))) = 1023 / 1024 := by\n",
+        "id": "test/algebra/2130.json",
+        "formal_proof": "sorry"
+    },
+    {
+        "header": "import Mathlib\n\n",
+        "problem": "Evaluate $24-(2x-y)$ if $x=4$ and $y=3$.",
+        "predicted_answer": "19",
+        "formal_statement": "theorem user_theorem : 24 - (2 * 4 - 3) = 19 := by\n",
+        "id": "test/algebra/1264.json",
+        "formal_proof": "sorry"
+    },
+    {
+        "header": "import Mathlib\n\n",
+        "problem": "If $x+y=12$ and $x-y=8$, what is the value of $2x-xy$?",
+        "predicted_answer": "0",
+        "formal_statement": "theorem user_theorem (x y : \u211d) (h\u2080 : x + y = 12) (h\u2081 : x - y = 8) : 2 * x - x * y = 0 := by\n",
+        "id": "test/algebra/1272.json",
+        "formal_proof": "sorry"
+    },
+    {
+        "header": "import Mathlib\n\n",
+        "problem": "A parabola with equation $y=x^2+bx+c$ passes through the points $(2,3)$ and $(4,3)$. What is $c$?",
+        "predicted_answer": "11",
+        "formal_statement": "theorem user_theorem (b c : \u211d) (h\u2081 : 3 = 2 ^ 2 + 2 * b + c) (h\u2082 : 3 = 4 ^ 2 + 4 * b + c) : c = 11 := by\n",
+        "id": "test/algebra/636.json",
+        "formal_proof": "sorry"
+    },
+    {
+        "header": "import Mathlib\n\nopen Finset\nopen scoped BigOperators\n\n",
+        "problem": "Two standard six-faced dice are rolled. Jean wins if the product of the two numbers rolled is odd or a multiple of three, otherwise Allen wins. What is the probability that Jean wins? Express your answer as a common fraction.",
+        "predicted_answer": "\\frac{2}{3}",
+        "formal_statement": "theorem user_theorem : ((Finset.filter (fun x => (x.1 * x.2) % 2 = 1 ∨ (x.1 * x.2) % 3 = 0) (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6))).card : ℚ) / (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6)).card = (2 : ℚ) / 3 := by\n",
+        "id": "test_counting_and_probability/551.json",
+        "formal_proof": "sorry"
+    },
+]
+
+
 
 examples_map = {
     "minif2f_deepseek_fewshot": minif2f_deepseek_fewshot,
     "math_to_lean4_fewshot": math_to_lean4_fewshot,
+    "math_to_lean4_predict_header_fewshot": math_to_lean4_predict_header_fewshot,
 }

@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+# Configuration for translating natural language (nat) to Lean 4 code, 
+# with a predefined Lean 4 header included in the output. 
+# Fields are optimized for "math" dataset.
 few_shot_examples:
   prefix: "Here are some examples of problems and their corresponding Lean 4 translation, including theorems proof placeholders `sorry` and `user_theorem` as the theorem name. Use them as a guide.\n\n"
   template: "Problem:\n{problem}\nAnswer is: {predicted_answer}\nExpected Lean 4 translation:\n```lean4\n{header}{formal_statement}{formal_proof}```\n\n\n\n\n\n"
@@ -24,19 +26,4 @@ user: |-
   {examples}{problem}
   Answer is: {expected_answer}
   ```lean4
-  import Mathlib
-
-  open Complex Filter Function Metric Finset
-  open scoped BigOperators Topology
-  
-
-
-
-
-
-
-
-
-
-
-  
+  {header}

@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# Configuration for proving formal theorems in Lean 4.
+# This file is tailored for tasks that involve constructing and verifying proofs
+# of theorems within the Lean 4 formal system.
 few_shot_examples:
   prefix: "Here are some examples of Lean4 statements and corresponding proofs you can refer to.\n\n"
   template: "Lean 4 statement:\n```lean4\n{header}{informal_prefix}{formal_statement}\nExpected response with the proof:\n{formal_proof}```\n\n\n\n\n\n"

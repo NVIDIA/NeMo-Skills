@@ -17,6 +17,7 @@ import importlib
 import os
 import sys
 from typing import Dict
+import json
 
 
 @contextlib.contextmanager
@@ -59,3 +60,25 @@ def get_dataset_module(dataset, extra_datasets=None):
             dataset_module = importlib.import_module(dataset)
         found_in_extra = True
     return dataset_module, found_in_extra
+
+
+def get_lean4_header():
+    LEAN4_HEADER= "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n"
+    return LEAN4_HEADER
+
+def add_header_to_jsonl_inplace(jsonl_path, header):
+    """
+    Adds or updates the header field for all entries in a JSONL file.
+
+    Args:
+        jsonl_path (str): Path to the JSONL file.
+        header (str): The header string to add or update in each entry.
+    """
+    with open(jsonl_path, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+
+    with open(jsonl_path, "w", encoding="utf-8") as file:
+        for line in lines:
+            data = json.loads(line)
+            data["header"] = header  
+            file.write(json.dumps(data) + "\n")

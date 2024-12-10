@@ -408,3 +408,44 @@ def test_math_to_lean4_fewshots(sandbox_type):
     assert (
         not stderr_list
     ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."
+
+
+@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
+def test_math_to_lean4_predict_header_fewshot(sandbox_type):
+    sandbox = _get_sandbox(sandbox_type)
+
+    from nemo_skills.prompt.few_shot_examples.lean4 import math_to_lean4_predict_header_fewshot
+
+    # Test case for Lean4 code with syntax error
+    session_id_list = []
+    process_status_list = []
+    stdout_list = []
+    stderr_list = []
+
+    for i, entry in enumerate(math_to_lean4_predict_header_fewshot):
+        code = entry["header"] + entry["formal_statement"] + entry["formal_proof"]
+
+        output, session_id = sandbox.execute_code(code, language="lean4")
+
+        if session_id is not None:
+            session_id_list.append(i)
+        if output["process_status"] != 'completed':
+            process_status_list.append(i)
+        if "warning: declaration uses 'sorry'" not in output["stdout"]:
+            stdout_list.append(i)
+        if output["stderr"] != "":
+            stderr_list.append(i)
+
+    # Assertions for the correct code
+    assert (
+        not session_id_list
+    ), f"Expected session_id to be None for all test cases, but got session_ids for few shots at indices {session_id_list}."
+    assert (
+        not process_status_list
+    ), f"Expected process_status to be 'completed' for all test cases, but these few shots did not complete successfully: indices {process_status_list}."
+    assert (
+        not stdout_list
+    ), f"Expected the stdout to include the warning 'declaration uses 'sorry'' for incomplete proofs in all test cases, but mismatches or missing warnings were found at indices {stdout_list}."
+    assert (
+        not stderr_list
+    ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."
