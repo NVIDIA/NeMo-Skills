@@ -659,8 +659,6 @@ def get_executor(
             f"--ntasks={tasks_per_node * num_nodes}",
             f"--nodes={num_nodes}",
         ],
-        # TODO: can we relax this to allow partial node allocation?
-        exclusive=True,
         mem=0,
         job_details=CustomJobDetails(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
@@ -671,7 +669,6 @@ def get_executor(
         wait_time_for_group_job=0.01,
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
-        dependency_type="afterany",
         env_vars=env_vars,
     )
 
@@ -691,7 +688,7 @@ def add_task(
     with_sandbox=False,
     server_config=None,
     task_dependencies: list[str] = None,
-    run_after=None,
+    run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
 ):
@@ -699,8 +696,9 @@ def add_task(
 
     Note that there are two parameters that control dependencies.
         - task_dependencies: list of tasks that this task depends on **within the same experiment**
-        - run_after: a single **experiment name** that this task should run after. Will schedule
-          dependencies on all tasks inside `run_after` experiment. It needs to already be launched and running.
+        - run_after: a string with experiment name or a list of experiment names that this task
+          should run after. Will schedule dependencies on all tasks inside `run_after` experiments.
+          It needs to already be launched and running.
 
     Example of how to set task_dependencies:
 
@@ -709,12 +707,15 @@ def add_task(
         task2 = add_task(exp, ..., task_dependencies=[task1])
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
-        dependencies = tuple(get_exp_handles(run_after))
+        if isinstance(run_after, str):
+            run_after = [run_after]
+        dependencies = tuple([handle for exp_name in run_after for handle in get_exp_handles(exp_name)])
     else:
         dependencies = None
 
     if num_gpus is None and cluster_config['executor'] == "slurm":
-        num_gpus = 1
+        if not 'cpu' in (partition or cluster_config.get("partition", "")):
+            num_gpus = 1
 
     commands = []
     executors = []

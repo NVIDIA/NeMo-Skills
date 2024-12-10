@@ -22,6 +22,7 @@ from typing import Dict, Optional
 from sdp.processors.base_processor import BaseProcessor
 from tqdm.contrib.concurrent import process_map
 
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import unroll_files
 
@@ -39,6 +40,7 @@ class ReadData(BaseProcessor):
         skip_first: int = 0,
         add_correct: bool = True,
         add_incorrect: bool = False,
+        use_judgement: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -49,6 +51,7 @@ class ReadData(BaseProcessor):
         self.skip_first = skip_first
         self.add_correct = add_correct
         self.add_incorrect = add_incorrect
+        self.use_judgement = use_judgement
 
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")
@@ -95,15 +98,26 @@ class ReadData(BaseProcessor):
                 continue
 
             # skipping any incomplete generations
-            if "is_correct" not in line_dict:
-                LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
-                continue
+            if not self.use_judgement:
+                if "is_correct" not in line_dict:
+                    LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
+                    continue
 
-            if not self.add_correct and line_dict["is_correct"]:
-                continue
+                if not self.add_correct and line_dict["is_correct"]:
+                    continue
 
-            if not self.add_incorrect and not line_dict["is_correct"]:
-                continue
+                if not self.add_incorrect and not line_dict["is_correct"]:
+                    continue
+            else:
+                if "judgement" not in line_dict:
+                    LOG.warning("Found incomplete generations (judgement field is missing) - skipping")
+                    continue
+
+                if not self.add_correct and is_correct_judgement(line_dict["judgement"]):
+                    continue
+
+                if not self.add_incorrect and not is_correct_judgement(line_dict["judgement"]):
+                    continue
 
             line_dict['filename'] = file_handle.name
             samples.append(line_dict)

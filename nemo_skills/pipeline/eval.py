@@ -15,6 +15,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
+from typing import List
 
 import nemo_run as run
 import typer
@@ -108,7 +109,9 @@ def eval(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
-    run_after: str = typer.Option(None, help="Task to run after the evaluation"),
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     extra_datasets: str = typer.Option(
@@ -204,7 +207,7 @@ def eval(
             add_task(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=eval_cmd),
-                task_name=f'eval-{idx}',
+                task_name=f'{expname}-{idx}',
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,

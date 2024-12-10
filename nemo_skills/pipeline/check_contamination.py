@@ -13,22 +13,31 @@
 # limitations under the License.
 
 from enum import Enum
+from typing import List
 
 import nemo_run as run
 import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.utils import setup_logging
 
 
-def get_check_contamination_cmd(input_file, output_file, extra_arguments=""):
-    return (
+def get_check_contamination_cmd(input_file, output_file, data_files, extra_arguments=""):
+    cmd = (
         f"python -m nemo_skills.inference.check_contamination "
         f"    ++input_file={input_file} "
         f"    ++output_file={output_file} "
         f"    {extra_arguments} "
     )
+    if data_files:
+        cmd += " && " + (
+            f"python -m nemo_skills.training.data_preparation_utils.add_contaminated_label "
+            f"    --label_file {output_file} "
+            f"    --data_files {data_files} "
+        )
+    return cmd
 
 
 class SupportedServers(str, Enum):
@@ -51,6 +60,7 @@ def check_contamination(
         ..., help="Input file with the data to check for contamination. An output of the retrieve_similar.py script."
     ),
     output_file: str = typer.Option(..., help="Where to save results"),
+    data_files: str = typer.Option(None, help="Glob pattern(s) for the files to update with contaminated label."),
     expname: str = typer.Option("llm-math-judge", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API."),
     server_address: str = typer.Option(
@@ -64,12 +74,13 @@ def check_contamination(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    run_after: str = typer.Option(
-        None,
-        help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -119,15 +130,22 @@ def check_contamination(
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
                 exp,
-                cmd=get_generation_command(
-                    server_address=server_address,
-                    generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
+                cmd=wrap_cmd(
+                    get_generation_command(
+                        server_address=server_address,
+                        generation_commands=get_check_contamination_cmd(
+                            input_file, output_file, data_files, extra_arguments
+                        ),
+                    ),
+                    preprocess_cmd=preprocess_cmd,
+                    postprocess_cmd=postprocess_cmd,
                 ),
-                task_name="check-contamination",
+                task_name=expname,
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 partition=partition,
+                time_min=time_min,
                 server_config=server_config,
                 task_dependencies=prev_tasks,
                 run_after=run_after,

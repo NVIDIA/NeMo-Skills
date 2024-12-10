@@ -20,7 +20,7 @@ import re
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 
@@ -71,6 +71,7 @@ def summarize_results(
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
+    wandb_group: Optional[str] = typer.Option(None, help="Name of the wandb group to sync these results to"),
     wandb_project: Optional[str] = typer.Option('nemo-skills', help="Name of the wandb project"),
 ):
     """Summarize results of an evaluation job."""
@@ -218,7 +219,12 @@ def summarize_results(
         import wandb
 
         run = wandb.init(
-            project=wandb_project, name=wandb_name, id=wandb_name, resume="allow", settings=wandb.Settings(silent=True)
+            project=wandb_project,
+            name=wandb_name,
+            id=wandb_name,
+            resume="allow",
+            group=wandb_group,
+            settings=wandb.Settings(silent=True),
         )
         plots = {}
 

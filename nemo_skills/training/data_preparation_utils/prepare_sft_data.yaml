@@ -12,6 +12,7 @@ metadata: null  # can provide additional metadata to store (e.g. dataset or gene
 skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
+use_judgement: false  # if True, uses judgement instead of is_correct field
 
 downsampling_method: null  # fair, random or null
 random_seed: 42
@@ -67,6 +68,7 @@ processors:
     skip_first: ${skip_first}
     add_correct: ${add_correct}
     add_incorrect: ${add_incorrect}
+    use_judgement: ${use_judgement}
 
   - _target_: nemo_skills.training.data_preparation_utils.filters.DropMultiBoxed
     should_run: ${filters.drop_multi_boxed}

@@ -21,6 +21,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -46,7 +47,7 @@ def llm_math_judge(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    input_files: List[str] = typer.Option(
+    input_files: str = typer.Option(
         ...,
         help="Can also specify multiple glob patterns, like output-rs*.jsonl. Will add judgement field to each file",
     ),
@@ -63,9 +64,10 @@ def llm_math_judge(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    run_after: str = typer.Option(
-        None,
-        help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
+    preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
@@ -86,11 +88,10 @@ def llm_math_judge(
         pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    for input_file in input_files:
+    for input_file in input_files.split():
         check_if_mounted(cluster_config, input_file)
     if log_dir:
         check_if_mounted(cluster_config, log_dir)
-    input_files_str = f'"{" ".join(input_files)}"'
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
@@ -113,11 +114,15 @@ def llm_math_judge(
     with run.Experiment(expname) as exp:
         add_task(
             exp,
-            cmd=get_generation_command(
-                server_address=server_address,
-                generation_commands=get_judge_cmd(input_files_str, extra_arguments),
+            cmd=wrap_cmd(
+                get_generation_command(
+                    server_address=server_address,
+                    generation_commands=get_judge_cmd(input_files, extra_arguments),
+                ),
+                preprocess_cmd,
+                postprocess_cmd,
             ),
-            task_name="llm-math-judge",
+            task_name=expname,
             log_dir=log_dir,
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,

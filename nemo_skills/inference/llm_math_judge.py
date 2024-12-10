@@ -22,11 +22,12 @@ from typing import Any
 import hydra
 from tqdm import tqdm
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
 
@@ -114,6 +115,9 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         with open(jsonl_file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
 
+        if "predicted_answer" not in data[0]:
+            data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
+
         LOG.info("Example prompt:\nData dictionary: %s\nPrompt string: %s", data[0], prompt.fill(data[0]))
 
         if cfg.dry_run:
@@ -139,6 +143,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         # saving to a tmp file to avoid corrupting original generation in case something goes wrong
         with open(output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
             for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
+                if "predicted_answer" not in data_point:
+                    data_point["predicted_answer"] = extract_answer(data_point["generation"])
                 judgement = prefill_judgement(data_point)
                 if judgement is None:
                     data_points.append(data_point)

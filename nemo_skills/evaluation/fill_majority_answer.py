@@ -23,6 +23,7 @@ import hydra
 from omegaconf import MISSING
 from tqdm import tqdm
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.evaluation.metrics import read_predictions
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
@@ -42,6 +43,9 @@ class FillMajorityAnswerConfig:
     # where to put the majority answer. By default replacing the expected_answer (assuming it's unknown)
     # but change to predicted_answer, to follow up with a judge evaluation
     fill_key: str = "expected_answer"
+
+    # if True, will not change the fill_key if it's already filled with not None
+    ignore_if_not_none: bool = False
 
     # if True, will use string match to fill is_correct key
     fill_is_correct: bool = True
@@ -67,15 +71,17 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     all_predictions = []
     for idx, predictions in enumerate(tqdm(zip_longest(*file_handles))):
         data = read_predictions(predictions)
+        for elem in data:
+            if 'predicted_answer' not in elem:
+                elem['predicted_answer'] = extract_answer(elem['generation'])
         all_predictions.append(data)
+
         # TODO: currently majority does not take into account equivalent answers written in a different way
-        valid_answers_and_results = [
-            (elem['predicted_answer'], elem['is_correct']) for elem in data if elem['predicted_answer'] is not None
-        ]
+        valid_answers = [elem['predicted_answer'] for elem in data if elem['predicted_answer'] is not None]
         majority_answers.append((None, (0, len(file_handles))))
-        if len(valid_answers_and_results) == 0:
+        if len(valid_answers) == 0:
             continue
-        (majority_answer, _), num_votes = Counter(valid_answers_and_results).most_common(1)[0]
+        majority_answer, num_votes = Counter(valid_answers).most_common(1)[0]
         majority_answers[-1] = (majority_answer, (num_votes, len(file_handles)))
 
     for file_handle in file_handles:
@@ -85,6 +91,9 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     file_handles = [open(file, "wt", encoding="utf-8") for file in unroll_files(cfg.input_files)]
     for idx, predictions in enumerate(all_predictions):
         for lidx, handle in enumerate(file_handles):
+            if cfg.ignore_if_not_none and predictions[lidx][cfg.fill_key] is not None:
+                handle.write(json.dumps(predictions[lidx]) + "\n")
+                continue
             predictions[lidx][cfg.fill_key] = majority_answers[idx][0]
             predictions[lidx]["majority_votes"], predictions[lidx]["total_votes"] = majority_answers[idx][1]
             # this is just a string match check, so for full correctness need to rerun the evaluator
@@ -93,7 +102,7 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
                     predictions[lidx]["predicted_answer"] == predictions[lidx]["expected_answer"]
                 )
             else:
-                del predictions[lidx]["is_correct"]
+                predictions[lidx].pop("is_correct")
             handle.write(json.dumps(predictions[lidx]) + "\n")
 
     for file_handle in file_handles:
