@@ -43,9 +43,11 @@ PATTERN_PYTHON_CODE = re.compile("```[pP]ython")
 class BaseFilter(BaseParallelProcessor):
     def __init__(self, **kwargs):
         if 'in_memory_chunksize' not in kwargs:
-            kwargs['in_memory_chunksize'] = 100000000
+            kwargs['in_memory_chunksize'] = 500000
         if 'chunksize' not in kwargs:
-            kwargs['chunksize'] = 100000
+            kwargs['chunksize'] = 5000
+        if 'max_workers' not in kwargs:
+            kwargs['max_workers'] = max(100, os.cpu_count())
         super().__init__(**kwargs)
 
     def finalize(self, metrics: List):
@@ -142,7 +144,7 @@ class RemoveContaminated(BaseFilter):
         self.contamination_key = contamination_key
 
     def process_dataset_entry(self, data_entry) -> List:
-        if self.contamination_key in data_entry and data_entry[self.contamination_key]:
+        if data_entry.get(self.contamination_key, False):
             return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]

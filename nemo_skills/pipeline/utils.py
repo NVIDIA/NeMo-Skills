@@ -609,6 +609,7 @@ def get_executor(
     time_min=None,
     dependencies=None,
     extra_package_dirs: list[str] | None = None,
+    slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config, env_vars)
@@ -670,6 +671,7 @@ def get_executor(
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
         env_vars=env_vars,
+        **(slurm_kwargs or {}),
     )
 
 
@@ -691,6 +693,7 @@ def add_task(
     run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
+    slurm_kwargs: dict | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -716,6 +719,11 @@ def add_task(
     if num_gpus is None and cluster_config['executor'] == "slurm":
         if not 'cpu' in (partition or cluster_config.get("partition", "")):
             num_gpus = 1
+        # for cpu tasks always ask for the full node
+        # TODO: should we not do that? Is there any good way to figure out number of cores?
+        else:
+            slurm_kwargs = slurm_kwargs or {}
+            slurm_kwargs['exclusive'] = True
 
     commands = []
     executors = []
@@ -737,6 +745,7 @@ def add_task(
             log_dir=log_dir,
             log_prefix="server",
             extra_package_dirs=extra_package_dirs,
+            slurm_kwargs=slurm_kwargs,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -762,6 +771,7 @@ def add_task(
                 log_dir=log_dir,
                 log_prefix="main",
                 extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
             )
         )
 
@@ -781,6 +791,7 @@ def add_task(
             log_dir=log_dir,
             log_prefix="sandbox",
             extra_package_dirs=extra_package_dirs,
+            slurm_kwargs=slurm_kwargs,
         )
         commands.append(get_sandox_command())
         executors.append(sandbox_executor)

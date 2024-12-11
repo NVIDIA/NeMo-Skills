@@ -27,7 +27,7 @@ LOG = logging.getLogger(__file__)
 
 def get_cmd(extra_arguments):
     cmd = f"{extra_arguments} "
-    cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && {cmd}"
+    cmd = f"export HYDRA_FULL_ERROR=1 && export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && {cmd}"
     return cmd
 
 

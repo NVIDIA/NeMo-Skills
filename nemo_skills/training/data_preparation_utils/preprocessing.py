@@ -14,8 +14,10 @@
 
 import json
 import logging
+import os
 import random
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 from typing import Dict, Optional
 
@@ -41,6 +43,8 @@ class ReadData(BaseProcessor):
         add_correct: bool = True,
         add_incorrect: bool = False,
         use_judgement: bool = False,
+        keys_to_keep: list[str] | None = None,
+        deduplicate: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -52,6 +56,15 @@ class ReadData(BaseProcessor):
         self.add_correct = add_correct
         self.add_incorrect = add_incorrect
         self.use_judgement = use_judgement
+        self.keys_to_keep = keys_to_keep
+        self.deduplicate = deduplicate
+
+        if self.keys_to_keep is not None:
+            self.keys_to_keep = set(self.keys_to_keep)
+            self.keys_to_keep.add(self.input_key)
+            self.keys_to_keep.add(self.output_key)
+            self.keys_to_keep.add("is_correct")
+            self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")
@@ -72,6 +85,8 @@ class ReadData(BaseProcessor):
             if idx < self.skip_first:
                 continue
             sample = json.loads(line)
+            if self.keys_to_keep:
+                sample = {k: v for k, v in sample.items() if k in self.keys_to_keep}
             questions.add(sample[self.input_key])
             samples.append(sample)
 
@@ -134,6 +149,23 @@ class ReadData(BaseProcessor):
             seen_predictions[question].add(sample[self.output_key])
             yield sample
 
+    def _batch_deduplicate(self, batch):
+        seen_predictions = defaultdict(set)
+        unique_samples = []
+
+        for sample in batch:
+            question = sample[self.input_key]
+            if sample[self.output_key] not in seen_predictions[question]:
+                seen_predictions[question].add(sample[self.output_key])
+                unique_samples.append(sample)
+
+        return unique_samples
+
+    def _chunks(self, lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
     def process(self):
         samples = []
         if self.input_files:
@@ -144,13 +176,40 @@ class ReadData(BaseProcessor):
             args = [(file, self._read_preprocessed_data) for file in unroll_files(self.preprocessed_dataset_files)]
             results = process_map(self._parallel_read_file, args, max_workers=None, chunksize=1)
             samples.extend(list(chain(*results)))
-        LOG.info("Total samples before deduplication: %d", len(samples))
-        samples_count = 0
-        with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
-            for sample in self._unique_iterator(samples):
-                fout.write(json.dumps(sample) + "\n")
-                samples_count += 1
-        LOG.info("Total samples after deduplication: %d", samples_count)
+
+        if self.deduplicate:
+            LOG.info("Total samples before deduplication: %d", len(samples))
+
+            # Parallel deduplication
+            chunk_size = 100000
+            num_cores = max(100, len(samples) // chunk_size)
+
+            with ProcessPoolExecutor(max_workers=num_cores) as executor:
+                # Process chunks in parallel
+                futures = [
+                    executor.submit(self._batch_deduplicate, chunk) for chunk in self._chunks(samples, chunk_size)
+                ]
+
+                # Final deduplication of results from all chunks
+                seen_predictions = defaultdict(set)
+                samples_count = 0
+
+                with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
+                    for future in futures:
+                        chunk_results = future.result()
+                        for sample in chunk_results:
+                            question = sample[self.input_key]
+                            if sample[self.output_key] not in seen_predictions[question]:
+                                seen_predictions[question].add(sample[self.output_key])
+                                fout.write(json.dumps(sample) + "\n")
+                                samples_count += 1
+
+            LOG.info("Total samples after deduplication: %d", samples_count)
+        else:
+            LOG.info("Total samples: %d", len(samples))
+            with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
+                for sample in samples:
+                    fout.write(json.dumps(sample) + "\n")
 
 
 class GroupSamples(BaseProcessor):
