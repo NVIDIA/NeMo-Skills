@@ -74,6 +74,7 @@ class BaseFilter(BaseParallelProcessor):
                 yield manifest_chunk
                 manifest_chunk = []
         if len(manifest_chunk) > 0:
+            LOG.info("Processing last chunk")
             yield manifest_chunk
 
 
