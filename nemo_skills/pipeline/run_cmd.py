@@ -56,6 +56,7 @@ def run_cmd(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False)
@@ -77,6 +78,7 @@ def run_cmd(
             time_min=time_min,
             run_after=run_after,
             num_gpus=num_gpus,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         run_exp(exp, cluster_config)
 

@@ -64,6 +64,18 @@ class BaseFilter(BaseParallelProcessor):
             num_modified_entries = sum(metric.get('num_modified', 0) for metric in metrics)
             LOG.info("Number of modified entries: %d", num_modified_entries)
 
+    def _chunk_manifest(self):
+        """Small modification of original function to print progress."""
+        manifest_chunk = []
+        for idx, data_entry in enumerate(self.read_manifest(), 1):
+            manifest_chunk.append(data_entry)
+            if idx % self.in_memory_chunksize == 0:
+                LOG.info("Processing chunk %d", idx)
+                yield manifest_chunk
+                manifest_chunk = []
+        if len(manifest_chunk) > 0:
+            yield manifest_chunk
+
 
 class DropMultiBoxed(BaseFilter):
     def __init__(self, solution_key: str = "generation", **kwargs):

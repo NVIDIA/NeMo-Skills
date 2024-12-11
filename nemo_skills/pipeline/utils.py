@@ -660,7 +660,6 @@ def get_executor(
             f"--ntasks={tasks_per_node * num_nodes}",
             f"--nodes={num_nodes}",
         ],
-        mem=0,
         job_details=CustomJobDetails(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
@@ -719,11 +718,6 @@ def add_task(
     if num_gpus is None and cluster_config['executor'] == "slurm":
         if not 'cpu' in (partition or cluster_config.get("partition", "")):
             num_gpus = 1
-        # for cpu tasks always ask for the full node
-        # TODO: should we not do that? Is there any good way to figure out number of cores?
-        else:
-            slurm_kwargs = slurm_kwargs or {}
-            slurm_kwargs['exclusive'] = True
 
     commands = []
     executors = []
