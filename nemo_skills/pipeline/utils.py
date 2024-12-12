@@ -52,15 +52,6 @@ def get_unmounted_path(cluster_config, path):
     raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
 
 
-def _get_latest_dir(path, expname, job_id) -> str:
-    if job_id is not None:
-        return os.path.join(path, f"{expname}_{job_id}")
-
-    dirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-    latest_dir = max(dirs, key=lambda d: os.path.getctime(os.path.join(path, d)))
-    return os.path.join(path, latest_dir)
-
-
 def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=True) -> list[str]:
     """Will return the handles of the tasks in the experiment.
 

@@ -20,6 +20,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -50,6 +51,8 @@ def run_cmd(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
@@ -69,7 +72,7 @@ def run_cmd(
     with run.Experiment(expname) as exp:
         add_task(
             exp,
-            cmd=get_cmd(extra_arguments=extra_arguments),
+            cmd=wrap_cmd(get_cmd(extra_arguments=extra_arguments), preprocess_cmd, postprocess_cmd),
             task_name=expname,
             log_dir=log_dir,
             container=cluster_config["containers"][container],
