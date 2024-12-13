@@ -116,10 +116,44 @@ math_to_lean4_predict_header_fewshot = [
     },
 ]
 
+proof_false_fewshot = [
+    {
+        "header": "import Mathlib\n\nopen Nat\n\n",
+        "informal_prefix": "/-- Using Nat.noConfusion on an impossible Nat equality. Prove False from 0 = 1. -/",
+        "formal_statement": "theorem user_theorem (h : 0 = 1) : False := by",
+        "formal_proof": "apply Nat.noConfusion h"
+    },
+    {
+        "header": "import Mathlib\n\nopen Nat\n\n",
+        "informal_prefix": "/-- Exploiting a logical contradiction (p AND ¬p). Prove False from p and ¬p. -/",
+        "formal_statement": "theorem user_theorem (p : Prop) (hp : p) (hnp : ¬p) : False :=",
+        "formal_proof": "hnp hp"
+    },
+    {
+        "header": "import Mathlib\n\nopen Nat\n\n",
+        "informal_prefix": "/-- Pattern matching on True ∧ False to prove False. -/",
+        "formal_statement": "theorem user_theorem (h : True ∧ False) : False :=",
+        "formal_proof": "h.right"
+    },
+    {
+        "header": "import Mathlib\n\nopen Nat\n\n",
+        "informal_prefix": "/-- Using well-known lemmas about Nat to derive a contradiction. Prove False from 1 < 1. -/",
+        "formal_statement": "theorem user_theorem (h : 1 < 1) : False :=",
+        "formal_proof": "Nat.lt_irrefl 1 h"
+    },
+    {
+        "header": "import Mathlib\n\nopen Nat\n\n",
+        "informal_prefix": "/-- Injectivity of Nat.succ leads to a contradiction. Prove False from 1 = 2. -/",
+        "formal_statement": "theorem user_theorem (h : 1 = 2) : False := by",
+        "formal_proof": "have : Nat.succ 0 = Nat.succ 1 := congrArg Nat.succ h let zero_eq_one : 0 = 1 := Nat.succ_injective this apply Nat.noConfusion zero_eq_one"
+    }
+]
+
 
 
 examples_map = {
     "minif2f_deepseek_fewshot": minif2f_deepseek_fewshot,
     "math_to_lean4_fewshot": math_to_lean4_fewshot,
     "math_to_lean4_predict_header_fewshot": math_to_lean4_predict_header_fewshot,
+    "proof_false_fewshot": proof_false_fewshot,
 }
