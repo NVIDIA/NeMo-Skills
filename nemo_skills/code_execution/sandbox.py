@@ -421,6 +421,16 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                     "predicted_proof key not found in the line_dict. "
                                     "Set use_predicted_proof_key=False to re-combine"
                                 )
+                    elif answer_format == "lean4-proof-with-header":
+                        if not use_predicted_proof_key:
+                            generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
+                            line_dict["predicted_proof"] = line_dict["formal_statement"] + generation
+                        else:
+                            if "predicted_proof" not in line_dict:
+                                raise ValueError(
+                                    "predicted_proof key not found in the line_dict. "
+                                    "Set use_predicted_proof_key=False to re-combine"
+                                )
                     elif answer_format == "lean4-statement":
                         if not use_predicted_proof_key:
                             generation = re.sub(r"^\s*```(lean4)?\s*|\s*```$", "", line_dict["generation"])
