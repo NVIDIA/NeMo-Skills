@@ -58,9 +58,26 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
 
 
 def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for reward model")
     cmd = (
-        f"python -m nemo_skills.inference.reward_model ++skip_filled=True "
-        f"++output_dir={output_dir} ++random_seed={random_seed} "
+        f"python -m nemo_skills.inference.reward_model "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd
+
+
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for math judge")
+    cmd = (
+        f"python -m nemo_skills.inference.llm_math_judge "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
     return cmd
@@ -81,16 +98,19 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
+    math_judge = "math_judge"
 
 
 server_command_factories = {
     GenerationType.generate: get_server_command,
     GenerationType.reward: get_reward_server_command,
+    GenerationType.math_judge: get_server_command,
 }
 
 client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
+    GenerationType.math_judge: get_math_judge_cmd,
 }
 
 
@@ -133,7 +153,7 @@ def generate(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
 ):
     """Generate LLM completions for a given input file.
 

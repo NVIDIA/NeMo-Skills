@@ -20,6 +20,7 @@ export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_
 # generation/evaluation tests
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
+pytest tests/gpu-tests/test_judge.py -s -x
 
 # for sft we are using the tiny random model to run much faster
 docker run --rm \
