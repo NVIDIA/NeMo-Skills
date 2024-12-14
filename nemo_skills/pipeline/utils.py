@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tarfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -52,6 +53,9 @@ def get_unmounted_path(cluster_config, path):
     raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
 
 
+# caching the status assuming it doesn't change while experiment is being scheduled
+# otherwise this results in too many ssh calls
+@lru_cache
 def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=True) -> list[str]:
     """Will return the handles of the tasks in the experiment.
 
@@ -68,7 +72,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
         handles = []
         for job in exp.jobs:
             if not ignore_finished or (
-                job.status(exp._runner) in [AppState.RUNNING, AppState.PENDING, AppState.SUBMITTED]
+                job.status(exp._runner) in [AppState.RUNNING, AppState.PENDING, AppState.SUBMITTED, AppState.UNKNOWN]
             ):
                 handles.append(job.handle)
                 continue
@@ -314,8 +318,27 @@ def get_cluster_config(cluster=None, config_dir=None):
     return read_config(config_file)
 
 
+@lru_cache
+def _get_tunnel_cached(
+    job_dir: str,
+    host: str,
+    user: str,
+    identity: str | None = None,
+    shell: str | None = None,
+    pre_command: str | None = None,
+):
+    return run.SSHTunnel(
+        host=host,
+        user=user,
+        identity=identity,
+        shell=shell,
+        pre_command=pre_command,
+        job_dir=job_dir,
+    )
+
+
 def get_tunnel(cluster_config):
-    return run.SSHTunnel(**cluster_config["ssh_tunnel"])
+    return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
 # Helper class and function to support streaming updates
@@ -429,7 +452,8 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-def get_packager(extra_package_dirs: list[str] | None = None):
+@lru_cache
+def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = Path(__file__).absolute().parents[1]
 
@@ -607,13 +631,15 @@ def get_executor(
     partition=None,
     time_min=None,
     dependencies=None,
-    extra_package_dirs: list[str] | None = None,
+    extra_package_dirs: tuple[str] | None = None,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config, env_vars)
 
     mounts = mounts or config_mounts
+    if extra_package_dirs is not None:
+        extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
     if cluster_config["executor"] == "local":
         if num_nodes > 1:

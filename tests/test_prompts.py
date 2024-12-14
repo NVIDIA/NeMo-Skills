@@ -205,7 +205,6 @@ def test_generic_codegen_prompt():
     prompt = get_prompt('generic/codegen')
 
     expected_prompt = [
-        {'role': 'system', 'content': ''},
         {
             'role': 'user',
             'content': '''
@@ -228,7 +227,6 @@ def test_generic_default_prompt():
     prompt = get_prompt('generic/default')
 
     expected_prompt = [
-        {'role': 'system', 'content': ''},
         {
             'role': 'user',
             'content': 'How are you?',
@@ -912,10 +910,6 @@ def test_judge_math():
 
     expected_prompt = [
         {
-            'role': 'system',
-            'content': '',
-        },
-        {
             'role': 'user',
             'content': '''
 You will be asked to look at the two answers (predicted and expected) to a math problem and to judge whether they are equivalent within the context of the problem.
@@ -1012,10 +1006,6 @@ def test_judge_check_contamination():
     prompt = get_prompt('judge/check-contamination')
 
     expected_prompt = [
-        {
-            'role': 'system',
-            'content': '',
-        },
         {
             'role': 'user',
             'content': '''
@@ -1209,6 +1199,7 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
         == expected_prompt
     )
 
+
 def test_mmlu_pro_llama_few_shot_prompt():
     prompt = get_prompt('llama3-instruct/mmlu_pro', 'llama3-instruct', 'mmlu_pro_few_shot_llama_math')
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -1340,10 +1331,10 @@ Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
 
     inputs = {
-        'question' : 'If the half-life of a radioactive substance is 8 years, how long will it take, in years, for two thirds of the substance to decay?',
-        'options' :'A. 22.45\nB. 12.21\nC. 12.68\nD. 7.69\nE. 16.89\nF. 20.76\nG. 4.68\nH. 14.12\nI. 10.33\nJ. 18.34',
+        'question': 'If the half-life of a radioactive substance is 8 years, how long will it take, in years, for two thirds of the substance to decay?',
+        'options': 'A. 22.45\nB. 12.21\nC. 12.68\nD. 7.69\nE. 16.89\nF. 20.76\nG. 4.68\nH. 14.12\nI. 10.33\nJ. 18.34',
     }
-    assert (prompt.fill(inputs) == expected_prompt)
+    assert prompt.fill(inputs) == expected_prompt
 
 
 def test_mmlu_pro_tigerlab_few_shot_prompt():
@@ -1441,10 +1432,9 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
     inputs = {
-        'question' : "What is the square root of 81 squared?",
-        'options' : "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
-        "subset_for_metrics": "other"
+        'question': "What is the square root of 81 squared?",
+        'options': "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
+        "subset_for_metrics": "other",
     }
     print(prompt.fill(inputs))
     assert prompt.fill(inputs) == expected_prompt
-
