@@ -673,7 +673,7 @@ def get_executor(
         f"--ntasks={tasks_per_node * num_nodes}",
         f"--nodes={num_nodes}",
     ]
-    if not cluster_config.get("disable_gpus_per_node", False):
+    if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
     return run.SlurmExecutor(
