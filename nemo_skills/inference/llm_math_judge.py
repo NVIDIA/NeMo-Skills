@@ -142,6 +142,9 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
     # additionally, skipping whatever is pre-filled, assuming offset didn't change
     data = data[starting_idx:]
 
+    if len(data) == 0:  # we might not have any examples if skip_filled=True
+        return
+
     prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
     LOG.info("Prompt used: %s", prompt)
     LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
