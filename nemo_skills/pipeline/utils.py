@@ -664,6 +664,18 @@ def get_executor(
     else:
         timeout = cluster_config["timeouts"][partition]
 
+    srun_args = [
+        "--no-container-mount-home",
+        "--overlap",
+        "--mpi=pmix",
+        '--wait=10',
+        # we need to be explicit about this in srun as commands might need to run in parallel
+        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--nodes={num_nodes}",
+    ]
+    if not cluster_config.get("disable_gpus_per_node", False):
+        srun_args.append(f"--gpus-per-node={gpus_per_node}")
+
     return run.SlurmExecutor(
         account=cluster_config["account"],
         partition=partition,
@@ -674,17 +686,10 @@ def get_executor(
         container_mounts=mounts,
         time=timeout,
         additional_parameters={'time_min': time_min} if time_min is not None else {},
+        exclusive=True,
         packager=packager,
         gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
-        srun_args=[
-            "--no-container-mount-home",
-            "--overlap",
-            "--mpi=pmix",
-            '--wait=10',
-            # we need to be explicit about this in srun as commands might need to run in parallel
-            f"--ntasks={tasks_per_node * num_nodes}",
-            f"--nodes={num_nodes}",
-        ],
+        srun_args=srun_args,
         job_details=CustomJobDetails(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
