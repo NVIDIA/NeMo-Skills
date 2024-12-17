@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   gpu-tests-llama:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
@@ -48,7 +48,7 @@ jobs:
         ./tests/gpu-tests/run_llama.sh
 
   gpu-tests-qwen:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
@@ -79,7 +79,7 @@ jobs:
         ./tests/gpu-tests/run_qwen.sh
   
   gpu-tests-rm:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
