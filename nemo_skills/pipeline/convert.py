@@ -172,6 +172,11 @@ def convert(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code_exp: str = typer.Option(
+        None,
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
@@ -246,8 +251,11 @@ def convert(
             partition=partition,
             time_min=time_min,
             run_after=run_after,
+            reuse_code_exp=reuse_code_exp,
         )
         run_exp(exp, cluster_config)
+
+    return exp
 
 
 if __name__ == "__main__":

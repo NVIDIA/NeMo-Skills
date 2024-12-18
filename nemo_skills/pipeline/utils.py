@@ -91,6 +91,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 return []
             raise ValueError(f"Experiment {expname} not found!")
 
+
 def get_free_port(exclude: list[int] | None = None):
     """Will return a free port on the host."""
     exclude = exclude or []
@@ -98,6 +99,7 @@ def get_free_port(exclude: list[int] | None = None):
     while port in exclude:
         port += 1
     return port
+
 
 def get_generation_command(server_address, generation_commands):
     cmd = (
@@ -531,7 +533,7 @@ def get_env_variables(cluster_config):
     - `required_env_vars` - list of required environment variables
     - `env_vars` - list of optional environment variables
 
-    NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
+    WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
 
     Args:
         cluster_config: cluster config dictionary
@@ -552,7 +554,7 @@ def get_env_variables(cluster_config):
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
     # value, assuming it has not been updated externally between these two calls
-    always_optional_env_vars = ["NVIDIA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"]
+    always_optional_env_vars = ["WANDB_API_KEY", "NVIDIA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"]
     default_factories = {
         "HF_TOKEN": lambda: str(get_token()),
     }
@@ -678,6 +680,11 @@ def get_executor(
     else:
         timeout = cluster_config["timeouts"][partition]
 
+    additional_parameters = {'time_min': time_min} if time_min is not None else {}
+    if cluster_config.get('mail_type') is not None:
+        additional_parameters['mail_type'] = cluster_config['mail_type']
+    if cluster_config.get('mail_user') is not None:
+        additional_parameters['mail_user'] = cluster_config['mail_user']
     srun_args = [
         "--no-container-mount-home",
         "--overlap",
@@ -690,6 +697,8 @@ def get_executor(
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
+    dependency_type = cluster_config.get("dependency_type", "afterok")
+
     return run.SlurmExecutor(
         account=cluster_config["account"],
         partition=partition,
@@ -699,8 +708,8 @@ def get_executor(
         container_image=container,
         container_mounts=mounts,
         time=timeout,
-        additional_parameters={'time_min': time_min} if time_min is not None else {},
-        exclusive=True,
+        additional_parameters=additional_parameters,
+        exclusive=True,  # TODO: remove after we fix port conflicts
         packager=packager,
         gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
         srun_args=srun_args,
@@ -713,6 +722,7 @@ def get_executor(
         wait_time_for_group_job=0.01,
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
+        dependency_type=dependency_type,
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
@@ -732,6 +742,7 @@ def add_task(
     time_min=None,
     with_sandbox=False,
     server_config=None,
+    reuse_code_exp: str | run.Experiment | None = None,
     task_dependencies: list[str] = None,
     run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
@@ -751,6 +762,10 @@ def add_task(
     with run.Experiment(expname) as exp:
         task1 = add_task(exp, ...)
         task2 = add_task(exp, ..., task_dependencies=[task1])
+
+    You can use `reuse_code_exp` to reuse the code from another experiment
+    (and thus avoid costly packaging/ssh uploading). You can provide either experiment
+    name or the experiment object itself.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, str):
@@ -842,6 +857,18 @@ def add_task(
         )
         commands.append(get_sandox_command())
         executors.append(sandbox_executor)
+
+    if reuse_code_exp is not None:
+        tunnel = get_tunnel(cluster_config)
+        if isinstance(reuse_code_exp, run.Experiment):
+            LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
+            reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+        else:
+            with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
+                LOG.info("Reusing code from experiment %s", reuse_code_exp)
+                reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+        for executor in executors:
+            executor.packager.symlink_from_remote_dir = reuse_dir
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case

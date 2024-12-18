@@ -38,7 +38,7 @@ input_key: problem
 output_key: generation
 
 # For synthesized questions
-contamination_key: contaminated
+contamination_file: null
 
 majority_filter:
   # minimum number of majority votes to use the answer
@@ -57,6 +57,8 @@ filters:
   remove_len_outlier_problems: true
   remove_len_outlier_solutions: false
   code_text_filter: null
+  remove_code_errors: false
+  remove_verification_code: false
 
 deduplicate: true
 
@@ -72,7 +74,6 @@ processors:
     use_judgement: ${use_judgement}
     deduplicate: ${deduplicate}
     keys_to_keep:  # input/output/is_correct/judgement are automatically added
-      - ${contamination_key}
       - "total_votes"
       - "majority_votes"
       - "expected_answer"
@@ -93,7 +94,40 @@ processors:
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveContaminated
         should_run: ${filters.remove_contaminated}
-        contamination_key: ${contamination_key}
+        contamination_file: ${contamination_file}
+
+      - _target_: sdp.processors.DropIfRegexMatch
+        should_run: ${filters.remove_code_errors}
+        text_key: ${output_key}
+        regex_patterns:
+          - 'Traceback (most recent call last)'
+          - '<output cut>'
+          - 'Timed out'
+        test_cases:
+          - {input: {generation: "My solution:\n---Traceback (most recent call last)---\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\nSome long output<output cut>\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\nTimed out\nSomething else"}, output: null}
+          - {input: {generation: "My solution, no errors"}, output: {generation: "My solution, no errors"}}
+
+      - _target_: sdp.processors.DropIfRegexMatch
+        should_run: ${filters.remove_verification_code}
+        text_key: ${output_key}
+        regex_patterns:
+          - "Let's verify this with Python"
+          - "Let's verify this using Python"
+          - "Let's confirm this with Python"
+          - "Let's use Python to plot"
+          - "Let's verify this solution using Python"
+          - "Let's use Python to verify"
+          - "Let's confirm this result with some Python"
+        test_cases:
+          - {input: {generation: "Here is the solution. Let's verify this with Python. It should work."}, output: null}
+          - {input: {generation: "Here is the solution. Let's verify this using Python. It should work."}, output: null}
+          - {input: {generation: "First, we solve the problem. Let's confirm this with Python. Finally, we get the result."}, output: null}
+          - {input: {generation: "First, we solve the problem. Let's verify this solution using Python. Finally, we get the result."}, output: null}
+          - {input: {generation: "First, we solve the problem. Let's use Python to verify the solution. Finally, we get the result."}, output: null}
+          - {input: {generation: "The answer is calculated. Let's use Python to plot the results."}, output: null}
+          - {input: {generation: "This is the correct solution without any verification code."}, output: {generation: "This is the correct solution without any verification code."}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.MajorityFilter
         should_run: ${filters.majority_filter}
