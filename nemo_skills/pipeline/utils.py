@@ -91,6 +91,13 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 return []
             raise ValueError(f"Experiment {expname} not found!")
 
+def get_free_port(exclude: list[int] | None = None):
+    """Will return a free port on the host."""
+    exclude = exclude or []
+    port = 5000
+    while port in exclude:
+        port += 1
+    return port
 
 def get_generation_command(server_address, generation_commands):
     cmd = (
@@ -112,6 +119,7 @@ def get_reward_server_command(
     num_nodes: int,
     model_path: str,
     cluster_config: dict,
+    server_port: int,
     server_args: str = "",
 ):
     num_tasks = num_gpus
@@ -126,6 +134,7 @@ def get_reward_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        nemo_aligner_reward_model_port = get_free_port(exclude=[server_port])
         server_start_cmd = (
             # Note: The order of the two commands is important as the reward model server
             # needs to be the first command so it can get the HF_TOKEN from the environment
@@ -137,13 +146,13 @@ def get_reward_server_command(
             f"    +pipeline_model_parallel_size={num_nodes} "
             # This port could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f"    inference.port=5001 "
+            f"    inference.port={nemo_aligner_reward_model_port} "
             f"    {server_args} & "
             f"python -m nemo_skills.inference.server.serve_nemo_reward_model "
             # These ports could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f"    inference_port=5000  "
-            f"    triton_server_address=localhost:5001 "
+            f"    inference_port={server_port}  "
+            f"    triton_server_address=localhost:{nemo_aligner_reward_model_port} "
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
@@ -158,6 +167,7 @@ def get_reward_server_command(
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = 1
@@ -179,6 +189,7 @@ def get_server_command(
     num_nodes: int,
     model_path: str,
     cluster_config: dict,
+    server_port: int,
     server_args: str = "",
 ):
     num_tasks = num_gpus
@@ -200,6 +211,7 @@ def get_server_command(
             f"    trainer.num_nodes={num_nodes} "
             f"    tensor_model_parallel_size={num_gpus} "
             f"    pipeline_model_parallel_size={num_nodes} "
+            f"    ++port={server_port} "
             f"    {server_args} "
         )
 
@@ -214,6 +226,7 @@ def get_server_command(
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = 1
@@ -222,7 +235,8 @@ def get_server_command(
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
-            f"    --model_path {model_path}"
+            f"    --model_path {model_path} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = num_gpus

@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 import hydra
 import numpy as np
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 from mpi4py import MPI
 from pytriton.client import ModelClient
 
@@ -54,8 +54,10 @@ def proxy_rm(cfg: RewardModelGenerationConfig) -> None:
 
         client = ModelClient(cfg.triton_server_address, "reward_model")
 
+
         @app.route('/score', methods=['POST'])
         def infer():
+            client.wait_for_model(3600)
             data = request.json
             input_data = np.array([[obj.encode('utf-8')] for obj in data['prompts']], dtype=np.bytes_)
 

@@ -21,6 +21,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.utils import get_free_port
 from nemo_skills.utils import setup_logging
 
 
@@ -109,7 +110,8 @@ def check_contamination(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = "localhost:5000"
+        server_port = get_free_port()
+        server_address = f"localhost:{server_port}"
 
         server_config = {
             "model_path": model,
@@ -117,6 +119,7 @@ def check_contamination(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_port": server_port,
         }
         extra_arguments += f" ++server.server_type={server_type} "
     else:  # model is hosted elsewhere
