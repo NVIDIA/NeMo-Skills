@@ -146,6 +146,9 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         return
 
     prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
+    if "predicted_answer" not in data[0]:
+        data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
+
     LOG.info("Prompt used: %s", prompt)
     LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
 
@@ -157,6 +160,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
             if "predicted_answer" not in data_point:
                 data_point["predicted_answer"] = extract_answer(data_point["generation"])
+            if data_point["expected_answer"] is None:
+                raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
             judgement = prefill_judgement(data_point)
             if judgement is None:
                 data_points.append(data_point)
@@ -168,12 +173,13 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                 prompts = [prompt.fill(dp) for dp in data_points]
                 stop_phrases = prompt.stop_phrases
 
-                outputs = llm.generate(
-                    prompts=prompts,
-                    stop_phrases=stop_phrases,
-                    **asdict(cfg.inference),
-                    **extra_generate_params,
-                )
+                if len(prompts) > 0:
+                    outputs = llm.generate(
+                        prompts=prompts,
+                        stop_phrases=stop_phrases,
+                        **asdict(cfg.inference),
+                        **extra_generate_params,
+                    )
 
                 prefilled_idx = 0
                 generated_idx = 0

@@ -214,41 +214,6 @@ ns check_contamination \
     ++check_both_ways=True
 ```
 
-Identify all the problems for which the `contaminated` key has the output True.
-Add the entry `"contaminated": True` in all the generation files in `<path to workspace>/new-problems-solution-augmentation/`. Here is a sample python script for this:
-
-```python
-def load_contaminated_problems(jsonl_file):
-    contaminated_problems = set()
-    with open(jsonl_file, 'r') as f:
-        for line in f:
-            data = json.loads(line)
-            if data['contaminated']:
-                contaminated_problems.add(data['problem'])
-    return contaminated_problems
-
-def update_output_files(directory, contaminated_problems):
-    file_pattern = str(Path(directory) / '**' / 'output-rs*.jsonl')
-    for file_path in glob.glob(file_pattern, recursive=True):
-        temp_file_path = Path(file_path).with_suffix('.temp')
-
-        with open(file_path, 'r') as input_file, open(temp_file_path, 'w') as output_file:
-            for line in input_file:
-                data = json.loads(line)
-                if data['problem'] in contaminated_problems:
-                    data['contaminated'] = True
-                json.dump(data, output_file)
-                output_file.write('\n')
-
-        # Replace the original file with the updated one
-        temp_file_path.replace(file_path)
-        print(f"Updated file: {file_path}")
-
-contaminated_problems = load_contaminated_problems("<path to workspace>/new-problems-solution-augmentation/contamination-llm.jsonl")
-
-update_output_files("<path to workspace>/new-problems-solution-augmentation/", contaminated_problems)
-```
-
 
 ## Converting to SFT format
 
@@ -263,14 +228,15 @@ python -m nemo_skills.training.prepare_sft_data \
     ++prompt_config=generic/math \
     ++input_files="<path to workspace>/solution-augmentation/**/output-rs*.jsonl <path to workspace>/new-problems-solution-augmentation/**/output-rs*.jsonl" \
     ++output_path=<path to workspace>/sft_data.jsonl \
-    ++filters.remove_contamindated=true \
     ++filters.remove_len_outlier_problems=true \
     ++max_problem_length=1024 \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \
     ++min_solution_length=200 \
     ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
-    ++max_solution_length=1024
+    ++max_solution_length=1024 \
+    ++filters.remove_contaminated=true \
+    ++contamination_file=<path to workspace>/new-problems-solution-augmentation/contamination-llm.jsonl
 ```
 
 ## Dataset contamination explorer
