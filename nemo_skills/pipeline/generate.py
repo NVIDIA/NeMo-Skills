@@ -21,7 +21,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_reward_server_command, get_server_command, get_free_port
+from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -113,7 +113,18 @@ client_command_factories = {
     GenerationType.math_judge: get_math_judge_cmd,
 }
 
-def configure_client(generation_type, server_gpus, server_type, server_address, server_port, server_nodes, model, server_args, extra_arguments):
+
+def configure_client(
+    generation_type,
+    server_gpus,
+    server_type,
+    server_address,
+    server_port,
+    server_nodes,
+    model,
+    server_args,
+    extra_arguments,
+):
     if server_address is None:  # we need to host the model
         server_port = get_free_port()
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
@@ -135,6 +146,7 @@ def configure_client(generation_type, server_gpus, server_type, server_address, 
         )
         server_port = None
     return server_config, extra_arguments, server_address, server_port
+
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
@@ -209,6 +221,7 @@ def generate(
 
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]
+    original_server_address = server_address
 
     with run.Experiment(expname) as exp:
         if random_seeds:
@@ -218,7 +231,7 @@ def generate(
                     generation_type=generation_type,
                     server_gpus=server_gpus,
                     server_type=server_type,
-                    server_address=server_address,
+                    server_address=original_server_address,
                     server_port=server_port,
                     server_nodes=server_nodes,
                     model=model,
@@ -233,6 +246,7 @@ def generate(
                     eval_args=eval_args,
                 )
                 prev_tasks = None
+
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
@@ -262,7 +276,7 @@ def generate(
                 generation_type=generation_type,
                 server_gpus=server_gpus,
                 server_type=server_type,
-                server_address=server_address,
+                server_address=original_server_address,
                 server_port=server_port,
                 server_nodes=server_nodes,
                 model=model,
