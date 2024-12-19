@@ -72,7 +72,7 @@ def start_server(
         "num_gpus": server_gpus,
         "num_nodes": server_nodes,
         "server_args": server_args,
-        "server_port": get_free_port(),
+        "server_port": get_free_port(strategy="random"),
     }
 
     with run.Experiment("server") as exp:
