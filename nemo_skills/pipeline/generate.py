@@ -14,13 +14,14 @@
 
 import logging
 from enum import Enum
+from typing import List
 
 import nemo_run as run
 import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_reward_server_command, get_server_command
+from nemo_skills.pipeline.utils import get_reward_server_command, get_server_command, get_free_port
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -57,18 +58,39 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
 
 
 def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for reward model")
     cmd = (
-        f"python -m nemo_skills.inference.reward_model ++skip_filled=True "
-        f"++output_dir={output_dir} ++random_seed={random_seed} "
+        f"python -m nemo_skills.inference.reward_model "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
     return cmd
 
 
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd):
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for math judge")
+    cmd = (
+        f"python -m nemo_skills.inference.llm_math_judge "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd
+
+
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
     if preprocess_cmd:
+        if random_seed is not None:
+            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
         cmd = f" {preprocess_cmd} && {cmd} "
     if postprocess_cmd:
+        if random_seed is not None:
+            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
         cmd = f" {cmd} && {postprocess_cmd} "
     return cmd
 
@@ -76,18 +98,43 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd):
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
+    math_judge = "math_judge"
 
 
 server_command_factories = {
     GenerationType.generate: get_server_command,
     GenerationType.reward: get_reward_server_command,
+    GenerationType.math_judge: get_server_command,
 }
 
 client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
+    GenerationType.math_judge: get_math_judge_cmd,
 }
 
+def configure_client(generation_type, server_gpus, server_type, server_address, server_port, server_nodes, model, server_args, extra_arguments):
+    if server_address is None:  # we need to host the model
+        server_port = get_free_port()
+        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        server_address = f"localhost:{server_port}"
+
+        server_config = {
+            "model_path": model,
+            "server_type": server_type,
+            "num_gpus": server_gpus,
+            "num_nodes": server_nodes,
+            "server_args": server_args,
+            "server_port": server_port,
+        }
+        extra_arguments += f" ++server.server_type={server_type} "
+    else:  # model is hosted elsewhere
+        server_config = None
+        extra_arguments += (
+            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
+        )
+        server_port = None
+    return server_config, extra_arguments, server_address, server_port
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
@@ -113,6 +160,7 @@ def generate(
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
+    random_seeds: List[int] = typer.Option(None, help="List of random seeds to use for generation"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
@@ -123,11 +171,11 @@ def generate(
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
     ),
-    run_after: str = typer.Option(
-        None, help="Can specify an expname that needs to be completed before this one starts"
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
 ):
     """Generate LLM completions for a given input file.
 
@@ -142,6 +190,11 @@ def generate(
     except AttributeError:
         pass
 
+    if random_seeds and num_random_seeds:
+        raise ValueError("Cannot specify both random_seeds and num_random_seeds")
+    if num_random_seeds:
+        random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
+
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
     if log_dir:
@@ -149,37 +202,25 @@ def generate(
     else:
         log_dir = f"{output_dir}/generation-logs"
 
-    if server_address is None:  # we need to host the model
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        # Note: for reward models, the port is hard-coded to 5000 in the
-        # get_reward_server_command function. Since RM has a proxy server on 5000
-        # and an actual GPU is being loaded on port 5001, we need to wait for 5001
-        # to come online before sending requests
-        if generation_type == GenerationType.reward:
-            server_address = "localhost:5001"
-        else:
-            server_address = "localhost:5000"
-
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-        }
-        extra_arguments += f" ++server.server_type={server_type} "
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments += (
-            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
-        )
-
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]
 
     with run.Experiment(expname) as exp:
-        if num_random_seeds:
-            for seed in range(starting_seed, starting_seed + num_random_seeds):
+        if random_seeds:
+            for seed in random_seeds:
+                server_port = get_free_port()
+                server_config, extra_arguments, server_address, server_port = configure_client(
+                    generation_type=generation_type,
+                    server_gpus=server_gpus,
+                    server_type=server_type,
+                    server_address=server_address,
+                    server_port=server_port,
+                    server_nodes=server_nodes,
+                    model=model,
+                    server_args=server_args,
+                    extra_arguments=extra_arguments,
+                )
+
                 cmd = get_cmd(
                     random_seed=seed,
                     output_dir=output_dir,
@@ -194,8 +235,9 @@ def generate(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
                             postprocess_cmd,
+                            random_seed=seed,
                         ),
-                        task_name=f'generate-rs{seed}',
+                        task_name=f'{expname}-rs{seed}',
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
@@ -209,6 +251,18 @@ def generate(
                     )
                     prev_tasks = [new_task]
         else:
+            server_port = get_free_port()
+            server_config, extra_arguments, server_address, server_port = configure_client(
+                generation_type=generation_type,
+                server_gpus=server_gpus,
+                server_type=server_type,
+                server_address=server_address,
+                server_port=server_port,
+                server_nodes=server_nodes,
+                model=model,
+                server_args=server_args,
+                extra_arguments=extra_arguments,
+            )
             cmd = get_cmd(
                 random_seed=None,
                 output_dir=output_dir,
@@ -224,7 +278,7 @@ def generate(
                         preprocess_cmd,
                         postprocess_cmd,
                     ),
-                    task_name="generate",
+                    task_name=expname,
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,

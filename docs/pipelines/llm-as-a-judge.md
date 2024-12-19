@@ -2,7 +2,7 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/llm_math_judge.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/llm_math_judge.py)
+    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
 
     All extra parameters are passed to [nemo_skills/inference/llm_math_judge.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/llm_math_judge.py)
 
@@ -11,25 +11,31 @@ While we do perform such comparison by default, for most accurate results it's b
 E.g. symbolic comparison can perform very inaccurately for multi-choice questions where an answer might either be
 one of the letters or an expression corresponding to that letter.
 
-If you have an output of the [evaluation script](evaluation.md) on one of the math datasets, you can run LLM-as-a-judge
+If you have an output of the [evaluation script](evaluation.md) on e.g. math benchmark, you can run LLM-as-a-judge
 in the following way (assuming you have `/workspace` mounted in your [cluster config](../basics/prerequisites.md#cluster-configs)
 and evaluation output available in `/workspace/test-eval/eval-results`).
 
 ```bash
-ns llm_math_judge \
+ns generate \
+    --generation_type=math_judge \
     --cluster=local \
     --model=gpt-4o \
     --server_type=openai \
     --server_address=https://api.openai.com/v1 \
-    --input_files="/workspace/test-eval/eval-results/**/output*.jsonl"
+    --output_dir=/workspace/test-eval-judge/eval-results/math \
+    ++input_dir=/workspace/test-eval/eval-results/math
 ```
 
-This will run the judge pipeline on all benchmarks inside `eval-results` folder and evaluation all `output*.jsonl` files.
+This will run the judge pipeline on the data inside `eval-results/math` folder and judge solutions from `output.jsonl` file.
+If you ran the benchmark with N samples (e.g. using `math:8`) and want to judge all of them, add `--num_random_seeds=8`.
+Note that if you want to judge both greedy generations and samples, you'd need to run the command two times.
+
 In this example we use gpt-4o from OpenAI, but you can use Llama-405B (that you can host on cluster yourself) or any
-other models. After the judge pipeline has finished, you can see the results by running
+other models. If you have multiple benchmarks, you would need to run the command multiple times.
+After the judge pipeline has finished, you can see the results by running
 
 ```bash
-ns summarize_results /workspace/test-eval/ --cluster local
+ns summarize_results /workspace/test-eval-judge --cluster local
 ```
 
 Which should output something like this

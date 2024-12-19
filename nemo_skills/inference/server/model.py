@@ -366,8 +366,10 @@ class OpenAIModel(BaseModel):
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
 
-        self.model = model
         self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.model = model
+        if self.model == "model":  # that's a placeholder, so trying to find real name
+            self.model = self.get_model_name_from_server()
 
     def batch_generate(
         self,
@@ -506,6 +508,13 @@ class OpenAIModel(BaseModel):
 
         output = response.message.content
         return {'generation': output}
+
+    def get_model_name_from_server(self):
+        model_list = self.client.models.list()
+        # TODO: this is a bit hacky, but will go away when we switch to a unified openai api for all models
+        assert len(model_list.data) == 1, "Unexpected number of models returned by OpenAI API."
+        model_name = model_list.data[0].id
+        return model_name
 
 
 class VLLMModel(BaseModel):

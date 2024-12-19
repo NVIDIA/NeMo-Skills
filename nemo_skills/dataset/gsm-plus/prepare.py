@@ -15,6 +15,7 @@
 import argparse
 import json
 import os
+import pathlib
 import urllib.request
 from pathlib import Path
 
@@ -32,7 +33,7 @@ if __name__ == "__main__":
             "adding_operation",
             "critical_thinking",
             "digit_expansion",
-            "distractor_insertion",
+            "distraction_insertion",
             "integer-decimal-fraction_conversion",
             "numerical_substitution",
             "problem_understanding",
@@ -40,6 +41,7 @@ if __name__ == "__main__":
         ],
     )
     parser.add_argument("--no_rounding_instructions", action='store_true')
+    parser.add_argument("--cleaning", choices=["none", "light", "hard"], default="none")
     args = parser.parse_args()
 
     split = "test"
@@ -56,15 +58,25 @@ if __name__ == "__main__":
         output_file_rounded = str(data_dir / f"{split}_rounded.jsonl")
         file_rounded = open(output_file_rounded, 'w')
 
+    with open(os.path.join(pathlib.Path(__file__).parent, "cleaned_indexes.json")) as f:
+        cleaning_options = json.load(f)
+        for key in cleaning_options.keys():
+            cleaning_options[key] = set(cleaning_options[key])
+
     with open(original_file, "rt") as original, open(output_file, "w") as test_full:
         original_data = [json.loads(line) for line in original.readlines()]
-        for original_entry in original_data:
-            if original_entry["perturbation_type"].replace(' ', '_') in args.categories:
+        cleaning_options['none'] = set(range(len(original_data)))
+        for i, original_entry in enumerate(original_data):
+            if (
+                original_entry["perturbation_type"].replace(' ', '_') in args.categories
+                and i in cleaning_options[args.cleaning]
+            ):
                 # original entries
                 reference_solution = original_entry.get("solution", None) or original_entry.get(
                     "reference_solution", None
                 )
                 expected_answer = original_entry.get("answer", None) or original_entry.get("expected_answer", None)
+                expected_answer = expected_answer if expected_answer != 'None' else 'insufficient'
                 entry = dict(
                     problem=original_entry["question"],
                     reference_solution=reference_solution,

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import os
 import shlex
@@ -20,6 +19,7 @@ import subprocess
 import sys
 import tarfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -27,11 +27,10 @@ import nemo_run as run
 import yaml
 from huggingface_hub import get_token
 from invoke import StreamWatcher
-from nemo_run.config import NEMORUN_HOME
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
-from nemo_run.core.serialization.zlib_json import ZlibJSONSerializer
 from nemo_run.core.tunnel import SSHTunnel
+from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
@@ -54,40 +53,51 @@ def get_unmounted_path(cluster_config, path):
     raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
 
 
-def _get_latest_dir(path, expname, job_id) -> str:
-    if job_id is not None:
-        return os.path.join(path, f"{expname}_{job_id}")
+# caching the status assuming it doesn't change while experiment is being scheduled
+# otherwise this results in too many ssh calls
+@lru_cache
+def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=True) -> list[str]:
+    """Will return the handles of the tasks in the experiment.
 
-    dirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-    latest_dir = max(dirs, key=lambda d: os.path.getctime(os.path.join(path, d)))
-    return os.path.join(path, latest_dir)
+    If ignore_finished=True, will only return handles for the tasks
+    that are not yet finished. Useful for filtering handles to set dependencies on.
 
+    If ignore_exp_not_exists=True, will not raise an error if the experiment does not exist.
 
-def get_exp_handles(expname):
-    # TODO: remove this after we can properly use .from_title api
-    job_id = None
-    if "_" in expname and expname.split("_")[-1].isdigit():
-        job_id = int(expname.split("_")[-1])
-        expname = expname[: expname.rfind("_")]
+    TODO: it's still possible that job submission fails if the tasks exist when this function
+          is called, but finish before nemo-run submits a new job (which might take minutes)
+    """
 
-    parent_dir = os.path.join(NEMORUN_HOME, "experiments", expname)
-    exp_dir = _get_latest_dir(parent_dir, expname, job_id)
+    def _get_handles(exp):
+        handles = []
+        for job in exp.jobs:
+            if not ignore_finished or (
+                job.status(exp._runner) in [AppState.RUNNING, AppState.PENDING, AppState.SUBMITTED, AppState.UNKNOWN]
+            ):
+                handles.append(job.handle)
+                continue
+        return handles
 
-    with open(os.path.join(exp_dir, '_TASKS')) as f:
-        serialized_jobs = json.load(f)
+    try:
+        with run.Experiment.from_title(expname) as exp:
+            return _get_handles(exp)
+    except FileNotFoundError:
+        try:
+            with run.Experiment.from_id(expname) as exp:
+                return _get_handles(exp)
+        except AssertionError:
+            if ignore_exp_not_exists:
+                LOG.warning("Experiment %s not found!", expname)
+                return []
+            raise ValueError(f"Experiment {expname} not found!")
 
-    serializer = ZlibJSONSerializer()
-    handles = []
-    for job in serialized_jobs:
-        obj = serializer.deserialize(job[0])
-        if hasattr(obj, 'handle'):
-            handles.append(obj.handle)
-        elif hasattr(obj, 'handles'):
-            handles.extend(obj.handles)
-        else:
-            raise ValueError(f"Object {obj} does not have a handle or handles attribute.")
-    return handles
-
+def get_free_port(exclude: list[int] | None = None):
+    """Will return a free port on the host."""
+    exclude = exclude or []
+    port = 5000
+    while port in exclude:
+        port += 1
+    return port
 
 def get_generation_command(server_address, generation_commands):
     cmd = (
@@ -109,6 +119,7 @@ def get_reward_server_command(
     num_nodes: int,
     model_path: str,
     cluster_config: dict,
+    server_port: int,
     server_args: str = "",
 ):
     num_tasks = num_gpus
@@ -123,6 +134,7 @@ def get_reward_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        nemo_aligner_reward_model_port = get_free_port(exclude=[server_port])
         server_start_cmd = (
             # Note: The order of the two commands is important as the reward model server
             # needs to be the first command so it can get the HF_TOKEN from the environment
@@ -134,13 +146,13 @@ def get_reward_server_command(
             f"    +pipeline_model_parallel_size={num_nodes} "
             # This port could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f"    inference.port=5001 "
+            f"    inference.port={nemo_aligner_reward_model_port} "
             f"    {server_args} & "
             f"python -m nemo_skills.inference.server.serve_nemo_reward_model "
             # These ports could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
-            f"    inference_port=5000  "
-            f"    triton_server_address=localhost:5001 "
+            f"    inference_port={server_port}  "
+            f"    triton_server_address=localhost:{nemo_aligner_reward_model_port} "
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
@@ -155,6 +167,7 @@ def get_reward_server_command(
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = 1
@@ -176,6 +189,7 @@ def get_server_command(
     num_nodes: int,
     model_path: str,
     cluster_config: dict,
+    server_port: int,
     server_args: str = "",
 ):
     num_tasks = num_gpus
@@ -197,6 +211,7 @@ def get_server_command(
             f"    trainer.num_nodes={num_nodes} "
             f"    tensor_model_parallel_size={num_gpus} "
             f"    pipeline_model_parallel_size={num_nodes} "
+            f"    ++port={server_port} "
             f"    {server_args} "
         )
 
@@ -211,6 +226,7 @@ def get_server_command(
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = 1
@@ -219,7 +235,8 @@ def get_server_command(
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
-            f"    --model_path {model_path}"
+            f"    --model_path {model_path} "
+            f"    --port {server_port} "
             f"    {server_args} "
         )
         num_tasks = num_gpus
@@ -315,8 +332,27 @@ def get_cluster_config(cluster=None, config_dir=None):
     return read_config(config_file)
 
 
+@lru_cache
+def _get_tunnel_cached(
+    job_dir: str,
+    host: str,
+    user: str,
+    identity: str | None = None,
+    shell: str | None = None,
+    pre_command: str | None = None,
+):
+    return run.SSHTunnel(
+        host=host,
+        user=user,
+        identity=identity,
+        shell=shell,
+        pre_command=pre_command,
+        job_dir=job_dir,
+    )
+
+
 def get_tunnel(cluster_config):
-    return run.SSHTunnel(**cluster_config["ssh_tunnel"])
+    return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
 # Helper class and function to support streaming updates
@@ -430,7 +466,8 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-def get_packager(extra_package_dirs: list[str] | None = None):
+@lru_cache
+def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = Path(__file__).absolute().parents[1]
 
@@ -608,12 +645,15 @@ def get_executor(
     partition=None,
     time_min=None,
     dependencies=None,
-    extra_package_dirs: list[str] | None = None,
+    extra_package_dirs: tuple[str] | None = None,
+    slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config, env_vars)
 
     mounts = mounts or config_mounts
+    if extra_package_dirs is not None:
+        extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
     if cluster_config["executor"] == "local":
         if num_nodes > 1:
@@ -638,6 +678,18 @@ def get_executor(
     else:
         timeout = cluster_config["timeouts"][partition]
 
+    srun_args = [
+        "--no-container-mount-home",
+        "--overlap",
+        "--mpi=pmix",
+        '--wait=10',
+        # we need to be explicit about this in srun as commands might need to run in parallel
+        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--nodes={num_nodes}",
+    ]
+    if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
+        srun_args.append(f"--gpus-per-node={gpus_per_node}")
+
     return run.SlurmExecutor(
         account=cluster_config["account"],
         partition=partition,
@@ -648,20 +700,10 @@ def get_executor(
         container_mounts=mounts,
         time=timeout,
         additional_parameters={'time_min': time_min} if time_min is not None else {},
+        exclusive=True,
         packager=packager,
         gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
-        srun_args=[
-            "--no-container-mount-home",
-            "--overlap",
-            "--mpi=pmix",
-            '--wait=10',
-            # we need to be explicit about this in srun as commands might need to run in parallel
-            f"--ntasks={tasks_per_node * num_nodes}",
-            f"--nodes={num_nodes}",
-        ],
-        # TODO: can we relax this to allow partial node allocation?
-        exclusive=True,
-        mem=0,
+        srun_args=srun_args,
         job_details=CustomJobDetails(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
@@ -671,8 +713,8 @@ def get_executor(
         wait_time_for_group_job=0.01,
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
-        dependency_type="afterany",
         env_vars=env_vars,
+        **(slurm_kwargs or {}),
     )
 
 
@@ -691,16 +733,18 @@ def add_task(
     with_sandbox=False,
     server_config=None,
     task_dependencies: list[str] = None,
-    run_after=None,
+    run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
+    slurm_kwargs: dict | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
     Note that there are two parameters that control dependencies.
         - task_dependencies: list of tasks that this task depends on **within the same experiment**
-        - run_after: a single **experiment name** that this task should run after. Will schedule
-          dependencies on all tasks inside `run_after` experiment. It needs to already be launched and running.
+        - run_after: a string with experiment name or a list of experiment names that this task
+          should run after. Will schedule dependencies on all tasks inside `run_after` experiments.
+          It needs to already be launched and running.
 
     Example of how to set task_dependencies:
 
@@ -709,12 +753,24 @@ def add_task(
         task2 = add_task(exp, ..., task_dependencies=[task1])
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
-        dependencies = tuple(get_exp_handles(run_after))
+        if isinstance(run_after, str):
+            run_after = [run_after]
+        dependencies = []
+        for dep_expname in run_after:
+            exp_handles = get_exp_handles(dep_expname)
+            if len(exp_handles) == 0:
+                LOG.warning(
+                    "No pending or running tasks found for experiment %s, cannot set dependencies.", dep_expname
+                )
+            dependencies.extend(exp_handles)
+        if len(dependencies) == 0:
+            dependencies = None
     else:
         dependencies = None
 
     if num_gpus is None and cluster_config['executor'] == "slurm":
-        num_gpus = 1
+        if not 'cpu' in (partition or cluster_config.get("partition", "")):
+            num_gpus = 1
 
     commands = []
     executors = []
@@ -736,6 +792,7 @@ def add_task(
             log_dir=log_dir,
             log_prefix="server",
             extra_package_dirs=extra_package_dirs,
+            slurm_kwargs=slurm_kwargs,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -761,6 +818,7 @@ def add_task(
                 log_dir=log_dir,
                 log_prefix="main",
                 extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
             )
         )
 
@@ -780,6 +838,7 @@ def add_task(
             log_dir=log_dir,
             log_prefix="sandbox",
             extra_package_dirs=extra_package_dirs,
+            slurm_kwargs=slurm_kwargs,
         )
         commands.append(get_sandox_command())
         executors.append(sandbox_executor)

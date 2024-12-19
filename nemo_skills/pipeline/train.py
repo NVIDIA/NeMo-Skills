@@ -17,11 +17,10 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable
+from typing import Callable, List
 
 import nemo_run as run
 import typer
-from huggingface_hub import get_token
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -63,6 +62,7 @@ def get_cmd(params: TrainingParams) -> str:
         f"export WANDB_API_KEY={os.getenv('WANDB_API_KEY', '')} && "
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
         f"cd /nemo_run/code && "
         f"echo 'Starting training' && "
         f"{params.training_script} "
@@ -191,9 +191,9 @@ def get_avg_checkpoints_cmd(nemo_model, output_dir, final_nemo_path, average_ste
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
         f"python -m nemo_skills.training.average_checkpoints "
-        f" --untarred_nemo_dir {nemo_model} "
-        f" --name_prefix=model "
-        f" --checkpoint_dir={output_dir}/training/checkpoints {average_steps} && "
+        f"    --untarred_nemo_dir {nemo_model} "
+        f"    --name_prefix=model "
+        f"    --checkpoint_dir={output_dir}/training/checkpoints {average_steps} && "
         f"mkdir -p {os.path.dirname(final_nemo_path)} && "
         f"mv {output_dir}/training/checkpoints/{name} {final_nemo_path} "
     )
@@ -229,7 +229,9 @@ def train(
     average_steps: str = typer.Option(
         None, help="List of commas separated checkpoint steps to average. E.g 1000,5000"
     ),
-    run_after: str = typer.Option(None, help="Experiment to run after"),
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
 ):
@@ -295,7 +297,7 @@ def train(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{training_algo}-{job_id}',
+                task_name=f'{expname}-{training_algo}-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["nemo"],
                 num_gpus=num_gpus,
@@ -319,7 +321,7 @@ def train(
         add_task(
             exp,
             cmd=cmd,
-            task_name="prepare-eval",
+            task_name=f"{expname}-prepare-eval",
             log_dir=f"{log_dir}/prepare-eval-logs",
             container=cluster_config["containers"]['nemo'],
             cluster_config=cluster_config,

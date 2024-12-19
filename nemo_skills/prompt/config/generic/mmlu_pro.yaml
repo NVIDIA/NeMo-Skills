@@ -1,0 +1,19 @@
+# Prompt used by TigerLab for MMLU-Pro benchmark
+# https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/main/evaluate_from_api.py
+
+few_shot_examples:
+  prefix: ""
+  template: |-
+
+    Question: {question}
+    Options: {options}{user_end}{assistant_begin}Answer: Let's think step by step. {solution}{assistant_end}{user_begin}
+
+  suffix: ""
+  examples_type: "{examples_type}"
+
+
+user: |-
+  The following are multiple choice questions (with answers) about {subset_for_metrics}. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+  {examples}
+  Question: {question}
+  Options: {options}

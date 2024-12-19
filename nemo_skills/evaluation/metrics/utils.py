@@ -12,12 +12,19 @@
 # See the License for the specific lang
 
 import json
+import logging
+
+LOG = logging.getLogger(__file__)
 
 
-def read_predictions(predictions):
+def read_predictions(predictions, line_idx, file_handles):
     data = []
-    for prediction in predictions:
-        prediction_dict = json.loads(prediction)
+    for file_idx, prediction in enumerate(predictions):
+        try:
+            prediction_dict = json.loads(prediction)
+        except Exception as e:
+            LOG.error(f"Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
+            raise
         data.append(prediction_dict)
 
     return data

@@ -60,6 +60,8 @@ def nested_dataclass(*args, **kwargs):
 
 
 def unroll_files(input_files):
+    if len(input_files) == 0:
+        raise ValueError("No files found with the given pattern.")
     for file_pattern in input_files:
         for file in sorted(glob.glob(file_pattern, recursive=True)):
             yield file
