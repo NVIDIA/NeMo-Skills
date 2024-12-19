@@ -13,9 +13,10 @@ Here are some of the things we support.
   and [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) servers and easily convert checkpoints from one format to another.
 - [Model evaluation](pipelines/evaluation.md): Evaluate your models on many popular benchmarks
     - Math problem solving: gsm8k, math, amc23, aime24, omni-math (and many more)
+    - Formal proofs in Lean: minif2f, proofnet
     - Coding skills: human-eval, mbpp
-    - Chat/instruction following: ifeval, arena-hard
-    - General knowledge: mmlu (generative)
+    - Chat/instruction following: ifeval, arena-hard, mt-bench
+    - General knowledge: mmlu (generative), mmlu-pro
 - [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 To get started, follow the [prerequisites](basics/prerequisites.md) and then run `ns --help` to see all available

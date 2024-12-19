@@ -103,11 +103,11 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
          or [create your own prompts](prompt-format.md)
 
 
-    2.   This should print
+    3.   This should print
 
          ```python-console
          >>> print(prompts[0])
-         [{'role': 'system', 'content': ''}, {'role': 'user', 'content': "What's 2 + 2?"}]
+         [{'role': 'user', 'content': "What's 2 + 2?"}]
          ```
 
          If you don't want to use our prompt class, just create this list yourself

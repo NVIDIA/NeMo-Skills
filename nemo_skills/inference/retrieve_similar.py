@@ -67,10 +67,16 @@ class RetrieveSimilarConfig:
 
     def __post_init__(self):
         if isinstance(self.retrieve_from, str):
-            self.retrieve_from = self.retrieve_from.split(" ")
+            if ',' in self.retrieve_from:
+                self.retrieve_from = self.retrieve_from.split(",")
+            else:
+                self.retrieve_from = self.retrieve_from.split(" ")
 
         if isinstance(self.compare_to, str):
-            self.compare_to = self.compare_to.split(" ")
+            if ',' in self.compare_to:
+                self.compare_to = self.compare_to.split(",")
+            else:
+                self.compare_to = self.compare_to.split(" ")
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
