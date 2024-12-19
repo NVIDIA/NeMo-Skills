@@ -22,10 +22,9 @@ python -m nemo_skills.training.prepare_sft_data \
 !!! tip
 
     Many scripts access `++input_files` argument. You can use any glob patterns there and also
-    reference multiple files/patterns separated by space.
+    reference multiple files/patterns separated by space or comma.
 
-Note that unlike most other scripts, this one doesn't accept a `--cluster` parameter and you can currently only run
-it locally (this will be changed soon).
+If you want to run that command inside container or on cluster, add `ns run_cmd --cluster=...` in the beginning.
 
 You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
 that data preparation script supports which you can see
@@ -140,6 +139,7 @@ convert(
     run_after=expname,
     convert_from="nemo",
     convert_to="hf",
+    model_type="llama",
     num_gpus=8,
     hf_model_name="meta-llama/Meta-Llama-3.1-8B",
 )
@@ -153,6 +153,7 @@ convert(
     run_after=f"{expname}-to-hf",
     convert_from="hf",
     convert_to="trtllm",
+    model_type="llama",
     num_gpus=8,
 )
 

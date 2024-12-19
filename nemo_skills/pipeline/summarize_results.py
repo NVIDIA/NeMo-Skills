@@ -221,7 +221,7 @@ def summarize_results(
         run = wandb.init(
             project=wandb_project,
             name=wandb_name,
-            id=wandb_name,
+            id=wandb_name + (wandb_group if wandb_group else ""),
             resume="allow",
             group=wandb_group,
             settings=wandb.Settings(silent=True),
@@ -297,7 +297,9 @@ def summarize_results(
         # Log all plots
         run.log({**plots})
         run.finish()
-        print(f"Results are synced to wandb project {wandb_project} under the name {wandb_name}")
+        print(
+            f"Results are synced to wandb project {wandb_project} under the name {wandb_name} and group {wandb_group}"
+        )
 
 
 if __name__ == "__main__":

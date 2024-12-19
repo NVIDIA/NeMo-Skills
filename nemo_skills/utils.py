@@ -62,9 +62,13 @@ def nested_dataclass(*args, **kwargs):
 def unroll_files(input_files):
     if len(input_files) == 0:
         raise ValueError("No files found with the given pattern.")
+    total_files = 0
     for file_pattern in input_files:
         for file in sorted(glob.glob(file_pattern, recursive=True)):
+            total_files += 1
             yield file
+    if total_files == 0:
+        raise ValueError("No files found with the given pattern.")
 
 
 def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO):

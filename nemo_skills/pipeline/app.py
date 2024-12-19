@@ -60,6 +60,8 @@ def typer_unpacker(f: Callable):
                     kwargs[name] = func_default.default()
                 else:
                     kwargs[name] = func_default.default
+                if kwargs[name] is ...:
+                    raise TypeError(f"Missing required argument: '{name}'")
 
         # Call the wrapped function with the defaults injected if not specified.
         return f(*args, **kwargs)

@@ -113,8 +113,9 @@ from nemo_skills.pipeline.cli import generate
 
 # we generated 80 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 80 new data files
+exp = None
 for i in range(80):
-    generate(
+    exp = generate(
         cluster="slurm",
         server_type="trtllm",
         model="/trt_models/llama-3.1-405b-instruct",
@@ -128,6 +129,7 @@ for i in range(80):
             f"++examples_type=math_text_detailed "
             f"++prompt_template=llama3-base "
         ),
+        reuse_code_exp=exp,
     )
 ```
 
@@ -139,6 +141,7 @@ from nemo_skills.pipeline.cli import generate
 
 # we generated 10 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 10 new data files
+exp = None
 for i in range(10):
     generate(
         cluster="slurm",
@@ -154,6 +157,7 @@ for i in range(10):
             f"++examples_type=gsm8k_text_detailed "
             f"++prompt_template=llama3-base "
         ),
+        reuse_code_exp=exp,
     )
 ```
 
@@ -164,25 +168,43 @@ You also need to specify the full path to where `/workspace` is mounted
 Python/cmdline API as for other scripts).
 
 ```python
-import subprocess
+from nemo_skills.pipeline import wrap_arguments
+from nemo_skills.pipeline.cli import run_cmd
 
 # for MATH
-data_folder = "<path to where /workspace is>/new-problems-solution-augmentation/math"
+data_folder = "/workspace/new-problems-solution-augmentation/math"
+exp = None
+# if you want to avoid scheduling many jobs, you can instead
+# create one big cmd and run it directly to handle all files
+# or you can create a new script and reference it with
+# /nemo_run/code/<path to your script inside this repo>
 for i in range(80):
     cmd = (
         f'python -m nemo_skills.evaluation.fill_majority_answer '
         f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
     )
-    subprocess.run(cmd, shell=True, check=True)
+    exp = run_cmd(
+        cluster="slurm",
+        ctx=wrap_arguments(cmd),
+        reuse_code_exp=exp,
+        log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
+        # if cluster has a cpu partition you can specify it with a `partition` parameter
+    )
 
 # for GSM8K
-data_folder = "<path to where /workspace is>/new-problems-solution-augmentation/gsm8k"
+data_folder = "/workspace/new-problems-solution-augmentation/gsm8k"
 for i in range(10):
     cmd = (
         f'python -m nemo_skills.evaluation.fill_majority_answer '
         f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
     )
-    subprocess.run(cmd, shell=True, check=True)
+    exp = run_cmd(
+        cluster="slurm",
+        ctx=wrap_arguments(cmd),
+        reuse_code_exp=exp,
+        log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
+        # if cluster has a cpu partition you can specify it with a `partition` parameter
+    )
 ```
 
 
@@ -190,22 +212,34 @@ for i in range(10):
 We test against GSM8K, MATH, AMC 2023, and AIME 2024.
 
 Retrieve top-5 similar items from the test sets
-```bash
-python -m nemo_skills.inference.retrieve_similar \
-    ++retrieve_from="./nemo_skills/dataset/gsm8k/test.jsonl ./nemo_skills/dataset/math/test.jsonl ./nemo_skills/dataset/amc23/test.jsonl ./nemo_skills/dataset/aime24/test.jsonl" \
-    ++compare_to="<path to workspace>/new-problems-solution-augmentation/**/output-rs0.jsonl" \
-    ++output_file=<path to workspace>/new-problems-solution-augmentation/contamination-retrieved.jsonl \
-    ++top_k=5
+```python
+from nemo_skills.pipeline import wrap_arguments
+from nemo_skills.pipeline.cli import run_cmd
+
+
+test_sets = ['gsm8k', 'math', 'amc23', 'aime24']
+retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
+
+cmd = (
+    f"python -m nemo_skills.inference.retrieve_similar "
+    f"    ++retrieve_from=\\\'{retrieve_from}\\\' "
+    f"    ++compare_to='/workspace/new-problems-solution-augmentation/**/output-rs0.jsonl' "
+    f"    ++output_file='/workspace/new-problems-solution-augmentation/contamination-retrieved.jsonl' "
+    f"    ++top_k=5 "
+)
+
+run_cmd(
+    cluster="slurm",
+    container=nemo,
+    ctx=wrap_arguments(cmd),
+)
 ```
-!!! note
-
-    Currently the above command doesn't run inside docker, so you will need to install additional packages.
-
-Next, you need to run LLM inference to check those closest found problems from the output file. We use the Llama3.1-405B-Instruct model for this, and here's one way of doing it via Nvidia API catalog.
+Next, you need to run LLM inference to check those closest found problems from the output file.
+We use the Llama3.1-405B-Instruct model for this, and here's one way of doing it via Nvidia API catalog.
 
 ```bash
 ns check_contamination \
-    --cluster=local \
+    --cluster=slurm \
     --input_file=/workspace/new-problems-solution-augmentation/contamination-retrieved.jsonl \
     --output_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl \
     --server_type=openai \
@@ -213,6 +247,9 @@ ns check_contamination \
     --server_address=https://integrate.api.nvidia.com/v1 \
     ++check_both_ways=True
 ```
+
+Note that this command doesn't require GPUs, so it's best to run in a CPU partition or download data and run it locally.
+Alternatively you can always modify the command to host the model yourself.
 
 
 ## Converting to SFT format
@@ -223,11 +260,12 @@ We also remove problems and solutions with length > 1024 Llama tokens.
 To avoid the models from generating extremely short solutions, we remove solutions shorter than 200 characters.
 
 ```bash
+ns run_cmd --cluster=slurm \
 python -m nemo_skills.training.prepare_sft_data \
     ++prompt_template=llama3-instruct \
     ++prompt_config=generic/math \
-    ++input_files="<path to workspace>/solution-augmentation/**/output-rs*.jsonl <path to workspace>/new-problems-solution-augmentation/**/output-rs*.jsonl" \
-    ++output_path=<path to workspace>/sft_data.jsonl \
+    ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
+    ++output_path=/workspace/sft_data.jsonl \
     ++filters.remove_len_outlier_problems=true \
     ++max_problem_length=1024 \
     ++filters.remove_len_outlier_solutions=true \
@@ -236,7 +274,7 @@ python -m nemo_skills.training.prepare_sft_data \
     ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
     ++max_solution_length=1024 \
     ++filters.remove_contaminated=true \
-    ++contamination_file=<path to workspace>/new-problems-solution-augmentation/contamination-llm.jsonl
+    ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl
 ```
 
 ## Dataset contamination explorer
