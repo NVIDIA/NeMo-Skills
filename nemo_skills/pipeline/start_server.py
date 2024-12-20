@@ -52,6 +52,7 @@ def start_server(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False)
@@ -87,6 +88,7 @@ def start_server(
             time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         # we don't want to detach in this case even on slurm, so not using run_exp
         exp.run(detach=False, tail_logs=True)
