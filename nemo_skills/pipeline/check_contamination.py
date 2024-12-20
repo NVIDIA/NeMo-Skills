@@ -85,6 +85,7 @@ def check_contamination(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -149,6 +150,7 @@ def check_contamination(
                 task_dependencies=prev_tasks,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config)

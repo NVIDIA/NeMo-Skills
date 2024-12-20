@@ -198,6 +198,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Generate LLM completions for a given input file.
 
@@ -274,6 +275,7 @@ def generate(
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
                         get_server_command=get_server_command,
+                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
         else:
@@ -316,6 +318,7 @@ def generate(
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=prev_tasks,
                     get_server_command=get_server_command,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 )
                 prev_tasks = [new_task]
         run_exp(exp, cluster_config)

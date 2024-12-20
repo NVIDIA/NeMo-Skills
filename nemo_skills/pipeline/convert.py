@@ -178,7 +178,8 @@ def convert(
         "Can provide an experiment name or an experiment object if running from code.",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -252,6 +253,7 @@ def convert(
             time_min=time_min,
             run_after=run_after,
             reuse_code_exp=reuse_code_exp,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         run_exp(exp, cluster_config)
 
