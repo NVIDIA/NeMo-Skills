@@ -40,7 +40,7 @@ class InferenceConfig:
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
-    logprobs: int | None = None
+    get_logprobs: bool = False
 
 
 @nested_dataclass(kw_only=True)

@@ -101,6 +101,12 @@ class GenerationType(str, Enum):
     math_judge = "math_judge"
 
 
+class RMType(str, Enum):
+    disc = "disc"  # Discriminatory Reward Model
+    gen = "gen"  # Generative Reward Model
+    gen_cot = "gen_cot"  # Generative Reward Model with CoT
+
+
 server_command_factories = {
     GenerationType.generate: get_server_command,
     GenerationType.reward: get_reward_server_command,
@@ -116,6 +122,7 @@ client_command_factories = {
 
 def configure_client(
     generation_type,
+    rm_type,
     server_gpus,
     server_type,
     server_address,
@@ -125,6 +132,9 @@ def configure_client(
     server_args,
     extra_arguments,
 ):
+    if generation_type == "reward":
+        extra_arguments += f" ++server.rm_type={rm_type}"
+
     if server_address is None:  # we need to host the model
         server_port = get_free_port()
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
@@ -164,6 +174,7 @@ def generate(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
     generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
+    rm_type: RMType = typer.Option(RMType.disc, help="Type of reward model"),
     server_type: SupportedServers = typer.Option(help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
@@ -229,6 +240,7 @@ def generate(
                 server_port = get_free_port()
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
+                    rm_type=rm_type,
                     server_gpus=server_gpus,
                     server_type=server_type,
                     server_address=original_server_address,
@@ -274,6 +286,7 @@ def generate(
             server_port = get_free_port()
             server_config, extra_arguments, server_address, server_port = configure_client(
                 generation_type=generation_type,
+                rm_type=rm_type,
                 server_gpus=server_gpus,
                 server_type=server_type,
                 server_address=original_server_address,

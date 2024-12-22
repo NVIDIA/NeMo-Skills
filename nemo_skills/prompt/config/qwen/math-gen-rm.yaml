@@ -9,7 +9,7 @@ user: |-
   Question: {problem}
 
 
-  Solution: {solution}
+  Solution: {generation}
 
 
   Is the solution correct or not (Yes/No)?

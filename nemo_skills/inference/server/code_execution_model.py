@@ -16,7 +16,6 @@
 import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from math import log
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox

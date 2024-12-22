@@ -13,16 +13,18 @@
 # limitations under the License.
 
 import abc
+import logging
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient, OpenAI, BadRequestError
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
+from openai import BadRequestError, DefaultHttpxClient, OpenAI
+
 LOG = logging.getLogger(__file__)
+
 
 class BaseModel(abc.ABC):
     """Base model class for handling requests to the inference server.
@@ -86,8 +88,16 @@ class NemoRewardModel(BaseModel):
 
 
 class VLLMRewardModel(BaseModel):
-    def __init__(self, **kwargs):
+    def __init__(self, rm_type='disc', **kwargs):
         super().__init__(**kwargs)
+        if rm_type == "disc":
+            self.score_fn = self._disc_score_single_prompt
+        elif rm_type == "gen":
+            self.score_fn = self._gen_score_single_prompt
+        elif rm_type == "gen_cot":
+            self.score_fn = self._gen_cot_score_single_prompt
+        else:
+            raise ValueError(f"Model type: {rm_type} not supported!")
 
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
@@ -107,32 +117,54 @@ class VLLMRewardModel(BaseModel):
         model_list = self.oai_client.models.list()
         self.model = model_list.data[0].id
 
-    def _score_single_prompt(self, prompt):
+    def _disc_score_single_prompt(self, prompt):
+        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
+        # Once VLLM officially adds the support, change the API.
         response = self.oai_client.embeddings.create(input=[prompt], model=self.model)
         raw_score = response.data[0].embedding[-1]
         score = 1 / (1 + math.exp(-raw_score))
         return {"reward_model_score": score}
+
+    def _gen_score_single_prompt(self, prompt):
+        response = self.oai_client.completions.create(
+            model=self.model,
+            prompt=[prompt],
+            max_tokens=1,  # For simple GenRM, just generated 1 token
+            logprobs=2,
+            temperature=0,
+            extra_body={"guided_choice": ["Yes", "No"]},  # Assuming Yes and No are single tokens
+        )
+
+        logprob = response.choices[0].logprobs.top_logprobs[0]['Yes']
+        score = math.exp(logprob)
+
+        # LOG.info(f"Response: {response}")
+        return {"reward_model_score": score}
+
+    def _gen_cot_score_single_prompt(self, prompt):
+        # TODO: Add support for decoding with CoT
+        pass
+
     def score(self, prompts: list[str]) -> list[float]:
-        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
-        # Once VLLM officially adds the support, change the API.
-        
         outputs = [None] * len(prompts)  # Pre-allocate a list to store results in correct order
         futures = {}
 
         with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
             for idx, prompt in enumerate(prompts):
-                futures[executor.submit(self._score_single_prompt, prompt)] = idx
+                futures[executor.submit(self.score_fn, prompt)] = idx
 
             for future in as_completed(futures):
                 idx = futures[future]
                 try:
                     outputs[idx] = future.result()
                 except BadRequestError as e:
-                    error_details = e.body 
+                    error_details = e.body
                     error_message = error_details.get("message", "No message found")
-                    error_code = error_details.get("code", "No code found")            
+                    error_code = error_details.get("code", "No code found")
                     if error_code == 400 and 'maximum context length' in error_message:
-                        outputs[idx] = {"reward_model_score": 0}  # Default value set as 0 if we have request over maximum context length
+                        outputs[idx] = {
+                            "reward_model_score": 0
+                        }  # Default value set as 0 if we have request over maximum context length
                         LOG.warning("Maximum context length exceeded, setting reward score as 0")
                     else:
                         raise
