@@ -21,7 +21,7 @@ from dataclasses import asdict, field
 from pathlib import Path
 
 import hydra
-from omegaconf import open_dict, OmegaConf
+from omegaconf import OmegaConf, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -40,6 +40,7 @@ class InferenceConfig:
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
+    get_logprobs: bool = False
 
 
 @nested_dataclass(kw_only=True)
@@ -71,6 +72,7 @@ class GenerateSolutionsConfig:
     offset: int = 0
 
     generation_key: str = "generation"
+    include_generation: bool = False  # if True, will use "generation" as part of the prompt
     # if specified, we will have a loop over that key in the data file and
     # treat each element as a new turn of conversation
     # E.g. if multi_turn_key="turns" and a line in your data file has
@@ -119,6 +121,7 @@ class GenerateSolutionsConfig:
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
 
+
 def combine_stop_phrases(prompt_phrases, extra_phrases):
     if prompt_phrases is None and extra_phrases is None:
         return None
@@ -127,6 +130,7 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
     if extra_phrases is None:
         return prompt_phrases
     return prompt_phrases + extra_phrases
+
 
 @hydra.main(version_base=None, config_name='base_generation_config')
 def generate(cfg: GenerateSolutionsConfig):
@@ -274,6 +278,7 @@ def generate(cfg: GenerateSolutionsConfig):
                 for output, original_data_point in zip(outputs, data_points):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
+                    original_data_point.pop(cfg.generation_key, None)
                     output[cfg.generation_key] = output.pop("generation")
                     original_data_point.pop(cfg.generation_key, None)
                     output.update(original_data_point)
