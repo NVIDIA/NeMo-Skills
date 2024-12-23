@@ -53,6 +53,7 @@ def start_server(
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
     exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False)
@@ -73,7 +74,7 @@ def start_server(
         "num_gpus": server_gpus,
         "num_nodes": server_nodes,
         "server_args": server_args,
-        "server_port": get_free_port(strategy="random"),
+        "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
 
     with run.Experiment("server") as exp:
@@ -88,6 +89,7 @@ def start_server(
             time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
+            sandbox_port=None if get_random_port else 6000,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         # we don't want to detach in this case even on slurm, so not using run_exp
