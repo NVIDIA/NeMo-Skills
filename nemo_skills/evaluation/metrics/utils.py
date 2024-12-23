@@ -23,7 +23,7 @@ def read_predictions(predictions, line_idx, file_handles):
         try:
             prediction_dict = json.loads(prediction)
         except Exception as e:
-            LOG.error(f"Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
+            LOG.error(f"\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
             raise
         data.append(prediction_dict)
 
