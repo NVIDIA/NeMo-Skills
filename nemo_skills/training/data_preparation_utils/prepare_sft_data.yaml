@@ -85,15 +85,15 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
     _recursive_: False
     processor_configs:
-      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
-        text_key: "category"
-        regex_patterns:
-          - 'c5_contests_amp_programs'
-          - 'c6_high_school_olympiads'
-        test_cases:
-          - {input: {category: "c6_high_school_olympiads"}, output: null}
-          - {input: {category: "c7_college_math"}, output: {category: "c7_college_math"}}
-          - {input: {category: "c5_contests_amp_programs"}, output: null}
+      # - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
+      #   text_key: "category"
+      #   regex_patterns:
+      #     - 'c5_contests_amp_programs'
+      #     - 'c6_high_school_olympiads'
+      #   test_cases:
+      #     - {input: {category: "c6_high_school_olympiads"}, output: null}
+      #     - {input: {category: "c7_college_math"}, output: {category: "c7_college_math"}}
+      #     - {input: {category: "c5_contests_amp_programs"}, output: null}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropMultiBoxed
         should_run: ${filters.drop_multi_boxed}
