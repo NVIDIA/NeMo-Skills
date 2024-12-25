@@ -79,11 +79,22 @@ processors:
       - "expected_answer"
       - "predicted_answer"
       - "answer_rm_score"
+      - "category"
 
   # this will optimize processors inside to avoid serializing data to disk
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
     _recursive_: False
     processor_configs:
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
+        text_key: "category"
+        regex_patterns:
+          - 'c6_high_school_olympiads'
+          - 'c7_college_math'
+        test_cases:
+          - {input: {category: "c6_high_school_olympiads"}, output: null}
+          - {input: {category: "c7_college_math"}, output: null}
+          - {input: {category: "c5_contests_amp_programs"}, output: {category: "c5_contests_amp_programs"}}
+
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropMultiBoxed
         should_run: ${filters.drop_multi_boxed}
         solution_key: ${output_key}
