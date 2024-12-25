@@ -88,12 +88,12 @@ processors:
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         text_key: "category"
         regex_patterns:
-          - 'c6_high_school_olympiads'
+          - 'c5_contests_amp_programs'
           - 'c7_college_math'
         test_cases:
-          - {input: {category: "c6_high_school_olympiads"}, output: null}
+          - {input: {category: "c6_high_school_olympiads"}, output: {category: "c6_high_school_olympiads"}}
           - {input: {category: "c7_college_math"}, output: null}
-          - {input: {category: "c5_contests_amp_programs"}, output: {category: "c5_contests_amp_programs"}}
+          - {input: {category: "c5_contests_amp_programs"}, output: null}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropMultiBoxed
         should_run: ${filters.drop_multi_boxed}
