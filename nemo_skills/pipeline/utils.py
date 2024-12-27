@@ -103,6 +103,7 @@ def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) 
         return port
     elif strategy == "random":
         import random
+
         port = random.randint(1024, 65535)
         while port in exclude:
             port = random.randint(1024, 65535)
@@ -738,6 +739,7 @@ def get_executor(
         **(slurm_kwargs or {}),
     )
 
+
 @contextmanager
 def temporary_env_update(cluster_config, updates):
     original_env_vars = cluster_config.get("env_vars", []).copy()
@@ -749,6 +751,7 @@ def temporary_env_update(cluster_config, updates):
         yield
     finally:
         cluster_config["env_vars"] = original_env_vars
+
 
 def add_task(
     exp,
@@ -763,6 +766,7 @@ def add_task(
     partition=None,
     time_min=None,
     with_sandbox=False,
+    sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
     task_dependencies: list[str] = None,
@@ -809,7 +813,8 @@ def add_task(
         if not 'cpu' in (partition or cluster_config.get("partition", "")):
             num_gpus = 1
 
-    sandbox_port = get_free_port(strategy="random")
+    if sandbox_port is None:
+        sandbox_port = get_free_port(strategy="random")
 
     commands = []
     executors = []
