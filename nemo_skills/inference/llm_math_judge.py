@@ -162,6 +162,7 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                 data_point["predicted_answer"] = extract_answer(data_point["generation"])
             if data_point["expected_answer"] is None:
                 raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
+            data_point.pop("judgement")
             judgement = prefill_judgement(data_point)
             if judgement is None:
                 data_points.append(data_point)
