@@ -196,9 +196,7 @@ class PackingArgs:
         return self
 
 
-@hydra_runner(
-    config_path="../../examples/nlp/language_modeling/tuning/conf", config_name="megatron_gpt_finetuning_config"
-)
+@hydra_runner(config_path=".", config_name="pack_config")
 def main(cfg: 'DictConfig') -> None:
     args = PackingArgs().from_config(cfg)
     dataset, tokenizer = tokenize_dataset(cfg)
