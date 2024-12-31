@@ -15,6 +15,8 @@
 import collections
 import os
 from dataclasses import dataclass
+from functools import partial
+from multiprocessing import Pool
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 import numpy as np
@@ -312,6 +314,20 @@ Note:
 """
 
 
+def _process_chunk(indices, dataset):
+    return [dataset[i] for i in indices]
+
+
+def parallel_convert_dataset(dataset, num_workers=100):
+    chunk_size = len(dataset) // num_workers
+    chunks = [range(i, min(i + chunk_size, len(dataset))) for i in range(0, len(dataset), chunk_size)]
+
+    with Pool(num_workers) as pool:
+        results = pool.map(partial(_process_chunk, dataset=dataset), chunks)
+
+    return np.array([item for chunk in results for item in chunk])
+
+
 def tokenize_dataset(cfg: 'DictConfig'):
     """
     Tokenizes a dataset using the same configuration file as finetuninng with GPTSFTDataset.
@@ -374,7 +390,7 @@ def tokenize_dataset(cfg: 'DictConfig'):
     pad_id = dataset.tokenizer.eos_id
     tokenizer = dataset.tokenizer
     pad_seq_length_to_mult = dataset.pad_seq_length_to_mult
-    dataset = np.array([dataset[i] for i in range(len(dataset))])
+    dataset = parallel_convert_dataset(dataset)
     if cp_size > 1:
 
         def pre_pad_dataset(data, max_seq_length, max_length_to_pad, pad_id):
