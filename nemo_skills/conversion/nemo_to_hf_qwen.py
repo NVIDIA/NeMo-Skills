@@ -222,7 +222,11 @@ def convert(
 
     if not checkpoint_in_memory:
         checkpoint = torch.load(tmp_out_path, map_location=map_location)
-    model = AutoModelForCausalLM.from_config(AutoConfig.from_pretrained(hf_model_name))
+    # reassigning a few parameters that might have been changed during training
+    hf_config = AutoConfig.from_pretrained(hf_model_name)
+    hf_config.rope_theta = model_config.rotary_base
+    hf_config.max_position_embeddings = model_config.encoder_seq_length
+    model = AutoModelForCausalLM.from_config(hf_config)
     model.load_state_dict(checkpoint)
     model.to(dtype)
     model.save_pretrained(output_hf_path, max_shard_size=max_shard_size)
