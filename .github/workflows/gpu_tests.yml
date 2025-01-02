@@ -49,7 +49,7 @@ jobs:
     - name: Cleanup test directory
       if: always()
       run: |
-        rm -rf /tmp/nemo-skills-tests/llama
+        docker run --rm -v /tmp:/tmp igitman/nemo-skills-nemo:0.4.2 bash -c 'rm -rf /tmp/nemo-skills-tests/llama'
 
   gpu-tests-qwen:
     runs-on: self-hosted-nemo-gpus-1
@@ -84,7 +84,7 @@ jobs:
     - name: Cleanup test directory
       if: always()
       run: |
-        rm -rf /tmp/nemo-skills-tests/qwen
+        docker run --rm -v /tmp:/tmp igitman/nemo-skills-nemo:0.4.2 bash -c 'rm -rf /tmp/nemo-skills-tests/qwen'
 
   gpu-tests-rm:
     runs-on: self-hosted-nemo-gpus-1
@@ -118,4 +118,4 @@ jobs:
     - name: Cleanup test directory
       if: always()
       run: |
-        rm -rf /tmp/nemo-skills-tests/mistral_emb
+        docker run --rm -v /tmp:/tmp igitman/nemo-skills-nemo:0.4.2 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb'
