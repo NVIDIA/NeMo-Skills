@@ -1,0 +1,15 @@
+# Generative Reward Model 
+
+system: ""
+
+user: |-
+  You're an expert math grader. Given the input math question-solution pair, give a Yes/No answer to whether the solution correctly answers the question or not.
+
+  
+  Question: {problem}
+
+
+  Solution: {generation}
+
+
+  Is the solution correct or not (Yes/No)?
