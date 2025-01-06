@@ -112,7 +112,8 @@ class BaseModel(abc.ABC):
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
+        top_k: int | list[int] = 0.0,
+        min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
@@ -127,6 +128,7 @@ class BaseModel(abc.ABC):
             'temperature': temperature,
             'top_p': top_p,
             'top_k': top_k,
+            'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
@@ -173,20 +175,27 @@ class TRTLLMModel(BaseModel):
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0 ,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
+
         if stop_phrases is None:
             stop_phrases = []
+        top_p_min = None
+        if min_p > 0:
+            top_p_min = min_p
+
         request = {
             "prompt": prompt,
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
             "top_k": top_k,
             "top_p": top_p,
+            "top_p_min": top_p_min,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
