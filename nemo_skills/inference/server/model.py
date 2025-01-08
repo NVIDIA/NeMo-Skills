@@ -198,17 +198,11 @@ class TRTLLMModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
         }
-        try:
-            output_dict = self.requests_lib.put(
-                url="http://{}:{}/generate".format(self.server_host, self.server_port),
-                data=json.dumps(request),
-                headers={"Content-Type": "application/json"},
-                # to make sure we never hand indefinitely and abort the job if something is stuck in trtllm
-                timeout=3600,
-            ).json()
-        except requests.exceptions.Timeout:
-            LOG.error("Please report this! Request timed out for prompt: %s", prompt)
-            raise
+        output_dict = self.requests_lib.put(
+            url="http://{}:{}/generate".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        ).json()
         return output_dict
 
 
