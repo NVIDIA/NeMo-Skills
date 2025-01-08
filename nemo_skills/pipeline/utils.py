@@ -710,7 +710,7 @@ def get_executor(
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
-    dependency_type = cluster_config.get("dependency_type", "afterok")
+    dependency_type = cluster_config.get("dependency_type", "afterany")
 
     return run.SlurmExecutor(
         account=cluster_config["account"],
