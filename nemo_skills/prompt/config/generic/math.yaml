@@ -1,9 +1,9 @@
 # default prompt for all math benchmarks (e.g. gsm8k, math)
 
 few_shot_examples:
-  prefix: "I will show you a few examples of problem and how I want you to write the solutions. You should think carefully, questioning and double checking all of your derivations. If something doesn't look promising, try different approach. Verify your math, think aloud. Here are the examples of how I want you to reason\n\n"
+  prefix: "Here are some examples of problems and solutions you can refer to.\n\n"
   template: "Problem:\n{problem}\n\nSolution:\n{solution}\n\n\n\n\n\n"
-  suffix: "Here is the problem you need to solve. Follow the format of the example solutions!\n"
+  suffix: "Here is the problem you need to solve:\n"
   # this is built as <prefix>{template.format(example1)}{template.format(example2)}...{template.format(exampleN)}<suffix>
   # and available as {examples} key in the final prompt
   # if examples_type is not specified, then {examples} will be empty
@@ -15,5 +15,3 @@ user: |-
   Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{{}}.
 
   {examples}{problem}
-
-  Remember: You should think carefully, questioning and double checking all of your derivations. If something doesn't look promising, try different approach. Verify your math, think aloud. Follow the solution format of the above examples!
