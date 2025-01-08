@@ -66,12 +66,21 @@ def main(cfg) -> None:
     exp_manager(trainer, cfg.exp_manager)
     logger = CustomLoggerWrapper(trainer.loggers)
 
+    if reward_model_type == "regression":
+        if cfg.model.regression.loss_func in ["regular_bt", "margin_bt", "scaled_bt"]:
+            if cfg.model.micro_batch_size != 2:
+                raise ValueError(
+                    "micro_batch_size must be set to 2 in order to use {regular,margin,scaled}_bt loss func with regression reward model"
+                )
+
+    load_rm_head_weights = cfg.model.regression.load_rm_head_weights
+
     ptl_model = load_from_nemo(
         reward_model_cls,
         cfg.model,
         trainer,
         strict=True,
-        load_base_model_only=True,
+        load_base_model_only=not load_rm_head_weights,
         restore_path=cfg.pretrained_checkpoint.restore_from_path,
     )
 
@@ -114,6 +123,7 @@ def main(cfg) -> None:
         mbs=cfg.model.micro_batch_size,
         gbs=cfg.model.global_batch_size,
         load_gbs=True,
+        use_random_sampler=cfg.trainer.rm.train_random_sampler,
     )
 
     val_dataloader = build_dataloader(
@@ -123,7 +133,7 @@ def main(cfg) -> None:
         mbs=cfg.model.micro_batch_size,
         gbs=cfg.model.global_batch_size,
         load_gbs=True,
-        use_random_sampler=False,
+        use_random_sampler=cfg.trainer.rm.val_random_sampler,
     )
 
     init_using_ptl(trainer, ptl_model, train_dataloader, train_ds)
@@ -133,7 +143,7 @@ def main(cfg) -> None:
 
     logger.log_hyperparams(OmegaConf.to_container(cfg))
 
-    timer = Timer(cfg.exp_manager.get("max_time_per_run"))
+    timer = Timer(cfg.exp_manager.get("max_time_per_run") if cfg.exp_manager else None)
 
     rm_trainer = SupervisedTrainer(
         cfg=cfg.trainer.rm,

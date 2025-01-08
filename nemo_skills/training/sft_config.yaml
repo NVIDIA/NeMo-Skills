@@ -62,6 +62,7 @@ exp_manager:
     save_best_model: False   # need to keep this false otherwise it will create multiple last.ckpt files because restore reset the previous best model
 
 model:
+  dist_ckpt_format: zarr
   seed: 1234
   tensor_model_parallel_size: 1 # intra-layer model parallelism
   pipeline_model_parallel_size: 1 # inter-layer model parallelism
