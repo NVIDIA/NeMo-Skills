@@ -44,6 +44,8 @@ RUN pip install $FLASHINFER_URL
 # Install requirements
 RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sentence-transformers>=2.2.2
 
+# temporary workaround for some vllm bug
+RUN pip install opencv-python-headless==4.5.4.58
 WORKDIR /opt
 
 # Set environment variables for mounted HF Cache
