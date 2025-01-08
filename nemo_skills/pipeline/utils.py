@@ -155,8 +155,8 @@ def get_reward_server_command(
             f"    ++rm_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
-            f"    +tensor_model_parallel_size={num_gpus} "
-            f"    +pipeline_model_parallel_size={num_nodes} "
+            f"    +model.tensor_model_parallel_size={num_gpus} "
+            f"    +model.pipeline_model_parallel_size={num_nodes} "
             # This port could be configurable, but is hard coded to reduce
             # the divergence of the server command parameters from pipeline/generate.py
             f"    inference.port={nemo_aligner_reward_model_port} "
