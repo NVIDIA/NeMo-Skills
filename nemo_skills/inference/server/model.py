@@ -186,9 +186,6 @@ class TRTLLMModel(BaseModel):
 
         if stop_phrases is None:
             stop_phrases = []
-        top_p_min = None
-        if min_p > 0:
-            top_p_min = min_p
 
         request = {
             "prompt": prompt,
@@ -196,7 +193,7 @@ class TRTLLMModel(BaseModel):
             "temperature": temperature,
             "top_k": top_k,
             "top_p": top_p,
-            "top_p_min": top_p_min,
+            "top_p_min": min_p,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
