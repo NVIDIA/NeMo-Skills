@@ -190,7 +190,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                     else:
                         output = outputs[generated_idx]
                         output[cfg.generation_key] = output.pop("generation")
-                        data_points[generated_idx].pop(cfg.generation_key, None)
+                        for key in output:
+                            data_points[generated_idx].pop(key, None)
                         output.update(data_points[generated_idx])
                         fout.write(json.dumps(output) + "\n")
                         generated_idx += 1
