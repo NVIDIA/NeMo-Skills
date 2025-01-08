@@ -29,6 +29,8 @@ trainer:
     max_steps: -1
     val_check_interval: 100
     save_interval: 100
+    train_random_sampler: True # whether you want to randomly shuffle train set
+    val_random_sampler: False # whether you want to randomly shuffle val set
 
     # how many GBS we loop over
     # set to float for a percentage
@@ -79,9 +81,11 @@ model:
     merge_attributes: False # whether to merge multiple attributes into a scalar
     attribute_weights: null # apply these weights to each attributes when merging them into a scalar
     loss_mask_val: -100 #  mask dimensions with this value when calculating MSE loss
+    loss_func: regression # ["regression", "regular_bt", "margin_bt", "scaled_bt"]
+    load_rm_head_weights: False # [False, True] False only loads base model while True loads rm_head weights as well (useful for intializing rm_head with model containing existing rm_head)
   output_sequence: False  # Whether to output a single scalar or a sequence of scalars.
   use_avg_pool: False  # Whether to use avg pool to sum across the sequence dim in reward model
-  force_head_dtype: float32  # enforce specific dtype for the final projection in the model head
+  force_head_dtype: bfloat16  # enforce specific dtype for the final projection in the model head
   micro_batch_size: 1
   global_batch_size: 512
   megatron_amp_O2: True
