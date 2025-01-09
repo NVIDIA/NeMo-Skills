@@ -156,8 +156,8 @@ def check_contamination(cfg: CheckContaminationConfig):
                         num_contaminated += 1
                     total += 1
                     elem["all_generations"] = all_generations
-                    original_data_point.pop(cfg.generation_key, None)
-                    original_data_point.pop("all_generations", None)
+                    for key in elem:
+                        original_data_point.pop(key, None)
                     elem.update(original_data_point)
                     fout.write(json.dumps(elem) + '\n')
                 data_points = []

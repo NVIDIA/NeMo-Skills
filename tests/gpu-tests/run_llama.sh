@@ -27,7 +27,7 @@ docker run --rm \
     -e HF_TOKEN=$HF_TOKEN \
     -v /tmp:/tmp \
     -v `pwd`:/nemo_run/code \
-    igitman/nemo-skills-nemo:0.4.2 \
+    igitman/nemo-skills-nemo:0.5.0 \
     python /nemo_run/code/tests/gpu-tests/make_tiny_llm.py --model_type $NEMO_SKILLS_TEST_MODEL_TYPE
 
 # converting the model through test
