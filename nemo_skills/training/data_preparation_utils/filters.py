@@ -26,6 +26,7 @@ import tqdm
 from sdp.processors.base_processor import BaseParallelProcessor, DataEntry
 from tqdm.contrib.concurrent import process_map
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.prompt.utils import load_config
 from nemo_skills.training.data_preparation_utils.arithmetic_utils import (
     extract_expressions,
@@ -248,31 +249,20 @@ class TrimPrefix(BaseFilter):
 
 
 class TrimSolutions(BaseFilter):
-    """Filter for trimming solutions till the last line with the answer in \\boxed{}."""
+    """Trimming solutions till the last line with the answer in \\boxed{}."""
 
     def __init__(self, solution_key: str = "generation", **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
 
     def process_dataset_entry(self, data_entry) -> List:
-        output_lines = data_entry[self.solution_key].split("\n")
-
-        stop_idx = 0
-        for idx, soln_line in enumerate(output_lines):
-            if PATTERN_ANS.findall(soln_line):
-                stop_idx = idx
-                break
-
-        if stop_idx < len(output_lines) - 1 and (
-            "\\end{align" in output_lines[stop_idx + 1]
-            or "\]" in output_lines[stop_idx + 1]
-            or "$$" in output_lines[stop_idx + 1]
-        ):
-            stop_idx = stop_idx + 1
-
-        trimmed_output = "\n".join(output_lines[: stop_idx + 1])
-        is_modified = trimmed_output != data_entry[self.solution_key]
-        data_entry[self.solution_key] = trimmed_output
+        # extracting full boxed answer first
+        predicted_answer = extract_answer(data_entry[self.solution_key])
+        original_solution = data_entry[self.solution_key]
+        if predicted_answer is not None:
+            before, after = data_entry[self.solution_key].rsplit(predicted_answer, 1)
+            data_entry[self.solution_key] = before + predicted_answer + after.split("\n")[0]
+        is_modified = original_solution != data_entry[self.solution_key]
 
         return [DataEntry(data=data_entry, metrics=dict(num_modified=int(is_modified)))]
 
