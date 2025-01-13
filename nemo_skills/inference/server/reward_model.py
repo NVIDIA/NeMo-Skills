@@ -72,7 +72,14 @@ class RequestException(RuntimeError):
 
 
 class NemoRewardModel(BaseModel):
-    def score(self, prompts: list[str]) -> list[float]:
+    def __init__(self, rm_type='disc', **kwargs):
+        super().__init__(**kwargs)
+        if rm_type == "disc":
+            self.score_fn = self._disc_score
+        elif rm_type == "gen":
+            self.score_fn = self._gen_score
+
+    def _disc_score(self, prompts: list[str]) -> list[float]:
         request = {
             "prompts": prompts,
         }
@@ -85,6 +92,12 @@ class NemoRewardModel(BaseModel):
 
         outputs = [{"reward_model_score": score} for score in scores["rewards"]]
         return outputs
+
+    def _gen_score(self, prompts: list[str]) -> list[float]:
+        pass
+
+    def score(self, prompts: list[str]) -> list[float]:
+        return self.score_fn(prompts)
 
 
 class VLLMRewardModel(BaseModel):

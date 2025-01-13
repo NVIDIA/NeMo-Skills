@@ -27,13 +27,13 @@ trainer:
   rm:
     max_epochs: 1
     max_steps: -1
-    val_check_interval: 100
+    val_check_interval: ${.save_interval}
     save_interval: 100
 
     # how many GBS we loop over
     # set to float for a percentage
     # of the validation dataset
-    limit_val_batches: 1.0
+    limit_val_batches: 1
     gradient_clip_val: 1.0
 
   # do not change these
@@ -72,6 +72,11 @@ pretrained_checkpoint:
 model:
   mcore_gpt: True
   share_embeddings_and_output_weights: False
+  tensor_model_parallel_size: 1 # intra-layer model parallelism
+  pipeline_model_parallel_size: 1 # inter-layer model parallelism
+  
+  # restore_from_path: ??? # Path to an existing p-tuned/prompt tuned .nemo model you wish to add new tasks to or run inference with
+  resume_from_checkpoint: null # The path to a checkpoint file to continue the training,
 
   reward_model_type: binary_ranking # ["binary_ranking, "regression"]
   regression:
