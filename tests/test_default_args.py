@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-executor: local
+import sys
+from pathlib import Path
 
-containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.0
-  nemo: igitman/nemo-skills-nemo:0.5.0
-  sandbox: igitman/nemo-skills-sandbox:0.5.0
-  nemo-skills: igitman/nemo-skills:0.5.0
+import pytest
 
-mounts:
-  - /tmp:/tmp
-  # change this if the models are located in a different place
-  # TODO: can we make it simpler?
-  - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+sys.path.append(str(Path(__file__).absolute().parents[1]))
+from nemo_skills.pipeline import wrap_arguments
+from nemo_skills.pipeline.cli import generate
+
+
+def test_error_on_missing_default():
+    with pytest.raises(TypeError):
+        generate(ctx=wrap_arguments(""))

@@ -60,6 +60,7 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
 def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
+
     cmd = (
         f"python -m nemo_skills.inference.reward_model "
         f"    ++skip_filled=True "
@@ -136,7 +137,7 @@ def configure_client(
         extra_arguments += f" ++server.rm_type={rm_type}"
 
     if server_address is None:  # we need to host the model
-        server_port = get_free_port()
+        server_port = get_free_port(strategy="random")
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
         server_address = f"localhost:{server_port}"
 
@@ -148,11 +149,15 @@ def configure_client(
             "server_args": server_args,
             "server_port": server_port,
         }
-        extra_arguments += f" ++server.server_type={server_type} "
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.host=localhost ++server.port={server_port} "
+        )
     else:  # model is hosted elsewhere
         server_config = None
-        extra_arguments += (
-            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.base_url={server_address} ++server.model={model} "
         )
         server_port = None
     return server_config, extra_arguments, server_address, server_port
@@ -204,6 +209,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Generate LLM completions for a given input file.
 
@@ -235,9 +241,10 @@ def generate(
     original_server_address = server_address
 
     with run.Experiment(expname) as exp:
+        extra_arguments_original = extra_arguments
         if random_seeds:
             for seed in random_seeds:
-                server_port = get_free_port()
+                server_port = get_free_port(strategy="random")
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
                     rm_type=rm_type,
@@ -248,7 +255,7 @@ def generate(
                     server_nodes=server_nodes,
                     model=model,
                     server_args=server_args,
-                    extra_arguments=extra_arguments,
+                    extra_arguments=extra_arguments_original,
                 )
 
                 cmd = get_cmd(
@@ -280,10 +287,11 @@ def generate(
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
                         get_server_command=get_server_command,
+                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
         else:
-            server_port = get_free_port()
+            server_port = get_free_port(strategy="random")
             server_config, extra_arguments, server_address, server_port = configure_client(
                 generation_type=generation_type,
                 rm_type=rm_type,
@@ -294,7 +302,7 @@ def generate(
                 server_nodes=server_nodes,
                 model=model,
                 server_args=server_args,
-                extra_arguments=extra_arguments,
+                extra_arguments=extra_arguments_original,
             )
             cmd = get_cmd(
                 random_seed=None,
@@ -323,6 +331,7 @@ def generate(
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=prev_tasks,
                     get_server_command=get_server_command,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 )
                 prev_tasks = [new_task]
         run_exp(exp, cluster_config)

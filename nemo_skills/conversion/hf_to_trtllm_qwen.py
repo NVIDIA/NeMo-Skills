@@ -22,10 +22,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import tensorrt_llm
 from tensorrt_llm._utils import release_gc
+from tensorrt_llm.logger import logger
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models import QWenForCausalLM
 from tensorrt_llm.models.modeling_utils import QuantConfig
 from tensorrt_llm.quantization import QuantAlgo
+from transformers import AutoConfig
 
 
 def parse_arguments():
@@ -33,7 +35,15 @@ def parse_arguments():
     parser.add_argument('--model_dir', type=str, default=None, required=True)
     parser.add_argument('--tp_size', type=int, default=1, help='N-way tensor parallelism size')
     parser.add_argument('--pp_size', type=int, default=1, help='N-way pipeline parallelism size')
-    parser.add_argument('--dtype', type=str, default='float16', choices=['float32', 'bfloat16', 'float16'])
+    parser.add_argument(
+        '--dtype',
+        type=str,
+        default='auto',
+        choices=['auto', 'float16', 'bfloat16', 'float32'],
+        help="The data type for the model weights and activations if not quantized. "
+        "If 'auto', the data type is automatically inferred from the source model; "
+        "however, if the source dtype is float32, it is converted to float16.",
+    )
     parser.add_argument(
         '--use_weight_only',
         default=False,
@@ -122,13 +132,6 @@ def parse_arguments():
         'Note: embedding sharing is only enabled when embedding_sharding_dim = 0',
     )
     parser.add_argument(
-        '--use_embedding_sharing',
-        action="store_true",
-        default=False,
-        help='Try to reduce the engine size by sharing the embedding lookup table between two layers.'
-        'Note: the flag might not take effect when the criteria are not met.',
-    )
-    parser.add_argument(
         '--output_dir', type=str, default='tllm_checkpoint', help='The path to save the TensorRT-LLM checkpoint'
     )
     parser.add_argument(
@@ -183,11 +186,31 @@ def args_to_quant_config(args: argparse.Namespace) -> QuantConfig:
     return quant_config
 
 
+def update_quant_config_from_hf(quant_config, hf_config, override_fields) -> tuple[QuantConfig, dict]:
+    hf_config_dict = hf_config.to_dict()
+    if hf_config_dict.get('quantization_config'):
+        # update the quant_algo, and clamp_val.
+        if hf_config_dict['quantization_config'].get('quant_method') == 'awq':
+            logger.info("Load quantization configs from huggingface model_config.")
+            quant_config.quant_algo = QuantAlgo.W4A16_GPTQ
+            quant_config.group_size = hf_config_dict['quantization_config'].get('group_size', 128)
+            quant_config.has_zero_point = hf_config_dict['quantization_config'].get('zero_point', False)
+            override_fields.update({"use_autoawq": True})
+        elif hf_config_dict['quantization_config'].get('quant_method') == 'gptq':
+            logger.info("Load quantization configs from huggingface model_config.")
+            desc_act = hf_config_dict['quantization_config'].get('desc_act', False)
+            if desc_act:
+                raise ValueError("GPTQ with desc_act=True is not implemented!")
+            quant_config.quant_algo = QuantAlgo.W4A16_GPTQ
+            quant_config.group_size = hf_config_dict['quantization_config'].get('group_size', 128)
+            quant_config.has_zero_point = hf_config_dict['quantization_config'].get('sym', False)
+    return quant_config, override_fields
+
+
 def args_to_build_options(args):
     return {
         'use_parallel_embedding': args.use_parallel_embedding,
         'embedding_sharding_dim': args.embedding_sharding_dim,
-        'share_embedding_table': args.use_embedding_sharing,
         'disable_weight_only_quant_plugin': args.disable_weight_only_quant_plugin,
     }
 
@@ -200,10 +223,13 @@ def convert_and_save_hf(args):
     # before the refactor is done.
     override_fields = {}
     override_fields.update(args_to_build_options(args))
-
-    # Qwen models have GPTQ-quantized checkpoint available on HF.
-    use_hf_gptq_checkpoint = args.use_weight_only and args.weight_only_precision == 'int4_gptq'
     quant_config = args_to_quant_config(args)
+
+    try:
+        hf_config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
+        quant_config, override_fields = update_quant_config_from_hf(quant_config, hf_config, override_fields)
+    except:
+        logger.warning("AutoConfig cannot load the huggingface config.")
 
     if args.smoothquant is not None or args.int8_kv_cache:
         mapping = Mapping(
@@ -234,12 +260,7 @@ def convert_and_save_hf(args):
                 moe_ep_size=args.moe_ep_size,
             )
             qwen = QWenForCausalLM.from_hugging_face(
-                model_dir,
-                args.dtype,
-                mapping=mapping,
-                quant_config=quant_config,
-                use_hf_gptq_checkpoint=use_hf_gptq_checkpoint,
-                **override_fields,
+                model_dir, args.dtype, mapping=mapping, quant_config=quant_config, **override_fields
             )
             qwen.save_checkpoint(args.output_dir, save_config=(rank == 0))
             del qwen

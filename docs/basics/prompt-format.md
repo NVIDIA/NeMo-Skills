@@ -1,11 +1,5 @@
 # Prompt utilities
 
-!!! note
-
-    While some of the sections below mention multi-turn prompts, we don't actually
-    support them at the moment. This is mainly because we don't have a real use-case for multi-turn
-    conversations in our work. Please open an issue if you need to use multi-turn prompts.
-
 Our prompts are configured via two input yaml files: prompt template and prompt config.
 
 ## Prompt template
@@ -147,14 +141,70 @@ which outputs
 ```python-console
 [
   {
-    'role': 'system',
-    'content': ''
-  },
-  {
     'role': 'user',
     'content': "Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.\n\nWhat's 2 + 2?"
   }
 ]
 ```
 
-You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tests/test_prompts.py) to see more examples of using our prompt API.
+You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
+
+
+## Multi-turn prompts
+
+If your data is naturally multi-turn (e.g. user-assistant conversations), you can use a special parameter `multi_turn_key` to format
+all conversation together. It can be of any length, as long as each entry except last has a special `assistant` key. The prompt config
+will be applied on each list entry separately. Here is an example
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt('generic/default')
+data = {'turns': [{'question': "What's 2 + 2?", 'assistant': "easy, that's 5!"}, {'question': 'Can you double check?'}]}
+print(prompt.fill(data, multi_turn_key='turns'))
+```
+
+which outputs
+
+```python-console
+[
+  {
+    'role': 'user',
+    'content': "What's 2 + 2?"
+  },
+  {
+    'role': 'assistant',
+    'content': "easy, that's 5!"
+  },
+  {
+    'role': 'user',
+    'content': 'Can you double check?'
+  }
+]
+```
+
+or if using template
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt('generic/default', 'llama3-instruct')
+data = {'turns': [{'question': "What's 2 + 2?", 'assistant': "easy, that's 5!"}, {'question': 'Can you double check?'}]}
+print(prompt.fill(data, multi_turn_key='turns'))
+```
+
+which outputs
+
+```python-console
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+easy, that's 5!<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Can you double check?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+```
+
+For an example of how to use it in real data file, see [mt-bench dataset](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/dataset/mt-bench).

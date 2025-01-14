@@ -96,7 +96,7 @@ processors:
         should_run: ${filters.remove_contaminated}
         contamination_file: ${contamination_file}
 
-      - _target_: sdp.processors.DropIfRegexMatch
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         should_run: ${filters.remove_code_errors}
         text_key: ${output_key}
         regex_patterns:
@@ -109,7 +109,7 @@ processors:
           - {input: {generation: "My solution:\nTimed out\nSomething else"}, output: null}
           - {input: {generation: "My solution, no errors"}, output: {generation: "My solution, no errors"}}
 
-      - _target_: sdp.processors.DropIfRegexMatch
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         should_run: ${filters.remove_verification_code}
         text_key: ${output_key}
         regex_patterns:

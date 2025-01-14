@@ -57,13 +57,21 @@ def get_args():
         help="Load model in cpu only. Useful if the model cannot fit in GPU memory, "
         "but this option makes the conversion script significantly slower.",
     )
+    parser.add_argument("--rotary-base", type=float, default=None, help="Rotary base for the model")
     parser.add_argument("--max-shard-size", default="5GB", help="Maximum shard size for the output HF model")
     args = parser.parse_args()
     return args
 
 
 def convert(
-    input_nemo_path, output_hf_path, hf_model_name, max_shard_size, tmp_out_path=None, precision=None, cpu_only=False
+    input_nemo_path,
+    output_hf_path,
+    hf_model_name,
+    max_shard_size,
+    tmp_out_path=None,
+    precision=None,
+    cpu_only=False,
+    rotary_base=None,
 ) -> None:
     """
     Convert NeMo weights to HF weights
@@ -222,7 +230,11 @@ def convert(
 
     if not checkpoint_in_memory:
         checkpoint = torch.load(tmp_out_path, map_location=map_location)
-    model = AutoModelForCausalLM.from_config(AutoConfig.from_pretrained(hf_model_name))
+    # reassigning a few parameters that might have been changed during training
+    hf_config = AutoConfig.from_pretrained(hf_model_name)
+    hf_config.rope_theta = model_config.rotary_base if rotary_base is None else rotary_base
+    hf_config.max_position_embeddings = model_config.encoder_seq_length
+    model = AutoModelForCausalLM.from_config(hf_config)
     model.load_state_dict(checkpoint)
     model.to(dtype)
     model.save_pretrained(output_hf_path, max_shard_size=max_shard_size)
@@ -241,4 +253,5 @@ if __name__ == '__main__':
         max_shard_size=args.max_shard_size,
         precision=args.precision,
         cpu_only=args.cpu_only,
+        rotary_base=args.rotary_base,
     )

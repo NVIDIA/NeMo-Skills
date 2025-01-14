@@ -280,7 +280,8 @@ def generate(cfg: GenerateSolutionsConfig):
                     # all of the ground-truth data to the output file alongside the generated solutions
                     original_data_point.pop(cfg.generation_key, None)
                     output[cfg.generation_key] = output.pop("generation")
-                    original_data_point.pop(cfg.generation_key, None)
+                    for key in output:
+                        original_data_point.pop(key, None)
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []

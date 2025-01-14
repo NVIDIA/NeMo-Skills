@@ -125,6 +125,7 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -153,7 +154,7 @@ def eval(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port()
+        server_port = get_free_port(strategy="random")
         server_address = f"localhost:{server_port}"
 
         server_config = {
@@ -164,7 +165,10 @@ def eval(
             "server_args": server_args,
             "server_port": server_port,
         }
+        # += is okay here because the args have already been copied in this context
         extra_arguments += f" ++server.server_type={server_type} "
+        extra_arguments += f" ++server.host=localhost "
+        extra_arguments += f" ++server.port={server_port} "
     else:  # model is hosted elsewhere
         server_config = None
         extra_arguments += (
@@ -227,6 +231,7 @@ def eval(
                 reuse_code_exp=reuse_code_exp,
                 extra_package_dirs=[extra_datasets] if extra_datasets else None,
                 get_server_command=get_server_command,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
         run_exp(exp, cluster_config)
 

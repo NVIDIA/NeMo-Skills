@@ -128,7 +128,7 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
     for idx, predictions in enumerate(all_predictions):
         changed = False
         for fidx, handle in enumerate(file_handles):
-            if cfg.ignore_if_not_none and predictions[fidx][cfg.fill_key] is not None:
+            if cfg.ignore_if_not_none and predictions[fidx][cfg.fill_key]:
                 handle.write(json.dumps(predictions[fidx]) + "\n")
                 continue
 

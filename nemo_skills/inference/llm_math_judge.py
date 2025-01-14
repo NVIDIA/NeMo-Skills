@@ -62,6 +62,8 @@ class LlmMathJudgeConfig:
     batch_size: int = 128
     generation_key: str = "judgement"
 
+    max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
+
     skip_filled: bool = False  # skip already filled judgements
 
     # can add this flag to just print the first prompt instead of running generation
@@ -142,6 +144,16 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
     # additionally, skipping whatever is pre-filled, assuming offset didn't change
     data = data[starting_idx:]
 
+    # need to account for anything that's prefilled
+    if 0 <= cfg.max_samples <= starting_idx:
+        cfg.max_samples = 0
+
+    if starting_idx < cfg.max_samples:
+        cfg.max_samples -= starting_idx
+
+    if cfg.max_samples < 0 or cfg.max_samples > len(data):
+        cfg.max_samples = len(data)
+
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
@@ -158,6 +170,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
 
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
+            if idx >= cfg.max_samples:
+                break
             if "predicted_answer" not in data_point:
                 data_point["predicted_answer"] = extract_answer(data_point["generation"])
             if data_point["expected_answer"] is None:
@@ -169,7 +183,7 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                 judgements.append({cfg.generation_key: judgement, **data_point})
                 prefilled_indices.append(idx)
 
-            if len(data_points) == cfg.batch_size or idx == len(data) - 1:
+            if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
                 prompts = [prompt.fill(dp) for dp in data_points]
                 stop_phrases = prompt.stop_phrases
 
@@ -190,7 +204,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                     else:
                         output = outputs[generated_idx]
                         output[cfg.generation_key] = output.pop("generation")
-                        data_points[generated_idx].pop(cfg.generation_key, None)
+                        for key in output:
+                            data_points[generated_idx].pop(key, None)
                         output.update(data_points[generated_idx])
                         fout.write(json.dumps(output) + "\n")
                         generated_idx += 1

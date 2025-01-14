@@ -88,6 +88,7 @@ class BaseModel(abc.ABC):
         temperature: float | list[float],
         top_p: float | list[float],
         top_k: int | list[int],
+        min_p: float | list[float],
         repetition_penalty: float | list[float],
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
@@ -115,6 +116,7 @@ class BaseModel(abc.ABC):
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
         top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
@@ -130,6 +132,7 @@ class BaseModel(abc.ABC):
             'temperature': temperature,
             'top_p': top_p,
             'top_k': top_k,
+            'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'get_logprobs': get_logprobs,
@@ -177,6 +180,7 @@ class TRTLLMModel(BaseModel):
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         get_logprobs: bool = False,
@@ -188,27 +192,23 @@ class TRTLLMModel(BaseModel):
             raise NotImplementedError("trtllm server does not support logprobs.")
         if stop_phrases is None:
             stop_phrases = []
+
         request = {
             "prompt": prompt,
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
             "top_k": top_k,
             "top_p": top_p,
+            "top_p_min": min_p,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
         }
-        try:
-            output_dict = self.requests_lib.put(
-                url="http://{}:{}/generate".format(self.server_host, self.server_port),
-                data=json.dumps(request),
-                headers={"Content-Type": "application/json"},
-                # to make sure we never hand indefinitely and abort the job if something is stuck in trtllm
-                timeout=1800,
-            ).json()
-        except requests.exceptions.Timeout:
-            LOG.error("Please report this! Request timed out for prompt: %s", prompt)
-            raise
+        output_dict = self.requests_lib.put(
+            url="http://{}:{}/generate".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        ).json()
         return output_dict
 
 
@@ -220,6 +220,7 @@ class NemoModel(BaseModel):
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
         top_k: int | list[int] = 0,
+        min_p: float = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         logprobs: int | None = None,
@@ -229,6 +230,8 @@ class NemoModel(BaseModel):
 
         We will call it in threads on the list of prompts.
         """
+        if min_p > 0:
+            raise NotImplementedError("Nemo server does not support min_p parameter.")
         if isinstance(prompt, dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
@@ -277,12 +280,16 @@ class NemoModel(BaseModel):
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
         logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if min_p > 0:
+            raise NotImplementedError("Nemo server does not support min_p parameter.")
+
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
@@ -456,6 +463,7 @@ class OpenAIModel(BaseModel):
         temperature: float,
         top_p: float,
         top_k: int,
+        min_p: float,
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
@@ -465,6 +473,8 @@ class OpenAIModel(BaseModel):
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if logprobs is not None:  # TODO: add support for logprobs
             raise NotImplementedError("OpenAI API does not support logprobs.")
+        if min_p > 0:
+            ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
 
         try:
             response = self.client.chat.completions.create(
@@ -546,6 +556,7 @@ class VLLMModel(BaseModel):
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         get_logprobs: bool = False,
@@ -574,6 +585,7 @@ class VLLMModel(BaseModel):
             n=1,
             extra_body={
                 "top_k": top_k,
+                "min_p": min_p,
                 "repetition_penalty": repetition_penalty,
                 "spaces_between_special_tokens": False,
             },
