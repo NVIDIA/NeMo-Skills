@@ -15,6 +15,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
+from typing import List
 
 import nemo_run as run
 import typer
@@ -22,6 +23,7 @@ import typer
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import get_free_port, get_server_command
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -108,7 +110,14 @@ def eval(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
-    run_after: str = typer.Option(None, help="Task to run after the evaluation"),
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
+    reuse_code_exp: str = typer.Option(
+        None,
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     extra_datasets: str = typer.Option(
@@ -144,7 +153,8 @@ def eval(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = "localhost:5000"
+        server_port = get_free_port()
+        server_address = f"localhost:{server_port}"
 
         server_config = {
             "model_path": model,
@@ -152,6 +162,7 @@ def eval(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_port": server_port,
         }
         extra_arguments += f" ++server.server_type={server_type} "
     else:  # model is hosted elsewhere
@@ -204,7 +215,7 @@ def eval(
             add_task(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=eval_cmd),
-                task_name=f'eval-{idx}',
+                task_name=f'{expname}-{idx}',
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
@@ -213,9 +224,13 @@ def eval(
                 server_config=server_config,
                 with_sandbox=True,
                 run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
                 extra_package_dirs=[extra_datasets] if extra_datasets else None,
+                get_server_command=get_server_command,
             )
         run_exp(exp, cluster_config)
+
+    return exp
 
 
 if __name__ == "__main__":

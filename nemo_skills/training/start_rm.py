@@ -46,7 +46,7 @@ OmegaConf.register_new_resolver("int_div", lambda x, y: x // y, replace=True)
 mp.set_start_method("spawn", force=True)
 
 
-@hydra_runner(config_path=".", config_name="training_rm")
+@hydra_runner(config_path=".", config_name="rm_config")
 def main(cfg) -> None:
     """
     Binary ranking reward models use comparison based objective similar to the one found in the
@@ -71,12 +71,13 @@ def main(cfg) -> None:
         cfg.model,
         trainer,
         strict=True,
-        load_base_model_only=True,
+        load_base_model_only=True,  # Load the RM head as well
         restore_path=cfg.pretrained_checkpoint.restore_from_path,
     )
 
     # pull values from checkpoint
     trainer_restore_path = trainer.ckpt_path
+
     if trainer_restore_path is not None:
         custom_trainer_state_dict = retrieve_custom_trainer_state_dict(trainer)
         consumed_samples = custom_trainer_state_dict["consumed_samples"]

@@ -18,6 +18,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import get_free_port
 from nemo_skills.utils import setup_logging
 
 
@@ -71,6 +72,7 @@ def start_server(
         "num_gpus": server_gpus,
         "num_nodes": server_nodes,
         "server_args": server_args,
+        "server_port": get_free_port(),
     }
 
     with run.Experiment("server") as exp:

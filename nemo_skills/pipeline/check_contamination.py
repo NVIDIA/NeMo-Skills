@@ -13,22 +13,26 @@
 # limitations under the License.
 
 from enum import Enum
+from typing import List
 
 import nemo_run as run
 import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.utils import get_free_port
 from nemo_skills.utils import setup_logging
 
 
 def get_check_contamination_cmd(input_file, output_file, extra_arguments=""):
-    return (
+    cmd = (
         f"python -m nemo_skills.inference.check_contamination "
         f"    ++input_file={input_file} "
         f"    ++output_file={output_file} "
         f"    {extra_arguments} "
     )
+    return cmd
 
 
 class SupportedServers(str, Enum):
@@ -64,12 +68,18 @@ def check_contamination(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    run_after: str = typer.Option(
+    run_after: List[str] = typer.Option(
+        None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
+    reuse_code_exp: str = typer.Option(
         None,
-        help="Can specify an expname that needs to be completed before this one starts (will use as slurm dependency)",
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -98,7 +108,8 @@ def check_contamination(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = "localhost:5000"
+        server_port = get_free_port()
+        server_address = f"localhost:{server_port}"
 
         server_config = {
             "model_path": model,
@@ -106,6 +117,7 @@ def check_contamination(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_port": server_port,
         }
         extra_arguments += f" ++server.server_type={server_type} "
     else:  # model is hosted elsewhere
@@ -119,21 +131,29 @@ def check_contamination(
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
                 exp,
-                cmd=get_generation_command(
-                    server_address=server_address,
-                    generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
+                cmd=wrap_cmd(
+                    get_generation_command(
+                        server_address=server_address,
+                        generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
+                    ),
+                    preprocess_cmd=preprocess_cmd,
+                    postprocess_cmd=postprocess_cmd,
                 ),
-                task_name="check-contamination",
+                task_name=expname,
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 partition=partition,
+                time_min=time_min,
                 server_config=server_config,
                 task_dependencies=prev_tasks,
                 run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config)
+
+    return exp
 
 
 if __name__ == "__main__":

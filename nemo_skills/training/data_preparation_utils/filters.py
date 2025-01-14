@@ -43,9 +43,11 @@ PATTERN_PYTHON_CODE = re.compile("```[pP]ython")
 class BaseFilter(BaseParallelProcessor):
     def __init__(self, **kwargs):
         if 'in_memory_chunksize' not in kwargs:
-            kwargs['in_memory_chunksize'] = 100000000
+            kwargs['in_memory_chunksize'] = 250000
         if 'chunksize' not in kwargs:
-            kwargs['chunksize'] = 100000
+            kwargs['chunksize'] = 2500
+        if 'max_workers' not in kwargs:
+            kwargs['max_workers'] = max(100, os.cpu_count())
         super().__init__(**kwargs)
 
     def finalize(self, metrics: List):
@@ -61,6 +63,19 @@ class BaseFilter(BaseParallelProcessor):
         if 'num_modified' in metrics[0]:
             num_modified_entries = sum(metric.get('num_modified', 0) for metric in metrics)
             LOG.info("Number of modified entries: %d", num_modified_entries)
+
+    def _chunk_manifest(self):
+        """Small modification of original function to print progress."""
+        manifest_chunk = []
+        for idx, data_entry in enumerate(self.read_manifest(), 1):
+            manifest_chunk.append(data_entry)
+            if idx % self.in_memory_chunksize == 0:
+                LOG.info("Processing chunk %d", idx)
+                yield manifest_chunk
+                manifest_chunk = []
+        if len(manifest_chunk) > 0:
+            LOG.info("Processing last chunk")
+            yield manifest_chunk
 
 
 class DropMultiBoxed(BaseFilter):
@@ -137,12 +152,20 @@ class MajorityFilter(BaseFilter):
 
 
 class RemoveContaminated(BaseFilter):
-    def __init__(self, contamination_key: str = "contaminated", **kwargs):
+    def __init__(self, contamination_file, check_key="problem", **kwargs):
+        if contamination_file is None:
+            raise ValueError("Specify 'contamination_file' to filter contaminated questions")
         super().__init__(**kwargs)
-        self.contamination_key = contamination_key
+        self.check_key = check_key
+        self.contaminated_entries = set()
+        with open(contamination_file, "rt", encoding="utf-8") as fin:
+            for line in fin:
+                data = json.loads(line)
+                if data["contaminated"]:
+                    self.contaminated_entries.add(data[self.check_key])
 
     def process_dataset_entry(self, data_entry) -> List:
-        if self.contamination_key in data_entry and data_entry[self.contamination_key]:
+        if data_entry[self.check_key] in self.contaminated_entries:
             return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]

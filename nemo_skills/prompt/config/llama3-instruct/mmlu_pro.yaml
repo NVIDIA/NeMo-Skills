@@ -1,0 +1,25 @@
+# Prompt used by Llama-instruct models for MMLU-Pro benchmark
+# https://huggingface.co/datasets/meta-llama/Meta-Llama-3.1-8B-Instruct-evals/viewer/Meta-Llama-3.1-8B-Instruct-evals__mmlu_pro__details?row=
+
+few_shot_examples:
+  prefix: ""
+  template: |-
+    Given the following question and candidate answers, choose the best answer.
+    Question: {question}
+    {options}
+
+    Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
+
+    Let's think step by step.{user_end}{assistant_begin}{solution}{assistant_end}{user_begin}
+  suffix: ""
+  examples_type: "{examples_type}"
+
+
+user: |-
+  {examples}Given the following question and candidate answers, choose the best answer.
+  Question: {question}
+  {options}
+
+  Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
+
+  Let's think step by step.

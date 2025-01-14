@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dash[testing]
-pytest-rerunfailures
-webdriver-manager==4.0.2
+
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+
+PROMPT_CONFIG = 'llama3-instruct/mmlu_pro'
+DATASET_GROUP = 'multichoice'
+METRICS_TYPE = 'math'  # TODO: update this?
+DEFAULT_EVAL_ARGS = (
+    "++eval_type=mmlu "
+    "++eval_config.parse_func=llama "
+)
+
+
+DEFAULT_GENERATION_ARGS = "++split=test_llama"

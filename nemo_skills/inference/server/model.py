@@ -91,7 +91,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float],
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -118,7 +118,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
@@ -132,7 +132,7 @@ class BaseModel(abc.ABC):
             'top_k': top_k,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
-            'logprobs': logprobs,
+            'get_logprobs': get_logprobs,
             'stop_phrases': stop_phrases,
         }
         for key, value in kwargs.items():
@@ -179,12 +179,12 @@ class TRTLLMModel(BaseModel):
         top_k: int = 0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
         stop_phrases: list[str] | None = None,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
-        if logprobs is not None:
+        if get_logprobs:
             raise NotImplementedError("trtllm server does not support logprobs.")
         if stop_phrases is None:
             stop_phrases = []
@@ -366,8 +366,10 @@ class OpenAIModel(BaseModel):
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
 
-        self.model = model
         self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.model = model
+        if self.model == "model":  # that's a placeholder, so trying to find real name
+            self.model = self.get_model_name_from_server()
 
     def batch_generate(
         self,
@@ -507,6 +509,13 @@ class OpenAIModel(BaseModel):
         output = response.message.content
         return {'generation': output}
 
+    def get_model_name_from_server(self):
+        model_list = self.client.models.list()
+        # TODO: this is a bit hacky, but will go away when we switch to a unified openai api for all models
+        assert len(model_list.data) == 1, "Unexpected number of models returned by OpenAI API."
+        model_name = model_list.data[0].id
+        return model_name
+
 
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
@@ -539,7 +548,7 @@ class VLLMModel(BaseModel):
         top_k: int = 0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
         stop_phrases: list[str] | None = None,
     ) -> dict:
         if isinstance(prompt, dict):
@@ -560,7 +569,7 @@ class VLLMModel(BaseModel):
             echo=False,
             frequency_penalty=0.0,
             presence_penalty=0.0,
-            logprobs=logprobs,
+            logprobs=(0 if get_logprobs else None),
             logit_bias=None,
             n=1,
             extra_body={
@@ -570,9 +579,7 @@ class VLLMModel(BaseModel):
             },
         )
 
-        result = self.parse_openai_response(response)
-
-        return result
+        return self.parse_openai_response(response)
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
@@ -587,7 +594,6 @@ class VLLMModel(BaseModel):
         if choice.logprobs:
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
-            result['top_logprobs'] = choice.logprobs.top_logprobs
         return result
 
     def get_model_name_from_server(self):

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 
 import nemo.collections.nlp.data.language_modeling.megatron.gpt_sft_chat_dataset as gpt_sft_chat_dataset
 import torch.multiprocessing as mp
@@ -122,6 +123,35 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
+
+    # updating a few parameters based on num_checkpoints_to_save arg
+    if cfg.trainer.sft.get("num_checkpoints_to_save", None) is not None:
+        # if steps are > 0 using that
+        if cfg.trainer.sft.max_steps > 0:
+            num_steps = cfg.trainer.sft.max_steps
+        else:
+            # counting the steps per epoch
+            # using wc -l since sft file might be large and we want to use optimized util
+            data_size = int(os.popen(f'wc -l "{cfg.model.data.train_ds.file_path}"').read().split()[0])
+            assert cfg.trainer.sft.max_epochs > 0
+            num_steps = (data_size * cfg.trainer.sft.max_epochs) // cfg.model.data.train_ds.global_batch_size
+        num_checkpoints = cfg.trainer.sft.num_checkpoints_to_save
+        with open_dict(cfg):
+            cfg.trainer.sft.max_epochs = 10000  # always using steps internally
+            # rounding steps to make sure last checkpoint is not repeated
+            cfg.trainer.sft.max_steps = (num_steps // num_checkpoints) * num_checkpoints
+            cfg.trainer.sft.save_interval = num_steps // num_checkpoints
+            cfg.trainer.sft.val_check_interval = num_steps // num_checkpoints
+        logging.info(
+            (
+                "Adjusting config parameters in the following way:\n"
+                "max_epochs: %d\nmax_steps: %d\nsave_interval: %d\nval_check_interval: %d"
+            ),
+            cfg.trainer.sft.max_epochs,
+            cfg.trainer.sft.max_steps,
+            cfg.trainer.sft.save_interval,
+            cfg.trainer.sft.val_check_interval,
+        )
 
     trainer = resolve_and_create_trainer(cfg, "sft")
     exp_manager(trainer, cfg.exp_manager)

@@ -67,18 +67,22 @@ accurate numbers than symbolic comparison. You need to define `OPENAI_API_KEY` f
 the command below to work.
 
 ```bash
-ns llm_math_judge \
-    --cluster=local \
-    --model=gpt-4o \
-    --server_type=openai \
-    --server_address=https://api.openai.com/v1 \
-    --input_files="/workspace/openmath2-llama3.1-8b-eval/eval-results/**/output*.jsonl"
+for dataset in aime24 amc23 math gsm8k omni-math; do
+    ns generate \
+        --generation_type=math_judge \
+        --cluster=local \
+        --model=gpt-4o \
+        --server_type=openai \
+        --server_address=https://api.openai.com/v1 \
+        --output_dir=/workspace/openmath2-llama3.1-8b-eval-judged/eval-results/${dataset} \
+        ++input_dir=/workspace/openmath2-llama3.1-8b-eval/eval-results/${dataset}
+done
 ```
 
 Finally, to print the metrics run
 
 ```bash
-ns summarize_results /workspace/openmath2-llama3.1-8b-eval/eval-results --cluster local
+ns summarize_results /workspace/openmath2-llama3.1-8b-eval-judged/eval-results --cluster local
 ```
 
 This should print the metrics including both symbolic and judge evaluation. The judge is typically more accurate.
@@ -152,16 +156,20 @@ Repeat the above steps for all benchmarks. Now we are ready to run the judge pip
 after it is finished. You need to define `OPENAI_API_KEY` for the command below to work.
 
 ```bash
-ns llm_math_judge \
-    --cluster=local \
-    --model=gpt-4o \
-    --server_type=openai \
-    --server_address=https://api.openai.com/v1 \
-    --input_files="/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/**/output*.jsonl"
+for dataset in aime24 amc23 math gsm8k omni-math; do
+    ns generate \
+        --generation_type=math_judge \
+        --cluster=local \
+        --model=gpt-4o \
+        --server_type=openai \
+        --server_address=https://api.openai.com/v1 \
+        --output_dir=/workspace/openmath2-llama3.1-8b-eval-judged/eval-results-majority/${dataset} \
+        ++input_dir=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}
+done
 ```
 
 ```bash
-ns summarize_results /workspace/openmath2-llama3.1-8b-eval/eval-results-majority --cluster local
+ns summarize_results /workspace/openmath2-llama3.1-8b-eval-judged/eval-results-majority --cluster local
 ```
 
 This will print majority results (they will be labeled as `majority@1` since we fused them into a single file).

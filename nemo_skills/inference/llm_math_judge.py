@@ -22,20 +22,33 @@ from typing import Any
 import hydra
 from tqdm import tqdm
 
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
 LOG = logging.getLogger(__file__)
+
+# TODO: should we move slightly confusing input/output dir and rs to the pipeline wrapper?
 
 
 @nested_dataclass(kw_only=True)
 class LlmMathJudgeConfig:
     """Top-level parameters for the script"""
 
-    input_files: Any  # will update them with judgements
+    input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
+    output_file: str | None = None  # Where to save the generations if `input_file` is provided
+    # Can specify an input directory, where the file will be inferred output.jsonl if no seed
+    # is provided, and output-rs{{seed}}.jsonl. This pattern is used to match the output files from
+    # the `generate` pipeline
+    input_dir: str | None = None
+    # Where to save the generations (with the identical file name) if `input_dir` is provided
+    output_dir: str | None = None
+    # Used to identify the input file if `input_dir` is provided. If `random_seed` is not provided,
+    # the input will be assumed to be from 'greedy' generation
+    random_seed: str | None = None
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
     # Sandbox configuration {sandbox_params}
@@ -59,8 +72,17 @@ class LlmMathJudgeConfig:
     code_execution: bool = False
 
     def __post_init__(self):
-        if isinstance(self.input_files, str):
-            self.input_files = self.input_files.split(" ")
+        if self.random_seed.strip() == 'None':
+            self.random_seed = None
+        if self.input_file is None and self.input_dir is not None:
+            seed = f'-rs{self.random_seed}' if self.random_seed is not None else ''
+            self.input_file = Path(self.input_dir) / f"output{seed}.jsonl"
+            self.output_file = Path(self.output_dir) / f"output{seed}.jsonl"
+        elif self.input_file is not None and self.input_dir is None:
+            if self.output_file is None:
+                raise ValueError("Output file should be provided if providing `input_file`")
+        else:
+            raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
         if self.server.server_type != "openai" and self.prompt_template is None:
             raise ValueError("Prompt template is required for non-OpenAI servers")
@@ -84,7 +106,6 @@ def prefill_judgement(data_point: dict) -> str | None:
     return None
 
 
-# TODO: should we change this to write to different files, so that it's easy to do things like majority voting?
 @hydra.main(version_base=None, config_name='base_llm_math_judge_config', config_path='.')
 def llm_math_judge(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
@@ -96,60 +117,63 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
     else:
         llm = get_model(**cfg.server)
 
-    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
-    LOG.info("Prompt used: %s", prompt)
-
     # if using code execution, we need some extra parameters for generate call
     if cfg.code_execution:
         extra_generate_params = prompt.get_code_execution_args()
     else:
         extra_generate_params = {}
 
-    # assuming everything fits in memory for simplicity
-    all_files = unroll_files(cfg.input_files)
-    if not all_files:
-        raise ValueError(f"No files found for the input pattern: {cfg.input_files}")
-    for jsonl_file in all_files:
-        LOG.info("Processing file: %s", jsonl_file)
-        with open(jsonl_file, 'rt', encoding='utf-8') as fin:
-            data = [json.loads(line) for line in fin]
+    # making sure output dir exists
+    Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt string: %s", data[0], prompt.fill(data[0]))
+    # we currently assume the dataset is small enough to be loaded into memory
+    data = []
+    with open(cfg.input_file, "rt", encoding="utf-8") as fin:
+        for line in fin:
+            data.append(json.loads(line))
 
-        if cfg.dry_run:
-            return
+    starting_idx = 0
+    if cfg.skip_filled:
+        try:
+            with open(cfg.output_file, "rt", encoding="utf-8") as fin:
+                starting_idx = len(fin.readlines())
+        except FileNotFoundError:
+            LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
+    # additionally, skipping whatever is pre-filled, assuming offset didn't change
+    data = data[starting_idx:]
 
-        if cfg.skip_filled and all(cfg.generation_key in data_point for data_point in data):
-            continue
+    if len(data) == 0:  # we might not have any examples if skip_filled=True
+        return
 
-        data_points = []
-        judgements = []
-        prefilled_indices = []
+    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
+    if "predicted_answer" not in data[0]:
+        data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
 
-        output_file = jsonl_file + '-judgement'
-        starting_idx = 0
-        if cfg.skip_filled:
-            try:
-                with open(output_file, "rt", encoding="utf-8") as fin:
-                    starting_idx = len(fin.readlines())
-            except FileNotFoundError:
-                LOG.warning(f"File `{output_file}` not found, starting from scratch")
-        data = data[starting_idx:]
+    LOG.info("Prompt used: %s", prompt)
+    LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
 
-        # saving to a tmp file to avoid corrupting original generation in case something goes wrong
-        with open(output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
-            for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
-                judgement = prefill_judgement(data_point)
-                if judgement is None:
-                    data_points.append(data_point)
-                else:
-                    judgements.append({cfg.generation_key: judgement, **data_point})
-                    prefilled_indices.append(idx)
+    data_points = []
+    judgements = []
+    prefilled_indices = []
 
-                if len(data_points) == cfg.batch_size or idx == len(data) - 1:
-                    prompts = [prompt.fill(dp) for dp in data_points]
-                    stop_phrases = prompt.stop_phrases
+    with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
+            if "predicted_answer" not in data_point:
+                data_point["predicted_answer"] = extract_answer(data_point["generation"])
+            if data_point["expected_answer"] is None:
+                raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
+            judgement = prefill_judgement(data_point)
+            if judgement is None:
+                data_points.append(data_point)
+            else:
+                judgements.append({cfg.generation_key: judgement, **data_point})
+                prefilled_indices.append(idx)
 
+            if len(data_points) == cfg.batch_size or idx == len(data) - 1:
+                prompts = [prompt.fill(dp) for dp in data_points]
+                stop_phrases = prompt.stop_phrases
+
+                if len(prompts) > 0:
                     outputs = llm.generate(
                         prompts=prompts,
                         stop_phrases=stop_phrases,
@@ -157,26 +181,23 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
                         **extra_generate_params,
                     )
 
-                    prefilled_idx = 0
-                    generated_idx = 0
-                    for cur_idx in range(idx - len(data_points) - len(judgements) + 1, idx + 1):
-                        if cur_idx in prefilled_indices:
-                            fout.write(json.dumps(judgements[prefilled_idx]) + "\n")
-                            prefilled_idx += 1
-                        else:
-                            output = outputs[generated_idx]
-                            output[cfg.generation_key] = output.pop("generation")
-                            data_points[generated_idx].pop(cfg.generation_key, None)
-                            output.update(data_points[generated_idx])
-                            fout.write(json.dumps(output) + "\n")
-                            generated_idx += 1
+                prefilled_idx = 0
+                generated_idx = 0
+                for cur_idx in range(idx - len(data_points) - len(judgements) + 1, idx + 1):
+                    if cur_idx in prefilled_indices:
+                        fout.write(json.dumps(judgements[prefilled_idx]) + "\n")
+                        prefilled_idx += 1
+                    else:
+                        output = outputs[generated_idx]
+                        output[cfg.generation_key] = output.pop("generation")
+                        data_points[generated_idx].pop(cfg.generation_key, None)
+                        output.update(data_points[generated_idx])
+                        fout.write(json.dumps(output) + "\n")
+                        generated_idx += 1
 
-                    data_points.clear()
-                    judgements.clear()
-                    prefilled_indices.clear()
-
-        # replacing original file with the judgement file
-        Path(output_file).replace(jsonl_file)
+                data_points.clear()
+                judgements.clear()
+                prefilled_indices.clear()
 
 
 HELP_MESSAGE = get_help_message(

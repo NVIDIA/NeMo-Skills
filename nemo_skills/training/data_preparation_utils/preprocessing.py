@@ -14,14 +14,17 @@
 
 import json
 import logging
+import os
 import random
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 from typing import Dict, Optional
 
 from sdp.processors.base_processor import BaseProcessor
 from tqdm.contrib.concurrent import process_map
 
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import unroll_files
 
@@ -39,6 +42,9 @@ class ReadData(BaseProcessor):
         skip_first: int = 0,
         add_correct: bool = True,
         add_incorrect: bool = False,
+        use_judgement: bool = False,
+        keys_to_keep: list[str] | None = None,
+        deduplicate: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -49,6 +55,16 @@ class ReadData(BaseProcessor):
         self.skip_first = skip_first
         self.add_correct = add_correct
         self.add_incorrect = add_incorrect
+        self.use_judgement = use_judgement
+        self.keys_to_keep = keys_to_keep
+        self.deduplicate = deduplicate
+
+        if self.keys_to_keep is not None:
+            self.keys_to_keep = set(self.keys_to_keep)
+            self.keys_to_keep.add(self.input_key)
+            self.keys_to_keep.add(self.output_key)
+            self.keys_to_keep.add("is_correct")
+            self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")
@@ -69,6 +85,8 @@ class ReadData(BaseProcessor):
             if idx < self.skip_first:
                 continue
             sample = json.loads(line)
+            if self.keys_to_keep:
+                sample = {k: v for k, v in sample.items() if k in self.keys_to_keep}
             questions.add(sample[self.input_key])
             samples.append(sample)
 
@@ -95,15 +113,26 @@ class ReadData(BaseProcessor):
                 continue
 
             # skipping any incomplete generations
-            if "is_correct" not in line_dict:
-                LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
-                continue
+            if not self.use_judgement:
+                if "is_correct" not in line_dict:
+                    LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
+                    continue
 
-            if not self.add_correct and line_dict["is_correct"]:
-                continue
+                if not self.add_correct and line_dict["is_correct"]:
+                    continue
 
-            if not self.add_incorrect and not line_dict["is_correct"]:
-                continue
+                if not self.add_incorrect and not line_dict["is_correct"]:
+                    continue
+            else:
+                if "judgement" not in line_dict:
+                    LOG.warning("Found incomplete generations (judgement field is missing) - skipping")
+                    continue
+
+                if not self.add_correct and is_correct_judgement(line_dict["judgement"]):
+                    continue
+
+                if not self.add_incorrect and not is_correct_judgement(line_dict["judgement"]):
+                    continue
 
             line_dict['filename'] = file_handle.name
             samples.append(line_dict)
@@ -120,6 +149,23 @@ class ReadData(BaseProcessor):
             seen_predictions[question].add(sample[self.output_key])
             yield sample
 
+    def _batch_deduplicate(self, batch):
+        seen_predictions = defaultdict(set)
+        unique_samples = []
+
+        for sample in batch:
+            question = sample[self.input_key]
+            if sample[self.output_key] not in seen_predictions[question]:
+                seen_predictions[question].add(sample[self.output_key])
+                unique_samples.append(sample)
+
+        return unique_samples
+
+    def _chunks(self, lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
     def process(self):
         samples = []
         if self.input_files:
@@ -130,13 +176,40 @@ class ReadData(BaseProcessor):
             args = [(file, self._read_preprocessed_data) for file in unroll_files(self.preprocessed_dataset_files)]
             results = process_map(self._parallel_read_file, args, max_workers=None, chunksize=1)
             samples.extend(list(chain(*results)))
-        LOG.info("Total samples before deduplication: %d", len(samples))
-        samples_count = 0
-        with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
-            for sample in self._unique_iterator(samples):
-                fout.write(json.dumps(sample) + "\n")
-                samples_count += 1
-        LOG.info("Total samples after deduplication: %d", samples_count)
+
+        if self.deduplicate:
+            LOG.info("Total samples before deduplication: %d", len(samples))
+
+            # Parallel deduplication
+            chunk_size = 100000
+            num_cores = max(100, len(samples) // chunk_size)
+
+            with ProcessPoolExecutor(max_workers=num_cores) as executor:
+                # Process chunks in parallel
+                futures = [
+                    executor.submit(self._batch_deduplicate, chunk) for chunk in self._chunks(samples, chunk_size)
+                ]
+
+                # Final deduplication of results from all chunks
+                seen_predictions = defaultdict(set)
+                samples_count = 0
+
+                with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
+                    for future in futures:
+                        chunk_results = future.result()
+                        for sample in chunk_results:
+                            question = sample[self.input_key]
+                            if sample[self.output_key] not in seen_predictions[question]:
+                                seen_predictions[question].add(sample[self.output_key])
+                                fout.write(json.dumps(sample) + "\n")
+                                samples_count += 1
+
+            LOG.info("Total samples after deduplication: %d", samples_count)
+        else:
+            LOG.info("Total samples: %d", len(samples))
+            with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
+                for sample in samples:
+                    fout.write(json.dumps(sample) + "\n")
 
 
 class GroupSamples(BaseProcessor):
@@ -253,12 +326,6 @@ class WriteFinalSftManifest(BaseProcessor):
         else:
             LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
-        if self.chat_format and self.prompt is None:
-            error_str = ""
-            error_str += "prompt_config is missing! " if prompt_config is None else ""
-            error_str += "prompt_template is missing!" if prompt_template is None else ""
-            raise ValueError(f"chat_format requires prompt information: {error_str}")
-
     def process(self):
         samples_count = 0
         seen_predictions = defaultdict(set)
@@ -290,18 +357,23 @@ class WriteFinalSftManifest(BaseProcessor):
                         output_sample["output"] = generation + self.prompt.config.template.assistant_end
                     else:
                         output_sample["input"] = elem[self.input_key]
+                        output_sample["output"] = generation
 
                 elif self.chat_format.lower() == "nemotron":
                     output_sample['conversations'] = [
-                        {'value': self.prompt.config.user.format(**elem), 'from': 'User', 'canonical_form': ''},
+                        {
+                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
+                            'from': 'User',
+                            'canonical_form': '',
+                        },
                         {'value': elem.pop(self.output_key), 'from': 'Assistant', 'canonical_form': ''},
                     ]
-                    output_sample['system'] = self.prompt.config.system
+                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
                     output_sample['mask'] = 'User'
                 elif self.chat_format.lower() == "llama":
                     output_sample['conversations'] = [
                         {
-                            'value': self.prompt.config.user.format(**elem),
+                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
                             'from': '<|start_header_id|>user<|end_header_id|>',
                             'canonical_form': '',
                         },
@@ -311,7 +383,7 @@ class WriteFinalSftManifest(BaseProcessor):
                             'canonical_form': '',
                         },
                     ]
-                    output_sample['system'] = self.prompt.config.system
+                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
                     output_sample['mask'] = '<|start_header_id|>user<|end_header_id|>'
                 else:
                     raise ValueError(f"Chat format {self.chat_format} is not supported")

@@ -89,10 +89,7 @@ See our [paper](https://arxiv.org/abs/2410.01560) for ablations studies and more
 
 ## Nemo Inspector
 
-We also provide a convenient [tool](/nemo_inspector/Readme.md) for visualizing inference and data analysis
-|                                              Overview                                               |                                                     Inference Page                                                      |                                                    Analyze Page                                                     |
-| :-------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------: |
-| [![Demo of the tool](/nemo_inspector/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE) | [![Demo of the inference page](/nemo_inspector/images/inference_page.png)](https://www.youtube.com/watch?v=6utSkPCdNks) | [![Demo of the analyze page](/nemo_inspector/images/analyze_page.png)](https://www.youtube.com/watch?v=cnPyDlDmQXg) |
+We also provide a convenient [tool](https://github.com/NVIDIA/NeMo-Inspector) for visualizing inference and data analysis.
 
 
 ## Papers
