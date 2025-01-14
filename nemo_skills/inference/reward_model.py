@@ -95,6 +95,8 @@ def generate(cfg: RewardModelConfig):
     LOG.info("Config used: %s", cfg)
     llm = get_reward_model(**cfg.server)
 
+    rm_type = cfg.server['rm_type']
+
     # making sure output dir exists
     Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
@@ -134,12 +136,20 @@ def generate(cfg: RewardModelConfig):
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    LOG.info(
-        "Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0], include_generation=True)
-    )
-
     if cfg.dry_run:
         return
+
+    if rm_type == 'disc':
+        include_generation = True
+    else:
+        # The template for GenRM already includes the generation, so we don't need to include it again
+        include_generation = False
+
+    LOG.info(
+        "Example prompt:\nData dictionary: %s\nPrompt: %s",
+        data[0],
+        prompt.fill(data[0], include_generation=include_generation),
+    )
 
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
@@ -151,7 +161,7 @@ def generate(cfg: RewardModelConfig):
 
             if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
                 outputs = llm.score(
-                    prompts=[prompt.fill(dp, include_generation=True) for dp in data_points],
+                    prompts=[prompt.fill(dp, include_generation=include_generation) for dp in data_points],
                 )
 
                 for output, original_data_point in zip(outputs, data_points):

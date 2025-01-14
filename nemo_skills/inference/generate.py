@@ -40,6 +40,7 @@ class InferenceConfig:
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
+    get_logprobs: bool = False
 
 
 @nested_dataclass(kw_only=True)
@@ -71,6 +72,7 @@ class GenerateSolutionsConfig:
     offset: int = 0
 
     generation_key: str = "generation"
+    include_generation: bool = False  # if True, will use "generation" as part of the prompt
     # if specified, we will have a loop over that key in the data file and
     # treat each element as a new turn of conversation
     # E.g. if multi_turn_key="turns" and a line in your data file has
@@ -227,7 +229,7 @@ def generate(cfg: GenerateSolutionsConfig):
             if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
                 if cfg.multi_turn_key is None:
                     outputs = llm.generate(
-                        prompts=[prompt.fill(dp) for dp in data_points],
+                        prompts=[prompt.fill(dp, cfg.include_generation) for dp in data_points],
                         stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                         **asdict(cfg.inference),
                         **extra_generate_params,
@@ -276,6 +278,7 @@ def generate(cfg: GenerateSolutionsConfig):
                 for output, original_data_point in zip(outputs, data_points):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
+                    original_data_point.pop(cfg.generation_key, None)
                     output[cfg.generation_key] = output.pop("generation")
                     for key in output:
                         original_data_point.pop(key, None)
