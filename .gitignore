@@ -34,3 +34,5 @@ __pycache__
 
 cluster_configs/*
 !cluster_configs/example-*.yaml
+
+.idea
