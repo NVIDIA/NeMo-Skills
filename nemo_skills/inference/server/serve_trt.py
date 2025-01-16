@@ -539,7 +539,7 @@ class TensorRTLLM:
                 timeout=self.timeout,
             )
             self.active_requests[generation_id] = request_id
-            _stream(**stream_kwargs)
+            output = _stream(**stream_kwargs)
 
         except RuntimeError as e:
             logging.error("RuntimeError: %s", e)
@@ -689,9 +689,9 @@ class MPIWrapper:
                 await asyncio.sleep(0.1)
 
         @app.put("/generate_async", response_model=GenerationResponseAsync)
-        async def generate_async(request: GetGenerationRequest):
+        async def generate_async(request: GenerationRequest):
             data = {
-                "session": request.prompt,
+                "prompt": request.prompt,
                 "max_new_tokens": request.tokens_to_generate,
                 "temperature": request.temperature,
                 "top_k": None if request.top_k == 0 else request.top_k,
@@ -706,10 +706,10 @@ class MPIWrapper:
             data = self.comm.bcast(data, root=0)
 
             generation_id = self.model.start_generation(data)
-            return generation_id
+            return {'generation_id': generation_id}
 
         @app.put("/get_generation", response_model=GenerationResponse)
-        async def get_generation(request: GenerationRequest):
+        async def get_generation(request: GetGenerationRequest):
             generation_id = request.generation_id
 
             output = self.model.get_generation(generation_id)
@@ -718,7 +718,7 @@ class MPIWrapper:
             return {'generation': None}
 
         @app.put("/cancel_generation", response_model=CancelGenerationResponse)
-        async def cancel_generation(request: GenerationRequest):
+        async def cancel_generation(request: GetGenerationRequest):
             generation_id = request.generation_id
             return self.model.cancel_generation(generation_id)
 

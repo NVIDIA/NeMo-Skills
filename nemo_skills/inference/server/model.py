@@ -202,7 +202,48 @@ class TRTLLMModel(BaseModel):
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
-        ).json()
+        )
+        print(output_dict.content.decode())
+        output_dict = output_dict.json()
+        return output_dict
+
+    def _generate_single_async(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+    ) -> list[dict]:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
+
+        if stop_phrases is None:
+            stop_phrases = []
+
+        request = {
+            "prompt": prompt,
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_k": top_k,
+            "top_p": top_p,
+            "top_p_min": min_p,
+            "random_seed": random_seed,
+            "repetition_penalty": repetition_penalty,
+            "stop_words_list": stop_phrases,
+        }
+        output_dict = self.requests_lib.put(
+            url="http://{}:{}/generate_async".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        )
+        print(output_dict.content.decode())
+        output_dict = output_dict.json()
+
         return output_dict
 
 
