@@ -30,3 +30,17 @@ containers:
 #   - /mnt/datadrive/models:/models
 #   - /mnt/datadrive/data:/data
 #   - /home/<username>/workspace:/workspace
+
+# Environment variables.
+# You can configure how the executor handles environment variables like this
+# env_vars:
+#  - MYENVVAR  # will pick the value from env
+#  - MYENVVAR2=my_value  # will use my_value
+#  - HYDRA_FULL_ERROR=1 # This one is useful for debugging
+#  - HF_HOME=<path to a mounted folder which links to your HF_cache> # This allows you to reuse the hf cache in
+#                                                                    #  your host
+
+# Mandatory environment variables:
+# If you need a job to fail when a variable is not defined then add them to the required_env_vars section
+# required_env_vars:
+#  - MY_ALL_IMPORTANT_BEHAVIOR_CHANGING_VAR

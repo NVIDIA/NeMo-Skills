@@ -139,6 +139,7 @@ def generate(cfg: GenerateSolutionsConfig):
     if cfg.prompt_template is None and cfg.server["server_type"] != "openai":
         # TODO: handle this explicitly in model.py clients
         # switching to OpenAI client always if prompt template is not provided
+        LOG.warning("No prompt template provided will override `server_type` and use openai server")
         with open_dict(cfg.server):
             cfg.server["server_type"] = "openai"
             cfg.server["model"] = "model"
@@ -165,6 +166,7 @@ def generate(cfg: GenerateSolutionsConfig):
 
     starting_idx = 0
     if cfg.skip_filled:
+        # Try to update starting_index with the number of lines present in the output file
         try:
             with open(cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
