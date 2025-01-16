@@ -325,9 +325,11 @@ def generate(
     ]
 
     request_ids = runner.session.enqueue_requests(requests)
-    return _stream(
+    assert len(request_ids) == 1
+
+    stream_kwargs = dict(
         runner=runner,
-        request_ids=request_ids,
+        request_id=request_ids[0],
         end_id=end_id,
         return_dict=return_dict,
         output_sequence_lengths=output_sequence_lengths,
@@ -346,10 +348,12 @@ def generate(
         input_lengths=input_lengths,
     )
 
+    return request_ids[0], stream_kwargs
+
 
 def _stream(
     runner,
-    request_ids,
+    request_id,
     end_id,
     return_dict,
     output_sequence_lengths,
@@ -369,7 +373,7 @@ def _stream(
 ):
     if stop_words_list is None:
         stop_words_list = []
-    assert len(request_ids) == 1
+    request_ids = [request_id]
     num_sequences = runner._get_num_sequences(sampling_config)
     output_ids = [
         [copy.deepcopy(batch_input_ids_list[batch_idx]) for _ in range(num_sequences)]
@@ -492,10 +496,12 @@ class TensorRTLLM:
         self.timeout = timeout_seconds
 
         self.active_generations = {}
+        self.active_requests = {}
         self.executor = ThreadPoolExecutor(max_workers=1024)
 
     def get_output(
         self,
+        generation_id,
         batch_input_ids,
         input_lengths,
         max_output_token,
@@ -508,7 +514,7 @@ class TensorRTLLM:
         stop_words_list,
     ):
         try:
-            output = generate(
+            request_id, stream_kwargs = generate(
                 self.runner,
                 batch_input_ids[0],
                 max_new_tokens=max_output_token,
@@ -532,6 +538,9 @@ class TensorRTLLM:
                 streaming=True,
                 timeout=self.timeout,
             )
+            self.active_requests[generation_id] = request_id
+            _stream(**stream_kwargs)
+
         except RuntimeError as e:
             logging.error("RuntimeError: %s", e)
             # TODO: return dictionary with a proper error reporting
@@ -546,6 +555,7 @@ class TensorRTLLM:
 
         future = self.executor.submit(
             self.get_output,
+            generation_id,
             batch_input_ids,
             input_lengths,
             data["max_new_tokens"],
@@ -576,6 +586,23 @@ class TensorRTLLM:
         else:
             return None
 
+    def cancel_request(self, request_id):
+        self.runner.session.cancel_request(request_id)
+
+    def cancel_generation(self, generation_id: str) -> Dict[str, Any]:
+        if generation_id not in self.active_generations:
+            raise HTTPException(status_code=404, detail="Generation not found")
+
+        future = self.active_generations[generation_id]
+        request_id = self.active_requests[generation_id]
+        self.cancel_request(request_id)
+        future.cancel()
+
+        # Clean up canceled generation
+        del self.active_generations[generation_id]
+
+        return {"status": "canceled"}
+
 
 class GenerationRequest(BaseModel):
     prompt: str
@@ -593,6 +620,18 @@ class GenerationResponse(BaseModel):
     generation: Optional[str] = None
     num_generated_tokens: Optional[int] = None
     generation_time: Optional[int] = None
+
+
+class GenerationResponseAsync(BaseModel):
+    generation_id: str
+
+
+class CancelGenerationResponse(BaseModel):
+    status: str
+
+
+class GetGenerationRequest(BaseModel):
+    generation_id: str
 
 
 class MPIWrapper:
@@ -648,6 +687,40 @@ class MPIWrapper:
                 if output is not None:
                     return output
                 await asyncio.sleep(0.1)
+
+        @app.put("/generate_async", response_model=GenerationResponseAsync)
+        async def generate_async(request: GetGenerationRequest):
+            data = {
+                "session": request.prompt,
+                "max_new_tokens": request.tokens_to_generate,
+                "temperature": request.temperature,
+                "top_k": None if request.top_k == 0 else request.top_k,
+                "top_p": request.top_p,
+                "top_p_min": request.top_p_min,
+                "repetition_penalty": request.repetition_penalty,
+                "random_seed": request.random_seed,
+                "stop_words_list": request.stop_words_list,
+            }
+
+            self.comm.Barrier()
+            data = self.comm.bcast(data, root=0)
+
+            generation_id = self.model.start_generation(data)
+            return generation_id
+
+        @app.put("/get_generation", response_model=GenerationResponse)
+        async def get_generation(request: GenerationRequest):
+            generation_id = request.generation_id
+
+            output = self.model.get_generation(generation_id)
+            if output is not None:
+                return output
+            return {'generation': None}
+
+        @app.put("/cancel_generation", response_model=CancelGenerationResponse)
+        async def cancel_generation(request: GenerationRequest):
+            generation_id = request.generation_id
+            return self.model.cancel_generation(generation_id)
 
         return app
 
