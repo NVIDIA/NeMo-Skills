@@ -202,9 +202,7 @@ class TRTLLMModel(BaseModel):
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
-        )
-        print(output_dict.content.decode())
-        output_dict = output_dict.json()
+        ).json()
         return output_dict
 
     def _generate_single_async(
@@ -240,11 +238,103 @@ class TRTLLMModel(BaseModel):
             url="http://{}:{}/generate_async".format(self.server_host, self.server_port),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
-        )
-        print(output_dict.content.decode())
-        output_dict = output_dict.json()
+        ).json()
 
-        return output_dict
+        return output_dict['generation_id']
+
+    def generate_async(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        remove_stop_phrases: bool = True,
+    ) -> list[dict]:
+        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
+
+        Not every server supports that, so make sure to override this method directly if that's not the case.
+        """
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+        }
+        for key, value in kwargs.items():
+            is_list = False
+            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
+                is_list = True
+            if key != 'stop_phrases' and isinstance(value, list):
+                is_list = True
+            if is_list and len(value) != len(prompts):
+                raise ValueError(f"Length of {key} should match the number of prompts.")
+            if not is_list:
+                kwargs[key] = [value for _ in range(len(prompts))]
+
+        futures = []
+        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
+            for request_idx in range(len(prompts)):
+                request = {key: value[request_idx] for key, value in kwargs.items()}
+                request['prompt'] = prompts[request_idx]
+                self.preprocess_request(request)
+                futures.append(executor.submit(self._generate_single_async, **request))
+        outputs = [future.result() for future in futures]
+
+        return outputs
+
+    def cancel_generations(
+        self,
+        generation_ids: list[str],
+    ) -> list[str]:
+
+        statuses = []
+        for generation_id in generation_ids:
+            request = {
+                "generation_id": generation_id,
+            }
+            output_dict = self.requests_lib.put(
+                url="http://{}:{}/cancel_generation".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            statuses.append(output_dict["status"])
+
+        return statuses
+
+    def get_generations(
+        self,
+        generation_ids: list[str],
+        # TODO: remember those from first command
+        stop_phrases: list[str] | None = None,
+        remove_stop_phrases: bool = True,
+    ) -> list[dict]:
+
+        generations = []
+        for generation_id in generation_ids:
+            request = {
+                "generation_id": generation_id,
+            }
+            output = self.requests_lib.put(
+                url="http://{}:{}/get_generation".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            if remove_stop_phrases:
+                if output['generation'] is not None:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+            generations.append(output)
+
+        return generations
 
 
 class NemoModel(BaseModel):
