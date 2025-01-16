@@ -159,7 +159,8 @@ def generate(cfg: RewardModelConfig):
                     # all of the ground-truth data to the output file alongside the generated solutions
                     result = output.pop('reward_model_score')
                     output[cfg.reward_model_score_key] = result
-                    original_data_point.pop(cfg.reward_model_score_key, None)
+                    for key in output:
+                        original_data_point.pop(key, None)
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []

@@ -67,10 +67,16 @@ class ReadData(BaseProcessor):
             self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
-            self.input_files = self.input_files.split(" ")
+            if ',' in self.input_files:
+                self.input_files = self.input_files.split(",")
+            else:
+                self.input_files = self.input_files.split(" ")
 
         if isinstance(self.preprocessed_dataset_files, str):
-            self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(" ")
+            if ',' in self.preprocessed_dataset_files:
+                self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(",")
+            else:
+                self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(" ")
 
         if self.input_files is None and self.preprocessed_dataset_files is None:
             raise ValueError("Either `input_files` or `preprocessed_dataset_files` should be provided")

@@ -21,7 +21,7 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_reward_server_command, get_server_command
+from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -72,9 +72,27 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, outpu
 
 
 def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for reward model")
+
     cmd = (
-        f"python -m nemo_skills.inference.reward_model ++skip_filled=True "
-        f"++output_dir={output_dir} ++random_seed={random_seed} "
+        f"python -m nemo_skills.inference.reward_model "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd
+
+
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for math judge")
+    cmd = (
+        f"python -m nemo_skills.inference.llm_math_judge "
+        f"    ++skip_filled=True "
+        f"    ++output_dir={output_dir} "
+        f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
     return cmd
@@ -95,17 +113,58 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
+    math_judge = "math_judge"
 
 
 server_command_factories = {
     GenerationType.generate: get_server_command,
     GenerationType.reward: get_reward_server_command,
+    GenerationType.math_judge: get_server_command,
 }
 
 client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
+    GenerationType.math_judge: get_math_judge_cmd,
 }
+
+
+def configure_client(
+    generation_type,
+    server_gpus,
+    server_type,
+    server_address,
+    server_port,
+    server_nodes,
+    model,
+    server_args,
+    extra_arguments,
+):
+    if server_address is None:  # we need to host the model
+        server_port = get_free_port(strategy="random")
+        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        server_address = f"localhost:{server_port}"
+
+        server_config = {
+            "model_path": model,
+            "server_type": server_type,
+            "num_gpus": server_gpus,
+            "num_nodes": server_nodes,
+            "server_args": server_args,
+            "server_port": server_port,
+        }
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.host=localhost ++server.port={server_port} "
+        )
+    else:  # model is hosted elsewhere
+        server_config = None
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.base_url={server_address} ++server.model={model} "
+        )
+        server_port = None
+    return server_config, extra_arguments, server_address, server_port
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -146,12 +205,22 @@ def generate(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code_exp: str = typer.Option(
+        None,
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+<<<<<<< HEAD
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
     output_base: str = typer.Option(
         None, 
         help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
     ),
+=======
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+>>>>>>> main
 ):
     """Generate LLM completions for a given input file.
 
@@ -178,37 +247,27 @@ def generate(
     else:
         log_dir = f"{output_dir}/generation-logs"
 
-    if server_address is None:  # we need to host the model
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        # Note: for nemo reward models, the port is hard-coded to 5000 in the
-        # get_reward_server_command function. Since RM has a proxy server on 5000
-        # and an actual GPU is being loaded on port 5001, we need to wait for 5001
-        # to come online before sending requests
-        if generation_type == GenerationType.reward and server_type == SupportedServers.nemo:
-            server_address = "localhost:5001"
-        else:
-            server_address = "localhost:5000"
-
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-        }
-        extra_arguments += f" ++server.server_type={server_type} "
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments += (
-            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
-        )
-
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]
+    original_server_address = server_address
 
     with run.Experiment(expname) as exp:
+        extra_arguments_original = extra_arguments
         if random_seeds:
             for seed in random_seeds:
+                server_port = get_free_port(strategy="random")
+                server_config, extra_arguments, server_address, server_port = configure_client(
+                    generation_type=generation_type,
+                    server_gpus=server_gpus,
+                    server_type=server_type,
+                    server_address=original_server_address,
+                    server_port=server_port,
+                    server_nodes=server_nodes,
+                    model=model,
+                    server_args=server_args,
+                    extra_arguments=extra_arguments_original,
+                )
+
                 cmd = get_cmd(
                     random_seed=seed,
                     output_dir=output_dir,
@@ -217,6 +276,7 @@ def generate(
                     output_base=output_base,
                 )
                 prev_tasks = None
+
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
@@ -235,11 +295,25 @@ def generate(
                         server_config=server_config,
                         with_sandbox=True,
                         run_after=run_after,
+                        reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
                         get_server_command=get_server_command,
+                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
         else:
+            server_port = get_free_port(strategy="random")
+            server_config, extra_arguments, server_address, server_port = configure_client(
+                generation_type=generation_type,
+                server_gpus=server_gpus,
+                server_type=server_type,
+                server_address=original_server_address,
+                server_port=server_port,
+                server_nodes=server_nodes,
+                model=model,
+                server_args=server_args,
+                extra_arguments=extra_arguments_original,
+            )
             cmd = get_cmd(
                 random_seed=None,
                 output_dir=output_dir,
@@ -265,11 +339,15 @@ def generate(
                     server_config=server_config,
                     with_sandbox=True,
                     run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
                     task_dependencies=prev_tasks,
                     get_server_command=get_server_command,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 )
                 prev_tasks = [new_task]
         run_exp(exp, cluster_config)
+
+    return exp
 
 
 if __name__ == "__main__":

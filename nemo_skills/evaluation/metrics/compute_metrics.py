@@ -53,7 +53,7 @@ class ComputeMetrics:
             for idx, predictions in enumerate(zip_longest(*file_handles)):
                 if idx == self.max_samples:
                     break
-                data = read_predictions(predictions)
+                data = read_predictions(predictions, idx, file_handles)
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:

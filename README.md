@@ -9,9 +9,10 @@ Here are some of the things we support.
   and [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) servers and easily convert checkpoints from one format to another.
 - [Model evaluation](https://nvidia.github.io/NeMo-Skills/pipelines/evaluation): Evaluate your models on many popular benchmarks
     - Math problem solving: gsm8k, math, amc23, aime24, omni-math (and many more)
+    - Formal proofs in Lean: minif2f, proofnet
     - Coding skills: human-eval, mbpp
-    - Chat/instruction following: ifeval, arena-hard
-    - General knowledge: mmlu (generative)
+    - Chat/instruction following: ifeval, arena-hard, mt-bench
+    - General knowledge: mmlu (generative), mmlu-pro
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
@@ -89,10 +90,7 @@ See our [paper](https://arxiv.org/abs/2410.01560) for ablations studies and more
 
 ## Nemo Inspector
 
-We also provide a convenient [tool](/nemo_inspector/Readme.md) for visualizing inference and data analysis
-|                                              Overview                                               |                                                     Inference Page                                                      |                                                    Analyze Page                                                     |
-| :-------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------: |
-| [![Demo of the tool](/nemo_inspector/images/demo.png)](https://www.youtube.com/watch?v=EmBFEl7ydqE) | [![Demo of the inference page](/nemo_inspector/images/inference_page.png)](https://www.youtube.com/watch?v=6utSkPCdNks) | [![Demo of the analyze page](/nemo_inspector/images/analyze_page.png)](https://www.youtube.com/watch?v=cnPyDlDmQXg) |
+We also provide a convenient [tool](https://github.com/NVIDIA/NeMo-Inspector) for visualizing inference and data analysis.
 
 
 ## Papers

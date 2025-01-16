@@ -62,7 +62,11 @@ exp_manager:
     save_best_model: False   # need to keep this false otherwise it will create multiple last.ckpt files because restore reset the previous best model
 
 model:
+  dist_ckpt_format: zarr
   seed: 1234
+  micro_batch_size: ${model.data.train_ds.micro_batch_size}
+  global_batch_size: ${model.data.train_ds.global_batch_size}
+
   tensor_model_parallel_size: 1 # intra-layer model parallelism
   pipeline_model_parallel_size: 1 # inter-layer model parallelism
   restore_from_path: ??? # Path to an existing p-tuned/prompt tuned .nemo model you wish to add new tasks to or run inference with
@@ -164,7 +168,7 @@ model:
       truncation_field: ${model.data.train_ds.truncation_field} # Options: keys in prompt_template
       index_mapping_dir: null # Path to a directory to write index mapping files.
       prompt_template: ${model.data.train_ds.prompt_template} # fstring to use for assistant prompt. Example: "Q: {input}\nA: {output}"
-      hf_dataset: False # Whether to load the json file with the HuggingFace dataset. otherwise, will load the jsonl file with the JSONLMemMapDataset.
+      hf_dataset: True # Whether to load the json file with the HuggingFace dataset. otherwise, will load the jsonl file with the JSONLMemMapDataset.
       truncation_method: 'right' # Truncation from which position, Options: ['left', 'right']
       output_original_text: True  # needed for the proper metrics support
 

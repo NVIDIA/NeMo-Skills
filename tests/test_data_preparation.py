@@ -14,7 +14,6 @@
 
 import hashlib
 import sys
-import uuid
 from pathlib import Path
 
 import yaml
@@ -56,7 +55,7 @@ def test_multiple_files():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_multiple_files',
         ctx=wrap_arguments(
-            "python -m nemo_skills.training.prepare_sft_data "
+            f"python -m nemo_skills.training.prepare_sft_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -67,6 +66,7 @@ def test_multiple_files():
             f"    ++filters.trim_solutions=true "
             f"    ++filters.drop_incorrect_arithmetic=false "
             f"    ++filters.split_arithmetic=false "
+            f"    ++filters.remove_contaminated=false "
             f"    ++num_output_samples=32 "
             f"    ++downsampling_method=fair "
             f"    ++do_shuffle=false "
@@ -89,7 +89,7 @@ def test_exclude_keys():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_exclude_keys',
         ctx=wrap_arguments(
-            "python -m nemo_skills.training.prepare_sft_data "
+            f"python -m nemo_skills.training.prepare_sft_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -100,6 +100,7 @@ def test_exclude_keys():
             f"    ++filters.trim_solutions=true "
             f"    ++filters.drop_incorrect_arithmetic=false "
             f"    ++filters.split_arithmetic=false "
+            f"    ++filters.remove_contaminated=false "
             f"    ++num_output_samples=32 "
             f"    ++downsampling_method=fair "
             f"    ++do_shuffle=false ",
@@ -122,7 +123,7 @@ def test_code_sft_data():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_code_sft_data',
         ctx=wrap_arguments(
-            "python -m nemo_skills.training.prepare_sft_data "
+            f"python -m nemo_skills.training.prepare_sft_data "
             f"    --config-name=prepare_code_sft_data "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
             f"    ++output_path={output_file} "
@@ -149,18 +150,19 @@ def test_openmathinstruct2():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_openmathinstruct2',
         ctx=wrap_arguments(
-            "python -m nemo_skills.training.prepare_sft_data "
-            "++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
-            f"++output_path={output_file} "
-            "++prompt_template=llama3-instruct "
-            "++prompt_config=generic/math "
-            "++output_key=generated_solution "
-            "++filters.remove_len_outlier_problems=false "
-            "++filters.drop_multi_boxed=false "
-            "++filters.trim_prefix=false "
-            "++filters.trim_solutions=false "
-            "++filters.drop_incorrect_arithmetic=false "
-            "++filters.split_arithmetic=false "
+            f"python -m nemo_skills.training.prepare_sft_data "
+            f"    ++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
+            f"    ++output_path={output_file} "
+            f"    ++prompt_template=llama3-instruct "
+            f"    ++prompt_config=generic/math "
+            f"    ++output_key=generated_solution "
+            f"    ++filters.remove_len_outlier_problems=false "
+            f"    ++filters.drop_multi_boxed=false "
+            f"    ++filters.trim_prefix=false "
+            f"    ++filters.trim_solutions=false "
+            f"    ++filters.drop_incorrect_arithmetic=false "
+            f"    ++filters.split_arithmetic=false "
+            f"    ++filters.remove_contaminated=false "
         ),
     )
 

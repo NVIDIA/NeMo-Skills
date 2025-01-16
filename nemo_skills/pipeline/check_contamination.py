@@ -21,22 +21,17 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.utils import get_free_port
 from nemo_skills.utils import setup_logging
 
 
-def get_check_contamination_cmd(input_file, output_file, data_files, extra_arguments=""):
+def get_check_contamination_cmd(input_file, output_file, extra_arguments=""):
     cmd = (
         f"python -m nemo_skills.inference.check_contamination "
         f"    ++input_file={input_file} "
         f"    ++output_file={output_file} "
         f"    {extra_arguments} "
     )
-    if data_files:
-        cmd += " && " + (
-            f"python -m nemo_skills.training.data_preparation_utils.add_contaminated_label "
-            f"    --label_file {output_file} "
-            f"    --data_files {data_files} "
-        )
     return cmd
 
 
@@ -60,7 +55,6 @@ def check_contamination(
         ..., help="Input file with the data to check for contamination. An output of the retrieve_similar.py script."
     ),
     output_file: str = typer.Option(..., help="Where to save results"),
-    data_files: str = typer.Option(None, help="Glob pattern(s) for the files to update with contaminated label."),
     expname: str = typer.Option("llm-math-judge", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API."),
     server_address: str = typer.Option(
@@ -77,6 +71,11 @@ def check_contamination(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code_exp: str = typer.Option(
+        None,
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
@@ -86,6 +85,7 @@ def check_contamination(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -109,7 +109,8 @@ def check_contamination(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = "localhost:5000"
+        server_port = get_free_port(strategy="random")
+        server_address = f"localhost:{server_port}"
 
         server_config = {
             "model_path": model,
@@ -117,8 +118,11 @@ def check_contamination(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_port": server_port,
         }
         extra_arguments += f" ++server.server_type={server_type} "
+        extra_arguments += f" ++server.host=localhost "
+        extra_arguments += f" ++server.port={server_port} "
     else:  # model is hosted elsewhere
         server_config = None
         extra_arguments += (
@@ -133,9 +137,7 @@ def check_contamination(
                 cmd=wrap_cmd(
                     get_generation_command(
                         server_address=server_address,
-                        generation_commands=get_check_contamination_cmd(
-                            input_file, output_file, data_files, extra_arguments
-                        ),
+                        generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
                     ),
                     preprocess_cmd=preprocess_cmd,
                     postprocess_cmd=postprocess_cmd,
@@ -149,9 +151,13 @@ def check_contamination(
                 server_config=server_config,
                 task_dependencies=prev_tasks,
                 run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config)
+
+    return exp
 
 
 if __name__ == "__main__":

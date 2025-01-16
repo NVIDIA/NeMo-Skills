@@ -89,8 +89,9 @@ configs = {
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
         f" ++model.data.train_ds.file_path='{params.training_data}' "
-        f" ++model.data.validation_ds.file_path='{params.validation_data}' "
         f" ++model.data.train_ds.index_mapping_dir='{os.path.dirname(os.path.abspath(params.training_data))}' "
+        f" ++model.data.validation_ds.file_path='{params.validation_data}' "
+        f" ++model.data.validation_ds.index_mapping_dir='{os.path.dirname(os.path.abspath(params.validation_data))}' "
         f" model.restore_from_path={params.nemo_model} " + params.extra_arguments
     ),
     TrainingAlgo.dpo: lambda params: (
@@ -232,8 +233,14 @@ def train(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code_exp: str = typer.Option(
+        None,
+        help="If specified, will reuse the code from this experiment. "
+        "Can provide an experiment name or an experiment object if running from code.",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -308,7 +315,9 @@ def train(
                 time_min=time_min,
                 with_sandbox=with_sandbox,
                 run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
 
         cmd = get_avg_checkpoints_cmd(
@@ -331,11 +340,15 @@ def train(
             num_tasks=1,
             num_gpus=num_gpus,
             run_after=run_after,
+            reuse_code_exp=reuse_code_exp,
             task_dependencies=[prev_task] if prev_task is not None else None,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
 
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
+
+    return exp
 
 
 if __name__ == "__main__":

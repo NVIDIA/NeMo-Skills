@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ from nemo_aligner.utils.train_script_utils import (
     resolve_and_create_trainer,
     retrieve_custom_trainer_state_dict,
 )
-from nemo_aligner.utils.utils import load_from_nemo
+from nemo_aligner.utils.utils import load_and_override_model_config, load_from_nemo
 from omegaconf.omegaconf import OmegaConf, open_dict
 
 """Script to start SFT training"""
@@ -50,77 +50,10 @@ OmegaConf.register_new_resolver("int_div", lambda x, y: x // y, replace=True)
 mp.set_start_method("spawn", force=True)
 
 
-def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
-    """
-    This function modifies the original gpt pre-training config (gpt_cfg) with attributes from the finetuning config (cfg).
-    The `add_cfg_to_tree` arg adds `cfg` to the top of the yaml tree which is needed for all `hparams.yaml` files when passed as an arg to `load_from_checkpoint()`.
-    """
-    OmegaConf.set_struct(gpt_cfg, True)
-    OmegaConf.resolve(cfg)
-    with open_dict(gpt_cfg):
-        gpt_cfg.megatron_amp_O2 = cfg.model.get("megatron_amp_O2", False)
-        gpt_cfg.micro_batch_size = cfg.model.data.train_ds.micro_batch_size
-        gpt_cfg.global_batch_size = cfg.model.data.train_ds.global_batch_size
-        gpt_cfg.sequence_parallel = cfg.model.get("sequence_parallel", False)
-        gpt_cfg.activations_checkpoint_granularity = cfg.model.get("activations_checkpoint_granularity", None)
-        gpt_cfg.activations_checkpoint_num_layers = cfg.model.get("activations_checkpoint_num_layers", None)
-        gpt_cfg.activations_checkpoint_method = cfg.model.get("activations_checkpoint_method", None)
-        gpt_cfg.activations_checkpoint_layers_per_pipeline = cfg.model.get(
-            "activations_checkpoint_layers_per_pipeline", None
-        )
-        gpt_cfg.peft = cfg.model.peft
-        gpt_cfg.data = cfg.model.data
-        gpt_cfg.optim = cfg.model.optim
-        gpt_cfg.precision = cfg.trainer.precision
-        gpt_cfg.answer_only_loss = cfg.model.answer_only_loss
-        gpt_cfg.restore_from_path = cfg.model.restore_from_path
-        gpt_cfg.resume_from_checkpoint = cfg.model.resume_from_checkpoint
-        gpt_cfg.save_nemo_on_validation_end = cfg.model.save_nemo_on_validation_end
-        gpt_cfg.gradient_as_bucket_view = cfg.model.gradient_as_bucket_view
-        gpt_cfg.hidden_dropout = cfg.model.get("hidden_dropout", 0.0)
-        gpt_cfg.attention_dropout = cfg.model.get("attention_dropout", 0.0)
-        gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
-        gpt_cfg.use_flash_attention = cfg.model.get("use_flash_attention", False)
-        # if TP/PP size is -1, use default TP/PP size as original model
-        if cfg.model.get("tensor_model_parallel_size", 1) > 0:
-            gpt_cfg.tensor_model_parallel_size = cfg.model.get("tensor_model_parallel_size", 1)
-        if cfg.model.get("pipeline_model_parallel_size", 1) > 0:
-            gpt_cfg.pipeline_model_parallel_size = cfg.model.get("pipeline_model_parallel_size", 1)
-        gpt_cfg.pipeline_model_parallel_split_rank = cfg.model.get("pipeline_model_parallel_split_rank", 0)
-
-        if cfg.model.data.get("chat", False):
-            # chat model, overwrite the prompt template
-            prompt_template = get_prompt_template_example(cfg.model.data.chat_prompt_tokens)
-            gpt_cfg.data.train_ds.prompt_template = prompt_template
-            gpt_cfg.data.validation_ds.prompt_template = prompt_template
-
-        sft_cls = GPTSFTModel
-        gpt_cfg.target = f"{sft_cls.__module__}.{sft_cls.__name__}"
-
-        if cfg.model.get("use_flash_attention", None) is not None:
-            gpt_cfg.use_flash_attention = cfg.model.use_flash_attention
-
-        if cfg.model.get("seq_len_interpolation_factor", None) is not None:
-            gpt_cfg.seq_len_interpolation_factor = cfg.model.seq_len_interpolation_factor
-
-        if cfg.model.get("dist_ckpt_load_strictness", None) is not None:
-            gpt_cfg.dist_ckpt_load_strictness = cfg.model.dist_ckpt_load_strictness
-
-        gpt_cfg.inference = cfg.model.get("inference", {})
-
-        # This is needed when modifying a hparam file directly to load `.ckpt` files.
-        # This is not needed to modify the cfg in `.nemo` files.
-        if add_cfg_to_tree:
-            OmegaConf.resolve(gpt_cfg)
-            gpt_cfg.cfg = gpt_cfg
-
-        # OVERRRIDE: set the dist_ckpt_format to zarr explicitly unless specified in the config
-        gpt_cfg.dist_ckpt_format = cfg.model.get("dist_ckpt_format", "zarr")
-    return gpt_cfg
-
-
 @hydra_runner(config_path=".", config_name="sft_config")
 def main(cfg) -> None:
+    cfg.model = load_and_override_model_config(cfg.model.restore_from_path, cfg.model)
+
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
@@ -161,17 +94,16 @@ def main(cfg) -> None:
     with open_dict(cfg):
         cfg.model.precision = cfg.trainer.precision
 
-    ptl_model, updated_cfg = load_from_nemo(
+    ptl_model = load_from_nemo(
         GPTSFTModel,
         cfg,
         trainer,
         strict=True,
-        modify_config_fn=_modify_config,
         restore_path=cfg.model.restore_from_path,
-        return_updated_cfg=True,
+        return_updated_cfg=False,
     )
 
-    init_peft(ptl_model, updated_cfg)
+    init_peft(ptl_model, cfg.model)
 
     with open_dict(cfg):
         # overwrite the model config with the config from the checkpoint

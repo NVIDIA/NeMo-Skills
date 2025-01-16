@@ -21,7 +21,7 @@ from dataclasses import asdict, field
 from pathlib import Path
 
 import hydra
-from omegaconf import open_dict, OmegaConf
+from omegaconf import OmegaConf, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -119,6 +119,7 @@ class GenerateSolutionsConfig:
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
 
+
 def combine_stop_phrases(prompt_phrases, extra_phrases):
     if prompt_phrases is None and extra_phrases is None:
         return None
@@ -127,6 +128,7 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
     if extra_phrases is None:
         return prompt_phrases
     return prompt_phrases + extra_phrases
+
 
 @hydra.main(version_base=None, config_name='base_generation_config')
 def generate(cfg: GenerateSolutionsConfig):
@@ -275,7 +277,8 @@ def generate(cfg: GenerateSolutionsConfig):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
                     output[cfg.generation_key] = output.pop("generation")
-                    original_data_point.pop(cfg.generation_key, None)
+                    for key in output:
+                        original_data_point.pop(key, None)
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []

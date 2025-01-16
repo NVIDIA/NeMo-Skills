@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   gpu-tests-llama:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
@@ -46,9 +46,13 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_llama.sh
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
 
   gpu-tests-qwen:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
@@ -77,9 +81,13 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_qwen.sh
-  
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+
   gpu-tests-rm:
-    runs-on: self-hosted-nemo-skills
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
     - name: Cleanup old containers
@@ -107,3 +115,7 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_rm.sh
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'

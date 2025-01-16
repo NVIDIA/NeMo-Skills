@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dash[testing]
-pytest-rerunfailures
-webdriver-manager==4.0.2
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.append(str(Path(__file__).absolute().parents[1]))
+from nemo_skills.pipeline import wrap_arguments
+from nemo_skills.pipeline.cli import generate
+
+
+def test_error_on_missing_default():
+    with pytest.raises(TypeError):
+        generate(ctx=wrap_arguments(""))

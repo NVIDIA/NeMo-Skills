@@ -19,7 +19,7 @@ user_end: "<|im_end|>\n"
 assistant_begin: "<|im_start|>assistant\n"
 assistant_end: "<|im_end|>\n"
 
-stop_phrases: ["<|im_end|>"]
+stop_phrases: ["<|im_end|>", "<|endoftext|>"]
 
 # TODO: need to figure the right format for code execution
 # used to execute code within these tags

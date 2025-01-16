@@ -266,14 +266,20 @@ class Prompt:
             return prompt_string
         else:
             if multi_turn_key is None:
-                messages = [
-                    {"role": "system", "content": self.config.system},
-                    {"role": "user", "content": self.build_user_message(input_dict)},
-                ]
+                if self.config.system:
+                    messages = [
+                        {"role": "system", "content": self.config.system},
+                    ]
+                else:
+                    messages = []
+                messages.append({"role": "user", "content": self.build_user_message(input_dict)})
                 if generation and include_generation:
                     messages.append({"role": "assistant", "content": generation})
             else:
-                messages = [{"role": "system", "content": self.config.system}]
+                if self.config.system:
+                    messages = [{"role": "system", "content": self.config.system}]
+                else:
+                    messages = []
                 for turn in input_dict[multi_turn_key][:-1]:
                     messages.append({"role": "user", "content": self.build_user_message(turn)})
                     messages.append({"role": "assistant", "content": turn["assistant"]})

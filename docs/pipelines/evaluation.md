@@ -48,7 +48,7 @@ Which should print the following
 ```
 ------------------------- gsm8k -------------------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 1319        | 82.34         | 0.91
+greedy          | 1319        | 82.34            | 0.91
 
 
 ------------------------------ human-eval -----------------------------
