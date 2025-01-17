@@ -589,12 +589,14 @@ class GPTSFTPackedDataset(GPTSFTDataset):
 
         if isinstance(self.indexed_dataset, _PackedDataset):
             input_ids = self.indexed_dataset.input_ids[idx].tolist()
-            input_ids = input_ids[: input_ids.index(-1)]  # remove -1 padding
+            if -1 in input_ids:
+                input_ids = input_ids[: input_ids.index(-1)]  # remove -1 padding
 
             loss_mask = self.indexed_dataset.loss_mask[idx][: len(input_ids)]
 
             seq_start_id = self.indexed_dataset.seq_start_id[idx].tolist()
-            seq_start_id = seq_start_id[: seq_start_id.index(-1)]  # remove -1 padding
+            if -1 in seq_start_id:
+                seq_start_id = seq_start_id[: seq_start_id.index(-1)]  # remove -1 padding
             seq_boundaries = seq_start_id + [len(input_ids)]
         else:
             input_ids = self.indexed_dataset[idx]['input_ids']
