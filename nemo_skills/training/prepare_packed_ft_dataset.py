@@ -319,7 +319,7 @@ def _process_chunk(indices, dataset):
 
 
 def parallel_convert_dataset(dataset, num_workers=100):
-    chunk_size = len(dataset) // num_workers
+    chunk_size = max(len(dataset) // num_workers, 1)
     chunks = [range(i, min(i + chunk_size, len(dataset))) for i in range(0, len(dataset), chunk_size)]
 
     with Pool(num_workers) as pool:
@@ -458,14 +458,8 @@ def process_dataset_chunk(
     sequences, histogram = create_hist(chunk_data, max_seq_length)
     assignments, _ = create_packing_strategy(histogram, pack_size, packing_algorithm)
     packed_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
-
-    # Split the packed data into separate arrays
-    result = {
-        'input_ids': [item['input_ids'] for item in packed_data],
-        'loss_mask': [item['loss_mask'] for item in packed_data],
-        'seq_start_id': [item['seq_start_id'] for item in packed_data],
-    }
-    return result
+    # Return list of dicts
+    return packed_data
 
 
 def process_chunk_wrapper(args):
@@ -517,25 +511,34 @@ def main(cfg: 'DictConfig') -> None:
                 )
             )
 
-        # Sort results by chunk_id and concatenate
-        results.sort(key=lambda x: x[0])  # Sort by chunk_id
-
-        # Initialize arrays for each component
-        all_input_ids = []
-        all_loss_mask = []
-        all_seq_start_id = []
-
-        # Concatenate results
+        # Gather all packed_data from the chunks
+        all_packed_data = []
         for _, chunk_result in results:
-            all_input_ids.extend(chunk_result['input_ids'])
-            all_loss_mask.extend(chunk_result['loss_mask'])
-            all_seq_start_id.extend(chunk_result['seq_start_id'])
+            all_packed_data.extend(chunk_result)
 
-        all_input_ids = np.array(all_input_ids)
-        all_loss_mask = np.array(all_loss_mask)
-        all_seq_start_id = np.array(all_seq_start_id)
+        # Compute global P, M
+        N = len(all_packed_data)
+        P, M = 0, 0
+        for sample in all_packed_data:
+            P = max(P, len(sample['input_ids']))
+            M = max(M, len(sample['seq_start_id']))
 
-        # Save separate arrays
+        # Pre-allocate arrays with default fill
+        all_input_ids = -np.ones((N, P), dtype=np.int32)
+        all_loss_mask = np.ones((N, P), dtype=np.bool_)
+        all_seq_start_id = -np.ones((N, M), dtype=np.int32)
+
+        # Fill arrays using slicing
+        for i, sample in enumerate(all_packed_data):
+            seq_len_ids = len(sample['input_ids'])
+            seq_len_mask = len(sample['loss_mask'])
+            seq_len_starts = len(sample['seq_start_id'])
+
+            all_input_ids[i, :seq_len_ids] = sample['input_ids']
+            all_loss_mask[i, :seq_len_mask] = sample['loss_mask']
+            all_seq_start_id[i, :seq_len_starts] = sample['seq_start_id']
+
+        # Save arrays
         os.makedirs(args.output_dir, exist_ok=True)
         base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
         np.save(f'{base_path}.input_ids.npy', all_input_ids)
