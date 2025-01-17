@@ -113,9 +113,8 @@ from nemo_skills.pipeline.cli import generate
 
 # we generated 80 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 80 new data files
-exp = None
 for i in range(80):
-    exp = generate(
+    generate(
         cluster="slurm",
         server_type="trtllm",
         model="/trt_models/llama-3.1-405b-instruct",
@@ -129,7 +128,6 @@ for i in range(80):
             f"++examples_type=math_text_detailed "
             f"++prompt_template=llama3-base "
         ),
-        reuse_code_exp=exp,
     )
 ```
 
@@ -141,7 +139,6 @@ from nemo_skills.pipeline.cli import generate
 
 # we generated 10 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 10 new data files
-exp = None
 for i in range(10):
     generate(
         cluster="slurm",
@@ -157,7 +154,6 @@ for i in range(10):
             f"++examples_type=gsm8k_text_detailed "
             f"++prompt_template=llama3-base "
         ),
-        reuse_code_exp=exp,
     )
 ```
 
@@ -173,7 +169,6 @@ from nemo_skills.pipeline.cli import run_cmd
 
 # for MATH
 data_folder = "/workspace/new-problems-solution-augmentation/math"
-exp = None
 # if you want to avoid scheduling many jobs, you can instead
 # create one big cmd and run it directly to handle all files
 # or you can create a new script and reference it with
@@ -183,10 +178,9 @@ for i in range(80):
         f'python -m nemo_skills.evaluation.fill_majority_answer '
         f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
     )
-    exp = run_cmd(
+    run_cmd(
         cluster="slurm",
         ctx=wrap_arguments(cmd),
-        reuse_code_exp=exp,
         log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
         # if cluster has a cpu partition you can specify it with a `partition` parameter
     )
@@ -198,10 +192,9 @@ for i in range(10):
         f'python -m nemo_skills.evaluation.fill_majority_answer '
         f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
     )
-    exp = run_cmd(
+    run_cmd(
         cluster="slurm",
         ctx=wrap_arguments(cmd),
-        reuse_code_exp=exp,
         log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
         # if cluster has a cpu partition you can specify it with a `partition` parameter
     )

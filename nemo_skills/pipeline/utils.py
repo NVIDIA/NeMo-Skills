@@ -944,7 +944,7 @@ def run_exp(exp, cluster_config, sequential=None):
     else:
         exp.run(detach=True, sequential=False if sequential is None else sequential)
 
-    # caching the experiment code for reuse
-    ssh_hash = tunnel_hash(get_tunnel(cluster_config))
-    if ssh_hash not in REUSE_CODE_EXP:
-        REUSE_CODE_EXP[ssh_hash] = exp
+        # caching the experiment code for reuse
+        ssh_hash = tunnel_hash(get_tunnel(cluster_config))
+        if ssh_hash not in REUSE_CODE_EXP:
+            REUSE_CODE_EXP[ssh_hash] = exp
