@@ -34,11 +34,25 @@ class SupportedServers(str, Enum):
     openai = "openai"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
-    if random_seed is not None:
-        output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
+def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, output_base=None):
+    """Construct the generation command for language model inference.
+
+    If `output_base` is defined, it replaces the default `output.jsonl` filenames with:
+        - `{output_base}.jsonl` for the single-seed run
+        - `{output_base}-rs{seed}.jsonl` if `random_seed` is provided.
+    """
+    if output_base is not None:
+        if random_seed is not None:
+            output_file = f"{output_dir}/generation/{output_base}-rs{random_seed}.jsonl"
+        else:
+            output_file = f"{output_dir}/generation/{output_base}.jsonl"
     else:
-        output_file = f"{output_dir}/generation/output.jsonl"
+        # Fallback to original naming scheme if output_base is not provided
+        if random_seed is not None:
+            output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
+        else:
+            output_file = f"{output_dir}/generation/output.jsonl"
+
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
     if random_seed is not None:
         cmd += (
@@ -197,7 +211,11 @@ def generate(
         "Can provide an experiment name or an experiment object if running from code.",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
+    output_base: str = typer.Option(
+        None, 
+        help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
+    ),
     exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
 ):
     """Generate LLM completions for a given input file.
@@ -251,6 +269,7 @@ def generate(
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
+                    output_base=output_base,
                 )
                 prev_tasks = None
 
@@ -296,6 +315,7 @@ def generate(
                 output_dir=output_dir,
                 extra_arguments=extra_arguments,
                 eval_args=eval_args,
+                output_base=output_base,
             )
             prev_tasks = None
             for _ in range(dependent_jobs + 1):
