@@ -1200,7 +1200,6 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
     )
 
 
-<<<<<<< HEAD
 def test_generic_nat_to_lean4_prompt():
     prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
 
@@ -1331,8 +1330,6 @@ Lean 4 translation:"""
         == expected_prompt
     )
 
-=======
->>>>>>> main
 def test_mmlu_pro_llama_few_shot_prompt():
     prompt = get_prompt('llama3-instruct/mmlu_pro', 'llama3-instruct', 'mmlu_pro_few_shot_llama_math')
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>

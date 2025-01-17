@@ -211,16 +211,12 @@ def generate(
         "Can provide an experiment name or an experiment object if running from code.",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-<<<<<<< HEAD
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
     output_base: str = typer.Option(
         None, 
         help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
     ),
-=======
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
->>>>>>> main
 ):
     """Generate LLM completions for a given input file.
 
