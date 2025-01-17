@@ -901,8 +901,8 @@ def add_task(
             )
             executors.append(sandbox_executor)
 
-    tunnel = get_tunnel(cluster_config)
     if cluster_config["executor"] != "local":
+        tunnel = get_tunnel(cluster_config)
         if reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
