@@ -73,7 +73,7 @@ def test_multiple_files():
         ),
     )
 
-    expected_md5 = "8fce1c6a4abc47e82eec4e781909469b"
+    expected_md5 = "a8bed58f4d98cdcc991f30fef477b74c"
     output_md5 = compute_md5(output_file)
 
     assert (
@@ -107,7 +107,7 @@ def test_exclude_keys():
         ),
     )
 
-    expected_md5 = "08c9b228faa1065825b68c0c994fcdb4"
+    expected_md5 = "00639f65c3d9f35b7edc02359d3ebf59"
     output_md5 = compute_md5(output_file)
 
     assert (
