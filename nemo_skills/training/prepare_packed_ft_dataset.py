@@ -531,6 +531,10 @@ def main(cfg: 'DictConfig') -> None:
             all_loss_mask.extend(chunk_result['loss_mask'])
             all_seq_start_id.extend(chunk_result['seq_start_id'])
 
+        all_input_ids = np.array(all_input_ids)
+        all_loss_mask = np.array(all_loss_mask)
+        all_seq_start_id = np.array(all_seq_start_id)
+
         # Save separate arrays
         os.makedirs(args.output_dir, exist_ok=True)
         base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
