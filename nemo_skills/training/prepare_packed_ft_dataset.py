@@ -440,20 +440,99 @@ class PackingArgs:
         return self
 
 
+def process_dataset_chunk(chunk_data: np.array, pack_size: int, tokenizer, packing_algorithm: str):
+    """
+    Process a chunk of the dataset independently.
+
+    Args:
+        chunk_data: NumPy array containing a subset of the tokenized dataset
+        pack_size: The maximum capacity of each bin
+        tokenizer: The tokenizer instance
+        packing_algorithm: The packing algorithm to use
+
+    Returns:
+        Dictionary containing packed sequences split into input_ids, loss_mask, and seq_start_id arrays
+    """
+    sequences, histogram = create_hist(chunk_data, len(chunk_data[0]['input_ids']) - 1)
+    assignments, _ = create_packing_strategy(histogram, pack_size, packing_algorithm)
+    packed_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
+
+    # Split the packed data into separate arrays
+    result = {
+        'input_ids': [item['input_ids'] for item in packed_data],
+        'loss_mask': [item['loss_mask'] for item in packed_data],
+        'seq_start_id': [item['seq_start_id'] for item in packed_data],
+    }
+    return result
+
+
+def process_chunk_wrapper(args):
+    """
+    Wrapper function for parallel processing of chunks.
+
+    Args:
+        args: Tuple containing (chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id)
+
+    Returns:
+        Tuple of (chunk_id, processed_chunk_data)
+    """
+    chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id = args
+    logging.info(f"Processing chunk {chunk_id}")
+    result = process_dataset_chunk(chunk_data, pack_size, tokenizer, packing_algorithm)
+    return chunk_id, result
+
+
 @hydra_runner(config_path=".", config_name="pack_config")
 def main(cfg: 'DictConfig') -> None:
     args = PackingArgs().from_config(cfg)
     dataset, tokenizer = tokenize_dataset(cfg)
-    sequences, histogram = create_hist(dataset, cfg.model.data.train_ds.max_seq_length)
-    for pack_size in args.pack_sizes:
-        assignments, metadata = create_packing_strategy(histogram, pack_size, args.packing_algorithm)
-        output_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
+    split_packing_length = cfg.split_packing_length
 
-        # save output data
+    # Split dataset into chunks
+    n_samples = len(dataset)
+    n_chunks = (n_samples + split_packing_length - 1) // split_packing_length
+    chunks = np.array_split(dataset, n_chunks)
+
+    num_workers = cfg.get("num_workers", min(os.cpu_count() // 2, n_chunks))
+    logging.info(
+        f"Processing dataset in {n_chunks} chunks of {split_packing_length} samples using {num_workers} workers"
+    )
+
+    for pack_size in args.pack_sizes:
+        # Prepare arguments for parallel processing
+        chunk_args = [(chunk, pack_size, tokenizer, args.packing_algorithm, i) for i, chunk in enumerate(chunks)]
+
+        # Process chunks in parallel
+        with Pool(num_workers) as pool:
+            results = list(
+                tqdm(
+                    pool.imap(process_chunk_wrapper, chunk_args),
+                    total=len(chunk_args),
+                    desc=f"Processing chunks for pack_size={pack_size}",
+                )
+            )
+
+        # Sort results by chunk_id and concatenate
+        results.sort(key=lambda x: x[0])  # Sort by chunk_id
+
+        # Initialize arrays for each component
+        all_input_ids = []
+        all_loss_mask = []
+        all_seq_start_id = []
+
+        # Concatenate results
+        for _, chunk_result in results:
+            all_input_ids.extend(chunk_result['input_ids'])
+            all_loss_mask.extend(chunk_result['loss_mask'])
+            all_seq_start_id.extend(chunk_result['seq_start_id'])
+
+        # Save separate arrays
         os.makedirs(args.output_dir, exist_ok=True)
-        output_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}.npy')
-        np.save(output_path, output_data)
-        logging.info(f"Done, output written to {output_path}")
+        base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
+        np.save(f'{base_path}.input_ids.npy', all_input_ids)
+        np.save(f'{base_path}.loss_mask.npy', all_loss_mask)
+        np.save(f'{base_path}.seq_start_id.npy', all_seq_start_id)
+        logging.info(f"Done, output written to {base_path}.[input_ids|loss_mask|seq_start_id].npy")
 
     logging.info(
         f"""
