@@ -173,3 +173,81 @@ exp = eval(
     reuse_code_exp=exp,
 )
 ```
+
+## Using sequence packing and context parallel
+
+When training on sequences >4k or so, it's recommended to use sequence packing and context parallel.
+Here is an example how to do that. Most of the parameters don't need to change, but
+the `global_batch_size` might need to be adjusted to be n times smaller than without packing
+where n is the average number of sequences per pack, that packing script outputs, e.g.
+
+```
+[NeMo I 2025-01-16 13:57:37 prepare_packed_ft_dataset:165] Packing sequences to length 16384...
+[NeMo I 2025-01-16 15:06:24 prepare_packed_ft_dataset:182] Packing is 98.23% efficient
+[NeMo I 2025-01-16 15:06:24 prepare_packed_ft_dataset:183] >>>>> For pack size 16384, average number of sequences per pack is n = 3.669 <<<<<
+```
+
+Here is an example of running packing and training.
+
+```python
+from nemo_skills.pipeline import wrap_arguments
+from nemo_skills.pipeline.cli import train, run_cmd
+
+expname = "my-training-job"
+cluster = "slurm"
+output_dir = f"/workspace/{expname}/checkpoints"
+
+# your memory consumption will be similar to a job with
+# `pack_seq_length / context_parallel` sequences without packing
+pack_seq_length = 16384
+context_parallel = 4
+
+original_bs = 512
+avg_sequences_per_pack = 3.7
+# you need to make sure this is divisible by your data parallel rank,
+# so might need to round to a power of 2
+packed_bs = original_bs // avg_sequences_per_pack
+
+packing_cmd = (
+    f"python /nemo_run/code/nemo_skills/training/prepare_packed_ft_dataset.py "
+    f"    ++model.data.train_ds.file_names=[/data/sft-data.jsonl] "
+    f"    ++model.data.train_ds.max_seq_length={pack_seq_length} "
+    f"    ++model.context_parallel_size={context_parallel} "
+    f"    ++tokenizer_path=/hf_models/Meta-Llama-3.1-8B "
+    f"    ++output_dir=/data "
+    f"    ++pack_sizes=[{pack_seq_length}] "
+    f"    ++model.data.train_ds.hf_dataset=True "
+)
+
+run_cmd(
+    ctx=wrap_arguments(packing_cmd),
+    cluster=cluster,
+    expname=f"{expname}-packing",
+    partition="cpu",  # if available on your cluster
+    exclusive=True,  # better to get the full node, since packing is resource intensive
+)
+
+train(
+    ctx=wrap_arguments(
+        f"++model.data.train_ds.packed_sequence=True "
+        f"++model.data.train_ds.micro_batch_size=1 "  # should always be 1 for packed jobs
+        f"++model.data.train_ds.global_batch_size={packed_bs} "
+        f"++model.context_parallel_size={context_parallel} "
+        f"++model.data.train_ds.max_seq_length={pack_seq_length} "
+        # all other parameters are generally the same as for the non-packed job with
+        # max seq length = packed_seq_length / context_parallel
+        # and keep in mind that each step now processes avg_sequences_per_pack * packed_bs examples
+    ),
+    cluster=cluster,
+    expname=expname,
+    run_after=f"{expname}-packing",
+    output_dir=output_dir,
+    nemo_model="/nemo_models/llama3.1-8b-base",
+    num_nodes=8,
+    num_gpus=8,
+    num_training_jobs=4,
+    training_data=f"/data/packed_{pack_seq_length}_seed0.npy",
+)
+
+# can follow up with the same convert/eval steps as above
+```

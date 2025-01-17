@@ -319,7 +319,7 @@ def _process_chunk(indices, dataset):
 
 
 def parallel_convert_dataset(dataset, num_workers=100):
-    chunk_size = len(dataset) // num_workers
+    chunk_size = max(len(dataset) // num_workers, 1)
     chunks = [range(i, min(i + chunk_size, len(dataset))) for i in range(0, len(dataset), chunk_size)]
 
     with Pool(num_workers) as pool:
@@ -440,20 +440,112 @@ class PackingArgs:
         return self
 
 
+def process_dataset_chunk(
+    chunk_data: np.array, pack_size: int, tokenizer, packing_algorithm: str, max_seq_length: int
+):
+    """
+    Process a chunk of the dataset independently.
+
+    Args:
+        chunk_data: NumPy array containing a subset of the tokenized dataset
+        pack_size: The maximum capacity of each bin
+        tokenizer: The tokenizer instance
+        packing_algorithm: The packing algorithm to use
+
+    Returns:
+        Dictionary containing packed sequences split into input_ids, loss_mask, and seq_start_id arrays
+    """
+    sequences, histogram = create_hist(chunk_data, max_seq_length)
+    assignments, _ = create_packing_strategy(histogram, pack_size, packing_algorithm)
+    packed_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
+    # Return list of dicts
+    return packed_data
+
+
+def process_chunk_wrapper(args):
+    """
+    Wrapper function for parallel processing of chunks.
+
+    Args:
+        args: Tuple containing (chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id)
+
+    Returns:
+        Tuple of (chunk_id, processed_chunk_data)
+    """
+    chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id, max_seq_length = args
+    logging.info(f"Processing chunk {chunk_id}")
+    result = process_dataset_chunk(chunk_data, pack_size, tokenizer, packing_algorithm, max_seq_length)
+    return chunk_id, result
+
+
 @hydra_runner(config_path=".", config_name="pack_config")
 def main(cfg: 'DictConfig') -> None:
     args = PackingArgs().from_config(cfg)
     dataset, tokenizer = tokenize_dataset(cfg)
-    sequences, histogram = create_hist(dataset, cfg.model.data.train_ds.max_seq_length)
-    for pack_size in args.pack_sizes:
-        assignments, metadata = create_packing_strategy(histogram, pack_size, args.packing_algorithm)
-        output_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
+    split_packing_length = cfg.split_packing_length
 
-        # save output data
+    # Split dataset into chunks
+    n_samples = len(dataset)
+    n_chunks = (n_samples + split_packing_length - 1) // split_packing_length
+    chunks = np.array_split(dataset, n_chunks)
+
+    num_workers = cfg.get("num_workers", min(os.cpu_count() // 2, n_chunks))
+    logging.info(
+        f"Processing dataset in {n_chunks} chunks of {split_packing_length} samples using {num_workers} workers"
+    )
+
+    for pack_size in args.pack_sizes:
+        # Prepare arguments for parallel processing
+        chunk_args = [
+            (chunk, pack_size, tokenizer, args.packing_algorithm, i, cfg.model.data.train_ds.max_seq_length)
+            for i, chunk in enumerate(chunks)
+        ]
+
+        # Process chunks in parallel
+        with Pool(num_workers) as pool:
+            results = list(
+                tqdm(
+                    pool.imap(process_chunk_wrapper, chunk_args),
+                    total=len(chunk_args),
+                    desc=f"Processing chunks for pack_size={pack_size}",
+                )
+            )
+
+        logging.info("Gathering all packed_data from chunk results...")
+        all_packed_data = []
+        for _, chunk_result in tqdm(results, desc="Collecting chunk results"):
+            all_packed_data.extend(chunk_result)
+
+        logging.info("Computing global maximum sequence lengths...")
+        N = len(all_packed_data)
+        P, M = 0, 0
+        for sample in tqdm(all_packed_data, desc="Finding P, M"):
+            P = max(P, len(sample['input_ids']))
+            M = max(M, len(sample['seq_start_id']))
+
+        logging.info("Pre-allocating arrays...")
+        all_input_ids = -np.ones((N, P), dtype=np.int32)
+        all_loss_mask = np.ones((N, P), dtype=np.bool_)
+        all_seq_start_id = -np.ones((N, M), dtype=np.int32)
+
+        logging.info("Filling arrays to max len...")
+        for i, sample in tqdm(enumerate(all_packed_data), desc="Filling arrays", total=len(all_packed_data)):
+            seq_len_ids = len(sample['input_ids'])
+            seq_len_mask = len(sample['loss_mask'])
+            seq_len_starts = len(sample['seq_start_id'])
+
+            all_input_ids[i, :seq_len_ids] = sample['input_ids']
+            all_loss_mask[i, :seq_len_mask] = sample['loss_mask']
+            all_seq_start_id[i, :seq_len_starts] = sample['seq_start_id']
+
+        # Save arrays
+        logging.info("Writing final npy files")
         os.makedirs(args.output_dir, exist_ok=True)
-        output_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}.npy')
-        np.save(output_path, output_data)
-        logging.info(f"Done, output written to {output_path}")
+        base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
+        np.save(f'{base_path}.input_ids.npy', all_input_ids)
+        np.save(f'{base_path}.loss_mask.npy', all_loss_mask)
+        np.save(f'{base_path}.seq_start_id.npy', all_seq_start_id)
+        logging.info(f"Done, output written to {base_path}.[input_ids|loss_mask|seq_start_id].npy")
 
     logging.info(
         f"""
