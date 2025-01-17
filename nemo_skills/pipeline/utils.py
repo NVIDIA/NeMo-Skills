@@ -902,20 +902,21 @@ def add_task(
             executors.append(sandbox_executor)
 
     tunnel = get_tunnel(cluster_config)
-    if reuse_code:
-        reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
-        if reuse_code_exp is not None:
-            if isinstance(reuse_code_exp, run.Experiment):
-                LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
-                reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-            else:
-                with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
-                    LOG.info("Reusing code from experiment %s", reuse_code_exp)
-                    reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-            for executor in executors:
-                executor.packager.symlink_from_remote_dir = reuse_dir
-    else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
-        REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
+    if cluster_config["executor"] != "local":
+        if reuse_code:
+            reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
+            if reuse_code_exp is not None:
+                if isinstance(reuse_code_exp, run.Experiment):
+                    LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
+                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                else:
+                    with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
+                        LOG.info("Reusing code from experiment %s", reuse_code_exp)
+                        reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                for executor in executors:
+                    executor.packager.symlink_from_remote_dir = reuse_dir
+        else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+            REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
