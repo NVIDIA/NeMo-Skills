@@ -178,7 +178,7 @@ exp = eval(
 
 When training on sequences >4k or so, it's recommended to use sequence packing and context parallel.
 Here is an example how to do that. Most of the parameters don't need to change, but
-the `global_batch_size` might need to be adjusted to be m times smaller than without packing
+the `global_batch_size` might need to be adjusted to be n times smaller than without packing
 where n is the average number of sequences per pack, that packing script outputs, e.g.
 
 ```
@@ -191,7 +191,7 @@ Here is an example of running packing and training.
 
 ```python
 from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import train, convert, eval
+from nemo_skills.pipeline.cli import train, run_cmd
 
 expname = "my-training-job"
 cluster = "slurm"
@@ -233,7 +233,7 @@ train(
         f"++model.data.train_ds.micro_batch_size=1 "  # should always be 1 for packed jobs
         f"++model.data.train_ds.global_batch_size={packed_bs} "
         f"++model.context_parallel_size={context_parallel} "
-        f"++model.data.train_ds.max_seq_length={packed_seq_length} "
+        f"++model.data.train_ds.max_seq_length={pack_seq_length} "
         # all other parameters are generally the same as for the non-packed job with
         # max seq length = packed_seq_length / context_parallel
         # and keep in mind that each step now processes avg_sequences_per_pack * packed_bs examples
