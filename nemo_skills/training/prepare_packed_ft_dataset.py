@@ -511,25 +511,25 @@ def main(cfg: 'DictConfig') -> None:
                 )
             )
 
-        # Gather all packed_data from the chunks
+        logging.info("Gathering all packed_data from chunk results...")
         all_packed_data = []
-        for _, chunk_result in results:
+        for _, chunk_result in tqdm(results, desc="Collecting chunk results"):
             all_packed_data.extend(chunk_result)
 
-        # Compute global P, M
+        logging.info("Computing global maximum sequence lengths...")
         N = len(all_packed_data)
         P, M = 0, 0
-        for sample in all_packed_data:
+        for sample in tqdm(all_packed_data, desc="Finding P, M"):
             P = max(P, len(sample['input_ids']))
             M = max(M, len(sample['seq_start_id']))
 
-        # Pre-allocate arrays with default fill
+        logging.info("Pre-allocating arrays...")
         all_input_ids = -np.ones((N, P), dtype=np.int32)
         all_loss_mask = np.ones((N, P), dtype=np.bool_)
         all_seq_start_id = -np.ones((N, M), dtype=np.int32)
 
-        # Fill arrays using slicing
-        for i, sample in enumerate(all_packed_data):
+        logging.info("Filling arrays to max len...")
+        for i, sample in tqdm(enumerate(all_packed_data), desc="Filling arrays", total=len(all_packed_data)):
             seq_len_ids = len(sample['input_ids'])
             seq_len_mask = len(sample['loss_mask'])
             seq_len_starts = len(sample['seq_start_id'])
@@ -539,6 +539,7 @@ def main(cfg: 'DictConfig') -> None:
             all_seq_start_id[i, :seq_len_starts] = sample['seq_start_id']
 
         # Save arrays
+        logging.info("Writing final npy files")
         os.makedirs(args.output_dir, exist_ok=True)
         base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
         np.save(f'{base_path}.input_ids.npy', all_input_ids)
