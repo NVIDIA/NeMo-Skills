@@ -440,7 +440,9 @@ class PackingArgs:
         return self
 
 
-def process_dataset_chunk(chunk_data: np.array, pack_size: int, tokenizer, packing_algorithm: str):
+def process_dataset_chunk(
+    chunk_data: np.array, pack_size: int, tokenizer, packing_algorithm: str, max_seq_length: int
+):
     """
     Process a chunk of the dataset independently.
 
@@ -453,7 +455,7 @@ def process_dataset_chunk(chunk_data: np.array, pack_size: int, tokenizer, packi
     Returns:
         Dictionary containing packed sequences split into input_ids, loss_mask, and seq_start_id arrays
     """
-    sequences, histogram = create_hist(chunk_data, len(chunk_data[0]['input_ids']) - 1)
+    sequences, histogram = create_hist(chunk_data, max_seq_length)
     assignments, _ = create_packing_strategy(histogram, pack_size, packing_algorithm)
     packed_data = fill_packing_strategy(assignments, sequences, pack_size, tokenizer.eos_id)
 
@@ -476,9 +478,9 @@ def process_chunk_wrapper(args):
     Returns:
         Tuple of (chunk_id, processed_chunk_data)
     """
-    chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id = args
+    chunk_data, pack_size, tokenizer, packing_algorithm, chunk_id, max_seq_length = args
     logging.info(f"Processing chunk {chunk_id}")
-    result = process_dataset_chunk(chunk_data, pack_size, tokenizer, packing_algorithm)
+    result = process_dataset_chunk(chunk_data, pack_size, tokenizer, packing_algorithm, max_seq_length)
     return chunk_id, result
 
 
@@ -500,7 +502,10 @@ def main(cfg: 'DictConfig') -> None:
 
     for pack_size in args.pack_sizes:
         # Prepare arguments for parallel processing
-        chunk_args = [(chunk, pack_size, tokenizer, args.packing_algorithm, i) for i, chunk in enumerate(chunks)]
+        chunk_args = [
+            (chunk, pack_size, tokenizer, args.packing_algorithm, i, cfg.model.data.train_ds.max_seq_length)
+            for i, chunk in enumerate(chunks)
+        ]
 
         # Process chunks in parallel
         with Pool(num_workers) as pool:
