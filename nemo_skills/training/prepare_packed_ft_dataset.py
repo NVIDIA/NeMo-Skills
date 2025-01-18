@@ -210,7 +210,7 @@ def fill_packing_strategy(
                         loss mask (if available), and starting indices.
     """
     ifile_handles = dict()
-    for seq_len in tqdm(range(pack_size + 1)):
+    for seq_len in range(pack_size + 1):
         per_seq_data = sequences[seq_len]
         if len(per_seq_data) > 0:
             perm = np.random.permutation(len(per_seq_data))
@@ -231,7 +231,7 @@ def fill_packing_strategy(
 
     input_ids, loss_mask, seq_start_id = {}, {}, {}
 
-    for oindex, assignment in tqdm(enumerate(assignments), total=len(assignments)):
+    for oindex, assignment in enumerate(assignments):
         _input_ids, _loss_mask, _seq_start_id = [], [], [0]
 
         for seq_length in assignment:
