@@ -117,9 +117,8 @@ from nemo_skills.pipeline.cli import train, convert, eval
 expname = "my-training-job"
 cluster = "slurm"
 output_dir = f"/workspace/{expname}/checkpoints"
-exp = None
 
-exp = train(
+train(
     ctx=wrap_arguments(""),
     cluster=cluster,
     expname=expname,
@@ -129,10 +128,9 @@ exp = train(
     num_gpus=8,
     num_training_jobs=4,
     training_data="/data/sft-data.jsonl",
-    reuse_code_exp=exp,
 )
 
-exp = convert(
+convert(
     ctx=wrap_arguments(""),
     cluster=cluster,
     input_model=f"{output_dir}/model-averaged-nemo",
@@ -144,10 +142,9 @@ exp = convert(
     model_type="llama",
     num_gpus=8,
     hf_model_name="meta-llama/Meta-Llama-3.1-8B",
-    reuse_code_exp=exp,
 )
 
-exp = convert(
+convert(
     ctx=wrap_arguments(""),
     cluster=cluster,
     input_model=f"{output_dir}/model-averaged-hf",
@@ -158,10 +155,9 @@ exp = convert(
     convert_to="trtllm",
     model_type="llama",
     num_gpus=8,
-    reuse_code_exp=exp,
 )
 
-exp = eval(
+eval(
     ctx=wrap_arguments("++prompt_template=llama3-instruct ++batch_size=512"),
     cluster=cluster,
     model=f"{output_dir}/model-averaged-trtllm",
@@ -170,7 +166,6 @@ exp = eval(
     benchmarks="gsm8k:0,math:0",
     server_gpus=8,
     run_after=f"{expname}-to-trtllm",
-    reuse_code_exp=exp,
 )
 ```
 

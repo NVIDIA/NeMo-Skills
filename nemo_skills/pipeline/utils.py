@@ -36,6 +36,12 @@ from torchx.specs.api import AppState
 LOG = logging.getLogger(__file__)
 
 
+# keeping a global variable for first submitted experiment (per cluster) and reusing it by default
+# we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
+# we can still reuse code as long as ssh matches
+REUSE_CODE_EXP = {}
+
+
 def check_if_mounted(cluster_config, path_to_check):
     """Will check that path_to_check is referenced inside one of the mounts."""
     for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
@@ -364,6 +370,10 @@ def _get_tunnel_cached(
     )
 
 
+def tunnel_hash(tunnel):
+    return f"{tunnel.job_dir}:{tunnel.host}:{tunnel.user}:{tunnel.identity}:{tunnel.shell}:{tunnel.pre_command}"
+
+
 def get_tunnel(cluster_config):
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
@@ -479,7 +489,6 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-@lru_cache
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = Path(__file__).absolute().parents[1]
@@ -591,7 +600,7 @@ def get_env_variables(cluster_config):
     return env_vars
 
 
-def get_mounts_from_config(cluster_config: dict, env_vars: dict = None):
+def get_mounts_from_config(cluster_config: dict):
     """
     Determines if there are mount paths that are being passed via environment variables.
     Selects the key in the cluster config called `mounts` which is a list of strings.
@@ -600,7 +609,6 @@ def get_mounts_from_config(cluster_config: dict, env_vars: dict = None):
 
     Args:
         cluster_config (dict): cluster config dictionary
-        env_vars (dict): dictionary of environment variables
 
     Returns:
         list: updated list of mounts
@@ -662,7 +670,7 @@ def get_executor(
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
-    config_mounts = get_mounts_from_config(cluster_config, env_vars)
+    config_mounts = get_mounts_from_config(cluster_config)
 
     mounts = mounts or config_mounts
     if extra_package_dirs is not None:
@@ -769,6 +777,7 @@ def add_task(
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
+    reuse_code: bool = True,
     task_dependencies: list[str] = None,
     run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
@@ -792,6 +801,9 @@ def add_task(
     You can use `reuse_code_exp` to reuse the code from another experiment
     (and thus avoid costly packaging/ssh uploading). You can provide either experiment
     name or the experiment object itself.
+
+    By default we will reuse the code of the first submitted experiment.
+    If you want to avoid this, set `reuse_code=False`.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, str):
@@ -889,17 +901,22 @@ def add_task(
             )
             executors.append(sandbox_executor)
 
-    if reuse_code_exp is not None:
+    if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
-        if isinstance(reuse_code_exp, run.Experiment):
-            LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
-            reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-        else:
-            with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
-                LOG.info("Reusing code from experiment %s", reuse_code_exp)
-                reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-        for executor in executors:
-            executor.packager.symlink_from_remote_dir = reuse_dir
+        if reuse_code:
+            reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
+            if reuse_code_exp is not None:
+                if isinstance(reuse_code_exp, run.Experiment):
+                    LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
+                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                else:
+                    with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
+                        LOG.info("Reusing code from experiment %s", reuse_code_exp)
+                        reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                for executor in executors:
+                    executor.packager.symlink_from_remote_dir = reuse_dir
+        else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+            REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
@@ -927,3 +944,8 @@ def run_exp(exp, cluster_config, sequential=None):
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
         exp.run(detach=True, sequential=False if sequential is None else sequential)
+
+        # caching the experiment code for reuse
+        ssh_hash = tunnel_hash(get_tunnel(cluster_config))
+        if ssh_hash not in REUSE_CODE_EXP:
+            REUSE_CODE_EXP[ssh_hash] = exp
