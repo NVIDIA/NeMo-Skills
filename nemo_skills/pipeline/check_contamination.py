@@ -55,7 +55,7 @@ def check_contamination(
         ..., help="Input file with the data to check for contamination. An output of the retrieve_similar.py script."
     ),
     output_file: str = typer.Option(..., help="Where to save results"),
-    expname: str = typer.Option("llm-math-judge", help="Nemo run experiment name"),
+    expname: str = typer.Option("check-contamination", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API."),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers."
