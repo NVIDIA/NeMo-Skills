@@ -146,6 +146,8 @@ processors:
         test_cases:
           - {input: {generation: "Solution ends at \\boxed{0}\nThis line is useless."}, output: {generation: "Solution ends at \\boxed{0}"}}
           - {input: {generation: "Solution continues \\boxed{7} after boxed"}, output: {generation: "Solution continues \\boxed{7} after boxed"}}
+          - {input: {generation: "Solution\n\ncontinues \n\n\\boxed{7} after\n boxed"}, output: {generation: "Solution\n\ncontinues \n\n\\boxed{7} after"}}
+          - {input: {generation: "Works alright with newlines inside \\boxed{7\n5} and properly\ncuts after"}, output: {generation: "Works alright with newlines inside \\boxed{7\n5} and properly"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIncorrectArithmetic
         should_run: ${filters.drop_incorrect_arithmetic}
