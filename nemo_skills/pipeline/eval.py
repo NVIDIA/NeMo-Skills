@@ -118,7 +118,13 @@ def eval(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
-    reuse_code: bool = typer.Option(True, help="If True, will reuse the code from the last/provided experiment"),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     extra_datasets: str = typer.Option(
