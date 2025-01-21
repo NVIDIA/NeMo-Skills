@@ -42,7 +42,7 @@ def main():
     if node_rank == 0:
         ray.init(_node_ip_address=head_node)
     else:
-        ray.init(address=f"{head_node}:6379")
+        ray.init(address=f"{head_node}:8265")
 
     cmd = (
         f'python -m vllm.entrypoints.openai.api_server '
