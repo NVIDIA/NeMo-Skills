@@ -123,6 +123,7 @@ def get_hf_to_nemo_cmd(
 class SupportedTypes(str, Enum):
     llama = "llama"
     qwen = "qwen"
+    deepseek_v3 = "deepseek_v3"
 
 
 class SupportedFormatsTo(str, Enum):
@@ -204,6 +205,9 @@ def convert(
 
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
+
+    if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
+        raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_model)
