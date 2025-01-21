@@ -83,10 +83,7 @@ def get_hf_to_trtllm_cmd(
         f"    --output_dir {output_model} "
         f"    --gpt_attention_plugin {dtype} "
         f"    --use_paged_context_fmha enable "
-        f"    --max_input_len 4096 "
-        f"    --max_seq_len 8192 "
-        f"    --max_num_tokens 8192 "
-        f"    --max_batch_size 128 "
+        f"    --max_batch_size 512 "
         f"    {extra_arguments} && "
         f"cp {input_model}/tokenizer* {output_model} "
     )
