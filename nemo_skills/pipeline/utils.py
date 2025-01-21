@@ -238,9 +238,6 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        if num_nodes > 1:
-            raise ValueError("VLLM server does not support multi-node execution")
-
         server_start_cmd = (
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
