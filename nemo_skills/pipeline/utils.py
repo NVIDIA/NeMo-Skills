@@ -536,6 +536,8 @@ def get_git_repo_path(path: str | Path = None):
     if path:
         command.extend([f"cd {str(path)}",  "&&"])
 
+    print(os.getcwd())
+
     command.extend(["git", "rev-parse", "--show-toplevel"])
 
     try:
