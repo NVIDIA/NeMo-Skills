@@ -605,7 +605,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     extra_repos = {}
     if len(EXTERNAL_REPOS) > 1:
         # Insert root package as the first package
-        extra_repos[''] = root_package
+        extra_repos[''] = [root_package]
 
         for repo_name, repo_path in EXTERNAL_REPOS.items():
             if repo_name == 'nemo_skills':
@@ -614,16 +614,20 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             repo_include_pattern = [str(Path(repo_path) / '*')]
             repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
             if get_git_repo_path(repo_path):
-                extra_repos[repo_name] = run.GitArchivePackager(
-                    # basepath=str(repo_path),
-                    include_pattern=repo_include_pattern,
-                    include_pattern_relative_path=repo_include_pattern_relative_path,
-                    check_uncommitted_changes=check_uncommited_changes
+                extra_repos[''].append(
+                    run.GitArchivePackager(
+                        # basepath=str(repo_path),
+                        include_pattern=repo_include_pattern,
+                        include_pattern_relative_path=repo_include_pattern_relative_path,
+                        check_uncommitted_changes=check_uncommited_changes
+                    )
                 )
             else:
-                extra_repos[repo_name] = run.PatternPackager(
-                    include_pattern=repo_include_pattern,
-                    relative_path=repo_include_pattern_relative_path,
+                extra_repos[''].append(
+                    run.PatternPackager(
+                        include_pattern=repo_include_pattern,
+                        relative_path=repo_include_pattern_relative_path,
+                    )
                 )
 
         # Return hybrid packager
