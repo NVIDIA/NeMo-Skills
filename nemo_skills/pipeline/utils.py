@@ -238,12 +238,25 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
+        # server_start_cmd = (
+        #     f"python -m nemo_skills.inference.server.serve_vllm "
+        #     f"    --model {model_path} "
+        #     f"    --num_gpus {num_gpus} "
+        #     f"    --port {server_port} "
+        #     f"    {server_args} "
+        # )
+        server_start_cmd_head = "echo 'Starting head node' && " "ray start --block --head --port=6379"
+        server_start_cmd_worker = (
+            "echo 'Starting worker node' && "
+            "echo \"${SLURM_NODELIST%%,*}\" | sed 's/\[//g' && "
+            "ray start --block --address=`echo \"${SLURM_NODELIST%%,*}\" | sed 's/\[//g'`:6379"
+        )
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
-            f"    --model {model_path} "
-            f"    --num_gpus {num_gpus} "
-            f"    --port {server_port} "
-            f"    {server_args} "
+            'if [ "${SLURM_PROCID}" = "0" ]; then'
+            f"    {server_start_cmd_head}"
+            'else'
+            f"    {server_start_cmd_worker}"
+            'fi'
         )
         num_tasks = 1
     else:
