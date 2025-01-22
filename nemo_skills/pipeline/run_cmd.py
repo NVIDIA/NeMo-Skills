@@ -51,6 +51,13 @@ def run_cmd(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -85,6 +92,7 @@ def run_cmd(
             partition=partition,
             time_min=time_min,
             run_after=run_after,
+            reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             num_gpus=num_gpus,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
