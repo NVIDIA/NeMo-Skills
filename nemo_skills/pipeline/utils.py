@@ -585,6 +585,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         # repo_types.append("git")
 
         root_package = run.GitArchivePackager(
+            basepath=str(repo_path),
             include_pattern=include_patterns,
             include_pattern_relative_path=include_pattern_relative_paths,
             check_uncommitted_changes=check_uncommited_changes,
