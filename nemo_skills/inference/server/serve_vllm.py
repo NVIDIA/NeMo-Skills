@@ -51,23 +51,23 @@ def main():
         ray.init(address=f"ray://{head_node}:6379")
         print("Worker is done!", flush=True)
 
-    # cmd = (
-    #     f'python -m vllm.entrypoints.openai.api_server '
-    #     f'    --model="{args.model}" '
-    #     f'    --served-model-name="{args.model}"'
-    #     f'    --trust-remote-code '
-    #     f'    --host="0.0.0.0" '
-    #     f'    --port={args.port} '
-    #     f'    --tensor-parallel-size={args.num_gpus} '
-    #     f'    --gpu-memory-utilization=0.9 '
-    #     f'    --max-num-seqs=256 '
-    #     f'    --enforce-eager '
-    #     f'    --disable-log-requests '
-    #     f'    --disable-log-stats '
-    #     f'    {extra_arguments} | grep -v "200 OK"'
-    # )
+    cmd = (
+        f'python -m vllm.entrypoints.openai.api_server '
+        f'    --model="{args.model}" '
+        f'    --served-model-name="{args.model}"'
+        f'    --trust-remote-code '
+        f'    --host="0.0.0.0" '
+        f'    --port={args.port} '
+        f'    --tensor-parallel-size={args.num_gpus} '
+        f'    --gpu-memory-utilization=0.9 '
+        f'    --max-num-seqs=256 '
+        f'    --enforce-eager '
+        f'    --disable-log-requests '
+        f'    --disable-log-stats '
+        f'    {extra_arguments} | grep -v "200 OK"'
+    )
 
-    # subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(cmd, shell=True, check=True)
 
 
 if __name__ == "__main__":
