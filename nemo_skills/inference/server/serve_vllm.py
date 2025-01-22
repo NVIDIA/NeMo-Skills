@@ -44,11 +44,8 @@ def main():
         ray.init(address="local")
         print("Head node is done!", flush=True)
     else:
-        import time
-
-        time.sleep(10)
         print("I'm a worker node", flush=True)
-        ray.init(address=f"ray://{head_node}:6379")
+        ray.init(address=f"{head_node}:6379")
         print("Worker is done!", flush=True)
 
     cmd = (
