@@ -14,7 +14,6 @@
 
 import argparse
 import os
-import socket
 import subprocess
 
 import ray
@@ -36,34 +35,32 @@ def main():
     # Get node information from SLURM env vars
     node_rank = int(os.environ["SLURM_PROCID"])
     head_node = os.environ["SLURM_NODELIST"].split(",")[0]
-    head_node_ip = socket.gethostbyname(head_node)
     print(f"Node rank: {node_rank}, head node: {head_node}")
     print(f"All nodes: {os.environ['SLURM_NODELIST']}")
-    print(f"Head node IP: {head_node_ip}")
 
     # Initialize Ray based on node rank
     if node_rank == 0:
-        ray.init(_node_ip_address=head_node_ip)
+        ray.init(_node_ip_address=head_node)
     else:
-        ray.init(address=f"{head_node_ip}:6379")
+        ray.init(address=f"{head_node}:6379")
 
-    cmd = (
-        f'python -m vllm.entrypoints.openai.api_server '
-        f'    --model="{args.model}" '
-        f'    --served-model-name="{args.model}"'
-        f'    --trust-remote-code '
-        f'    --host="0.0.0.0" '
-        f'    --port={args.port} '
-        f'    --tensor-parallel-size={args.num_gpus} '
-        f'    --gpu-memory-utilization=0.9 '
-        f'    --max-num-seqs=256 '
-        f'    --enforce-eager '
-        f'    --disable-log-requests '
-        f'    --disable-log-stats '
-        f'    {extra_arguments} | grep -v "200 OK"'
-    )
+    # cmd = (
+    #     f'python -m vllm.entrypoints.openai.api_server '
+    #     f'    --model="{args.model}" '
+    #     f'    --served-model-name="{args.model}"'
+    #     f'    --trust-remote-code '
+    #     f'    --host="0.0.0.0" '
+    #     f'    --port={args.port} '
+    #     f'    --tensor-parallel-size={args.num_gpus} '
+    #     f'    --gpu-memory-utilization=0.9 '
+    #     f'    --max-num-seqs=256 '
+    #     f'    --enforce-eager '
+    #     f'    --disable-log-requests '
+    #     f'    --disable-log-stats '
+    #     f'    {extra_arguments} | grep -v "200 OK"'
+    # )
 
-    subprocess.run(cmd, shell=True, check=True)
+    # subprocess.run(cmd, shell=True, check=True)
 
 
 if __name__ == "__main__":
