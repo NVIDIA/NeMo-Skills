@@ -149,11 +149,43 @@ proof_false_fewshot = [
     }
 ]
 
-
+lean4_false_fewshots = [
+    {
+        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "informal_prefix": "/-- Prove that a real number cannot be both greater than and less than zero simultaneously. -/\n",
+        "formal_statement": "theorem user_theorem : \n  ∀ (x : \u211d), x > 0 \u2227 x < 0 \u2192 False := by\n",
+        "formal_proof": "/- Assume x > 0 and x < 0. The lt_asymm theorem states that for any real numbers a and b, both a < b and b < a cannot hold simultaneously. Applying this to x > 0 and x < 0 yields a contradiction. -/\nintro x h\nhave h1 : x > 0 := h.1\nhave h2 : x < 0 := h.2\nexact lt_asymm h1 h2",
+    },
+    {
+        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "informal_prefix": "/-- Prove that a real number cannot be both less than and greater than another real number. -/\n",
+        "formal_statement": "theorem user_theorem_4 : \n  ∀ (x y : \u211d), x < y \u2227 y < x \u2192 False := by\n",
+        "formal_proof": "/- Assume x < y and y < x. The lt_asymm theorem ensures that this combination is contradictory. -/\nintros x y h\nhave h1 : x < y := h.1\nhave h2 : y < x := h.2\nexact lt_asymm h1 h2",
+    },
+    {
+        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "informal_prefix": "/-- Prove that an integer cannot have a remainder of both 0 and 1 modulo 2. -/\n",
+        "formal_statement": "theorem user_theorem_5 : \n  ∀ (x : \u2124), x % 2 = 0 \u2227 x % 2 = 1 \u2192 False := by\n",
+        "formal_proof": "/- Assume x % 2 = 0 and x % 2 = 1. Substituting the first equality into the second leads to 0 = 1, which is a contradiction. -/\nintro x h\nhave h1 : x % 2 = 0 := h.1\nhave h2 : x % 2 = 1 := h.2\nrw [h1] at h2\nexact Int.zero_ne_one h2",
+    },
+    {
+        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "informal_prefix": "/-- Prove that a real number cannot be both strictly greater than and less than or equal to another real number. -/\n",
+        "formal_statement": "theorem user_theorem_6 : \n  ∀ (x y : \u211d), x > y \u2227 x ≤ y \u2192 False := by\n",
+        "formal_proof": "/- Assume x > y and x ≤ y. The not_le_of_gt theorem ensures that this combination leads to a contradiction. -/\nintros x y h\nhave h1 : x > y := h.1\nhave h2 : x ≤ y := h.2\nexact not_le_of_gt h1 h2",
+    },
+    {
+        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "informal_prefix": "/-- Prove that a real number cannot be both strictly positive and less than or equal to zero. -/\n",
+        "formal_statement": "theorem user_theorem_8 : \n  ∀ (x : \u211d), x > 0 \u2227 x ≤ 0 \u2192 False := by\n",
+        "formal_proof": "/- Assume x > 0 and x ≤ 0. The not_le_of_gt theorem ensures that this leads to a contradiction. -/\nintro x h\nhave h1 : x > 0 := h.1\nhave h2 : x ≤ 0 := h.2\nexact not_le_of_gt h1 h2",
+    },
+]
 
 examples_map = {
     "minif2f_deepseek_fewshot": minif2f_deepseek_fewshot,
     "math_to_lean4_fewshot": math_to_lean4_fewshot,
     "math_to_lean4_predict_header_fewshot": math_to_lean4_predict_header_fewshot,
     "proof_false_fewshot": proof_false_fewshot,
+    "lean4_false_fewshots": lean4_false_fewshots,
 }
