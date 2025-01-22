@@ -13,10 +13,7 @@
 # limitations under the License.
 
 import argparse
-import os
 import subprocess
-
-import ray
 
 
 def main():

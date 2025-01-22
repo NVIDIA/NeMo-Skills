@@ -238,26 +238,25 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        server_vllm_cmd = (
+        start_vllm_cmd = (
             f" python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        server_start_cmd = f"""
-if [ "${{SLURM_PROCID}}" = "0" ]; then
-    echo 'Starting head node' && \
-    ray start --head --port=6379 && \
-    sleep 30 && \
-    {server_vllm_cmd}
-else
-    echo 'Starting worker node' && \
-    head_node=$(echo "${{SLURM_NODELIST%%,*}}" | sed 's/\[//g') && \
-    echo $head_node && \
-    ray start --block --address="${{head_node}}:6379"
-fi
-"""
+        server_start_cmd = (
+            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+            "    echo 'Starting head node' && "
+            "    ray start --head --port=6379 && "
+            f"   {start_vllm_cmd} "
+            "else "
+            "    echo 'Starting worker node' && "
+            "    head_node=$(echo ${SLURM_NODELIST%%,*} | sed 's/\[//g') && "
+            "    echo 'Connecting to head node at $head_node' && "
+            "    ray start --block --address=${head_node}:6379 "
+            "fi"
+        )
         num_tasks = 1
     else:
         # need this flag for stable Nemotron-4-340B deployment
