@@ -40,14 +40,16 @@ def main():
 
     # Initialize Ray based on node rank
     if node_rank == 0:
+        print("I'm the head node", flush=True)
         ray.init(_node_ip_address=head_node)
-        print("I'm the head node")
+        print("Head node is done!", flush=True)
     else:
         import time
 
         time.sleep(10)
+        print("I'm a worker node", flush=True)
         ray.init(address=f"{head_node}:6379")
-        print("I'm a worker node")
+        print("Worker is done!", flush=True)
 
     # cmd = (
     #     f'python -m vllm.entrypoints.openai.api_server '
