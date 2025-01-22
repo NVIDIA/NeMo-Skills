@@ -245,21 +245,19 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        server_start_cmd = (
-            """
-if [ "${SLURM_PROCID}" = "0" ]; then
+        server_start_cmd = f"""
+if [ "${{SLURM_PROCID}}" = "0" ]; then
     echo 'Starting head node' && \
-    ray start --head --port=6379
+    ray start --head --port=6379 && \
+    sleep 30 && \
+    {server_vllm_cmd}
 else
     echo 'Starting worker node' && \
-    head_node=$(echo "${SLURM_NODELIST%%,*}" | sed 's/\[//g') && \
+    head_node=$(echo "${{SLURM_NODELIST%%,*}}" | sed 's/\[//g') && \
     echo $head_node && \
-    ray start --address="${head_node}:6379"
+    ray start --block --address="${{head_node}}:6379"
 fi && \
-sleep 30 && ray status && \
 """
-            + server_vllm_cmd
-        )
         num_tasks = 1
     else:
         # need this flag for stable Nemotron-4-340B deployment
