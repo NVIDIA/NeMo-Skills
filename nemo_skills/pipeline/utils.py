@@ -238,29 +238,30 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        # server_start_cmd = (
-        #     f"python -m nemo_skills.inference.server.serve_vllm "
-        #     f"    --model {model_path} "
-        #     f"    --num_gpus {num_gpus} "
-        #     f"    --port {server_port} "
-        #     f"    {server_args} "
-        # )
-        server_start_cmd_head = "echo 'Starting head node' && " "ray start --block --head --port=6379"
-        server_start_cmd_worker = (
-            "echo 'Starting worker node' && "
-            "echo \"${SLURM_NODELIST%%,*}\" | sed 's/\[//g' && "
-            "ray start --block --address=`echo \"${SLURM_NODELIST%%,*}\" | sed 's/\[//g'`:6379"
+        server_vllm_cmd = (
+            f" python -m nemo_skills.inference.server.serve_vllm "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
+            f"    {server_args} "
         )
         server_start_cmd = (
-            'if [ "${SLURM_PROCID}" = "0" ]; then'
-            f"    {server_start_cmd_head}"
-            'else'
-            f"    {server_start_cmd_worker}"
-            'fi'
+            """
+if [ "${SLURM_PROCID}" = "0" ]; then
+    echo 'Starting head node' && \
+    ray start --head --port=6379
+else
+    echo 'Starting worker node' && \
+    head_node=$(echo "${SLURM_NODELIST%%,*}" | sed 's/\[//g') && \
+    echo $head_node && \
+    ray start --address="${head_node}:6379"
+fi && \
+sleep 30 && ray status && \
+"""
+            + server_vllm_cmd
         )
         num_tasks = 1
     else:
-        # adding sleep to ensure the logs file exists
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "

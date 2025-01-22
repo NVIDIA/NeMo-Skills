@@ -31,23 +31,6 @@ def main():
     print(f"Deploying model {args.model}")
     print("Starting OpenAI Server")
 
-    # TODO: don't break local
-    # Get node information from SLURM env vars
-    node_rank = int(os.environ["SLURM_PROCID"])
-    head_node = os.environ["SLURM_NODELIST"].split(",")[0].replace("[", "")
-    print(f"Node rank: {node_rank}, head node: {head_node}")
-    print(f"All nodes: {os.environ['SLURM_NODELIST']}")
-
-    # Initialize Ray based on node rank
-    if node_rank == 0:
-        print("I'm the head node", flush=True)
-        ray.init(address="local")
-        print("Head node is done!", flush=True)
-    else:
-        print("I'm a worker node", flush=True)
-        ray.init(address=f"{head_node}:6379")
-        print("Worker is done!", flush=True)
-
     cmd = (
         f'python -m vllm.entrypoints.openai.api_server '
         f'    --model="{args.model}" '
