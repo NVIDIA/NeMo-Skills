@@ -1201,7 +1201,7 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
 
 
 def test_mmlu_pro_few_shot_prompt():
-    prompt = get_prompt('generic/mmlu-pro', "llama3-instruct", 'mmlu_pro_few_shot_other')
+    prompt = get_prompt('generic/mmlu-pro-few-shot', "llama3-instruct", 'mmlu_pro_few_shot_other')
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
