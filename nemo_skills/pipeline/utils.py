@@ -256,7 +256,7 @@ else
     head_node=$(echo "${{SLURM_NODELIST%%,*}}" | sed 's/\[//g') && \
     echo $head_node && \
     ray start --block --address="${{head_node}}:6379"
-fi && \
+fi
 """
         num_tasks = 1
     else:
