@@ -616,7 +616,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
 
             repo_include_pattern = [str(Path(repo_path) / '*')]
             repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
-            if get_git_repo_path(repo_name):
+            if get_git_repo_path(repo_path):
                 extra_repos[repo_name] = run.GitArchivePackager(
                     include_pattern=repo_include_pattern,
                     include_pattern_relative_path=repo_include_pattern_relative_path,
