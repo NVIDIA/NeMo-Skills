@@ -40,7 +40,7 @@ DATASETS = [
     ('svamp', ['test']),
     ('tabmwp', ['train', 'validation', 'test']),
     ('answer-judge', ['test']),
-    ('mmlu-pro', ['test_llama', 'test_tigerlab']),
+    ('mmlu-pro', ['test']),
 ]
 
 
