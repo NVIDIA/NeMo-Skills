@@ -5,7 +5,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 
-def format_entry(entry, type):
+def format_entry(entry):
     category = entry['category'].replace(" ", "_")  # Fix computer science category
     return {
         "question": entry['question'],
@@ -16,10 +16,10 @@ def format_entry(entry, type):
     }
 
 
-def write_data_to_file(output_file, data, type):
+def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            json.dump(format_entry(entry, type), fout)
+            json.dump(format_entry(entry), fout)
             fout.write("\n")
 
 
