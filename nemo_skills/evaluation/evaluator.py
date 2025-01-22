@@ -35,7 +35,8 @@ LOG = logging.getLogger(__file__)
 
 
 def eval_mmlu_pro(cfg):
-
+    # Adapted from https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/8b6741a3011d8caa405fdd629f54b6931cb6e042/evaluate_from_api.py#L189
+    # Original three functions are merged into one
     def tigerlab_parse(sample):
         attempt_one = re.search(r"answer is \(([A-J])\)", sample['generation'])
         if attempt_one:
