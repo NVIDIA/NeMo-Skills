@@ -34,7 +34,7 @@ def main():
     # TODO: don't break local
     # Get node information from SLURM env vars
     node_rank = int(os.environ["SLURM_PROCID"])
-    head_node = os.environ["SLURM_NODELIST"].split(",")[0]
+    head_node = os.environ["SLURM_NODELIST"].split(",")[0].replace("[", "").replace("]", "")
     print(f"Node rank: {node_rank}, head node: {head_node}")
     print(f"All nodes: {os.environ['SLURM_NODELIST']}")
 
