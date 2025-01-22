@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import socket
 import subprocess
 
 import ray
@@ -35,14 +36,16 @@ def main():
     # Get node information from SLURM env vars
     node_rank = int(os.environ["SLURM_PROCID"])
     head_node = os.environ["SLURM_NODELIST"].split(",")[0]
+    head_node_ip = socket.gethostbyname(head_node)
     print(f"Node rank: {node_rank}, head node: {head_node}")
     print(f"All nodes: {os.environ['SLURM_NODELIST']}")
+    print(f"Head node IP: {head_node_ip}")
 
     # Initialize Ray based on node rank
     if node_rank == 0:
-        ray.init(_node_ip_address=head_node, port="6379", enable_dashboard=False)
+        ray.init(_node_ip_address=head_node_ip)
     else:
-        ray.init(address=f"{head_node}:6379", enable_dashboard=False)
+        ray.init(address=f"{head_node_ip}:6379")
 
     cmd = (
         f'python -m vllm.entrypoints.openai.api_server '
