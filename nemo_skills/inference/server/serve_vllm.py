@@ -41,7 +41,7 @@ def main():
     # Initialize Ray based on node rank
     if node_rank == 0:
         print("I'm the head node", flush=True)
-        ray.init(_node_ip_address=head_node)
+        ray.init(address="local")
         print("Head node is done!", flush=True)
     else:
         import time
