@@ -531,16 +531,12 @@ def get_git_repo_path(path: str | Path = None):
     Returns:
         Path to the repo if it is a git repo, otherwise None.
     """
-    command = []
-
-    if path:
-        command.extend([f"cd {str(path)}",  "&&"])
-
-    print(os.getcwd())
-
-    command.extend(["git", "rev-parse", "--show-toplevel"])
-
+    original_path = os.getcwd()
+    command = ["git", "rev-parse", "--show-toplevel"]
     try:
+        if path:
+            os.chdir(path)
+
         repo_path = (
             subprocess.run(
                 command,
@@ -554,6 +550,9 @@ def get_git_repo_path(path: str | Path = None):
 
     except subprocess.CalledProcessError:
         return None
+
+    finally:
+        os.chdir(original_path)
 
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
