@@ -55,7 +55,7 @@ def check_contamination(
         ..., help="Input file with the data to check for contamination. An output of the retrieve_similar.py script."
     ),
     output_file: str = typer.Option(..., help="Where to save results"),
-    expname: str = typer.Option("llm-math-judge", help="Nemo run experiment name"),
+    expname: str = typer.Option("check-contamination", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API."),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers."
@@ -70,6 +70,13 @@ def check_contamination(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
     ),
     reuse_code_exp: str = typer.Option(
         None,
@@ -151,6 +158,7 @@ def check_contamination(
                 server_config=server_config,
                 task_dependencies=prev_tasks,
                 run_after=run_after,
+                reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
