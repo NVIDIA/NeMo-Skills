@@ -45,6 +45,8 @@ RUN pip install $FLASHINFER_URL
 RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sentence-transformers>=2.2.2 && \
     pip install "megablocks==0.5.1"
 
+RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
+
 WORKDIR /opt
 
 # Set environment variables for mounted HF Cache
