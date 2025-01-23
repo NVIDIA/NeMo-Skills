@@ -84,7 +84,7 @@ class BaseModel(abc.ABC):
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
 
-        self.executor = ThreadPoolExecutor(max_workers=5000)  # is this too much?
+        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
 
     @abc.abstractmethod
     def _generate_single(
