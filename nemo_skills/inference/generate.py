@@ -227,8 +227,6 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
 
 def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params):
     """Asynchronous version that sends all the data to server and then dumps outputs as soon as they are finished."""
-    # TODO: code execution model
-
     if cfg.max_samples > 0:
         data = data[: cfg.max_samples]
 
