@@ -242,8 +242,11 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         except FileNotFoundError:
             LOG.warning(f"File `{cfg.output_file}-async` not found, starting from scratch")
 
-        # if output_file (not async) exists, means we are fully done
-        if Path(cfg.output_file).exists():
+    # if output_file (not async) exists, means we are fully done or need to remove it and regenerate
+    if Path(cfg.output_file).exists():
+        if not cfg.skip_filled:
+            Path(cfg.output_file).unlink()
+        else:
             return
 
     if len(data) == 0:  # we might not have any examples if skip_filled=True
