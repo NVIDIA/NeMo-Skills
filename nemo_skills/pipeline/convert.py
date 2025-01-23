@@ -74,7 +74,7 @@ def get_hf_to_trtllm_cmd(
         f"    --dtype {dtype} "
         f"    --tp_size {num_gpus} "
         f"    --pp_size {num_nodes} "
-        f"    --workers 8 "
+        f"    --workers 16 "
         f"    {trt_prepare_args} "
     )
 
