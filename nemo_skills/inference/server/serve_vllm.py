@@ -44,7 +44,6 @@ def main():
         f'    --tensor-parallel-size={args.num_gpus} '
         f'    --gpu-memory-utilization=0.9 '
         f'    --max-num-seqs=256 '
-        f'    --enforce-eager '
         f'    {logging_args} '
         f'    {extra_arguments} ' + (' | grep -v "200 OK"' if not args.verbose else "")
     )
