@@ -1200,145 +1200,8 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
     )
 
 
-def test_mmlu_pro_llama_few_shot_prompt():
-    prompt = get_prompt('llama3-instruct/mmlu_pro', 'llama3-instruct', 'mmlu_pro_few_shot_llama_math')
-    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: The symmetric group $S_n$ has $factorial{n}$ elements, hence it is not true that $S_{10}$ has 10 elements.
-Find the characteristic of the ring 2Z.
-A. 0
-B. 30
-C. 3
-D. 10
-E. 12
-F. 50
-G. 2
-H. 100
-I. 20
-J. 5
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-A characteristic of a ring is R is $n$ if the statement $ka = 0$ for all $a\in 2Z$ implies that $k$ is a multiple of $n$. Assume that $ka = 0$ for all $a\in 2Z$ for some $k$. In particular $2k = 0$. Hence $k=0$ and $n=0$. The best answer is A.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: Let V be the set of all real polynomials p(x). Let transformations T, S be defined on V by T:p(x) -> xp(x) and S:p(x) -> p'(x) = d/dx p(x), and interpret (ST)(p(x)) as S(T(p(x))). Which of the following is true?
-A. ST + TS is the identity map of V onto itself.
-B. TS = 0
-C. ST = 1
-D. ST - TS = 0
-E. ST = T
-F. ST = 0
-G. ST = TS
-H. ST - TS is the identity map of V onto itself.
-I. TS = T
-J. ST = S
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-For a given polynomial $p$ we have
-\[ST(p) = (xp(x))’ = p(x) + xp’(x)\]
-and
-\[TS(p) = xp’(x).\]
-Hence \[ST(p) - TS(p) = p(x) + xp’(x) - xp’(x).\] The best answer is H.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: Let A be the set of all ordered pairs of integers (m, n) such that 7m + 12n = 22. What is the greatest negative number in the set B = {m + n : (m, n) \in A}?
-A. -5
-B. 0
-C. -3
-D. -7
-E. -4
-F. -6
-G. -1
-H. -2
-I. -9
-J. N/A
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-We have 12n = 22 - 7m and one of the solutions is $m = -2$, $n = 3$. Then $m + n = 1$, hence we need to look for smaller $m$ in order to make $m + n$ negative. The next solution is $m = -14$ and $n = 10$. For smaller $m$ we have $m + n$ smaller than $-4$. The best answer is E.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: A tank initially contains a salt solution of 3 grams of salt dissolved in 100 liters of water. A salt solution containing 0.02 grams of salt per liter of water is sprayed into the tank at a rate of 4 liters per minute. The sprayed solution is continually mixed with the salt solution in the tank, and the mixture flows out of the tank at a rate of 4 liters per minute. If the mixing is instantaneous, how many grams of salt are in the tank after 100 minutes have elapsed?
-A. 3 + e^-2
-B. 2 - e^-4
-C. 2 - e^-2
-D. 3 + e^-4
-E. 2 + e^-3
-F. 2 - e^-3
-G. 3 - e^-2
-H. 2 + e^-2
-I. 2 + e^-4
-J. 2
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-For all $t \\in \\mathbb{R}$, let $s(t)$ denote the number grams of salt in the tank at the $t$ minute mark. Then $s(0) = 3$.
-We use $s$ and $s(t)$ interchangeably. We also use $s^{\\prime}$ and $s^{\\prime}(t)$ interchangeably. The solution sprayed into the tank adds $(0.02) 4=2 / 25$ grams of salt per minute. There are always 100 liters of liquid in the tank, containing $s$ grams of salt. So the density of salt in the tank is $s / 100$ grams per liter. The flow of water out of the tank therefore subtracts $4(s / 100)=s / 25$ grams of salt per minute. Then, for all $t \\in \\mathbb{R}$, we have $s^{\\prime}(t)=(2 / 25)-(s / 25)=(2-s) / 25$, and so $[s(t)=2] \\Rightarrow\\left[s^{\\prime}(t)=0ight]$. For all $t \\in \\mathbb{R}$,
-$$
-\frac{d}{d t}[\\ln (s-2)]=\frac{s^{\\prime}}{s-2}=\frac{-1}{25}=\frac{d}{d t}\\left[-\frac{t}{25}ight] .
-$$
-Choose $C \\in \\mathbb{R}$ such that, for all $t \\in \\mathbb{R}, \\ln ((s(t)-2))=-[t / 25]+C$. Let $K:=e^{C}$. Then, for all $t \\in \\mathbb{R}$, we have $(s(t))-2=K e^{-t / 25}$, and so $s(t)=2+K e^{-t / 25}$. Then $3=s(0)=2+K e^{0}=2+K$, so $K=1$. Then $s(100)=2+K e^{-100 / 25}=2+1 \\cdot e^{-4}=2+e^{-4}$. The best answer is I.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: A total of 30 players will play basketball at a park. There will be exactly 5 players on each team. Which statement correctly explains how to find the number of teams needed?
-A. Multiply 5 by 5 to find 25 teams.
-B. Divide 30 by 5 to find 6 teams.
-C. Add 5 to 30 to find 35 teams.
-D. Subtract 30 from 5 to find -25 teams.
-E. Divide 5 by 30 to find 0.1667 teams.
-F. Add 5 to 30 then divide by 2 to find 17.5 teams.
-G. N/A
-H. N/A
-I. N/A
-J. N/A
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-We want to find the number of teams. We know that there are 5 players/team, and 30 players. Thus to get the number of teams we divide players by players/team, so 30 players / 5 players/team = 6 teams. The best answer is B.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Given the following question and candidate answers, choose the best answer.
-Question: If the half-life of a radioactive substance is 8 years, how long will it take, in years, for two thirds of the substance to decay?
-A. 22.45
-B. 12.21
-C. 12.68
-D. 7.69
-E. 16.89
-F. 20.76
-G. 4.68
-H. 14.12
-I. 10.33
-J. 18.34
-
-Your response should end with "The best answer is [the_answer_letter]." where the [the_answer_letter] is a letter from the provided choices.
-
-Let's think step by step.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-
-    inputs = {
-        'question': 'If the half-life of a radioactive substance is 8 years, how long will it take, in years, for two thirds of the substance to decay?',
-        'options': 'A. 22.45\nB. 12.21\nC. 12.68\nD. 7.69\nE. 16.89\nF. 20.76\nG. 4.68\nH. 14.12\nI. 10.33\nJ. 18.34',
-    }
-    assert prompt.fill(inputs) == expected_prompt
-
-
-def test_mmlu_pro_tigerlab_few_shot_prompt():
-    prompt = get_prompt('generic/mmlu_pro', "llama3-instruct", 'mmlu_pro_few_shot_tigerlab_other')
+def test_mmlu_pro_few_shot_prompt():
+    prompt = get_prompt('generic/mmlu-pro-few-shot', "llama3-instruct", 'mmlu_pro_few_shot_other')
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
@@ -1431,6 +1294,36 @@ I. 81
 J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
+    inputs = {
+        'question': "What is the square root of 81 squared?",
+        'options': "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
+        "subset_for_metrics": "other",
+    }
+    print(prompt.fill(inputs))
+    assert prompt.fill(inputs) == expected_prompt
+
+def test_mmlu_pro_zero_shot_prompt():
+    prompt = get_prompt('generic/mmlu-pro-zero-shot', "llama3-instruct")
+    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+The following are multiple choice questions (with answers) about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+
+Question: What is the square root of 81 squared?
+Options: A. 9^2
+B. 27
+C. 81^2
+D. 729
+E. 6561
+F. 12
+G. 162
+H. 243
+I. 81
+J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+
     inputs = {
         'question': "What is the square root of 81 squared?",
         'options': "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
