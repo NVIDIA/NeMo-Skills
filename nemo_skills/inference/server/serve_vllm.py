@@ -21,12 +21,18 @@ def main():
     parser.add_argument("--model", help="Path to the model or a model name to pull from HF")
     parser.add_argument("--num_gpus", type=int, required=True)
     parser.add_argument("--port", type=int, default=5000, help="Server port")
+    parser.add_argument("--verbose", action="store_true", help="Print verbose logs")
     args, unknown = parser.parse_known_args()
 
     extra_arguments = f'{" ".join(unknown)}'
 
     print(f"Deploying model {args.model}")
     print("Starting OpenAI Server")
+
+    if args.verbose:
+        logging_args = ""
+    else:
+        logging_args = ' --disable-log-requests --disable-log-stats '
 
     cmd = (
         f'python -m vllm.entrypoints.openai.api_server '
@@ -39,9 +45,10 @@ def main():
         f'    --gpu-memory-utilization=0.9 '
         f'    --max-num-seqs=256 '
         f'    --enforce-eager '
-        f'    --disable-log-requests '
-        f'    --disable-log-stats '
-        f'    {extra_arguments} | grep -v "200 OK"'
+        f'    {logging_args} '
+        f'    {extra_arguments} ' + '| grep -v "200 OK"'
+        if not args.verbose
+        else ""
     )
 
     subprocess.run(cmd, shell=True, check=True)
