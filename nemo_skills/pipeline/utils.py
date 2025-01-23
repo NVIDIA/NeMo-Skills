@@ -249,7 +249,6 @@ def get_server_command(
             "--node-manager-port=12345 "
             "--object-manager-port=12346 "
             "--dashboard-port=8265 "
-            "--gcs-server-port=12347 "
             "--min-worker-port=10002 "
             "--max-worker-port=10999 "
             "--runtime-env-agent-port=12348 "
