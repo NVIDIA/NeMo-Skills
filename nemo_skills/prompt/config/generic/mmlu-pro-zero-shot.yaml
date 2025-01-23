@@ -3,5 +3,6 @@
 
 user: |-
   The following are multiple choice questions (with answers) about {subset_for_metrics}. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+  
   Question: {question}
   Options: {options}
