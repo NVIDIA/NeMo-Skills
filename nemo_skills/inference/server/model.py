@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -79,6 +80,9 @@ class BaseModel(abc.ABC):
             session.mount('https://', adapter)
             self.requests_lib = session
 
+        self.gen_id_to_params = {}
+        self.gen_id_to_future = {}
+
     @abc.abstractmethod
     def _generate_single(
         self,
@@ -106,6 +110,62 @@ class BaseModel(abc.ABC):
             request["temperature"] = 1.0
             request["top_k"] = 1
             request["top_p"] = 1.0
+
+    def generate_async(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        remove_stop_phrases: bool = True,
+    ) -> list[dict]:
+        """Returns a list of generation ids that can be later queried with get_generation calls."""
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+        }
+        for key, value in kwargs.items():
+            is_list = False
+            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
+                is_list = True
+            if key != 'stop_phrases' and isinstance(value, list):
+                is_list = True
+            if is_list and len(value) != len(prompts):
+                raise ValueError(f"Length of {key} should match the number of prompts.")
+            if not is_list:
+                kwargs[key] = [value for _ in range(len(prompts))]
+
+        futures = []
+        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
+            for request_idx in range(len(prompts)):
+                request = {key: value[request_idx] for key, value in kwargs.items()}
+                request['prompt'] = prompts[request_idx]
+                self.preprocess_request(request)
+                futures.append(executor.submit(self._generate_single, **request))
+
+        gen_ids = []
+        for future in futures:
+            gen_id = str(uuid.uuid4())
+            gen_ids.append(gen_id)
+            self.gen_id_to_future[gen_id] = future
+
+        self.gen_id_to_params = {
+            gen_id: (req_stop_phrases, remove_stop_phrases)
+            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
+        }
+
+        return gen_ids
 
     def generate(
         self,
