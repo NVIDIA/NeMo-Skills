@@ -245,19 +245,22 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
+        ports = (
+            "--node-manager-port=12345 "
+            "--object-manager-port=12346 "
+            "--dashboard-port=8265 "
+            "--gcs-server-port=12347 "
+            "--min-worker-port=10002 "
+            "--max-worker-port=10999 "
+            "--runtime-env-agent-port=12348 "
+        )
         server_start_cmd = (
             "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
             "    echo 'Starting head node' && "
             "    ray start "
             "        --head "
             "        --port=6379 "
-            "        --node-manager-port=12345 "
-            "        --object-manager-port=12346 "
-            "        --dashboard-port=8265 "
-            "        --gcs-server-port=12347 "
-            "        --min-worker-port=10002 "
-            "        --max-worker-port=10999 "
-            "        --runtime-env-agent-port=12348 && "
+            f"       {ports} && "
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
@@ -266,8 +269,7 @@ def get_server_command(
             "    ray start "
             "        --block "
             "        --address=${head_node}:6379 "
-            "        --node-manager-port=12345 "
-            "        --object-manager-port=12346 ;"
+            f"       {ports} ;"
             "fi"
         )
         num_tasks = 1
