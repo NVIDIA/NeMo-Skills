@@ -46,9 +46,7 @@ def main():
         f'    --max-num-seqs=256 '
         f'    --enforce-eager '
         f'    {logging_args} '
-        f'    {extra_arguments} ' + '| grep -v "200 OK"'
-        if not args.verbose
-        else ""
+        f'    {extra_arguments} ' + (' | grep -v "200 OK"' if not args.verbose else "")
     )
 
     subprocess.run(cmd, shell=True, check=True)
