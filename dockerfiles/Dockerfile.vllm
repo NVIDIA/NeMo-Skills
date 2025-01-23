@@ -47,6 +47,9 @@ RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sen
 
 RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
 
+COPY dockerfiles/vllm.patch /opt/vllm/vllm.patch
+RUN cd /opt/vllm && git apply vllm.patch
+
 WORKDIR /opt
 
 # Set environment variables for mounted HF Cache
@@ -57,3 +60,4 @@ ENV HF_HOME=/cache/huggingface
 ENV TRANSFORMERS_CACHE=/cache/huggingface/transformers
 ENV HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
 ENV HF_DATASETS_CACHE=/cache/huggingface/datasets
+
