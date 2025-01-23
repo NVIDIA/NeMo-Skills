@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -83,6 +84,8 @@ class BaseModel(abc.ABC):
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
 
+        self.executor = ThreadPoolExecutor(max_workers=5000)  # is this too much?
+
     @abc.abstractmethod
     def _generate_single(
         self,
@@ -147,12 +150,11 @@ class BaseModel(abc.ABC):
                 kwargs[key] = [value for _ in range(len(prompts))]
 
         futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single, **request))
+        for request_idx in range(len(prompts)):
+            request = {key: value[request_idx] for key, value in kwargs.items()}
+            request['prompt'] = prompts[request_idx]
+            self.preprocess_request(request)
+            futures.append(self.executor.submit(self._generate_single, **request))
 
         gen_ids = []
         for future in futures:
@@ -166,6 +168,33 @@ class BaseModel(abc.ABC):
         }
 
         return gen_ids
+
+    def get_generations(
+        self,
+        generation_ids: list[str],
+    ) -> list[dict]:
+
+        generations = []
+        for generation_id in generation_ids:
+            if generation_id not in self.gen_id_to_future:
+                raise ValueError(f"Generation id {generation_id} not found.")
+
+            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
+            future = self.gen_id_to_future[generation_id]
+            if not future.done():
+                output = {'generation': None}
+                del self.gen_id_to_future[generation_id]
+                del self.gen_id_to_params[generation_id]
+            else:
+                output = future.result()
+
+            if remove_stop_phrases:
+                if output['generation'] is not None:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+            generations.append(output)
+
+        return generations
 
     def generate(
         self,
@@ -184,41 +213,32 @@ class BaseModel(abc.ABC):
 
         Not every server supports that, so make sure to override this method directly if that's not the case.
         """
-        kwargs = {
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'random_seed': random_seed,
-            'stop_phrases': stop_phrases,
-        }
-        for key, value in kwargs.items():
-            is_list = False
-            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
-                is_list = True
-            if key != 'stop_phrases' and isinstance(value, list):
-                is_list = True
-            if is_list and len(value) != len(prompts):
-                raise ValueError(f"Length of {key} should match the number of prompts.")
-            if not is_list:
-                kwargs[key] = [value for _ in range(len(prompts))]
+        generation_ids = self.generate_async(
+            prompts=prompts,
+            tokens_to_generate=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            random_seed=random_seed,
+            stop_phrases=stop_phrases,
+            remove_stop_phrases=remove_stop_phrases,
+        )
+        all_generations = [None] * len(prompts)
+        while True:
+            remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
+            remaining_positions = [
+                idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
+            ]
+            generations = self.get_generations(remaining_ids)
+            idx = 0
+            for gen_pos, gen_dict in zip(remaining_positions, generations):
+                if gen_dict['generation'] is not None:  # will be None until done
+                    generation_ids[gen_pos] = None
+                    all_generations[gen_pos] = gen_dict
 
-        futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single, **request))
-        outputs = [future.result() for future in futures]
-
-        if remove_stop_phrases:
-            for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
-
-        return outputs
+            time.sleep(1)
 
 
 class TRTLLMModel(BaseModel):
