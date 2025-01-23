@@ -183,10 +183,10 @@ class BaseModel(abc.ABC):
             future = self.gen_id_to_future[generation_id]
             if not future.done():
                 output = {'generation': None}
-                del self.gen_id_to_future[generation_id]
-                del self.gen_id_to_params[generation_id]
             else:
                 output = future.result()
+                del self.gen_id_to_future[generation_id]
+                del self.gen_id_to_params[generation_id]
 
             if remove_stop_phrases:
                 if output['generation'] is not None:
