@@ -220,6 +220,8 @@ def generate(
     except AttributeError:
         pass
 
+    get_random_port = server_gpus != 8 and not exclusive
+
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
     if num_random_seeds:
@@ -240,7 +242,7 @@ def generate(
         extra_arguments_original = extra_arguments
         if random_seeds:
             for seed in random_seeds:
-                server_port = get_free_port(strategy="random")
+                server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
                     server_gpus=server_gpus,
@@ -278,6 +280,7 @@ def generate(
                         time_min=time_min,
                         server_config=server_config,
                         with_sandbox=True,
+                        sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
@@ -287,7 +290,7 @@ def generate(
                     )
                     prev_tasks = [new_task]
         else:
-            server_port = get_free_port(strategy="random")
+            server_port = get_free_port(strategy="random") if get_random_port else 5000
             server_config, extra_arguments, server_address, server_port = configure_client(
                 generation_type=generation_type,
                 server_gpus=server_gpus,
@@ -322,6 +325,7 @@ def generate(
                     time_min=time_min,
                     server_config=server_config,
                     with_sandbox=True,
+                    sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,

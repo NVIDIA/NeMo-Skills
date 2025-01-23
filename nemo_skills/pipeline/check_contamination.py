@@ -108,6 +108,8 @@ def check_contamination(
     except AttributeError:
         pass
 
+    get_random_port = server_gpus != 8 and not exclusive
+
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_file)
     check_if_mounted(cluster_config, output_file)
@@ -116,7 +118,7 @@ def check_contamination(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port(strategy="random")
+        server_port = get_free_port(strategy="random") if get_random_port else 5000
         server_address = f"localhost:{server_port}"
 
         server_config = {
