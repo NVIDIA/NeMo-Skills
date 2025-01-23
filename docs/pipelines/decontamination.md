@@ -44,7 +44,7 @@ cmd = (
 
 run_cmd(
     cluster="local",
-    container=nemo,
+    container="nemo",
     ctx=wrap_arguments(cmd),
 )
 ```

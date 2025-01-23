@@ -238,19 +238,41 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        if num_nodes > 1:
-            raise ValueError("VLLM server does not support multi-node execution")
-
-        server_start_cmd = (
+        start_vllm_cmd = (
             f"python -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
+        ports = (
+            "--node-manager-port=12345 "
+            "--object-manager-port=12346 "
+            "--dashboard-port=8265 "
+            "--min-worker-port=12349 "
+            "--max-worker-port=14349 "
+            "--runtime-env-agent-port=12348 "
+        )
+        server_start_cmd = (
+            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+            "    echo 'Starting head node' && "
+            "    ray start "
+            "        --head "
+            "        --port=6379 "
+            f"       {ports} && "
+            f"   {start_vllm_cmd} ;"
+            "else "
+            "    echo 'Starting worker node' && "
+            "    export head_node=$(echo ${SLURM_NODELIST%%,*} | sed 's/\[//g') && "
+            "    echo 'Connecting to head node at ${head_node}' && "
+            "    ray start "
+            "        --block "
+            "        --address=${head_node}:6379 "
+            f"       {ports} ;"
+            "fi"
+        )
         num_tasks = 1
     else:
-        # adding sleep to ensure the logs file exists
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "

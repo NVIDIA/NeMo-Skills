@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-executor: local
-
-containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.1
-  nemo: igitman/nemo-skills-nemo:0.5.0
-  sandbox: igitman/nemo-skills-sandbox:0.5.0
-  nemo-skills: igitman/nemo-skills:0.5.0
-
-mounts:
-  - /tmp:/tmp
-  # change this if the models are located in a different place
-  # TODO: can we make it simpler?
-  - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+text_begin: "<｜begin▁of▁sentence｜>"
+system_begin: ""
+system_end: ""
+user_begin: "<｜User｜>"
+user_end: ""
+assistant_begin: "<｜Assistant｜>"
+assistant_end: "<｜end▁of▁sentence｜>"  # TODO: is that right? Shouldn't affect single turn, but need to check more for multi-turn
+code_begin: '<llm-code>\n'
+code_end: '</llm-code>\n'
+code_output_begin: '<llm-code-output>\n'
+code_output_end: '</llm-code-output>\n'
+code_output_format: "qwen"
+stop_phrases: ["<｜end▁of▁sentence｜>"]

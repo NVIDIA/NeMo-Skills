@@ -74,6 +74,7 @@ def get_hf_to_trtllm_cmd(
         f"    --dtype {dtype} "
         f"    --tp_size {num_gpus} "
         f"    --pp_size {num_nodes} "
+        f"    --workers 16 "
         f"    {trt_prepare_args} "
     )
 
@@ -83,10 +84,10 @@ def get_hf_to_trtllm_cmd(
         f"    --output_dir {output_model} "
         f"    --gpt_attention_plugin {dtype} "
         f"    --use_paged_context_fmha enable "
+        f"    --max_batch_size 512 "
         f"    --max_input_len 4096 "
         f"    --max_seq_len 8192 "
         f"    --max_num_tokens 8192 "
-        f"    --max_batch_size 128 "
         f"    {extra_arguments} && "
         f"cp {input_model}/tokenizer* {output_model} "
     )
@@ -123,6 +124,7 @@ def get_hf_to_nemo_cmd(
 class SupportedTypes(str, Enum):
     llama = "llama"
     qwen = "qwen"
+    deepseek_v3 = "deepseek_v3"
 
 
 class SupportedFormatsTo(str, Enum):
@@ -211,6 +213,9 @@ def convert(
 
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
+
+    if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
+        raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_model)
