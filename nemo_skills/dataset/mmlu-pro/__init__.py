@@ -15,13 +15,12 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = 'llama3-instruct/mmlu_pro'
+PROMPT_CONFIG = 'generic/mmlu-pro-zero-shot'
 DATASET_GROUP = 'multichoice'
 METRICS_TYPE = 'math'  # TODO: update this?
 DEFAULT_EVAL_ARGS = (
-    "++eval_type=mmlu "
-    "++eval_config.parse_func=llama "
+    "++eval_type=mmlu-pro "
 )
 
 
-DEFAULT_GENERATION_ARGS = "++split=test_llama"
+DEFAULT_GENERATION_ARGS = "++split=test"
