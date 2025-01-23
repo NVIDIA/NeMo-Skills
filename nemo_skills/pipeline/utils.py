@@ -249,8 +249,8 @@ def get_server_command(
             "--node-manager-port=12345 "
             "--object-manager-port=12346 "
             "--dashboard-port=8265 "
-            "--min-worker-port=12349 "
-            "--max-worker-port=14349 "
+            "--min-worker-port=14349 "
+            "--max-worker-port=16349 "
             "--runtime-env-agent-port=12348 "
         )
         server_start_cmd = (
