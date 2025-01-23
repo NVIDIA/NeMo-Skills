@@ -76,6 +76,18 @@ Most of our pipeline scripts use a mix of normal command-line arguments and Hydr
 see this, it means that the regular `--arg_name` parameters are used to control the wrapper script itself and
 all other parameters are directly passed into the underlying `nemo_skills/...` script called by the wrapper.
 
+### Environment variables
+
+You can define environment variables in the cluster config file, which will be set inside the container.
+
+```yaml
+env_vars:
+  - MYENVVAR  # will pick the value from env
+  - MYENVVAR2=my_value  # will use my_value
+```
+
+If an environment variable is required, and the user must provide it, you can use `required_env_vars` instead. One thing to note is that `required_env_vars` does not support passing values directly, so you must provide them via environment variable only.
+
 ## Running pipelines
 
 All of the [pipeline scripts](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/pipeline) can be called in 3 equivalent ways.
