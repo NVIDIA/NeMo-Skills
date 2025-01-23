@@ -205,6 +205,7 @@ class TRTLLMModel(BaseModel):
         ).json()
         return output_dict
 
+    # TODO: DRY
     def _generate_single_async(
         self,
         prompt: str | dict,
@@ -289,6 +290,11 @@ class TRTLLMModel(BaseModel):
                 futures.append(executor.submit(self._generate_single_async, **request))
         outputs = [future.result() for future in futures]
 
+        self.gen_id_to_params = {
+            gen_id: (req_stop_phrases, remove_stop_phrases)
+            for gen_id, req_stop_phrases in zip(outputs, kwargs["stop_phrases"])
+        }
+
         return outputs
 
     def cancel_generations(
@@ -313,9 +319,6 @@ class TRTLLMModel(BaseModel):
     def get_generations(
         self,
         generation_ids: list[str],
-        # TODO: remember those from first command
-        stop_phrases: list[str] | None = None,
-        remove_stop_phrases: bool = True,
     ) -> list[dict]:
 
         generations = []
@@ -328,6 +331,7 @@ class TRTLLMModel(BaseModel):
                 data=json.dumps(request),
                 headers={"Content-Type": "application/json"},
             ).json()
+            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
             if remove_stop_phrases:
                 if output['generation'] is not None:
                     output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
