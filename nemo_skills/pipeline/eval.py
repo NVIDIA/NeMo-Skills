@@ -51,15 +51,15 @@ def get_greedy_cmds(
         file_path = f"{Path(__file__).parents[1]}/dataset/{benchmark}/{split}.jsonl"
 
     if num_workers > 1:
-        benchmark_size = int(os.popen(f'wc -l "{file_path}"').read().split()[0])
-        if num_workers > benchmark_size:
+        data_size = int(os.popen(f'wc -l "{file_path}"').read().split()[0])
+        if num_workers > data_size:
             raise ValueError(
                 f"Number of workers ({num_workers}) should be less than the "
-                f"number of samples in the benchmark ({benchmark_size})"
+                f"number of samples in the data file ({data_size})"
             )
         # Calculate base size and remainder for even distribution
-        base_size = benchmark_size // num_workers
-        remainder = benchmark_size % num_workers
+        base_size = data_size // num_workers
+        remainder = data_size % num_workers
 
         # Compute start and end indices for each worker
         start_indices = []
