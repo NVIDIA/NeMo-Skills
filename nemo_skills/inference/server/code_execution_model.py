@@ -138,7 +138,6 @@ class CodeExecutionWrapper:
 
         Not every server supports that, so make sure to override this method directly if that's not the case.
         """
-        print("I'm HERE!!")
         # TODO: currently nemo server would get separate 1-batch requests, which is likely really inefficient
         #       but the alternative is to have a fully separate implementation, which is also not nice
         #       If we find ourselves needing to use nemo with code execution often, we should fix this
@@ -169,12 +168,11 @@ class CodeExecutionWrapper:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
         futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.model.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single, **request))
+        for request_idx in range(len(prompts)):
+            request = {key: value[request_idx] for key, value in kwargs.items()}
+            request['prompt'] = prompts[request_idx]
+            self.model.preprocess_request(request)
+            futures.append(self.executor.submit(self._generate_single, **request))
 
         gen_ids = []
         for future in futures:
