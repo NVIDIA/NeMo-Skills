@@ -263,11 +263,10 @@ def get_server_command(
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
-            "    export head_node=$(echo ${SLURM_NODELIST%%,*} | sed 's/\[//g') && "
-            "    echo 'Connecting to head node at ${head_node}' && "
+            "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
             "    ray start "
             "        --block "
-            "        --address=${head_node}:6379 "
+            "        --address=$VLLM_HEAD_NODE:6379 "
             f"       {ports} ;"
             "fi"
         )
@@ -714,6 +713,8 @@ def get_executor(
             network="host",
             env_vars=env_vars,
         )
+
+    env_vars["VLLM_HEAD_NODE"] = "${head_node}"
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
