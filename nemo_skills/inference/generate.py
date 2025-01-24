@@ -28,7 +28,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -82,6 +82,11 @@ class GenerateSolutionsConfig:
     # with the first question, second entry to both first question, first answer and second question
     # and so on
     multi_turn_key: str | None = None
+
+    # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
+    # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
+    # to `output_file`-async (and put it back in order after all generations are done)
+    use_async_loop: bool = True
 
     # can add this flag to just print the first prompt instead of running generation
     # useful to double check that your data can be loaded and prompt has what you expect
@@ -365,7 +370,7 @@ def generate(cfg: GenerateSolutionsConfig):
     extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
 
     # for nemo or multi-turn generation, we don't support async yet
-    if cfg.server["server_type"] == "nemo" or cfg.multi_turn_key is not None:
+    if cfg.use_async_loop is False or cfg.server["server_type"] == "nemo" or cfg.multi_turn_key is not None:
         sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
     else:
         async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
