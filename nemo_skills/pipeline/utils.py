@@ -263,11 +263,10 @@ def get_server_command(
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
-            "    export head_node=$(echo ${SLURM_NODELIST%%,*} | sed 's/\[//g') && "
-            "    echo 'Connecting to head node at ${head_node}' && "
+            "    echo 'Connecting to head node at $head_node' && "
             "    ray start "
             "        --block "
-            "        --address=${head_node}:6379 "
+            "        --address=$head_node:6379 "
             f"       {ports} ;"
             "fi"
         )
