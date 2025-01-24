@@ -13,16 +13,19 @@
 # limitations under the License.
 
 import abc
+import logging
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
 
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient, OpenAI, BadRequestError
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
+from openai import BadRequestError, DefaultHttpxClient, OpenAI
+
 LOG = logging.getLogger(__file__)
+
 
 class BaseModel(abc.ABC):
     """Base model class for handling requests to the inference server.
@@ -86,8 +89,11 @@ class NemoRewardModel(BaseModel):
 
 
 class VLLMRewardModel(BaseModel):
-    def __init__(self, **kwargs):
+    def __init__(self, model_type="orm", **kwargs):
         super().__init__(**kwargs)
+
+        # Reward model type
+        self.model_type = model_type
 
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
@@ -104,18 +110,25 @@ class VLLMRewardModel(BaseModel):
             http_client=http_client,
         )
 
+        # Request URL
+        self.request_url = f"http://{self.server_host}:{self.server_port}/pooling"
+
         model_list = self.oai_client.models.list()
         self.model = model_list.data[0].id
 
     def _score_single_prompt(self, prompt):
-        response = self.oai_client.embeddings.create(input=[prompt], model=self.model)
-        raw_score = response.data[0].embedding[-1]
-        score = 1 / (1 + math.exp(-raw_score))
+        response = requests.post(self.request_url, json=prompt)
+        rm_scores = response.json['data'][0]['data']
+
+        score = None
+        if self.model_type == "prm":
+            score = rm_scores[-1][1]
+        elif self.model_type == "orm":
+            score = rm_scores[-1][0]
+
         return {"reward_model_score": score}
+
     def score(self, prompts: list[str]) -> list[float]:
-        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
-        # Once VLLM officially adds the support, change the API.
-        
         outputs = [None] * len(prompts)  # Pre-allocate a list to store results in correct order
         futures = {}
 
@@ -128,11 +141,13 @@ class VLLMRewardModel(BaseModel):
                 try:
                     outputs[idx] = future.result()
                 except BadRequestError as e:
-                    error_details = e.body 
+                    error_details = e.body
                     error_message = error_details.get("message", "No message found")
-                    error_code = error_details.get("code", "No code found")            
+                    error_code = error_details.get("code", "No code found")
                     if error_code == 400 and 'maximum context length' in error_message:
-                        outputs[idx] = {"reward_model_score": 0}  # Default value set as 0 if we have request over maximum context length
+                        outputs[idx] = {
+                            "reward_model_score": 0
+                        }  # Default value set as 0 if we have request over maximum context length
                         LOG.warning("Maximum context length exceeded, setting reward score as 0")
                     else:
                         raise
