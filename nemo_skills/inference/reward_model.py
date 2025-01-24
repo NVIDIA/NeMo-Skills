@@ -16,9 +16,11 @@ import json
 import logging
 import sys
 from dataclasses import field
+from enum import Enum
 from pathlib import Path
 
 import hydra
+import typer
 from tqdm import tqdm
 
 from nemo_skills.inference.server.code_execution_model import server_params
@@ -27,6 +29,13 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
+
+
+class SupportedRewardModels(str, Enum):
+    ORM = "orm"
+    PRM = "prm"
+    GENRM = "genrm"
+    GENRM_COT = "genrm_cot"
 
 
 @nested_dataclass(kw_only=True)
@@ -57,7 +66,8 @@ class RewardModelConfig:
     # if > 0, will skip this many samples from the beginning of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
-
+    # Default reward model type
+    reward_model_type: SupportedRewardModels = SupportedRewardModels.ORM
     reward_model_score_key: str = "reward_model_score"
 
     # can add this flag to just print the first prompt instead of running generation
@@ -82,6 +92,8 @@ class RewardModelConfig:
 
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
+
+        self.server["model_type"] = self.reward_model_type
 
 
 cs = hydra.core.config_store.ConfigStore.instance()

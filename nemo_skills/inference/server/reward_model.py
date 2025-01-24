@@ -28,9 +28,10 @@ LOG = logging.getLogger(__file__)
 
 
 class BaseModel(abc.ABC):
-    """Base model class for handling requests to the inference server.
+    """Base model class for handling requests to the reward model inference server.
 
     Args:
+        model_type: Reward model type
         host: Optional[str] = '127.0.0.1' - Host of the inference server.
         port: Optional[str] = '5000' - Port of the inference server.
             Only required if handle_code_execution is True.
@@ -43,11 +44,13 @@ class BaseModel(abc.ABC):
 
     def __init__(
         self,
+        model_type: str,
         host: str = '127.0.0.1',
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
     ):
+        self.model_type = model_type
         self.server_host = host
         self.server_port = port
         self.ssh_server = ssh_server
@@ -89,11 +92,8 @@ class NemoRewardModel(BaseModel):
 
 
 class VLLMRewardModel(BaseModel):
-    def __init__(self, model_type="orm", **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # Reward model type
-        self.model_type = model_type
 
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
@@ -110,7 +110,8 @@ class VLLMRewardModel(BaseModel):
             http_client=http_client,
         )
 
-        # Request URL
+        # Reward models are accessed via the "pooling" interface
+        # https://docs.vllm.ai/en/latest/models/pooling_models.html
         self.request_url = f"http://{self.server_host}:{self.server_port}/pooling"
 
         model_list = self.oai_client.models.list()
