@@ -45,10 +45,10 @@ def get_greedy_cmds(
 
     if found_in_extra:
         data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-        file_path = "{extra_datasets}/{benchmark}/{split}.jsonl"
+        file_path = f"{extra_datasets}/{benchmark}/{split}.jsonl"
     else:
         data_parameters = f"++dataset={benchmark} ++split={split}"
-        file_path = f"{Path(__file__.parents[2])}/{benchmark}/{split}.jsonl"
+        file_path = f"{Path(__file__).parents[1]}/dataset/{benchmark}/{split}.jsonl"
 
     if num_workers > 1:
         benchmark_size = int(os.popen(f'wc -l "{file_path}"').read().split()[0])
