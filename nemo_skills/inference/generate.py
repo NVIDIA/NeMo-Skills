@@ -328,10 +328,11 @@ def generate(cfg: GenerateSolutionsConfig):
             data.append(json.loads(line))
 
     # skipping based on the offset first
-    if cfg.start_idx is not None:
-        data = data[cfg.start_idx :]
-    if cfg.end_idx is not None:
-        data = data[: cfg.end_idx]
+    if cfg.start_idx is None:
+        cfg.start_idx = 0
+    if cfg.end_idx is None:
+        cfg.end_idx = len(data)
+    data = data[cfg.start_idx : cfg.end_idx]
 
     if cfg.prompt_config is None:
         # fetching from the default for corresponding dataset
