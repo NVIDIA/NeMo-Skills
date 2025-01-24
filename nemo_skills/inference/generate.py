@@ -252,14 +252,12 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         return
 
     # submitting all data at ones
-    print("I'M HERE!!! ***")
     generation_ids = llm.generate_async(
         prompts=[prompt.fill(dp) for dp in data],
         stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
         **asdict(cfg.inference),
         **extra_generate_params,
     )
-    print("I'M HERE!!! ###")
 
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file + '-async', "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
@@ -294,7 +292,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         for gen_dict in ordered_generations:
             fout.write(json.dumps(gen_dict) + "\n")
 
-    # Path(cfg.output_file + '-async').unlink()
+    Path(cfg.output_file + '-async').unlink()
 
 
 @hydra.main(version_base=None, config_name='base_generation_config')
