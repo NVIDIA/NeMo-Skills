@@ -45,7 +45,7 @@ def test_vllm_generate_greedy():
         f"    --output_dir /tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++input_file=/nemo_run/code/nemo_skills/dataset/math/test.jsonl "
+        f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
         f"    ++batch_size=8 "
@@ -86,7 +86,7 @@ def test_vllm_generate_seeds():
         f"    --server_nodes 1 "
         f"    --num_random_seeds {num_seeds} "
         f"    --eval_args='++eval_type=math' "
-        f"    ++dataset=math "
+        f"    ++dataset=gsm8k "
         f"    ++split=test "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
@@ -107,9 +107,9 @@ def test_vllm_generate_seeds():
             assert 'generation' in data
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='math').compute_metrics(
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation/output-rs*.jsonl"],
     )["all"]["majority@3"]
     # rough check, since exact accuracy varies depending on gpu type
-    assert metrics['symbolic_correct'] >= 20
+    assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 10
