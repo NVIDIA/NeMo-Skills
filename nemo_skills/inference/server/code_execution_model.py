@@ -138,6 +138,7 @@ class CodeExecutionWrapper:
 
         Not every server supports that, so make sure to override this method directly if that's not the case.
         """
+        print("I'm HERE!!")
         # TODO: currently nemo server would get separate 1-batch requests, which is likely really inefficient
         #       but the alternative is to have a fully separate implementation, which is also not nice
         #       If we find ourselves needing to use nemo with code execution often, we should fix this
