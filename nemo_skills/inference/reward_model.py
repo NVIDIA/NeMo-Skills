@@ -93,8 +93,6 @@ class RewardModelConfig:
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
-        self.server["model_type"] = self.reward_model_type
-
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_reward_model_config", node=RewardModelConfig)
@@ -105,7 +103,7 @@ def generate(cfg: RewardModelConfig):
     cfg = RewardModelConfig(_init_nested=True, **cfg)
 
     LOG.info("Config used: %s", cfg)
-    llm = get_reward_model(**cfg.server)
+    llm = get_reward_model(model_type=cfg.reward_model_type, **cfg.server)
 
     # making sure output dir exists
     Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)

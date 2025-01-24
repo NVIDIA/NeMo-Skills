@@ -165,7 +165,7 @@ models = {
 }
 
 
-def get_reward_model(server_type, **kwargs):
+def get_reward_model(server_type, model_type, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    return model_class(**kwargs)
+    return model_class(model_type=model_type, **kwargs)
