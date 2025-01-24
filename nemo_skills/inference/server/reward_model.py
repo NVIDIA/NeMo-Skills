@@ -118,13 +118,17 @@ class VLLMRewardModel(BaseModel):
 
     def _score_single_prompt(self, prompt):
         response = requests.post(self.request_url, json=prompt)
-        rm_scores = response.json['data'][0]['data']
+        per_token_scores = response.json['data'][0]['data']
 
         score = None
-        if self.model_type == "prm":
-            score = rm_scores[-1][1]
-        elif self.model_type == "orm":
-            score = rm_scores[-1][0]
+        if self.model_type == "orm":
+            # Last token's score
+            logit_score = per_token_scores[-1][0]
+            # Normalize the score
+            score = 1 / (1 + math.exp(-logit_score))
+        elif self.model_type == "prm":
+            # Last token's score, a 2-entry array where the second entry is the probability of being correct
+            score = per_token_scores[-1][1]
 
         return {"reward_model_score": score}
 
