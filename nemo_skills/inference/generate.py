@@ -291,7 +291,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         for gen_dict in ordered_generations:
             fout.write(json.dumps(gen_dict) + "\n")
 
-    Path(cfg.output_file + '-async').unlink()
+    # Path(cfg.output_file + '-async').unlink()
 
 
 @hydra.main(version_base=None, config_name='base_generation_config')
