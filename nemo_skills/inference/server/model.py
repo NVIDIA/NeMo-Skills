@@ -241,6 +241,8 @@ class BaseModel(abc.ABC):
 
             time.sleep(1)
 
+        return all_generations
+
 
 class TRTLLMModel(BaseModel):
     """Note that the current implementation supports inflight-batching so

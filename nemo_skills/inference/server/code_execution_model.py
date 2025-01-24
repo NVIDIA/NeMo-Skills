@@ -269,6 +269,8 @@ class CodeExecutionWrapper:
 
             time.sleep(1)
 
+        return all_generations
+
 
 def server_params():
     """Returns server documentation (to include in cmd help)."""
