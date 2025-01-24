@@ -67,9 +67,11 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    # if > 0, will skip this many samples from the beginning of the data file.
+    # Will skip this many samples from the beginning/end of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
-    offset: int = 0
+    start_idx: int | None = None
+    # end index is not inclusive (can use negative like in normal python slicing)
+    end_idx: int | None = None
 
     generation_key: str = "generation"
     # if specified, we will have a loop over that key in the data file and
@@ -326,7 +328,10 @@ def generate(cfg: GenerateSolutionsConfig):
             data.append(json.loads(line))
 
     # skipping based on the offset first
-    data = data[cfg.offset :]
+    if cfg.start_idx is not None:
+        data = data[cfg.start_idx :]
+    if cfg.end_idx is not None:
+        data = data[: cfg.end_idx]
 
     if cfg.prompt_config is None:
         # fetching from the default for corresponding dataset

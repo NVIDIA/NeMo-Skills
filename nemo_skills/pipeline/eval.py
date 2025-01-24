@@ -29,7 +29,7 @@ from nemo_skills.utils import setup_logging
 LOG = logging.getLogger(__file__)
 
 
-def get_greedy_cmd(
+def get_greedy_cmds(
     benchmark,
     split,
     output_dir,
@@ -37,32 +37,78 @@ def get_greedy_cmd(
     extra_eval_args="",
     extra_arguments="",
     extra_datasets=None,
+    num_workers=1,
 ):
     benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-    if found_in_extra:
-        data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-    else:
-        data_parameters = f"++dataset={benchmark} ++split={split}"
-
     extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
     extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
-    cmd = (
-        f'echo "Evaluating benchmark {benchmark}" && '
-        f'python -m nemo_skills.inference.generate '
-        f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-        f'    {data_parameters} '
-        f'    {extra_arguments} && '
-        f'python -m nemo_skills.evaluation.evaluate_results '
-        f'    ++input_files={output_dir}/eval-results/{benchmark}/{output_name} {extra_eval_args}'
-    )
-    return cmd
+
+    if found_in_extra:
+        data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
+        file_path = "{extra_datasets}/{benchmark}/{split}.jsonl"
+    else:
+        data_parameters = f"++dataset={benchmark} ++split={split}"
+        file_path = f"{Path(__file__.parents[2])}/{benchmark}/{split}.jsonl"
+
+    if num_workers > 1:
+        benchmark_size = int(os.popen(f'wc -l "{file_path}"').read().split()[0])
+        if num_workers > benchmark_size:
+            raise ValueError(
+                f"Number of workers ({num_workers}) should be less than the "
+                f"number of samples in the benchmark ({benchmark_size})"
+            )
+        # Calculate base size and remainder for even distribution
+        base_size = benchmark_size // num_workers
+        remainder = benchmark_size % num_workers
+
+        # Compute start and end indices for each worker
+        start_indices = []
+        end_indices = []
+        current_idx = 0
+
+        for i in range(num_workers):
+            start_indices.append(current_idx)
+            # Add one extra item if there's still remainder to distribute
+            size = base_size + (1 if i < remainder else 0)
+            current_idx += size
+            end_indices.append(current_idx)
+    else:
+        start_indices = ["null"]
+        end_indices = ["null"]
+
+    cmds = []
+    for start_idx, end_idx in zip(start_indices, end_indices):
+        if num_workers > 1:
+            suffix = f"-{start_idx}-{end_idx}"
+        else:
+            suffix = ""
+        cmd = (
+            f'echo "Evaluating benchmark {benchmark}" && '
+            f'python -m nemo_skills.inference.generate '
+            f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name}{suffix} '
+            f'    ++start_idx={start_idx} '
+            f'    ++end_idx={end_idx} '
+            f'    {data_parameters} '
+            f'    {extra_arguments} && '
+            f'python -m nemo_skills.evaluation.evaluate_results '
+            f'    ++input_files={output_dir}/eval-results/{benchmark}/{output_name}{suffix} {extra_eval_args}'
+        )
+        cmds.append(cmd)
+    return cmds
 
 
-def get_sampling_cmd(
-    benchmark, split, output_dir, random_seed, extra_eval_args="", extra_arguments="", extra_datasets=None
+def get_sampling_cmds(
+    benchmark,
+    split,
+    output_dir,
+    random_seed,
+    extra_eval_args="",
+    extra_arguments="",
+    extra_datasets=None,
+    num_workers=1,
 ):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
-    return get_greedy_cmd(
+    return get_greedy_cmds(
         benchmark=benchmark,
         split=split,
         output_dir=output_dir,
@@ -70,6 +116,7 @@ def get_sampling_cmd(
         extra_eval_args=extra_eval_args,
         extra_arguments=extra_arguments,
         extra_datasets=extra_datasets,
+        num_workers=num_workers,
     )
 
 
@@ -105,7 +152,17 @@ def eval(
     server_args: str = typer.Option("", help="Additional arguments for the server"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option('test', help="Data split to use for evaluation"),
-    num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
+    num_workers: int = typer.Option(
+        1,
+        help="Number of workers to use for evaluation. "
+        "Each job will have that many workers splitting the benchmark files",
+    ),
+    num_jobs: int = typer.Option(
+        -1,
+        help="Number of jobs to split the evaluation into. "
+        "This will split each benchmark/sampling, but will not split individual evaluations. "
+        "To do that, use num_workers",
+    ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
@@ -190,21 +247,26 @@ def eval(
 
     eval_cmds = (
         [
-            get_greedy_cmd(
+            cmd
+            for benchmark in benchmarks.keys()
+            for cmd in get_greedy_cmds(
                 benchmark,
                 split,
                 output_dir,
                 extra_eval_args=extra_eval_args,
                 extra_arguments=extra_arguments,
                 extra_datasets=extra_datasets,
+                num_workers=num_workers,
             )
-            for benchmark in benchmarks.keys()
         ]
         if not skip_greedy
         else []
     )
     eval_cmds += [
-        get_sampling_cmd(
+        cmd
+        for benchmark, rs_num in benchmarks.items()
+        for rs in range(starting_seed, starting_seed + rs_num)
+        for cmd in get_sampling_cmds(
             benchmark,
             split,
             output_dir,
@@ -212,13 +274,13 @@ def eval(
             extra_eval_args=extra_eval_args,
             extra_arguments=extra_arguments,
             extra_datasets=extra_datasets,
+            num_workers=num_workers,
         )
-        for benchmark, rs_num in benchmarks.items()
-        for rs in range(starting_seed, starting_seed + rs_num)
     ]
     if num_jobs == -1:
         num_jobs = len(eval_cmds)
-
+    else:
+        num_jobs *= num_workers
     # splitting eval cmds equally across num_jobs nodes
     eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
 
