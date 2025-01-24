@@ -256,11 +256,12 @@ class CodeExecutionWrapper:
         all_generations = [None] * len(prompts)
         while True:
             remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
+            if len(remaining_ids) == 0:
+                break
             remaining_positions = [
                 idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
             ]
             generations = self.get_generations(remaining_ids)
-            idx = 0
             for gen_pos, gen_dict in zip(remaining_positions, generations):
                 if gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
