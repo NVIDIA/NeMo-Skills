@@ -263,7 +263,8 @@ def get_server_command(
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
-            "    echo 'Connecting to head node at $head_node' && "
+            "    echo \"Connecting to head node at $head_node\" && "
+            "    echo $head_node "
             "    ray start "
             "        --block "
             "        --address=$head_node:6379 "
@@ -734,7 +735,7 @@ def get_executor(
         f"--ntasks={tasks_per_node * num_nodes}",
         f"--nodes={num_nodes}",
         # NeMo-run should take care of this, but we'll put it here temporarily
-        f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
+        f"--container-env={','.join([k.strip() for k in list(env_vars.keys()) + ['head_node']])}",
     ]
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
