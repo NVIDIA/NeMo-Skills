@@ -174,6 +174,7 @@ class CodeExecutionWrapper:
                 request['prompt'] = prompts[request_idx]
                 self.model.preprocess_request(request)
                 futures.append(executor.submit(self._generate_single, **request))
+
         gen_ids = []
         for future in futures:
             gen_id = str(uuid.uuid4())
@@ -238,6 +239,11 @@ class CodeExecutionWrapper:
         """
         generation_ids = self.generate_async(
             prompts=prompts,
+            code_begin=code_begin,
+            code_end=code_end,
+            code_output_begin=code_output_begin,
+            code_output_end=code_output_end,
+            code_output_format=code_output_format,
             tokens_to_generate=tokens_to_generate,
             temperature=temperature,
             top_p=top_p,
