@@ -20,42 +20,41 @@ def test_error_on_extra_params():
 
     # top-level
     # test is not supported
-    cmd = """python nemo_skills/inference/generate_solutions.py \
-        output_file=./test-results/gsm8k/output-greedy.jsonl \
-        +prompt=openmathinstruct/sft \
-        ++prompt.few_shot_examples.examples_type=null \
-        ++dataset=gsm8k \
-        ++split_name=test \
-        ++server.server_type=nemo \
-        ++server.host=1 \
-        ++test=1"""
+    cmd = (
+        "python nemo_skills/inference/generate.py "
+        "    ++output_file=./test-results/gsm8k/output.jsonl "
+        "    ++dataset=gsm8k "
+        "    ++split=test "
+        "    ++server.server_type=nemo "
+        "    ++test=1"
+    )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         assert "got an unexpected keyword argument 'test'" in e.stderr.decode()
 
     # inside nested dataclass
-    # prompt.num_few_shots is not supported
-    cmd = """python nemo_skills/inference/generate_solutions.py \
-        output_file=./test-results/gsm8k/output-greedy.jsonl \
-        +prompt=openmathinstruct/sft \
-        ++prompt.few_shot_examples.examples_type=null \
-        ++prompt.num_few_shots=0 \
-        ++dataset=gsm8k \
-        ++split_name=test \
-        ++server.server_type=nemo \
-        ++server.host=1 \
-        ++sandbox.host=1"""
+    cmd = (
+        "python nemo_skills/inference/generate.py "
+        "    ++output_file=./test-results/gsm8k/output.jsonl "
+        "    ++inference.num_few_shots=0 "
+        "    ++dataset=gsm8k "
+        "    ++split=test "
+        "    ++server.server_type=nemo "
+    )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         assert "got an unexpected keyword argument 'num_few_shots'" in e.stderr.decode()
 
     # sandbox.sandbox_host is not supported
-    cmd = """python nemo_skills/evaluation/evaluate_results.py \
-        ++prediction_jsonl_files=./test-results/gsm8k/output-greedy.jsonl \
-        ++eval_config.grading_config.sandbox.sandbox_type=local \
-        ++eval_config.grading_config.sandbox.sandbox_host=123"""
+    cmd = (
+        "python nemo_skills/evaluation/evaluate_results.py "
+        "    ++input_files=./test-results/gsm8k/output.jsonl "
+        "    ++eval_type=math "
+        "    ++eval_config.sandbox.sandbox_type=local "
+        "    ++eval_config.sandbox.sandbox_host=123 "
+    )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:

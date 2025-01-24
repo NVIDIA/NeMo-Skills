@@ -12,40 +12,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import re
-from typing import Tuple
+from typing import Dict, Tuple
 
-CODE_SEPARATORS = ('<llm-code>', '</llm-code>')  # used to execute code within these tags
-CODE_OUTPUT_SEPARATORS = ('<llm-code-output>', '</llm-code-output>')  # used to extract the code output
+LOG = logging.getLogger(__name__)
 
 
-def _extract_between_separators(generation, separators: Tuple[str, str], extract_all=False):
+def format_code_output(
+    execution_dict: Dict[str, str], code_output_begin: str, code_output_end: str, code_output_format: str = 'llama'
+):
+    """Formatting code output to be displayed as an llm expects it."""
+    if code_output_format == 'llama':
+        output = execution_dict["process_status"]
+        if execution_dict['stdout']:
+            output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
+        if execution_dict['stderr']:
+            output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
+        output = f"{code_output_begin}\n\n{output}{code_output_end}\n\n"
+    elif code_output_format == 'qwen':
+        output = ""
+        if execution_dict['stdout']:
+            output += f"{execution_dict['stdout']}"
+        if execution_dict['stderr']:
+            output += f"{execution_dict['stderr']}"
+        if execution_dict['stderr'] and execution_dict['stdout']:
+            LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
+        output = f"{code_output_begin}{output}{code_output_end}"
+    else:
+        raise ValueError(f"Unknown code_output_format: {code_output_format}")
+
+    # wrapping with code output separators
+    return output
+
+
+def _extract_between_separators(generation: str, separators: Tuple[str, str], extract_all: bool = False):
     """Extracting all text between last occurrence of separators[0] and [1].
 
     If extract_all is True, returning a list with all occurrences of text between separators.
     """
     if extract_all:
+        separators = [re.escape(sp) for sp in separators]
         pattern = f'{separators[0]}(.*?){separators[1]}'
         return re.findall(pattern, generation, re.DOTALL)
     return generation.split(separators[0])[-1].split(separators[1])[0]
 
 
-def extract_code_to_execute(generation, extract_all=False):
-    return _extract_between_separators(generation, CODE_SEPARATORS, extract_all)
+def extract_code_to_execute(generation: str, code_begin: str, code_end: str, extract_all: bool = False):
+    return _extract_between_separators(generation, [code_begin, code_end], extract_all)
 
 
-def extract_code_output(generation, extract_all=False):
-    return _extract_between_separators(generation, CODE_OUTPUT_SEPARATORS, extract_all)
-
-
-def extract_error_message(generation):
-    """Parsing output for any error messages and returning if found."""
-    from nemo_skills.code_execution.sandbox import Sandbox
-
-    if CODE_OUTPUT_SEPARATORS[0] not in generation:
-        return Sandbox.NOT_EXECUTED
-    code_output = generation.split(CODE_OUTPUT_SEPARATORS[0])[-1].split(CODE_OUTPUT_SEPARATORS[1])[0].strip()
-    for prefix in Sandbox.ERROR_PREFIXES:
-        if code_output.startswith(prefix):
-            return code_output
-    return ""
+def extract_code_output(generation: str, code_output_begin: str, code_output_end: str, extract_all: bool = False):
+    return _extract_between_separators(generation, [code_output_begin, code_output_end], extract_all)

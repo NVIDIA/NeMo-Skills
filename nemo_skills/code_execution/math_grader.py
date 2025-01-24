@@ -84,8 +84,25 @@ This logic is largely copied from the Hendrycks' MATH release (math_equivalence)
 import contextlib
 import re
 import signal
+from importlib.metadata import PackageNotFoundError, version
 from math import isclose
 from typing import Union
+
+
+def _check_antlr_version():
+    "Function for checking the antlr package version."
+    # Check antlr version
+    PACKAGE_NAME = 'antlr4-python3-runtime'
+    REQUIRED_VERSION = '4.11.0'
+
+    try:
+        installed_version = version(PACKAGE_NAME)
+        if installed_version != REQUIRED_VERSION:
+            raise RuntimeError(
+                f"Package {PACKAGE_NAME} version mismatch: {installed_version} (required: {REQUIRED_VERSION})"
+            )
+    except PackageNotFoundError:
+        raise RuntimeError(f"Package {PACKAGE_NAME} not found. Please install antlr4-python3-runtime==4.11.0.")
 
 
 def _fix_fracs(string):
@@ -362,6 +379,10 @@ def math_equal(
     1. numerical equal: both can convert to float and are equal
     2. symbolic equal: both can convert to sympy expression and are equal
     """
+
+    # Check that the right antlr version is installed.
+    _check_antlr_version()
+
     from sympy.parsing.sympy_parser import parse_expr
 
     prediction = normalize(prediction)
@@ -528,6 +549,9 @@ def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: 
         match = re.search(extract_regex, string)
         if match:
             return match.group(1)
+        return None
+
+    if "\\boxed" not in string:
         return None
 
     idx = string.rfind("\\boxed")

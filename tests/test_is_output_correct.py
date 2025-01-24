@@ -33,6 +33,7 @@ from test_code_execution import _get_sandbox
         ("E", "\\mathrm{E}"),
         ("B", "\\mathcal{B}"),
         ("A", "\\textbf{A}"),
+        ("f'", "f'"),
         ("185", "185\\"),
         ("185\\", "185\\"),
         (".185", "0.185"),
@@ -65,6 +66,7 @@ def test_correct_examples(sandbox_type, output_pair):
         ("x^2+2x+1", "x^3+2x+1"),
         ("odd", "\\text{oddd}"),
         ("E", "\\mathrm{E}*2"),
+        ("E", "E'"),
     ],
     ids=str,
 )

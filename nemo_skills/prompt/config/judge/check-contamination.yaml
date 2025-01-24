@@ -1,0 +1,13 @@
+# adapted from https://github.com/lm-sys/llm-decontaminator/blob/main/detect_instruct.py
+
+system: ""
+
+user: |-
+  Help me determine if the following two math problems are the same.
+
+  First problem: {problem1}
+  Second problem: {problem2}
+
+  Disregard the names and minor changes in word order that appear within.
+  If the two problems are very similar and if they produce the same answer, we consider them to be the same problem.
+  Respond with only "True" (problems are the same) or "False" (problems are different). Do not respond with anything else.

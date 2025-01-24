@@ -15,8 +15,11 @@
 
 import logging
 import multiprocessing
+import os
 import resource
+import subprocess
 import sys
+import tempfile
 from io import StringIO
 
 from flask import Flask, request
@@ -24,31 +27,89 @@ from flask import Flask, request
 app = Flask(__name__)
 
 
-# need to memory-limit to avoid common errors of allocating too much
-# but this has to be done in a subprocess to not crush server itself
-def execute_code_subprocess(generated_code, queue):
-    # this can be overriden inside generated code, so it's not a guaranteed protection
-    limit = 1024 * 1024 * 1024 * 10  # 10gb - somehow with a smaller limit the server dies when numpy is used
-    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
-    resource.setrlimit(resource.RLIMIT_DATA, (limit, limit))
-    resource.setrlimit(resource.RLIMIT_STACK, (limit, limit))
-
-    sys.stdout = StringIO()
-    exec(generated_code, {})
-    queue.put(sys.stdout.getvalue())
-
-
-@app.route("/execute", methods=["POST"])
-def execute():
-    generated_code = request.json['generated_code']
-    timeout = request.json['timeout']
+def execute_python(generated_code, timeout):
     # running in a separate process to ensure any kind of crashes are properly handled
     queue = multiprocessing.Queue()
     process = multiprocessing.Process(target=execute_code_subprocess, args=(generated_code, queue))
     process.start()
     process.join(timeout=timeout)
+
     if process.is_alive():  # didn't finish successfully
         process.kill()
-        # TODO: ideally need to use Sandbox.TimeoutError, but need to move code over to docker just for that
-        return '{"result": null, "error_message": "timeout"}'
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
     return queue.get()
+
+
+def execute_lean4(generated_code, timeout):
+    temp_file_name = None
+    try:
+        project_path = "/lean4/my_project"
+        with tempfile.NamedTemporaryFile(dir=project_path, delete=False, suffix=".lean") as temp_file:
+            temp_file_name = temp_file.name
+            temp_file.write(generated_code.encode('utf-8'))
+
+        result = subprocess.run(
+            ['lake', 'env', '--dir', project_path, 'lean', temp_file_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            cwd=project_path,  # Ensure we are in the correct working directory
+        )
+
+        if result.returncode == 0:
+            process_status = "completed"
+        else:
+            process_status = "failed"
+
+        return {
+            "process_status": process_status,
+            "stdout": result.stdout.decode('utf-8'),
+            "stderr": result.stderr.decode('utf-8'),
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {"process_status": "error", "stdout": "", "stderr": str(e) + "\n"}
+    finally:
+        # Safely remove the temporary file if it was created
+        if temp_file_name and os.path.exists(temp_file_name):
+            os.remove(temp_file_name)
+
+
+# need to memory-limit to avoid common errors of allocating too much
+# but this has to be done in a subprocess to not crush server itself
+def execute_code_subprocess(generated_code, queue):
+    limit = 1024 * 1024 * 1024 * 10  # 10gb - somehow with a smaller limit the server dies when numpy is used
+    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+    resource.setrlimit(resource.RLIMIT_DATA, (limit, limit))
+
+    # this can be overriden inside generated code, so it's not a guaranteed protection
+    sys.stdout = StringIO()
+    try:
+        exec(generated_code, {})
+        queue.put(sys.stdout.getvalue())
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
+
+
+# Main Flask endpoint to handle execution requests
+@app.route("/execute", methods=["POST"])
+def execute():
+    generated_code = request.json['generated_code']
+    timeout = request.json['timeout']
+    language = request.json.get('language', 'python')
+
+    if language == 'python':
+        return execute_python(generated_code, timeout)
+    elif language == 'lean4':
+        return execute_lean4(generated_code, timeout)
+
+
+if __name__ == '__main__':
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.WARNING)
+    app.run(port=6000)

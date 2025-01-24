@@ -1,0 +1,63 @@
+site_name: NeMo-Skills
+site_url: https://nvidia.github.io/NeMo-Skills
+extra_css:
+  - css/extra.css
+theme:
+  name: material
+  logo: favicon.ico
+  favicon: favicon.ico
+  palette:
+    primary: blue grey
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.indexes
+    - toc.follow
+markdown_extensions:
+  - meta
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+nav:
+  - Getting started: index.md
+  - Basics:
+    - Prerequisites: basics/prerequisites.md
+    - Inference: basics/inference.md
+    - Prompt format: basics/prompt-format.md
+    - Common parameters: basics/common-parameters.md
+  - Pipelines:
+    - Generation: pipelines/generation.md
+    - Evaluation: pipelines/evaluation.md
+    - Training: pipelines/training.md
+    - Checkpoint conversion: pipelines/checkpoint-conversion.md
+    - LLM-as-a-judge: pipelines/llm-as-a-judge.md
+    - Decontamination: pipelines/decontamination.md
+  - Code execution:
+    - Sandbox: code-execution/sandbox.md
+  - OpenMathInstruct:
+    - openmathinstruct2/index.md
+    - Model evaluation: openmathinstruct2/evaluation.md
+    - Dataset construction: openmathinstruct2/dataset.md
+    - Model training: openmathinstruct2/training.md

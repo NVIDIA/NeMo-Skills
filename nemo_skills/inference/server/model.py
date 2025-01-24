@@ -18,38 +18,23 @@ import json
 import logging
 import os
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union
 
+import httpx
+import openai
 import requests
+from openai import DefaultHttpxClient
 
 LOG = logging.getLogger(__name__)
 
 
-def remove_stop_phrases(text: str, stop_phrases: list[str]) -> str:
+def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
     """Removes everything after the last stop token."""
     if not stop_phrases:
         return text
     # Escape all special characters in stop phrases
     escaped_stop_phrases = [re.escape(sp) for sp in stop_phrases]
     return re.split("|".join(escaped_stop_phrases), text, maxsplit=1)[0]
-
-
-def preprocess_request(request: dict):
-    """Just a small utility to pre-process some of the parameters of request."""
-    # temperature of 0 means greedy, but it's not always supported by the server
-    # so setting explicit greedy parameters instead
-    if request["temperature"] == 0:
-        request["temperature"] = 1.0
-        request["top_k"] = 1
-        request["top_p"] = 1.0
-
-
-def postprocess_output(outputs: list[dict], stop_phrases: list[str]):
-    """Post-processes the outputs of the model."""
-    for output in outputs:
-        output['generation'] = remove_stop_phrases(output['generation'], stop_phrases)
 
 
 class BaseModel(abc.ABC):
@@ -87,25 +72,96 @@ class BaseModel(abc.ABC):
 
             self.requests_lib = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
         else:
-            self.requests_lib = requests
+            # TODO: switch to httpx
+            session = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
+            self.requests_lib = session
 
     @abc.abstractmethod
-    def generate(
+    def _generate_single(
         self,
-        prompts: list[str],
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-        remove_stop_phrases: bool = True,
-    ) -> list[dict]:
+        prompt: str | dict,
+        tokens_to_generate: int | list[int],
+        temperature: float | list[float],
+        top_p: float | list[float],
+        top_k: int | list[int],
+        min_p: float | list[float],
+        repetition_penalty: float | list[float],
+        random_seed: int | list[int],
+        stop_phrases: list[str] | list[list[str]] | None,
+    ) -> dict:
+        """If the engine supports inflight-batching of requests, you only need to define this method.
+
+        We will call it in threads on the list of prompts.
+        """
         pass
 
+    def preprocess_request(self, request: dict):
+        """Just a small utility to pre-process some of the parameters of request."""
+        # temperature of 0 means greedy, but it's not always supported by the server
+        # so setting explicit greedy parameters instead
+        if request["temperature"] == 0:
+            request["temperature"] = 1.0
+            request["top_k"] = 1
+            request["top_p"] = 1.0
 
-class TensorRTLLMModel(BaseModel):
+    def generate(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        remove_stop_phrases: bool = True,
+    ) -> list[dict]:
+        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
+
+        Not every server supports that, so make sure to override this method directly if that's not the case.
+        """
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+        }
+        for key, value in kwargs.items():
+            is_list = False
+            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
+                is_list = True
+            if key != 'stop_phrases' and isinstance(value, list):
+                is_list = True
+            if is_list and len(value) != len(prompts):
+                raise ValueError(f"Length of {key} should match the number of prompts.")
+            if not is_list:
+                kwargs[key] = [value for _ in range(len(prompts))]
+
+        futures = []
+        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
+            for request_idx in range(len(prompts)):
+                request = {key: value[request_idx] for key, value in kwargs.items()}
+                request['prompt'] = prompts[request_idx]
+                self.preprocess_request(request)
+                futures.append(executor.submit(self._generate_single, **request))
+        outputs = [future.result() for future in futures]
+
+        if remove_stop_phrases:
+            for output in outputs:
+                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+        return outputs
+
+
+class TRTLLMModel(BaseModel):
     """Note that the current implementation supports inflight-batching so
     to make the most use of it, you should submit a large number of prompts
     at the same time.
@@ -113,76 +169,245 @@ class TensorRTLLMModel(BaseModel):
     A good default value is 16-32 times bigger than the model's max batch size.
     """
 
-    def generate(
+    def _generate_single(
         self,
-        prompts: list[str],
+        prompt: str | dict,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
+    ) -> list[dict]:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
+
+        if stop_phrases is None:
+            stop_phrases = []
+
+        request = {
+            "prompt": prompt,
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_k": top_k,
+            "top_p": top_p,
+            "top_p_min": min_p,
+            "random_seed": random_seed,
+            "repetition_penalty": repetition_penalty,
+            "stop_words_list": stop_phrases,
+        }
+        output_dict = self.requests_lib.put(
+            url="http://{}:{}/generate".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        ).json()
+        return output_dict
+
+    # TODO: DRY
+    def _generate_single_async(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+    ) -> list[dict]:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
+
+        if stop_phrases is None:
+            stop_phrases = []
+
+        request = {
+            "prompt": prompt,
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_k": top_k,
+            "top_p": top_p,
+            "top_p_min": min_p,
+            "random_seed": random_seed,
+            "repetition_penalty": repetition_penalty,
+            "stop_words_list": stop_phrases,
+        }
+        output_dict = self.requests_lib.put(
+            url="http://{}:{}/generate_async".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        ).json()
+
+        return output_dict['generation_id']
+
+    def generate_async(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
+
+        Not every server supports that, so make sure to override this method directly if that's not the case.
+        """
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+        }
+        for key, value in kwargs.items():
+            is_list = False
+            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
+                is_list = True
+            if key != 'stop_phrases' and isinstance(value, list):
+                is_list = True
+            if is_list and len(value) != len(prompts):
+                raise ValueError(f"Length of {key} should match the number of prompts.")
+            if not is_list:
+                kwargs[key] = [value for _ in range(len(prompts))]
+
+        futures = []
+        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
+            for request_idx in range(len(prompts)):
+                request = {key: value[request_idx] for key, value in kwargs.items()}
+                request['prompt'] = prompts[request_idx]
+                self.preprocess_request(request)
+                futures.append(executor.submit(self._generate_single_async, **request))
+        outputs = [future.result() for future in futures]
+
+        self.gen_id_to_params = {
+            gen_id: (req_stop_phrases, remove_stop_phrases)
+            for gen_id, req_stop_phrases in zip(outputs, kwargs["stop_phrases"])
+        }
+
+        return outputs
+
+    def cancel_generations(
+        self,
+        generation_ids: list[str],
+    ) -> list[str]:
+
+        statuses = []
+        for generation_id in generation_ids:
+            request = {
+                "generation_id": generation_id,
+            }
+            output_dict = self.requests_lib.put(
+                url="http://{}:{}/cancel_generation".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            statuses.append(output_dict["status"])
+
+        return statuses
+
+    def get_generations(
+        self,
+        generation_ids: list[str],
+    ) -> list[dict]:
+
+        generations = []
+        for generation_id in generation_ids:
+            request = {
+                "generation_id": generation_id,
+            }
+            output = self.requests_lib.put(
+                url="http://{}:{}/get_generation".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
+            if remove_stop_phrases:
+                if output['generation'] is not None:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+            generations.append(output)
+
+        return generations
+
+
+class NemoModel(BaseModel):
+    def _generate_single(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int | list[int] = 512,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+    ) -> list[dict]:
+        """If the engine supports inflight-batching of requests, you only need to define this method.
+
+        We will call it in threads on the list of prompts.
+        """
+        if min_p > 0:
+            raise NotImplementedError("Nemo server does not support min_p parameter.")
+        if isinstance(prompt, dict):
+            raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
+            "sentences": [prompt],
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
             "top_k": top_k,
             "top_p": top_p,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
-            "stop_words_list": stop_phrases,
+            "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
-        preprocess_request(request)
+        generations = self.requests_lib.put(
+            url="http://{}:{}/generate".format(self.server_host, self.server_port),
+            data=json.dumps(request),
+            headers={"Content-Type": "application/json"},
+        ).json()
+        # we need to remove the original prompt as nemo always returns it
+        output = generations['sentences'][0]
+        # when the prompt starts from special tokens like bos, nemo will remove them,
+        # so we need this hack to find where to start the cut
+        begin_idx = 0
+        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(output[:20]):
+            begin_idx += 1
+        output = {'generation': output[(len(prompt) - begin_idx) :]}
+        return output
 
-        generation_ids = []
-
-        for prompt in prompts:
-            request["prompt"] = prompt
-            generation_ids.append(
-                self.requests_lib.put(
-                    url="http://{}:{}/start_generation".format(self.server_host, self.server_port),
-                    data=json.dumps(request),
-                    headers={"Content-Type": "application/json"},
-                ).json()
-            )
-
-        outputs = [None] * len(generation_ids)
-        finished_count = 0
-        while finished_count < len(generation_ids):
-            time.sleep(0.1)
-            for pos, generation_id in enumerate(generation_ids):
-                if outputs[pos] is not None:
-                    continue
-                result = self.requests_lib.put(
-                    url="http://{}:{}/get_result".format(self.server_host, self.server_port),
-                    data=json.dumps({'generation_id': generation_id}),
-                    headers={"Content-Type": "application/json"},
-                ).json()
-                if result is not None:
-                    finished_count += 1
-                    outputs[pos] = {'generation': result}
-        if remove_stop_phrases:
-            postprocess_output(outputs, stop_phrases)
-        return outputs
-
-
-class NemoModel(BaseModel):
     def generate(
         self,
-        prompts: list[str],
+        prompts: list[str | dict],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
+        if min_p > 0:
+            raise NotImplementedError("Nemo server does not support min_p parameter.")
+
+        # we are overriding generate directly, since nemo doesn't support inflight batching
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
@@ -195,7 +420,7 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
-        preprocess_request(request)
+        self.preprocess_request(request)
         generations = self.requests_lib.put(
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
             data=json.dumps(request),
@@ -212,17 +437,21 @@ class NemoModel(BaseModel):
             outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
 
         if remove_stop_phrases:
-            postprocess_output(outputs, stop_phrases)
+            for output in outputs:
+                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+        # TODO: return num_generated_tokens as well
         return outputs
 
 
 class OpenAIModel(BaseModel):
     def __init__(
         self,
+        host: str = '127.0.0.1',
+        port: str = '5000',
         model=None,
         base_url=None,
         api_key=None,
-        max_parallel_requests: int = 100,  # can adjust to avoid rate-limiting
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -234,59 +463,23 @@ class OpenAIModel(BaseModel):
                 raise ValueError("model argument is required for OpenAI model.")
 
         if base_url is None:
-            base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL")
+            # if not provided, we assume it's served on host/port
+            base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
             if base_url is not None and 'api.nvidia.com' in base_url:
                 api_key = os.getenv("NVIDIA_API_KEY", api_key)
-            else:
+                if not api_key:
+                    raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
+            elif base_url is not None and 'api.openai.com' in base_url:
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
 
-        self.model = model
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.max_parallel_requests = max_parallel_requests
-
-    def generate(
-        self,
-        prompts: list[str],
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-        reduce_generation_tokens_if_error: bool = True,
-        remove_stop_phrases: bool = True,
-    ) -> list[dict]:
-        if stop_phrases is None:
-            stop_phrases = []
-        if top_k != 0:
-            raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
-
-        futures = []
-        with ThreadPoolExecutor(max_workers=self.max_parallel_requests) as executor:
-            for prompt in prompts:
-                futures.append(
-                    executor.submit(
-                        self._send_request,
-                        prompt=prompt,
-                        tokens_to_generate=tokens_to_generate,
-                        temperature=temperature,
-                        top_p=top_p,
-                        repetition_penalty=repetition_penalty,
-                        random_seed=random_seed,
-                        stop_phrases=stop_phrases,
-                        reduce_generation_tokens_if_error=reduce_generation_tokens_if_error,
-                    )
-                )
-
-        outputs = [{'generation': future.result()} for future in futures]
-
-        if remove_stop_phrases:
-            postprocess_output(outputs, stop_phrases)
-
-        return outputs
+        self.model = model
+        if self.model == "model":  # that's a placeholder, so trying to find real name
+            self.model = self.get_model_name_from_server()
 
     def batch_generate(
         self,
@@ -316,7 +509,7 @@ class OpenAIModel(BaseModel):
                             "url": "/v1/chat/completions",
                             "body": {
                                 "model": self.model,
-                                "messages": self._parse_prompt(prompt),
+                                "messages": prompt,
                                 "max_tokens": tokens_to_generate,
                                 "temperature": temperature,
                                 "top_p": top_p,
@@ -362,20 +555,27 @@ class OpenAIModel(BaseModel):
 
         return metadata, outputs
 
-    def _send_request(
+    def preprocess_request(self, request: dict):
+        """OpenAI doesn't support top-k, so not making any changes here."""
+        pass
+
+    def _generate_single(
         self,
-        prompt: str,
+        prompt: dict,
         tokens_to_generate: int,
         temperature: float,
         top_p: float,
+        top_k: int,
+        min_p: float,
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
-        reduce_generation_tokens_if_error: bool = True,
     ) -> str:
-        import openai
+        if top_k != 0:
+            raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
+        if min_p > 0:
+            ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
 
-        messages = self._parse_prompt(prompt)
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -385,13 +585,11 @@ class OpenAIModel(BaseModel):
                 presence_penalty=repetition_penalty,
                 seed=random_seed,
                 stop=stop_phrases,
-                messages=messages,
+                messages=prompt,
             )
             response = response.choices[0]
         except openai.BadRequestError as e:
             # this likely only works for Nvidia-hosted models
-            if not reduce_generation_tokens_if_error:
-                raise
             msg = e.body['detail']
             # expected message:
             # This model's maximum context length is N tokens.
@@ -409,7 +607,7 @@ class OpenAIModel(BaseModel):
                     presence_penalty=repetition_penalty,
                     seed=random_seed,
                     stop=stop_phrases,
-                    messages=messages,
+                    messages=prompt,
                 ).choices[0]
             else:
                 raise
@@ -419,35 +617,14 @@ class OpenAIModel(BaseModel):
             raise
 
         output = response.message.content
-        return output
+        return {'generation': output}
 
-    def _parse_prompt(self, prompt: str) -> dict:
-        """
-        OpenAI chat API requires a structured input, so we need to parse the prompt
-        into a structured list of messages.
-        """
-        system_pattern = re.compile(r"<system_start>(.*?)<system_end>", re.DOTALL)
-        user_pattern = re.compile(r"<user_start>(.*?)<user_end>", re.DOTALL)
-        generation_pattern = re.compile(r"<assistant_start>(.*)", re.DOTALL)
-        try:
-            system_message = system_pattern.search(prompt).group(1)
-        except AttributeError:
-            system_message = ""
-        try:
-            user_message = user_pattern.search(prompt).group(1)
-        except AttributeError:
-            user_message = prompt
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message},
-        ]
-        try:
-            assistant_message = generation_pattern.search(prompt).group(1)
-            if assistant_message:
-                messages.append({"role": "assistant", "content": assistant_message})
-        except AttributeError:
-            pass
-        return messages
+    def get_model_name_from_server(self):
+        model_list = self.client.models.list()
+        # TODO: this is a bit hacky, but will go away when we switch to a unified openai api for all models
+        assert len(model_list.data) == 1, "Unexpected number of models returned by OpenAI API."
+        model_name = model_list.data[0].id
+        return model_name
 
 
 class VLLMModel(BaseModel):
@@ -457,138 +634,85 @@ class VLLMModel(BaseModel):
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
-        self.server_type = "openai"
-        self.oai_client = None
-        self.oai_client = self.prepare_openai(self.server_host, self.server_port)  # type: openai.OpenAI
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
+        self.oai_client = openai.OpenAI(
+            api_key="EMPTY",
+            base_url=f"http://{self.server_host}:{self.server_port}/v1",
+            timeout=None,
+            http_client=http_client,
+        )
 
         self.model_name_server = self.get_model_name_from_server()
         self.model = self.model_name_server
 
-        LOG.info("Model hosted by %s server: %s", self.server_type, self.model)
-
-    def generate(
+    def _generate_single(
         self,
-        prompts: list[str],
+        prompt: str | dict,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = -1,
+        top_k: int = 0,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
-        remove_stop_phrases: bool = True,
-    ) -> list[dict]:
-        if stop_phrases is None:
-            stop_phrases = []
-        request = {
-            'prompt': prompts,
-            'max_tokens': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'num_generations': 1,  # VLLM provides 1 generation per prompt, duplicate prompts if you want more
-            'stop': stop_phrases,
-            'echo': False,
-            'repetition_penalty': repetition_penalty,
-            'frequency_penalty': 0.0,
-            'presence_penalty': 0.0,
-            'logprobs': None,
-            'logit_bias': None,
-            'seed': random_seed,
-        }
-        preprocess_request(request)
-        outputs = [{'generation': output} for output in self.prompt_api(**request, parse_response=True)]
-        if remove_stop_phrases:
-            postprocess_output(outputs, stop_phrases)
-        return outputs
+    ) -> dict:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
+        stop_phrases = stop_phrases or []
 
-    def prompt_api(
-        self,
-        prompt: str,
-        max_tokens: int,
-        temperature: float,
-        top_p: float,
-        top_k: int = -1,
-        num_generations: int = 1,
-        stop=None,
-        echo: bool = False,
-        repetition_penalty: float = 1.0,
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        logprobs: int = None,
-        logit_bias: dict = None,
-        seed: int = None,
-        parse_response: bool = True,
-    ) -> Union[list[str], "openai.types.Completion"]:
         if top_k == 0:
-            top_k = 1
+            top_k = -1
 
-        # Process top_k
-        extra_body = {
-            "extra_body": {
-                "top_k": top_k,
-                "repetition_penalty": repetition_penalty,
-                "spaces_between_special_tokens": False,
-            }
-        }
         response = self.oai_client.completions.create(
             model=self.model,
-            prompt=prompt,
-            max_tokens=max_tokens,
+            prompt=[prompt],
+            max_tokens=tokens_to_generate,
             temperature=temperature,
             top_p=top_p,
-            n=num_generations,
-            stream=False,
-            stop=stop,
-            echo=echo,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            logprobs=logprobs,
-            logit_bias=logit_bias,
-            seed=seed,
-            **extra_body,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=None,
+            logit_bias=None,
+            n=1,
+            extra_body={
+                "top_k": top_k,
+                "min_p": min_p,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            },
         )
 
-        if parse_response:
-            response = self.parse_openai_response(response)
-
-        return response
+        output, num_generated_tokens = self.parse_openai_response(response)
+        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> list[str]:
-        responses = []
-        if not isinstance(response, list):
-            response = [response]
+    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+        assert not isinstance(response, list)
+        assert len(response.choices) == 1
+        choice = response.choices[0]
+        output = choice.text
+        # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
+            output += choice.stop_reason
+        num_generated_tokens = response.usage.completion_tokens
+        return output, num_generated_tokens
 
-        for resp in response:
-            for choice in resp.choices:
-                output = choice.text
-                # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-                if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-                    output += choice.stop_reason
-                responses.append(output)
-        return responses
-
-    @staticmethod
-    def prepare_openai(host: str, port: str = "5000") -> "OpenAI":
-        import openai
-
-        # Update global config of openai
-        openai.api_key = "EMPTY"
-        openai.base_url = f"http://{host}:{port}/v1"
-
-        # Create local client with no timeout
-        client = openai.OpenAI(api_key="EMPTY", base_url=f"http://{host}:{port}/v1", timeout=None)
-        return client
-
-    def get_model_name_from_server(self) -> str:
+    def get_model_name_from_server(self):
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
 
 
 models = {
-    'tensorrt_llm': TensorRTLLMModel,
+    'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,

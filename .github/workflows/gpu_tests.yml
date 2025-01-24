@@ -16,10 +16,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gpu-tests:
-    runs-on: self-hosted-nemo-skills
+  gpu-tests-llama:
+    runs-on: self-hosted-nemo-gpus-1
     if: ${{ github.event.label.name == 'run GPU tests' }}
     steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
+    - uses: actions/checkout@v3
+      with:
+        path: ${{ github.run_id }}
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd ${{ github.run_id }}
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements/common-tests.txt
+        python -m nemo_skills.dataset.prepare
+    - name: Run GPU tests
+      timeout-minutes: 120
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd ${{ github.run_id }}
+        nvidia-smi
+        set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
+        ./tests/gpu-tests/run_llama.sh
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+
+  gpu-tests-qwen:
+    runs-on: self-hosted-nemo-gpus-1
+    if: ${{ github.event.label.name == 'run GPU tests' }}
+    steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
     - uses: actions/checkout@v3
       with:
         path: ${{ github.run_id }}
@@ -31,10 +71,9 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         python -m pip install --upgrade pip
-        pip install .
-        pip install -r requirements/datasets.txt
+        pip install -e .
         pip install -r requirements/common-tests.txt
-        python datasets/prepare.py
+        python -m nemo_skills.dataset.prepare
     - name: Run GPU tests
       timeout-minutes: 120
       env:
@@ -42,6 +81,43 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         nvidia-smi
-        export NEMO_SKILLS_CONFIG=cluster_configs/local.yaml
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
-        ./tests/gpu-tests/run.sh /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B /mnt/datadrive/nemo-skills-data/Meta-Llama-3-8B-Instruct
+        ./tests/gpu-tests/run_qwen.sh
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+
+  gpu-tests-rm:
+    runs-on: self-hosted-nemo-gpus-1
+    if: ${{ github.event.label.name == 'run GPU tests' }}
+    steps:
+    - name: Cleanup old containers
+      run: |
+        docker system prune --all --filter "until=360h" --force
+    - uses: actions/checkout@v3
+      with:
+        path: ${{ github.run_id }}
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        cd ${{ github.run_id }}
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements/common-tests.txt
+    - name: Run GPU tests
+      timeout-minutes: 120
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd ${{ github.run_id }}
+        nvidia-smi
+        set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
+        ./tests/gpu-tests/run_rm.sh
+    - name: Cleanup test directory
+      if: always()
+      run: |
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.5.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'

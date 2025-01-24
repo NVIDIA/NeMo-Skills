@@ -1,0 +1,5 @@
+# Prompt used by Qwen models for math benchmarks
+
+system: Please reason step by step, and put your final answer within \boxed{{}}.
+
+user: "{problem}"

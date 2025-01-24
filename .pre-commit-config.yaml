@@ -22,9 +22,10 @@ ci:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: check-yaml
+        exclude: ^mkdocs\.yml$
       - id: check-case-conflict
       - id: detect-private-key
       - id: check-added-large-files
@@ -40,7 +41,7 @@ repos:
         args: ["--profile", "black"]
 
   - repo: https://github.com/psf/black
-    rev: 24.4.2
+    rev: 24.10.0
     hooks:
       - id: black
         name: Format code

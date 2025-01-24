@@ -1,0 +1,16 @@
+# Prompt for few-shot inference with Llama instruct for GSM8K
+
+few_shot_examples:
+  prefix: ""
+  template: |-
+    Given the following problem, reason and give a final answer to the problem.
+    Problem: {problem}
+    Your response should end with "The final answer is \boxed{{[answer]}}" where [answer] is the response to the problem.{user_end}{assistant_begin}{solution}{assistant_end}{user_begin}
+  suffix: ""
+  examples_type: gsm8k_standard_few_shot
+
+
+user: |-
+  {examples}Given the following problem, reason and give a final answer to the problem.
+  Problem: {problem}
+  Your response should end with "The final answer is \boxed{{[answer]}}" where [answer] is the response to the problem.

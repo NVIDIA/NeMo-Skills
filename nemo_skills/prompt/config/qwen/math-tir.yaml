@@ -1,0 +1,3 @@
+system: "Please integrate natural language reasoning with programs to solve the problem above, and put your final answer within \\boxed{{}}."
+
+user: "{problem}"

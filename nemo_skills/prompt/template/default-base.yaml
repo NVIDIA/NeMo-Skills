@@ -1,0 +1,31 @@
+# Default prompt template for any base model that does not add BOS token (e.g. Nemotron)
+
+# these tokens are always used to construct a prompt like this
+#
+#   single-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user}<user_end><assistant_begin>{generation}
+#   multi-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user1}<user_end><assistant_begin>{assistant1}<assistant_end>...
+#     <user_begin>{userN}<user_end><assistant_begin>{generation}
+
+text_begin: ""
+
+system_begin: ""
+system_end: ""
+
+user_begin: ""
+user_end: ""
+
+assistant_begin: ""
+assistant_end: ""
+
+# by default we separate few shot examples with 6 newlines, so using it to stop
+stop_phrases: ["\n\n\n\n\n\n"]
+
+# used to execute code within these tags
+code_begin: '<llm-code>\n'
+code_end: '</llm-code>\n'
+# used to extract the code output
+code_output_begin: '<llm-code-output>\n'
+code_output_end: '</llm-code-output>\n'
+code_output_format: "qwen"

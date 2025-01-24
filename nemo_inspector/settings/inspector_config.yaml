@@ -1,9 +1,0 @@
-defaults:
-  # add custom config to set up model_prediction
-  - generation_config
-  - base_inspector_config
-  - _self_
-
-hydra:
-  searchpath:
-    - file://${oc.env:config_dir}
