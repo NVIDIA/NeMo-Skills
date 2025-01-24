@@ -229,7 +229,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     """Asynchronous version that sends all the data to server and then dumps outputs as soon as they are finished."""
     if cfg.max_samples > 0:
         data = data[: cfg.max_samples]
-
+    original_positions = [idx for idx in range(len(data))]
     if cfg.skip_filled:
         try:
             filled_positions = set()
@@ -237,6 +237,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                 for line in fin:
                     filled_positions.add(int(json.loads(line)[0]))
             data = [dp for idx, dp in enumerate(data) if idx not in filled_positions]
+            original_positions = [idx for idx in original_positions if idx not in filled_positions]
         except FileNotFoundError:
             LOG.warning(f"File `{cfg.output_file}-async` not found, starting from scratch")
 
@@ -275,7 +276,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     for key in gen_dict:
                         data[gen_pos].pop(key, None)
                     gen_dict.update(data[gen_pos])
-                    fout.write(json.dumps([gen_pos, gen_dict]) + "\n")
+                    fout.write(json.dumps([original_positions[gen_pos], gen_dict]) + "\n")
 
             time.sleep(1)
 
