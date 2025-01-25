@@ -266,10 +266,18 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file + '-async', "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        pbar = tqdm(total=len(generation_ids), desc="Remaining generations")
+        prev_remaining = len(generation_ids)
         while True:
             remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
-            if len(remaining_ids) == 0:
+            curr_remaining = len(remaining_ids)
+            if curr_remaining == 0:
                 break
+            # Update progress bar with completed generations
+            if curr_remaining < prev_remaining:
+                pbar.update(prev_remaining - curr_remaining)
+                prev_remaining = curr_remaining
+
             remaining_positions = [
                 idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
             ]
@@ -284,6 +292,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     fout.write(json.dumps([original_positions[gen_pos], gen_dict]) + "\n")
 
             time.sleep(1)
+        pbar.close()
 
     # after we are done, need to restore the order and resave without position ids
     with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
