@@ -33,6 +33,7 @@ elif args.model_type == 'qwen_orm':
     output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
     hidden_dim = 128
     head_dim = 64
+    num_attention_heads = 8
     max_position_embeddings = 2048
 else:
     model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
