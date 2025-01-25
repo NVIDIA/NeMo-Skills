@@ -336,7 +336,7 @@ def generate(cfg: GenerateSolutionsConfig):
 
     # chunk the dataset if required
     if cfg.num_chunks is not None and cfg.chunk_id is not None:
-        data, output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
+        data, cfg.output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
         LOG.info(
             f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
             f"Number of samples in the chunk: {len(data)}"
