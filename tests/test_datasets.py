@@ -33,7 +33,7 @@ DATASETS = [
     ('hle-math', ['test']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
-    ('math', ['train', 'train_full', 'validation', 'test']),
+    # ('math', ['train', 'train_full', 'validation', 'test']),  # TODO: enable when the dataset is back online
     ('math-odyssey', ['test']),
     ('mawps', ['test']),
     ('mbpp', ['test']),
@@ -65,6 +65,11 @@ def test_dataset_scripts():
         assert len(group_datasets) > 0, f"No datasets were prepared for group {group}"
 
     all_datasets = set(dataset for dataset, _ in DATASETS)
+
+    # TODO: remove after MATH is back online
+    all_datasets.discard('math')
+    prepared_datasets.discard('math')
+
     assert (
         prepared_datasets == all_datasets
     ), f"Not all datasets were covered. Missing: {all_datasets - prepared_datasets}"

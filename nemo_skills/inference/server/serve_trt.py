@@ -476,8 +476,6 @@ class TensorRTLLM:
         timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
     ):
-        with open(Path(model_path) / "config.json", 'r') as f:
-            config = json.load(f)
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(tokenizer_dir=model_path)
 
         runner_kwargs = dict(
@@ -776,10 +774,12 @@ if __name__ == "__main__":
 
     class LogFilter(logging.Filter):
         def filter(self, record):
-            filter_strings = ("PUT /generate HTTP/1.1", 
-                              "PUT /get_generation HTTP/1.1", 
-                              "PUT /generate_async HTTP/1.1", 
-                              "PUT /cancel_generation HTTP/1.1", )
+            filter_strings = (
+                "PUT /generate HTTP/1.1",
+                "PUT /get_generation HTTP/1.1",
+                "PUT /generate_async HTTP/1.1",
+                "PUT /cancel_generation HTTP/1.1",
+            )
             return all(filter_string not in record.getMessage() for filter_string in filter_strings)
 
     logging.getLogger('uvicorn.access').addFilter(LogFilter())
