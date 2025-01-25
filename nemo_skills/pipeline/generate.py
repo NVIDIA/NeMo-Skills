@@ -22,7 +22,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import setup_logging, compute_chunk_ids
 
 LOG = logging.getLogger(__file__)
 
@@ -183,7 +183,7 @@ def generate(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
     ),
-    chunk_ids: List[int] = typer.Option(None, help="List of explicit chunk ids to run"),
+    chunk_ids: str = typer.Option(None, help="List of explicit chunk ids to run"),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
@@ -232,10 +232,8 @@ def generate(
     if num_random_seeds:
         random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
 
-    if num_chunks and not chunk_ids:
-        chunk_ids = list(range(num_chunks))
-    assert max(chunk_ids) < num_chunks, "Chunk ids should be less than `num_chunks`"
-    assert min(chunk_ids) >= 0, "Chunk ids should be non-negative"
+    if num_chunks:
+        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
     should_chunk_dataset = num_chunks is not None and chunk_ids is not None
 
     cluster_config = get_cluster_config(cluster, config_dir)

@@ -280,3 +280,32 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
         logging.info(f"Chunked Output filename: {output_filename}")
 
     return data, output_filename
+
+
+def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
+    if num_chunks is None:
+        return None
+
+    # Parse chunk ids
+    if chunk_ids is not None:
+        # Split by comma if explicitly provided
+        if ',' in chunk_ids:
+            num_chunks = chunk_ids.split(',')
+            num_chunks = [int(x.strip()) for x in num_chunks if x.strip() != '']
+
+        elif '..' in chunk_ids:
+            start, end = chunk_ids.split('..')
+            num_chunks = list(range(int(start), int(end) + 1))
+
+        else:
+            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+
+    else:
+        chunk_ids = list(range(0, num_chunks))
+
+    # Assert that run ids are 1-indexed
+    for chunk_id in chunk_ids:
+        assert chunk_id < num_chunks, "Run ids should have 1-based indexing"
+        assert chunk_id >= 0, "Run ids should have 1-based indexing"
+
+    return chunk_ids
