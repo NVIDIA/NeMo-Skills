@@ -119,7 +119,7 @@ class VLLMRewardModel(BaseModel):
 
     def _score_single_prompt(self, prompt):
         response = requests.post(self.request_url, json=prompt)
-        per_token_scores = response.json['data'][0]['data']
+        per_token_scores = response.json()['data'][0]['data']
 
         score = None
         if self.model_type == "orm":
