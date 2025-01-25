@@ -71,6 +71,10 @@ class GenerateSolutionsConfig:
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
 
+    # chunk the dataset into equal sized parts and index into them
+    num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
+    chunk_id: int | None = None  # if specified, will index the specified chunk only
+
     generation_key: str = "generation"
     # if specified, we will have a loop over that key in the data file and
     # treat each element as a new turn of conversation
