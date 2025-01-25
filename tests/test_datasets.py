@@ -33,7 +33,7 @@ DATASETS = [
     ('hle-math', ['test']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
-    ('math', ['train', 'train_full', 'validation', 'test']),
+    # ('math', ['train', 'train_full', 'validation', 'test']),  # TODO: enable when the dataset is back online
     ('math-odyssey', ['test']),
     ('mawps', ['test']),
     ('mbpp', ['test']),
