@@ -291,11 +291,11 @@ def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
         # Split by comma if explicitly provided
         if ',' in chunk_ids:
             num_chunks = chunk_ids.split(',')
-            num_chunks = [int(x.strip()) for x in num_chunks if x.strip() != '']
+            chunk_ids = [int(x.strip()) for x in num_chunks if x.strip() != '']
 
         elif '..' in chunk_ids:
             start, end = chunk_ids.split('..')
-            num_chunks = list(range(int(start), int(end) + 1))
+            chunk_ids = list(range(int(start), int(end) + 1))
 
         else:
             raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
