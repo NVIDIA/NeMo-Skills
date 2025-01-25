@@ -290,8 +290,8 @@ def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
     if chunk_ids is not None:
         # Split by comma if explicitly provided
         if ',' in chunk_ids:
-            num_chunks = chunk_ids.split(',')
-            chunk_ids = [int(x.strip()) for x in num_chunks if x.strip() != '']
+            chunk_ids = chunk_ids.split(',')
+            chunk_ids = [int(x.strip()) for x in chunk_ids if x.strip() != '']
 
         elif '..' in chunk_ids:
             start, end = chunk_ids.split('..')
