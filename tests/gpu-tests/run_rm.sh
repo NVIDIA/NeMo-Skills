@@ -2,7 +2,7 @@
 # also need to define HF_TOKEN for some of the tests
 set -e
 
-export NEMO_SKILLS_TEST_MODEL_TYPE=mistral_emb
+export NEMO_SKILLS_TEST_MODEL_TYPE=qwen_orm
 
 docker run --rm \
     -e HF_TOKEN=$HF_TOKEN \

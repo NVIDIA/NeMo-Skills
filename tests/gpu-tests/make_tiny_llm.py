@@ -19,7 +19,7 @@ import argparse
 from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoTokenizer
 
 parser = argparse.ArgumentParser(description="Create a tiny model for testing.")
-parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama", "mistral_emb"))
+parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama", "qwen_orm"))
 args = parser.parse_args()
 
 if args.model_type == 'qwen':
@@ -28,9 +28,9 @@ if args.model_type == 'qwen':
     hidden_dim = 56
     head_dim = 2
     max_position_embeddings = 256
-elif args.model_type == 'mistral_emb':
-    model_name = "intfloat/e5-mistral-7b-instruct"
-    output_dir = "/tmp/nemo-skills-tests/mistral_emb/tiny-model-hf"
+elif args.model_type == 'qwen_orm':
+    model_name = "Qwen/Qwen2.5-Math-RM-72B"
+    output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
     hidden_dim = 128
     head_dim = 64
     max_position_embeddings = 2048
@@ -53,7 +53,7 @@ config.update(
 )
 print("new config", config)
 
-if args.model_type == 'mistral_emb':
+if args.model_type == 'qwen_orm':
     tiny_model = AutoModel.from_config(config)
 else:
     # create a tiny random model
