@@ -283,6 +283,16 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
 
 
 def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
+    """
+    Compute chunk ids from the provided chunk ids string.
+
+    Args:
+        chunk_ids: Comma separated list of chunk ids or range separated by '..' or ','.
+        num_chunks: Total number of chunks.
+
+    Returns:
+        List of chunk ids.
+    """
     if num_chunks is None:
         return None
 
