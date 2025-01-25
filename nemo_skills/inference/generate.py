@@ -256,6 +256,8 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
+    LOG.warning("Async loop is submitting all data for inference - batch_size parameter is ignored!")
+
     # submitting all data at ones
     generation_ids = llm.generate_async(
         prompts=[prompt.fill(dp) for dp in data],
