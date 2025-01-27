@@ -31,13 +31,6 @@ from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 LOG = logging.getLogger(__file__)
 
 
-class SupportedRewardModels(str, Enum):
-    ORM = "orm"
-    PRM = "prm"
-    GENRM = "genrm"
-    GENRM_COT = "genrm_cot"
-
-
 @nested_dataclass(kw_only=True)
 class RewardModelConfig:
     """LLM reward model parameters."""
@@ -67,7 +60,7 @@ class RewardModelConfig:
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
     # Default reward model type
-    reward_model_type: SupportedRewardModels = SupportedRewardModels.ORM
+    reward_model_type: str = "orm"
     reward_model_score_key: str = "reward_model_score"
 
     # can add this flag to just print the first prompt instead of running generation

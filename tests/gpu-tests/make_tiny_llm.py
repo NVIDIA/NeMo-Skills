@@ -46,7 +46,7 @@ else:
     num_attention_heads = None
 
 
-config = AutoConfig.from_pretrained(model_name)
+config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 config.update(
     dict(
         hidden_size=hidden_dim,
@@ -60,12 +60,12 @@ config.update(
 print("new config", config)
 
 if args.model_type == 'qwen_orm':
-    tiny_model = AutoModel.from_config(config)
+    tiny_model = AutoModel.from_config(config, trust_remote_code=True)
 else:
     # create a tiny random model
     tiny_model = AutoModelForCausalLM.from_config(config)
 
-print(f"num of params {tiny_model.num_parameters()}")
+print(f"# of params: {tiny_model.num_parameters() / 1_000_000:.1f}M")
 
 # shrink it more and save
 tiny_model.bfloat16()  # half-size
