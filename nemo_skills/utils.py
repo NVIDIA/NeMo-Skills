@@ -290,7 +290,7 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
     return data, output_filename
 
 
-def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
+def compute_chunk_ids(chunk_ids: list[int], num_chunks: int) -> list[int] | None:
     """
     Compute chunk ids from the provided chunk ids string.
 
@@ -306,17 +306,7 @@ def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
 
     # Parse chunk ids
     if chunk_ids is not None:
-        # Split by comma if explicitly provided
-        if ',' in chunk_ids:
-            chunk_ids = chunk_ids.split(',')
-            chunk_ids = [int(x.strip()) for x in chunk_ids if x.strip() != '']
-
-        elif '..' in chunk_ids:
-            start, end = chunk_ids.split('..')
-            chunk_ids = list(range(int(start), int(end) + 1))
-
-        else:
-            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+        return chunk_ids
 
     else:
         chunk_ids = list(range(0, num_chunks))
