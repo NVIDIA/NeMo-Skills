@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import glob
 import inspect
 import io
 import logging
+import os
 import re
 import sys
 import tokenize
@@ -265,9 +265,17 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
                 f"chunk_id should be in the range [0, num_chunks)."
             )
 
-        chunk_size = len(data) // num_chunks
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size if (chunk_id < num_chunks - 1) else len(data)
+        remainder = len(data) % num_chunks
+        base_size = len(data) // num_chunks
+
+        extra = 1 if chunk_id < remainder else 0
+
+        if chunk_id < remainder:
+            start_idx = chunk_id * (base_size + 1)
+        else:
+            start_idx = remainder * (base_size + 1) + (chunk_id - remainder) * base_size
+
+        end_idx = start_idx + base_size + extra
         data = data[start_idx:end_idx]
 
         if len(data) > 0:
