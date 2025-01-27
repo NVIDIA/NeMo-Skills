@@ -240,6 +240,11 @@ def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
     return colored_args[:-1]
 
 
+def get_chunked_filename(chunk_id, output_filename):
+    basename, ext = os.path.splitext(output_filename)
+    return f"{basename}_chunk_{chunk_id}{ext}"
+
+
 def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], num_chunks: Optional[int]):
     """
     Chunk data if chunk_id and num_chunks are provided.
@@ -282,9 +287,7 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
             logging.info(f"Processing chunk {chunk_id + 1}/{num_chunks} with {len(data)} samples.")
 
         # Modify output_filename to include chunk_id
-        output_filename = (
-            f"{os.path.splitext(output_filename)[0]}_chunk_{chunk_id}{os.path.splitext(output_filename)[1]}"
-        )
+        output_filename = get_chunked_filename(chunk_id, output_filename)
         logging.info(f"Chunked Output filename: {output_filename}")
 
     return data, output_filename

@@ -24,7 +24,7 @@ from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_server_command
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -37,6 +37,8 @@ def get_greedy_cmd(
     extra_eval_args="",
     extra_arguments="",
     extra_datasets=None,
+    num_chunks=None,
+    chunk_ids=None,
 ):
     benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
     if found_in_extra:
@@ -46,20 +48,38 @@ def get_greedy_cmd(
 
     extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
     extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
-    cmd = (
-        f'echo "Evaluating benchmark {benchmark}" && '
-        f'python -m nemo_skills.inference.generate '
-        f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-        f'    {data_parameters} '
-        f'    {extra_arguments} && '
-        f'python -m nemo_skills.evaluation.evaluate_results '
-        f'    ++input_files={output_dir}/eval-results/{benchmark}/{output_name} {extra_eval_args}'
-    )
-    return cmd
+
+    cmds = []
+    if num_chunks is None or chunk_ids is None:
+        chunk_params = ["++chunk_id=null ++num_chunks=null"]
+        chunked_output_names = [output_name]
+    else:
+        chunk_params = [f"++chunk_id={chunk_id} ++num_chunks={num_chunks}" for chunk_id in chunk_ids]
+        chunked_output_names = [get_chunked_filename(chunk_id, output_name) for chunk_id in chunk_ids]
+    for chunk_param, chunked_output_name in zip(chunk_params, chunked_output_names):
+        cmds.append(
+            f'echo "Evaluating benchmark {benchmark}" && '
+            f'python -m nemo_skills.inference.generate '
+            f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
+            f'    {data_parameters} '
+            f'    {chunk_param} '
+            f'    {extra_arguments} && '
+            f'python -m nemo_skills.evaluation.evaluate_results '
+            f'    ++input_files={output_dir}/eval-results/{benchmark}/{chunked_output_name} {extra_eval_args}'
+        )
+    return cmds
 
 
 def get_sampling_cmd(
-    benchmark, split, output_dir, random_seed, extra_eval_args="", extra_arguments="", extra_datasets=None
+    benchmark,
+    split,
+    output_dir,
+    random_seed,
+    extra_eval_args="",
+    extra_arguments="",
+    extra_datasets=None,
+    num_chunks=None,
+    chunk_ids=None,
 ):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
     return get_greedy_cmd(
@@ -70,6 +90,8 @@ def get_sampling_cmd(
         extra_eval_args=extra_eval_args,
         extra_arguments=extra_arguments,
         extra_datasets=extra_datasets,
+        num_chunks=num_chunks,
+        chunk_ids=chunk_ids,
     )
 
 
@@ -106,6 +128,11 @@ def eval(
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option('test', help="Data split to use for evaluation"),
     num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
+    num_chunks: int = typer.Option(
+        None,
+        help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
+    ),
+    chunk_ids: List[int] = typer.Option(None, help="List of explicit chunk ids to run."),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
@@ -156,6 +183,11 @@ def eval(
     else:
         log_dir = f"{output_dir}/eval-logs"
 
+    if num_chunks:
+        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
+    should_chunk_dataset = num_chunks is not None and chunk_ids is not None
+    num_runs = len(chunk_ids) if should_chunk_dataset else 1
+
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
@@ -190,21 +222,27 @@ def eval(
 
     eval_cmds = (
         [
-            get_greedy_cmd(
+            cmd
+            for benchmark in benchmarks.keys()
+            for cmd in get_greedy_cmd(
                 benchmark,
                 split,
                 output_dir,
                 extra_eval_args=extra_eval_args,
                 extra_arguments=extra_arguments,
                 extra_datasets=extra_datasets,
+                num_chunks=num_chunks,
+                chunk_ids=chunk_ids,
             )
-            for benchmark in benchmarks.keys()
         ]
         if not skip_greedy
         else []
     )
     eval_cmds += [
-        get_sampling_cmd(
+        cmd
+        for benchmark, rs_num in benchmarks.items()
+        for rs in range(starting_seed, starting_seed + rs_num)
+        for cmd in get_sampling_cmd(
             benchmark,
             split,
             output_dir,
@@ -212,12 +250,15 @@ def eval(
             extra_eval_args=extra_eval_args,
             extra_arguments=extra_arguments,
             extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
         )
-        for benchmark, rs_num in benchmarks.items()
-        for rs in range(starting_seed, starting_seed + rs_num)
     ]
     if num_jobs == -1:
         num_jobs = len(eval_cmds)
+    else:
+        # TODO: should we keep num_jobs as the total max?
+        num_jobs *= num_runs
 
     # splitting eval cmds equally across num_jobs nodes
     eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
