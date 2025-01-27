@@ -28,11 +28,13 @@ if args.model_type == 'qwen':
     hidden_dim = 56
     head_dim = 2
     max_position_embeddings = 256
+    num_attention_heads = None
 elif args.model_type == 'qwen_orm':
+    # vLLM requires a minimum head dimension size of 32, so we use a larger value here
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
     output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
-    hidden_dim = 128 * 16
-    head_dim = 64
+    hidden_dim = 256
+    head_dim = 32
     num_attention_heads = 8
     max_position_embeddings = 2048
 else:
@@ -41,6 +43,8 @@ else:
     hidden_dim = 64
     head_dim = 2
     max_position_embeddings = 256
+    num_attention_heads = None
+
 
 config = AutoConfig.from_pretrained(model_name)
 config.update(
@@ -50,6 +54,7 @@ config.update(
         intermediate_size=hidden_dim,
         num_hidden_layers=2,
         max_position_embeddings=max_position_embeddings,
+        num_attention_heads=num_attention_heads,
     )
 )
 print("new config", config)
