@@ -28,7 +28,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -70,6 +70,10 @@ class GenerateSolutionsConfig:
     # if > 0, will skip this many samples from the beginning of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
+
+    # chunk the dataset into equal sized parts and index into them
+    num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
+    chunk_id: int | None = None  # if specified, will index the specified chunk only
 
     generation_key: str = "generation"
     # if specified, we will have a loop over that key in the data file and
@@ -340,6 +344,22 @@ def generate(cfg: GenerateSolutionsConfig):
     with open(cfg.input_file, "rt", encoding="utf-8") as fin:
         for line in fin:
             data.append(json.loads(line))
+
+    # chunk the dataset if required
+    if cfg.num_chunks is not None and cfg.chunk_id is not None:
+        data, cfg.output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
+        LOG.info(
+            f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
+            f"Number of samples in the chunk: {len(data)}"
+        )
+
+        if cfg.offset > 0:
+            LOG.warning(
+                f"\n\n"
+                f"Chunking is enabled, and offset is set to {cfg.offset}. \n"
+                f"Know that offset is applied to the pre-chunked data, not to the original dataset."
+                f"\n\n"
+            )
 
     # skipping based on the offset first
     data = data[cfg.offset :]

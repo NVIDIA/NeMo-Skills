@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import glob
 import inspect
 import io
@@ -21,6 +22,7 @@ import sys
 import tokenize
 import typing
 from dataclasses import MISSING, dataclass, fields, is_dataclass
+from typing import Any, List, Optional
 
 
 def nested_dataclass(*args, **kwargs):
@@ -236,3 +238,84 @@ def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
         line = line.replace("        ", "    ").replace("    ", "  ")
         colored_args += line + '\n'
     return colored_args[:-1]
+
+
+def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], num_chunks: Optional[int]):
+    """
+    Chunk data if chunk_id and num_chunks are provided.
+
+    Args:
+        data: List of dictionaries to be chunked.
+        output_filename: Original output filename.
+        chunk_id: Chunk ID (0-indexed).
+        num_chunks: Number of chunks to split the data into.
+
+    Returns:
+        Tuple of chunked data and chunked output filename.
+    """
+    # Chunk instruction_data if chunk_id and num_chunks are provided
+    if chunk_id is not None:
+        chunk_id = int(chunk_id)
+    if num_chunks is not None:
+        num_chunks = int(num_chunks)
+    if chunk_id is not None and num_chunks is not None:
+        if chunk_id < 0 or chunk_id >= num_chunks:
+            raise ValueError(
+                f"Invalid chunk_id or num_chunks. chunk_id: {chunk_id}, num_chunks: {num_chunks}.\n"
+                f"chunk_id should be in the range [0, num_chunks)."
+            )
+
+        chunk_size = len(data) // num_chunks
+        start_idx = chunk_id * chunk_size
+        end_idx = (chunk_id + 1) * chunk_size if (chunk_id < num_chunks - 1) else len(data)
+        data = data[start_idx:end_idx]
+
+        if len(data) > 0:
+            logging.info(f"Processing chunk {chunk_id + 1}/{num_chunks} with {len(data)} samples.")
+
+        # Modify output_filename to include chunk_id
+        output_filename = (
+            f"{os.path.splitext(output_filename)[0]}_chunk_{chunk_id}{os.path.splitext(output_filename)[1]}"
+        )
+        logging.info(f"Chunked Output filename: {output_filename}")
+
+    return data, output_filename
+
+
+def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
+    """
+    Compute chunk ids from the provided chunk ids string.
+
+    Args:
+        chunk_ids: Comma separated list of chunk ids or range separated by '..' or ','.
+        num_chunks: Total number of chunks.
+
+    Returns:
+        List of chunk ids.
+    """
+    if num_chunks is None:
+        return None
+
+    # Parse chunk ids
+    if chunk_ids is not None:
+        # Split by comma if explicitly provided
+        if ',' in chunk_ids:
+            chunk_ids = chunk_ids.split(',')
+            chunk_ids = [int(x.strip()) for x in chunk_ids if x.strip() != '']
+
+        elif '..' in chunk_ids:
+            start, end = chunk_ids.split('..')
+            chunk_ids = list(range(int(start), int(end) + 1))
+
+        else:
+            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+
+    else:
+        chunk_ids = list(range(0, num_chunks))
+
+    # Assert that run ids are 1-indexed
+    for chunk_id in chunk_ids:
+        assert chunk_id < num_chunks, "Run ids should have 1-based indexing"
+        assert chunk_id >= 0, "Run ids should have 1-based indexing"
+
+    return chunk_ids
