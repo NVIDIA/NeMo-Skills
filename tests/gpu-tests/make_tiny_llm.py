@@ -31,7 +31,7 @@ if args.model_type == 'qwen':
 elif args.model_type == 'qwen_orm':
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
     output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
-    hidden_dim = 128
+    hidden_dim = 128 * 16
     head_dim = 64
     num_attention_heads = 8
     max_position_embeddings = 2048
