@@ -181,6 +181,9 @@ def process_data():
     parser.add_argument("--validation_size", type=int, default=1000)
     args = parser.parse_args()
 
+    print("MATH preparation is temporary not supported as it's been removed from Berkeley's website.")
+    return
+
     if args.split == "all":
         for split in ["test", "validation", "train", "train_full"]:
             save_data(split, args.random_seed, args.validation_size)
