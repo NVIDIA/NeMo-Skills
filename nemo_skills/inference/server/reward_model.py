@@ -125,7 +125,7 @@ class VLLMRewardModel(BaseModel):
         score = None
         if self.model_type == "orm":
             # Last token's score
-            if type(last_token_score, list):
+            if isinstance(last_token_score, list):
                 logit_score = last_token_score[0]
             else:
                 logit_score = last_token_score
