@@ -118,7 +118,7 @@ class VLLMRewardModel(BaseModel):
         self.model = model_list.data[0].id
 
     def _score_single_prompt(self, prompt):
-        response = requests.post(self.request_url, json=prompt)
+        response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
         per_token_scores = response.json()['data'][0]['data']
 
         score = None
