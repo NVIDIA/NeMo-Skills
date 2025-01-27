@@ -56,6 +56,7 @@ def test_vllm_reward():
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
+    print(cmd)
     subprocess.run(cmd, shell=True, check=True)
 
     # no evaluation by default - checking just the number of lines and that there is a "reward_model_score" key
