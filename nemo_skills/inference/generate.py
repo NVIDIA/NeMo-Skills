@@ -85,6 +85,7 @@ class GenerateSolutionsConfig:
     # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
     # to `output_file`-async (and put it back in order after all generations are done)
     use_async_loop: bool = True
+    async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation
     # useful to double check that your data can be loaded and prompt has what you expect
@@ -240,7 +241,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             filled_positions = set()
             with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                 for line in fin:
-                    filled_positions.add(int(json.loads(line)[0]))
+                    filled_positions.add(int(json.loads(line)[cfg.async_position_key]))
             data = [dp for idx, dp in enumerate(data) if idx not in filled_positions]
             original_positions = [idx for idx in original_positions if idx not in filled_positions]
         except FileNotFoundError:
@@ -291,7 +292,11 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     for key in gen_dict:
                         data[gen_pos].pop(key, None)
                     gen_dict.update(data[gen_pos])
-                    fout.write(json.dumps([original_positions[gen_pos], gen_dict]) + "\n")
+
+                    # insert async position information
+                    gen_dict[cfg.async_position_key] = original_positions[gen_pos]
+
+                    fout.write(json.dumps(gen_dict) + "\n")
 
             time.sleep(1)
         pbar.close()
