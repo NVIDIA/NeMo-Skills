@@ -183,7 +183,7 @@ def get_reward_server_command(
             raise ValueError("VLLM server does not support multi-node execution")
 
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
