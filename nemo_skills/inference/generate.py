@@ -67,10 +67,6 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    # if > 0, will skip this many samples from the beginning of the data file.
-    # Useful if need to run multiple slurm jobs on the same data file
-    offset: int = 0
-
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -150,7 +146,7 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
         except FileNotFoundError:
             LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
 
-    # additionally, skipping whatever is pre-filled, assuming offset didn't change
+    # additionally, skipping whatever is pre-filled
     data = data[starting_idx:]
 
     # need to account for anything that's prefilled
@@ -352,17 +348,6 @@ def generate(cfg: GenerateSolutionsConfig):
             f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
             f"Number of samples in the chunk: {len(data)}"
         )
-
-        if cfg.offset > 0:
-            LOG.warning(
-                f"\n\n"
-                f"Chunking is enabled, and offset is set to {cfg.offset}. \n"
-                f"Know that offset is applied to the pre-chunked data, not to the original dataset."
-                f"\n\n"
-            )
-
-    # skipping based on the offset first
-    data = data[cfg.offset :]
 
     if cfg.prompt_config is None:
         # fetching from the default for corresponding dataset
