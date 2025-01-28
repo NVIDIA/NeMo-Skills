@@ -308,7 +308,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     ordered_generations = [None] * len(generations)
     for gen_dict in generations:
         async_pos = gen_dict.pop(cfg.async_position_key)
-        ordered_generations[gen_dict[async_pos]] = gen_dict
+        ordered_generations[async_pos] = gen_dict
 
     with open(cfg.output_file, "wt", encoding="utf-8") as fout:
         for gen_dict in ordered_generations:
