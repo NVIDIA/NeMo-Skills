@@ -273,6 +273,15 @@ def get_server_command(
             "fi"
         )
         num_tasks = 1
+    elif server_type == 'sglang':
+        server_start_cmd = (
+            f"python -m nemo_skills.inference.server.serve_sglang "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --port {server_port} "
+            f"    {server_args} "
+        )
+        num_tasks = 1
     else:
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (

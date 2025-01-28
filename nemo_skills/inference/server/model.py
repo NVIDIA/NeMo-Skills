@@ -794,11 +794,97 @@ class VLLMModel(BaseModel):
         return model_name
 
 
+
+
+class SGlangModel(BaseModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        if self.ssh_server and self.ssh_key_path:
+            raise NotImplementedError("SSH tunnelling is not implemented for STlang model.")
+
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
+        self.oai_client = openai.OpenAI(
+            api_key="EMPTY",
+            base_url=f"http://{self.server_host}:{self.server_port}/v1",
+            timeout=None,
+            http_client=http_client,
+        )
+
+        self.model_name_server = self.get_model_name_from_server()
+        self.model = self.model_name_server
+
+    def _generate_single(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+    ) -> dict:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
+        stop_phrases = stop_phrases or []
+
+        if top_k == 0:
+            top_k = -1
+
+        response = self.oai_client.completions.create(
+            model=self.model,
+            prompt=[prompt],
+            max_tokens=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=None,
+            logit_bias=None,
+            n=1,
+            extra_body={
+                "top_k": top_k,
+                "min_p": min_p,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            },
+        )
+
+        output, num_generated_tokens = self.parse_openai_response(response)
+        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
+
+    @classmethod
+    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+        assert not isinstance(response, list)
+        assert len(response.choices) == 1
+        choice = response.choices[0]
+        output = choice.text
+        # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
+            output += choice.stop_reason
+        num_generated_tokens = response.usage.completion_tokens
+        return output, num_generated_tokens
+
+    def get_model_name_from_server(self):
+        model_list = self.oai_client.models.list()
+        model_name = model_list.data[0].id
+        return model_name
+
 models = {
     'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
+    'sglang': SGlangModel
 }
 
 
