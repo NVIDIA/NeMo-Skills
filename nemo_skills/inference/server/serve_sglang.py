@@ -20,6 +20,9 @@ def main():
     parser = argparse.ArgumentParser(description="Serve STlang model")
     parser.add_argument("--model", help="Path to the model or a model name to pull from HF")
     parser.add_argument("--num_gpus", type=int, required=True)
+    parser.add_argument("--num_nodes", type=int, required=True)
+    parser.add_argument("--node_rank", type=int, required=True)
+    parser.add_argument("--dist_init_addr", type=str, required=True)
     parser.add_argument("--port", type=int, default=5000, help="Server port")
     parser.add_argument("--verbose", action="store_true", help="Print verbose logs")
     args, unknown = parser.parse_known_args()
@@ -41,7 +44,10 @@ def main():
         f'    --trust-remote-code '
         f'    --host="0.0.0.0" '
         f'    --port={args.port} '
-        f'    --tensor-parallel-size={args.num_gpus} '
+        f'    --tensor-parallel-size={args.num_gpus*args.num_nodes} '
+        f'    --nnodes={args.num_nodes} '
+        f'    --node-rank={args.node_rank} '
+        f'    --dist-init-addr="{args.dist_init_addr}:20000" '
     )
 
     subprocess.run(cmd, shell=True, check=True)
