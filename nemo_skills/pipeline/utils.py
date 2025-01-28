@@ -239,7 +239,7 @@ def get_server_command(
             num_tasks = 1
     elif server_type == 'vllm':
         start_vllm_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -714,6 +714,7 @@ def get_executor(
             num_gpus=gpus_per_node,
             network="host",
             env_vars=env_vars,
+            additional_kwargs={"entrypoint": ""},
         )
 
     env_vars["VLLM_HEAD_NODE"] = "${head_node}"
