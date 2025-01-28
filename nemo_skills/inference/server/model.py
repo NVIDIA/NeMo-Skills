@@ -869,8 +869,8 @@ class SGlangModel(BaseModel):
         choice = response.choices[0]
         output = choice.text
         # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-            output += choice.stop_reason
+        if choice.finish_reason == "stop" and isinstance(choice.finish_reason, str):
+            output += choice.finish_reason
         num_generated_tokens = response.usage.completion_tokens
         return output, num_generated_tokens
 

@@ -713,7 +713,17 @@ def get_executor(
             raise ValueError("Local executor does not support multi-node execution")
 
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
-
+        print('xxxx')
+        print(DockerExecutor(
+            container_image=container,
+            packager=packager,
+            ipc_mode="host",
+            volumes=mounts,
+            ntasks_per_node=1,
+            num_gpus=gpus_per_node,
+            network="host",
+            env_vars=env_vars,
+        ))
         return DockerExecutor(
             container_image=container,
             packager=packager,
