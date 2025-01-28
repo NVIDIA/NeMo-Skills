@@ -15,7 +15,7 @@
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.1
+  trtllm: igitman/nemo-skills-trtllm:0.5.0
   vllm: igitman/nemo-skills-vllm:0.5.1
   nemo: igitman/nemo-skills-nemo:0.5.1
   sandbox: igitman/nemo-skills-sandbox:0.5.0
