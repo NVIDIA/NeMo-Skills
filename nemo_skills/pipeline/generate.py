@@ -22,7 +22,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
-from nemo_skills.utils import setup_logging, compute_chunk_ids
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(__file__)
 
@@ -34,7 +34,7 @@ class SupportedServers(str, Enum):
     openai = "openai"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if random_seed is not None:
         output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
     else:
@@ -47,6 +47,9 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
+    if chunk_id is not None:
+        cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
+        output_file = get_chunked_filename(chunk_id, output_file)
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -57,7 +60,10 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+# TODO: support chunking for reward model and math judge
+
+
+def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -71,7 +77,7 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
@@ -177,13 +183,21 @@ def generate(
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
-    random_seeds: List[int] = typer.Option(None, help="List of random seeds to use for generation"),
+    random_seeds: str = typer.Option(
+        None,
+        help="List of random seeds to use for generation. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     num_chunks: int = typer.Option(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
     ),
-    chunk_ids: str = typer.Option(None, help="List of explicit chunk ids to run"),
+    chunk_ids: str = typer.Option(
+        None,
+        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
@@ -231,10 +245,13 @@ def generate(
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
     if num_random_seeds:
         random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
+    if isinstance(random_seeds, str):
+        random_seeds = str_ids_to_list(random_seeds)
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-    should_chunk_dataset = num_chunks is not None and chunk_ids is not None
+    if chunk_ids is None:
+        chunk_ids = [None]
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
@@ -249,58 +266,60 @@ def generate(
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
-        if random_seeds and not should_chunk_dataset:
-            for seed in random_seeds:
-                server_port = get_free_port(strategy="random") if get_random_port else 5000
-                server_config, extra_arguments, server_address, server_port = configure_client(
-                    generation_type=generation_type,
-                    server_gpus=server_gpus,
-                    server_type=server_type,
-                    server_address=original_server_address,
-                    server_port=server_port,
-                    server_nodes=server_nodes,
-                    model=model,
-                    server_args=server_args,
-                    extra_arguments=extra_arguments_original,
-                )
-
-                cmd = get_cmd(
-                    random_seed=seed,
-                    output_dir=output_dir,
-                    extra_arguments=extra_arguments,
-                    eval_args=eval_args,
-                )
-                prev_tasks = None
-
-                for _ in range(dependent_jobs + 1):
-                    new_task = add_task(
-                        exp,
-                        cmd=wrap_cmd(
-                            get_generation_command(server_address=server_address, generation_commands=cmd),
-                            preprocess_cmd,
-                            postprocess_cmd,
-                            random_seed=seed,
-                        ),
-                        task_name=f'{expname}-rs{seed}',
-                        log_dir=log_dir,
-                        container=cluster_config["containers"]["nemo-skills"],
-                        cluster_config=cluster_config,
-                        partition=partition,
-                        time_min=time_min,
-                        server_config=server_config,
-                        with_sandbox=True,
-                        sandbox_port=None if get_random_port else 6000,
-                        run_after=run_after,
-                        reuse_code=reuse_code,
-                        reuse_code_exp=reuse_code_exp,
-                        task_dependencies=prev_tasks,
-                        get_server_command=get_server_command,
-                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+        # TODO: reduce code duplication
+        if random_seeds:
+            for chunk_id in chunk_ids:
+                for seed in random_seeds:
+                    server_port = get_free_port(strategy="random") if get_random_port else 5000
+                    server_config, extra_arguments, server_address, server_port = configure_client(
+                        generation_type=generation_type,
+                        server_gpus=server_gpus,
+                        server_type=server_type,
+                        server_address=original_server_address,
+                        server_port=server_port,
+                        server_nodes=server_nodes,
+                        model=model,
+                        server_args=server_args,
+                        extra_arguments=extra_arguments_original,
                     )
-                    prev_tasks = [new_task]
+                    cmd = get_cmd(
+                        random_seed=seed,
+                        output_dir=output_dir,
+                        extra_arguments=extra_arguments,
+                        eval_args=eval_args,
+                        chunk_id=chunk_id,
+                        num_chunks=num_chunks,
+                    )
+                    prev_tasks = None
+
+                    for _ in range(dependent_jobs + 1):
+                        new_task = add_task(
+                            exp,
+                            cmd=wrap_cmd(
+                                get_generation_command(server_address=server_address, generation_commands=cmd),
+                                preprocess_cmd,
+                                postprocess_cmd,
+                                random_seed=seed,
+                            ),
+                            task_name=f'{expname}-rs{seed}',
+                            log_dir=log_dir,
+                            container=cluster_config["containers"]["nemo-skills"],
+                            cluster_config=cluster_config,
+                            partition=partition,
+                            time_min=time_min,
+                            server_config=server_config,
+                            with_sandbox=True,
+                            sandbox_port=None if get_random_port else 6000,
+                            run_after=run_after,
+                            reuse_code=reuse_code,
+                            reuse_code_exp=reuse_code_exp,
+                            task_dependencies=prev_tasks,
+                            get_server_command=get_server_command,
+                            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                        )
+                        prev_tasks = [new_task]
         else:
-            num_runs = len(chunk_ids) if should_chunk_dataset else 1
-            for run_idx in range(num_runs):
+            for chunk_id in chunk_ids:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -313,17 +332,14 @@ def generate(
                     server_args=server_args,
                     extra_arguments=extra_arguments_original,
                 )
-
-                # If we are chunking the dataset, we need to pass the chunk_id to the generation command
-                run_arguments = copy.deepcopy(extra_arguments)
-                if should_chunk_dataset:
-                    run_arguments += f" ++num_chunks={num_chunks} ++chunk_id={chunk_ids[run_idx]} "
 
                 cmd = get_cmd(
                     random_seed=None,
                     output_dir=output_dir,
-                    extra_arguments=run_arguments,
+                    extra_arguments=extra_arguments,
                     eval_args=eval_args,
+                    chunk_id=chunk_id,
+                    num_chunks=num_chunks,
                 )
                 prev_tasks = None
                 for _ in range(dependent_jobs + 1):

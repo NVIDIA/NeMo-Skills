@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import glob
 import inspect
 import io
 import logging
+import os
 import re
 import sys
 import tokenize
@@ -240,6 +240,11 @@ def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
     return colored_args[:-1]
 
 
+def get_chunked_filename(chunk_id, output_filename):
+    basename, ext = os.path.splitext(output_filename)
+    return f"{basename}_chunk_{chunk_id}{ext}"
+
+
 def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], num_chunks: Optional[int]):
     """
     Chunk data if chunk_id and num_chunks are provided.
@@ -265,24 +270,55 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
                 f"chunk_id should be in the range [0, num_chunks)."
             )
 
-        chunk_size = len(data) // num_chunks
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size if (chunk_id < num_chunks - 1) else len(data)
+        remainder = len(data) % num_chunks
+        base_size = len(data) // num_chunks
+
+        extra = 1 if chunk_id < remainder else 0
+
+        if chunk_id < remainder:
+            start_idx = chunk_id * (base_size + 1)
+        else:
+            start_idx = remainder * (base_size + 1) + (chunk_id - remainder) * base_size
+
+        end_idx = start_idx + base_size + extra
         data = data[start_idx:end_idx]
 
         if len(data) > 0:
             logging.info(f"Processing chunk {chunk_id + 1}/{num_chunks} with {len(data)} samples.")
 
         # Modify output_filename to include chunk_id
-        output_filename = (
-            f"{os.path.splitext(output_filename)[0]}_chunk_{chunk_id}{os.path.splitext(output_filename)[1]}"
-        )
+        output_filename = get_chunked_filename(chunk_id, output_filename)
         logging.info(f"Chunked Output filename: {output_filename}")
 
     return data, output_filename
 
 
-def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
+def str_ids_to_list(ids: str) -> list[int]:
+    """
+    Convert a string of comma or .. separated ids to a list of ids.
+
+    Args:
+        ids: Comma separated list of ids.
+
+    Returns:
+        List of ids.
+    """
+    if ',' in ids and '..' in ids:
+        raise ValueError(
+            "Invalid chunk ids format. Can be a comma separated list or a range separated by '..' but not both"
+        )
+    if ',' in ids:
+        ids = ids.split(',')
+        ids = [int(x.strip()) for x in ids if x.strip() != '']
+    elif '..' in ids:
+        start, end = ids.split('..')
+        ids = list(range(int(start), int(end) + 1))
+    else:
+        raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+    return ids
+
+
+def compute_chunk_ids(chunk_ids: list[int] | str, num_chunks: int) -> list[int] | None:
     """
     Compute chunk ids from the provided chunk ids string.
 
@@ -298,17 +334,9 @@ def compute_chunk_ids(chunk_ids: str, num_chunks: int) -> list | None:
 
     # Parse chunk ids
     if chunk_ids is not None:
-        # Split by comma if explicitly provided
-        if ',' in chunk_ids:
-            chunk_ids = chunk_ids.split(',')
-            chunk_ids = [int(x.strip()) for x in chunk_ids if x.strip() != '']
-
-        elif '..' in chunk_ids:
-            start, end = chunk_ids.split('..')
-            chunk_ids = list(range(int(start), int(end) + 1))
-
-        else:
-            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+        if isinstance(chunk_ids, str):
+            return str_ids_to_list(chunk_ids)
+        return chunk_ids
 
     else:
         chunk_ids = list(range(0, num_chunks))
