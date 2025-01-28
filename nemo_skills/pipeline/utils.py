@@ -274,7 +274,7 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'sglang':
-        start_server_cmd = (
+        server_start_cmd = (
             f"python3 -m nemo_skills.inference.server.serve_sglang "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
