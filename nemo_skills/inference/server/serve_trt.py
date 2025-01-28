@@ -475,6 +475,7 @@ class TensorRTLLM:
         max_beam_width: Optional[int] = None,
         timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
+        disable_chunked_context: bool = False,
     ):
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(tokenizer_dir=model_path)
 
@@ -486,7 +487,7 @@ class TensorRTLLM:
             max_output_len=max_output_len,
             max_beam_width=max_beam_width,
             kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
-            enable_chunked_context=True,
+            enable_chunked_context=not disable_chunked_context,
             kv_cache_enable_block_reuse=True,
         )
 
@@ -642,6 +643,7 @@ class MPIWrapper:
         max_beam_width: Optional[int] = None,
         timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
+        disable_chunked_context: bool = False,
     ):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
@@ -653,6 +655,7 @@ class MPIWrapper:
             max_beam_width=max_beam_width,
             kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
             timeout_seconds=timeout_seconds,
+            disable_chunked_context=disable_chunked_context,
         )
         self.app = None
         if self.rank == 0:
@@ -756,6 +759,7 @@ def main():
     parser.add_argument(
         "--kv_cache_free_gpu_memory_fraction", type=float, default=None, help="Free GPU memory fraction for cache"
     )
+    parser.add_argument("--disable_chunked_context", action="store_true", help="Disable chunked context")
     args = parser.parse_args()
 
     wrapper = MPIWrapper(
@@ -766,6 +770,7 @@ def main():
         max_beam_width=args.max_beam_width,
         timeout_seconds=args.timeout_seconds,
         kv_cache_free_gpu_memory_fraction=args.kv_cache_free_gpu_memory_fraction,
+        disable_chunked_context=args.disable_chunked_context,
     )
     wrapper.run(host=args.host, port=args.port)
 
