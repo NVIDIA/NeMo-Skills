@@ -13,21 +13,25 @@
 # limitations under the License.
 
 import abc
+import logging
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
 
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient, OpenAI, BadRequestError
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
+from openai import BadRequestError, DefaultHttpxClient, OpenAI
+
 LOG = logging.getLogger(__file__)
 
+
 class BaseModel(abc.ABC):
-    """Base model class for handling requests to the inference server.
+    """Base model class for handling requests to the reward model inference server.
 
     Args:
+        model_type: Reward model type
         host: Optional[str] = '127.0.0.1' - Host of the inference server.
         port: Optional[str] = '5000' - Port of the inference server.
             Only required if handle_code_execution is True.
@@ -40,11 +44,13 @@ class BaseModel(abc.ABC):
 
     def __init__(
         self,
+        model_type: str,
         host: str = '127.0.0.1',
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
     ):
+        self.model_type = model_type
         self.server_host = host
         self.server_port = port
         self.ssh_server = ssh_server
@@ -104,18 +110,34 @@ class VLLMRewardModel(BaseModel):
             http_client=http_client,
         )
 
+        # Reward models are accessed via the "pooling" interface
+        # https://docs.vllm.ai/en/latest/models/pooling_models.html
+        self.request_url = f"http://{self.server_host}:{self.server_port}/pooling"
+
         model_list = self.oai_client.models.list()
         self.model = model_list.data[0].id
 
     def _score_single_prompt(self, prompt):
-        response = self.oai_client.embeddings.create(input=[prompt], model=self.model)
-        raw_score = response.data[0].embedding[-1]
-        score = 1 / (1 + math.exp(-raw_score))
+        response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
+        per_token_scores = response.json()['data'][0]['data']
+        last_token_score = per_token_scores[-1]
+
+        score = None
+        if self.model_type == "orm":
+            # Last token's score
+            if isinstance(last_token_score, list):
+                logit_score = last_token_score[0]
+            else:
+                logit_score = last_token_score
+            # Normalize the score
+            score = 1 / (1 + math.exp(-logit_score))
+        elif self.model_type == "prm":
+            # Last token's score, a 2-entry array where the second entry is the probability of being correct
+            score = last_token_score[1]
+
         return {"reward_model_score": score}
+
     def score(self, prompts: list[str]) -> list[float]:
-        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
-        # Once VLLM officially adds the support, change the API.
-        
         outputs = [None] * len(prompts)  # Pre-allocate a list to store results in correct order
         futures = {}
 
@@ -128,11 +150,13 @@ class VLLMRewardModel(BaseModel):
                 try:
                     outputs[idx] = future.result()
                 except BadRequestError as e:
-                    error_details = e.body 
+                    error_details = e.body
                     error_message = error_details.get("message", "No message found")
-                    error_code = error_details.get("code", "No code found")            
+                    error_code = error_details.get("code", "No code found")
                     if error_code == 400 and 'maximum context length' in error_message:
-                        outputs[idx] = {"reward_model_score": 0}  # Default value set as 0 if we have request over maximum context length
+                        outputs[idx] = {
+                            "reward_model_score": 0
+                        }  # Default value set as 0 if we have request over maximum context length
                         LOG.warning("Maximum context length exceeded, setting reward score as 0")
                     else:
                         raise
@@ -145,7 +169,7 @@ models = {
 }
 
 
-def get_reward_model(server_type, **kwargs):
+def get_reward_model(server_type, model_type, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    return model_class(**kwargs)
+    return model_class(model_type=model_type, **kwargs)
