@@ -132,7 +132,11 @@ def eval(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
     ),
-    chunk_ids: List[int] = typer.Option(None, help="List of explicit chunk ids to run."),
+    chunk_ids: str = typer.Option(
+        None,
+        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),

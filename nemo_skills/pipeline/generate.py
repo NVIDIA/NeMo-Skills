@@ -22,7 +22,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(__file__)
 
@@ -180,13 +180,21 @@ def generate(
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
-    random_seeds: List[int] = typer.Option(None, help="List of random seeds to use for generation"),
+    random_seeds: str = typer.Option(
+        None,
+        help="List of random seeds to use for generation. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     num_chunks: int = typer.Option(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
     ),
-    chunk_ids: List[int] = typer.Option(None, help="List of explicit chunk ids to run."),
+    chunk_ids: str = typer.Option(
+        None,
+        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
@@ -234,6 +242,8 @@ def generate(
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
     if num_random_seeds:
         random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
+    if isinstance(random_seeds, str):
+        random_seeds = str_ids_to_list(random_seeds)
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
