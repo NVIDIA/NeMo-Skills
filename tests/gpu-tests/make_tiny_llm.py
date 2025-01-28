@@ -28,7 +28,7 @@ if args.model_type == 'qwen':
     hidden_dim = 56
     head_dim = 2
     max_position_embeddings = 256
-    num_attention_heads = None
+    num_attention_heads = 8
 elif args.model_type == 'qwen_orm':
     # vLLM requires a minimum head dimension size of 32, so we use a larger value here
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
@@ -43,7 +43,7 @@ else:
     hidden_dim = 64
     head_dim = 2
     max_position_embeddings = 256
-    num_attention_heads = None
+    num_attention_heads = 8
 
 
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
