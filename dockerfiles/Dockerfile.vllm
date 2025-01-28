@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:24.03-py3
+ARG BASE_IMAGE=vllm/vllm-openai:v0.7.0
 
 # build an image that includes only the nemo dependencies, ensures that dependencies
 # are included first for optimal caching, and useful for building a development
@@ -22,10 +22,6 @@ FROM ${BASE_IMAGE} AS vllm-deps
 # install vllm dependencies
 WORKDIR /opt
 
-# https://github.com/vllm-project/vllm/pull/8896
-# https://github.com/vllm-project/vllm/commit/bc2ef1f77c1578612198f60ec392731efb3847c5
-# Bug introduced in future PRs have made us revert to this commit
-# See discussion on bug here - https://github.com/vllm-project/vllm/pull/9090
 ARG VLLM_HASH=v0.7.0
 
 RUN git clone https://github.com/vllm-project/vllm.git && \
@@ -33,22 +29,6 @@ RUN git clone https://github.com/vllm-project/vllm.git && \
   git checkout ${VLLM_HASH} && \
   pip install -e . && \
   cd ..
-
-# Install Flash Infer
-# ALWAYS UPDATE FROM https://github.com/vllm-project/vllm/blob/main/Dockerfile
-ARG FLASHINFER_URL=https://github.com/flashinfer-ai/flashinfer/releases/download/v0.1.6/flashinfer-0.1.6+cu121torch2.4-cp310-cp310-linux_x86_64.whl
-
-RUN pip install $FLASHINFER_URL
-
-
-# Install requirements
-RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sentence-transformers>=2.2.2 && \
-    pip install "megablocks==0.5.1"
-
-RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
-
-COPY dockerfiles/vllm.patch /opt/vllm/vllm.patch
-RUN cd /opt/vllm && git apply vllm.patch
 
 WORKDIR /opt
 
@@ -60,4 +40,3 @@ ENV HF_HOME=/cache/huggingface
 ENV TRANSFORMERS_CACHE=/cache/huggingface/transformers
 ENV HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
 ENV HF_DATASETS_CACHE=/cache/huggingface/datasets
-
