@@ -60,7 +60,10 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
     return cmd
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+# TODO: support chunking for reward model and math judge
+
+
+def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -74,7 +77,7 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
