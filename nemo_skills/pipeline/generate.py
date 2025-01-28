@@ -285,7 +285,7 @@ def generate(
                     cmd = get_cmd(
                         random_seed=seed,
                         output_dir=output_dir,
-                        extra_arguments=run_arguments,
+                        extra_arguments=extra_arguments,
                         eval_args=eval_args,
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
@@ -333,13 +333,10 @@ def generate(
                     extra_arguments=extra_arguments_original,
                 )
 
-                # If we are chunking the dataset, we need to pass the chunk_id to the generation command
-                run_arguments = copy.deepcopy(extra_arguments)
-
                 cmd = get_cmd(
                     random_seed=None,
                     output_dir=output_dir,
-                    extra_arguments=run_arguments,
+                    extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
