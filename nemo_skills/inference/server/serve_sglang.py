@@ -49,6 +49,7 @@ def main():
         f'    --node-rank={args.node_rank} '
         f'    --load-format="npcache" '
         f'    --dist-init-addr="{args.dist_init_addr}:20000" '
+        f'    {extra_arguments} '
     )
 
     subprocess.run(cmd, shell=True, check=True)
