@@ -245,6 +245,8 @@ def generate(
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 
+    # TODO: warning if num_chunks and postprocess_cmd are both specified
+
     try:
         server_type = server_type.value
     except AttributeError:
@@ -305,8 +307,7 @@ def generate(
 
                     one_off_output_dir = f"{output_dir}/{'generation/' if generation_type == GenerationType.generate else ''}"
                     one_off_postprocess_cmd = (
-                        f"{postprocess_cmd} "
-                        f"{'&&' if postprocess_cmd else ""} "
+                        f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
                         f"touch {get_chunked_rs_filename(one_off_output_dir, random_seed=seed, chunk_id=chunk_id)}"
                     )
 
