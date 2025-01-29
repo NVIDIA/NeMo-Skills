@@ -28,7 +28,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -67,9 +67,9 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    # if > 0, will skip this many samples from the beginning of the data file.
-    # Useful if need to run multiple slurm jobs on the same data file
-    offset: int = 0
+    # chunk the dataset into equal sized parts and index into them
+    num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
+    chunk_id: int | None = None  # if specified, will index the specified chunk only
 
     generation_key: str = "generation"
     # if specified, we will have a loop over that key in the data file and
@@ -85,6 +85,7 @@ class GenerateSolutionsConfig:
     # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
     # to `output_file`-async (and put it back in order after all generations are done)
     use_async_loop: bool = True
+    async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation
     # useful to double check that your data can be loaded and prompt has what you expect
@@ -146,7 +147,7 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
         except FileNotFoundError:
             LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
 
-    # additionally, skipping whatever is pre-filled, assuming offset didn't change
+    # additionally, skipping whatever is pre-filled
     data = data[starting_idx:]
 
     # need to account for anything that's prefilled
@@ -240,7 +241,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             filled_positions = set()
             with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                 for line in fin:
-                    filled_positions.add(int(json.loads(line)[0]))
+                    filled_positions.add(int(json.loads(line)[cfg.async_position_key]))
             data = [dp for idx, dp in enumerate(data) if idx not in filled_positions]
             original_positions = [idx for idx in original_positions if idx not in filled_positions]
         except FileNotFoundError:
@@ -291,7 +292,11 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     for key in gen_dict:
                         data[gen_pos].pop(key, None)
                     gen_dict.update(data[gen_pos])
-                    fout.write(json.dumps([original_positions[gen_pos], gen_dict]) + "\n")
+
+                    # insert async position information
+                    gen_dict[cfg.async_position_key] = original_positions[gen_pos]
+
+                    fout.write(json.dumps(gen_dict) + "\n")
 
             time.sleep(1)
         pbar.close()
@@ -302,7 +307,8 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
     ordered_generations = [None] * len(generations)
     for gen_dict in generations:
-        ordered_generations[gen_dict[0]] = gen_dict[1]
+        async_pos = gen_dict.pop(cfg.async_position_key)
+        ordered_generations[async_pos] = gen_dict
 
     with open(cfg.output_file, "wt", encoding="utf-8") as fout:
         for gen_dict in ordered_generations:
@@ -341,8 +347,13 @@ def generate(cfg: GenerateSolutionsConfig):
         for line in fin:
             data.append(json.loads(line))
 
-    # skipping based on the offset first
-    data = data[cfg.offset :]
+    # chunk the dataset if required
+    if cfg.num_chunks is not None and cfg.chunk_id is not None:
+        data, cfg.output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
+        LOG.info(
+            f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
+            f"Number of samples in the chunk: {len(data)}"
+        )
 
     if cfg.prompt_config is None:
         # fetching from the default for corresponding dataset

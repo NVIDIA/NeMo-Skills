@@ -16,9 +16,11 @@ import json
 import logging
 import sys
 from dataclasses import field
+from enum import Enum
 from pathlib import Path
 
 import hydra
+import typer
 from tqdm import tqdm
 
 from nemo_skills.inference.server.code_execution_model import server_params
@@ -57,7 +59,8 @@ class RewardModelConfig:
     # if > 0, will skip this many samples from the beginning of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
-
+    # Default reward model type
+    reward_model_type: str = "orm"
     reward_model_score_key: str = "reward_model_score"
 
     # can add this flag to just print the first prompt instead of running generation
@@ -93,7 +96,7 @@ def generate(cfg: RewardModelConfig):
     cfg = RewardModelConfig(_init_nested=True, **cfg)
 
     LOG.info("Config used: %s", cfg)
-    llm = get_reward_model(**cfg.server)
+    llm = get_reward_model(model_type=cfg.reward_model_type, **cfg.server)
 
     # making sure output dir exists
     Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)

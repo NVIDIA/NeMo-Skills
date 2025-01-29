@@ -35,7 +35,7 @@ def main():
         logging_args = ' --disable-log-requests --disable-log-stats '
 
     cmd = (
-        f'python -m vllm.entrypoints.openai.api_server '
+        f'python3 -m vllm.entrypoints.openai.api_server '
         f'    --model="{args.model}" '
         f'    --served-model-name="{args.model}"'
         f'    --trust-remote-code '
