@@ -58,6 +58,7 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++input_files={output_file} "
             f"    {eval_args} "
         )
+    cmd += f" && touch {output_file.rstrip()}.done"
     return cmd
 
 
