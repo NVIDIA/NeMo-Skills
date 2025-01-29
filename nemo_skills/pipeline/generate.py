@@ -273,7 +273,7 @@ def generate(
     original_server_address = server_address
 
     # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
-    if generation_type == GenerationType.generate and isinstance(ctx.obj, dict) and 'generation_task_type' in ctx.obj:
+    if generation_type == GenerationType.generate and ctx.obj is not None and isinstance(ctx.obj, dict) and 'generation_task_type' in ctx.obj:
         generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
         assert issubclass(generation_task, GenerationTask), f"`generation_task_type` must be a subclass of GenerationTask"
         cmd_script = generation_task.get_generation_module()
