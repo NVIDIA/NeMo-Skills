@@ -17,25 +17,33 @@ import subprocess
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Serve STlang model")
+    parser = argparse.ArgumentParser(description="Serve SGlang model")
     parser.add_argument("--model", help="Path to the model or a model name to pull from HF")
     parser.add_argument("--num_gpus", type=int, required=True)
-    parser.add_argument("--num_nodes", type=int, required=True)
-    parser.add_argument("--node_rank", type=int, required=True)
-    parser.add_argument("--dist_init_addr", type=str, required=True)
-    parser.add_argument("--port", type=int, default=5000, help="Server port")
-    parser.add_argument("--verbose", action="store_true", help="Print verbose logs")
+    parser.add_argument("--num_nodes", type=int, required=False, default=1)
+    parser.add_argument("--node_rank", type=int, required=False)
+    parser.add_argument("--dist_init_addr", type=str, required=False)
+    parser.add_argument("--port", type=int, default=20000, help="Server port")
     args, unknown = parser.parse_known_args()
+
+    if args.num_nodes > 1:
+        if args.node_rank is None:
+            raise ValueError("node_rank must be specified for multi-node setup")
+        if args.dist_init_addr is None:
+            raise ValueError("dist_init_addr must be specified for multi-node setup")
 
     extra_arguments = f'{" ".join(unknown)}'
 
     print(f"Deploying model {args.model}")
     print("Starting OpenAI Server")
 
-    if args.verbose:
-        logging_args = ""
-    else:
-        logging_args = ' --disable-log-requests --disable-log-stats '
+    multinode_paramaters = (
+        f'    --nnodes={args.num_nodes} '
+        f'    --node-rank={args.node_rank} '
+        f'    --dist-init-addr="{args.dist_init_addr}:20000" '
+        if args.num_nodes > 1
+        else ""
+    )
 
     cmd = (
         f'python3 -m sglang.launch_server '
@@ -44,10 +52,8 @@ def main():
         f'    --trust-remote-code '
         f'    --host="0.0.0.0" '
         f'    --port={args.port} '
-        f'    --tensor-parallel-size={args.num_gpus*args.num_nodes} '
-        f'    --nnodes={args.num_nodes} '
-        f'    --node-rank={args.node_rank} '
-        f'    --dist-init-addr="{args.dist_init_addr}:20000" '
+        f'    --tensor-parallel-size={args.num_gpus * args.num_nodes} '  # TODO: is this a good default for multinode setup?
+        f'    {multinode_paramaters} '
         f'    {extra_arguments} '
     )
 
