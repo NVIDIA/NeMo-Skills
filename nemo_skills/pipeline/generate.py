@@ -305,10 +305,10 @@ def generate(
                     )
                     prev_tasks = None
 
-                    one_off_output_dir = f"{output_dir}/{'generation' if generation_type == GenerationType.generate else ''}"
-                    one_off_postprocess_cmd = (
+                    single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                    single_postprocess_cmd = (
                         f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
-                        f"touch {get_chunked_rs_filename(one_off_output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
+                        f"touch {get_chunked_rs_filename(single_output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
                     )
 
                     for _ in range(dependent_jobs + 1):
@@ -317,7 +317,7 @@ def generate(
                             cmd=wrap_cmd(
                                 get_generation_command(server_address=server_address, generation_commands=cmd),
                                 preprocess_cmd,
-                                one_off_postprocess_cmd,
+                                single_postprocess_cmd,
                                 random_seed=seed,
                             ),
                             task_name=f'{expname}-rs{seed}',
@@ -361,13 +361,18 @@ def generate(
                     num_chunks=num_chunks,
                 )
                 prev_tasks = None
+                single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                single_postprocess_cmd = (
+                    f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
+                    f"touch {get_chunked_rs_filename(single_output_dir, random_seed=None, chunk_id=chunk_id)}.done"
+                )
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
-                            postprocess_cmd,
+                            single_postprocess_cmd,
                         ),
                         task_name=expname,
                         log_dir=log_dir,
