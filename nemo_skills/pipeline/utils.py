@@ -31,6 +31,7 @@ from invoke import StreamWatcher
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
 from nemo_run.core.tunnel import SSHTunnel
+from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
@@ -347,9 +348,17 @@ def get_cluster_config(cluster=None, config_dir=None):
     If NEMO_SKILLS_CONFIG is provided and cluster is None,
     it will be used as a full path to the config file
     and NEMO_SKILLS_CONFIG_DIR will be ignored.
+
+    If cluster is a python object (dict-like), then we simply
+    return the cluster config, under the assumption that the
+    config is prepared by the user.
     """
     # if cluster is provided, we try to find it in one of the folders
     if cluster is not None:
+        # check if cluster is a python object instead of a str path, pass through
+        if isinstance(cluster, (dict, DictConfig)):
+            return cluster
+
         # either using the provided config_dir or getting from env var
         config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
         if config_dir:
