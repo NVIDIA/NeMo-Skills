@@ -105,17 +105,49 @@ def summarize_results(
         results_dir = Path(temp_dir) / Path(results_dir).name
 
     # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
-    # Check if there is an eval-results dir inside the results_dir
-    eval_results_dir = Path(results_dir) / 'eval-results'
-    if eval_results_dir.exists() and eval_results_dir.is_dir():
-        results_dir = eval_results_dir
-    else:
-        raise ValueError(f"No 'eval-results' dir found in {results_dir}")
 
-    benchmarks_paths = [path for path in glob.glob(f'{results_dir}/*') if '-logs' not in os.path.basename(path)]
+    # Check for all possible directory structures
+    # 1. {results_dir}/eval-results/{benchmark}/output*jsonl
+    # 2. {results_dir}/{benchmark}/output*jsonl
+    # 3. {results_dir}/output*jsonl
+
+    # List to store all valid benchmarks results paths
+    benchmarks_paths = []
+
+    # Check for Option 3 - Root directory corresponds to a benchmark
+    if Path(results_dir).is_dir() and len(glob.glob(f'{results_dir}/output*jsonl')) > 0:
+        benchmarks_paths = [results_dir]
+    else:
+        cand_results_dir = Path(results_dir) / 'eval-results'
+        # Check for Option 1
+        if cand_results_dir.exists() and cand_results_dir.is_dir():
+            results_dir = cand_results_dir
+        elif Path(results_dir).name == 'eval-results':
+            results_dir = results_dir
+        else:
+            raise ValueError(
+                f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
+            )
+
+        benchmarks_paths = [
+            path
+            for path in glob.glob(f'{results_dir}/*')
+            if '-logs' not in os.path.basename(path) and Path(path).is_dir()
+        ]
 
     if benchmarks:
+        # Filter benchmarks_paths to only include the specified benchmarks
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
+
+    if benchmarks_paths:
+        # Ascertain that the benchmarks_paths are valid
+        for benchmark_path in benchmarks_paths:
+            # Valid benchmark_path should contain output*jsonl files
+            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
+                raise ValueError(f"The benchmark directory {benchmark_path} is not a valid benchmark directory.")
+    else:
+        print(f"No benchmarks found in {results_dir}")
+        return
 
     results = defaultdict(lambda: defaultdict(dict))
     max_metrics_to_print = {}
