@@ -31,6 +31,7 @@ from invoke import StreamWatcher
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
 from nemo_run.core.tunnel import SSHTunnel
+from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
@@ -183,7 +184,7 @@ def get_reward_server_command(
             raise ValueError("VLLM server does not support multi-node execution")
 
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -239,7 +240,7 @@ def get_server_command(
             num_tasks = 1
     elif server_type == 'vllm':
         start_vllm_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -347,9 +348,17 @@ def get_cluster_config(cluster=None, config_dir=None):
     If NEMO_SKILLS_CONFIG is provided and cluster is None,
     it will be used as a full path to the config file
     and NEMO_SKILLS_CONFIG_DIR will be ignored.
+
+    If cluster is a python object (dict-like), then we simply
+    return the cluster config, under the assumption that the
+    config is prepared by the user.
     """
     # if cluster is provided, we try to find it in one of the folders
     if cluster is not None:
+        # check if cluster is a python object instead of a str path, pass through
+        if isinstance(cluster, (dict, DictConfig)):
+            return cluster
+
         # either using the provided config_dir or getting from env var
         config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
         if config_dir:
@@ -715,6 +724,7 @@ def get_executor(
             num_gpus=gpus_per_node,
             network="host",
             env_vars=env_vars,
+            additional_kwargs={"entrypoint": ""},
         )
 
     env_vars["VLLM_HEAD_NODE"] = "${head_node}"
