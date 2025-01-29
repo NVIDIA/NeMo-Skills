@@ -305,10 +305,10 @@ def generate(
                     )
                     prev_tasks = None
 
-                    one_off_output_dir = f"{output_dir}/{'generation/' if generation_type == GenerationType.generate else ''}"
+                    one_off_output_dir = f"{output_dir}/{'generation' if generation_type == GenerationType.generate else ''}"
                     one_off_postprocess_cmd = (
                         f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
-                        f"touch {get_chunked_rs_filename(one_off_output_dir, random_seed=seed, chunk_id=chunk_id)}"
+                        f"touch {get_chunked_rs_filename(one_off_output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
                     )
 
                     for _ in range(dependent_jobs + 1):
