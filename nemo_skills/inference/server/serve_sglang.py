@@ -47,7 +47,6 @@ def main():
         f'    --tensor-parallel-size={args.num_gpus*args.num_nodes} '
         f'    --nnodes={args.num_nodes} '
         f'    --node-rank={args.node_rank} '
-        f'    --load-format="npcache" '
         f'    --dist-init-addr="{args.dist_init_addr}:20000" '
         f'    {extra_arguments} '
     )
