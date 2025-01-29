@@ -109,6 +109,9 @@ def summarize_results(
     eval_results_dir = Path(results_dir) / 'eval-results'
     if eval_results_dir.exists() and eval_results_dir.is_dir():
         results_dir = eval_results_dir
+    else:
+        raise ValueError(f"No 'eval-results' dir found in {results_dir}")
+
     benchmarks_paths = [path for path in glob.glob(f'{results_dir}/*') if '-logs' not in os.path.basename(path)]
 
     if benchmarks:
