@@ -783,7 +783,9 @@ class VLLMModel(BaseModel):
         choice = response.choices[0]
         output = choice.text
         # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
+        if choice.finish_reason == "stop":
+            print(dir(choice))
+            print(choice)
             output += choice.stop_reason
         num_generated_tokens = response.usage.completion_tokens
         return output, num_generated_tokens
