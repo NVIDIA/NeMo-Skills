@@ -19,12 +19,11 @@ import sys
 import time
 from copy import deepcopy
 from dataclasses import asdict, field
-from omegaconf import ListConfig
 from typing import List, Dict, Optional
 from pathlib import Path
 
 import hydra
-from omegaconf import OmegaConf, open_dict
+from omegaconf import OmegaConf, ListConfig, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
