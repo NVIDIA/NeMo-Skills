@@ -275,14 +275,17 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'sglang':
+        if num_nodes > 1:
+            multinode_args = f"    --dist_init_addr $VLLM_HEAD_NODE " f"    --node_rank $SLURM_PROCID "
+        else:
+            multinode_args = ""
         server_start_cmd = (
             f"python3 -m nemo_skills.inference.server.serve_sglang "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --num_nodes {num_nodes} "
             f"    --port {server_port} "
-            f"    --dist_init_addr $VLLM_HEAD_NODE "
-            f"    --node_rank $SLURM_PROCID "
+            f"    {multinode_args} "
             f"    {server_args} "
         )
         num_tasks = 1
