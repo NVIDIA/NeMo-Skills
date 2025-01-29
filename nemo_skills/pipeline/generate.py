@@ -34,12 +34,18 @@ class SupportedServers(str, Enum):
     openai = "openai"
     sglang = "sglang"
 
+def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
+    if random_seed is not None:
+        output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
+    else:
+        output_file = f"{output_dir}/output.jsonl"
+    if chunk_id is not None:
+        output_file = get_chunked_filename(chunk_id, output_file)
+    return output_file
 
 def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
-    if random_seed is not None:
-        output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
-    else:
-        output_file = f"{output_dir}/generation/output.jsonl"
+    # First get the unchunked filename for the output file
+    output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
     if random_seed is not None:
         cmd += (
@@ -50,7 +56,7 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
         )
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_filename(chunk_id, output_file)
+        output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed, chunk_id=chunk_id)
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -58,7 +64,6 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++input_files={output_file} "
             f"    {eval_args} "
         )
-    cmd += f" && touch {output_file.rstrip()}.done"
     return cmd
 
 
@@ -298,13 +303,20 @@ def generate(
                     )
                     prev_tasks = None
 
+                    one_off_output_dir = f"{output_dir}/{'generation/' if generation_type == GenerationType.generate else ''}"
+                    one_off_postprocess_cmd = (
+                        f"{postprocess_cmd} "
+                        f"{'&&' if postprocess_cmd else ""} "
+                        f"touch {get_chunked_rs_filename(one_off_output_dir, random_seed=seed, chunk_id=chunk_id)}"
+                    )
+
                     for _ in range(dependent_jobs + 1):
                         new_task = add_task(
                             exp,
                             cmd=wrap_cmd(
                                 get_generation_command(server_address=server_address, generation_commands=cmd),
                                 preprocess_cmd,
-                                postprocess_cmd,
+                                one_off_postprocess_cmd,
                                 random_seed=seed,
                             ),
                             task_name=f'{expname}-rs{seed}',
