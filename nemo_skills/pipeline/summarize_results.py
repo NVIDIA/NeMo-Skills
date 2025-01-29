@@ -130,9 +130,9 @@ def summarize_results(
             )
 
         benchmarks_paths = [
-            path
-            for path in glob.glob(f'{results_dir}/*')
-            if '-logs' not in os.path.basename(path) and Path(path).is_dir()
+            cand_path
+            for cand_path in glob.glob(f'{results_dir}/*')
+            if '-logs' not in os.path.basename(cand_path) and Path(cand_path).is_dir()
         ]
 
     if benchmarks:
@@ -144,7 +144,7 @@ def summarize_results(
         for benchmark_path in benchmarks_paths:
             # Valid benchmark_path should contain output*jsonl files
             if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
-                raise ValueError(f"The benchmark directory {benchmark_path} is not a valid benchmark directory.")
+                raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
     else:
         print(f"No benchmarks found in {results_dir}")
         return
