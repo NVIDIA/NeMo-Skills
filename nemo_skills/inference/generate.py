@@ -157,6 +157,9 @@ class GenerationTask:
         self.llm = None
         self.prompt = None
 
+        if not isinstance(self.cfg, GenerateSolutionsConfig):
+            raise ValueError(f"Expected GenerateSolutionsConfig or a subclass, got {type(self.cfg)}")
+
         # Extra parameters for generation
         self.extra_generate_params = {}
         self.extra_stop_phrases = None
@@ -464,17 +467,25 @@ class GenerationTask:
         self.run_generation_loop(cfg)
 
     @classmethod
-    def generate(cls, cfg: GenerateSolutionsConfig):
-        cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
-        LOG.info("Config used: %s", cfg)
-        task = cls(cfg)
-        task.generate_output(cfg)
+    def get_generation_module(cls):
+        """
+        Returns the path to the script module that performs the generation task.
+        Override this method to customize the generation module.
+
+        Returns:
+            str: Path to the generation module.
+        """
+        return "nemo_skills.inference.generate"
 
 
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_generation_config')
 def generate(cfg: GenerateSolutionsConfig):
-    GenerationTask.generate(cfg)
+    cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
+    LOG.info("Config used: %s", cfg)
+
+    task = GenerationTask(cfg)
+    task.generate_output(cfg)
 
 
 HELP_MESSAGE = get_help_message(
