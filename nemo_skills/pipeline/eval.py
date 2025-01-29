@@ -78,6 +78,7 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     openai = "openai"
+    sglang = "sglang"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
