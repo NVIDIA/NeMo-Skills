@@ -259,6 +259,7 @@ def get_server_command(
         server_start_cmd = (
             "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
             "    echo 'Starting head node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
             "    ray start "
             "        --head "
             "        --port=6379 "
@@ -266,6 +267,7 @@ def get_server_command(
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
             "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
             "    ray start "
             "        --block "
