@@ -132,7 +132,7 @@ class VLLMRewardModel(BaseModel):
             print(f"Tokenization error: {ve}")
         except KeyError as ke:
             # Returned output is not adhering to the expected output format
-            print("Output fmt error: {ke}")
+            print(f"Output fmt error: {ke}")
             print(output)
 
         if per_token_scores is None:
