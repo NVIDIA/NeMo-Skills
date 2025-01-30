@@ -67,6 +67,7 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
+    max_concurrent_requests: int = 128  # Maximum number of concurrent requests to the server for the async loop
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -260,8 +261,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     LOG.warning("Maintaining 1000 concurrent requests throughout execution.")
 
     
-    # Define concurrency constraints
-    max_concurrent_requests = 1000  
+    
     request_queue = list(range(len(data)))  # Queue of unsubmitted task indices
     in_progress = {}  # Track ongoing requests {index: generation_id}
     
@@ -271,7 +271,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         pbar = tqdm(total=len(data), desc="Processing requests")
 
         # **Step 1: Pre-fill `in_progress` with the first 2000 tasks**
-        while len(in_progress) < max_concurrent_requests and request_queue:
+        while len(in_progress) < cfg.max_concurrent_requests and request_queue:
             idx = request_queue.pop(0)
             in_progress[idx] = None  # Placeholder for reservation
 
@@ -328,7 +328,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
             
             # **Step 4: Refill requests to maintain exactly 1000 concurrent tasks**
-            num_to_submit = max_concurrent_requests - len(in_progress)
+            num_to_submit = cfg.max_concurrent_requests - len(in_progress)
             batch_indices = [request_queue.pop(0) for _ in range(min(num_to_submit, len(request_queue)))]
             batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
             if len(batch_prompts) > 0:
