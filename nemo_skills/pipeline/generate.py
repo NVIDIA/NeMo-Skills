@@ -34,7 +34,7 @@ class SupportedServers(str, Enum):
     openai = "openai"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, output_base=None):
+def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, output_base=None, chunk_id=None, num_chunks=None):
     """Construct the generation command for language model inference.
 
     If `output_base` is defined, it replaces the default `output.jsonl` filenames with:
