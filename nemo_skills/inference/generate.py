@@ -84,7 +84,7 @@ class GenerateSolutionsConfig:
     # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
     # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
     # to `output_file`-async (and put it back in order after all generations are done)
-    use_async_loop: bool = False
+    use_async_loop: bool = True
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation

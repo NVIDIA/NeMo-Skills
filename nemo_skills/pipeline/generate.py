@@ -307,6 +307,7 @@ def generate(
                         eval_args=eval_args,
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
+                        output_base=output_base,
                     )
                     prev_tasks = None
 
