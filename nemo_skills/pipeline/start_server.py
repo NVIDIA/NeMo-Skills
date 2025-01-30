@@ -52,7 +52,12 @@ def start_server(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        is_flag=True,
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
