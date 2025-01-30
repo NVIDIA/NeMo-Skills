@@ -53,7 +53,6 @@ def main():
         f'    --host="0.0.0.0" '
         f'    --port={args.port} '
         f'    --tensor-parallel-size={args.num_gpus * args.num_nodes} '  # TODO: is this a good default for multinode setup?
-        f'    --log-level=WARNING '
         f'    {multinode_paramaters} '
         f'    {extra_arguments} '
     )
