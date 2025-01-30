@@ -118,10 +118,28 @@ class VLLMRewardModel(BaseModel):
         self.model = model_list.data[0].id
 
     def _score_single_prompt(self, prompt):
-        response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
-        per_token_scores = response.json()['data'][0]['data']
-        last_token_score = per_token_scores[-1]
+        """Score a single prompt"""
 
+        per_token_scores = None
+        try:
+            response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
+            output = response.json()
+            per_token_scores = output['data'][0]['data']
+        except requests.exceptions.HTTPError as err:
+            print(f"Request failed: {err}")
+        except ValueError as ve:
+            # Could be that the sequence exceeds the maximum context length
+            print(f"Tokenization error: {ve}")
+        except KeyError as ke:
+            # Returned output is not adhering to the expected output format
+            print("Output fmt error: {ke}")
+            print(output)
+
+        if per_token_scores is None:
+            # Return a trivial reward model score
+            return {"reward_model_score": 0.0}
+
+        last_token_score = per_token_scores[-1]
         score = None
         if self.model_type == "orm":
             # Last token's score
