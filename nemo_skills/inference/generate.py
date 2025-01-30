@@ -257,48 +257,79 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    LOG.warning("Async loop is submitting all data for inference - batch_size parameter is ignored!")
+    LOG.warning("Maintaining 1000 concurrent requests throughout execution.")
 
-    # submitting all data at ones
-    generation_ids = llm.generate_async(
-        prompts=[prompt.fill(dp) for dp in data],
-        stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
-        **asdict(cfg.inference),
-        **extra_generate_params,
-    )
+    
+    # Define concurrency constraints
+    max_concurrent_requests = 1000  
+    request_queue = list(range(len(data)))  # Queue of unsubmitted task indices
+    in_progress = {}  # Track ongoing requests {index: generation_id}
+    
 
-    # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
-    with open(cfg.output_file + '-async', "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
-        pbar = tqdm(total=len(generation_ids), desc="Remaining generations")
-        prev_remaining = len(generation_ids)
-        while True:
-            remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
-            curr_remaining = len(remaining_ids)
-            if curr_remaining == 0:
-                break
-            # Update progress bar with completed generations
-            if curr_remaining < prev_remaining:
-                pbar.update(prev_remaining - curr_remaining)
-                prev_remaining = curr_remaining
 
-            remaining_positions = [
-                idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
-            ]
-            generations = llm.get_generations(remaining_ids)
-            for gen_pos, gen_dict in zip(remaining_positions, generations):
-                if gen_dict['generation'] is not None:  # will be None until done
-                    generation_ids[gen_pos] = None
+    with open(cfg.output_file + "-async", "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        pbar = tqdm(total=len(data), desc="Processing requests")
+
+        # **Step 1: Pre-fill `in_progress` with the first 2000 tasks**
+        while len(in_progress) < max_concurrent_requests and request_queue:
+            idx = request_queue.pop(0)
+            in_progress[idx] = None  # Placeholder for reservation
+
+        # **Step 2: Submit first 1000 requests as a batch**
+        batch_indices = list(in_progress.keys())  # Get reserved indices
+        batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]  # Prepare prompts
+
+        batch_ids = llm.generate_async(  # Submit all at once
+            prompts=batch_prompts,  
+            stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
+            **asdict(cfg.inference),
+            **extra_generate_params,
+        )
+
+        # Store the request IDs returned by LLM
+        for i, idx in enumerate(batch_indices):
+            in_progress[idx] = batch_ids[i]
+
+        # **Step 3: Monitor and refill requests dynamically**
+        while in_progress or request_queue:  # Continue until all tasks are complete
+            remaining_ids = {idx: gen_id for idx, gen_id in in_progress.items() if gen_id is not None}
+            generations = llm.get_generations(list(remaining_ids.values()))
+
+            completed_tasks = []
+            for (idx, gen_id), gen_dict in zip(remaining_ids.items(), generations):
+                if gen_dict['generation'] is not None:
+                    # Mark task as completed
+                    completed_tasks.append(idx)
+                    in_progress[idx] = None  
+
+                    # Write results immediately to avoid memory overhead
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
-                    for key in gen_dict:
-                        data[gen_pos].pop(key, None)
-                    gen_dict.update(data[gen_pos])
+                    gen_dict.update(data[idx])
+                    fout.write(json.dumps([original_positions[idx], gen_dict]) + "\n")
 
-                    # insert async position information
-                    gen_dict[cfg.async_position_key] = original_positions[gen_pos]
+                    # Update progress bar
+                    pbar.update(1)
 
-                    fout.write(json.dumps(gen_dict) + "\n")
+            # Remove completed tasks from `in_progress`
+            for idx in completed_tasks:
+                del in_progress[idx]
 
+            # **Step 4: Refill requests to maintain exactly 2000 concurrent tasks**
+            while len(in_progress) < max_concurrent_requests and request_queue:
+                idx = request_queue.pop(0)
+                dp = data[idx]
+                prompt_text = prompt.fill(dp)
+
+                in_progress[idx] = llm.generate_async(
+                    prompts=[prompt_text],  
+                    stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
+                    **asdict(cfg.inference),
+                    **extra_generate_params,
+                )[0]
+
+            # Prevent excessive API overload
             time.sleep(1)
+
         pbar.close()
 
     # after we are done, need to restore the order and resave without position ids
