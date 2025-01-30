@@ -292,9 +292,16 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
         # **Step 3: Monitor and refill requests dynamically**
         while in_progress or request_queue:  # Continue until all tasks are complete
-            remaining_ids = {idx: gen_id for idx, gen_id in in_progress.items() if gen_id is not None}
+            remaining_ids = {idx: gen_id for idx, gen_id in in_progress.items() if gen_id is not None and gen_id in llm.gen_id_to_params}
             generations = llm.get_generations(list(remaining_ids.values()))
 
+            lost_tasks = [idx for idx in in_progress if in_progress[idx] is not None and in_progress[idx] not in llm.gen_id_to_params]
+            for idx in lost_tasks:
+                LOG.warning(f"Lost task detected: {idx}, re-queueing for reprocessing.")
+                request_queue.append(idx)  
+                del in_progress[idx]  
+            
+            
             completed_tasks = []
             for (idx, gen_id), gen_dict in zip(remaining_ids.items(), generations):
                 if gen_dict['generation'] is not None:
@@ -302,10 +309,15 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     completed_tasks.append(idx)
                     in_progress[idx] = None  
 
-                    # Write results immediately to avoid memory overhead
+                    # Prepare the result for writing
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
                     gen_dict.update(data[idx])
-                    fout.write(json.dumps([original_positions[idx], gen_dict]) + "\n")
+                    
+                    # Insert the async position to preserve the original order
+                    gen_dict[cfg.async_position_key] = original_positions[idx]
+                    
+                    # Write the result immediately to minimize memory usage
+                    fout.write(json.dumps(gen_dict) + "\n")  
 
                     # Update progress bar
                     pbar.update(1)
@@ -314,18 +326,19 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             for idx in completed_tasks:
                 del in_progress[idx]
 
-            # **Step 4: Refill requests to maintain exactly 2000 concurrent tasks**
-            while len(in_progress) < max_concurrent_requests and request_queue:
-                idx = request_queue.pop(0)
-                dp = data[idx]
-                prompt_text = prompt.fill(dp)
-
-                in_progress[idx] = llm.generate_async(
-                    prompts=[prompt_text],  
+            
+            # **Step 4: Refill requests to maintain exactly 1000 concurrent tasks**
+            num_to_submit = max_concurrent_requests - len(in_progress)
+            batch_indices = [request_queue.pop(0) for _ in range(min(num_to_submit, len(request_queue)))]
+            batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
+            if len(batch_prompts) > 0:
+                batch_ids = llm.generate_async(
+                    prompts=batch_prompts,  
                     stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                     **asdict(cfg.inference),
-                    **extra_generate_params,
-                )[0]
+                    **extra_generate_params,)
+            for i, idx in enumerate(batch_indices):
+                in_progress[idx] = batch_ids[i]
 
             # Prevent excessive API overload
             time.sleep(1)
