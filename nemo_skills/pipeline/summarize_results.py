@@ -122,13 +122,13 @@ def summarize_results(
         # Check for Option 1
         if cand_results_dir.exists() and cand_results_dir.is_dir():
             results_dir = cand_results_dir
-        elif len(glob.glob(f'{results_dir}/*/output*jsonl')) > 0:
-            # Option 2 - The current directory has the benchmarks as its subdirectories
-            results_dir = results_dir
         else:
-            raise ValueError(
-                f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
-            )
+            # Assume by default it's Option 2.
+            # Verify if it indeed has this structure: {results_dir}/{benchmark}/output*jsonl
+            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0:
+                raise ValueError(
+                    f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
+                )
 
         benchmarks_paths = [
             cand_path
