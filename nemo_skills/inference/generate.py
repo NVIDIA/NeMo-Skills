@@ -29,6 +29,7 @@ from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from collections import deque
 
 LOG = logging.getLogger(__file__)
 
@@ -306,6 +307,8 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                         
                     # Prepare the result for writing
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
+                    for key in gen_dict:
+                        data[idx].pop(key, None)
                     gen_dict.update(data[idx])
                     
                     # Insert the async position to preserve the original order
