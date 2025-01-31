@@ -18,5 +18,5 @@ FROM nvcr.io/nvidia/pytorch:24.07-py3
 
 RUN pip uninstall xgboost transformer_engine flash_attn -y
 
-ARG COMMIT=956b5adfbd3d360ce43c0c951c4275df37d6dddc
-RUN cd /opt && git clone https://github.com/OpenRLHF/OpenRLHF.git && cd OpenRLHF && git checkout $COMMIT && pip install -e .
+# TODO: is that the right way to install? Seems to override pytorch..
+RUN pip install openrlhf[vllm_latest]
