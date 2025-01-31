@@ -326,7 +326,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                 del in_progress[idx]
 
             
-            # **Step 4: Refill requests to maintain exactly 1000 concurrent tasks**
+            # **Step 4: Refill requests to maintain exactly N concurrent tasks**
             num_to_submit = cfg.max_concurrent_requests - len(in_progress)
             batch_indices = [request_queue.pop(0) for _ in range(min(num_to_submit, len(request_queue)))]
             batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
