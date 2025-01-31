@@ -21,7 +21,6 @@ assistant_end: "<|im_end|>\n"
 
 stop_phrases: ["<|im_end|>", "<|endoftext|>"]
 
-# TODO: need to figure the right format for code execution
 # used to execute code within these tags
 code_begin: "```python\n"
 code_end: "```\n"
