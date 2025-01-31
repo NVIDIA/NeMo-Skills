@@ -716,6 +716,7 @@ def get_executor(
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
+    heterogeneous=False,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
@@ -794,6 +795,7 @@ def get_executor(
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
         dependency_type=dependency_type,
+        heterogeneous=heterogeneous,
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
