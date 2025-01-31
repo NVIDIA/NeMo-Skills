@@ -287,7 +287,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
         # Store the request IDs returned by LLM
         for idx in batch_indices:
-            in_progress[idx] = batch_ids[i]
+            in_progress[idx] = idx
 
         # **Step 3: Monitor and refill requests dynamically**
         while in_progress or request_queue:  # Continue until all tasks are complete
