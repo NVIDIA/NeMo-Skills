@@ -122,7 +122,8 @@ def summarize_results(
         # Check for Option 1
         if cand_results_dir.exists() and cand_results_dir.is_dir():
             results_dir = cand_results_dir
-        elif Path(results_dir).name == 'eval-results':
+        elif len(glob.glob(f'{results_dir}/*/output*jsonl')) > 0:
+            # Option 2 - The current directory has the benchmarks as its subdirectories
             results_dir = results_dir
         else:
             raise ValueError(
