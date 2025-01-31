@@ -26,6 +26,7 @@ class SupportedServers(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
     nemo = "nemo"
+    sglang = "sglang"
 
 
 @app.command()
