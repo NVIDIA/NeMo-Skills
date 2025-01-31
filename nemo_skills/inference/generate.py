@@ -258,9 +258,8 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    LOG.warning("Maintaining 1000 concurrent requests throughout execution.")
+    LOG.warning(f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!.")
 
-    
     
     request_queue = list(range(len(data)))  # Queue of unsubmitted task indices
     in_progress = {}  # Track ongoing requests {index: generation_id}
@@ -270,12 +269,12 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     with open(cfg.output_file + "-async", "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         pbar = tqdm(total=len(data), desc="Processing requests")
 
-        # **Step 1: Pre-fill `in_progress` with the first 2000 tasks**
+        # **Step 1: Pre-fill `in_progress` with the first max_concurrent_requests request**
         while len(in_progress) < cfg.max_concurrent_requests and request_queue:
             idx = request_queue.pop(0)
             in_progress[idx] = None  # Placeholder for reservation
 
-        # **Step 2: Submit first 1000 requests as a batch**
+        # **Step 2: Submit first max_concurrent_requests requests as a batch**
         batch_indices = list(in_progress.keys())  # Get reserved indices
         batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]  # Prepare prompts
 
