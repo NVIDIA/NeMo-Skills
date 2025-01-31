@@ -287,24 +287,21 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         )
 
         # Store the request IDs returned by LLM
-        for i, idx in enumerate(batch_indices):
-            in_progress[idx] = batch_ids[i]
+        for batch_idx, request_idx in enumerate(batch_indices):
+            in_progress[request_idx] = batch_ids[batch_idx]
+
 
         # **Step 3: Monitor and refill requests dynamically**
         while in_progress or request_queue:  # Continue until all tasks are complete
             remaining_ids = {idx: gen_id for idx, gen_id in in_progress.items()}
             generations = llm.get_generations(list(remaining_ids.values()))
             
-            completed_tasks = []
             for (idx, gen_id), gen_dict in zip(remaining_ids.items(), generations):
                 if gen_dict['generation'] is not None:
                     # Mark task as completed
                     completed_tasks.append(idx)
                     del in_progress[idx]
-                    ### we can remove the gen_id from the gen_id_to_params to save memory when we are done with it
-                    if gen_id in llm.gen_id_to_params:
-                        del llm.gen_id_to_params[gen_id]
-                        
+                                            
                     # Prepare the result for writing
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
                     for key in gen_dict:
@@ -320,8 +317,6 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     # Update progress bar
                     pbar.update(1)
 
-
-
             
             # **Step 4: Refill requests to maintain exactly N=max_concurrent_requests concurrent tasks**
             # num_to_submit = cfg.max_concurrent_requests - len(in_progress)
@@ -331,16 +326,17 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
             batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
             if len(batch_prompts) > 0:
-                old_gen_id_to_params = llm.gen_id_to_params.copy()
+                # old_gen_id_to_params = llm.gen_id_to_params.copy()
                 batch_ids = llm.generate_async(
                     prompts=batch_prompts,  
                     stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                     **asdict(cfg.inference),
                     **extra_generate_params,)
-                llm.gen_id_to_params.update(old_gen_id_to_params)  
-                
-            for i, idx in enumerate(batch_indices):
-                in_progress[idx] = batch_ids[i]
+                # llm.gen_id_to_params.update(old_gen_id_to_params)  
+             
+             
+            for batch_idx, request_idx in enumerate(batch_indices):
+                in_progress[request_idx] = batch_ids[batch_idx]
 
             # Prevent excessive API overload
             time.sleep(1)
