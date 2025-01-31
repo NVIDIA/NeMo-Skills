@@ -261,7 +261,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     LOG.warning(f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!.")
 
     
-    request_queue = list(range(len(data)))  # Queue of unsubmitted task indices
+    request_queue = deque(range(len(data)))  # Queue of unsubmitted task indices
     in_progress = {}  # Track ongoing requests {index: generation_id}
     
 
@@ -271,7 +271,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
         # **Step 1: Pre-fill `in_progress` with the first max_concurrent_requests request**
         while len(in_progress) < cfg.max_concurrent_requests and request_queue:
-            idx = request_queue.pop(0)
+            idx = request_queue.popleft()
             in_progress[idx] = None  # Placeholder for reservation
 
         # **Step 2: Submit first max_concurrent_requests requests as a batch**
@@ -300,7 +300,10 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
                     # Mark task as completed
                     completed_tasks.append(idx)
                     del in_progress[idx]
-
+                    ### we can remove the gen_id from the gen_id_to_params to save memory when we are done with it
+                    if gen_id in llm.gen_id_to_params:
+                        del llm.gen_id_to_params[gen_id]
+                        
                     # Prepare the result for writing
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
                     gen_dict.update(data[idx])
@@ -317,9 +320,12 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
 
 
             
-            # **Step 4: Refill requests to maintain exactly N concurrent tasks**
-            num_to_submit = cfg.max_concurrent_requests - len(in_progress)
-            batch_indices = [request_queue.pop(0) for _ in range(min(num_to_submit, len(request_queue)))]
+            # **Step 4: Refill requests to maintain exactly N=max_concurrent_requests concurrent tasks**
+            # num_to_submit = cfg.max_concurrent_requests - len(in_progress)
+            # batch_indices = [request_queue.popleft() for _ in range(min(num_to_submit, len(request_queue)))]
+            num_to_submit = min(cfg.max_concurrent_requests - len(in_progress), len(request_queue))
+            batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
+
             batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
             if len(batch_prompts) > 0:
                 old_gen_id_to_params = llm.gen_id_to_params.copy()
