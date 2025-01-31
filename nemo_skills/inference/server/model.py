@@ -783,8 +783,12 @@ class VLLMModel(BaseModel):
         choice = response.choices[0]
         output = choice.text
         # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-            output += choice.stop_reason
+        if choice.finish_reason == "stop":
+            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                output += choice.stop_reason
+            # sglang has a little different api here
+            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                output += choice.matched_stop
         num_generated_tokens = response.usage.completion_tokens
         return output, num_generated_tokens
 
@@ -799,6 +803,7 @@ models = {
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
+    'sglang': VLLMModel,  # interface is the same
 }
 
 
