@@ -260,7 +260,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
         return
 
     LOG.warning(f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!.")
-
+    LOG.warning("Users can set '++max_concurrent_requests' to control the number of concurrent requests.")
     
     request_queue = deque(range(len(data)))  # Queue of unsubmitted task indices
     in_progress = {}  # Track ongoing requests {index: generation_id}
