@@ -743,7 +743,7 @@ def get_executor(
             additional_kwargs={"entrypoint": ""},
         )
 
-    env_vars["SLURM_MASTER_NODE"] = "${head_node}"
+    env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
