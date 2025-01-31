@@ -298,8 +298,7 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             
             for (idx, gen_id), gen_dict in zip(remaining_ids.items(), generations):
                 if gen_dict['generation'] is not None:
-                    # Mark task as completed
-                    completed_tasks.append(idx)
+                    # remove the completed task from in_progress
                     del in_progress[idx]
                                             
                     # Prepare the result for writing
