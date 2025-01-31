@@ -228,7 +228,6 @@ def generate(
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
-        is_flag=True,
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
