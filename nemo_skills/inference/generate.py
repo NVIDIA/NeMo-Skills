@@ -67,7 +67,7 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    max_concurrent_requests: int = 128  # Maximum number of concurrent requests to the server for the async loop
+    max_concurrent_requests: int = 1024  # Maximum number of concurrent requests to the server for the async loop
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
