@@ -259,6 +259,7 @@ def get_server_command(
         server_start_cmd = (
             "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
             "    echo 'Starting head node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
             "    ray start "
             "        --head "
             "        --port=6379 "
@@ -266,12 +267,28 @@ def get_server_command(
             f"   {start_vllm_cmd} ;"
             "else "
             "    echo 'Starting worker node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
             "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
             "    ray start "
             "        --block "
             "        --address=$VLLM_HEAD_NODE:6379 "
             f"       {ports} ;"
             "fi"
+        )
+        num_tasks = 1
+    elif server_type == 'sglang':
+        if num_nodes > 1:
+            multinode_args = f"    --dist_init_addr $VLLM_HEAD_NODE " f"    --node_rank $SLURM_PROCID "
+        else:
+            multinode_args = ""
+        server_start_cmd = (
+            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
+            f"    --port {server_port} "
+            f"    {multinode_args} "
+            f"    {server_args} "
         )
         num_tasks = 1
     else:
@@ -713,7 +730,6 @@ def get_executor(
             raise ValueError("Local executor does not support multi-node execution")
 
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
-
         return DockerExecutor(
             container_image=container,
             packager=packager,
