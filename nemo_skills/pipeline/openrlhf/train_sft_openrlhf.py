@@ -193,7 +193,7 @@ def get_training_cmd(
 
 @openrlhf_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def run_cmd(
+def sft_openrlhf(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
