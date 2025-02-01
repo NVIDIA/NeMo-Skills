@@ -298,7 +298,7 @@ def sft_openrlhf(
                 cmd=train_cmd,
                 task_name=f'{expname}-sft-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["nemo"],
+                container=cluster_config["containers"]["openrlhf"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
@@ -339,8 +339,8 @@ def sft_openrlhf(
         #     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         # )
         #
-        # # explicitly setting sequential to False since we set dependencies directly
-        # run_exp(exp, cluster_config, sequential=False)
+        # explicitly setting sequential to False since we set dependencies directly
+        run_exp(exp, cluster_config, sequential=False)
 
     return exp
 
