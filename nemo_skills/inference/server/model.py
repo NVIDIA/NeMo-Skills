@@ -157,14 +157,14 @@ class BaseModel(abc.ABC):
             futures.append(self.executor.submit(self._generate_single, **request))
         
         gen_ids = []
-        new_gen_id_to_future = {}  # Stores futures for the current batch
+
         new_gen_id_to_params = {}  # Stores generation parameters for the current batch
 
         # Generate unique IDs for each future and store them
         for future in futures:
             gen_id = str(uuid.uuid4())  # Generate a unique generation ID
             gen_ids.append(gen_id)
-            new_gen_id_to_future[gen_id] = future  # Store the future in the dictionary
+            self.gen_id_to_future[gen_id] = future  # Store the future in the dictionary
 
         # Construct new_gen_id_to_params mapping gen_id to stop_phrases and remove_stop_phrases
         new_gen_id_to_params = {
@@ -173,7 +173,6 @@ class BaseModel(abc.ABC):
         }
 
         # Update global dictionaries to retain existing data while adding new entries
-        self.gen_id_to_future.update(new_gen_id_to_future)
         self.gen_id_to_params.update(new_gen_id_to_params)
         
         
