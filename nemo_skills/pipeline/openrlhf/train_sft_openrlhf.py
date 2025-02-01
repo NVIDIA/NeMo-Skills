@@ -269,6 +269,9 @@ def run_cmd(
     if validation_data:
         check_if_mounted(cluster_config, validation_data)
 
+    if cluster_config["executor"] == "local":
+        assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
+
     # if " " in str(average_steps):
     #     raise ValueError("average steps should be separated with commas")
 
