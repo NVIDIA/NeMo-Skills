@@ -14,9 +14,26 @@
 
 # copied from https://openrlhf.readthedocs.io/en/latest/quick_start.html#one-click-installation-script-of-nvidia-docker
 
+# Build instructions:
+# DOCKER_BUILDKIT=1 docker build . -f dockerfiles/Dockerfile.openrlhf -t gitlab-master.nvidia.com/smajumdar/nemo_containers/nemo-skills-openrlhf:0.5.0 --progress=plain
+
+# Push
+# docker push gitlab-master.nvidia.com/smajumdar/nemo_containers/nemo-skills-openrlhf:0.5.0
+
 FROM nvcr.io/nvidia/pytorch:24.07-py3
+
+RUN apt-get update
 
 RUN pip uninstall xgboost transformer_engine flash_attn -y
 
+WORKDIR /opt
 ARG COMMIT=956b5adfbd3d360ce43c0c951c4275df37d6dddc
-RUN cd /opt && git clone https://github.com/OpenRLHF/OpenRLHF.git && cd OpenRLHF && git checkout $COMMIT && pip install -e .
+RUN cd /opt && \
+    git clone https://github.com/OpenRLHF/OpenRLHF.git && \
+    cd OpenRLHF && \
+    git checkout $COMMIT && \
+    pip install -e .[vllm_latest]
+
+RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
+
+WORKDIR /workspace
