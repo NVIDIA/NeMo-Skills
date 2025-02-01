@@ -111,14 +111,14 @@ def get_sft_common_arg_overrides(cluster_config, params: TrainingParams):
     )
     return cmd
 
-def format_wandb_args(cluster_config, params: TrainingParams):
-    if not params.disable_wandb:
+def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
+    if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
         cmd = (f" --use_wandb $WANDB_API_KEY "
-               f" --wandb_project {params.wandb_project} "
-               f" --wandb_run_name {params.expname} ")
+               f" --wandb_project {wandb_project} "
+               f" --wandb_run_name {expname} ")
     else:
         cmd = ""
 
@@ -136,7 +136,7 @@ def get_cmd(cluster_config, params: TrainingParams):
         f"  {format_train_args(cluster_config, params)} "
         f"  {format_data_args(cluster_config, params)} "
         f"  {get_sft_common_arg_overrides(cluster_config, params)} "
-        f"  {format_wandb_args(cluster_config, params)} "
+        f"  {params.logging_params} "
         f"  {params.extra_arguments}"
     )
     return cmd
@@ -171,7 +171,7 @@ def get_training_cmd(
             f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
         )
 
-    logging_params = format_wandb_args(cluster_config, wandb_project)
+    logging_params = format_wandb_args(cluster_config, disable_wandb, wandb_project, expname)
 
     training_params = TrainingParams(
         model=hf_model,
