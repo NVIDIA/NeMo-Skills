@@ -156,18 +156,14 @@ class BaseModel(abc.ABC):
             request['prompt'] = prompts[request_idx]
             self.preprocess_request(request)
 
-            gen_id = str(uuid.uuid4())  # Generate a unique generation ID
+            # Generate a unique generation ID
+            gen_id = str(uuid.uuid4())
             gen_ids.append(gen_id)
+
+            # Update global dictionaries tracking the progress of generations
             self.gen_id_to_future[gen_id] = self.executor.submit(self._generate_single, **request)
+            self.gen_id_to_params[gen_id] = (kwargs["stop_phrases"][request_idx], remove_stop_phrases)
 
-        # Construct new_gen_id_to_params mapping gen_id to stop_phrases and remove_stop_phrases
-        new_gen_id_to_params = {
-            gen_id: (req_stop_phrases, remove_stop_phrases)
-            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
-        }
-
-        # Update global dictionaries to retain existing data while adding new entries
-        self.gen_id_to_params.update(new_gen_id_to_params)
         return gen_ids
 
     def get_generations(self, generation_ids: list[str]) -> list[dict]:
