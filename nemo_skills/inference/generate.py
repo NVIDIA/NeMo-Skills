@@ -17,6 +17,7 @@ import json
 import logging
 import sys
 import time
+from collections import deque
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
@@ -29,7 +30,6 @@ from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
-from collections import deque
 
 LOG = logging.getLogger(__file__)
 
@@ -259,67 +259,65 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    LOG.warning(f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!.")
+    LOG.warning(
+        f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!."
+    )
     LOG.warning("Users can set '++max_concurrent_requests' to control the number of concurrent requests.")
-    
+
     request_queue = deque(range(len(data)))  # Queue of unsubmitted task indices
     in_progress = {}  # Track ongoing requests {index: generation_id}
-    
-
 
     with open(cfg.output_file + "-async", "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         pbar = tqdm(total=len(data), desc="Processing requests")
 
-        
         while in_progress or request_queue:  # Continue until all tasks are complete
-            
             # Dynamic sending requests to maintain cfg.max_concurrent_requests running requests
             num_to_submit = min(cfg.max_concurrent_requests - len(in_progress), len(request_queue))
             batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
-
             batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
+
             if len(batch_prompts) > 0:
-               
                 generation_ids = llm.generate_async(
-                    prompts=batch_prompts,  
+                    prompts=batch_prompts,
                     stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                     **asdict(cfg.inference),
-                    **extra_generate_params,)
-             
-            ### map the generated ids to the original positions
+                    **extra_generate_params,
+                )
+
+            # Map the generated ids to the original positions
             for gen_ids_idx, original_pos in enumerate(batch_indices):
                 in_progress[original_pos] = generation_ids[gen_ids_idx]
-            
-            ### create a snapshot of in_progress to avoid modifying the dictionary while iterating over it
-            snapshot_in_progress = in_progress.copy() 
+
+            # Create a snapshot of in_progress to avoid modifying the dictionary while iterating over it
+            snapshot_in_progress = in_progress.copy()
             generations = llm.get_generations(list(snapshot_in_progress.values()))
-            
+
             for (idx, gen_id), gen_dict in zip(snapshot_in_progress.items(), generations):
                 if gen_dict['generation'] is not None:
                     # remove the completed task from in_progress
                     del in_progress[idx]
-                                            
+
                     # Prepare the result for writing
                     gen_dict[cfg.generation_key] = gen_dict.pop("generation")
                     for key in gen_dict:
                         data[idx].pop(key, None)
                     gen_dict.update(data[idx])
-                    
+
                     # Insert the async position to preserve the original order
                     gen_dict[cfg.async_position_key] = original_positions[idx]
-                    
+
                     # Write the result immediately to minimize memory usage
-                    fout.write(json.dumps(gen_dict) + "\n")  
+                    fout.write(json.dumps(gen_dict) + "\n")
 
                     # Update progress bar
                     pbar.update(1)
-                    
+
             # Prevent excessive API overload
             time.sleep(1)
 
         pbar.close()
 
-    # after we are done, need to restore the order and resave without position ids
+    # After we are done, need to restore the order and resave without position ids
     with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
         generations = [json.loads(line) for line in fin]
 
