@@ -14,8 +14,11 @@
 
 import contextlib
 import importlib
+import json
 import os
 import sys
+import urllib.request
+from pathlib import Path
 from typing import Dict
 
 
@@ -59,3 +62,31 @@ def get_dataset_module(dataset, extra_datasets=None):
             dataset_module = importlib.import_module(dataset)
         found_in_extra = True
     return dataset_module, found_in_extra
+
+
+def save_data_from_qwen(dataset, split="test"):
+    url = (
+        "https://raw.githubusercontent.com/QwenLM/Qwen2.5-Math/refs/heads/main/evaluation/data/{dataset}/{split}.jsonl"
+    )
+
+    data_dir = Path(__file__).absolute().parent
+    original_file = str(data_dir / dataset / f"original_{split}.json")
+    data_dir.mkdir(exist_ok=True)
+    output_file = str(data_dir / dataset / f"{split}.jsonl")
+    data = []
+    if not os.path.exists(original_file):
+        urllib.request.urlretrieve(url.format(split=split, dataset=dataset), original_file)
+
+    with open(original_file, "rt", encoding="utf-8") as fin:
+        for index, line in enumerate(fin):
+            entry = json.loads(line)
+            # TODO: add else
+            if "answer" in entry:
+                entry["expected_answer"] = entry.pop("answer")
+            if "problem" not in entry:
+                entry["problem"] = entry.pop("question")
+            data.append(entry)
+
+    with open(output_file, "wt", encoding="utf-8") as fout:
+        for entry in data:
+            fout.write(json.dumps(entry) + "\n")
