@@ -62,7 +62,7 @@ def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict['master_port'] = format_dict.get('master_port', 9901)
 
     cmd = (
-        "torchrun --nproc_per_node {nproc_per_node} --nnodes {nnodes} --node_rank {node_rank} "
+        "torchrun --nproc_per_node {nproc_per_node} --nnodes {nnodes} --node-rank {node_rank} "
         "--master_addr {master_addr} --master_port {master_port} "
     )
     return cmd.format(**format_dict)
