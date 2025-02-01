@@ -705,8 +705,28 @@ class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        # TODO: move this to base model?
+        self._tunnel = None
         if self.ssh_server and self.ssh_key_path:
-            raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
+            import sshtunnel
+
+            if '@' in self.ssh_server:
+                ssh_username, ssh_server = self.ssh_server.split('@')
+            else:
+                ssh_server = self.ssh_server
+                ssh_username = None
+
+            self._tunnel = sshtunnel.SSHTunnelForwarder(
+                (ssh_server, 22),
+                ssh_username=ssh_username,
+                ssh_pkey=self.ssh_key_path,
+                remote_bind_address=(self.server_host, int(self.server_port)),
+            )
+            self._tunnel.start()
+            # Use localhost with tunneled port for OpenAI client
+            # This way all traffic to server_host:server_port goes through SSH tunnel
+            self.server_host = '127.0.0.1'
+            self.server_port = str(self._tunnel.local_bind_port)
 
         http_client = DefaultHttpxClient(
             limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
@@ -722,6 +742,10 @@ class VLLMModel(BaseModel):
 
         self.model_name_server = self.get_model_name_from_server()
         self.model = self.model_name_server
+
+    def __del__(self):
+        if self._tunnel:
+            self._tunnel.stop()
 
     def _generate_single(
         self,
@@ -774,8 +798,12 @@ class VLLMModel(BaseModel):
         choice = response.choices[0]
         output = choice.text
         # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-            output += choice.stop_reason
+        if choice.finish_reason == "stop":
+            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                output += choice.stop_reason
+            # sglang has a little different api here
+            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                output += choice.matched_stop
         num_generated_tokens = response.usage.completion_tokens
         return output, num_generated_tokens
 
@@ -790,6 +818,7 @@ models = {
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
+    'sglang': VLLMModel,  # interface is the same
 }
 
 

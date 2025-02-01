@@ -104,7 +104,8 @@ def test_trtllm_code_execution_eval():
 
 
 @pytest.mark.gpu
-def test_vllm_eval():
+@pytest.mark.parametrize("server_type", ['vllm', 'sglang'])
+def test_hf_eval(server_type):
     # this test expects llama3-instruct to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
     # mmlu/ifeval will be cut to 400 samples to save time
@@ -122,8 +123,8 @@ def test_vllm_eval():
         f"ns eval "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --model {model_path} "
-        f"    --server_type vllm "
-        f"    --output_dir /tmp/nemo-skills-tests/{model_type}/vllm-eval "
+        f"    --server_type {server_type} "
+        f"    --output_dir /tmp/nemo-skills-tests/{model_type}/{server_type}-eval "
         f"    --benchmarks algebra222:0,human-eval:0,mbpp:0,ifeval:0,mmlu:0 "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
@@ -137,35 +138,35 @@ def test_vllm_eval():
 
     # checking that summarize results works (just that there are no errors, but can inspect the output as well)
     subprocess.run(
-        f"ns summarize_results /tmp/nemo-skills-tests/{model_type}/vllm-eval",
+        f"ns summarize_results /tmp/nemo-skills-tests/{model_type}/{server_type}-eval",
         shell=True,
         check=True,
     )
 
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='algebra222').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/algebra222/output.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/algebra222/output.jsonl"],
     )["all"]["greedy"]
 
     assert metrics['symbolic_correct'] >= 80
     assert metrics['num_entries'] == 222
 
     metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/human-eval/output.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/human-eval/output.jsonl"],
     )["all"]["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
     metrics = ComputeMetrics(benchmark='mbpp').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mbpp/output.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/mbpp/output.jsonl"],
     )["all"]["greedy"]
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 378
 
     metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/ifeval/output.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/ifeval/output.jsonl"],
     )["all"]["greedy"]
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
@@ -175,7 +176,7 @@ def test_vllm_eval():
     assert metrics['num_instructions'] == 601
 
     metrics = ComputeMetrics(benchmark='mmlu').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/vllm-eval/eval-results/mmlu/output.jsonl"],
+        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/mmlu/output.jsonl"],
     )["all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 400

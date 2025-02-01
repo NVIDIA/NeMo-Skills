@@ -19,10 +19,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 
-import httpx
 import openai
 import requests
-from openai import BadRequestError, DefaultHttpxClient, OpenAI
+from openai import BadRequestError, OpenAI
 
 LOG = logging.getLogger(__file__)
 
@@ -98,16 +97,10 @@ class VLLMRewardModel(BaseModel):
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
         self.oai_client = openai.OpenAI(
             api_key="EMPTY",
             base_url=f"http://{self.server_host}:{self.server_port}/v1",
             timeout=None,
-            http_client=http_client,
         )
 
         # Reward models are accessed via the "pooling" interface
@@ -118,10 +111,31 @@ class VLLMRewardModel(BaseModel):
         self.model = model_list.data[0].id
 
     def _score_single_prompt(self, prompt):
-        response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
-        per_token_scores = response.json()['data'][0]['data']
-        last_token_score = per_token_scores[-1]
+        """Score a single prompt"""
 
+        per_token_scores = None
+        inference_error = ""
+        try:
+            response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
+            output = response.json()
+            per_token_scores = output['data'][0]['data']
+        except requests.exceptions.HTTPError as err:
+            inference_error = f"Request failed: {err}"
+        except ValueError as ve:
+            # Could be that the sequence exceeds the maximum context length
+            inference_error = f"Tokenization error: {ve}"
+        except KeyError as ke:
+            # Returned output is not adhering to the expected output format
+            inference_error = f"Output fmt error: {ke}\n{output}"
+
+        if inference_error:
+            LOG.warning(inference_error)
+
+        if per_token_scores is None:
+            # Return a trivial reward model score
+            return {"reward_model_score": 0.0, "inference_error": inference_error}
+
+        last_token_score = per_token_scores[-1]
         score = None
         if self.model_type == "orm":
             # Last token's score
