@@ -16,12 +16,17 @@
 
 FROM nvcr.io/nvidia/pytorch:24.07-py3
 
-ARG COMMIT=956b5adfbd3d360ce43c0c951c4275df37d6dddc
-RUN cd /opt && git clone https://github.com/OpenRLHF/OpenRLHF.git && cd OpenRLHF && git checkout $COMMIT && pip install -e .
+RUN pip install git+https://github.com/OpenRLHF/OpenRLHF.git
 
 ARG FLASHINFER_URL=https://github.com/flashinfer-ai/flashinfer/releases/download/v0.2.0.post1/flashinfer-0.2.0.post1+cu121torch2.4-cp310-cp310-linux_x86_64.whl
 RUN pip install $FLASHINFER_URL
 
-RUN pip install vllm==0.7.0
+RUN pip install vllm==0.6.6.post1
+
+# Install requirements
+RUN pip install geventhttpclient outlines sentencepiece transformers>=4.45.2 sentence-transformers>=2.2.2 && \
+    pip install "megablocks==0.5.1"
+
+RUN pip install opencv-fixer==0.2.5 && python -c "from opencv_fixer import AutoFix; AutoFix()"
 
 WORKDIR /workspace

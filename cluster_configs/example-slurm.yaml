@@ -19,6 +19,7 @@ containers:
   vllm: igitman/nemo-skills-vllm:0.5.1
   sglang: igitman/nemo-skills-sglang:0.5.0
   nemo: igitman/nemo-skills-nemo:0.5.0
+  openrlhf: igitman/nemo-skills-openrlhf:0.5.0
   sandbox: igitman/nemo-skills-sandbox:0.5.0
   nemo-skills: igitman/nemo-skills:0.5.0
 
