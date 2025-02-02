@@ -49,15 +49,16 @@ class TrainingParams:
 def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict = {}
     if cluster_config['executor'] == 'local':
+        assert params.num_gpus == 1, "Local executor only supports single GPU training for debugging"
         format_dict['nnodes'] = 1
         format_dict['nproc_per_node'] = params.num_gpus
-        format_dict['node_rank'] = "${OMPI_COMM_WORLD_RANK}"
+        format_dict['node_rank'] = 0  # TODO(som): We could do multi gpu local debug if we properly read "$OMPI_COMM_WORLD_RANK"
         format_dict['master_addr'] = "localhost"
     else:
         format_dict['nnodes'] = params.num_nodes
         format_dict['nproc_per_node'] = params.num_gpus
-        format_dict['node_rank'] = "${SLURM_PROCID}"
-        format_dict['master_addr'] = "${SLURM_MASTER_NODE}"
+        format_dict['node_rank'] = "$SLURM_PROCID"
+        format_dict['master_addr'] = "$SLURM_MASTER_NODE"
 
     format_dict['master_port'] = format_dict.get('master_port', 9901)
 
@@ -131,7 +132,10 @@ def get_cmd(cluster_config, params: TrainingParams):
     cmd = (
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"export TRITON_CACHE_DIR=/nemo_run/code/.triton_cache && "
         f"cd /nemo_run/code && "
+        f"echo 'Starting trainig' && "
+        f'echo "Torch run cmd: {torchrun_cmd}" && '
         f"{torchrun_cmd} -m openrlhf.cli.train_sft "
         f"  {format_train_args(cluster_config, params)} "
         f"  {format_data_args(cluster_config, params)} "
