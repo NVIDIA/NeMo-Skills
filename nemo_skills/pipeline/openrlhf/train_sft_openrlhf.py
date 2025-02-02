@@ -71,8 +71,19 @@ def get_torchrun_cmd(cluster_config, params: TrainingParams):
 
 def format_train_args(cluster_config, params: TrainingParams):
     format_dict = OmegaConf.structured(params)
+
+    # NOTE:
+    # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
+    # with optim states)
+    # `save` refers to the final HF model checkpoint (the equivalent of nemo final model checkpoint)
+    # You can opt in to save both ds and HF checkpoint at every save_steps by setting `--save_hf_ckpt` as extra args
     cmd = (f" --pretrain {params.model} "
+           f" --load_checkpoint "
+           f" --ckpt_path {os.path.join(params.output_dir, 'ds_checkpoints')} "
+           f" --max_ckpt_num 3 "
+           f" --max_ckpt_mem 10000000000 "
            f" --save_path {os.path.join(params.output_dir, 'checkpoints')} "
+           f" --save_steps -1 "
            f" --max_samples {format_dict.get('max_samples', 500000)} "
            f" --max_epochs {format_dict.get('max_epochs', 1)} ")
     return cmd
@@ -101,7 +112,6 @@ def get_sft_common_arg_overrides(cluster_config, params: TrainingParams):
         f" --max_len {format_dict.get('max_len', 4096)} "
         f" --train_batch_size {format_dict.get('train_batch_size', 256)} "
         f" --micro_train_batch_size {format_dict.get('micro_train_batch_size', 1)} "
-        " --save_steps -1 "
         " --logging_steps 1 "
         " --eval_steps -1 "
         " --zero_stage 2 "
