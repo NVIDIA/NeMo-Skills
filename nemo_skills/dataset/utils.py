@@ -14,10 +14,15 @@
 
 import contextlib
 import importlib
+import json
 import os
 import sys
+import time
+import urllib.request
+from pathlib import Path
 from typing import Dict
-
+from urllib.error import URLError
+from nemo_skills.dataset.parser_qwen import parse_ground_truth
 
 @contextlib.contextmanager
 def add_to_path(p):
@@ -59,3 +64,51 @@ def get_dataset_module(dataset, extra_datasets=None):
             dataset_module = importlib.import_module(dataset)
         found_in_extra = True
     return dataset_module, found_in_extra
+
+
+def download_with_retries(url, output_file, max_retries=3, retry_delay=1):
+    """Download a file with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            urllib.request.urlretrieve(url, output_file)
+            return True
+        except URLError as e:
+            if attempt == max_retries - 1:
+                raise Exception(f"Failed to download after {max_retries} attempts: {e}")
+            time.sleep(retry_delay * (attempt + 1))
+    return False
+
+
+def save_data_from_qwen(dataset, split="test"):
+    url = (
+        "https://raw.githubusercontent.com/QwenLM/Qwen2.5-Math/refs/heads/main/evaluation/data/{dataset}/{split}.jsonl"
+    )
+
+    data_dir = Path(__file__).absolute().parent
+    original_file = str(data_dir / dataset / f"original_{split}.json")
+    data_dir.mkdir(exist_ok=True)
+    output_file = str(data_dir / dataset / f"{split}.jsonl")
+    data = []
+    if not os.path.exists(original_file):
+        formatted_url = url.format(split=split, dataset=dataset)
+        download_with_retries(formatted_url, original_file)
+
+    with open(original_file, "rt", encoding="utf-8") as fin:
+        for index, line in enumerate(fin):
+            entry = json.loads(line)
+            # TODO: add else
+
+            if "problem" not in entry:
+                entry["problem"] = entry.pop("question")
+            # use parse_ground_truth from qwen repo to get the expected answer
+            _, expected_answer = parse_ground_truth(entry, dataset)
+            entry["expected_answer"] = expected_answer
+            if "answer" in entry: entry.pop("answer")
+            data.append(entry)
+
+    with open(output_file, "wt", encoding="utf-8") as fout:
+        for entry in data:
+            fout.write(json.dumps(entry) + "\n")
+
+
+    return output_file

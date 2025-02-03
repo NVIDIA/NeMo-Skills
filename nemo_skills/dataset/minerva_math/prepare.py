@@ -15,4 +15,4 @@
 from nemo_skills.dataset.utils import save_data_from_qwen
 
 if __name__ == "__main__":
-    save_data_from_qwen("amc23")
+    save_data_from_qwen("minerva_math")

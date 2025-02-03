@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.dataset.utils import save_data_from_qwen
-
-if __name__ == "__main__":
-    save_data_from_qwen("amc23")
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+PROMPT_CONFIG = 'generic/math'
+DATASET_GROUP = 'math'
+METRICS_TYPE = "math"
+DEFAULT_EVAL_ARGS = "++eval_type=math"
+DEFAULT_GENERATION_ARGS = ""
