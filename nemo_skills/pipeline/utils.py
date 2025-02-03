@@ -31,9 +31,16 @@ from invoke import StreamWatcher
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
 from nemo_run.core.tunnel import SSHTunnel
+from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
+
+
+# keeping a global variable for first submitted experiment (per cluster) and reusing it by default
+# we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
+# we can still reuse code as long as ssh matches
+REUSE_CODE_EXP = {}
 
 
 def check_if_mounted(cluster_config, path_to_check):
@@ -177,7 +184,7 @@ def get_reward_server_command(
             raise ValueError("VLLM server does not support multi-node execution")
 
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -232,19 +239,59 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        if num_nodes > 1:
-            raise ValueError("VLLM server does not support multi-node execution")
-
-        server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+        start_vllm_cmd = (
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
+        ports = (
+            "--node-manager-port=12345 "
+            "--object-manager-port=12346 "
+            "--dashboard-port=8265 "
+            "--dashboard-agent-grpc-port=12347 "
+            "--runtime-env-agent-port=12349 "
+            "--metrics-export-port=12350 "
+            "--min-worker-port=14349 "
+            "--max-worker-port=18349 "
+        )
+        server_start_cmd = (
+            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+            "    echo 'Starting head node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
+            "    ray start "
+            "        --head "
+            "        --port=6379 "
+            f"       {ports} && "
+            f"   {start_vllm_cmd} ;"
+            "else "
+            "    echo 'Starting worker node' && "
+            "    export RAY_raylet_start_wait_time_s=120 && "
+            "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
+            "    ray start "
+            "        --block "
+            "        --address=$VLLM_HEAD_NODE:6379 "
+            f"       {ports} ;"
+            "fi"
+        )
+        num_tasks = 1
+    elif server_type == 'sglang':
+        if num_nodes > 1:
+            multinode_args = f"    --dist_init_addr $VLLM_HEAD_NODE " f"    --node_rank $SLURM_PROCID "
+        else:
+            multinode_args = ""
+        server_start_cmd = (
+            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
+            f"    --port {server_port} "
+            f"    {multinode_args} "
+            f"    {server_args} "
+        )
         num_tasks = 1
     else:
-        # adding sleep to ensure the logs file exists
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
@@ -318,9 +365,17 @@ def get_cluster_config(cluster=None, config_dir=None):
     If NEMO_SKILLS_CONFIG is provided and cluster is None,
     it will be used as a full path to the config file
     and NEMO_SKILLS_CONFIG_DIR will be ignored.
+
+    If cluster is a python object (dict-like), then we simply
+    return the cluster config, under the assumption that the
+    config is prepared by the user.
     """
     # if cluster is provided, we try to find it in one of the folders
     if cluster is not None:
+        # check if cluster is a python object instead of a str path, pass through
+        if isinstance(cluster, (dict, DictConfig)):
+            return cluster
+
         # either using the provided config_dir or getting from env var
         config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
         if config_dir:
@@ -362,6 +417,10 @@ def _get_tunnel_cached(
         pre_command=pre_command,
         job_dir=job_dir,
     )
+
+
+def tunnel_hash(tunnel):
+    return f"{tunnel.job_dir}:{tunnel.host}:{tunnel.user}:{tunnel.identity}:{tunnel.shell}:{tunnel.pre_command}"
 
 
 def get_tunnel(cluster_config):
@@ -479,7 +538,6 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-@lru_cache
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = Path(__file__).absolute().parents[1]
@@ -591,7 +649,7 @@ def get_env_variables(cluster_config):
     return env_vars
 
 
-def get_mounts_from_config(cluster_config: dict, env_vars: dict = None):
+def get_mounts_from_config(cluster_config: dict):
     """
     Determines if there are mount paths that are being passed via environment variables.
     Selects the key in the cluster config called `mounts` which is a list of strings.
@@ -600,7 +658,6 @@ def get_mounts_from_config(cluster_config: dict, env_vars: dict = None):
 
     Args:
         cluster_config (dict): cluster config dictionary
-        env_vars (dict): dictionary of environment variables
 
     Returns:
         list: updated list of mounts
@@ -659,10 +716,11 @@ def get_executor(
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
+    heterogeneous=False,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
-    config_mounts = get_mounts_from_config(cluster_config, env_vars)
+    config_mounts = get_mounts_from_config(cluster_config)
 
     mounts = mounts or config_mounts
     if extra_package_dirs is not None:
@@ -673,7 +731,6 @@ def get_executor(
             raise ValueError("Local executor does not support multi-node execution")
 
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
-
         return DockerExecutor(
             container_image=container,
             packager=packager,
@@ -683,7 +740,10 @@ def get_executor(
             num_gpus=gpus_per_node,
             network="host",
             env_vars=env_vars,
+            additional_kwargs={"entrypoint": ""},
         )
+
+    env_vars["VLLM_HEAD_NODE"] = "${head_node}"
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
@@ -735,6 +795,7 @@ def get_executor(
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
         dependency_type=dependency_type,
+        heterogeneous=heterogeneous,
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
@@ -769,6 +830,7 @@ def add_task(
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
+    reuse_code: bool = True,
     task_dependencies: list[str] = None,
     run_after: str | list[str] | None = None,
     get_server_command=get_server_command,
@@ -792,6 +854,9 @@ def add_task(
     You can use `reuse_code_exp` to reuse the code from another experiment
     (and thus avoid costly packaging/ssh uploading). You can provide either experiment
     name or the experiment object itself.
+
+    By default we will reuse the code of the first submitted experiment.
+    If you want to avoid this, set `reuse_code=False`.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, str):
@@ -889,17 +954,22 @@ def add_task(
             )
             executors.append(sandbox_executor)
 
-    if reuse_code_exp is not None:
+    if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
-        if isinstance(reuse_code_exp, run.Experiment):
-            LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
-            reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-        else:
-            with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
-                LOG.info("Reusing code from experiment %s", reuse_code_exp)
-                reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-        for executor in executors:
-            executor.packager.symlink_from_remote_dir = reuse_dir
+        if reuse_code:
+            reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
+            if reuse_code_exp is not None:
+                if isinstance(reuse_code_exp, run.Experiment):
+                    LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
+                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                else:
+                    with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
+                        LOG.info("Reusing code from experiment %s", reuse_code_exp)
+                        reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                for executor in executors:
+                    executor.packager.symlink_from_remote_dir = reuse_dir
+        else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+            REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
@@ -927,3 +997,8 @@ def run_exp(exp, cluster_config, sequential=None):
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
         exp.run(detach=True, sequential=False if sequential is None else sequential)
+
+        # caching the experiment code for reuse
+        ssh_hash = tunnel_hash(get_tunnel(cluster_config))
+        if ssh_hash not in REUSE_CODE_EXP:
+            REUSE_CODE_EXP[ssh_hash] = exp

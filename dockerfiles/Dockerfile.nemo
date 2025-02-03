@@ -161,3 +161,7 @@ for pr_and_commit in \
   git tag cherry-pick-PR-${pr}
 done
 EOF
+
+# patching gpt sft dataset to properly support packing
+# TODO: remove when integrated in NeMo
+COPY nemo_skills/training/gpt_sft_dataset.py /opt/NeMo/nemo/collections/nlp/data/language_modeling/megatron/gpt_sft_dataset.py

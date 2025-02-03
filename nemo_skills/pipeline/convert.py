@@ -74,6 +74,7 @@ def get_hf_to_trtllm_cmd(
         f"    --dtype {dtype} "
         f"    --tp_size {num_gpus} "
         f"    --pp_size {num_nodes} "
+        f"    --workers 16 "
         f"    {trt_prepare_args} "
     )
 
@@ -83,10 +84,10 @@ def get_hf_to_trtllm_cmd(
         f"    --output_dir {output_model} "
         f"    --gpt_attention_plugin {dtype} "
         f"    --use_paged_context_fmha enable "
+        f"    --max_batch_size 512 "
         f"    --max_input_len 4096 "
         f"    --max_seq_len 8192 "
         f"    --max_num_tokens 8192 "
-        f"    --max_batch_size 128 "
         f"    {extra_arguments} && "
         f"cp {input_model}/tokenizer* {output_model} "
     )
@@ -123,6 +124,7 @@ def get_hf_to_nemo_cmd(
 class SupportedTypes(str, Enum):
     llama = "llama"
     qwen = "qwen"
+    deepseek_v3 = "deepseek_v3"
 
 
 class SupportedFormatsTo(str, Enum):
@@ -172,6 +174,13 @@ def convert(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -179,7 +188,11 @@ def convert(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -204,6 +217,9 @@ def convert(
 
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
+
+    if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
+        raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_model)
@@ -252,6 +268,7 @@ def convert(
             partition=partition,
             time_min=time_min,
             run_after=run_after,
+            reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import copy
 import logging
 from enum import Enum
 from typing import List
@@ -22,7 +22,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(__file__)
 
@@ -32,9 +32,10 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     openai = "openai"
+    sglang = "sglang"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if random_seed is not None:
         output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
     else:
@@ -47,6 +48,9 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
+    if chunk_id is not None:
+        cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
+        output_file = get_chunked_filename(chunk_id, output_file)
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -57,7 +61,10 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+# TODO: support chunking for reward model and math judge
+
+
+def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -71,7 +78,7 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
     return cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None):
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
@@ -188,8 +195,21 @@ def generate(
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
-    random_seeds: List[int] = typer.Option(None, help="List of random seeds to use for generation"),
+    random_seeds: str = typer.Option(
+        None,
+        help="List of random seeds to use for generation. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
+    num_chunks: int = typer.Option(
+        None,
+        help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
+    ),
+    chunk_ids: str = typer.Option(
+        None,
+        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
@@ -202,6 +222,13 @@ def generate(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -209,7 +236,11 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -224,10 +255,19 @@ def generate(
     except AttributeError:
         pass
 
+    get_random_port = server_gpus != 8 and not exclusive
+
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
     if num_random_seeds:
         random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
+    if isinstance(random_seeds, str):
+        random_seeds = str_ids_to_list(random_seeds)
+
+    if num_chunks:
+        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
+    if chunk_ids is None:
+        chunk_ids = [None]
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
@@ -242,9 +282,61 @@ def generate(
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
+        # TODO: reduce code duplication
         if random_seeds:
-            for seed in random_seeds:
-                server_port = get_free_port(strategy="random")
+            for chunk_id in chunk_ids:
+                for seed in random_seeds:
+                    server_port = get_free_port(strategy="random") if get_random_port else 5000
+                    server_config, extra_arguments, server_address, server_port = configure_client(
+                        generation_type=generation_type,
+                        server_gpus=server_gpus,
+                        server_type=server_type,
+                        server_address=original_server_address,
+                        server_port=server_port,
+                        server_nodes=server_nodes,
+                        model=model,
+                        server_args=server_args,
+                        extra_arguments=extra_arguments_original,
+                    )
+                    cmd = get_cmd(
+                        random_seed=seed,
+                        output_dir=output_dir,
+                        extra_arguments=extra_arguments,
+                        eval_args=eval_args,
+                        chunk_id=chunk_id,
+                        num_chunks=num_chunks,
+                    )
+                    prev_tasks = None
+
+                    for _ in range(dependent_jobs + 1):
+                        new_task = add_task(
+                            exp,
+                            cmd=wrap_cmd(
+                                get_generation_command(server_address=server_address, generation_commands=cmd),
+                                preprocess_cmd,
+                                postprocess_cmd,
+                                random_seed=seed,
+                            ),
+                            task_name=f'{expname}-rs{seed}',
+                            log_dir=log_dir,
+                            container=cluster_config["containers"]["nemo-skills"],
+                            cluster_config=cluster_config,
+                            partition=partition,
+                            time_min=time_min,
+                            server_config=server_config,
+                            with_sandbox=True,
+                            sandbox_port=None if get_random_port else 6000,
+                            run_after=run_after,
+                            reuse_code=reuse_code,
+                            reuse_code_exp=reuse_code_exp,
+                            task_dependencies=prev_tasks,
+                            get_server_command=get_server_command,
+                            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                        )
+                        prev_tasks = [new_task]
+        else:
+            for chunk_id in chunk_ids:
+                server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
                     rm_type=rm_type,
@@ -259,13 +351,14 @@ def generate(
                 )
 
                 cmd = get_cmd(
-                    random_seed=seed,
+                    random_seed=None,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
+                    chunk_id=chunk_id,
+                    num_chunks=num_chunks,
                 )
                 prev_tasks = None
-
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
@@ -273,9 +366,8 @@ def generate(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
                             postprocess_cmd,
-                            random_seed=seed,
                         ),
-                        task_name=f'{expname}-rs{seed}',
+                        task_name=expname,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
@@ -283,57 +375,15 @@ def generate(
                         time_min=time_min,
                         server_config=server_config,
                         with_sandbox=True,
+                        sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
+                        reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
                         get_server_command=get_server_command,
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
-        else:
-            server_port = get_free_port(strategy="random")
-            server_config, extra_arguments, server_address, server_port = configure_client(
-                generation_type=generation_type,
-                rm_type=rm_type,
-                server_gpus=server_gpus,
-                server_type=server_type,
-                server_address=original_server_address,
-                server_port=server_port,
-                server_nodes=server_nodes,
-                model=model,
-                server_args=server_args,
-                extra_arguments=extra_arguments_original,
-            )
-            cmd = get_cmd(
-                random_seed=None,
-                output_dir=output_dir,
-                extra_arguments=extra_arguments,
-                eval_args=eval_args,
-            )
-            prev_tasks = None
-            for _ in range(dependent_jobs + 1):
-                new_task = add_task(
-                    exp,
-                    cmd=wrap_cmd(
-                        get_generation_command(server_address=server_address, generation_commands=cmd),
-                        preprocess_cmd,
-                        postprocess_cmd,
-                    ),
-                    task_name=expname,
-                    log_dir=log_dir,
-                    container=cluster_config["containers"]["nemo-skills"],
-                    cluster_config=cluster_config,
-                    partition=partition,
-                    time_min=time_min,
-                    server_config=server_config,
-                    with_sandbox=True,
-                    run_after=run_after,
-                    reuse_code_exp=reuse_code_exp,
-                    task_dependencies=prev_tasks,
-                    get_server_command=get_server_command,
-                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                )
-                prev_tasks = [new_task]
         run_exp(exp, cluster_config)
 
     return exp

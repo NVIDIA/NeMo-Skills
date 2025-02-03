@@ -233,6 +233,13 @@ def train(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -240,7 +247,11 @@ def train(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -315,6 +326,7 @@ def train(
                 time_min=time_min,
                 with_sandbox=with_sandbox,
                 run_after=run_after,
+                reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
@@ -340,6 +352,7 @@ def train(
             num_tasks=1,
             num_gpus=num_gpus,
             run_after=run_after,
+            reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             task_dependencies=[prev_task] if prev_task is not None else None,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,

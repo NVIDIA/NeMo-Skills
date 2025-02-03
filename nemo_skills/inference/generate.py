@@ -16,6 +16,8 @@ import importlib
 import json
 import logging
 import sys
+import time
+from collections import deque
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
@@ -27,7 +29,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -67,9 +69,10 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    # if > 0, will skip this many samples from the beginning of the data file.
-    # Useful if need to run multiple slurm jobs on the same data file
-    offset: int = 0
+    max_concurrent_requests: int = 1024  # Maximum number of concurrent requests to the server for the async loop
+    # chunk the dataset into equal sized parts and index into them
+    num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
+    chunk_id: int | None = None  # if specified, will index the specified chunk only
 
     generation_key: str = "generation"
     include_generation: bool = False  # if True, will use "generation" as part of the prompt
@@ -81,6 +84,12 @@ class GenerateSolutionsConfig:
     # with the first question, second entry to both first question, first answer and second question
     # and so on
     multi_turn_key: str | None = None
+
+    # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
+    # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
+    # to `output_file`-async (and put it back in order after all generations are done)
+    use_async_loop: bool = True
+    async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation
     # useful to double check that your data can be loaded and prompt has what you expect
@@ -132,39 +141,8 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
     return prompt_phrases + extra_phrases
 
 
-@hydra.main(version_base=None, config_name='base_generation_config')
-def generate(cfg: GenerateSolutionsConfig):
-    cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
-
-    LOG.info("Config used: %s", cfg)
-
-    if cfg.prompt_template is None and cfg.server["server_type"] != "openai":
-        # TODO: handle this explicitly in model.py clients
-        # switching to OpenAI client always if prompt template is not provided
-        with open_dict(cfg.server):
-            cfg.server["server_type"] = "openai"
-            cfg.server["model"] = "model"
-        if cfg.code_execution:
-            raise ValueError("Code execution is not supported for OpenAI server")
-
-    if cfg.code_execution:
-        sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
-        llm = get_code_execution_model(**cfg.server, sandbox=sandbox)
-    else:
-        llm = get_model(**cfg.server)
-
-    # making sure output dir exists
-    Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
-
-    # we currently assume the dataset is small enough to be loaded into memory
-    data = []
-    with open(cfg.input_file, "rt", encoding="utf-8") as fin:
-        for line in fin:
-            data.append(json.loads(line))
-
-    # skipping based on the offset first
-    data = data[cfg.offset :]
-
+def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params):
+    """Synchronous version that only dumps data when full batch is finished."""
     starting_idx = 0
     if cfg.skip_filled:
         try:
@@ -173,15 +151,8 @@ def generate(cfg: GenerateSolutionsConfig):
         except FileNotFoundError:
             LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
 
-    # additionally, skipping whatever is pre-filled, assuming offset didn't change
+    # additionally, skipping whatever is pre-filled
     data = data[starting_idx:]
-    if cfg.prompt_config is None:
-        # fetching from the default for corresponding dataset
-        dataset_module = importlib.import_module(f"nemo_skills.dataset.{cfg.dataset}")
-        cfg.prompt_config = dataset_module.PROMPT_CONFIG
-
-    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
-    LOG.info("Prompt used: %s", prompt)
 
     # need to account for anything that's prefilled
     if 0 <= cfg.max_samples <= starting_idx:
@@ -196,37 +167,15 @@ def generate(cfg: GenerateSolutionsConfig):
     if len(data) == 0:  # we might not have any examples if skip_filled=True
         return
 
-    if cfg.multi_turn_key is None:
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
-    else:
-        first_sample = deepcopy(data[0])
-        first_sample[cfg.multi_turn_key] = first_sample[cfg.multi_turn_key][:1]
-        LOG.info(
-            "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
-            first_sample,
-            prompt.fill(first_sample, multi_turn_key=cfg.multi_turn_key),
-        )
-
-    if cfg.dry_run:
-        return
-
-    # if using code execution, we need some extra parameters for generate call
-    if cfg.code_execution:
-        extra_generate_params = prompt.get_code_execution_args()
-    else:
-        extra_generate_params = {}
-
-    extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
+    data = data[: cfg.max_samples]
 
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
         data_points = []
         for idx, data_point in tqdm(enumerate(data), initial=starting_idx, total=len(data) + starting_idx):
-            if idx >= cfg.max_samples:
-                break
             data_points.append(data_point)
 
-            if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
+            if len(data_points) == cfg.batch_size or idx == len(data) - 1:
                 if cfg.multi_turn_key is None:
                     outputs = llm.generate(
                         prompts=[prompt.fill(dp, cfg.include_generation) for dp in data_points],
@@ -285,6 +234,181 @@ def generate(cfg: GenerateSolutionsConfig):
                     output.update(original_data_point)
                     fout.write(json.dumps(output) + "\n")
                 data_points = []
+
+
+def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params):
+    """Asynchronous version that sends all the data to server and then dumps outputs as soon as they are finished."""
+    if cfg.max_samples > 0:
+        data = data[: cfg.max_samples]
+    original_positions = [idx for idx in range(len(data))]
+    if cfg.skip_filled:
+        try:
+            filled_positions = set()
+            with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+                for line in fin:
+                    filled_positions.add(int(json.loads(line)[cfg.async_position_key]))
+            data = [dp for idx, dp in enumerate(data) if idx not in filled_positions]
+            original_positions = [idx for idx in original_positions if idx not in filled_positions]
+        except FileNotFoundError:
+            LOG.warning(f"File `{cfg.output_file}-async` not found, starting from scratch")
+
+    # if output_file (not async) exists, means we are fully done or need to remove it and regenerate
+    if Path(cfg.output_file).exists():
+        if not cfg.skip_filled:
+            Path(cfg.output_file).unlink()
+        else:
+            return
+
+    if len(data) == 0:  # we might not have any examples if skip_filled=True
+        return
+
+    LOG.warning(
+        f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!."
+    )
+    LOG.warning("Users can set '++max_concurrent_requests' to control the number of concurrent requests.")
+
+    request_queue = deque(range(len(data)))  # Queue of unsubmitted task indices
+    in_progress = {}  # Track ongoing requests {index: generation_id}
+
+    with open(cfg.output_file + "-async", "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        pbar = tqdm(total=len(data), desc="Processing requests")
+
+        while in_progress or request_queue:  # Continue until all tasks are complete
+            # Dynamic sending requests to maintain cfg.max_concurrent_requests running requests
+            num_to_submit = min(cfg.max_concurrent_requests - len(in_progress), len(request_queue))
+            batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
+            batch_prompts = [prompt.fill(data[idx]) for idx in batch_indices]
+
+            if len(batch_prompts) > 0:
+                generation_ids = llm.generate_async(
+                    prompts=batch_prompts,
+                    stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
+                    **asdict(cfg.inference),
+                    **extra_generate_params,
+                )
+
+            # Map the generated ids to the original positions
+            for gen_ids_idx, original_pos in enumerate(batch_indices):
+                in_progress[original_pos] = generation_ids[gen_ids_idx]
+
+            # Create a snapshot of in_progress to avoid modifying the dictionary while iterating over it
+            snapshot_in_progress = in_progress.copy()
+            generations = llm.get_generations(list(snapshot_in_progress.values()))
+
+            for (idx, gen_id), gen_dict in zip(snapshot_in_progress.items(), generations):
+                if gen_dict['generation'] is not None:
+                    # remove the completed task from in_progress
+                    del in_progress[idx]
+
+                    # Prepare the result for writing
+                    gen_dict[cfg.generation_key] = gen_dict.pop("generation")
+                    for key in gen_dict:
+                        data[idx].pop(key, None)
+                    gen_dict.update(data[idx])
+
+                    # Insert the async position to preserve the original order
+                    gen_dict[cfg.async_position_key] = original_positions[idx]
+
+                    # Write the result immediately to minimize memory usage
+                    fout.write(json.dumps(gen_dict) + "\n")
+
+                    # Update progress bar
+                    pbar.update(1)
+
+            # Prevent excessive API overload
+            time.sleep(1)
+
+        pbar.close()
+
+    # After we are done, need to restore the order and resave without position ids
+    with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+        generations = [json.loads(line) for line in fin]
+
+    ordered_generations = [None] * len(generations)
+    for gen_dict in generations:
+        async_pos = gen_dict.pop(cfg.async_position_key)
+        ordered_generations[async_pos] = gen_dict
+
+    with open(cfg.output_file, "wt", encoding="utf-8") as fout:
+        for gen_dict in ordered_generations:
+            fout.write(json.dumps(gen_dict) + "\n")
+
+    Path(cfg.output_file + '-async').unlink()
+
+
+@hydra.main(version_base=None, config_name='base_generation_config')
+def generate(cfg: GenerateSolutionsConfig):
+    cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
+
+    LOG.info("Config used: %s", cfg)
+
+    if cfg.prompt_template is None and cfg.server["server_type"] != "openai":
+        # TODO: handle this explicitly in model.py clients
+        # switching to OpenAI client always if prompt template is not provided
+        with open_dict(cfg.server):
+            cfg.server["server_type"] = "openai"
+            cfg.server["model"] = "model"
+        if cfg.code_execution:
+            raise ValueError("Code execution is not supported for OpenAI server")
+
+    if cfg.code_execution:
+        sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
+        llm = get_code_execution_model(**cfg.server, sandbox=sandbox)
+    else:
+        llm = get_model(**cfg.server)
+
+    # making sure output dir exists
+    Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
+
+    # we currently assume the dataset is small enough to be loaded into memory
+    data = []
+    with open(cfg.input_file, "rt", encoding="utf-8") as fin:
+        for line in fin:
+            data.append(json.loads(line))
+
+    # chunk the dataset if required
+    if cfg.num_chunks is not None and cfg.chunk_id is not None:
+        data, cfg.output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
+        LOG.info(
+            f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
+            f"Number of samples in the chunk: {len(data)}"
+        )
+
+    if cfg.prompt_config is None:
+        # fetching from the default for corresponding dataset
+        dataset_module = importlib.import_module(f"nemo_skills.dataset.{cfg.dataset}")
+        cfg.prompt_config = dataset_module.PROMPT_CONFIG
+
+    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
+    LOG.info("Prompt used: %s", prompt)
+
+    if cfg.multi_turn_key is None:
+        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
+    else:
+        first_sample = deepcopy(data[0])
+        first_sample[cfg.multi_turn_key] = first_sample[cfg.multi_turn_key][:1]
+        LOG.info(
+            "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
+            first_sample,
+            prompt.fill(first_sample, multi_turn_key=cfg.multi_turn_key),
+        )
+
+    if cfg.dry_run:
+        return
+
+    # if using code execution, we need some extra parameters for generate call
+    if cfg.code_execution:
+        extra_generate_params = prompt.get_code_execution_args()
+    else:
+        extra_generate_params = {}
+
+    extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
+
+    # for nemo or multi-turn generation, we don't support async yet
+    if cfg.use_async_loop is False or cfg.server["server_type"] == "nemo" or cfg.multi_turn_key is not None:
+        sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
+    else:
+        async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
 
 
 HELP_MESSAGE = get_help_message(

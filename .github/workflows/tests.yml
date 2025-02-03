@@ -32,6 +32,7 @@ jobs:
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
         docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.5.0 &
         sleep 120

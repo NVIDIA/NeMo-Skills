@@ -17,19 +17,20 @@ import logging
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
 
-import httpx
 import openai
 import requests
-from openai import BadRequestError, DefaultHttpxClient, OpenAI
+from openai import BadRequestError, OpenAI
 
 LOG = logging.getLogger(__file__)
 
 
 class BaseModel(abc.ABC):
-    """Base model class for handling requests to the inference server.
+    """Base model class for handling requests to the reward model inference server.
 
     Args:
+        model_type: Reward model type
         host: Optional[str] = '127.0.0.1' - Host of the inference server.
         port: Optional[str] = '5000' - Port of the inference server.
             Only required if handle_code_execution is True.
@@ -42,11 +43,13 @@ class BaseModel(abc.ABC):
 
     def __init__(
         self,
+        model_type: str,
         host: str = '127.0.0.1',
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
     ):
+        self.model_type = model_type
         self.server_host = host
         self.server_port = port
         self.ssh_server = ssh_server
@@ -115,48 +118,59 @@ class VLLMRewardModel(BaseModel):
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
 
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
         self.oai_client = openai.OpenAI(
             api_key="EMPTY",
             base_url=f"http://{self.server_host}:{self.server_port}/v1",
             timeout=None,
-            http_client=http_client,
         )
+
+        # Reward models are accessed via the "pooling" interface
+        # https://docs.vllm.ai/en/latest/models/pooling_models.html
+        self.request_url = f"http://{self.server_host}:{self.server_port}/pooling"
 
         model_list = self.oai_client.models.list()
         self.model = model_list.data[0].id
 
-    def _disc_score_single_prompt(self, prompt):
-        # TODO: The current VLLM support for Qwen-RM uses a hack of using embedding APIs.
-        # Once VLLM officially adds the support, change the API.
-        response = self.oai_client.embeddings.create(input=[prompt], model=self.model)
-        raw_score = response.data[0].embedding[-1]
-        score = 1 / (1 + math.exp(-raw_score))
+    def _score_single_prompt(self, prompt):
+        """Score a single prompt"""
+
+        per_token_scores = None
+        inference_error = ""
+        try:
+            response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
+            output = response.json()
+            per_token_scores = output['data'][0]['data']
+        except requests.exceptions.HTTPError as err:
+            inference_error = f"Request failed: {err}"
+        except ValueError as ve:
+            # Could be that the sequence exceeds the maximum context length
+            inference_error = f"Tokenization error: {ve}"
+        except KeyError as ke:
+            # Returned output is not adhering to the expected output format
+            inference_error = f"Output fmt error: {ke}\n{output}"
+
+        if inference_error:
+            LOG.warning(inference_error)
+
+        if per_token_scores is None:
+            # Return a trivial reward model score
+            return {"reward_model_score": 0.0, "inference_error": inference_error}
+
+        last_token_score = per_token_scores[-1]
+        score = None
+        if self.model_type == "orm":
+            # Last token's score
+            if isinstance(last_token_score, list):
+                logit_score = last_token_score[0]
+            else:
+                logit_score = last_token_score
+            # Normalize the score
+            score = 1 / (1 + math.exp(-logit_score))
+        elif self.model_type == "prm":
+            # Last token's score, a 2-entry array where the second entry is the probability of being correct
+            score = last_token_score[1]
+
         return {"reward_model_score": score}
-
-    def _gen_score_single_prompt(self, prompt):
-        response = self.oai_client.completions.create(
-            model=self.model,
-            prompt=[prompt],
-            max_tokens=1,  # For simple GenRM, just generated 1 token
-            logprobs=2,
-            temperature=0,
-            extra_body={"guided_choice": ["Yes", "No"]},  # Assuming Yes and No are single tokens
-        )
-
-        logprob = response.choices[0].logprobs.top_logprobs[0]['Yes']
-        score = math.exp(logprob)
-
-        # LOG.info(f"Response: {response}")
-        return {"reward_model_score": score}
-
-    def _gen_cot_score_single_prompt(self, prompt):
-        # TODO: Add support for decoding with CoT
-        pass
 
     def score(self, prompts: list[str]) -> list[float]:
         outputs = [None] * len(prompts)  # Pre-allocate a list to store results in correct order
@@ -190,7 +204,7 @@ models = {
 }
 
 
-def get_reward_model(server_type, **kwargs):
+def get_reward_model(server_type, model_type, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    return model_class(**kwargs)
+    return model_class(model_type=model_type, **kwargs)

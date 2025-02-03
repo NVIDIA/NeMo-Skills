@@ -15,6 +15,8 @@
 
 import copy
 import logging
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
@@ -37,6 +39,11 @@ class CodeExecutionWrapper:
         self.model = model
         self.sandbox = sandbox
         self.config = config
+
+        self.gen_id_to_params = {}
+        self.gen_id_to_future = {}
+
+        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
 
     def _generate_single(
         self,
@@ -112,7 +119,7 @@ class CodeExecutionWrapper:
         return {'generation': request['prompt'][len(prompt) :]}
 
     # TODO: is there a way to reuse this with BaseModel?
-    def generate(
+    def generate_async(
         self,
         prompts: list[str | dict],
         code_begin: str | list[str],
@@ -167,19 +174,108 @@ class CodeExecutionWrapper:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
         futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.model.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single, **request))
-        outputs = [future.result() for future in futures]
+        for request_idx in range(len(prompts)):
+            request = {key: value[request_idx] for key, value in kwargs.items()}
+            request['prompt'] = prompts[request_idx]
+            self.model.preprocess_request(request)
+            futures.append(self.executor.submit(self._generate_single, **request))
 
-        if remove_stop_phrases:
-            for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+        gen_ids = []
+        for future in futures:
+            gen_id = str(uuid.uuid4())
+            gen_ids.append(gen_id)
+            self.gen_id_to_future[gen_id] = future
 
-        return outputs
+        self.gen_id_to_params = {
+            gen_id: (req_stop_phrases, remove_stop_phrases)
+            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
+        }
+
+        return gen_ids
+
+    def get_generations(
+        self,
+        generation_ids: list[str],
+    ) -> list[dict]:
+
+        generations = []
+        for generation_id in generation_ids:
+            if generation_id not in self.gen_id_to_future:
+                raise ValueError(f"Generation id {generation_id} not found.")
+
+            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
+            future = self.gen_id_to_future[generation_id]
+            if not future.done():
+                output = {'generation': None}
+            else:
+                output = future.result()
+                del self.gen_id_to_future[generation_id]
+                del self.gen_id_to_params[generation_id]
+
+            if remove_stop_phrases:
+                if output['generation'] is not None:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+            generations.append(output)
+
+        return generations
+
+    def generate(
+        self,
+        prompts: list[str | dict],
+        code_begin: str | list[str],
+        code_end: str | list[str],
+        code_output_begin: str | list[str],
+        code_output_end: str | list[str],
+        code_output_format: str | list[str],
+        tokens_to_generate: int | list[int] = 512,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        remove_stop_phrases: bool = True,
+    ) -> list[dict]:
+        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
+
+        Not every server supports that, so make sure to override this method directly if that's not the case.
+        """
+        generation_ids = self.generate_async(
+            prompts=prompts,
+            code_begin=code_begin,
+            code_end=code_end,
+            code_output_begin=code_output_begin,
+            code_output_end=code_output_end,
+            code_output_format=code_output_format,
+            tokens_to_generate=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            random_seed=random_seed,
+            stop_phrases=stop_phrases,
+            remove_stop_phrases=remove_stop_phrases,
+        )
+        all_generations = [None] * len(prompts)
+        while True:
+            remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
+            if len(remaining_ids) == 0:
+                break
+            remaining_positions = [
+                idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
+            ]
+            generations = self.get_generations(remaining_ids)
+            for gen_pos, gen_dict in zip(remaining_positions, generations):
+                if gen_dict['generation'] is not None:  # will be None until done
+                    generation_ids[gen_pos] = None
+                    all_generations[gen_pos] = gen_dict
+
+            time.sleep(1)
+
+        return all_generations
 
 
 def server_params():

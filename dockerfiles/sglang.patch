@@ -1,0 +1,108 @@
+diff --git a/python/sglang/srt/model_loader/loader.py b/python/sglang/srt/model_loader/loader.py
+index 9e6b094..2bc44ee 100644
+--- a/python/sglang/srt/model_loader/loader.py
++++ b/python/sglang/srt/model_loader/loader.py
+@@ -53,6 +53,18 @@ from sglang.srt.utils import (
+     set_weight_attrs,
+ )
+ 
++from sglang.srt.layers.quantization.fp8_utils import (
++    block_quant_to_tensor_quant,
++    input_to_float8,
++    normalize_e4m3fn_to_e4m3fnuz,
++)
++
++from vllm import _custom_ops as ops
++
++from sglang.srt.utils import is_cuda_available, is_hip
++
++is_hip_ = is_hip()
++
+ 
+ @contextmanager
+ def device_loading_context(module: torch.nn.Module, target_device: torch.device):
+@@ -602,6 +614,8 @@ class ShardedStateLoader(BaseModelLoader):
+                         # If loading with LoRA enabled, additional padding may
+                         # be added to certain parameters. We only load into a
+                         # narrowed view of the parameter data.
++                        if 'experts.e_score_correction_bias' in key:
++                            key = key.replace('experts.e_score_correction_bias', 'experts.correction_bias')
+                         param_data = state_dict[key].data
+                         param_shape = state_dict[key].shape
+                         for dim, size in enumerate(tensor.shape):
+@@ -617,6 +631,58 @@ class ShardedStateLoader(BaseModelLoader):
+                             )
+                         param_data.copy_(tensor)
+                         state_dict.pop(key)
++
++            # patching for DS-v3/r1
++            for layer_id in range(model.config.num_hidden_layers):
++                self_attn = model.model.layers[layer_id].self_attn
++                if hasattr(self_attn.kv_b_proj, "qweight"):
++                    # AWQ compatible
++                    w = ops.awq_dequantize(
++                        self_attn.kv_b_proj.qweight,
++                        self_attn.kv_b_proj.scales,
++                        self_attn.kv_b_proj.qzeros,
++                        0,
++                        0,
++                        0,
++                    ).T
++                else:
++                    w = self_attn.kv_b_proj.weight
++                # NOTE(HandH1998): Since `bmm_fp8` only supports per-tensor scale, we have to requantize `self_attn.kv_b_proj`.
++                # This may affect the accuracy of fp8 model.
++                if hasattr(model.quant_config, "weight_block_size") and w.dtype in (
++                    torch.float8_e4m3fn,
++                    torch.float8_e4m3fnuz,
++                ):
++                    weight_block_size = model.quant_config.weight_block_size
++                    if weight_block_size is not None:
++                        assert hasattr(self_attn.kv_b_proj, "weight_scale_inv")
++                        if is_hip_:
++                            weight, weight_scale, _ = normalize_e4m3fn_to_e4m3fnuz(
++                                weight=w,
++                                weight_scale=self_attn.kv_b_proj.weight_scale_inv,
++                                input_scale=None,
++                            )
++                        else:
++                            weight = w
++                            weight_scale = self_attn.kv_b_proj.weight_scale_inv
++
++                        w, scale = block_quant_to_tensor_quant(
++                            weight, weight_scale, weight_block_size
++                        )
++                        self_attn.w_scale = scale
++                w_kc, w_vc = w.unflatten(
++                    0, (-1, self_attn.qk_nope_head_dim + self_attn.v_head_dim)
++                ).split([self_attn.qk_nope_head_dim, self_attn.v_head_dim], dim=1)
++                self_attn.w_kc = w_kc.transpose(1, 2).contiguous().transpose(1, 2)
++                self_attn.w_vc = w_vc.contiguous().transpose(1, 2)
++                if (
++                    hasattr(self_attn.kv_b_proj, "weight_scale")
++                    and self_attn.w_scale is None
++                ):
++                    self_attn.w_scale = self_attn.kv_b_proj.weight_scale
++                    if is_hip_:
++                        self_attn.w_scale *= 2.0
++
+             if state_dict:
+                 raise ValueError(f"Missing keys {tuple(state_dict)} in loaded state!")
+         return model.eval()
+@@ -1225,3 +1291,4 @@ def get_model_loader(load_config: LoadConfig) -> BaseModelLoader:
+         return LayeredModelLoader(load_config)
+ 
+     return DefaultModelLoader(load_config)
++
+diff --git a/python/sglang/srt/server_args.py b/python/sglang/srt/server_args.py
+index 7bee346..4fab9d6 100644
+--- a/python/sglang/srt/server_args.py
++++ b/python/sglang/srt/server_args.py
+@@ -320,6 +320,7 @@ class ServerArgs:
+                 "gguf",
+                 "bitsandbytes",
+                 "layered",
++                "sharded_state",
+             ],
+             help="The format of the model weights to load. "
+             '"auto" will try to load the weights in the safetensors format '

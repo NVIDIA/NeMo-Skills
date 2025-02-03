@@ -24,7 +24,7 @@ from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_server_command
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -37,6 +37,8 @@ def get_greedy_cmd(
     extra_eval_args="",
     extra_arguments="",
     extra_datasets=None,
+    num_chunks=None,
+    chunk_ids=None,
 ):
     benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
     if found_in_extra:
@@ -46,20 +48,38 @@ def get_greedy_cmd(
 
     extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
     extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
-    cmd = (
-        f'echo "Evaluating benchmark {benchmark}" && '
-        f'python -m nemo_skills.inference.generate '
-        f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-        f'    {data_parameters} '
-        f'    {extra_arguments} && '
-        f'python -m nemo_skills.evaluation.evaluate_results '
-        f'    ++input_files={output_dir}/eval-results/{benchmark}/{output_name} {extra_eval_args}'
-    )
-    return cmd
+
+    cmds = []
+    if num_chunks is None or chunk_ids is None:
+        chunk_params = ["++chunk_id=null ++num_chunks=null"]
+        chunked_output_names = [output_name]
+    else:
+        chunk_params = [f"++chunk_id={chunk_id} ++num_chunks={num_chunks}" for chunk_id in chunk_ids]
+        chunked_output_names = [get_chunked_filename(chunk_id, output_name) for chunk_id in chunk_ids]
+    for chunk_param, chunked_output_name in zip(chunk_params, chunked_output_names):
+        cmds.append(
+            f'echo "Evaluating benchmark {benchmark}" && '
+            f'python -m nemo_skills.inference.generate '
+            f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
+            f'    {data_parameters} '
+            f'    {chunk_param} '
+            f'    {extra_arguments} && '
+            f'python -m nemo_skills.evaluation.evaluate_results '
+            f'    ++input_files={output_dir}/eval-results/{benchmark}/{chunked_output_name} {extra_eval_args}'
+        )
+    return cmds
 
 
 def get_sampling_cmd(
-    benchmark, split, output_dir, random_seed, extra_eval_args="", extra_arguments="", extra_datasets=None
+    benchmark,
+    split,
+    output_dir,
+    random_seed,
+    extra_eval_args="",
+    extra_arguments="",
+    extra_datasets=None,
+    num_chunks=None,
+    chunk_ids=None,
 ):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
     return get_greedy_cmd(
@@ -70,6 +90,8 @@ def get_sampling_cmd(
         extra_eval_args=extra_eval_args,
         extra_arguments=extra_arguments,
         extra_datasets=extra_datasets,
+        num_chunks=num_chunks,
+        chunk_ids=chunk_ids,
     )
 
 
@@ -78,6 +100,7 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     openai = "openai"
+    sglang = "sglang"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -106,6 +129,15 @@ def eval(
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option('test', help="Data split to use for evaluation"),
     num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
+    num_chunks: int = typer.Option(
+        None,
+        help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
+    ),
+    chunk_ids: str = typer.Option(
+        None,
+        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
+        "Can provide a list directly when using through Python",
+    ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
@@ -118,6 +150,13 @@ def eval(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     extra_datasets: str = typer.Option(
@@ -125,7 +164,11 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -149,12 +192,19 @@ def eval(
     else:
         log_dir = f"{output_dir}/eval-logs"
 
+    if num_chunks:
+        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
+    should_chunk_dataset = num_chunks is not None and chunk_ids is not None
+    num_runs = len(chunk_ids) if should_chunk_dataset else 1
+
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
+    get_random_port = server_gpus != 8 and not exclusive
+
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port(strategy="random")
+        server_port = get_free_port(strategy="random") if get_random_port else 5000
         server_address = f"localhost:{server_port}"
 
         server_config = {
@@ -181,21 +231,27 @@ def eval(
 
     eval_cmds = (
         [
-            get_greedy_cmd(
+            cmd
+            for benchmark in benchmarks.keys()
+            for cmd in get_greedy_cmd(
                 benchmark,
                 split,
                 output_dir,
                 extra_eval_args=extra_eval_args,
                 extra_arguments=extra_arguments,
                 extra_datasets=extra_datasets,
+                num_chunks=num_chunks,
+                chunk_ids=chunk_ids,
             )
-            for benchmark in benchmarks.keys()
         ]
         if not skip_greedy
         else []
     )
     eval_cmds += [
-        get_sampling_cmd(
+        cmd
+        for benchmark, rs_num in benchmarks.items()
+        for rs in range(starting_seed, starting_seed + rs_num)
+        for cmd in get_sampling_cmd(
             benchmark,
             split,
             output_dir,
@@ -203,12 +259,15 @@ def eval(
             extra_eval_args=extra_eval_args,
             extra_arguments=extra_arguments,
             extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
         )
-        for benchmark, rs_num in benchmarks.items()
-        for rs in range(starting_seed, starting_seed + rs_num)
     ]
     if num_jobs == -1:
         num_jobs = len(eval_cmds)
+    else:
+        # TODO: should we keep num_jobs as the total max?
+        num_jobs *= num_runs
 
     # splitting eval cmds equally across num_jobs nodes
     eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
@@ -229,8 +288,10 @@ def eval(
                 with_sandbox=True,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
                 extra_package_dirs=[extra_datasets] if extra_datasets else None,
                 get_server_command=get_server_command,
+                sandbox_port=None if get_random_port else 6000,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
         run_exp(exp, cluster_config)
