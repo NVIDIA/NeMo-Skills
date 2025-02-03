@@ -266,8 +266,6 @@ class TRTLLMModel(BaseModel):
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
-        if get_logprobs:
-            raise NotImplementedError("trtllm server does not support logprobs.")
         if stop_phrases is None:
             stop_phrases = []
 
@@ -281,12 +279,16 @@ class TRTLLMModel(BaseModel):
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
+            "get_logprobs": get_logprobs,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
         ).json()
+        if not get_logprobs:
+            output_dict.pop('tokens')
+            output_dict.pop('logprobs')
         return output_dict
 
     # TODO: DRY
@@ -300,6 +302,7 @@ class TRTLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        get_logprobs: bool = False,
         stop_phrases: list[str] | None = None,
     ) -> list[dict]:
         if isinstance(prompt, dict):
@@ -430,7 +433,7 @@ class NemoModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
         stop_phrases: list[str] | list[list[str]] | None = None,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -453,7 +456,7 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
-        if logprobs is not None:
+        if get_logprobs:
             request["all_probs"] = True
             request["compute_logprob"] = True
         generations = self.requests_lib.put(
@@ -469,15 +472,10 @@ class NemoModel(BaseModel):
         while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(output[:20]):
             begin_idx += 1
         output = {'generation': output[(len(prompt) - begin_idx) :]}
-        if logprobs is not None:  # TODO: for some reason nemo return non-zero logprobs only for the prompt
+        if get_logprobs:
             # outputs[idx]['num_generated_tokens'] = TODO: we can use returned tokens
             output['logprobs'] = generations['logprob'][0]
             output['tokens'] = generations['tokens'][0]
-            output['top_logprobs'] = []
-            for token_full_logprob in generations['full_logprob'][0]:
-                output['top_logprobs'].append(
-                    dict(sorted(enumerate(token_full_logprob), key=lambda x: x[1], reverse=True)[:logprobs])
-                )
         return output
 
     def generate(
@@ -491,7 +489,7 @@ class NemoModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
-        logprobs: int | None = None,
+        get_logprobs: bool = False,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         if min_p > 0:
@@ -512,7 +510,7 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
-        if logprobs is not None:
+        if get_logprobs:
             request["all_probs"] = True
             request["compute_logprob"] = True
         self.preprocess_request(request)
@@ -524,28 +522,48 @@ class NemoModel(BaseModel):
         # we need to remove the original prompt as nemo always returns it
         outputs = [None] * len(generations['sentences'])
         for idx, generation in enumerate(generations['sentences']):
-            # when the prompt starts from special tokens like bos, nemo will remove them,
-            # so we need this hack to find where to start the cut
-            begin_idx = 0
-            while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
-                begin_idx += 1
-            outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
-            if logprobs is not None:  # TODO: for some reason nemo return non-zero logprobs only for the prompt
-                # outputs[idx]['num_generated_tokens'] = TODO: we can use returned tokens
-                outputs[idx]['logprobs'] = generations['logprob'][idx]
-                outputs[idx]['tokens'] = generations['tokens'][idx]
-                outputs[idx]['top_logprobs'] = []
-                for token_full_logprob in generations['full_logprob'][idx]:
-                    outputs[idx]['top_logprobs'].append(
-                        dict(sorted(enumerate(token_full_logprob), key=lambda x: x[1], reverse=True)[:logprobs])
-                    )
+            outputs[idx] = self.remove_prompt_from_output(
+                prompts[idx], generation, generations['logprob'][idx], generations['tokens'][idx]
+            )
 
         if remove_stop_phrases:
             for output in outputs:
                 output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
-        # TODO: return num_generated_tokens as well
         return outputs
+
+    @classmethod
+    def remove_prompt_from_output(cls, prompt: str, generation: str, logprobs: list, tokens: list) -> dict:
+        # when the prompt starts from special tokens like bos, nemo will remove them,
+        # so we need this hack to find where to start the cut
+        begin_idx = 0
+        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(generation[: len(prompt) - begin_idx]):
+            begin_idx += 1
+
+        # skip corresponding number of tokens
+        cumsum = 0
+        num_prompt_tokens = 0
+        for token in tokens:
+            cumsum += len(token)
+            num_prompt_tokens += 1
+            if cumsum >= begin_idx:
+                break
+
+        # calculate how many tokens are in prompt
+        cut_idx = 0
+        for token in tokens[num_prompt_tokens:]:
+            if cut_idx + begin_idx < len(prompt):
+                num_prompt_tokens += 1
+                cut_idx += len(token)
+            else:
+                break
+
+        result = {'generation': generation[(len(prompt) - begin_idx) :]}
+        result['tokens'] = tokens[num_prompt_tokens:]
+        result['logprobs'] = logprobs[num_prompt_tokens:]
+        result['num_generated_tokens'] = len(result['logprobs'])
+
+        return result
 
 
 class OpenAIModel(BaseModel):
