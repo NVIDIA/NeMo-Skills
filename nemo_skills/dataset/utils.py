@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict
 from urllib.error import URLError
-
+from nemo_skills.dataset.parser_qwen import parse_ground_truth
 
 @contextlib.contextmanager
 def add_to_path(p):
@@ -97,12 +97,18 @@ def save_data_from_qwen(dataset, split="test"):
         for index, line in enumerate(fin):
             entry = json.loads(line)
             # TODO: add else
-            if "answer" in entry:
-                entry["expected_answer"] = entry.pop("answer")
+
             if "problem" not in entry:
                 entry["problem"] = entry.pop("question")
+            # use parse_ground_truth from qwen repo to get the expected answer
+            _, expected_answer = parse_ground_truth(entry, dataset)
+            entry["expected_answer"] = expected_answer
+                
             data.append(entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+
+    return output_file
