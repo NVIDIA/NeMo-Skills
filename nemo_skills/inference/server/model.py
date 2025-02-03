@@ -321,6 +321,7 @@ class TRTLLMModel(BaseModel):
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
+            "get_logprobs": get_logprobs,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/generate_async".format(self.server_host, self.server_port),
@@ -340,6 +341,7 @@ class TRTLLMModel(BaseModel):
         min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
+        get_logprobs: bool = False,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
@@ -356,6 +358,7 @@ class TRTLLMModel(BaseModel):
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            'get_logprobs': get_logprobs,
         }
         for key, value in kwargs.items():
             is_list = False
