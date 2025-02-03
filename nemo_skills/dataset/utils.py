@@ -103,7 +103,7 @@ def save_data_from_qwen(dataset, split="test"):
             # use parse_ground_truth from qwen repo to get the expected answer
             _, expected_answer = parse_ground_truth(entry, dataset)
             entry["expected_answer"] = expected_answer
-                
+            if "answer" in entry: entry.pop("answer")
             data.append(entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
