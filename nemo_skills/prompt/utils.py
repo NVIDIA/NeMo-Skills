@@ -245,7 +245,7 @@ class Prompt:
                 prompt_string += self.TURN_BEGIN_FORMAT.format(
                     user=self.build_user_message(input_dict), **asdict(self.config.template)
                 )
-                if generation:
+                if generation: # TODO: HERE IS THE PROBLEM, THIS IS NOT WHAT WE WANT
                     # Generation can be part of the input in cases such as reward models
                     prompt_string += self.TURN_END_FORMAT.format(assistant=generation, **asdict(self.config.template))
             else:
