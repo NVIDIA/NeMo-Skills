@@ -21,7 +21,6 @@ import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from math import log
 
 import httpx
 import openai
