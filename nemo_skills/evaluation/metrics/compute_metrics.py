@@ -27,6 +27,8 @@ class ComputeMetrics:
         self.benchmark = benchmark
         self.extra_datasets = extra_datasets
         self.metric_type = metric_type
+        # Dictionary to store metrics calculators for different subsets
+        self.calculators = {}
 
     def get_metrics_calculator(self, benchmark, extra_datasets=None, metric_type=None):
         if metric_type is None:

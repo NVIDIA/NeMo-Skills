@@ -149,31 +149,24 @@ class BaseModel(abc.ABC):
             if not is_list:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
-        futures = []
+        gen_ids = []
         for request_idx in range(len(prompts)):
+            # Prepare request
             request = {key: value[request_idx] for key, value in kwargs.items()}
             request['prompt'] = prompts[request_idx]
             self.preprocess_request(request)
-            futures.append(self.executor.submit(self._generate_single, **request))
 
-        gen_ids = []
-        for future in futures:
+            # Generate a unique generation ID
             gen_id = str(uuid.uuid4())
             gen_ids.append(gen_id)
-            self.gen_id_to_future[gen_id] = future
 
-        self.gen_id_to_params = {
-            gen_id: (req_stop_phrases, remove_stop_phrases)
-            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
-        }
+            # Update global dictionaries tracking the progress of generations
+            self.gen_id_to_future[gen_id] = self.executor.submit(self._generate_single, **request)
+            self.gen_id_to_params[gen_id] = (kwargs["stop_phrases"][request_idx], remove_stop_phrases)
 
         return gen_ids
 
-    def get_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[dict]:
-
+    def get_generations(self, generation_ids: list[str]) -> list[dict]:
         generations = []
         for generation_id in generation_ids:
             if generation_id not in self.gen_id_to_future:
@@ -373,18 +366,16 @@ class TRTLLMModel(BaseModel):
                 futures.append(executor.submit(self._generate_single_async, **request))
         outputs = [future.result() for future in futures]
 
-        self.gen_id_to_params = {
+        new_gen_id_to_params = {
             gen_id: (req_stop_phrases, remove_stop_phrases)
             for gen_id, req_stop_phrases in zip(outputs, kwargs["stop_phrases"])
         }
 
+        self.gen_id_to_params.update(new_gen_id_to_params)
+
         return outputs
 
-    def cancel_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[str]:
-
+    def cancel_generations(self, generation_ids: list[str]) -> list[str]:
         statuses = []
         for generation_id in generation_ids:
             request = {
@@ -399,11 +390,7 @@ class TRTLLMModel(BaseModel):
 
         return statuses
 
-    def get_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[dict]:
-
+    def get_generations(self, generation_ids: list[str]) -> list[dict]:
         generations = []
         for generation_id in generation_ids:
             request = {
