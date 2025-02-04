@@ -622,6 +622,7 @@ class GenerationRequest(BaseModel):
     repetition_penalty: float = 1.2
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
+    get_logprobs: bool = False
 
 
 class GenerationResponse(BaseModel):
@@ -713,6 +714,7 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
+                "get_logprobs": request.get_logprobs,
             }
 
             self.comm.Barrier()
