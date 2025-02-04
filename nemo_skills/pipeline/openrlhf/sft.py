@@ -141,7 +141,6 @@ def get_cmd(cluster_config, params: TrainingParams):
     cmd = (
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export TRITON_CACHE_DIR=/nemo_run/code/.triton_cache && "
         f"cd /nemo_run/code && "
         f"echo 'Starting trainig' && "
         f'echo "Torch run cmd: {torchrun_cmd}" && '
