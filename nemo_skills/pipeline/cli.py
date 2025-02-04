@@ -23,6 +23,7 @@ from nemo_skills.pipeline.convert import convert
 from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.generate import generate
 from nemo_skills.pipeline.openrlhf.sft import sft_openrlhf
+from nemo_skills.pipeline.openrlhf.ppo import ppo_openrlhf
 from nemo_skills.pipeline.run_cmd import run_cmd
 from nemo_skills.pipeline.start_server import start_server
 from nemo_skills.pipeline.summarize_results import summarize_results
