@@ -14,8 +14,12 @@ shift
 for file in "$@"; do
     done_file="${file}.done"
     if [ ! -f "$done_file" ]; then
-        echo "Error: $done_file not found. Skipping the rest of the script."
-        exit 1
+        echo "Info: $done_file not found. Skipping the rest of the script."
+        exit 0
+    fi
+    if [ ! -f "$file" ]; then
+        echo "Info: $file not found. Exiting." # Do not try to merge if the generation file does not exist
+        exit 0
     fi
 done
 
@@ -25,6 +29,9 @@ cat "$@" > "$output_file"
 # Check if the operation was successful
 if [ $? -eq 0 ]; then
     echo "Successfully concatenated $# files to $output_file"
+    # delete the chunked files
+    touch "$output_file.done"
+    rm -f "$@"
 else
     echo "An error occurred while concatenating files"
     exit 1
