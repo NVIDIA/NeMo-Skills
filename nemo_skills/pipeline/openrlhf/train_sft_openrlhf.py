@@ -105,7 +105,7 @@ def format_data_args(cluster_config, params: TrainingParams):
     return cmd
 
 
-def get_sft_common_arg_overrides(cluster_config, params: TrainingParams):
+def get_common_arg_overrides(cluster_config, params: TrainingParams):
     format_dict = OmegaConf.structured(params)
     cmd = (
         f" --learning_rate {format_dict.get('learning_rate', 5e-6)} "
@@ -149,7 +149,7 @@ def get_cmd(cluster_config, params: TrainingParams):
         f"{torchrun_cmd} -m openrlhf.cli.train_sft "
         f"  {format_train_args(cluster_config, params)} "
         f"  {format_data_args(cluster_config, params)} "
-        f"  {get_sft_common_arg_overrides(cluster_config, params)} "
+        f"  {get_common_arg_overrides(cluster_config, params)} "
         f"  {params.logging_params} "
         f"  {params.extra_arguments}"
     )
