@@ -95,7 +95,7 @@ def test_vllm_generate_greedy_chunked():
     # no evaluation by default - checking just the number of lines and that there is no is_correct key
     with open(f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy-chunked/generation/output.jsonl") as fin:
         lines = fin.readlines()
-    assert len(lines) == 10
+    assert len(lines) == 20 # because max_samples is the number of samples per chunk
     for line in lines:
         data = json.loads(line)
         assert 'is_correct' not in data
