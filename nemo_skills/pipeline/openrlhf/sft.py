@@ -93,9 +93,8 @@ def format_train_args(cluster_config, params: TrainingParams):
 
 def format_data_args(cluster_config, params: TrainingParams):
     # Option - "$'User: {}\nAssistant: '"
-    format_dict = OmegaConf.structured(params)
-
-    # TODO: Validation data isnt used as of now
+    # TODO: Validation data isn't used as of now
+    # TODO: change defaults after verifying that it works with our data
     cmd = (
         f" --dataset {params.training_data} "
         f" --input_key question "
@@ -142,7 +141,7 @@ def get_cmd(cluster_config, params: TrainingParams):
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
-        f"echo 'Starting trainig' && "
+        f"echo 'Starting SFT' && "
         f'echo "Torch run cmd: {torchrun_cmd}" && '
         f"{torchrun_cmd} -m openrlhf.cli.train_sft "
         f"  {format_train_args(cluster_config, params)} "
@@ -213,7 +212,7 @@ def sft_openrlhf(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
-    expname: str = typer.Option(..., help="Nemo run experiment name"),
+    expname: str = typer.Option('openrlhf-sft', help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the NeMo model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
     validation_data: str = typer.Option(None, help="Path to the validation data"),
@@ -270,7 +269,8 @@ def sft_openrlhf(
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
-        check_if_mounted(cluster_config, training_data)
+        if training_data.startswith("/"):  # could ask to download from HF
+            check_if_mounted(cluster_config, training_data)
 
     if validation_data:
         check_if_mounted(cluster_config, validation_data)
@@ -301,7 +301,7 @@ def sft_openrlhf(
                 container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=num_gpus,
+                num_tasks=1,  # torchrun will launch all processes
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
