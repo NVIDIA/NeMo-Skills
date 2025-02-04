@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.pipeline.app import app
 from typer import Typer
 
-openrlhf_app = Typer()
+from nemo_skills.pipeline.app import app
+
+openrlhf_app = Typer(help="OpenRLHF training pipelines (run 'ns openrlhf --help' for more information)")
 
 app.add_typer(openrlhf_app, name="openrlhf")

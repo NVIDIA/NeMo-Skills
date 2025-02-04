@@ -13,22 +13,23 @@
 # limitations under the License.
 
 import logging
+import os
+from dataclasses import dataclass
+from datetime import datetime
 from typing import List
 
-import os
 import nemo_run as run
 import typer
-from datetime import datetime
-from dataclasses import dataclass
 from omegaconf import OmegaConf
 
-from nemo_skills.pipeline.openrlhf import openrlhf_app
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.openrlhf import openrlhf_app
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
+
 
 @dataclass
 class TrainingParams:
@@ -41,7 +42,7 @@ class TrainingParams:
     expname: str
     disable_wandb: bool
     wandb_project: str
-    timeout: str
+    timeout: str  # TODO: add proper support
     extra_arguments: str = ""
     logging_params: str = ""
 
@@ -49,10 +50,10 @@ class TrainingParams:
 def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict = {}
     if cluster_config['executor'] == 'local':
-        assert params.num_gpus == 1, "Local executor only supports single GPU training for debugging"
+        assert params.num_nodes == 1, "Local executor only supports single node training"
         format_dict['nnodes'] = 1
         format_dict['nproc_per_node'] = params.num_gpus
-        format_dict['node_rank'] = 0  # TODO(som): We could do multi gpu local debug if we properly read "$OMPI_COMM_WORLD_RANK"
+        format_dict['node_rank'] = 0
         format_dict['master_addr'] = "localhost"
     else:
         format_dict['nnodes'] = params.num_nodes
@@ -60,7 +61,7 @@ def get_torchrun_cmd(cluster_config, params: TrainingParams):
         format_dict['node_rank'] = "$SLURM_PROCID"
         format_dict['master_addr'] = "$SLURM_MASTER_NODE"
 
-    format_dict['master_port'] = format_dict.get('master_port', 9901)
+    format_dict['master_port'] = 9901
 
     cmd = (
         "torchrun --nproc_per_node {nproc_per_node} --nnodes {nnodes} --node-rank {node_rank} "
@@ -70,22 +71,23 @@ def get_torchrun_cmd(cluster_config, params: TrainingParams):
 
 
 def format_train_args(cluster_config, params: TrainingParams):
-    format_dict = OmegaConf.structured(params)
 
     # NOTE:
     # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
     # with optim states)
     # `save` refers to the final HF model checkpoint (the equivalent of nemo final model checkpoint)
     # You can opt in to save both ds and HF checkpoint at every save_steps by setting `--save_hf_ckpt` as extra args
-    cmd = (f" --pretrain {params.model} "
-           f" --load_checkpoint "
-           f" --ckpt_path {os.path.join(params.output_dir, 'ds_checkpoints')} "
-           f" --max_ckpt_num 3 "
-           f" --max_ckpt_mem 10000000000 "
-           f" --save_path {os.path.join(params.output_dir, 'checkpoints')} "
-           f" --save_steps -1 "
-           f" --max_samples {format_dict.get('max_samples', 500000)} "
-           f" --max_epochs {format_dict.get('max_epochs', 1)} ")
+    cmd = (
+        f" --pretrain {params.model} "
+        f" --load_checkpoint "
+        f" --ckpt_path {os.path.join(params.output_dir, 'ds_checkpoints')} "
+        f" --max_ckpt_num 8 "
+        f" --max_ckpt_mem 10000000000 "
+        f" --save_path {os.path.join(params.output_dir, 'checkpoints')} "
+        f" --save_steps -1 "
+        f" --max_samples 500000 "
+        f" --max_epochs 1 "
+    )
     return cmd
 
 
@@ -122,14 +124,13 @@ def get_sft_common_arg_overrides(cluster_config, params: TrainingParams):
     )
     return cmd
 
+
 def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
     if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-        cmd = (f" --use_wandb $WANDB_API_KEY "
-               f" --wandb_project {wandb_project} "
-               f" --wandb_run_name {expname} ")
+        cmd = f" --use_wandb $WANDB_API_KEY " f" --wandb_project {wandb_project} " f" --wandb_run_name {expname} "
     else:
         cmd = ""
 
@@ -215,7 +216,6 @@ def sft_openrlhf(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
-    final_checkpoint_path: str = typer.Option(None, help="Where to put the final checkpoint"),
     expname: str = typer.Option(..., help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the NeMo model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
@@ -225,7 +225,6 @@ def sft_openrlhf(
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
-    with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -257,7 +256,7 @@ def sft_openrlhf(
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
-    """Run a pre-defined module or script in the NeMo-Skills container."""
+    """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
@@ -276,18 +275,8 @@ def sft_openrlhf(
             raise ValueError("training_data is required when num_training_jobs > 0")
         check_if_mounted(cluster_config, training_data)
 
-    # if not final_checkpoint_path:
-    #     final_checkpoint_path = f"{output_dir}/model-averaged-hf"
-    # check_if_mounted(cluster_config, final_checkpoint_path)
-
     if validation_data:
         check_if_mounted(cluster_config, validation_data)
-
-    if cluster_config["executor"] == "local":
-        assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
-
-    # if " " in str(average_steps):
-    #     raise ValueError("average steps should be separated with commas")
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
@@ -319,7 +308,6 @@ def sft_openrlhf(
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
-                with_sandbox=with_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
@@ -327,33 +315,6 @@ def sft_openrlhf(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
 
-        # cmd = get_avg_checkpoints_cmd(
-        #     nemo_model=nemo_model,
-        #     output_dir=output_dir,
-        #     final_nemo_path=final_nemo_path,
-        #     average_steps=f"--steps {' '.join(average_steps.split(','))} " if average_steps else "",
-        # )
-
-        # add_task(
-        #     exp,
-        #     cmd=cmd,
-        #     task_name=f"{expname}-prepare-eval",
-        #     log_dir=f"{log_dir}/prepare-eval-logs",
-        #     container=cluster_config["containers"]['nemo'],
-        #     cluster_config=cluster_config,
-        #     partition=partition,
-        #     time_min=time_min,
-        #     num_nodes=1,
-        #     num_tasks=1,
-        #     num_gpus=num_gpus,
-        #     run_after=run_after,
-        #     reuse_code=reuse_code,
-        #     reuse_code_exp=reuse_code_exp,
-        #     task_dependencies=[prev_task] if prev_task is not None else None,
-        #     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-        # )
-        #
-        # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
 
     return exp
@@ -362,5 +323,3 @@ def sft_openrlhf(
 if __name__ == "__main__":
     typer.main.get_command_name = lambda name: name
     app()
-
-
