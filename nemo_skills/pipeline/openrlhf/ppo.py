@@ -36,8 +36,6 @@ class PPOOpenRLHFTask:
     model: str
     reward_model: str
     output_dir: str
-    training_data: str
-    validation_data: str
     prompt_data: str
     num_gpus: int
     num_nodes: int
@@ -138,7 +136,7 @@ class PPOOpenRLHFTask:
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
         cmd = (
-            f" --dataset {self.training_data} "
+            f" --prompt_data {self.prompt_data} "
             f" --input_key 'question' "
             f" --output_key 'response' "
             f" --input_template None "
@@ -166,7 +164,6 @@ class PPOOpenRLHFTask:
 
     def get_common_rl_arg_overrides(self, cluster_config):
         cmd = (
-            f" --prompt_data {self.prompt_data} "
             " --micro_rollout_batch_size 16 "
             " --rollout_batch_size 1024 "
             " --n_samples_per_prompt 1 "
@@ -239,8 +236,6 @@ def get_training_cmd(
     hf_model,
     rm_model,
     output_dir,
-    training_data,
-    validation_data,
     prompt_data,
     num_gpus,
     num_nodes,
@@ -249,9 +244,6 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
 ):
-    if validation_data is None:
-        validation_data = training_data
-
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
     else:
@@ -269,8 +261,6 @@ def get_training_cmd(
             model=hf_model,
             reward_model=rm_model,
             output_dir=output_dir,
-            training_data=training_data,
-            validation_data=validation_data,
             prompt_data=prompt_data,
             num_gpus=num_gpus,
             num_nodes=num_nodes,
@@ -283,8 +273,6 @@ def get_training_cmd(
         )
 
     else:
-        if task.validation_data is None:
-            task.validation_data = task.training_data
         task.timeout = timeout
         task.extra_arguments = extra_arguments
 
@@ -305,8 +293,6 @@ def ppo_openrlhf(
     expname: str = typer.Option(..., help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(..., help="Path to the HF reward model"),
-    training_data: str = typer.Option(None, help="Path to the training data"),
-    validation_data: str = typer.Option(None, help="Path to the validation data"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
@@ -360,22 +346,13 @@ def ppo_openrlhf(
         log_dir = output_dir
 
     if num_training_jobs > 0:
-        if training_data is None:
-            raise ValueError("training_data is required when num_training_jobs > 0")
-        check_if_mounted(cluster_config, training_data)
+        if prompt_data is None:
+            raise ValueError("prompt_data is required when num_training_jobs > 0")
+        check_if_mounted(cluster_config, prompt_data)
 
     # if not final_checkpoint_path:
     #     final_checkpoint_path = f"{output_dir}/model-averaged-hf"
     # check_if_mounted(cluster_config, final_checkpoint_path)
-
-    if training_data and not prompt_data:
-        raise ValueError("prompt_data is required when training_data is provided")
-
-    if validation_data:
-        check_if_mounted(cluster_config, validation_data)
-
-    if prompt_data:
-        check_if_mounted(cluster_config, prompt_data)
 
     if cluster_config["executor"] == "local":
         assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
@@ -398,8 +375,6 @@ def ppo_openrlhf(
         hf_model=hf_model,
         rm_model=rm_model,
         output_dir=output_dir,
-        training_data=training_data,
-        validation_data=validation_data,
         prompt_data=prompt_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
