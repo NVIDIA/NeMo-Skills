@@ -69,6 +69,7 @@ class PPOOpenRLHFTask:
             f"       {self.get_ray_server_ports(cluster_config)} ;"
             "fi"
         )
+        return ray_start_cmd
 
     def get_ray_server_ports(self, cluster_config):
         ports = (
@@ -168,6 +169,7 @@ class PPOOpenRLHFTask:
             f" --prompt_data {self.prompt_data} "
             " --micro_rollout_batch_size 16 "
             " --rollout_batch_size 1024 "
+            " --n_samples_per_prompt 1 "
             " --actor_learning_rate 5e-7 "
             " --critic_learning_rate 9e-6 "
             " --init_kl_coef 0.01 "
