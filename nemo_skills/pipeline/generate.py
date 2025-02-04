@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import logging
+from collections import defaultdict
 from enum import Enum
 from typing import List
 
@@ -34,12 +35,18 @@ class SupportedServers(str, Enum):
     openai = "openai"
     sglang = "sglang"
 
+def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
+    if random_seed is not None:
+        output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
+    else:
+        output_file = f"{output_dir}/output.jsonl"
+    if chunk_id is not None:
+        output_file = get_chunked_filename(chunk_id, output_file)
+    return output_file
 
 def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
-    if random_seed is not None:
-        output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
-    else:
-        output_file = f"{output_dir}/generation/output.jsonl"
+    # First get the unchunked filename for the output file
+    output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
     if random_seed is not None:
         cmd += (
@@ -50,7 +57,7 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
         )
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_filename(chunk_id, output_file)
+        output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed, chunk_id=chunk_id)
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -239,6 +246,20 @@ def generate(
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 
+    chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
+    if chunking_enabled and postprocess_cmd:
+        logging.warning(
+            "Chunking is enabled, but postprocess_cmd is also specified. "
+            "Note that will be run for each chunk separately. Chunk merging "
+            "will be performed after postprocess_cmd."
+        )
+    if chunking_enabled and generation_type != GenerationType.generate:
+        logging.warning(
+            "Chunking is enabled, but generation type is not 'generate'. "
+            "Chunking is only supported for generation type 'generate'."
+            "This may result in superfluous generation jobs."
+        )
+
     try:
         server_type = server_type.value
     except AttributeError:
@@ -272,8 +293,14 @@ def generate(
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
         # TODO: reduce code duplication
+        donefiles = defaultdict(list)
         if random_seeds:
             for chunk_id in chunk_ids:
+                for seed in random_seeds:
+                    single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                    single_donefile = f"{get_chunked_rs_filename(single_output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
+                    donefiles[seed].append(single_donefile)
+            for chunk_idx, chunk_id in enumerate(chunk_ids):
                 for seed in random_seeds:
                     server_port = get_free_port(strategy="random") if get_random_port else 5000
                     server_config, extra_arguments, server_address, server_port = configure_client(
@@ -297,13 +324,26 @@ def generate(
                     )
                     prev_tasks = None
 
+                    single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                    single_postprocess_cmd = (
+                        f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
+                        f"touch {donefiles[seed][chunk_idx]}"
+                    )
+                    if chunk_id != None:
+                        single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=seed)
+                        merge_cmd = (
+                            f"bash /nemo_run/code/nemo_skills/inference/merge_chunks.sh {single_output_file} "
+                            f"{' '.join([f[:-5] for f in donefiles[seed]])}"
+                        )
+                        single_postprocess_cmd += f" && {merge_cmd}"
+
                     for _ in range(dependent_jobs + 1):
                         new_task = add_task(
                             exp,
                             cmd=wrap_cmd(
                                 get_generation_command(server_address=server_address, generation_commands=cmd),
                                 preprocess_cmd,
-                                postprocess_cmd,
+                                single_postprocess_cmd,
                                 random_seed=seed,
                             ),
                             task_name=f'{expname}-rs{seed}',
@@ -325,6 +365,10 @@ def generate(
                         prev_tasks = [new_task]
         else:
             for chunk_id in chunk_ids:
+                single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                single_donefile = f"{get_chunked_rs_filename(single_output_dir, random_seed=None, chunk_id=chunk_id)}.done"
+                donefiles[None].append(single_donefile)
+            for chunk_idx, chunk_id in enumerate(chunk_ids):
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -347,13 +391,26 @@ def generate(
                     num_chunks=num_chunks,
                 )
                 prev_tasks = None
+                single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
+                single_postprocess_cmd = (
+                    f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
+                    f"touch {donefiles[None][chunk_idx]}"
+                )
+                if chunk_id != None:
+                    single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=None)
+                    merge_cmd = (
+                        f"bash /nemo_run/code/nemo_skills/inference/merge_chunks.sh {single_output_file} "
+                        f"{' '.join([f[:-5] for f in donefiles[None]])}"
+                    )
+                    single_postprocess_cmd += f" && {merge_cmd}"
+
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
-                            postprocess_cmd,
+                            single_postprocess_cmd,
                         ),
                         task_name=expname,
                         log_dir=log_dir,
