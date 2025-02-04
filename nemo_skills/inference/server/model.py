@@ -700,7 +700,7 @@ class OpenAIModel(BaseModel):
         if top_k != 0:
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if min_p > 0:
-            ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
+            raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
 
         try:
             response = self.client.chat.completions.create(
@@ -852,7 +852,7 @@ class VLLMModel(BaseModel):
         return self.parse_openai_response(response)
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+    def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
         assert not isinstance(response, list)
         assert len(response.choices) == 1
         choice = response.choices[0]
@@ -864,10 +864,10 @@ class VLLMModel(BaseModel):
             # sglang has a little different api here
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs:
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         return result
 
     def get_model_name_from_server(self):
