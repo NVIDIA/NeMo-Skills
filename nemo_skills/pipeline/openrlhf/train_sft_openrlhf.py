@@ -94,26 +94,24 @@ def format_train_args(cluster_config, params: TrainingParams):
 def format_data_args(cluster_config, params: TrainingParams):
     # Option - "$'User: {}\nAssistant: '"
     format_dict = OmegaConf.structured(params)
-    input_template = format_dict.get('input_template', 'None')
 
-    # Note: Validation data isnt used as of now
+    # TODO: Validation data isnt used as of now
     cmd = (
         f" --dataset {params.training_data} "
-        f" --input_key {format_dict.get('input_key', 'question')} "
-        f" --output_key {format_dict.get('output_key', 'response')} "
-        f" --input_template " + input_template + " "
+        f" --input_key question "
+        f" --output_key response "
+        f" --input_template None "
     )
 
     return cmd
 
 
 def get_common_arg_overrides(cluster_config, params: TrainingParams):
-    format_dict = OmegaConf.structured(params)
     cmd = (
-        f" --learning_rate {format_dict.get('learning_rate', 5e-6)} "
-        f" --max_len {format_dict.get('max_len', 4096)} "
-        f" --train_batch_size {format_dict.get('train_batch_size', 256)} "
-        f" --micro_train_batch_size {format_dict.get('micro_train_batch_size', 1)} "
+        " --learning_rate 5e-6 "
+        " --max_len 4096 "
+        " --train_batch_size 256 "
+        " --micro_train_batch_size 1 "
         " --logging_steps 1 "
         " --eval_steps -1 "
         " --zero_stage 2 "
@@ -130,7 +128,7 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-        cmd = f" --use_wandb $WANDB_API_KEY " f" --wandb_project {wandb_project} " f" --wandb_run_name {expname} "
+        cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} "
     else:
         cmd = ""
 
@@ -301,10 +299,10 @@ def sft_openrlhf(
                 cmd=train_cmd,
                 task_name=f'{expname}-sft-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["openrlhf"],
+                container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
+                num_tasks=num_gpus,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
