@@ -99,7 +99,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float],
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
-        get_logprobs: bool = False,
+        logprobs: int | None = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -127,7 +127,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
-        get_logprobs: bool = False,
+        logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
@@ -139,7 +139,7 @@ class BaseModel(abc.ABC):
             'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
-            'get_logprobs': get_logprobs,
+            'logprobs': logprobs,
             'stop_phrases': stop_phrases,
         }
         for key, value in kwargs.items():
@@ -204,7 +204,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
-        get_logprobs: bool = False,
+        logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
@@ -221,7 +221,7 @@ class BaseModel(abc.ABC):
             repetition_penalty=repetition_penalty,
             random_seed=random_seed,
             stop_phrases=stop_phrases,
-            get_logprobs=get_logprobs,
+            logprobs=logprobs,
             remove_stop_phrases=remove_stop_phrases,
         )
         all_generations = [None] * len(prompts)
@@ -616,7 +616,7 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict]: # TODO: do we need logprobs here?
         # only supported by the OpenAI endpoint!
         if stop_phrases is None:
             stop_phrases = []
@@ -695,13 +695,14 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
-        get_logprobs: bool | None = None,
+        logprobs: int | None = None,
     ) -> str:
         if top_k != 0:
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if min_p > 0:
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
-
+        if logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
+            raise ValueError("`logprobs` > 1 is not supported by Nvidia-hosted models.")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -712,8 +713,8 @@ class OpenAIModel(BaseModel):
                 seed=random_seed,
                 stop=stop_phrases,
                 messages=prompt,
-                logprobs=get_logprobs,
-                top_logprobs=(1 if get_logprobs else None),
+                logprobs=logprobs is not None,
+                top_logprobs=logprobs,
             )
         except openai.BadRequestError as e:
             # this likely only works for Nvidia-hosted models
@@ -735,8 +736,8 @@ class OpenAIModel(BaseModel):
                     seed=random_seed,
                     stop=stop_phrases,
                     messages=prompt,
-                    logprobs=get_logprobs,
-                    top_logprobs=(1 if get_logprobs else None),
+                    logprobs=logprobs is not None,
+                    top_logprobs=logprobs,
                 )
             else:
                 raise
@@ -751,6 +752,10 @@ class OpenAIModel(BaseModel):
         if choice.logprobs:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = [
+                {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                for token_logprob in choice.logprobs.content
+            ]
         return result
 
     def get_model_name_from_server(self):
@@ -817,7 +822,7 @@ class VLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
-        get_logprobs: bool = False,
+        logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> dict:
         if isinstance(prompt, dict):
@@ -838,7 +843,7 @@ class VLLMModel(BaseModel):
             echo=False,
             frequency_penalty=0.0,
             presence_penalty=0.0,
-            logprobs=(0 if get_logprobs else None),
+            logprobs=logprobs,
             logit_bias=None,
             n=1,
             extra_body={
@@ -868,6 +873,7 @@ class VLLMModel(BaseModel):
         if choice.logprobs:
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
+            result['top_logprobs'] = choice.logprobs.top_logprobs
         return result
 
     def get_model_name_from_server(self):
