@@ -268,17 +268,17 @@ def get_server_command(
             "else "
             "    echo 'Starting worker node' && "
             "    export RAY_raylet_start_wait_time_s=120 && "
-            "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
+            "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
             "    ray start "
             "        --block "
-            "        --address=$VLLM_HEAD_NODE:6379 "
+            "        --address=$SLURM_MASTER_NODE:6379 "
             f"       {ports} ;"
             "fi"
         )
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:
-            multinode_args = f"    --dist_init_addr $VLLM_HEAD_NODE " f"    --node_rank $SLURM_PROCID "
+            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
         server_start_cmd = (
@@ -743,7 +743,7 @@ def get_executor(
             additional_kwargs={"entrypoint": ""},
         )
 
-    env_vars["VLLM_HEAD_NODE"] = "${head_node}"
+    env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:

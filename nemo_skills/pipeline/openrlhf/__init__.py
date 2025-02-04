@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-executor: local
+from typer import Typer
 
-containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.2
-  sglang: igitman/nemo-skills-sglang:0.5.0
-  nemo: igitman/nemo-skills-nemo:0.5.0
-  sandbox: igitman/nemo-skills-sandbox:0.5.0
-  nemo-skills: igitman/nemo-skills:0.5.0
+from nemo_skills.pipeline.app import app
 
-mounts:
-  - /tmp:/tmp
-  # change this if the models are located in a different place
-  # TODO: can we make it simpler?
-  - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+openrlhf_app = Typer(help="OpenRLHF training pipelines (run 'ns openrlhf --help' for more information)")
+
+app.add_typer(openrlhf_app, name="openrlhf")
