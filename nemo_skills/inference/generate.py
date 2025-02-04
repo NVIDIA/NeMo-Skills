@@ -57,6 +57,8 @@ class GenerateSolutionsConfig:
     # Prompt configuration - path to yaml files
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
+    include_generation: bool = False  # whether to include "generation" key while building prompt or not
+
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
