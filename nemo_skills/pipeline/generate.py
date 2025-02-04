@@ -397,7 +397,7 @@ def generate(
                     f"touch {donefiles[None][chunk_idx]}.done"
                 )
                 if chunk_id != None:
-                    single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=seed)
+                    single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=None)
                     merge_cmd = (
                         f"bash /nemo_run/code/nemo_skills/inference/merge_chunks.sh {single_output_file} "
                         f"{' '.join([f[:-5] for f in donefiles[seed]])}"
