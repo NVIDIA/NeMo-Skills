@@ -1,0 +1,20 @@
+# Idea is to use this to compare the outputs from two runs.
+
+system: ""
+
+user: |-
+  You will be given a math problem followed by a solution, including a reasoning trace. Your task is to assess the correctness of the provided solution. Note that the reasoning process in the solutions can have intermediate errors, but as long as the solution is able to identify and backtrack/recover from those errors, consider the solution as correct. 
+
+  YOUR TASK
+
+  Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{{}}
+
+  Problem: {problem}
+  Solution: {generation}
+
+  Provide your detailed reasoning for the evaluation of the solution and end the response with regards to whether the solution is correct or not:
+  - "Judgement: Yes"
+  - "Judgement: No"
+
+  Do not end the response with anything else other than these two options. 
+  

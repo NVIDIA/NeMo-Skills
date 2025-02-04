@@ -1,0 +1,13 @@
+user: |-
+  I will give you a math problem and a long solution to that problem exploring different approaches, making mistakes
+  along the way, correcting them, switching around and so on. But eventually that solution gets to the right approach
+  and solves the problem. Your task is to write a clean version of the final correct solution without all the
+  exploration.
+
+  Problem:
+  {problem}
+
+  Solution:
+  {generation}
+
+  Now write a clean version of the final correct solution without all the exploration.
