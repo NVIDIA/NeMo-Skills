@@ -517,7 +517,7 @@ class TensorRTLLM:
         repetition_penalty,
         random_seed,
         stop_words_list,
-        get_logprobs,
+        logprobs,
     ):
         try:
             request_id, stream_kwargs = generate(
@@ -532,7 +532,7 @@ class TensorRTLLM:
                 top_p_min=top_p_min,
                 repetition_penalty=repetition_penalty,
                 random_seed=random_seed,
-                get_output_logprobs=get_logprobs,
+                get_output_logprobs=bool(logprobs is not None),
                 # stop words in trtllm are supported on the token-level only and this representation is not unique
                 # so instead of passing in all tokenizations (is that even possible?) of each phrase, we will
                 # instead stream outputs and detokenize them to check for stop words - this is done inside
@@ -573,7 +573,7 @@ class TensorRTLLM:
             data["repetition_penalty"],
             data["random_seed"],
             data["stop_words_list"],
-            data["get_logprobs"],
+            data["logprobs"],
         )
 
         self.active_generations[generation_id] = future
@@ -622,7 +622,7 @@ class GenerationRequest(BaseModel):
     repetition_penalty: float = 1.2
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
-    get_logprobs: bool = False
+    logprobs: Optional[int] = None
 
 
 class GenerationResponse(BaseModel):
@@ -688,7 +688,7 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
-                "get_logprobs": request.get_logprobs,
+                "logprobs": request.logprobs,
             }
 
             self.comm.Barrier()
@@ -714,7 +714,7 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
-                "get_logprobs": request.get_logprobs,
+                "logprobs": request.logprobs,
             }
 
             self.comm.Barrier()
