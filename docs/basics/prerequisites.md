@@ -56,26 +56,6 @@ You can also use `NEMO_SKILLS_CONFIG` env variable instead of the `--cluster` pa
 The cluster config defines an executor (local or slurm), mounts for data/model access and (slurm-only) various parameters
 such as account, partition, ssh-tunnel arguments and so on.
 
-We use [NeMo-Run](https://github.com/NVIDIA/NeMo-Run) for managing our experiments with local and slurm-based
-execution supported (please open an issue if you need to run our code on other kinds of clusters).
-This means that even if you need to submit jobs on slurm, you do it from your local machine by defining an
-appropriate cluster config and nemo-run will package and upload your code, data and manage
-all complexities of slurm scheduling. Check their documentation to learn how to fetch logs, check status,
-cancel jobs, etc.
-
-!!! note
-
-    NeMo-Run will only package the code tracked by git (as well as all jsonl files from `nemo_skills/dataset`).
-    Any non-tracked files will not be automatically available inside the container or uploaded to slurm.
-
-We use [Hydra](https://hydra.cc/docs/1.3/intro/) for most of the scripts, so
-it's a good idea to read through their documentation if that's the first time you see it.
-
-Most of our pipeline scripts use a mix of normal command-line arguments and Hydra style config overrides
-(usually formatted as `++arg_name`). Whenever you
-see this, it means that the regular `--arg_name` parameters are used to control the wrapper script itself and
-all other parameters are directly passed into the underlying `nemo_skills/...` script called by the wrapper.
-
 ### Environment variables
 
 You can define environment variables in the cluster config file, which will be set inside the container.
@@ -87,6 +67,30 @@ env_vars:
 ```
 
 If an environment variable is required, and the user must provide it, you can use `required_env_vars` instead. One thing to note is that `required_env_vars` does not support passing values directly, so you must provide them via environment variable only.
+
+## Code packaging
+
+We use [NeMo-Run](https://github.com/NVIDIA/NeMo-Run) for managing our experiments with local and slurm-based
+execution supported (please open an issue if you need to run our code on other kinds of clusters).
+This means that even if you need to submit jobs on slurm, you do it from your local machine by defining an
+appropriate cluster config and nemo-run will package and upload your code, data and manage
+all complexities of slurm scheduling. Check their documentation to learn how to fetch logs, check status,
+cancel jobs, etc.
+
+To decide which code to package we use the following logic:
+1. If you run commands from inside a cloned NeMo-Skills repository, we will package that repository.
+2. If you run commands from inside a git repository which is not NeMo-Skills (doesn't have nemo_skills top-level folder),
+   we will package your current repository and also include `nemo_skills` subfolder from it's installed location.
+3. If you run commands from outside any git repository, we will only package `nemo_skills` subfolder from it's installed
+   location.
+
+Put simply, we will always include `nemo_skills` and might optionally include your personal git repository if you're
+running commands from it.
+
+!!! note
+
+    NeMo-Run will only package the code tracked by git (as well as all jsonl files from `nemo_skills/dataset`).
+    Any non-tracked files will not be automatically available inside the container or uploaded to slurm.
 
 ## Running pipelines
 
@@ -135,6 +139,18 @@ eval(
 
 You can also chain multiple pipelines together to set proper slurm dependencies using `--run_after` parameter.
 See an example in [training documentation](../pipelines/training.md#chaining-pipelines-with-python).
+
+### Pipeline arguments
+
+We use [Hydra](https://hydra.cc/docs/1.3/intro/) for most of the scripts, so
+it's a good idea to read through their documentation if that's the first time you see it.
+
+Most of our pipeline scripts use a mix of normal command-line arguments and Hydra style config overrides
+(usually formatted as `++arg_name`). Whenever you
+see this, it means that the regular `--arg_name` parameters are used to control the wrapper script itself and
+all other parameters are directly passed into the underlying `nemo_skills/...` script called by the wrapper.
+
+See [common parameters](common-parameters.md) for a list of parameters common to all scripts.
 
 ## Local execution
 
