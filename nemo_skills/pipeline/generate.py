@@ -394,7 +394,7 @@ def generate(
                 single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
                 single_postprocess_cmd = (
                     f"{postprocess_cmd + " && " if postprocess_cmd else ""}"
-                    f"touch {donefiles[None][chunk_idx]}.done"
+                    f"touch {donefiles[None][chunk_idx]}"
                 )
                 if chunk_id != None:
                     single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=None)
