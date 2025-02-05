@@ -24,7 +24,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import get_ray_server_cmd
+from nemo_skills.pipeline.utils import get_ray_server_cmd, get_timeout
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -200,17 +200,7 @@ def get_training_cmd(
     extra_arguments,
 ):
     # TODO: use those
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
+    timeout = get_timeout(cluster_config, partition)
 
     if task is None:
         task = PPOOpenRLHFTask(
