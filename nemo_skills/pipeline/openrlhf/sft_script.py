@@ -89,9 +89,9 @@ class CustomSFTTrainer(SFTTrainer):
             if check:
                 # We will force logging, evaluation and checkpointing to occur immediately
                 # by forcing the value of these step counter equal to global_step
-                args.logging_steps = global_step
-                args.eval_steps = global_step
-                args.save_steps = global_step
+                args.logging_steps = global_step if args.logging_steps > 0 else -1
+                args.eval_steps = global_step if args.eval_steps > 0 else -1
+                args.save_steps = global_step if args.save_steps > 0 else -1
 
                 # Call super() to save the logs and checkpoints
                 super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
