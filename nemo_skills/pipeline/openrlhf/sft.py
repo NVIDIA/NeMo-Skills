@@ -179,7 +179,7 @@ def get_training_cmd(
         # the format expected by nemo is days:hours:minutes:seconds
         time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
         timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+            f'{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
         )
 
     logging_params = format_wandb_args(cluster_config, disable_wandb, wandb_project, expname)
