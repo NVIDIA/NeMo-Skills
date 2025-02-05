@@ -25,9 +25,6 @@ DATASETS = [
     ('arena-hard', ['test']),
     ('mt-bench', ['test']),
     ('asdiv', ['test']),
-    ('gsm-hard', ['test', 'test_rounded']),
-    ('gsm-ic-2step', ['test']),
-    ('gsm-ic-mstep', ['test']),
     ('gsm-plus', ['test', 'test_rounded']),
     ('gsm8k', ['train', 'train_full', 'validation', 'test']),
     ('hle-math', ['test']),
@@ -39,7 +36,6 @@ DATASETS = [
     ('mbpp', ['test']),
     ('mmlu', ['test', 'dev', 'val']),
     ('svamp', ['test']),
-    ('tabmwp', ['train', 'validation', 'test']),
     ('answer-judge', ['test']),
     ('mmlu-pro', ['test']),
 ]
