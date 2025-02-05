@@ -75,14 +75,7 @@ class RequestException(RuntimeError):
 
 
 class NemoRewardModel(BaseModel):
-    def __init__(self, rm_type='disc', **kwargs):
-        super().__init__(**kwargs)
-        if rm_type == "disc":
-            self.score_fn = self._disc_score
-        elif rm_type == "gen":
-            self.score_fn = self._gen_score
-
-    def _disc_score(self, prompts: list[str]) -> list[float]:
+    def score(self, prompts: list[str]) -> list[float]:
         request = {
             "prompts": prompts,
         }
@@ -96,24 +89,10 @@ class NemoRewardModel(BaseModel):
         outputs = [{"reward_model_score": score} for score in scores["rewards"]]
         return outputs
 
-    def _gen_score(self, prompts: list[str]) -> list[float]:
-        pass
-
-    def score(self, prompts: list[str]) -> list[float]:
-        return self.score_fn(prompts)
-
 
 class VLLMRewardModel(BaseModel):
-    def __init__(self, rm_type='disc', **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if rm_type == "disc":
-            self.score_fn = self._disc_score_single_prompt
-        elif rm_type == "gen":
-            self.score_fn = self._gen_score_single_prompt
-        elif rm_type == "gen_cot":
-            self.score_fn = self._gen_cot_score_single_prompt
-        else:
-            raise ValueError(f"Model type: {rm_type} not supported!")
 
         if self.ssh_server and self.ssh_key_path:
             raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
@@ -178,7 +157,7 @@ class VLLMRewardModel(BaseModel):
 
         with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
             for idx, prompt in enumerate(prompts):
-                futures[executor.submit(self.score_fn, prompt)] = idx
+                futures[executor.submit(self._score_single_prompt, prompt)] = idx
 
             for future in as_completed(futures):
                 idx = futures[future]
