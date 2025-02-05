@@ -44,7 +44,7 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
         output_file = get_chunked_filename(chunk_id, output_file)
     return output_file
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, **kwargs):
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
@@ -65,13 +65,25 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++input_files={output_file} "
             f"    {eval_args} "
         )
-    return cmd
+
+    postprocess_cmd = (
+        f"{(postprocess_cmd + ' && ') if postprocess_cmd else ''}"
+        f"touch {kwargs['this_donefile']}"
+    )
+    if chunk_id != None:
+        single_output_file = get_chunked_rs_filename(output_dir, random_seed=kwargs["seed"])
+        merge_cmd = (
+            f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
+            f"{' '.join([f[:-5] for f in kwargs['all_donefiles']])}"
+        )
+        postprocess_cmd += f" && {merge_cmd}"
+    return cmd, postprocess_cmd
 
 
 # TODO: support chunking for reward model and math judge
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, postprocess_cmd=None, **kwargs):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -82,10 +94,10 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, ch
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, postprocess_cmd=None, **kwargs):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
@@ -95,7 +107,7 @@ def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
@@ -314,28 +326,19 @@ def generate(
                         server_args=server_args,
                         extra_arguments=extra_arguments_original,
                     )
-                    cmd = get_cmd(
+                    cmd, single_postprocess_cmd = get_cmd(
                         random_seed=seed,
                         output_dir=output_dir,
                         extra_arguments=extra_arguments,
                         eval_args=eval_args,
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
+                        postprocess_cmd=postprocess_cmd,
+                        this_donefile=donefiles[seed][chunk_idx],
+                        all_donefiles=donefiles[seed],
+                        seed=seed,
                     )
                     prev_tasks = None
-
-                    single_postprocess_cmd = (
-                        f"{postprocess_cmd + ' && ' if postprocess_cmd else ''}"
-                        f"touch {donefiles[seed][chunk_idx]}"
-                    )
-                    if chunk_id != None:
-                        single_output_file = get_chunked_rs_filename(output_dir, random_seed=seed)
-                        merge_cmd = (
-                            f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
-                            f"{' '.join([f[:-5] for f in donefiles[seed]])}"
-                        )
-                        single_postprocess_cmd += f" && {merge_cmd}"
-
                     for _ in range(dependent_jobs + 1):
                         new_task = add_task(
                             exp,
@@ -380,26 +383,19 @@ def generate(
                     extra_arguments=extra_arguments_original,
                 )
 
-                cmd = get_cmd(
+                cmd, single_postprocess_cmd = get_cmd(
                     random_seed=None,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
+                    postprocess_cmd=postprocess_cmd,
+                    this_donefile=donefiles[None][chunk_idx],
+                    all_donefiles=donefiles[None],
+                    seed=None,
                 )
                 prev_tasks = None
-                single_postprocess_cmd = (
-                    f"{postprocess_cmd + ' && ' if postprocess_cmd else ''}"
-                    f"touch {donefiles[None][chunk_idx]}"
-                )
-                if chunk_id != None:
-                    single_output_file = get_chunked_rs_filename(output_dir, random_seed=None)
-                    merge_cmd = (
-                        f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
-                        f"{' '.join([f[:-5] for f in donefiles[None]])}"
-                    )
-                    single_postprocess_cmd += f" && {merge_cmd}"
 
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
