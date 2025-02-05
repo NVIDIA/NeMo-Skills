@@ -473,8 +473,8 @@ class NemoModel(BaseModel):
         # we need to remove the original prompt as nemo always returns it
         output = self.remove_prompt_from_output(prompt, generations['sentences'][0], generations['tokens'][0])
         if top_logprobs:
-            output['logprobs'] = generations['logprob'][0][-output['num_generated_tokens'] :]
-            output['tokens'] = generations['tokens'][0][-output['num_generated_tokens'] :]
+            output['logprobs'] = generations['logprob'][0]
+            output['tokens'] = generations['tokens']
 
     def generate(
         self,
@@ -526,8 +526,8 @@ class NemoModel(BaseModel):
                 prompts[idx], generation, generations['tokens'][idx]
             )
             if top_logprobs is not None:
-                outputs[idx]['logprobs'] = generations['logprob'][idx][-outputs[idx]['num_generated_tokens'] :]
-                outputs[idx]['tokens'] = generations['tokens'][idx][-outputs[idx]['num_generated_tokens'] :]
+                outputs[idx]['logprobs'] = generations['logprob'][idx]
+                outputs[idx]['tokens'] = generations['tokens'][idx]
 
         if remove_stop_phrases:
             for output in outputs:
