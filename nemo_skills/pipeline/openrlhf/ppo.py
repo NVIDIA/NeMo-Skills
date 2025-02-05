@@ -97,18 +97,12 @@ class PPOOpenRLHFTask:
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = (
-            f" --prompt_data {self.prompt_data} "
-            f" --input_key 'question' "
-            f" --output_key 'response' "
-            f" --input_template None "
-        )
+        cmd = f" --prompt_data {self.prompt_data} " f" --input_key 'context_messages' " f" --apply_chat_template "
 
         return cmd
 
     def get_common_arg_overrides(self):
         cmd = (
-            " --learning_rate 5e-6 "
             " --train_batch_size 128 "
             " --micro_train_batch_size 8 "
             " --prompt_max_len 1024 "
