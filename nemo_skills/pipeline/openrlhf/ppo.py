@@ -16,7 +16,6 @@ import logging
 from typing import List
 
 import os
-import math
 import nemo_run as run
 import typer
 from datetime import datetime
@@ -31,68 +30,6 @@ from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
-
-def convert_args_to_dict(args):
-    """
-    Converts a list of command-line arguments into a dictionary.
-    
-    Options that start with '--' or '-' are treated as keys.
-    If the next token exists and is not another option, it is used as the value.
-    If no value is provided, the key is set to True.
-    Non-option arguments are collected under the key 'positional'.
-    
-    Args:
-        args (list of str): The list of extra arguments, e.g.
-                             ["arg1", "--foo", "bar", "arg2"]
-    
-    Returns:
-        dict: A dictionary with the parsed arguments.
-    """
-    arg_dict = {}
-    positional = []
-    i = 0
-
-    while i < len(args):
-        arg = args[i]
-
-        # Handle long options (e.g., --foo or --foo=bar)
-        if arg.startswith("--"):
-            # Remove the leading '--'
-            key = arg[2:]
-            if "=" in key:
-                # Option provided as --key=value
-                key, value = key.split("=", 1)
-                arg_dict[key] = value
-                i += 1
-            else:
-                # Check if the next token exists and is not an option
-                if i + 1 < len(args) and not args[i + 1].startswith("-"):
-                    arg_dict[key] = args[i + 1]
-                    i += 2
-                else:
-                    # No value provided; treat it as a boolean flag
-                    arg_dict[key] = "True"
-                    i += 1
-
-        # Handle short options (e.g., -f or -f value)
-        elif arg.startswith("-") and len(arg) > 1:
-            # Remove the leading '-'
-            key = arg[1:]
-            if i + 1 < len(args) and not args[i + 1].startswith("-"):
-                arg_dict[key] = args[i + 1]
-                i += 2
-            else:
-                arg_dict[key] = True
-                i += 1
-
-        else:
-            # Positional argument
-            positional.append(arg)
-            i += 1
-
-    arg_dict["positional"] = positional
-
-    return arg_dict
 
 @dataclass
 class PPOOpenRLHFTask:
@@ -152,95 +89,93 @@ class PPOOpenRLHFTask:
         return cmd
 
 
-    def get_default_reward_critic_args(self):
-        cmd = {
-            "reward_pretrain" : f"{self.reward_model}",
-            "ref_num_nodes" : f"{self.num_nodes}",
-            "ref_num_gpus_per_node" : f"{self.num_gpus}",
-            "reward_num_nodes" : f"{self.num_nodes}",
-            "reward_num_gpus_per_node" : f"{self.num_gpus}",
-            "critic_num_nodes" : f"{self.num_nodes}",
-            "critic_num_gpus_per_node" : f"{self.num_gpus}",
-            "vllm_num_engines" : f"{self.num_gpus}",
-            "vllm_tensor_parallel_size" : f"2",
-            "colocate_critic_reward " : f"False",
-            "colocate_actor_ref " : f"False",
-        }
+    def format_reward_critic_args(self, cluster_config):
+        cmd = (
+            f" --reward_pretrain {self.reward_model} "
+            f" --ref_num_nodes {self.num_nodes} "
+            f" --ref_num_gpus_per_node {self.num_gpus} "
+            f" --reward_num_nodes {self.num_nodes} "
+            f" --reward_num_gpus_per_node {self.num_gpus} "
+            f" --critic_num_nodes {self.num_nodes} "
+            f" --critic_num_gpus_per_node {self.num_gpus} "
+            f" --vllm_num_engines {self.num_gpus} "
+            f" --vllm_tensor_parallel_size 1 "
+            f" --colocate_critic_reward "
+            f" --colocate_actor_ref "
+        )
         return cmd
 
-    def get_default_actor_args(self):
-        cmd = {
-            "actor_num_nodes" : f"{self.num_nodes}",
-            "actor_num_gpus_per_node" : f"{self.num_gpus}",
-        }
+    def format_actor_args(self, cluster_config):
+        cmd = (
+            f" --actor_num_nodes {self.num_nodes} "
+            f" --actor_num_gpus_per_node {self.num_gpus} "
+        )
         return cmd
 
 
-    def get_default_train_args(self):
+    def format_train_args(self, cluster_config):
         # NOTE:
         # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
         # with optim states)
         # `save` refers to the final HF model checkpoint (the equivalent of nemo final model checkpoint)
         # You can opt in to save both ds and HF checkpoint at every save_steps by setting `--save_hf_ckpt` as extra args
-        cmd = {
-            "pretrain" : f"{self.model}",
-            "load_checkpoint" : None,
-            "ckpt_path" : os.path.join(self.output_dir, 'ds_checkpoints'),
-            "max_ckpt_num" : f"3",
-            "max_ckpt_mem" : f"10000000000",
-            "save_path" : os.path.join(self.output_dir, 'checkpoints'),
-            "save_steps" : f"-1",
-            "max_samples" : f"100000",
-            "max_epochs" : f"1",
-        }
+        cmd = (f" --pretrain {self.model} "
+               f" --load_checkpoint "
+               f" --ckpt_path {os.path.join(self.output_dir, 'ds_checkpoints')} "
+               f" --max_ckpt_num 3 "
+               f" --max_ckpt_mem 10000000000 "
+               f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
+               f" --save_steps -1 "
+               f" --max_samples 500000 "
+               f" --max_epochs 1 ")
         return cmd
 
 
-    def get_default_data_args(self):
+    def format_data_args(self, cluster_config):
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = {
-            "prompt_data" : f"{self.prompt_data}",
-            "input_key" : f"'question'",
-            "input_template" : None,
-        }
+        cmd = (
+            f" --prompt_data {self.prompt_data} "
+            f" --input_key 'question' "
+            f" --output_key 'response' "
+            f" --input_template None "
+        )
 
         return cmd
 
-    def get_default_common_arg_overrides(self):
-        cmd = {
-            "actor_learning_rate" : f"5e-7",
-            "critic_learning_rate" : f"9e-6",
-            "train_batch_size" : f"128",
-            "micro_train_batch_size" : f"8",
-            "prompt_max_len" : f"1024",
-            "generate_max_len" : f"1024",
-            "logging_steps" : f"1",
-            "eval_steps" : f"-1",
-            "zero_stage" : f"3",
-            "packing_samples" : f"False",
-            "bf16" : f"False",
-            "flash_attn" : f"False",
-            "gradient_checkpointing" : f"False",
-            "adam_offload" : f"False",
-        }
+    def get_common_arg_overrides(self, cluster_config):
+        cmd = (
+            " --learning_rate 5e-6 "
+            " --train_batch_size 128 "
+            " --micro_train_batch_size 8 "
+            " --prompt_max_len 1024 "
+            " --generate_max_len 1024 "
+            " --logging_steps 1 "
+            " --eval_steps -1 "
+            " --zero_stage 3 "
+            " --packing_samples "
+            " --bf16 "
+            " --flash_attn "
+            " --gradient_checkpointing "
+            " --adam_offload "
+        )
         return cmd
 
-    def get_default_common_rl_arg_overrides(self):
-        cmd = {
-            "micro_rollout_batch_size" : f"16",
-            "rollout_batch_size" : f"1024",
-            "n_samples_per_prompt" : f"1",
-            "actor_learning_rate" : f"5e-7",
-            "critic_learning_rate" : f"9e-6",
-            "init_kl_coef" : f"0.01",
-            "normalize_reward" : "False",
-            "vllm_sync_backend" : f"nccl",
-        }
+    def get_common_rl_arg_overrides(self, cluster_config):
+        cmd = (
+            " --micro_rollout_batch_size 16 "
+            " --rollout_batch_size 1024 "
+            " --n_samples_per_prompt 1 "
+            " --actor_learning_rate 5e-7 "
+            " --critic_learning_rate 9e-6 "
+            " --init_kl_coef 0.01 "
+            " --normalize_reward "
+            " --vllm_sync_backend nccl "
+        )
         return cmd
 
-    def format_wandb_args(self, disable_wandb, wandb_project, expname):
+    def format_wandb_args(self, cluster_config, disable_wandb, wandb_project, expname):
         if not disable_wandb:
             if os.getenv('WANDB_API_KEY') is None:
                 raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
@@ -257,37 +192,25 @@ class PPOOpenRLHFTask:
         cmd = " echo 'No preamble command to execute, skipping...' "
         return cmd
 
-    def format_args(self, extra_args):
-        assert type(extra_args) == dict, "extra_args must be a dictionary"
-        args = {}
-        args.update(self.get_default_reward_critic_args())
-        args.update(self.get_default_actor_args())
-        args.update(self.get_default_train_args())
-        args.update(self.get_default_data_args())
-        args.update(self.get_default_common_arg_overrides())
-        args.update(self.get_default_common_rl_arg_overrides())
-
-        args.update(extra_args)
-
-        flattened_args = args['positional'] + [f'--{k} {v}' if v != "True" else f'--{k}' for k, v in args.items() if (k != 'positional') and (v != "False") and (v != None)]
-        args = f'{" ".join(flattened_args)}'
-        return args
-
-
     def get_job_cmd(self, cluster_config):
         ray_job_cmd = self.get_ray_launch_cmd(cluster_config)
-        formatted_args = self.format_args(self.extra_arguments)
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"{ray_job_cmd} python3 -m openrlhf.cli.train_ppo_ray "
-            f"  {formatted_args} "
+            f"{ray_job_cmd} -m openrlhf.cli.train_ppo_ray "
+            f"  {self.format_reward_critic_args(cluster_config)} "
+            f"  {self.format_actor_args(cluster_config)} "
+            f"  {self.format_train_args(cluster_config)} "
+            f"  {self.format_data_args(cluster_config)} "
+            f"  {self.get_common_arg_overrides(cluster_config)} "
+            f"  {self.get_common_rl_arg_overrides(cluster_config)} "
             f"  {self.logging_params} "
+            f"  {self.extra_arguments} "
         )
         return ray_job_cmd
 
     def get_cmd(self, cluster_config):
 
-        self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
+        self.logging_params = self.format_wandb_args(cluster_config, self.disable_wandb, self.wandb_project, self.expname)
         preamble_cmd = self.get_preamble_cmd(cluster_config)
 
         cmd = (
@@ -295,7 +218,7 @@ class PPOOpenRLHFTask:
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
             f"export TRITON_CACHE_DIR=/nemo_run/code/.triton_cache && "
             f"cd /nemo_run/code && "
-            f"echo 'Running preamble command:' {preamble_cmd} && "
+            f"echo 'Running preamble command: '{preamble_cmd}' && "
             f"{preamble_cmd} && "
         )
 
@@ -353,9 +276,7 @@ def get_training_cmd(
         task.timeout = timeout
         task.extra_arguments = extra_arguments
 
-    cmd = task.get_cmd(cluster_config)
-    print(cmd)
-    return cmd
+    return task.get_cmd(cluster_config)
 
 
 @openrlhf_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -373,6 +294,8 @@ def ppo_openrlhf(
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(..., help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
+    num_nodes: int = typer.Option(1, help="Number of nodes"),
+    num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -410,23 +333,9 @@ def ppo_openrlhf(
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False)
-    extra_arguments = convert_args_to_dict(ctx.args)
+    extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-
-    num_nodes = {k.split('_')[0] : int(v) for k, v in extra_arguments.items() if k.endswith('_num_nodes')}
-    num_gpus = {k.split('_')[0] : int(v) for k, v in extra_arguments.items() if k.endswith('_num_gpus_per_node')}
-
-    for k in ['ref', 'reward', 'critic', 'actor']:
-        assert k in num_nodes, f"Missing {k} in num_nodes, need num_nodes and num_gpus for ref, reward, critic, actor"
-        assert k in num_gpus, f"Missing {k} in num_gpus, need num_nodes and num_gpus for ref, reward, critic, actor"
-
-    num_gpus = sum((num_gpus[k] * num_nodes[k] for k in num_gpus))
-    num_nodes = math.ceil(num_gpus / 8)
-    num_gpus = num_gpus if num_nodes == 1 else 8
-
-    print("Total number of GPUs per node: ", num_gpus)
-    print("Total number of nodes: ", num_nodes)
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
@@ -439,8 +348,7 @@ def ppo_openrlhf(
     if num_training_jobs > 0:
         if prompt_data is None:
             raise ValueError("prompt_data is required when num_training_jobs > 0")
-        if prompt_data.startswith('/'):
-            check_if_mounted(cluster_config, prompt_data)
+        check_if_mounted(cluster_config, prompt_data)
 
     # if not final_checkpoint_path:
     #     final_checkpoint_path = f"{output_dir}/model-averaged-hf"
@@ -454,7 +362,7 @@ def ppo_openrlhf(
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
-        ppo_task = ctx.obj['ppo_task']  # type: PPOOpenRLHFTask
+        ppo_task = ctx.obj['ppo_task']  # type: type(PPOOpenRLHFTask)
         assert isinstance(ppo_task,
                           PPOOpenRLHFTask), "`ppo_task` must be a subclass of PPOOpenRLHFTask"
     else:
@@ -487,7 +395,7 @@ def ppo_openrlhf(
                 container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=1,
+                num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
