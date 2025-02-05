@@ -35,6 +35,7 @@ class SupportedServers(str, Enum):
     openai = "openai"
     sglang = "sglang"
 
+
 def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
     if random_seed is not None:
         output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
@@ -44,7 +45,10 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
         output_file = get_chunked_filename(chunk_id, output_file)
     return output_file
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, **kwargs):
+
+def get_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
@@ -55,9 +59,36 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
+
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed, chunk_id=chunk_id)
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)
+        donefiles = []
+        # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
+        # the current run (as we don't want to merge partial jobs)
+        for chunk_id in range(num_chunks):
+            single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)}.done"
+            donefiles.append(single_donefile)
+
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {donefiles[chunk_id]} "
+        else:
+            postprocess_cmd = f"touch {donefiles[chunk_id]} "
+
+        # getting file name as if there is no chunking since that's where we want to merge
+        merged_output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed)
+        merge_cmd = (
+            f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
+            f"{' '.join([f[:-5] for f in donefiles])}"
+        )
+        postprocess_cmd += f" && {merge_cmd}"
+
+    else:  # only writing a single status file
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {output_file}.done "
+        else:
+            postprocess_cmd = f"touch {output_file}.done "
+
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -66,29 +97,15 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    {eval_args} "
         )
 
-    donefiles = []
-    for chunk_id in kwargs['chunk_ids']:
-        single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)}.done"
-        donefiles.append(single_donefile)
-
-    postprocess_cmd = (
-        f"{(postprocess_cmd + ' && ') if postprocess_cmd else ''}"
-        f"touch {donefiles[kwargs['chunk_idx']]} "
-    )
-    if chunk_id != None:
-        single_output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed)
-        merge_cmd = (
-            f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
-            f"{' '.join([f[:-5] for f in donefiles])}"
-        )
-        postprocess_cmd += f" && {merge_cmd}"
     return cmd, postprocess_cmd
 
 
 # TODO: support chunking for reward model and math judge
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, postprocess_cmd=None, **kwargs):
+def get_rm_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -102,7 +119,9 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, po
     return cmd, postprocess_cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, postprocess_cmd=None, **kwargs):
+def get_math_judge_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
@@ -312,7 +331,7 @@ def generate(
         extra_arguments_original = extra_arguments
         # TODO: reduce code duplication
         if random_seeds:
-            for chunk_idx, chunk_id in enumerate(chunk_ids):
+            for chunk_id in chunk_ids:
                 for seed in random_seeds:
                     server_port = get_free_port(strategy="random") if get_random_port else 5000
                     server_config, extra_arguments, server_address, server_port = configure_client(
@@ -326,7 +345,7 @@ def generate(
                         server_args=server_args,
                         extra_arguments=extra_arguments_original,
                     )
-                    cmd, single_postprocess_cmd = get_cmd(
+                    cmd, full_postprocess_cmd = get_cmd(
                         random_seed=seed,
                         output_dir=output_dir,
                         extra_arguments=extra_arguments,
@@ -335,7 +354,6 @@ def generate(
                         num_chunks=num_chunks,
                         postprocess_cmd=postprocess_cmd,
                         chunk_ids=chunk_ids,
-                        chunk_idx=chunk_idx,
                     )
                     prev_tasks = None
                     for _ in range(dependent_jobs + 1):
@@ -344,7 +362,7 @@ def generate(
                             cmd=wrap_cmd(
                                 get_generation_command(server_address=server_address, generation_commands=cmd),
                                 preprocess_cmd,
-                                single_postprocess_cmd,
+                                full_postprocess_cmd,
                                 random_seed=seed,
                             ),
                             task_name=f'{expname}-rs{seed}',
@@ -365,7 +383,7 @@ def generate(
                         )
                         prev_tasks = [new_task]
         else:
-            for chunk_idx, chunk_id in enumerate(chunk_ids):
+            for chunk_id in chunk_ids:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -379,7 +397,7 @@ def generate(
                     extra_arguments=extra_arguments_original,
                 )
 
-                cmd, single_postprocess_cmd = get_cmd(
+                cmd, full_postprocess_cmd = get_cmd(
                     random_seed=None,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
@@ -388,7 +406,6 @@ def generate(
                     num_chunks=num_chunks,
                     postprocess_cmd=postprocess_cmd,
                     chunk_ids=chunk_ids,
-                    chunk_idx=chunk_idx,
                 )
                 prev_tasks = None
 
@@ -398,7 +415,7 @@ def generate(
                         cmd=wrap_cmd(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
-                            single_postprocess_cmd,
+                            full_postprocess_cmd,
                         ),
                         task_name=expname,
                         log_dir=log_dir,
