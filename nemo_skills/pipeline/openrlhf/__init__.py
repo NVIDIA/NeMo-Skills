@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.dataset.utils import save_data_from_qwen
+from typer import Typer
 
-if __name__ == "__main__":
-    save_data_from_qwen("amc23")
+from nemo_skills.pipeline.app import app
+
+openrlhf_app = Typer(help="OpenRLHF training pipelines (run 'ns openrlhf --help' for more information)")
+
+app.add_typer(openrlhf_app, name="openrlhf")

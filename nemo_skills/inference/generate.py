@@ -63,7 +63,7 @@ class GenerateSolutionsConfig:
 
     # Can specify one of the existing datasets.
     dataset: str | None = None
-    split: str | None = None  # Can be train, validation, test or train_full (train + validation)
+    split: str | None = None  # Generally one of train/test, but can be anything since it's used as part of a file name
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
 
     batch_size: int = 128
