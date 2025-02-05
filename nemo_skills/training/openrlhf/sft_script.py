@@ -26,6 +26,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# File is modified from https://github.com/OpenRLHF/OpenRLHF/blob/main/openrlhf/cli/train_sft.py
+
 import re
 import time
 import argparse
