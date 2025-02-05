@@ -85,7 +85,7 @@ To decide which code to package we use the following logic:
 3. If you run commands from outside of any git repository, we will only package `nemo_skills` subfolder from it's installed
    location.
 
-Put simply, we will always include `nemo_skills` and might optionally include your personal git repository if you're
+Put simply, we will always include `nemo_skills` and will additionally include your personal git repository if you're
 running commands from it.
 
 !!! note
