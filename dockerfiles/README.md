@@ -22,6 +22,10 @@ To build vllm image do the following
    3. remove all hardcoded versions from requirements.txt to get latest
    4. run `pip install -e .`
 
+Current vllm version: v0.7.0
+
+Current OpenRLHF version: 631b0bcb7c14ec2fd4117a43a661903ed60d26cc
+
 ## Building sglang image
 
 Currently we can directly reuse `lmsysorg/sglang:latest` image except we need to apply the patch included in this folder.
@@ -34,3 +38,5 @@ git apply <path to NeMo-SKills>/dockerfiles/sglang.patch
 
 then run `docker ps -a` and note image id of your running container. Do `docker commit <image id>`
 and `docker tag <printed hash> igitman/nemo-skills-sglang:0.5.0` and push that image.
+
+Current sglang version: v0.4.2.post1-cu125
