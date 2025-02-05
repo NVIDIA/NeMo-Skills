@@ -22,7 +22,9 @@ import urllib.request
 from pathlib import Path
 from typing import Dict
 from urllib.error import URLError
+
 from nemo_skills.code_execution.math_grader import extract_answer
+
 
 @contextlib.contextmanager
 def add_to_path(p):
@@ -74,7 +76,7 @@ def download_with_retries(url, output_file, max_retries=3, retry_delay=1):
             return True
         except URLError as e:
             if attempt == max_retries - 1:
-                raise Exception(f"Failed to download after {max_retries} attempts: {e}")
+                raise RuntimeError(f"Failed to download after {max_retries} attempts: {e}")
             time.sleep(retry_delay * (attempt + 1))
     return False
 
@@ -94,24 +96,21 @@ def save_data_from_qwen(dataset, split="test"):
         download_with_retries(formatted_url, original_file)
 
     with open(original_file, "rt", encoding="utf-8") as fin:
-        for index, line in enumerate(fin):
+        for line in fin:
             entry = json.loads(line)
-            # TODO: add else
 
-            if "answer" in entry: 
+            if "answer" in entry:
                 entry["expected_answer"] = entry.pop("answer")
-                
+
             if "problem" not in entry:
                 entry["problem"] = entry.pop("question")
-                
+
             if dataset == "olympiadbench":
                 entry["expected_answer"] = entry.pop("final_answer")[0].strip("$")
+
             if dataset == "minerva_math":
                 entry["expected_answer"] = extract_answer(entry["solution"])
-            
-            
-            
-            
+
             data.append(entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
@@ -120,5 +119,5 @@ def save_data_from_qwen(dataset, split="test"):
 
     # cleaning up original data file
     os.remove(original_file)
-    
+
     return output_file
