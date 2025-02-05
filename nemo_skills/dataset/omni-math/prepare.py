@@ -26,8 +26,7 @@ if __name__ == "__main__":
     data_folder.mkdir(exist_ok=True)
     output_file = str(data_folder / "test.jsonl")
 
-    if not os.path.exists(original_file):
-        urllib.request.urlretrieve(URL, original_file)
+    urllib.request.urlretrieve(URL, original_file)
 
     data = []
 
@@ -41,3 +40,5 @@ if __name__ == "__main__":
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+    os.remove(original_file)
