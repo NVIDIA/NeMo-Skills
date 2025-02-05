@@ -38,6 +38,7 @@ DATASETS = [
     ('svamp', ['test']),
     ('answer-judge', ['test']),
     ('mmlu-pro', ['test']),
+    ('gpqa', ['diamond', 'extended', 'main']),
 ]
 
 

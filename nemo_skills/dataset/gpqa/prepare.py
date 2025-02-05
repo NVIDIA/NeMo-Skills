@@ -48,11 +48,11 @@ def format_entry(entry):
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
     return {
-        "choice1": choices[0],
-        "choice2": choices[1],
-        "choice3": choices[2],
-        "choice4": choices[3],
-        "choices": [choices[0], choices[1], choices[2], choices[3]],
+        "A": choices[0],
+        "B": choices[1],
+        "C": choices[2],
+        "D": choices[3],
+        "options": [choices[0], choices[1], choices[2], choices[3]],
         "expected_answer": f"{chr(65 + correct_answer_index)}",
         "explanation": preprocess(entry["Explanation"]),
         "question": entry["Question"],
