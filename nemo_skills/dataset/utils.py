@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict
 from urllib.error import URLError
-
+from nemo_skills.code_execution.math_grader import extract_answer
 
 @contextlib.contextmanager
 def add_to_path(p):
@@ -97,12 +97,28 @@ def save_data_from_qwen(dataset, split="test"):
         for index, line in enumerate(fin):
             entry = json.loads(line)
             # TODO: add else
-            if "answer" in entry:
+
+            if "answer" in entry: 
                 entry["expected_answer"] = entry.pop("answer")
+                
             if "problem" not in entry:
                 entry["problem"] = entry.pop("question")
+                
+            if dataset == "olympiadbench":
+                entry["expected_answer"] = entry.pop("final_answer")[0].strip("$")
+            if dataset == "minerva_math":
+                entry["expected_answer"] = extract_answer(entry["solution"])
+            
+            
+            
+            
             data.append(entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+    # cleaning up original data file
+    os.remove(original_file)
+    
+    return output_file
