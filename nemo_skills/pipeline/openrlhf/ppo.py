@@ -156,7 +156,7 @@ class PPOOpenRLHFTask:
         ray_job_cmd = self.get_ray_launch_cmd()
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"{ray_job_cmd} -m openrlhf.cli.train_ppo_ray "
+            f"{ray_job_cmd} python3 -m openrlhf.cli.train_ppo_ray "
             f"  {self.format_reward_critic_args()} "
             f"  {self.format_actor_args()} "
             f"  {self.format_train_args()} "
@@ -177,7 +177,6 @@ class PPOOpenRLHFTask:
             f"export HYDRA_FULL_ERROR=1 && "
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
             f"cd /nemo_run/code && "
-            f"echo 'Running preamble command: '{preamble_cmd}' && "
             f"{preamble_cmd} && "
         )
 
@@ -236,7 +235,7 @@ def get_training_cmd(
         task.timeout = timeout
         task.extra_arguments = extra_arguments
 
-    return task.get_cmd(cluster_config)
+    return task.get_cmd()
 
 
 @openrlhf_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -306,7 +305,8 @@ def ppo_openrlhf(
     if num_training_jobs > 0:
         if prompt_data is None:
             raise ValueError("prompt_data is required when num_training_jobs > 0")
-        check_if_mounted(cluster_config, prompt_data)
+        if prompt_data.startswith("/"):  # could ask to download from HF
+            check_if_mounted(cluster_config, prompt_data)
 
     if cluster_config["executor"] == "local":
         assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
