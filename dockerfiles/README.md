@@ -23,6 +23,8 @@ To build vllm image do the following
    3. remove all hardcoded versions from requirements.txt to get latest
    4. run `pip install -e .`
 
+Currently it takes 10+ hours to build this docker. Is there anything we can do to speed it up?
+
 Current vllm version: v0.7.0
 
 Current OpenRLHF version: 631b0bcb7c14ec2fd4117a43a661903ed60d26cc
