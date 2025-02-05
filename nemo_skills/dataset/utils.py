@@ -118,5 +118,7 @@ def save_data_from_qwen(dataset, split="test"):
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
 
-
+    # cleaning up original data file
+    os.remove(original_file)
+    
     return output_file
