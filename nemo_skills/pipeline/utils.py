@@ -203,6 +203,40 @@ def get_reward_server_command(
     return server_cmd, num_tasks
 
 
+def get_ray_server_cmd(start_cmd):
+    ports = (
+        "--node-manager-port=12345 "
+        "--object-manager-port=12346 "
+        "--dashboard-port=8265 "
+        "--dashboard-agent-grpc-port=12347 "
+        "--runtime-env-agent-port=12349 "
+        "--metrics-export-port=12350 "
+        "--min-worker-port=14349 "
+        "--max-worker-port=18349 "
+    )
+
+    ray_start_cmd = (
+        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        "    echo 'Starting head node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    ray start "
+        "        --head "
+        "        --port=6379 "
+        f"       {ports} && "
+        f"   {start_cmd} ;"
+        "else "
+        "    echo 'Starting worker node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        "    ray start "
+        "        --block "
+        "        --address=$SLURM_MASTER_NODE:6379 "
+        f"       {ports} ;"
+        "fi"
+    )
+    return ray_start_cmd
+
+
 def get_server_command(
     server_type: str,
     num_gpus: int,
@@ -246,35 +280,7 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        ports = (
-            "--node-manager-port=12345 "
-            "--object-manager-port=12346 "
-            "--dashboard-port=8265 "
-            "--dashboard-agent-grpc-port=12347 "
-            "--runtime-env-agent-port=12349 "
-            "--metrics-export-port=12350 "
-            "--min-worker-port=14349 "
-            "--max-worker-port=18349 "
-        )
-        server_start_cmd = (
-            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
-            "    echo 'Starting head node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    ray start "
-            "        --head "
-            "        --port=6379 "
-            f"       {ports} && "
-            f"   {start_vllm_cmd} ;"
-            "else "
-            "    echo 'Starting worker node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
-            "    ray start "
-            "        --block "
-            "        --address=$SLURM_MASTER_NODE:6379 "
-            f"       {ports} ;"
-            "fi"
-        )
+        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:
