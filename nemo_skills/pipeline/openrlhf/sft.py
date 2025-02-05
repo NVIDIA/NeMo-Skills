@@ -143,7 +143,7 @@ def get_cmd(cluster_config, params: TrainingParams):
         f"cd /nemo_run/code && "
         f"echo 'Starting SFT' && "
         f'echo "Torch run cmd: {torchrun_cmd}" && '
-        f"{torchrun_cmd} -m nemo_skills.pipeline.openrlhf.sft_script "
+        f"{torchrun_cmd} -m nemo_skills.training.openrlhf.sft_script "
         f"  {format_train_args(cluster_config, params)} "
         f"  {format_data_args(cluster_config, params)} "
         f"  {get_common_arg_overrides(cluster_config, params)} "
