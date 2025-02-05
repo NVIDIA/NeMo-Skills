@@ -433,6 +433,7 @@ EVALUATOR_MAP = {
     'answer_judgement': dummy_eval,
     'lean4': eval_lean4,
     'mmlu-pro': eval_mmlu_pro,
+    'gpqa': eval_mmlu_pro,
 }
 
 

@@ -1,0 +1,6 @@
+# Prompt used by TigerLab for MMLU-Pro benchmark
+# https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/main/evaluate_from_api.py
+
+user: |-
+  What is the correct answer to this question: {question}
+  Choices:\n(A) {{choice1}}\n(B) {{choice2}}\n(C) {{choice3}}\n(D) {{choice4}}\nThink step by step and then output the answer in the format of "The answer is (X)" at the end."
