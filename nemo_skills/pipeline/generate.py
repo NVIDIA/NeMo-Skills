@@ -66,15 +66,20 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    {eval_args} "
         )
 
+    donefiles = []
+    for chunk_id in kwargs['chunk_ids']:
+        single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)}.done"
+        donefiles.append(single_donefile)
+
     postprocess_cmd = (
         f"{(postprocess_cmd + ' && ') if postprocess_cmd else ''}"
-        f"touch {kwargs['this_donefile']}"
+        f"touch {donefiles[kwargs['chunk_idx']]} "
     )
     if chunk_id != None:
-        single_output_file = get_chunked_rs_filename(output_dir, random_seed=kwargs["seed"])
+        single_output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed)
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
-            f"{' '.join([f[:-5] for f in kwargs['all_donefiles']])}"
+            f"{' '.join([f[:-5] for f in donefiles])}"
         )
         postprocess_cmd += f" && {merge_cmd}"
     return cmd, postprocess_cmd
@@ -306,12 +311,7 @@ def generate(
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
         # TODO: reduce code duplication
-        donefiles = defaultdict(list)
         if random_seeds:
-            for chunk_id in chunk_ids:
-                for seed in random_seeds:
-                    single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
-                    donefiles[seed].append(single_donefile)
             for chunk_idx, chunk_id in enumerate(chunk_ids):
                 for seed in random_seeds:
                     server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -334,9 +334,8 @@ def generate(
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
                         postprocess_cmd=postprocess_cmd,
-                        this_donefile=donefiles[seed][chunk_idx],
-                        all_donefiles=donefiles[seed],
-                        seed=seed,
+                        chunk_ids=chunk_ids,
+                        chunk_idx=chunk_idx,
                     )
                     prev_tasks = None
                     for _ in range(dependent_jobs + 1):
@@ -366,9 +365,6 @@ def generate(
                         )
                         prev_tasks = [new_task]
         else:
-            for chunk_id in chunk_ids:
-                single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=chunk_id)}.done"
-                donefiles[None].append(single_donefile)
             for chunk_idx, chunk_id in enumerate(chunk_ids):
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
@@ -391,9 +387,8 @@ def generate(
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
                     postprocess_cmd=postprocess_cmd,
-                    this_donefile=donefiles[None][chunk_idx],
-                    all_donefiles=donefiles[None],
-                    seed=None,
+                    chunk_ids=chunk_ids,
+                    chunk_idx=chunk_idx,
                 )
                 prev_tasks = None
 
