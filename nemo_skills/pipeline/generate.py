@@ -46,7 +46,7 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
 
 def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
     # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed)
+    output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
     if random_seed is not None:
         cmd += (
@@ -57,7 +57,7 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
         )
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(f"{output_dir}/generation", random_seed=random_seed, chunk_id=chunk_id)
+        output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed, chunk_id=chunk_id)
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -298,8 +298,7 @@ def generate(
         if random_seeds:
             for chunk_id in chunk_ids:
                 for seed in random_seeds:
-                    single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
-                    single_donefile = f"{get_chunked_rs_filename(single_output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
+                    single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)}.done"
                     donefiles[seed].append(single_donefile)
             for chunk_idx, chunk_id in enumerate(chunk_ids):
                 for seed in random_seeds:
@@ -325,13 +324,12 @@ def generate(
                     )
                     prev_tasks = None
 
-                    single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
                     single_postprocess_cmd = (
                         f"{postprocess_cmd + ' && ' if postprocess_cmd else ''}"
                         f"touch {donefiles[seed][chunk_idx]}"
                     )
                     if chunk_id != None:
-                        single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=seed)
+                        single_output_file = get_chunked_rs_filename(output_dir, random_seed=seed)
                         merge_cmd = (
                             f"bash /nemo_run/code/nemo_skills/inference/merge_chunks.sh {single_output_file} "
                             f"{' '.join([f[:-5] for f in donefiles[seed]])}"
@@ -366,8 +364,7 @@ def generate(
                         prev_tasks = [new_task]
         else:
             for chunk_id in chunk_ids:
-                single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
-                single_donefile = f"{get_chunked_rs_filename(single_output_dir, random_seed=None, chunk_id=chunk_id)}.done"
+                single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=chunk_id)}.done"
                 donefiles[None].append(single_donefile)
             for chunk_idx, chunk_id in enumerate(chunk_ids):
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -392,13 +389,12 @@ def generate(
                     num_chunks=num_chunks,
                 )
                 prev_tasks = None
-                single_output_dir = f"{output_dir}{'/generation' if generation_type == GenerationType.generate else ''}"
                 single_postprocess_cmd = (
                     f"{postprocess_cmd + ' && ' if postprocess_cmd else ''}"
                     f"touch {donefiles[None][chunk_idx]}"
                 )
                 if chunk_id != None:
-                    single_output_file = get_chunked_rs_filename(single_output_dir, random_seed=None)
+                    single_output_file = get_chunked_rs_filename(output_dir, random_seed=None)
                     merge_cmd = (
                         f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
                         f"{' '.join([f[:-5] for f in donefiles[None]])}"
