@@ -146,11 +146,14 @@ class PPOOpenRLHFTask:
         cmd = " echo 'No preamble command to execute, skipping...' "
         return cmd
 
+    def get_script_module(self):
+        return "openrlhf.cli.train_ppo_ray"
+
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"{ray_job_cmd} python3 -m openrlhf.cli.train_ppo_ray "
+            f"{ray_job_cmd} python3 -m {self.get_script_module()} "
             f"  {self.format_reward_critic_args()} "
             f"  {self.format_actor_args()} "
             f"  {self.format_train_args()} "
