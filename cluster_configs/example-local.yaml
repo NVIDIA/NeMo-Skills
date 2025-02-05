@@ -16,7 +16,7 @@ executor: local
 
 containers:
   trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.1
+  vllm: igitman/nemo-skills-vllm:0.5.2
   sglang: igitman/nemo-skills-sglang:0.5.0
   nemo: igitman/nemo-skills-nemo:0.5.0
   sandbox: igitman/nemo-skills-sandbox:0.5.0
@@ -26,9 +26,8 @@ containers:
 # the code is mounted automatically inside /nemo_run/code
 # but please note that we only package what's tracked by git + jsonl files inside nemo_skills/dataset
 
-mounts:
+# mounts:
 # you can define as many as you need, e.g.
-  - /home/ebakhturina/gitlab/NeMo-Skills/del_results2:/results
-  - /home/ebakhturina/.cache/huggingface/hub:/models
-  - /mnt/ssd2/ebakhturina/checkpoints:/hf_models
-  - /home/ebakhturina/gitlab/NeMo-Skills:/workspace
+#   - /mnt/datadrive/models:/models
+#   - /mnt/datadrive/data:/data
+#   - /home/<username>/workspace:/workspace
