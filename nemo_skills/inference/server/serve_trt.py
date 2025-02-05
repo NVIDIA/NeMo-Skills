@@ -467,7 +467,7 @@ def _stream(
     if output_log_probs:
         result['tokens'] = out_tokens
         result['logprobs'] = output['log_probs'][0][0].tolist()
-
+    print(f"{result=}")
     return result
 
 
@@ -517,8 +517,9 @@ class TensorRTLLM:
         repetition_penalty,
         random_seed,
         stop_words_list,
-        logprobs,
+        top_logprobs,
     ):
+        print(f"ENTRY1: {top_logprobs=}")
         try:
             request_id, stream_kwargs = generate(
                 self.runner,
@@ -532,7 +533,7 @@ class TensorRTLLM:
                 top_p_min=top_p_min,
                 repetition_penalty=repetition_penalty,
                 random_seed=random_seed,
-                get_output_logprobs=bool(logprobs is not None),
+                output_log_probs=bool(top_logprobs is not None),
                 # stop words in trtllm are supported on the token-level only and this representation is not unique
                 # so instead of passing in all tokenizations (is that even possible?) of each phrase, we will
                 # instead stream outputs and detokenize them to check for stop words - this is done inside
@@ -573,8 +574,9 @@ class TensorRTLLM:
             data["repetition_penalty"],
             data["random_seed"],
             data["stop_words_list"],
-            data["logprobs"],
+            data["top_logprobs"],
         )
+        print(f"ENTRY2: {data['top_logprobs']=}")
 
         self.active_generations[generation_id] = future
 
@@ -622,7 +624,7 @@ class GenerationRequest(BaseModel):
     repetition_penalty: float = 1.2
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
-    logprobs: Optional[int] = None
+    top_logprobs: Optional[int] = None
 
 
 class GenerationResponse(BaseModel):
@@ -688,8 +690,9 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
-                "logprobs": request.logprobs,
+                "top_logprobs": request.top_logprobs,
             }
+            print(f"ENTRY3: {request.top_logprobs=}")
 
             self.comm.Barrier()
             data = self.comm.bcast(data, root=0)
@@ -714,8 +717,9 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
-                "logprobs": request.logprobs,
+                "top_logprobs": request.top_logprobs,
             }
+            print(f"ENTRY4: {request.top_logprobs=}")
 
             self.comm.Barrier()
             data = self.comm.bcast(data, root=0)

@@ -42,7 +42,7 @@ class InferenceConfig:
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
-    logprobs: int | None = None
+    top_logprobs: int | None = None
 
 
 @nested_dataclass(kw_only=True)
@@ -77,7 +77,6 @@ class GenerateSolutionsConfig:
     chunk_id: int | None = None  # if specified, will index the specified chunk only
 
     generation_key: str = "generation"
-    include_generation: bool = False  # if True, will use "generation" as part of the prompt
     partial_generation: bool = False  # if True, model will be prompted to continue "generation" without closing assistant tag
     # if specified, we will have a loop over that key in the data file and
     # treat each element as a new turn of conversation
@@ -230,7 +229,6 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
                 for output, original_data_point in zip(outputs, data_points):
                     # to make it easier to follow up with evaluation and limit accidental errors, we are adding
                     # all of the ground-truth data to the output file alongside the generated solutions
-                    original_data_point.pop(cfg.generation_key, None)
                     output[cfg.generation_key] = output.pop("generation")
                     for key in output:
                         original_data_point.pop(key, None)
