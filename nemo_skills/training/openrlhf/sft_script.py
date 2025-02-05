@@ -78,14 +78,10 @@ class CustomSFTTrainer(SFTTrainer):
         super().__init__(*args, **kwargs)
         self.max_time_per_run = max_time_per_run
 
-    def fit(self, args, consumed_samples=0, num_update_steps_per_epoch=None):
         if self.max_time_per_run:
             self.max_time_manager = MaxTimeManager(self.max_time_per_run)
         else:
             self.max_time_manager = None
-
-        super().fit(args, consumed_samples, num_update_steps_per_epoch)
-
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
         if self.max_time_manager is not None:
@@ -153,7 +149,7 @@ def train(args):
     if args.eval_steps > 0:
         eval_data = eval_data.select(range(min(args.max_samples, len(eval_data))))
     else:
-        eval_data = train_data.select(range(min(args.max_samples, len(train_data) * 0.03)))
+        eval_data = train_data.select(range(min(args.max_samples, int(len(train_data) * 0.03))))
     train_dataset = SFTDataset(
         train_data,
         tokenizer,
