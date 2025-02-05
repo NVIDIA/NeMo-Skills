@@ -172,7 +172,7 @@ def get_training_cmd(
         validation_data = training_data
 
     if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
+        timeout = "10000:00:00"
     else:
         timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
 
