@@ -15,17 +15,14 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List
 
 import nemo_run as run
 import typer
-from omegaconf import OmegaConf
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.openrlhf import openrlhf_app
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -171,17 +168,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
+    timeout = get_timeout(cluster_config, partition)
 
     logging_params = format_wandb_args(cluster_config, disable_wandb, wandb_project, expname)
 
