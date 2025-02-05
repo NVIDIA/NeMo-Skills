@@ -52,21 +52,26 @@ class PPOOpenRLHFTask:
     def format_reward_critic_args(self):
         cmd = (
             f" --reward_pretrain {self.reward_model} "
-            f" --ref_num_nodes {self.num_nodes} "
-            f" --ref_num_gpus_per_node {self.num_gpus} "
-            f" --reward_num_nodes {self.num_nodes} "
-            f" --reward_num_gpus_per_node {self.num_gpus} "
-            f" --critic_num_nodes {self.num_nodes} "
-            f" --critic_num_gpus_per_node {self.num_gpus} "
-            f" --vllm_num_engines {self.num_gpus} "
-            f" --vllm_tensor_parallel_size 1 "
-            f" --colocate_critic_reward "
-            f" --colocate_actor_ref "
+            # TODO: add proper defaults when we figure out how these should be used
+            #       for now we require users to be explicit
+            # f" --ref_num_nodes {self.num_nodes} "
+            # f" --ref_num_gpus_per_node {self.num_gpus} "
+            # f" --reward_num_nodes {self.num_nodes} "
+            # f" --reward_num_gpus_per_node {self.num_gpus} "
+            # f" --critic_num_nodes {self.num_nodes} "
+            # f" --critic_num_gpus_per_node {self.num_gpus} "
+            # f" --vllm_num_engines {self.num_gpus} "
+            # f" --vllm_tensor_parallel_size 1 "
+            # f" --colocate_critic_reward "
+            # f" --colocate_actor_ref "
         )
         return cmd
 
     def format_actor_args(self):
-        cmd = f" --actor_num_nodes {self.num_nodes} " f" --actor_num_gpus_per_node {self.num_gpus} "
+        # TODO: add proper defaults when we figure out how these should be used
+        #       for now we require users to be explicit
+        # cmd = f" --actor_num_nodes {self.num_nodes} --actor_num_gpus_per_node {self.num_gpus} "
+        cmd = ""
         return cmd
 
     def format_train_args(self):
