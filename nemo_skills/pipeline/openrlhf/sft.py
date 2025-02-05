@@ -42,7 +42,7 @@ class TrainingParams:
     expname: str
     disable_wandb: bool
     wandb_project: str
-    timeout: str  # TODO: add proper support
+    timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
 
@@ -87,6 +87,7 @@ def format_train_args(cluster_config, params: TrainingParams):
         f" --save_steps -1 "
         f" --max_samples 500000 "
         f" --max_epochs 1 "
+        f" --max_time_per_run {params.timeout} "
     )
     return cmd
 
