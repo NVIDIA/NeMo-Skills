@@ -331,7 +331,7 @@ def generate(
                     if chunk_id != None:
                         single_output_file = get_chunked_rs_filename(output_dir, random_seed=seed)
                         merge_cmd = (
-                            f"bash /nemo_run/code/nemo_skills/inference/merge_chunks.sh {single_output_file} "
+                            f"python -m nemo_skills.inference.merge_chunks {single_output_file} "
                             f"{' '.join([f[:-5] for f in donefiles[seed]])}"
                         )
                         single_postprocess_cmd += f" && {merge_cmd}"
