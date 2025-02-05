@@ -149,7 +149,7 @@ def train(args):
     if args.eval_steps > 0:
         eval_data = eval_data.select(range(min(args.max_samples, len(eval_data))))
     else:
-        eval_data = train_data.select(range(min(args.max_samples, int(len(train_data) * 0.03))))
+        eval_data = train_data.select(range(min(args.max_samples, max(1, int(len(train_data) * 0.03)))))
     train_dataset = SFTDataset(
         train_data,
         tokenizer,
