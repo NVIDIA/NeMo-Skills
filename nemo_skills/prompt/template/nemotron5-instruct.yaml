@@ -1,0 +1,30 @@
+# Prompt specification for the original Llama3-instruct model
+
+# these tokens are always used to construct a prompt like this
+#
+#   single-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user}<user_end><assistant_begin>{generation}
+#   multi-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user1}<user_end><assistant_begin>{assistant1}<assistant_end>...
+#     <user_begin>{userN}<user_end><assistant_begin>{generation}
+
+text_begin: ""
+
+system_begin: "<SPECIAL_10>System\n"
+system_end: "\n"
+
+user_begin: "<SPECIAL_11>User\n"
+user_end: "\n"
+
+assistant_begin: "<SPECIAL_11>Assistant\n"
+assistant_end: "\n"
+
+stop_phrases: ["<SPECIAL_11>"]
+
+# used to execute code within these tags
+code_begin: '<llm-code>\n'
+code_end: '</llm-code>\n'
+# used to extract the code output
+code_output_begin: '<llm-code-output>\n'
+code_output_end: '</llm-code-output>\n'
+code_output_format: "qwen"

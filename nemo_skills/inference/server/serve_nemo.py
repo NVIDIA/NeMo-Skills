@@ -118,6 +118,15 @@ def main(cfg) -> None:
             pretrained_cfg.megatron_amp_O2 = False
         elif trainer.precision in ['bf16', 'bf16-mixed'] and cfg.get('megatron_amp_O2', False):
             pretrained_cfg.megatron_amp_O2 = True
+            
+        if 'attn_scaling_during_inference_type' in cfg:
+            pretrained_cfg.attn_scaling_during_inference_type = cfg.attn_scaling_during_inference_type
+            logging.info(f"setting attn_scaling_during_inference_type to {pretrained_cfg.attn_scaling_during_inference_type}")
+
+        if 'attn_scaling_during_inference_value' in cfg:
+            pretrained_cfg.attn_scaling_during_inference_value = cfg.attn_scaling_during_inference_value
+            logging.info(f"setting attn_scaling_during_inference_value to {pretrained_cfg.attn_scaling_during_inference_value}")
+            
     model = MegatronGPTModel.restore_from(
         restore_path=cfg.gpt_model_file,
         trainer=trainer,
