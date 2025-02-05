@@ -40,4 +40,4 @@ git apply <path to NeMo-SKills>/dockerfiles/sglang.patch
 then run `docker ps -a` and note image id of your running container. Do `docker commit <image id>`
 and `docker tag <printed hash> igitman/nemo-skills-sglang:0.5.0` and push that image.
 
-Current sglang version: v0.4.2.post1-cu125
+Current sglang version: lmsysorg/sglang:v0.4.2.post2-cu125
