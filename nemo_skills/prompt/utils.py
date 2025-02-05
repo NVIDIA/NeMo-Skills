@@ -212,7 +212,7 @@ class Prompt:
         }
 
     def fill(
-        self, input_dict: Dict[str, str], include_generation: bool = False, multi_turn_key: str | None = None
+        self, input_dict: Dict[str, str], include_generation: bool = False, multi_turn_key: str | None = None, partial_generation: bool = False,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -247,7 +247,11 @@ class Prompt:
                 )
                 if generation:
                     # Generation can be part of the input in cases such as reward models
-                    prompt_string += self.TURN_END_FORMAT.format(assistant=generation, **asdict(self.config.template))
+                    if partial_generation:
+                        # Append generation without the closing tag.
+                        prompt_string += generation
+                    else:
+                        prompt_string += self.TURN_END_FORMAT.format(assistant=generation, **asdict(self.config.template))
             else:
                 prompt_string = self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
