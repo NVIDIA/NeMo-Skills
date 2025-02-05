@@ -63,7 +63,7 @@ class GenerateSolutionsConfig:
 
     # Can specify one of the existing datasets.
     dataset: str | None = None
-    split: str | None = None  # Can be train, validation, test or train_full (train + validation)
+    split: str | None = None  # Generally one of train/test, but can be anything since it's used as part of a file name
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
 
     batch_size: int = 128
@@ -206,7 +206,11 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
                         # getting a new set of generations
                         turn_outputs = llm.generate(
                             prompts=[
-                                prompt.fill(turn_data_points[dp_index], multi_turn_key=cfg.multi_turn_key, include_generation=cfg.include_generation)
+                                prompt.fill(
+                                    turn_data_points[dp_index],
+                                    multi_turn_key=cfg.multi_turn_key,
+                                    include_generation=cfg.include_generation,
+                                )
                                 for dp_index in dp_indices
                             ],
                             stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
@@ -276,7 +280,9 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             # Dynamic sending requests to maintain cfg.max_concurrent_requests running requests
             num_to_submit = min(cfg.max_concurrent_requests - len(in_progress), len(request_queue))
             batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
-            batch_prompts = [prompt.fill(data[idx], include_generation=cfg.include_generation) for idx in batch_indices]
+            batch_prompts = [
+                prompt.fill(data[idx], include_generation=cfg.include_generation) for idx in batch_indices
+            ]
 
             if len(batch_prompts) > 0:
                 generation_ids = llm.generate_async(
