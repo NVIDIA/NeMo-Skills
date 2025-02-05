@@ -47,15 +47,21 @@ def format_entry(entry):
 
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
-
     return {
         "choice1": choices[0],
         "choice2": choices[1],
         "choice3": choices[2],
         "choice4": choices[3],
         "choices": [choices[0], choices[1], choices[2], choices[3]],
-        "expected_answer": f"({chr(65 + correct_answer_index)})",
+        "expected_answer": f"{chr(65 + correct_answer_index)}",
         "explanation": preprocess(entry["Explanation"]),
+        "question": entry["Question"],
+        "subset_for_metrics": entry["Subdomain"],
+        "difficulty": (
+            re.split(r'\s*\(', entry["Writer's Difficulty Estimate"])[0]
+            if entry["Writer's Difficulty Estimate"] is not None
+            else None
+        ),
     }
 
 
@@ -70,7 +76,7 @@ def main(args):
     dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{args.split}")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"gpqa_{args.split}.jsonl"
+    output_file = data_dir / f"{args.split}.jsonl"
     write_data_to_file(output_file, dataset)
 
 

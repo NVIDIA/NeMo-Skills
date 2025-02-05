@@ -2,7 +2,7 @@
 # https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/main/evaluate_from_api.py
 
 user: |-
-  The following is a multiple choice question about {subject}. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+  The following is a multiple choice question about {subset_for_metrics}. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
   
   Question: {question}
   Options: {options}
