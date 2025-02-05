@@ -13,23 +13,22 @@
 # limitations under the License.
 
 import logging
-from typing import List
-
 import os
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Optional
+
 import nemo_run as run
 import typer
-from datetime import datetime
-from dataclasses import dataclass
-from omegaconf import OmegaConf
-from typing import Optional
 
-from nemo_skills.pipeline.openrlhf import openrlhf_app
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.openrlhf import openrlhf_app
+from nemo_skills.pipeline.utils import get_ray_server_cmd
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
+
 
 @dataclass
 class PPOOpenRLHFTask:
@@ -46,50 +45,11 @@ class PPOOpenRLHFTask:
     extra_arguments: str = ""
     logging_params: str = ""
 
-
-    def get_ray_server_cmd(self, start_cmd, cluster_config):
-        ray_start_cmd = (
-            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
-            "    echo 'Starting head node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    ray start "
-            "        --head "
-            "        --port=6379 "
-            f"       {self.get_ray_server_ports(cluster_config)} && "
-            f"   {start_cmd} ;"
-            "else "
-            "    echo 'Starting worker node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
-            "    ray start "
-            "        --block "
-            "        --address=$SLURM_MASTER_NODE:6379 "
-            f"       {self.get_ray_server_ports(cluster_config)} ;"
-            "fi"
-        )
-        return ray_start_cmd
-
-    def get_ray_server_ports(self, cluster_config):
-        ports = (
-            "--node-manager-port=12345 "
-            "--object-manager-port=12346 "
-            "--dashboard-port=8265 "
-            "--dashboard-agent-grpc-port=12347 "
-            "--runtime-env-agent-port=12349 "
-            "--metrics-export-port=12350 "
-            "--min-worker-port=14349 "
-            "--max-worker-port=18349 "
-        )
-        return ports
-
-    def get_ray_launch_cmd(self, cluster_config):
-        cmd = (
-            "ray job submit --address='http://127.0.0.1:8265' -- "
-        )
+    def get_ray_launch_cmd(self):
+        cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
         return cmd
 
-
-    def format_reward_critic_args(self, cluster_config):
+    def format_reward_critic_args(self):
         cmd = (
             f" --reward_pretrain {self.reward_model} "
             f" --ref_num_nodes {self.num_nodes} "
@@ -105,33 +65,30 @@ class PPOOpenRLHFTask:
         )
         return cmd
 
-    def format_actor_args(self, cluster_config):
-        cmd = (
-            f" --actor_num_nodes {self.num_nodes} "
-            f" --actor_num_gpus_per_node {self.num_gpus} "
-        )
+    def format_actor_args(self):
+        cmd = f" --actor_num_nodes {self.num_nodes} " f" --actor_num_gpus_per_node {self.num_gpus} "
         return cmd
 
-
-    def format_train_args(self, cluster_config):
+    def format_train_args(self):
         # NOTE:
         # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
         # with optim states)
         # `save` refers to the final HF model checkpoint (the equivalent of nemo final model checkpoint)
         # You can opt in to save both ds and HF checkpoint at every save_steps by setting `--save_hf_ckpt` as extra args
-        cmd = (f" --pretrain {self.model} "
-               f" --load_checkpoint "
-               f" --ckpt_path {os.path.join(self.output_dir, 'ds_checkpoints')} "
-               f" --max_ckpt_num 3 "
-               f" --max_ckpt_mem 10000000000 "
-               f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
-               f" --save_steps -1 "
-               f" --max_samples 500000 "
-               f" --max_epochs 1 ")
+        cmd = (
+            f" --pretrain {self.model} "
+            f" --load_checkpoint "
+            f" --ckpt_path {os.path.join(self.output_dir, 'ds_checkpoints')} "
+            f" --max_ckpt_num 3 "
+            f" --max_ckpt_mem 10000000000 "
+            f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
+            f" --save_steps -1 "
+            f" --max_samples 500000 "
+            f" --max_epochs 1 "
+        )
         return cmd
 
-
-    def format_data_args(self, cluster_config):
+    def format_data_args(self):
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
@@ -144,7 +101,7 @@ class PPOOpenRLHFTask:
 
         return cmd
 
-    def get_common_arg_overrides(self, cluster_config):
+    def get_common_arg_overrides(self):
         cmd = (
             " --learning_rate 5e-6 "
             " --train_batch_size 128 "
@@ -162,7 +119,7 @@ class PPOOpenRLHFTask:
         )
         return cmd
 
-    def get_common_rl_arg_overrides(self, cluster_config):
+    def get_common_rl_arg_overrides(self):
         cmd = (
             " --micro_rollout_batch_size 16 "
             " --rollout_batch_size 1024 "
@@ -175,55 +132,52 @@ class PPOOpenRLHFTask:
         )
         return cmd
 
-    def format_wandb_args(self, cluster_config, disable_wandb, wandb_project, expname):
+    def format_wandb_args(self, disable_wandb, wandb_project, expname):
         if not disable_wandb:
             if os.getenv('WANDB_API_KEY') is None:
                 raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-            cmd = (f" --use_wandb $WANDB_API_KEY "
-                   f" --wandb_project {wandb_project} "
-                   f" --wandb_run_name {expname} ")
+            cmd = f" --use_wandb $WANDB_API_KEY " f" --wandb_project {wandb_project} " f" --wandb_run_name {expname} "
         else:
             cmd = ""
 
         return cmd
 
-    def get_preamble_cmd(self, cluster_config):
+    def get_preamble_cmd(self):
         cmd = " echo 'No preamble command to execute, skipping...' "
         return cmd
 
-    def get_job_cmd(self, cluster_config):
-        ray_job_cmd = self.get_ray_launch_cmd(cluster_config)
+    def get_job_cmd(self):
+        ray_job_cmd = self.get_ray_launch_cmd()
         ray_job_cmd = (
             f"echo 'Starting training' && "
             f"{ray_job_cmd} -m openrlhf.cli.train_ppo_ray "
-            f"  {self.format_reward_critic_args(cluster_config)} "
-            f"  {self.format_actor_args(cluster_config)} "
-            f"  {self.format_train_args(cluster_config)} "
-            f"  {self.format_data_args(cluster_config)} "
-            f"  {self.get_common_arg_overrides(cluster_config)} "
-            f"  {self.get_common_rl_arg_overrides(cluster_config)} "
+            f"  {self.format_reward_critic_args()} "
+            f"  {self.format_actor_args()} "
+            f"  {self.format_train_args()} "
+            f"  {self.format_data_args()} "
+            f"  {self.get_common_arg_overrides()} "
+            f"  {self.get_common_rl_arg_overrides()} "
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
         return ray_job_cmd
 
-    def get_cmd(self, cluster_config):
+    def get_cmd(self):
 
-        self.logging_params = self.format_wandb_args(cluster_config, self.disable_wandb, self.wandb_project, self.expname)
-        preamble_cmd = self.get_preamble_cmd(cluster_config)
+        self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
+        preamble_cmd = self.get_preamble_cmd()
 
         cmd = (
             f"export HYDRA_FULL_ERROR=1 && "
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-            f"export TRITON_CACHE_DIR=/nemo_run/code/.triton_cache && "
             f"cd /nemo_run/code && "
             f"echo 'Running preamble command: '{preamble_cmd}' && "
             f"{preamble_cmd} && "
         )
 
-        ray_job_cmd = self.get_job_cmd(cluster_config)
-        ray_server_cmd = self.get_ray_server_cmd(ray_job_cmd, cluster_config)
+        ray_job_cmd = self.get_job_cmd()
+        ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
 
         cmd = f"{cmd} {ray_server_cmd} "
         return cmd
@@ -244,6 +198,7 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
 ):
+    # TODO: use those
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
     else:
@@ -289,8 +244,7 @@ def ppo_openrlhf(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
-    final_checkpoint_path: str = typer.Option(None, help="Where to put the final checkpoint"),
-    expname: str = typer.Option(..., help="Nemo run experiment name"),
+    expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(..., help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
@@ -299,7 +253,6 @@ def ppo_openrlhf(
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
-    with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -350,21 +303,13 @@ def ppo_openrlhf(
             raise ValueError("prompt_data is required when num_training_jobs > 0")
         check_if_mounted(cluster_config, prompt_data)
 
-    # if not final_checkpoint_path:
-    #     final_checkpoint_path = f"{output_dir}/model-averaged-hf"
-    # check_if_mounted(cluster_config, final_checkpoint_path)
-
     if cluster_config["executor"] == "local":
         assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
-
-    # if " " in str(average_steps):
-    #     raise ValueError("average steps should be separated with commas")
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
         ppo_task = ctx.obj['ppo_task']  # type: type(PPOOpenRLHFTask)
-        assert isinstance(ppo_task,
-                          PPOOpenRLHFTask), "`ppo_task` must be a subclass of PPOOpenRLHFTask"
+        assert isinstance(ppo_task, PPOOpenRLHFTask), "`ppo_task` must be a subclass of PPOOpenRLHFTask"
     else:
         ppo_task = None
 
@@ -395,11 +340,10 @@ def ppo_openrlhf(
                 container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
+                num_tasks=1,  # torchrun will launch all processes
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
-                with_sandbox=with_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
@@ -407,32 +351,6 @@ def ppo_openrlhf(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
 
-        # cmd = get_avg_checkpoints_cmd(
-        #     nemo_model=nemo_model,
-        #     output_dir=output_dir,
-        #     final_nemo_path=final_nemo_path,
-        #     average_steps=f"--steps {' '.join(average_steps.split(','))} " if average_steps else "",
-        # )
-
-        # add_task(
-        #     exp,
-        #     cmd=cmd,
-        #     task_name=f"{expname}-prepare-eval",
-        #     log_dir=f"{log_dir}/prepare-eval-logs",
-        #     container=cluster_config["containers"]['nemo'],
-        #     cluster_config=cluster_config,
-        #     partition=partition,
-        #     time_min=time_min,
-        #     num_nodes=1,
-        #     num_tasks=1,
-        #     num_gpus=num_gpus,
-        #     run_after=run_after,
-        #     reuse_code=reuse_code,
-        #     reuse_code_exp=reuse_code_exp,
-        #     task_dependencies=[prev_task] if prev_task is not None else None,
-        #     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-        # )
-        #
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
 
@@ -442,5 +360,3 @@ def ppo_openrlhf(
 if __name__ == "__main__":
     typer.main.get_command_name = lambda name: name
     app()
-
-
