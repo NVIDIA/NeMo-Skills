@@ -67,7 +67,7 @@ class MaxTimeManager:
     def check(self):
         current_time = time.time()
         if (current_time - self.start_time) >= self.save_interval:
-            print(f"Max time has been reached. Signalling to save a checkpoint.")
+            print(f"\n\n>>> Max time has been reached. Signalling to save a checkpoint.\n\n")
             self.max_time_reached = True
         return self.max_time_reached
 
@@ -76,12 +76,16 @@ class CustomSFTTrainer(SFTTrainer):
 
     def __init__(self, *args, max_time_per_run=None, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.max_time_per_run = max_time_per_run
+
+    def fit(self, args, consumed_samples=0, num_update_steps_per_epoch=None):
         if self.max_time_per_run:
-            self.max_time_manager = MaxTimeManager(max_time_per_run)
+            self.max_time_manager = MaxTimeManager(self.max_time_per_run)
         else:
             self.max_time_manager = None
+
+        super().fit(args, consumed_samples, num_update_steps_per_epoch)
+
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
         if self.max_time_manager is not None:
@@ -89,9 +93,9 @@ class CustomSFTTrainer(SFTTrainer):
             if check:
                 # We will force logging, evaluation and checkpointing to occur immediately
                 # by forcing the value of these step counter equal to global_step
-                args.logging_steps = global_step if args.logging_steps > 0 else -1
-                args.eval_steps = global_step if args.eval_steps > 0 else -1
-                args.save_steps = global_step if args.save_steps > 0 else -1
+                args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
+                args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
+                args.save_steps = global_step if args.save_steps > 0 else args.save_steps
 
                 # Call super() to save the logs and checkpoints
                 super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
@@ -149,7 +153,7 @@ def train(args):
     if args.eval_steps > 0:
         eval_data = eval_data.select(range(min(args.max_samples, len(eval_data))))
     else:
-        eval_data = train_data.select(range(min(args.max_samples, len(train_data))))
+        eval_data = train_data.select(range(min(args.max_samples, len(train_data) * 0.03)))
     train_dataset = SFTDataset(
         train_data,
         tokenizer,
