@@ -254,11 +254,12 @@ def generate(
             "will be performed after postprocess_cmd."
         )
     if chunking_enabled and generation_type != GenerationType.generate:
-        logging.warning(
+        logging.error(
             "Chunking is enabled, but generation type is not 'generate'. "
             "Chunking is only supported for generation type 'generate'."
             "This may result in superfluous generation jobs."
         )
+        raise ValueError("Chunking is only supported for generation type 'generate'")
 
     try:
         server_type = server_type.value
