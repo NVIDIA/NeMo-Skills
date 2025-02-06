@@ -15,16 +15,16 @@
 import importlib
 import json
 import logging
-from collections import deque
 import sys
 import time
+from collections import deque
 from copy import deepcopy
 from dataclasses import asdict, field
-from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import hydra
-from omegaconf import OmegaConf, ListConfig, open_dict
+from omegaconf import ListConfig, OmegaConf, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -175,32 +175,33 @@ class GenerationTask:
         self.async_in_progress = None
 
         # Early exit flag
-        self.early_exit = False # Flag to signal early exit from generation
+        self.early_exit = False  # Flag to signal early exit from generation
 
-    def load_data(self, cfg: GenerateSolutionsConfig):
+    def load_data(self):
         """Template method to load data.
 
         Note:
         Assigns the loaded data to `self.data`.
         """
         data = []
-        with open(cfg.input_file, "rt", encoding="utf-8") as fin:
+        with open(self.cfg.input_file, "rt", encoding="utf-8") as fin:
             for line in fin:
                 data.append(json.loads(line))
 
         # chunk the dataset if required
-        if cfg.num_chunks is not None and cfg.chunk_id is not None:
-            data, cfg.output_file = chunk_data(data, cfg.output_file, cfg.chunk_id, cfg.num_chunks)
+        if self.cfg.num_chunks is not None and self.cfg.chunk_id is not None:
+            data, self.cfg.output_file = chunk_data(data, self.cfg.output_file, self.cfg.chunk_id, self.cfg.num_chunks)
             LOG.info(
-                f"Chunking the data into {cfg.num_chunks} chunks and processing chunk {cfg.chunk_id}.\n"
+                f"Chunking the data into {self.cfg.num_chunks} chunks and processing chunk {self.cfg.chunk_id}.\n"
                 f"Number of samples in the chunk: {len(data)}"
             )
         self.data = data
 
-    def sync_data_skip(self, cfg: GenerateSolutionsConfig):
+    # TODO: this can be simplified a lot
+    def sync_data_skip(self):
         """Template method to determine data skipping based on output file.
 
-        Logic to skip already filled data based on `cfg.skip_filled` and `cfg.output_file`.
+        Logic to skip already filled data based on `self.cfg.skip_filled` and `self.cfg.output_file`.
         Also calculates max_samples and early_exit flags.
 
         Note:
@@ -208,59 +209,59 @@ class GenerationTask:
         If self.early_exit is set to True, the template processor must read the value and exit early.
         """
         starting_idx = 0
-        if cfg.skip_filled:
+        if self.cfg.skip_filled:
             try:
-                with open(cfg.output_file, "rt", encoding="utf-8") as fin:
+                with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                     starting_idx = len(fin.readlines())
             except FileNotFoundError:
-                LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
+                LOG.warning(f"File `{self.cfg.output_file}` not found, starting from scratch")
         self.sync_starting_idx = starting_idx
 
-        self.data = self.data[self.sync_starting_idx:]
+        self.data = self.data[self.sync_starting_idx :]
 
-        if 0 <= cfg.max_samples <= starting_idx:
-            cfg.max_samples = 0
-        elif starting_idx < cfg.max_samples:
-            cfg.max_samples -= starting_idx
+        if 0 <= self.cfg.max_samples <= starting_idx:
+            self.cfg.max_samples = 0
+        elif starting_idx < self.cfg.max_samples:
+            self.cfg.max_samples -= starting_idx
 
         data_len = len(self.data) if self.data is not None else 0  # in case data is not yet loaded, use 0
-        if cfg.max_samples < 0 or cfg.max_samples > data_len: # use data_len here
-            cfg.max_samples = data_len
+        if self.cfg.max_samples < 0 or self.cfg.max_samples > data_len:  # use data_len here
+            self.cfg.max_samples = data_len
 
         if len(self.data) == 0:  # we might not have any examples if skip_filled=True
             self.early_exit = True
 
-        self.data = self.data[: cfg.max_samples]
+        self.data = self.data[: self.cfg.max_samples]
 
-        if starting_idx >= data_len and cfg.skip_filled:  # check against data_len
+        if starting_idx >= data_len and self.cfg.skip_filled:  # check against data_len
             self.early_exit = True
-            LOG.info(f"Output file `{cfg.output_file}` is already filled and skip_filled is True. Exiting.")
+            LOG.info(f"Output file `{self.cfg.output_file}` is already filled and skip_filled is True. Exiting.")
             return
 
-        self.sync_starting_idx = starting_idx # update instance variable
+        self.sync_starting_idx = starting_idx  # update instance variable
 
-    def get_llm_and_sandbox(self, cfg: GenerateSolutionsConfig):
+    def get_llm_and_sandbox(self):
         """Template method to get LLM and sandbox.
 
         Note:
         Assigns the loaded LLM to `self.llm`.
         """
-        if cfg.prompt_template is None and cfg.server["server_type"] != "openai":
-            with open_dict(cfg.server):
-                cfg.server["server_type"] = "openai"
-                cfg.server["model"] = "model"
-            if cfg.code_execution:
+        if self.cfg.prompt_template is None and self.cfg.server["server_type"] != "openai":
+            with open_dict(self.cfg.server):
+                self.cfg.server["server_type"] = "openai"
+                self.cfg.server["model"] = "model"
+            if self.cfg.code_execution:
                 raise ValueError("Code execution is not supported for OpenAI server")
 
-        if cfg.code_execution:
-            sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
-            llm = get_code_execution_model(**cfg.server, sandbox=sandbox)
+        if self.cfg.code_execution:
+            sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
         else:
-            llm = get_model(**cfg.server)
+            llm = get_model(**self.cfg.server)
 
         self.llm = llm
 
-    def get_prompt_and_example(self, cfg: GenerateSolutionsConfig):
+    def get_prompt_and_example(self):
         """Template method to get prompt and display example.
 
         Also logs one example from the data with the prompt config + template.
@@ -268,53 +269,53 @@ class GenerationTask:
         Note:
         Assigns the loaded prompt to `self.prompt`.
         """
-        if cfg.prompt_config is None:
-            dataset_module = importlib.import_module(f"nemo_skills.dataset.{cfg.dataset}")
-            cfg.prompt_config = dataset_module.PROMPT_CONFIG
+        if self.cfg.prompt_config is None:
+            dataset_module = importlib.import_module(f"nemo_skills.dataset.{self.cfg.dataset}")
+            self.cfg.prompt_config = dataset_module.PROMPT_CONFIG
 
-        prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
+        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
         LOG.info("Prompt used: %s", prompt)
 
-        if cfg.multi_turn_key is None:
+        if self.cfg.multi_turn_key is None:
             LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", self.data[0], prompt.fill(self.data[0]))
         else:
             first_sample = deepcopy(self.data[0])
-            first_sample[cfg.multi_turn_key] = first_sample[cfg.multi_turn_key][:1]
+            first_sample[self.cfg.multi_turn_key] = first_sample[self.cfg.multi_turn_key][:1]
             LOG.info(
                 "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
                 first_sample,
-                prompt.fill(first_sample, multi_turn_key=cfg.multi_turn_key),
+                prompt.fill(first_sample, multi_turn_key=self.cfg.multi_turn_key),
             )
         self.prompt = prompt
 
-    def get_extra_parameters(self, cfg: GenerateSolutionsConfig):
+    def get_extra_parameters(self):
         """Template method to get extra parameters for generation.
 
         Note:
         Assigns the loaded extra parameters to `self.extra_generate_params`.
         """
-        if cfg.code_execution:
+        if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
-        self.extra_stop_phrases = OmegaConf.to_container(cfg.extra_stop_phrases, resolve=True)
+        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
-    def sync_llm_generate_single_turn_hook(self, cfg, data_points):
+    def sync_llm_generate_single_turn_hook(self, data_points):
         """Template method for synchronous LLM generation in sync loop.
 
         Calculate synchronous generations for single turn data points.
         """
         return self.llm.generate(
-                prompts=[
-                    self.prompt.fill(dp, prefix_generation_to_response=cfg.prefix_generation_to_response)
-                    for dp in data_points
-                ],
-                stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
-                **asdict(cfg.inference),
-                **self.extra_generate_params,
-            )
+            prompts=[
+                self.prompt.fill(dp, prefix_generation_to_response=self.cfg.prefix_generation_to_response)
+                for dp in data_points
+            ],
+            stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
+            **asdict(self.cfg.inference),
+            **self.extra_generate_params,
+        )
 
-    def sync_llm_generate_multi_turn_hook(self, cfg, data_points):
+    def sync_llm_generate_multi_turn_hook(self, data_points):
         """Template method for synchronous LLM generation in sync loop.
 
         Calculate synchronous generations for multi turn data points.
@@ -330,25 +331,25 @@ class GenerationTask:
             # updating the turns to only have data up-to the current turn
             # and adding any generated assistant messages
             for dp_index in dp_indices:
-                turn_data_points[dp_index][cfg.multi_turn_key] = data_points[dp_index][cfg.multi_turn_key][
-                                                                 :cur_turn
-                                                                 ]
+                turn_data_points[dp_index][self.cfg.multi_turn_key] = data_points[dp_index][self.cfg.multi_turn_key][
+                    :cur_turn
+                ]
                 for turn_idx in range(cur_turn - 1):
-                    turn_data_points[dp_index][cfg.multi_turn_key][turn_idx]['assistant'] = outputs[
-                        dp_index
-                    ]["generation"][turn_idx]
+                    turn_data_points[dp_index][self.cfg.multi_turn_key][turn_idx]['assistant'] = outputs[dp_index][
+                        "generation"
+                    ][turn_idx]
             # getting a new set of generations
             turn_outputs = self.llm.generate(
                 prompts=[
                     self.prompt.fill(
                         turn_data_points[dp_index],
-                        multi_turn_key=cfg.multi_turn_key,
-                        prefix_generation_to_response=cfg.prefix_generation_to_response,
+                        multi_turn_key=self.cfg.multi_turn_key,
+                        prefix_generation_to_response=self.cfg.prefix_generation_to_response,
                     )
                     for dp_index in dp_indices
                 ],
                 stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
-                **asdict(cfg.inference),
+                **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             )
             # adding assistant answers to the generations
@@ -358,27 +359,27 @@ class GenerationTask:
             # removing any indices that got through all turns
             dp_indices = []
             for dp_index, (output, dp) in enumerate(zip(outputs, data_points)):
-                if len(output["generation"]) < len(dp[cfg.multi_turn_key]):
+                if len(output["generation"]) < len(dp[self.cfg.multi_turn_key]):
                     dp_indices.append(dp_index)
             cur_turn += 1
         return outputs
 
-    def sync_llm_generate_hook(self, cfg, data_points):
+    def sync_llm_generate_hook(self, data_points):
         """Template method for synchronous LLM generation in sync loop.
 
         Calculate synchronous generations for data points.
-        Swaps between single turn and multi turn generation based on `cfg.multi_turn_key`.
+        Swaps between single turn and multi turn generation based on `self.cfg.multi_turn_key`.
         """
-        if cfg.multi_turn_key is None:
+        if self.cfg.multi_turn_key is None:
             # single turn generation
-            outputs = self.sync_llm_generate_single_turn_hook(cfg, data_points)
+            outputs = self.sync_llm_generate_single_turn_hook(self.cfg, data_points)
 
         else:
             # multi-turn generation
-            outputs = self.sync_llm_generate_multi_turn_hook(cfg, data_points)
+            outputs = self.sync_llm_generate_multi_turn_hook(self.cfg, data_points)
         return outputs
 
-    def sync_output_processing_hook(self, cfg, outputs, data_points, fout):
+    def sync_output_processing_hook(self, outputs, data_points, fout):
         """Template method for processing and writing output in sync loop.
 
         Writes the synchronized output data to the output file.
@@ -388,13 +389,13 @@ class GenerationTask:
         for output, original_data_point in zip(outputs, data_points):
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
             # all of the ground-truth data to the output file alongside the generated solutions
-            output[cfg.generation_key] = output.pop("generation")
+            output[self.cfg.generation_key] = output.pop("generation")
             for key in output:
                 original_data_point.pop(key, None)
             output.update(original_data_point)
             fout.write(json.dumps(output) + "\n")
 
-    def sync_loop(self, cfg: GenerateSolutionsConfig):
+    def sync_loop(self):
         """Outer execution loop for synchronous generation.
 
         Calls a series of hook methods to perform synchronized decoding and output processing.
@@ -409,51 +410,53 @@ class GenerationTask:
         if not self.data:
             return
 
-        with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        with open(self.cfg.output_file, "at" if self.cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
             data_points_batch = []
-            for idx, data_point in tqdm(enumerate(self.data), initial=self.sync_starting_idx, total=len(self.data) + self.sync_starting_idx):
+            for idx, data_point in tqdm(
+                enumerate(self.data), initial=self.sync_starting_idx, total=len(self.data) + self.sync_starting_idx
+            ):
                 data_points_batch.append(data_point)
-                if len(data_points_batch) == cfg.batch_size or idx == len(self.data) - 1:
-                    outputs = self.sync_llm_generate_hook(cfg, data_points_batch)
-                    self.sync_output_processing_hook(cfg, outputs, data_points_batch, fout)
+                if len(data_points_batch) == self.cfg.batch_size or idx == len(self.data) - 1:
+                    outputs = self.sync_llm_generate_hook(self.cfg, data_points_batch)
+                    self.sync_output_processing_hook(self.cfg, outputs, data_points_batch, fout)
                     data_points_batch = []
 
-    def async_data_skip_positions_hook(self, cfg: GenerateSolutionsConfig) -> List[int]:
+    def async_data_skip_positions_hook(self) -> List[int]:
         """Template method to determine data skipping based on output file.
 
-        Logic to skip already filled data based on `cfg.skip_filled` and `cfg.output_file`.
+        Logic to skip already filled data based on `self.cfg.skip_filled` and `self.cfg.output_file`.
         Also calculates max_samples and early_exit flags.
 
         Returns:
             List of original sample positions to process.
         """
-        if cfg.max_samples > 0:
-            self.data = self.data[: cfg.max_samples]
+        if self.cfg.max_samples > 0:
+            self.data = self.data[: self.cfg.max_samples]
 
         # Compute original position ids for samples
         original_positions = [idx for idx in range(len(self.data))]
 
-        if cfg.skip_filled:
+        if self.cfg.skip_filled:
             try:
                 filled_positions = set()
-                with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+                with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                     for line in fin:
-                        filled_positions.add(int(json.loads(line)[cfg.async_position_key]))
+                        filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
                 self.data = [dp for idx, dp in enumerate(self.data) if idx not in filled_positions]
                 original_positions = [idx for idx in original_positions if idx not in filled_positions]
             except FileNotFoundError:
-                LOG.warning(f"File `{cfg.output_file}-async` not found, starting from scratch")
+                LOG.warning(f"File `{self.cfg.output_file}-async` not found, starting from scratch")
 
-        if Path(cfg.output_file).exists():
-            if not cfg.skip_filled:
-                Path(cfg.output_file).unlink()
+        if Path(self.cfg.output_file).exists():
+            if not self.cfg.skip_filled:
+                Path(self.cfg.output_file).unlink()
             else:
                 self.early_exit = True
                 return []
 
         return original_positions
 
-    def async_get_request_queue(self, cfg: GenerateSolutionsConfig) -> deque:
+    def async_get_request_queue(self) -> deque:
         """Template method to get request queue for async generation.
 
         Returns:
@@ -461,23 +464,25 @@ class GenerationTask:
         """
         return deque(range(len(self.data)))
 
-    def async_get_batch_prompts_from_queue(self, cfg: GenerateSolutionsConfig, request_queue: deque) -> Tuple[List[str], List[int]]:
+    def async_get_batch_prompts_from_queue(self, request_queue: deque) -> Tuple[List[str], List[int]]:
         """Template method to get batch prompts from request queue for async generation.
 
         Returns:
             Tuple of batch prompts and batch indices.
         """
-        # Dynamic sending requests to maintain cfg.max_concurrent_requests running requests
-        num_to_submit = min(cfg.max_concurrent_requests - len(self.async_in_progress), len(request_queue))
+        # Dynamic sending requests to maintain self.cfg.max_concurrent_requests running requests
+        num_to_submit = min(self.cfg.max_concurrent_requests - len(self.async_in_progress), len(request_queue))
         batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
         batch_prompts = [
-            self.prompt.fill(self.data[idx], prefix_generation_to_response=cfg.prefix_generation_to_response)
+            self.prompt.fill(self.data[idx], prefix_generation_to_response=self.cfg.prefix_generation_to_response)
             for idx in batch_indices
         ]
 
         return batch_prompts, batch_indices
 
-    def async_llm_generate_from_batch_prompts(self, cfg: GenerateSolutionsConfig, batch_prompts: List[str], batch_indices: List[int]) -> Dict[int, str]:
+    def async_llm_generate_from_batch_prompts(
+        self, batch_prompts: List[str], batch_indices: List[int]
+    ) -> Dict[int, str]:
         """Template method to generate LLM output asynchronously for batch prompts.
 
         Note:
@@ -491,7 +496,7 @@ class GenerationTask:
             generation_ids = self.llm.generate_async(
                 prompts=batch_prompts,
                 stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
-                **asdict(cfg.inference),
+                **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             )
         else:
@@ -503,7 +508,7 @@ class GenerationTask:
 
         return generation_ids
 
-    def async_llm_get_generations(self, cfg: GenerateSolutionsConfig, generation_ids: Dict[int, str]) -> List[Dict[str, str]]:
+    def async_llm_get_generations(self, generation_ids: Dict[int, str]) -> List[Dict[str, str]]:
         """Template method to get LLM generations asynchronously for generation ids.
 
         Returns:
@@ -514,7 +519,7 @@ class GenerationTask:
         generations = self.llm.get_generations(list(snapshot_in_progress.values()))
         return generations
 
-    def async_write_generations(self, cfg: GenerateSolutionsConfig, generations: List[Dict[str, str]], pbar, fout) -> None:
+    def async_write_generations(self, generations: List[Dict[str, str]], pbar, fout) -> None:
         """Template method to write LLM generations asynchronously.
 
         Note:
@@ -528,13 +533,13 @@ class GenerationTask:
                 del self.async_in_progress[idx]
 
                 # Prepare the result for writing
-                gen_dict[cfg.generation_key] = gen_dict.pop("generation")
+                gen_dict[self.cfg.generation_key] = gen_dict.pop("generation")
                 for key in gen_dict:
                     self.data[idx].pop(key, None)
                 gen_dict.update(self.data[idx])
 
                 # Insert the async position to preserve the original order
-                gen_dict[cfg.async_position_key] = self.async_original_positions[idx]
+                gen_dict[self.cfg.async_position_key] = self.async_original_positions[idx]
 
                 # Write the result immediately to minimize memory usage
                 fout.write(json.dumps(gen_dict) + "\n")
@@ -542,28 +547,28 @@ class GenerationTask:
                 # Update progress bar
                 pbar.update(1)
 
-    def async_postprocess_outputs(self, cfg: GenerateSolutionsConfig) -> None:
+    def async_postprocess_outputs(self) -> None:
         """Template method to post-process the outputs of async generation.
 
         Note:
         Restores the order of generations and resaves the output file without position ids.
         """
         # After we are done, need to restore the order and resave without position ids
-        with open(cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+        with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
 
         ordered_generations = [None] * len(generations)
         for gen_dict in generations:
-            async_pos = gen_dict.pop(cfg.async_position_key)
+            async_pos = gen_dict.pop(self.cfg.async_position_key)
             ordered_generations[async_pos] = gen_dict
 
-        with open(cfg.output_file, "wt", encoding="utf-8") as fout:
+        with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
 
-        Path(cfg.output_file + '-async').unlink()
+        Path(self.cfg.output_file + '-async').unlink()
 
-    def async_process_request_queue(self, cfg: GenerateSolutionsConfig, request_queue: deque):
+    def async_process_request_queue(self, request_queue: deque):
         """Outer execution loop for asynchronous generation.
 
         Calls a series of hook methods to perform asynchronous decoding and output processing.
@@ -575,22 +580,23 @@ class GenerationTask:
         4) async_write_generations()
         5) async_postprocess_outputs
         """
-        with open(cfg.output_file + "-async", "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+        with open(
+            self.cfg.output_file + "-async", "at" if self.cfg.skip_filled else "wt", encoding="utf-8", buffering=1
+        ) as fout:
             pbar = tqdm(total=len(self.data), desc="Processing requests")
 
             while self.async_in_progress or request_queue:  # Continue until all tasks are complete
                 # Get the batch of prompts to send
-                batch_prompts, batch_indices = self.async_get_batch_prompts_from_queue(cfg, request_queue)
+                batch_prompts, batch_indices = self.async_get_batch_prompts_from_queue(self.cfg, request_queue)
 
                 # Get generation ids for the batch
-                generation_ids = self.async_llm_generate_from_batch_prompts(cfg, batch_prompts)
+                generation_ids = self.async_llm_generate_from_batch_prompts(self.cfg, batch_prompts)
 
                 # Get the generations for the batch
-                generations = self.async_llm_get_generations(cfg, generation_ids)
+                generations = self.async_llm_get_generations(self.cfg, generation_ids)
 
                 # Process the generations
-                self.async_write_generations(cfg, generations, pbar, fout)
-
+                self.async_write_generations(self.cfg, generations, pbar, fout)
 
                 # Prevent excessive API overload
                 time.sleep(1)
@@ -598,10 +604,9 @@ class GenerationTask:
             pbar.close()
 
         # Post-process the outputs
-        self.async_postprocess_outputs(cfg)
+        self.async_postprocess_outputs()
 
-
-    def async_loop(self, cfg: GenerateSolutionsConfig):
+    def async_loop(self):
         """Execution processor for asynchronous generation.
 
         Calls a series of hook methods to perform asynchronous decoding and output processing.
@@ -611,50 +616,54 @@ class GenerationTask:
         2) async_get_request_queue()
         3) async_process_request_queue()
         """
-        self.async_original_positions = self.async_data_skip_positions_hook(cfg)
+        self.async_original_positions = self.async_data_skip_positions_hook(self.cfg)
 
         if not self.data or self.early_exit:
             LOG.info("No data to process, exiting.")
             return
 
         LOG.warning(
-            f"Async loop is maintaining {cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!."
+            f"Async loop is maintaining {self.cfg.max_concurrent_requests} concurrent requests throughout execution -- batch_size parameter is ignored!."
         )
         LOG.warning("Users can set '++max_concurrent_requests' to control the number of concurrent requests.")
 
-        request_queue = self.async_get_request_queue(cfg) # Queue of unsubmitted task indices
+        request_queue = self.async_get_request_queue(self.cfg)  # Queue of unsubmitted task indices
         self.async_in_progress = {}  # Track ongoing requests {index: generation_id}
 
-        self.async_process_request_queue(cfg, request_queue)
+        self.async_process_request_queue(request_queue)
 
-    def run_generation_loop(self, cfg: GenerateSolutionsConfig):
+    def run_generation_loop(self):
         """Template method to run the generation loop (sync or async)."""
-        if cfg.use_async_loop is False or cfg.server["server_type"] == "nemo" or cfg.multi_turn_key is not None:
-            self.sync_loop(cfg)
+        if (
+            self.cfg.use_async_loop is False
+            or self.cfg.server["server_type"] == "nemo"
+            or self.cfg.multi_turn_key is not None
+        ):
+            self.sync_loop(self.cfg)
         else:
-            self.async_loop(cfg)
+            self.async_loop(self.cfg)
 
-    def generate_output(self, cfg: GenerateSolutionsConfig):
+    def generate_output(self):
         """Template method to orchestrate the generation process."""
-        Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
+        Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
-        self.load_data(cfg)
+        self.load_data()
 
-        if not cfg.use_async_loop:
-            self.sync_data_skip(cfg)
+        if not self.cfg.use_async_loop:
+            self.sync_data_skip()
 
-        if self.early_exit: # Check for early exit flag
+        if self.early_exit:  # Check for early exit flag
             LOG.info("Early exit requested, stopping generation.")
             return
 
-        self.get_llm_and_sandbox(cfg)
-        self.get_prompt_and_example(cfg)
-        self.get_extra_parameters(cfg)
+        self.get_llm_and_sandbox()
+        self.get_prompt_and_example()
+        self.get_extra_parameters()
 
-        if cfg.dry_run:
+        if self.cfg.dry_run:
             return
 
-        self.run_generation_loop(cfg)
+        self.run_generation_loop()
 
     @classmethod
     def get_generation_module(cls) -> str:
@@ -686,7 +695,7 @@ def generate(cfg: GenerateSolutionsConfig):
     LOG.info("Config used: %s", cfg)
 
     task = GenerationTask(cfg)
-    task.generate_output(cfg)
+    task.generate_output()
 
 
 HELP_MESSAGE = get_help_message(
