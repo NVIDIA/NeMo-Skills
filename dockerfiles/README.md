@@ -27,7 +27,7 @@ Currently it takes 10+ hours to build this docker. Is there anything we can do t
 
 Current vllm version: v0.7.0
 
-Current OpenRLHF version: 631b0bcb7c14ec2fd4117a43a661903ed60d26cc
+Current OpenRLHF version: dacaec274a6a1aa0ec9100688395cc818b8a6b09
 
 ## Building sglang image
 
