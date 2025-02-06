@@ -44,7 +44,112 @@ from openrlhf.trainer.ray import (
     RewardModelRayActor,
     create_vllm_engines,
 )
+from openrlhf.trainer.ray.ppo_actor import ActorPPOTrainer
 from openrlhf.utils import get_strategy
+
+from nemo_skills.training.openrlhf.utils import MaxTimeManager
+
+from typing import Callable
+import os
+
+class CustomActorModelRayActor(ActorModelRayActor):
+    # this fit is copy/pasted from the original ActorModelRayActor fit method
+    # but has the trainer overridden by CustomActorPPOTrainer
+    def fit(self,
+        critic_model: ray.actor.ActorHandle,
+        initial_model: ray.actor.ActorHandle,
+        reward_model: List[ray.actor.ActorHandle],
+        remote_rm_url: List[str] = None,
+        reward_fn: Callable[[List[torch.Tensor]], torch.Tensor] = None,
+        vllm_engines: List[ray.actor.ActorHandle] = None,
+        critic_train_remote: bool = False,
+        ):
+        """Train actor model with prompt datasets."""
+        strategy = self.strategy
+        args = self.strategy.args
+
+        # configure Trainer
+        trainer = CustomActorPPOTrainer(
+            strategy,
+            self.actor,
+            critic_model,
+            reward_model,
+            initial_model,
+            ema_model=self.ema_model,
+            actor_optim=None,
+            critic_optim=None,
+            actor_scheduler=self.actor_scheduler,
+            critic_scheduler=None,
+            remote_rm_url=remote_rm_url,
+            reward_fn=reward_fn,
+            vllm_engines=vllm_engines,
+            max_epochs=args.max_epochs,
+            micro_train_batch_size=args.micro_train_batch_size,
+            micro_rollout_batch_size=args.micro_rollout_batch_size,
+            gradient_checkpointing=args.gradient_checkpointing,
+            critic_train_remote=critic_train_remote,
+            tokenizer=self.tokenizer,
+            prompt_max_len=args.prompt_max_len,
+            value_clip=args.value_clip,
+            eps_clip=args.eps_clip,
+            gamma=args.gamma,
+            lambd=args.lambd,
+            init_kl_coef=args.init_kl_coef,
+            kl_target=args.kl_target,
+            ema_beta=0.992,
+            ptx_coef=args.ptx_coef,
+            max_norm=args.max_norm,
+            # fro GPT generation
+            do_sample=True,
+            max_new_tokens=args.generate_max_len,
+            max_length=args.max_len,
+            temperature=args.temperature,
+            top_p=args.top_p,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            save_hf_ckpt=args.save_hf_ckpt,
+            disable_ds_ckpt=args.disable_ds_ckpt,
+            max_time_per_run=args.max_time_per_run,
+        )
+
+        # broadcast checkpoint
+        ckpt_path = os.path.join(args.ckpt_path, "_actor")
+        if args.load_checkpoint and os.path.exists(ckpt_path) and not vllm_engines is None:
+            torch.distributed.barrier()
+            trainer._broadcast_to_vllm()
+
+        trainer.fit(
+            args,
+            self.prompts_dataloader,
+            self.pretrain_dataloader,
+            self.consumed_samples,
+            self.num_update_steps_per_episodes,
+        )
+
+class CustomActorPPOTrainer(ActorPPOTrainer):
+    def __init__(self, *args, max_time_per_run=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_time_per_run = max_time_per_run
+
+        if self.max_time_per_run:
+            self.max_time_manager = MaxTimeManager(max_time_per_run)
+        else:
+            self.match_time_manager = None
+
+    def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
+        if self.max_time_manager is not None and (check := self.max_time_manager.check()):
+            # We will force logging, evaluation and checkpointing to occur immediately
+            # by forcing the value of these step counter equal to global_step
+            args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
+            args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
+            args.save_steps = global_step if args.save_steps > 0 else args.save_steps
+
+            # Call super() to save the logs and checkpoints
+            super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
+            # Exit the program early
+        else:
+            return super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
+
 
 
 # NOTE: reward function for multiple reward models, replace this with your own function!
@@ -257,6 +362,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_ckpt_num", type=int, default=3)
     parser.add_argument("--max_ckpt_mem", type=int, default=1e8)
     parser.add_argument("--load_checkpoint", action="store_true", default=False)
+    parser.add_argument("--max_time_per_run", type=str, default=None, help="Max time to run in DD:HH:MM:SS format.")
 
     # DeepSpeed
     parser.add_argument("--local_rank", type=int, default=-1, help="local_rank for deepspeed")

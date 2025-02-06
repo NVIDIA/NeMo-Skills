@@ -90,6 +90,7 @@ class PPOOpenRLHFTask:
             f" --save_steps -1 "
             # f" --max_samples 500000 "
             f" --max_epochs 1 "
+            f" --max_time_per_run {self.timeout} "
         )
         return cmd
 
