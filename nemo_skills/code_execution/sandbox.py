@@ -30,6 +30,7 @@ import tqdm
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 from nemo_skills.dataset.utils import get_lean4_header
+from nemo_skills.code_execution.utils import clean_formal_generation
 
 LOG = logging.getLogger(__file__)
 
@@ -413,7 +414,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
+                            generation = clean_formal_generation(line_dict["generation"])
+                            # generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", line_dict["generation"])
                             line_dict["predicted_proof"] = line_dict["header"] + line_dict["formal_statement"] + generation
                         else:
                             if "predicted_proof" not in line_dict:
@@ -423,7 +425,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-proof-with-header":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
+                            generation = clean_formal_generation(line_dict["generation"])
+                            # generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
                             line_dict["predicted_proof"] = line_dict["formal_statement"] + generation
                         else:
                             if "predicted_proof" not in line_dict:
@@ -433,7 +436,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-statement":
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
+                            generation = clean_formal_generation(line_dict["generation"])
+                            # generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
                             header = get_lean4_header()
                             line_dict["predicted_proof"] = header + generation + "sorry"
                         else:
@@ -444,7 +448,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                 )
                     elif answer_format == "lean4-statement-with-header": 
                         if not use_predicted_proof_key:
-                            generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
+                            generation = clean_formal_generation(line_dict["generation"])
+                            # re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
                             line_dict["predicted_proof"] = generation + "sorry"
                         else:
                             if "predicted_proof" not in line_dict:

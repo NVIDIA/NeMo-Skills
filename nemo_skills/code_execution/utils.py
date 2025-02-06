@@ -64,3 +64,6 @@ def extract_code_to_execute(generation: str, code_begin: str, code_end: str, ext
 
 def extract_code_output(generation: str, code_output_begin: str, code_output_end: str, extract_all: bool = False):
     return _extract_between_separators(generation, [code_output_begin, code_output_end], extract_all)
+
+def clean_formal_generation(generation: str):
+    return re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", generation)
