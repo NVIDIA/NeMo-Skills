@@ -341,6 +341,8 @@ def generate(
         generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
         assert issubclass(generation_task, GenerationTask), f"`generation_task_type` must be a subclass of GenerationTask"
         cmd_script = generation_task.get_generation_module()
+        cmd_extra_args = generation_task.get_generation_default_args()
+        cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
