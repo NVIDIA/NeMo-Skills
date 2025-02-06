@@ -212,7 +212,11 @@ class Prompt:
         }
 
     def fill(
-        self, input_dict: Dict[str, str], include_generation: bool = False, multi_turn_key: str | None = None, partial_generation: bool = False,
+        self,
+        input_dict: Dict[str, str],
+        prefix_generation_to_response: bool = False,
+        continue_prefix_generation: bool = False,
+        multi_turn_key: str | None = None,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -222,7 +226,7 @@ class Prompt:
 
         Args:
             input_dict: The input dictionary to fill the prompt with.
-            include_generation: Whether to include the generation in the prompt.
+            prefix_generation_to_response: Whether to include the generation in the prompt.
             multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
                 and use it to construct the prompt. You input_dict should also have "assistant" key in all
                 turns except last containing assistant reply.
@@ -232,7 +236,7 @@ class Prompt:
         """
         # TODO: this function has too many cases, can we simplify this?
         # TODO: some error message for multi-turn + few-shots (it doesn't work well now)
-        if include_generation:
+        if prefix_generation_to_response:
             generation = input_dict.get("generation", "")
         else:
             generation = ""
@@ -247,7 +251,7 @@ class Prompt:
                 )
                 if generation:
                     # Generation can be part of the input in cases such as reward models
-                    if partial_generation:
+                    if continue_prefix_generation:
                         # Append generation without the closing tag.
                         prompt_string += generation
                     else:
@@ -277,7 +281,7 @@ class Prompt:
                 else:
                     messages = []
                 messages.append({"role": "user", "content": self.build_user_message(input_dict)})
-                if generation and include_generation:
+                if generation and prefix_generation_to_response:
                     messages.append({"role": "assistant", "content": generation})
             else:
                 if self.config.system:
@@ -288,7 +292,7 @@ class Prompt:
                     messages.append({"role": "user", "content": self.build_user_message(turn)})
                     messages.append({"role": "assistant", "content": turn["assistant"]})
                 messages.append({"role": "user", "content": self.build_user_message(input_dict[multi_turn_key][-1])})
-                if include_generation:  # optionally adding generation as the last assistant reply
+                if prefix_generation_to_response:  # optionally adding generation as the last assistant reply
                     messages.append({"role": "assistant", "content": turn["assistant"]})
             return messages
 

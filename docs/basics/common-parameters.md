@@ -21,6 +21,14 @@ All scripts inside pipeline folder have the following parameters.
   `--expname my-training-run` and then launch an eval with `--run_after my-training-run`.
 - **--partition**: Can be used to run in a specific slurm partition (e.g. commonly used
   to launch interactive jobs).
+- **--not_exclusive**: Can be used if you want to request a part o the slurm node. By default
+  we set `exclusive=True`.
+- **--time_min**: Can be used to specify minimum time after which the job might be killed by slurm.
+  Specify in the following format `00:30:00` (for 30 minutes). Using a lower value will help jobs
+  get scheduled faster.
+- **--reuse_code** / **--reuse_code_exp**: Can be used to specify another experiment and reuse
+  its code (to avoid re-packaing/uploading to cluster). If running from Python we will automatically
+  reuse the last submitted experiment in the current Python session.
 
 ## Generation scripts
 

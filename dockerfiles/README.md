@@ -15,12 +15,19 @@ To build vllm image do the following
 1. git clone https://github.com/vllm-project/vllm
 2. checkpoint tag/commit, e.g. `git checkout v0.7.1`
 3. remove the check for wheel size https://github.com/vllm-project/vllm/blob/main/Dockerfile#L130
-4. build a docker with `docker build -t igitman/nemo-skills-vllm:0.5.0 -f Dockerfile .`
-5. add OpenRLHF (you can include it in the previous step by modifying dockerfile or do it after and then commit the docker)
+4. check if vllm installation part is built from "-devel" image. If not, change that (otherwise nvcc will be missing)
+5. build a docker with `docker build -t igitman/nemo-skills-vllm:0.5.0 -f Dockerfile .`
+6. add OpenRLHF (you can include it in the previous step by modifying dockerfile or do it after and then commit the docker)
    1. `git clone https://github.com/OpenRLHF/OpenRLHF`
    2. checkpoint tag/commit
    3. remove all hardcoded versions from requirements.txt to get latest
    4. run `pip install -e .`
+
+Currently it takes 10+ hours to build this docker. Is there anything we can do to speed it up?
+
+Current vllm version: v0.7.0
+
+Current OpenRLHF version: dacaec274a6a1aa0ec9100688395cc818b8a6b09
 
 ## Building sglang image
 
@@ -34,3 +41,5 @@ git apply <path to NeMo-SKills>/dockerfiles/sglang.patch
 
 then run `docker ps -a` and note image id of your running container. Do `docker commit <image id>`
 and `docker tag <printed hash> igitman/nemo-skills-sglang:0.5.0` and push that image.
+
+Current sglang version: lmsysorg/sglang:v0.4.2.post2-cu125

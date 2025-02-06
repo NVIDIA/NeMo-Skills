@@ -15,17 +15,14 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List
 
 import nemo_run as run
 import typer
-from omegaconf import OmegaConf
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.openrlhf import openrlhf_app
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -42,7 +39,7 @@ class TrainingParams:
     expname: str
     disable_wandb: bool
     wandb_project: str
-    timeout: str  # TODO: add proper support
+    timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
 
@@ -87,6 +84,7 @@ def format_train_args(cluster_config, params: TrainingParams):
         f" --save_steps -1 "
         f" --max_samples 500000 "
         f" --max_epochs 1 "
+        f" --max_time_per_run {params.timeout} "
     )
     return cmd
 
@@ -143,7 +141,7 @@ def get_cmd(cluster_config, params: TrainingParams):
         f"cd /nemo_run/code && "
         f"echo 'Starting SFT' && "
         f'echo "Torch run cmd: {torchrun_cmd}" && '
-        f"{torchrun_cmd} -m openrlhf.cli.train_sft "
+        f"{torchrun_cmd} -m nemo_skills.training.openrlhf.sft_script "
         f"  {format_train_args(cluster_config, params)} "
         f"  {format_data_args(cluster_config, params)} "
         f"  {get_common_arg_overrides(cluster_config, params)} "
@@ -170,17 +168,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
+    timeout = get_timeout(cluster_config, partition)
 
     logging_params = format_wandb_args(cluster_config, disable_wandb, wandb_project, expname)
 
