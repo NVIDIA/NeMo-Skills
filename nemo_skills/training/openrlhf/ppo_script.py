@@ -46,6 +46,7 @@ from openrlhf.trainer.ray import (
 )
 from openrlhf.trainer.ray.ppo_actor import ActorPPOTrainer
 from openrlhf.utils import get_strategy
+from openrlhf.trainer.ray.launcher import BasePPORole
 
 from nemo_skills.training.openrlhf.utils import MaxTimeManager
 
@@ -59,18 +60,25 @@ class ActorMetaclass(type):
         return getattr(ActorModelRayActor, name)
 
 @ray.remote(num_gpus=1)
-class CustomActorModelRayActor(metaclass=ActorMetaclass):
-    def __init__(self, *args, **kwargs):
+class CustomActorModelRayActor(BasePPORole):
+    # This is a hack to avoid having to copy all the methods in ActorModelRayActor because
+    # Ray does not allow to inherit from a remote class
+    init_model_from_pretrained = ActorModelRayActor.init_model_from_pretrained
+    prepare_datasets = ActorModelRayActor.prepare_datasets
+    max_steps = ActorModelRayActor.max_steps
+    save_model = ActorModelRayActor.save_model
+
+    # def __init__(self, *args, **kwargs):
         # This is a hack to avoid having to copy all the methods in ActorModelRayActor because
         # Ray does not allow to inherit from a remote class
-        self.base_actor = ActorModelRayActor.remote(*args, **kwargs)
+        # self.base_actor = ActorModelRayActor.remote(*args, **kwargs)
 
-    def __getattr__(self, name):
-        # First check if the attribute exists in this class
-        if hasattr(self, name):
-            return getattr(self, name)
-        # If not, delegate to the base actor
-        return getattr(self.base_actor, name)
+    # def __getattr__(self, name):
+    #     # First check if the attribute exists in this class
+    #     if name in self.__dict__:
+    #         return self.__dict__[name]
+    #     # If not, delegate to the base actor
+    #     return getattr(self.base_actor, name)
 
     # this fit is copy/pasted from the original ActorModelRayActor fit method
     # but has the trainer overridden by CustomActorPPOTrainer
