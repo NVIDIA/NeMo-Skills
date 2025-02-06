@@ -52,8 +52,14 @@ from nemo_skills.training.openrlhf.utils import MaxTimeManager
 from typing import Callable
 import os
 
+class ActorMetaclass(type):
+    def __getattr__(cls, name):
+        if name in cls.__dict__:
+            return cls.__dict__[name]
+        return getattr(ActorModelRayActor, name)
+
 @ray.remote(num_gpus=1)
-class CustomActorModelRayActor:
+class CustomActorModelRayActor(metaclass=ActorMetaclass):
     def __init__(self, *args, **kwargs):
         # This is a hack to avoid having to copy all the methods in ActorModelRayActor because
         # Ray does not allow to inherit from a remote class
