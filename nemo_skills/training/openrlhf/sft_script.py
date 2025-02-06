@@ -58,13 +58,13 @@ class MaxTimeManager:
         self.start_time = time.time()
 
     def _parse_time_interval(self, interval_str):
-        match = re.fullmatch(r"(\d+):([0-5]?\d):([0-5]?\d)", interval_str)
+        match = re.fullmatch(r"(\d+):(\d+):([0-5]?\d):([0-5]?\d)", interval_str)
         if not match:
             raise ValueError(
-                f"Invalid time interval format: '{interval_str}'. Use HH:MM:SS format."
+                f"Invalid time interval format: '{interval_str}'. Use DD:HH:MM:SS format."
             )
-        hours, minutes, seconds = map(int, match.groups())
-        return hours * 3600 + minutes * 60 + seconds
+        days, hours, minutes, seconds = map(int, match.groups())
+        return days * 86400 + hours * 3600 + minutes * 60 + seconds
 
     def check(self):
         current_time = time.time()

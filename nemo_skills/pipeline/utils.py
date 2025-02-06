@@ -20,6 +20,7 @@ import sys
 import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -36,6 +37,8 @@ from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
+
+# TODO: this file is way too big - we need to split it into pieces
 
 # keeping a global variable for first submitted experiment (per cluster) and reusing it by default
 # we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
@@ -98,6 +101,21 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 LOG.warning("Experiment %s not found!", expname)
                 return []
             raise ValueError(f"Experiment {expname} not found!")
+
+
+def get_timeout(cluster_config, partition):
+    if 'timeouts' not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+
+        # subtracting 15 minutes to account for the time it takes to save the model
+        # the format expected by nemo is days:hours:minutes:seconds
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
+    return timeout
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:

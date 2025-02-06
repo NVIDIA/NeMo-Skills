@@ -314,7 +314,10 @@ def str_ids_to_list(ids: str) -> list[int]:
         start, end = ids.split('..')
         ids = list(range(int(start), int(end) + 1))
     else:
-        raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+        try:  # could be a single number
+            ids = [int(ids)]
+        except ValueError:
+            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
     return ids
 
 
