@@ -26,7 +26,7 @@ from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config,
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
 from nemo_skills.pipeline.utils import get_ray_server_cmd
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import setup_logging, get_timeout
 
 LOG = logging.getLogger(__file__)
 
@@ -190,19 +190,7 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
 ):
-    # TODO: use those
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
-
+    timeout = get_timeout(cluster_config, partition)
     if task is None:
         task = PPOOpenRLHFTask(
             model=hf_model,
@@ -270,9 +258,9 @@ def get_num_nodes_and_gpus(
         colocate_critic_reward = False
 
     try:
-        check_if_mounted(cluster_config, rm_model)
+        assert (rm_model != None) and (type(rm_model) == str) and (rm_model.startswith('/'))
         assert not colocate_critic_reward
-    except:
+    except AssertionError:
         gpus_per_node['reward'] = 0
         num_processes['reward'] = 0
 
@@ -312,7 +300,7 @@ def ppo_openrlhf(
     vllm_tensor_parallel_size: int = typer.Option(..., help="Number of VLLM tensor parallel size"),
     colocate_critic_reward: bool = typer.Option(False, help="Colocate critic and reward models"),
     colocate_actor_ref: bool = typer.Option(False, help="Colocate actor and reference models"),
-    advantage_estimator: str = typer.Option('gae', help="Path to the advantage estimator model"),
+    advantage_estimator: str = typer.Option('gae', help="What advantage estimator method to use [gae, reinforce, rloo]"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -394,10 +382,10 @@ def ppo_openrlhf(
     LOG.info(f"Number of GPUs per node: {num_gpus}")
     extra_arguments += f" --advantage_estimator {advantage_estimator}"
     if colocate_actor_ref:
-        LOG.warning("Colocating actor and reference models on same GPUs.")
+        LOG.info("Colocating actor and reference models on same GPUs.")
         extra_arguments += f" --colocate_actor_ref"
     if colocate_critic_reward:
-        LOG.warning("Colocating critic and reward models on same GPUs")
+        LOG.info("Colocating critic and reward models on same GPUs")
         extra_arguments += f" --colocate_critic_reward"
 
     check_if_mounted(cluster_config, output_dir)
@@ -406,6 +394,9 @@ def ppo_openrlhf(
         check_if_mounted(cluster_config, log_dir)
     else:
         log_dir = output_dir
+
+    if (rm_model != None) and (rm_model.startswith('/')):
+        check_if_mounted(cluster_config, rm_model)
 
     if num_training_jobs > 0:
         if prompt_data is None:
@@ -439,7 +430,7 @@ def ppo_openrlhf(
         extra_arguments=extra_arguments,
     )
 
-    print(train_cmd)
+    LOG.info(train_cmd)
 
     with run.Experiment(expname) as exp:
         prev_task = None
