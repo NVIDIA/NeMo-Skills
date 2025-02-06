@@ -46,8 +46,9 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
         output_file = get_chunked_filename(chunk_id, output_file)
     return output_file
 
+
 def get_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.generate'
+        output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.generate'
 ):
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)

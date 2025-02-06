@@ -208,7 +208,7 @@ class GenerationTask:
 
         self.data = self.data[: cfg.max_samples]
 
-        if starting_idx >= data_len and cfg.skip_filled: # check against data_len
+        if starting_idx >= data_len and cfg.skip_filled:  # check against data_len
             self.early_exit = True
             LOG.info(f"Output file `{cfg.output_file}` is already filled and skip_filled is True. Exiting.")
             return
