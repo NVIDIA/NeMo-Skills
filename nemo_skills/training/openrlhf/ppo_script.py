@@ -225,7 +225,7 @@ def train(args):
     actor_model = PPORayActorGroup(
         args.actor_num_nodes,
         args.actor_num_gpus_per_node,
-        ActorModelRayActor,
+        CustomActorModelRayActor,
         pg=pg,
         num_gpus_per_actor=0.75 if pg else 1,
     )
