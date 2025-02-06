@@ -56,7 +56,7 @@ class GenerateSolutionsConfig:
     # Prompt configuration - path to yaml files
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
-    include_generation: bool = False  # whether to include "generation" key while building prompt or not
+    prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -178,7 +178,10 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
             if len(data_points) == cfg.batch_size or idx == len(data) - 1:
                 if cfg.multi_turn_key is None:
                     outputs = llm.generate(
-                        prompts=[prompt.fill(dp, include_generation=cfg.include_generation) for dp in data_points],
+                        prompts=[
+                            prompt.fill(dp, prefix_generation_to_response=cfg.prefix_generation_to_response)
+                            for dp in data_points
+                        ],
                         stop_phrases=combine_stop_phrases(prompt.stop_phrases, extra_stop_phrases),
                         **asdict(cfg.inference),
                         **extra_generate_params,
@@ -209,7 +212,7 @@ def sync_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params)
                                 prompt.fill(
                                     turn_data_points[dp_index],
                                     multi_turn_key=cfg.multi_turn_key,
-                                    include_generation=cfg.include_generation,
+                                    prefix_generation_to_response=cfg.prefix_generation_to_response,
                                 )
                                 for dp_index in dp_indices
                             ],
@@ -281,7 +284,8 @@ def async_loop(cfg, data, llm, prompt, extra_stop_phrases, extra_generate_params
             num_to_submit = min(cfg.max_concurrent_requests - len(in_progress), len(request_queue))
             batch_indices = [request_queue.popleft() for _ in range(num_to_submit)]
             batch_prompts = [
-                prompt.fill(data[idx], include_generation=cfg.include_generation) for idx in batch_indices
+                prompt.fill(data[idx], prefix_generation_to_response=cfg.prefix_generation_to_response)
+                for idx in batch_indices
             ]
 
             if len(batch_prompts) > 0:
@@ -388,14 +392,22 @@ def generate(cfg: GenerateSolutionsConfig):
     LOG.info("Prompt used: %s", prompt)
 
     if cfg.multi_turn_key is None:
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
+        LOG.info(
+            "Example prompt:\nData dictionary: %s\nPrompt: %s",
+            data[0],
+            prompt.fill(data[0], prefix_generation_to_response=cfg.prefix_generation_to_response),
+        )
     else:
         first_sample = deepcopy(data[0])
         first_sample[cfg.multi_turn_key] = first_sample[cfg.multi_turn_key][:1]
         LOG.info(
             "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
             first_sample,
-            prompt.fill(first_sample, multi_turn_key=cfg.multi_turn_key),
+            prompt.fill(
+                first_sample,
+                multi_turn_key=cfg.multi_turn_key,
+                prefix_generation_to_response=cfg.prefix_generation_to_response,
+            ),
         )
 
     if cfg.dry_run:
