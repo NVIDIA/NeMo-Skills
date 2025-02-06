@@ -392,7 +392,11 @@ def generate(cfg: GenerateSolutionsConfig):
     LOG.info("Prompt used: %s", prompt)
 
     if cfg.multi_turn_key is None:
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
+        LOG.info(
+            "Example prompt:\nData dictionary: %s\nPrompt: %s",
+            data[0],
+            prompt.fill(data[0], prefix_generation_to_response=cfg.prefix_generation_to_response),
+        )
     else:
         first_sample = deepcopy(data[0])
         first_sample[cfg.multi_turn_key] = first_sample[cfg.multi_turn_key][:1]
