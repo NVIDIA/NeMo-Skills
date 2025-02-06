@@ -526,8 +526,8 @@ class NemoModel(BaseModel):
                 prompts[idx], generation, generations['tokens'][idx]
             )
             if top_logprobs is not None:
-                outputs[idx]['logprobs'] = generations['logprob'][idx]
-                outputs[idx]['tokens'] = generations['tokens'][idx]
+                outputs[idx]['logprobs'] = generations['logprob'][idx][-outputs[idx]['num_generated_tokens']:]
+                outputs[idx]['tokens'] = generations['tokens'][idx][-outputs[idx]['num_generated_tokens']:]
 
         if remove_stop_phrases:
             for output in outputs:
@@ -537,35 +537,23 @@ class NemoModel(BaseModel):
 
     @classmethod
     def remove_prompt_from_output(cls, prompt: str, generation: str, tokens: list) -> dict:
-        # when the prompt starts from special tokens like bos, nemo will remove them,
-        # so we need this hack to find where to start the cut
-        begin_idx = 0
-        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(generation[: len(prompt) - begin_idx]):
-            begin_idx += 1
+        prompt_idx, gen_idx, prompt_token_count = 0, 0, 0
 
-        # skip corresponding number of tokens
-        cumsum = 0
-        num_prompt_tokens = 0
         for token in tokens:
-            cumsum += len(token)
-            num_prompt_tokens += 1
-            if cumsum >= begin_idx:
+            if prompt_idx >= len(prompt):
                 break
+            
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            if generation[gen_idx:].startswith(token):
+                gen_idx += len(token)
 
-        # calculate how many tokens are in prompt
-        cut_idx = 0
-        for token in tokens[num_prompt_tokens:]:
-            if cut_idx + begin_idx < len(prompt):
-                num_prompt_tokens += 1
-                cut_idx += len(token)
-            else:
-                break
+            prompt_idx += len(token)
+            prompt_token_count += 1
 
-        result = {'generation': "".join(tokens[num_prompt_tokens:]), 'num_generated_tokens': len(tokens) - num_prompt_tokens}
-        if tokens[-1] == "<|endoftext|>":
-            result['generation'] = result['generation'].removesuffix("<|endoftext|>")
+        output_text = generation[gen_idx:]
+        num_generated_tokens = len(tokens) - prompt_token_count
 
-        return result
+        return {'generation': output_text, 'num_generated_tokens': num_generated_tokens}
 
 
 class OpenAIModel(BaseModel):
