@@ -18,6 +18,7 @@ pytest tests/gpu-tests/test_convert.py -k test_nemo_hf_conversion -s -x
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/nemo-to-hf/model
 
 # generation/evaluation tests
+pytest tests/gpu-tests/test_inference.py -s -x
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
