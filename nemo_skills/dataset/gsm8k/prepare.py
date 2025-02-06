@@ -46,11 +46,7 @@ def save_data(split, random_seed, validation_size):
     data_dir.mkdir(exist_ok=True)
     output_file = str(data_dir / f"{split}.jsonl")
 
-    if not os.path.exists(original_file):
-        urllib.request.urlretrieve(
-            URL.format(actual_split),
-            original_file,
-        )
+    urllib.request.urlretrieve(URL.format(actual_split), original_file)
 
     data = []
     with open(original_file, "rt", encoding="utf-8") as fin:
@@ -83,6 +79,9 @@ def save_data(split, random_seed, validation_size):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+    # cleaning up original data file
+    os.remove(original_file)
 
 
 if __name__ == "__main__":

@@ -149,31 +149,24 @@ class BaseModel(abc.ABC):
             if not is_list:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
-        futures = []
+        gen_ids = []
         for request_idx in range(len(prompts)):
+            # Prepare request
             request = {key: value[request_idx] for key, value in kwargs.items()}
             request['prompt'] = prompts[request_idx]
             self.preprocess_request(request)
-            futures.append(self.executor.submit(self._generate_single, **request))
 
-        gen_ids = []
-        for future in futures:
+            # Generate a unique generation ID
             gen_id = str(uuid.uuid4())
             gen_ids.append(gen_id)
-            self.gen_id_to_future[gen_id] = future
 
-        self.gen_id_to_params = {
-            gen_id: (req_stop_phrases, remove_stop_phrases)
-            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
-        }
+            # Update global dictionaries tracking the progress of generations
+            self.gen_id_to_future[gen_id] = self.executor.submit(self._generate_single, **request)
+            self.gen_id_to_params[gen_id] = (kwargs["stop_phrases"][request_idx], remove_stop_phrases)
 
         return gen_ids
 
-    def get_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[dict]:
-
+    def get_generations(self, generation_ids: list[str]) -> list[dict]:
         generations = []
         for generation_id in generation_ids:
             if generation_id not in self.gen_id_to_future:
@@ -373,18 +366,16 @@ class TRTLLMModel(BaseModel):
                 futures.append(executor.submit(self._generate_single_async, **request))
         outputs = [future.result() for future in futures]
 
-        self.gen_id_to_params = {
+        new_gen_id_to_params = {
             gen_id: (req_stop_phrases, remove_stop_phrases)
             for gen_id, req_stop_phrases in zip(outputs, kwargs["stop_phrases"])
         }
 
+        self.gen_id_to_params.update(new_gen_id_to_params)
+
         return outputs
 
-    def cancel_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[str]:
-
+    def cancel_generations(self, generation_ids: list[str]) -> list[str]:
         statuses = []
         for generation_id in generation_ids:
             request = {
@@ -399,11 +390,7 @@ class TRTLLMModel(BaseModel):
 
         return statuses
 
-    def get_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[dict]:
-
+    def get_generations(self, generation_ids: list[str]) -> list[dict]:
         generations = []
         for generation_id in generation_ids:
             request = {
@@ -714,8 +701,28 @@ class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        # TODO: move this to base model?
+        self._tunnel = None
         if self.ssh_server and self.ssh_key_path:
-            raise NotImplementedError("SSH tunnelling is not implemented for vLLM model.")
+            import sshtunnel
+
+            if '@' in self.ssh_server:
+                ssh_username, ssh_server = self.ssh_server.split('@')
+            else:
+                ssh_server = self.ssh_server
+                ssh_username = None
+
+            self._tunnel = sshtunnel.SSHTunnelForwarder(
+                (ssh_server, 22),
+                ssh_username=ssh_username,
+                ssh_pkey=self.ssh_key_path,
+                remote_bind_address=(self.server_host, int(self.server_port)),
+            )
+            self._tunnel.start()
+            # Use localhost with tunneled port for OpenAI client
+            # This way all traffic to server_host:server_port goes through SSH tunnel
+            self.server_host = '127.0.0.1'
+            self.server_port = str(self._tunnel.local_bind_port)
 
         http_client = DefaultHttpxClient(
             limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
@@ -731,6 +738,10 @@ class VLLMModel(BaseModel):
 
         self.model_name_server = self.get_model_name_from_server()
         self.model = self.model_name_server
+
+    def __del__(self):
+        if self._tunnel:
+            self._tunnel.stop()
 
     def _generate_single(
         self,
@@ -783,8 +794,12 @@ class VLLMModel(BaseModel):
         choice = response.choices[0]
         output = choice.text
         # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop" and isinstance(choice.stop_reason, str):
-            output += choice.stop_reason
+        if choice.finish_reason == "stop":
+            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                output += choice.stop_reason
+            # sglang has a little different api here
+            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                output += choice.matched_stop
         num_generated_tokens = response.usage.completion_tokens
         return output, num_generated_tokens
 
@@ -799,6 +814,7 @@ models = {
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
+    'sglang': VLLMModel,  # interface is the same
 }
 
 

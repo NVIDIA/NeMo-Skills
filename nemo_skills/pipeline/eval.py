@@ -100,6 +100,7 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     openai = "openai"
+    sglang = "sglang"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -163,7 +164,11 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 

@@ -48,6 +48,7 @@ def run_cmd(
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
+    num_nodes: int = typer.Option(1, help="Number of nodes to use"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -74,7 +75,6 @@ def run_cmd(
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
-        is_flag=True,
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
@@ -100,6 +100,7 @@ def run_cmd(
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             num_gpus=num_gpus,
+            num_nodes=num_nodes,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         run_exp(exp, cluster_config)

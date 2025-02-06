@@ -72,8 +72,7 @@ def save_data(split):
     data_dir.mkdir(exist_ok=True)
     output_file = str(data_dir / f"{split}.jsonl")
 
-    if not os.path.exists(data_file):
-        urllib.request.urlretrieve(URL, data_file)
+    urllib.request.urlretrieve(URL, data_file)
 
     original_data = read_csv_files_from_tar(data_file, split)
     data = []
@@ -86,6 +85,9 @@ def save_data(split):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
+    # cleaning up the data file to avoid accidental upload on clusters
+    os.remove(data_file)
 
 
 if __name__ == "__main__":

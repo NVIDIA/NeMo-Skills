@@ -26,6 +26,7 @@ class SupportedServers(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
     nemo = "nemo"
+    sglang = "sglang"
 
 
 @app.command()
@@ -55,7 +56,6 @@ def start_server(
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
-        is_flag=True,
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),

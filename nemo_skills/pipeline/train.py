@@ -15,15 +15,14 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import Callable, List
 
 import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -129,17 +128,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
+    timeout = get_timeout(cluster_config, partition)
 
     logging_params = get_logging_params(expname, disable_wandb, wandb_project)
 
@@ -250,7 +239,6 @@ def train(
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
-        is_flag=True,
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
