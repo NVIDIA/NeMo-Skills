@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import logging
+from collections import defaultdict
 from enum import Enum
 from typing import List
 
@@ -35,11 +36,21 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
     if random_seed is not None:
-        output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
+        output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
     else:
-        output_file = f"{output_dir}/generation/output.jsonl"
+        output_file = f"{output_dir}/output.jsonl"
+    if chunk_id is not None:
+        output_file = get_chunked_filename(chunk_id, output_file)
+    return output_file
+
+
+def get_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
+    # First get the unchunked filename for the output file
+    output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
     cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
     if random_seed is not None:
         cmd += (
@@ -48,9 +59,36 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
+
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_filename(chunk_id, output_file)
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)
+        donefiles = []
+        # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
+        # the current run (as we don't want to merge partial jobs)
+        for cur_chunk_id in range(num_chunks):
+            donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=cur_chunk_id)}.done"
+            donefiles.append(donefile)
+
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {donefiles[chunk_id]} "
+        else:
+            postprocess_cmd = f"touch {donefiles[chunk_id]} "
+
+        # getting file name as if there is no chunking since that's where we want to merge
+        merged_output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed)
+        merge_cmd = (
+            f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
+            f"{' '.join([f[:-5] for f in donefiles])}"
+        )
+        postprocess_cmd += f" && {merge_cmd}"
+
+    else:  # only writing a single status file
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {output_file}.done "
+        else:
+            postprocess_cmd = f"touch {output_file}.done "
+
     cmd += f" {extra_arguments} "
     if eval_args:
         cmd += (
@@ -58,13 +96,16 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk
             f"    ++input_files={output_file} "
             f"    {eval_args} "
         )
-    return cmd
+
+    return cmd, postprocess_cmd
 
 
 # TODO: support chunking for reward model and math judge
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_rm_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
@@ -75,10 +116,12 @@ def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, ch
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_math_judge_cmd(
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
@@ -88,7 +131,7 @@ def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
@@ -239,6 +282,21 @@ def generate(
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
 
+    chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
+    if chunking_enabled and postprocess_cmd:
+        logging.warning(
+            "Chunking is enabled, but postprocess_cmd is also specified. "
+            "Note that will be run for each chunk separately. Chunk merging "
+            "will be performed after postprocess_cmd."
+        )
+    if chunking_enabled and generation_type != GenerationType.generate:
+        logging.error(
+            "Chunking is enabled, but generation type is not 'generate'. "
+            "Chunking is only supported for generation type 'generate'."
+            "This may result in superfluous generation jobs."
+        )
+        raise ValueError("Chunking is only supported for generation type 'generate'")
+
     try:
         server_type = server_type.value
     except AttributeError:
@@ -287,23 +345,23 @@ def generate(
                         server_args=server_args,
                         extra_arguments=extra_arguments_original,
                     )
-                    cmd = get_cmd(
+                    cmd, full_postprocess_cmd = get_cmd(
                         random_seed=seed,
                         output_dir=output_dir,
                         extra_arguments=extra_arguments,
                         eval_args=eval_args,
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
+                        postprocess_cmd=postprocess_cmd,
                     )
                     prev_tasks = None
-
                     for _ in range(dependent_jobs + 1):
                         new_task = add_task(
                             exp,
                             cmd=wrap_cmd(
                                 get_generation_command(server_address=server_address, generation_commands=cmd),
                                 preprocess_cmd,
-                                postprocess_cmd,
+                                full_postprocess_cmd,
                                 random_seed=seed,
                             ),
                             task_name=f'{expname}-rs{seed}',
@@ -338,22 +396,24 @@ def generate(
                     extra_arguments=extra_arguments_original,
                 )
 
-                cmd = get_cmd(
+                cmd, full_postprocess_cmd = get_cmd(
                     random_seed=None,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
+                    postprocess_cmd=postprocess_cmd,
                 )
                 prev_tasks = None
+
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
-                            postprocess_cmd,
+                            full_postprocess_cmd,
                         ),
                         task_name=expname,
                         log_dir=log_dir,
