@@ -66,9 +66,9 @@ def get_cmd(
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
-        for chunk_id in range(num_chunks):
-            single_donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)}.done"
-            donefiles.append(single_donefile)
+        for cur_chunk_id in range(num_chunks):
+            donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=cur_chunk_id)}.done"
+            donefiles.append(donefile)
 
         if postprocess_cmd:
             postprocess_cmd += f" && touch {donefiles[chunk_id]} "
@@ -353,7 +353,6 @@ def generate(
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
                         postprocess_cmd=postprocess_cmd,
-                        chunk_ids=chunk_ids,
                     )
                     prev_tasks = None
                     for _ in range(dependent_jobs + 1):
@@ -405,7 +404,6 @@ def generate(
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
                     postprocess_cmd=postprocess_cmd,
-                    chunk_ids=chunk_ids,
                 )
                 prev_tasks = None
 
