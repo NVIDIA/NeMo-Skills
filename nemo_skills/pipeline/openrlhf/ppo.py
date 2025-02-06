@@ -88,7 +88,7 @@ class PPOOpenRLHFTask:
             f" --max_ckpt_mem 10000000000 "
             f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
             f" --save_steps -1 "
-            f" --max_samples 500000 "
+            # f" --max_samples 500000 "
             f" --max_epochs 1 "
         )
         return cmd
