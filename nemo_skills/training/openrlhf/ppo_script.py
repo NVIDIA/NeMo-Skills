@@ -63,10 +63,13 @@ class ActorMetaclass(type):
 class CustomActorModelRayActor(BasePPORole):
     # This is a hack to avoid having to copy all the methods in ActorModelRayActor because
     # Ray does not allow to inherit from a remote class
-    init_model_from_pretrained = ActorModelRayActor.init_model_from_pretrained
-    prepare_datasets = ActorModelRayActor.prepare_datasets
-    max_steps = ActorModelRayActor.max_steps
-    save_model = ActorModelRayActor.save_model
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        import types
+        self.init_model_from_pretrained = types.MethodType(ActorModelRayActor.init_model_from_pretrained, self)
+        self.prepare_datasets = types.MethodType(ActorModelRayActor.prepare_datasets, self)
+        self.max_steps = types.MethodType(ActorModelRayActor.max_steps, self)
+        self.save_model = types.MethodType(ActorModelRayActor.save_model, self)
 
     # def __init__(self, *args, **kwargs):
         # This is a hack to avoid having to copy all the methods in ActorModelRayActor because
