@@ -17,11 +17,9 @@ import json
 import logging
 import sys
 import time
-from collections import deque
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import hydra
 from omegaconf import ListConfig, OmegaConf, open_dict
@@ -30,7 +28,7 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import chunk_data, get_fields_docstring, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import chunk_data, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -221,7 +219,7 @@ class GenerationTask:
             self.cfg.prompt_config = dataset_module.PROMPT_CONFIG
 
         prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
-        LOG.info("Prompt used: %s", self.prompt)
+        LOG.info("Prompt used: %s", prompt)
         return prompt
 
     def log_example_prompt(self, data_point):
@@ -273,25 +271,24 @@ class GenerationTask:
         return data[starting_idx:]
 
     def skip_completed_samples_async(self, data):
-        if not self.cfg.skip_filled:
-            return data
         # Compute original position ids for samples
-        try:
-            filled_positions = set()
-            with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
-                for line in fin:
-                    filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
+        filled_positions = set()
+        if self.cfg.skip_filled:
+            try:
+                with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+                    for line in fin:
+                        filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
+            except FileNotFoundError:
+                LOG.warning(f"File `{self.cfg.output_file}-async` not found, starting from scratch")
 
-            remaining_data = []
-            for idx, dp in enumerate(data):
-                if idx in filled_positions:
-                    continue
-                dp[self.cfg.async_position_key] = idx
-                remaining_data.append(dp)
-        except FileNotFoundError:
-            LOG.warning(f"File `{self.cfg.output_file}-async` not found, starting from scratch")
+        remaining_data = []
+        for idx, dp in enumerate(data):
+            if idx in filled_positions:
+                continue
+            dp[self.cfg.async_position_key] = idx
+            remaining_data.append(dp)
 
-        return data
+        return remaining_data
 
     def fill_prompt(self, data_point):
         return self.prompt.fill(
