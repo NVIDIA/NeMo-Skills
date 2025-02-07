@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -24,7 +25,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.utils import get_ray_server_cmd
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -54,16 +55,6 @@ class PPOOpenRLHFTask:
             f" --reward_pretrain {self.reward_model} "
             # TODO: add proper defaults when we figure out how these should be used
             #       for now we require users to be explicit
-            # f" --ref_num_nodes {self.num_nodes} "
-            # f" --ref_num_gpus_per_node {self.num_gpus} "
-            # f" --reward_num_nodes {self.num_nodes} "
-            # f" --reward_num_gpus_per_node {self.num_gpus} "
-            # f" --critic_num_nodes {self.num_nodes} "
-            # f" --critic_num_gpus_per_node {self.num_gpus} "
-            # f" --vllm_num_engines {self.num_gpus} "
-            # f" --vllm_tensor_parallel_size 1 "
-            # f" --colocate_critic_reward "
-            # f" --colocate_actor_ref "
         )
         return cmd
 
@@ -98,8 +89,7 @@ class PPOOpenRLHFTask:
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = f" --prompt_data {self.prompt_data} " f" --input_key 'context_messages' " f" --apply_chat_template "
-
+        cmd = f" --prompt_data {self.prompt_data} --input_key 'context_messages' " 
         return cmd
 
     def get_common_arg_overrides(self):
@@ -154,7 +144,7 @@ class PPOOpenRLHFTask:
         ray_job_cmd = self.get_ray_launch_cmd()
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"{ray_job_cmd} python3 -m {self.get_script_module()} "
+            f"{ray_job_cmd} python3 -m openrlhf.cli.train_ppo_ray "
             f"  {self.format_reward_critic_args()} "
             f"  {self.format_actor_args()} "
             f"  {self.format_train_args()} "
@@ -201,7 +191,17 @@ def get_training_cmd(
     extra_arguments,
 ):
     # TODO: use those
-    timeout = get_timeout(cluster_config, partition)
+    if 'timeouts' not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+
+        # subtracting 15 minutes to account for the time it takes to save the model
+        # the format expected by nemo is days:hours:minutes:seconds
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
 
     if task is None:
         task = PPOOpenRLHFTask(
@@ -226,6 +226,66 @@ def get_training_cmd(
     return task.get_cmd()
 
 
+def pack_nodes(gpus_per_node, num_nodes):
+    order = ['actor', 'ref', 'critic', 'reward', 'vllm'] # This is the placement order in OpenRLHF cli/train_ppo_ray.py and so we follow that
+    items = []
+    for model in order:
+        g = gpus_per_node[model]
+        n = num_nodes[model]
+        if g*n == 0:
+            continue
+        items.extend([g]*n)
+
+    bins = []  # Each element is the sum of GPUs allocated on that node.
+    for item in items:
+        placed = False
+        # Try to place the item in an existing node
+        for i in range(len(bins)):
+            if bins[i] + item <= 8:
+                bins[i] += item
+                placed = True
+                break
+        # If it doesn't fit in any existing node, allocate a new node.
+        if not placed:
+            bins.append(item)
+
+    num_nodes_needed = len(bins)
+    return num_nodes_needed
+
+
+def get_num_nodes_and_gpus(
+    cluster_config,
+    rm_model,
+    num_processes,
+    gpus_per_node,
+    colocate_critic_reward,
+    colocate_actor_ref,
+    advantage_estimator,
+):
+    if advantage_estimator not in ['gae']:
+        # Colocation does not make sense if critic model is not needed
+        # This modification is also necessary for the next reward allocation if condition
+        gpus_per_node['critic'] = 0
+        num_processes['critic'] = 0
+        colocate_critic_reward = False
+
+    try:
+        check_if_mounted(cluster_config, rm_model)
+        assert not colocate_critic_reward
+    except:
+        gpus_per_node['reward'] = 0
+        num_processes['reward'] = 0
+
+    if colocate_actor_ref:
+        gpus_per_node['ref'] = 0
+        num_processes['ref'] = 0
+
+    num_nodes = pack_nodes(gpus_per_node, num_processes)
+    num_gpus = 8
+
+    return num_nodes, num_gpus
+
+
 @openrlhf_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def ppo_openrlhf(
@@ -240,8 +300,19 @@ def ppo_openrlhf(
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(..., help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
-    num_nodes: int = typer.Option(1, help="Number of nodes"),
-    num_gpus: int = typer.Option(..., help="Number of GPUs"),
+    ref_num_nodes: int = typer.Option(1, help="Number of nodes for reference model"),
+    ref_num_gpus_per_node: int = typer.Option(..., help="Number of GPUs per node for reference model"),
+    actor_num_nodes: int = typer.Option(..., help="Number of nodes for actor model"),
+    actor_num_gpus_per_node: int = typer.Option(..., help="Number of GPUs per node for actor model"),
+    critic_num_nodes: int = typer.Option(..., help="Number of nodes for critic model"),
+    critic_num_gpus_per_node: int = typer.Option(..., help="Number of GPUs per node for critic model"),
+    reward_num_nodes: int = typer.Option(..., help="Number of nodes for reward model"),
+    reward_num_gpus_per_node: int = typer.Option(..., help="Number of GPUs per node for reward model"),
+    vllm_num_engines: int = typer.Option(..., help="Number of VLLM engines"),
+    vllm_tensor_parallel_size: int = typer.Option(..., help="Number of VLLM tensor parallel size"),
+    colocate_critic_reward: bool = typer.Option(False, help="Colocate critic and reward models"),
+    colocate_actor_ref: bool = typer.Option(False, help="Colocate actor and reference models"),
+    advantage_estimator: str = typer.Option('gae', help="Path to the advantage estimator model"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -282,7 +353,53 @@ def ppo_openrlhf(
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
+    assert len(rm_model.split(',')) == 1, f"RM model must be a single model as behavior as our team has not tested multi-model RM feature in OpenRLHF. We got RM models: {rm_model}"
+
     cluster_config = get_cluster_config(cluster, config_dir)
+
+    gpus_per_node = {
+        'actor': actor_num_gpus_per_node,
+        'critic': critic_num_gpus_per_node,
+        'reward': reward_num_gpus_per_node,
+        'ref': ref_num_gpus_per_node,
+        'vllm': vllm_tensor_parallel_size,
+    }
+
+    num_processes = {
+        'actor': actor_num_nodes,
+        'critic': critic_num_nodes,
+        'reward': reward_num_nodes,
+        'ref': ref_num_nodes,
+        'vllm': vllm_num_engines,
+    }
+
+    for model in gpus_per_node:
+        if model == 'vllm':
+            continue
+        extra_arguments += f" --{model}_num_nodes {num_processes[model]}"
+        extra_arguments += f" --{model}_num_gpus_per_node {gpus_per_node[model]}"
+    extra_arguments += f" --vllm_num_engines {vllm_num_engines}"
+    extra_arguments += f" --vllm_tensor_parallel_size {vllm_tensor_parallel_size}"
+
+    num_nodes, num_gpus = get_num_nodes_and_gpus(
+        cluster_config,
+        rm_model,
+        num_processes,
+        gpus_per_node,
+        colocate_critic_reward,
+        colocate_actor_ref,
+        advantage_estimator,
+    )
+    LOG.info(f"Total number of nodes: {num_nodes}")
+    LOG.info(f"Number of GPUs per node: {num_gpus}")
+    extra_arguments += f" --advantage_estimator {advantage_estimator}"
+    if colocate_actor_ref:
+        LOG.warning("Colocating actor and reference models on same GPUs.")
+        extra_arguments += f" --colocate_actor_ref"
+    if colocate_critic_reward:
+        LOG.warning("Colocating critic and reward models on same GPUs")
+        extra_arguments += f" --colocate_critic_reward"
+
     check_if_mounted(cluster_config, output_dir)
     check_if_mounted(cluster_config, hf_model)
     if log_dir:
@@ -301,7 +418,7 @@ def ppo_openrlhf(
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
-        ppo_task = ctx.obj['ppo_task']  # type: type(PPOOpenRLHFTask)
+        ppo_task = ctx.obj['ppo_task']  # type: PPOOpenRLHFTask
         assert isinstance(ppo_task, PPOOpenRLHFTask), "`ppo_task` must be a subclass of PPOOpenRLHFTask"
     else:
         ppo_task = None
@@ -321,6 +438,8 @@ def ppo_openrlhf(
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
     )
+
+    print(train_cmd)
 
     with run.Experiment(expname) as exp:
         prev_task = None
