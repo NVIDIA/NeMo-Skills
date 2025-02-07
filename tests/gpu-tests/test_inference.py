@@ -50,7 +50,7 @@ def start_server(model_path: str, server_type: str) -> None:
     """
     cmd = (
         f"ns start_server "
-        f"--cluster test-local "
+        f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"--model {model_path} "
         f"--server_type {server_type} "
         f"--server_gpus 1 "
