@@ -203,6 +203,7 @@ avg_sequences_per_pack = 3.7
 # so might need to round to a power of 2
 packed_bs = original_bs // avg_sequences_per_pack
 
+# Make sure that ds_file_name is included in the bucket e.g., [/data/sft-data.jsonl]
 packing_cmd = (
     f"python /nemo_run/code/nemo_skills/training/prepare_packed_ft_dataset.py "
     f"    ++model.data.train_ds.file_names=[/data/sft-data.jsonl] "
@@ -218,6 +219,7 @@ run_cmd(
     ctx=wrap_arguments(packing_cmd),
     cluster=cluster,
     expname=f"{expname}-packing",
+    container="nemo", # please use "nemo container" for packed data prepration
     partition="cpu",  # if available on your cluster
     exclusive=True,  # better to get the full node, since packing is resource intensive
 )
