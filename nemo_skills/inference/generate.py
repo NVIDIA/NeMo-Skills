@@ -146,8 +146,6 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
     return prompt_phrases + extra_phrases
 
 
-# TODO: current implementation is a rough draft, so we will likely change
-#       existing methods in the future based on requirements for customization
 class GenerationTask:
     @classmethod
     def get_generation_module(cls) -> str:
