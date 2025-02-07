@@ -203,7 +203,7 @@ avg_sequences_per_pack = 3.7
 # so might need to round to a power of 2
 packed_bs = original_bs // avg_sequences_per_pack
 
-# Make sure that ds_file_name is included in the bucket e.g., [/data/sft-data.jsonl]
+# Make sure that train_ds.file_names is included in the bucket e.g., [/data/sft-data.jsonl]
 packing_cmd = (
     f"python /nemo_run/code/nemo_skills/training/prepare_packed_ft_dataset.py "
     f"    ++model.data.train_ds.file_names=[/data/sft-data.jsonl] "
