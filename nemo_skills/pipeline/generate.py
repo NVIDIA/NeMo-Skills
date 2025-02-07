@@ -20,6 +20,7 @@ from typing import List
 import nemo_run as run
 import typer
 
+from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
@@ -47,11 +48,12 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
 
 
 def get_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+        output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.generate'
 ):
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
-    cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
+    cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
+
     if random_seed is not None:
         cmd += (
             f"    ++inference.random_seed={random_seed} "
@@ -104,13 +106,13 @@ def get_cmd(
 
 
 def get_rm_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.reward_model'
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
     cmd = (
-        f"python -m nemo_skills.inference.reward_model "
+        f"python -m {script} "
         f"    ++skip_filled=True "
         f"    ++output_dir={output_dir} "
         f"    ++random_seed={random_seed} "
@@ -120,12 +122,12 @@ def get_rm_cmd(
 
 
 def get_math_judge_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None
+    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.llm_math_judge'
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
-        f"python -m nemo_skills.inference.llm_math_judge "
+        f"python -m {script} "
         f"    ++skip_filled=True "
         f"    ++output_dir={output_dir} "
         f"    ++random_seed={random_seed} "
@@ -162,6 +164,12 @@ client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
     GenerationType.math_judge: get_math_judge_cmd,
+}
+
+client_command_scripts = {
+    GenerationType.generate: 'nemo_skills.inference.generate',
+    GenerationType.reward: 'nemo_skills.inference.reward_model',
+    GenerationType.math_judge: 'nemo_skills.inference.llm_math_judge',
 }
 
 
@@ -325,7 +333,16 @@ def generate(
 
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]
+    cmd_script = client_command_scripts[generation_type]
     original_server_address = server_address
+
+    # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
+    if generation_type == GenerationType.generate and ctx.obj is not None and isinstance(ctx.obj, dict) and 'generation_task_type' in ctx.obj:
+        generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
+        assert issubclass(generation_task, GenerationTask), f"`generation_task_type` must be a subclass of GenerationTask"
+        cmd_script = generation_task.get_generation_module()
+        cmd_extra_args = generation_task.get_generation_default_args()
+        cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
@@ -353,6 +370,7 @@ def generate(
                         chunk_id=chunk_id,
                         num_chunks=num_chunks,
                         postprocess_cmd=postprocess_cmd,
+                        script=cmd_script,
                     )
                     prev_tasks = None
                     for _ in range(dependent_jobs + 1):
@@ -404,6 +422,7 @@ def generate(
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
                     postprocess_cmd=postprocess_cmd,
+                    script=cmd_script,
                 )
                 prev_tasks = None
 
