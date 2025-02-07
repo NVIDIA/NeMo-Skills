@@ -98,7 +98,7 @@ def start_server(
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         # we don't want to detach in this case even on slurm, so not using run_exp
-        exp.run(detach=True, tail_logs=True)
+        exp.run(detach=False, tail_logs=True)
         # TODO: seems like not being killed? If nemorun doesn't do this, we can catch the signal and kill the server ourselves
 
 
