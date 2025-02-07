@@ -20,6 +20,7 @@ import sys
 import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -36,6 +37,8 @@ from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
+
+# TODO: this file is way too big - we need to split it into pieces
 
 # keeping a global variable for first submitted experiment (per cluster) and reusing it by default
 # we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
@@ -98,6 +101,21 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 LOG.warning("Experiment %s not found!", expname)
                 return []
             raise ValueError(f"Experiment {expname} not found!")
+
+
+def get_timeout(cluster_config, partition):
+    if 'timeouts' not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+
+        # subtracting 15 minutes to account for the time it takes to save the model
+        # the format expected by nemo is days:hours:minutes:seconds
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
+    return timeout
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
@@ -203,6 +221,40 @@ def get_reward_server_command(
     return server_cmd, num_tasks
 
 
+def get_ray_server_cmd(start_cmd):
+    ports = (
+        "--node-manager-port=12345 "
+        "--object-manager-port=12346 "
+        "--dashboard-port=8265 "
+        "--dashboard-agent-grpc-port=12347 "
+        "--runtime-env-agent-port=12349 "
+        "--metrics-export-port=12350 "
+        "--min-worker-port=14349 "
+        "--max-worker-port=18349 "
+    )
+
+    ray_start_cmd = (
+        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        "    echo 'Starting head node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    ray start "
+        "        --head "
+        "        --port=6379 "
+        f"       {ports} && "
+        f"   {start_cmd} ;"
+        "else "
+        "    echo 'Starting worker node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        "    ray start "
+        "        --block "
+        "        --address=$SLURM_MASTER_NODE:6379 "
+        f"       {ports} ;"
+        "fi"
+    )
+    return ray_start_cmd
+
+
 def get_server_command(
     server_type: str,
     num_gpus: int,
@@ -246,35 +298,7 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        ports = (
-            "--node-manager-port=12345 "
-            "--object-manager-port=12346 "
-            "--dashboard-port=8265 "
-            "--dashboard-agent-grpc-port=12347 "
-            "--runtime-env-agent-port=12349 "
-            "--metrics-export-port=12350 "
-            "--min-worker-port=14349 "
-            "--max-worker-port=18349 "
-        )
-        server_start_cmd = (
-            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
-            "    echo 'Starting head node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    ray start "
-            "        --head "
-            "        --port=6379 "
-            f"       {ports} && "
-            f"   {start_vllm_cmd} ;"
-            "else "
-            "    echo 'Starting worker node' && "
-            "    export RAY_raylet_start_wait_time_s=120 && "
-            "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
-            "    ray start "
-            "        --block "
-            "        --address=$SLURM_MASTER_NODE:6379 "
-            f"       {ports} ;"
-            "fi"
-        )
+        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:

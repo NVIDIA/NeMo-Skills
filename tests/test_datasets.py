@@ -26,11 +26,11 @@ DATASETS = [
     ('mt-bench', ['test']),
     ('asdiv', ['test']),
     ('gsm-plus', ['test', 'test_rounded']),
-    ('gsm8k', ['train', 'train_full', 'validation', 'test']),
+    ('gsm8k', ['train', 'test']),
     ('hle-math', ['test']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
-    # ('math', ['train', 'train_full', 'validation', 'test']),  # TODO: enable when the dataset is back online
+    ('math', ['train', 'test']),
     ('math-odyssey', ['test']),
     ('mawps', ['test']),
     ('mbpp', ['test']),
@@ -38,7 +38,11 @@ DATASETS = [
     ('svamp', ['test']),
     ('answer-judge', ['test']),
     ('mmlu-pro', ['test']),
-    ('gpqa', ['diamond']) #, 'extended', 'main']),
+    ('gpqa', ['diamond', 'main', 'extended']),
+    ('minerva_math', ['test']),
+    ('olympiadbench', ['test']),
+    ('gaokao2023en', ['test']),
+    ('college_math', ['test']),
 ]
 
 

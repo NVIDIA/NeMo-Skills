@@ -24,8 +24,6 @@ import re
 Preprocessing adapted from https://github.com/EleutherAI/lm-evaluation-harness/blob/main/lm_eval/tasks/gpqa/generative/utils.py
 """
 
-random.seed(42)
-
 
 def preprocess(text):
     if text is None:
@@ -37,14 +35,14 @@ def preprocess(text):
     return text
 
 
-def format_entry(entry):
+def format_entry(entry, random_seed):
     choices = [
         preprocess(entry["Incorrect Answer 1"]),
         preprocess(entry["Incorrect Answer 2"]),
         preprocess(entry["Incorrect Answer 3"]),
         preprocess(entry["Correct Answer"]),
     ]
-
+    random.seed(random_seed)
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
     return {
@@ -65,28 +63,34 @@ def format_entry(entry):
     }
 
 
-def write_data_to_file(output_file, data):
+def write_data_to_file(output_file, data, random_seed):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            json.dump(format_entry(entry), fout)
+            json.dump(format_entry(entry, random_seed), fout)
             fout.write("\n")
 
 
-def main(args):
-    dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{args.split}")["train"]
+def save_data(split, random_seed):
+    dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{split}")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"{args.split}.jsonl"
-    write_data_to_file(output_file, dataset)
+    output_file = data_dir / f"{split}.jsonl"
+    write_data_to_file(output_file, dataset, random_seed)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--split",
-        default="diamond",
-        choices=("extended", "main", "diamond"),
+        default="all",
+        choices=("all", "extended", "main", "diamond"),
         help="Dataset split to process.",
     )
+    parser.add_argument("--random_seed", type=int, default=42)
     args = parser.parse_args()
-    main(args)
+
+    if args.split == "all":
+        for split in ["extended", "main", "diamond"]:
+            save_data(split, args.random_seed)
+    else:
+        save_data(args.split, args.random_seed)
