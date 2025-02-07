@@ -321,8 +321,7 @@ class CustomActorPPOTrainer(ActorPPOTrainer):
             self.match_time_manager = None
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
-        # if self.max_time_manager is not None and (check := self.max_time_manager.check()):
-        if True:
+        if self.max_time_manager is not None and (check := self.max_time_manager.check()):
             # We will force logging, evaluation and checkpointing to occur immediately
             # by forcing the value of these step counter equal to global_step
             args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
