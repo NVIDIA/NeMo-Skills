@@ -185,7 +185,6 @@ def configure_client(
     extra_arguments,
 ):
     if server_address is None:  # we need to host the model
-        server_port = get_free_port(strategy="random")
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
         server_address = f"localhost:{server_port}"
 
