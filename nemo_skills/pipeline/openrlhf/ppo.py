@@ -98,7 +98,7 @@ class PPOOpenRLHFTask:
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = f" --prompt_data {self.prompt_data} " f" --input_key '{self.input_key}' "
+        cmd = f" --prompt_data {self.prompt_data} --input_key '{self.input_key}' "
 
         return cmd
 
