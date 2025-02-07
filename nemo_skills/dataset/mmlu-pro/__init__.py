@@ -17,9 +17,9 @@
 
 PROMPT_CONFIG = 'generic/mmlu-pro-zero-shot'
 DATASET_GROUP = 'multichoice'
-METRICS_TYPE = 'math'  # TODO: update this?
+METRICS_TYPE = 'math'  
 DEFAULT_EVAL_ARGS = (
-    "++eval_type=mmlu-pro "
+    "++eval_type=multichoice "
 )
 
 

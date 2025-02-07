@@ -17,8 +17,9 @@
 
 PROMPT_CONFIG = 'generic/multichoice-zero-shot'
 DATASET_GROUP = 'multichoice'
-METRICS_TYPE = 'math'  # TODO: update this?
-DEFAULT_EVAL_ARGS = "++eval_type=gpqa "
-
+METRICS_TYPE = 'multichoice'  
+DEFAULT_EVAL_ARGS = (
+    "++eval_type=multichoice "
+)
 
 DEFAULT_GENERATION_ARGS = "++split=diamond"

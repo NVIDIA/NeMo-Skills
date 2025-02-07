@@ -432,9 +432,7 @@ EVALUATOR_MAP = {
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
     'lean4': eval_lean4,
-    'mmlu-pro': eval_mcq,
-    'gpqa': eval_mcq,
-    'mmlu': eval_mcq,
+    'multichoice': eval_mcq,
 }
 
 
