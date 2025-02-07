@@ -89,8 +89,9 @@ class PPOOpenRLHFTask:
             f" --max_ckpt_mem 10000000000 "
             f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
             f" --save_steps -1 "
-            f" --max_samples 500000 "
+            # f" --max_samples 500000 "
             f" --max_epochs 1 "
+            f" --max_time_per_run {self.timeout} "
         )
         return cmd
 
@@ -148,7 +149,7 @@ class PPOOpenRLHFTask:
         return cmd
 
     def get_script_module(self):
-        return "openrlhf.cli.train_ppo_ray"
+        return "nemo_skills.training.openrlhf.ppo_script"
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()

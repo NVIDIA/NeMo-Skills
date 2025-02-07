@@ -13,10 +13,11 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/multichoice'
+PROMPT_CONFIG = 'generic/multichoice-zero-shot'
 DATASET_GROUP = 'multichoice'
-METRICS_TYPE = "math" # TODO: update this? 
+METRICS_TYPE = 'multichoice'  
 DEFAULT_EVAL_ARGS = (
-    "++eval_type=math " "++eval_config.extract_from_boxed=False " "'++eval_config.extract_regex=\"Answer: (.+)$\"'"
+    "++eval_type=multichoice "
 )
-DEFAULT_GENERATION_ARGS = ""
+
+DEFAULT_GENERATION_ARGS = "++split=test"
