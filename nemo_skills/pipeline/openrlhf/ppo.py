@@ -98,7 +98,7 @@ class PPOOpenRLHFTask:
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = f" --prompt_data {self.prompt_data} " f" --input_key 'context_messages' " f" --apply_chat_template "
+        cmd = f" --prompt_data {self.prompt_data} --input_key input "
 
         return cmd
 
@@ -295,9 +295,6 @@ def ppo_openrlhf(
             raise ValueError("prompt_data is required when num_training_jobs > 0")
         if prompt_data.startswith("/"):  # could ask to download from HF
             check_if_mounted(cluster_config, prompt_data)
-
-    if cluster_config["executor"] == "local":
-        assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
