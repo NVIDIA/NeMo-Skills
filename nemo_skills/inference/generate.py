@@ -284,7 +284,10 @@ class GenerationTask:
         return data[starting_idx:]
 
     def skip_completed_samples_async(self, data):
-        # Compute original position ids for samples
+        # if non-async file exists and we are asked to skip filled, then there is no more data to process
+        if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
+            return []
+
         filled_positions = set()
         if self.cfg.skip_filled:
             try:
