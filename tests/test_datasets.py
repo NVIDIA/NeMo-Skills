@@ -38,6 +38,7 @@ DATASETS = [
     ('svamp', ['test']),
     ('answer-judge', ['test']),
     ('mmlu-pro', ['test']),
+    ('gpqa', ['diamond', 'main', 'extended']),
     ('minerva_math', ['test']),
     ('olympiadbench', ['test']),
     ('gaokao2023en', ['test']),
