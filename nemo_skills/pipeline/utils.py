@@ -761,7 +761,7 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
-            num_gpus=gpus_per_node,
+            num_gpus=4,#gpus_per_node,
             network="host",
             env_vars=env_vars,
             additional_kwargs={"entrypoint": ""},
