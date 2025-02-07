@@ -583,7 +583,7 @@ class GenerationTask:
                 batch_prompts, batch_indices = self.async_get_batch_prompts_from_queue(cfg, request_queue)
 
                 # Get generation ids for the batch
-                generation_ids = self.async_llm_generate_from_batch_prompts(cfg, batch_prompts)
+                generation_ids = self.async_llm_generate_from_batch_prompts(cfg, batch_prompts, batch_indices)
 
                 # Get the generations for the batch
                 generations = self.async_llm_get_generations(cfg, generation_ids)
