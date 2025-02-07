@@ -65,6 +65,7 @@ def managed_server(model_path, server_type):
     proc = start_server(model_path, server_type)
     try:
         wait_for_server("http://127.0.0.1:5000")
+        yield proc
     finally:
         proc.terminate()
         try:
