@@ -222,16 +222,18 @@ class GenerationTask:
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
-    def log_example_prompt(self, data_point):
-        data_point = deepcopy(data_point)
+    def log_example_prompt(self, data):
+        data_point = deepcopy(data[0])
         if self.cfg.multi_turn_key is None:
-            LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point))
+            LOG.info(
+                "Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data)
+            )
         else:
             data_point[self.cfg.multi_turn_key] = data_point[self.cfg.multi_turn_key][:1]
             LOG.info(
                 "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
                 data_point,
-                self.fill_prompt(data_point),
+                self.fill_prompt(data_point, data),
             )
 
     def load_data(self):
@@ -252,6 +254,17 @@ class GenerationTask:
             data = data[: self.cfg.max_samples]
 
         return data
+
+    def preprocess_data(self, data):
+        """A placeholder for any data preprocessing that needs to be done before generation."""
+        return data
+
+    def postprocess(self):
+        """A placeholder for any postprocessing that needs to be done after generation.
+
+        Data is already saved to self.cfg.output_file, so it can be read and re-saved from there.
+        """
+        pass
 
     def skip_completed_samples_sync(self, data):
         if not self.cfg.skip_filled:
@@ -290,23 +303,25 @@ class GenerationTask:
 
         return remaining_data
 
-    def fill_prompt(self, data_point):
+    # TODO: data will not include any samples skipped after restart
+    def fill_prompt(self, data_point, data):
+        """Passing in full data in case it's needed to fill the prompt in subclasses."""
         return self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
         )
 
-    def llm_generate(self, data_points, is_async=False):
+    def llm_generate(self, data_points, data, is_async=False):
         generate_method = self.llm.generate_async if is_async else self.llm.generate
         return generate_method(
-            prompts=[self.fill_prompt(dp) for dp in data_points],
+            prompts=[self.fill_prompt(dp, data) for dp in data_points],
             stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
         )
 
-    def llm_generate_multi_turn(self, data_points):
+    def llm_generate_multi_turn(self, data_points, data):
         # TODO: this will not be efficient if different elements have different number of turns
         # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
         # no matter the turns. Also even the below implementation can probably be simplified
@@ -326,7 +341,7 @@ class GenerationTask:
                         "generation"
                     ][turn_idx]
             # getting a new set of generations
-            turn_outputs = self.llm_generate([turn_data_points[dp_index] for dp_index in dp_indices])
+            turn_outputs = self.llm_generate([turn_data_points[dp_index] for dp_index in dp_indices], data)
             # adding assistant answers to the generations
             for pos_index, dp_index in enumerate(dp_indices):
                 outputs[dp_index]["generation"].append(turn_outputs[pos_index]["generation"])
@@ -356,9 +371,9 @@ class GenerationTask:
                 data_points_batch.append(data_point)
                 if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
                     if self.cfg.multi_turn_key is None:
-                        outputs = self.llm_generate(data_points_batch)
+                        outputs = self.llm_generate(data_points_batch, data)
                     else:
-                        outputs = self.llm_generate_multi_turn(data_points_batch)
+                        outputs = self.llm_generate_multi_turn(data_points_batch, data)
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
 
@@ -372,7 +387,7 @@ class GenerationTask:
                 num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
                 if last_submitted_idx < len(data) and num_to_submit > 0:
                     generation_ids = self.llm_generate(
-                        data[last_submitted_idx : last_submitted_idx + num_to_submit], is_async=True
+                        data[last_submitted_idx : last_submitted_idx + num_to_submit], data, is_async=True
                     )
                     for idx, gen_id in enumerate(generation_ids):
                         requests_in_progress[gen_id] = data[last_submitted_idx + idx]
@@ -431,7 +446,9 @@ class GenerationTask:
             LOG.info("No data to process, exiting.")
             return
 
-        self.log_example_prompt(data[0])
+        data = self.preprocess_data(data)
+
+        self.log_example_prompt(data)
 
         if self.cfg.dry_run:
             LOG.info("Exiting without running generation as dry_run flag is set.")
@@ -446,6 +463,8 @@ class GenerationTask:
             self.async_loop(data)
         else:
             self.sync_loop(data)
+
+        self.postprocess()
 
 
 # Update the hydra main to use the class method
