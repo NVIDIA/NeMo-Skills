@@ -69,6 +69,8 @@ class CustomSFTTrainer(SFTTrainer):
 
                 # Exit the program early
                 exit(0)
+            else:
+                super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
 
         else:
             super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
