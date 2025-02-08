@@ -224,6 +224,16 @@ run_cmd(
     exclusive=True,  # better to get the full node, since packing is resource intensive
 )
 
+
+# The `packing_cmd` generates three files when `pack_seq_length=16384` is used, for example:
+
+#  `packed_16384_seed0.input_ids.npy`
+#  `packed_16384_seed0.loss_mask.npy`
+#  `packed_16384_seed0.seq_start_id.npy`
+
+# For training, set training_data=packed_16384_seed0.npy
+# Refer to the _load_dataset_alt function in nemo_skills/training/gpt_sft_dataset.py for details on why this is required.
+
 train(
     ctx=wrap_arguments(
         f"++model.data.train_ds.packed_sequence=True "
