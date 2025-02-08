@@ -220,8 +220,8 @@ run_cmd(
     cluster=cluster,
     expname=f"{expname}-packing",
     container="nemo", # please use "nemo container" for packed data prepration
-    partition="cpu",  # if available on your cluster
-    exclusive=True,  # better to get the full node, since packing is resource intensive
+    # this is a cpu-only operation, so if a cluster has a good cpu partition, it can be used
+    # note that this is an expensive operation requiring a lot of CPUs and RAM
 )
 
 
