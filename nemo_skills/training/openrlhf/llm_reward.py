@@ -5,8 +5,9 @@ from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
-def reward_func(queries: list[str], prompts: list[str]):
-    expected_answers = ["42" for _ in range(len(queries))]
+def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[dict]):
+    print(prompt_metadata)
+    expected_answers = [data["expected_answer"] for data in prompt_metadata]
     predicted_answers = [extract_answer(query) for query in queries]
     problems = ["My dummy problem" for _ in range(len(queries))]
     llm = get_model(server_type="trtllm")
