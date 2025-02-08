@@ -9,18 +9,13 @@ def reward_func(queries: list[str], prompts: list[str]):
     expected_answers = ["42" for _ in range(len(queries))]
     predicted_answers = [extract_answer(query) for query in queries]
     problems = ["My dummy problem" for _ in range(len(queries))]
-    print(predicted_answers)
     llm = get_model(server_type="trtllm")
     prompt = get_prompt('judge/math', 'qwen-instruct')
     prompts = [
         prompt.fill({'problem': problem, 'expected_answer': expected_answer, 'predicted_answer': predicted_answer})
         for problem, expected_answer, predicted_answer in zip(problems, expected_answers, predicted_answers)
     ]
-    print(prompts)
     outputs = llm.generate(prompts=prompts)
-    print(outputs)
     is_correct_array = [is_correct_judgement(output["generation"]) for output in outputs]
-    print(is_correct_array)
-    print(outputs[0]["generation"])
 
     return torch.tensor(is_correct_array, dtype=torch.float32)
