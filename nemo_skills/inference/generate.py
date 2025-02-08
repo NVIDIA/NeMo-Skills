@@ -101,6 +101,10 @@ class GenerateSolutionsConfig:
     extra_stop_phrases: list[str] = field(default_factory=list)
 
     def __post_init__(self):
+        self._post_init_validate_data()
+        self._post_init_validate_server()
+
+    def _post_init_validate_data(self):
         if self.input_file is not None:
             if self.dataset is not None or self.split is not None:
                 raise ValueError("Either `input_file` or `dataset` and `split` should be provided, but not both")
@@ -112,6 +116,7 @@ class GenerateSolutionsConfig:
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
 
+    def _post_init_validate_server(self):
         if self.server["server_type"] == "trtllm" and self.prompt_template is None:
             # TODO: fix that
             raise ValueError("Prompt template is required for trtllm servers")
