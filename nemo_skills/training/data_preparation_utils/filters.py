@@ -248,7 +248,6 @@ class RemoveLenOutliers(BaseFilter):
                 return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
         if property_len > self.max_length:
-            print(property_val)
             return [DataEntry(data=None, metrics=dict(num_removed=1))]
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
