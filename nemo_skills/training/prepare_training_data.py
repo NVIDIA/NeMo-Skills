@@ -18,7 +18,7 @@ from sdp.run_processors import run_processors
 from nemo_skills.utils import setup_logging
 
 
-@hydra.main(version_base=None, config_path="data_preparation_utils/", config_name="prepare_sft_data.yaml")
+@hydra.main(version_base=None, config_path="data_preparation_utils/", config_name="prepare_training_data.yaml")
 def main(cfg):
     run_processors(cfg)
 

@@ -35,7 +35,7 @@ Convert the data into the SFT format that NeMo-Aligner understands.
 
 ```bash
 ns run_cmd --cluster=local \
-python -m nemo_skills.training.prepare_sft_data \
+python -m nemo_skills.training.prepare_training_data \
     ++prompt_template=llama3-instruct \
     ++prompt_config=generic/math \
     ++preprocessed_dataset_files=/workspace/openmathinstruct2.jsonl \
