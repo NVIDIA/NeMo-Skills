@@ -225,21 +225,14 @@ run_cmd(
 )
 
 
-# Packing Command Output
+# The `packing_cmd` generates three files when `pack_seq_length=16384` is used, for example:
 
-The `packing_cmd` generates three files when `pack_seq_length=16384` is used, for example:
+#  `packed_16384_seed0.input_ids.npy`
+#  `packed_16384_seed0.loss_mask.npy`
+#  `packed_16384_seed0.seq_start_id.npy`
 
-- `packed_16384_seed0.input_ids.npy`
-- `packed_16384_seed0.loss_mask.npy`
-- `packed_16384_seed0.seq_start_id.npy`
-
-# Training Data Requirement
-
-For training, set:
-
-```bash
-training_data=packed_16384_seed0.npy
-#Refer to the _load_dataset_alt function in nemo_skills/training/gpt_sft_dataset.py for details on why this is required.
+# For training, set training_data=packed_16384_seed0.npy
+# Refer to the _load_dataset_alt function in nemo_skills/training/gpt_sft_dataset.py for details on why this is required.
 
 train(
     ctx=wrap_arguments(
