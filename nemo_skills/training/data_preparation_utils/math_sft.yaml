@@ -25,7 +25,7 @@ hf_model_name: null
 
 # Problem params
 min_problem_length: 0
-max_problem_length: 1024
+max_problem_length: 2048
 
 # Solution params
 min_solution_length: 0
