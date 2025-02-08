@@ -147,7 +147,7 @@ class PPOOpenRLHFTask:
         return cmd
 
     def get_script_module(self):
-        return "nemo_skills.training.openrlhf.ppo_script"
+        return "openrlhf.cli.train_ppo_ray"
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
