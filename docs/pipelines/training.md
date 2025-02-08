@@ -220,7 +220,7 @@ run_cmd(
     cluster=cluster,
     expname=f"{expname}-packing",
     container="nemo", # please use "nemo container" for packed data prepration
-    partition="cpu",  # if available on your cluster
+    partition="cpu",  # if available on your cluster, but we suggest you use gpu partition="interactive" if you have large dataset, e.g., 200k
     exclusive=True,  # better to get the full node, since packing is resource intensive
 )
 
