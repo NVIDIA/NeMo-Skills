@@ -15,7 +15,6 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Optional
 
 import nemo_run as run
@@ -89,7 +88,6 @@ class PPOOpenRLHFTask:
             f" --max_ckpt_mem 10000000000 "
             f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
             f" --save_steps -1 "
-            # f" --max_samples 500000 "
             f" --max_epochs 1 "
             f" --max_time_per_run {self.timeout} "
         )
@@ -299,9 +297,6 @@ def ppo_openrlhf(
             raise ValueError("prompt_data is required when num_training_jobs > 0")
         if prompt_data.startswith("/"):  # could ask to download from HF
             check_if_mounted(cluster_config, prompt_data)
-
-    if cluster_config["executor"] == "local":
-        assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
