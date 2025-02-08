@@ -392,3 +392,74 @@ class WriteFinalSftManifest(BaseProcessor):
                 samples_count += 1
 
         LOG.info("Prepared dataset size: %d", samples_count)
+
+
+class WriteFinalRLManifest(BaseProcessor):
+    def __init__(
+        self,
+        prompt_config: str,
+        prompt_template: str,
+        input_key: str = "input",
+        metadata: dict | None = None,
+        exclude_optional_keys: bool = True,
+        random_seed: int = 0,
+        do_shuffle: bool = True,
+        num_output_samples: int | None = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.input_key = input_key
+        self.metadata = metadata
+        self.exclude_optional_keys = exclude_optional_keys
+        if not self.metadata:
+            self.metadata = {}
+
+        self.prompt = None
+        if prompt_config and prompt_template:
+            self.prompt = get_prompt(prompt_config, prompt_template)
+        else:
+            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        self.random_seed = random_seed
+        self.do_shuffle = do_shuffle
+        self.num_output_samples = num_output_samples
+
+    def process(self):
+        samples_count = 0
+        all_data = []
+        with (open(self.input_manifest_file, "rt", encoding="utf-8") as fin,):
+            # only looping over the correct samples (unless asked for incorrect)
+            for line in fin:
+                elem = json.loads(line)
+                if 'expected_answer' in elem:
+                    elem['expected_answer'] = str(elem['expected_answer'])
+                # take only required keys from the input if exclude_optional_keys is True
+                output_sample = {}
+                if not self.exclude_optional_keys:
+                    output_sample = json.loads(line)
+                elif "expected_answer" in elem:
+                    output_sample["expected_answer"] = elem["expected_answer"]
+                    output_sample["problem"] = elem["problem"]
+
+                if self.prompt:
+                    output_sample["input"] = self.prompt.fill(input_dict=elem)
+                else:
+                    output_sample["input"] = elem[self.input_key]
+
+                output_sample.update(self.metadata)
+                all_data.append(output_sample)
+                samples_count += 1
+
+        LOG.info("Full dataset size: %d", samples_count)
+
+        if self.do_shuffle:
+            random.seed(self.random_seed)
+            random.shuffle(all_data)
+
+        if self.num_output_samples is not None:
+            all_data = all_data[: self.num_output_samples]
+            LOG.info("Downsampled dataset size: %d", len(all_data))
+
+        with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
+            for sample in all_data:
+                fout.write(json.dumps(sample) + "\n")
