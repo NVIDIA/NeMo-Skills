@@ -38,6 +38,7 @@ filters:
   remove_contaminated: true
   remove_len_outlier_problems: true
   majority_filter: false
+  drop_none_answers: true
 
 deduplicate: true
 
@@ -57,6 +58,11 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
     _recursive_: False
     processor_configs:
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfEqual
+        should_run: ${filters.drop_none_answers}
+        key: expected_answer
+        values: [null, ""]
+
       - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveContaminated
         should_run: ${filters.remove_contaminated}
         contamination_file: ${contamination_file}
