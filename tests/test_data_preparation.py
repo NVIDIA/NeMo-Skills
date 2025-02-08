@@ -55,7 +55,7 @@ def test_multiple_files():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_multiple_files',
         ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_training_data "
+            f"python -m nemo_skills.training.prepare_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -78,7 +78,7 @@ def test_multiple_files():
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_training_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
 
 
 def test_exclude_keys():
@@ -89,7 +89,7 @@ def test_exclude_keys():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_exclude_keys',
         ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_training_data "
+            f"python -m nemo_skills.training.prepare_data "
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
@@ -112,7 +112,7 @@ def test_exclude_keys():
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_training_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
 
 
 def test_code_sft_data():
@@ -123,7 +123,7 @@ def test_code_sft_data():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_code_sft_data',
         ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_training_data "
+            f"python -m nemo_skills.training.prepare_data "
             f"    --config-name=prepare_code_sft_data "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
             f"    ++output_path={output_file} "
@@ -139,7 +139,7 @@ def test_code_sft_data():
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_training_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
 
 
 def test_openmathinstruct2():
@@ -150,7 +150,7 @@ def test_openmathinstruct2():
         config_dir=Path(__file__).parent / 'gpu-tests',
         log_dir='/tmp/nemo-skills-tests/test_openmathinstruct2',
         ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_training_data "
+            f"python -m nemo_skills.training.prepare_data "
             f"    ++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_template=llama3-instruct "
@@ -171,4 +171,4 @@ def test_openmathinstruct2():
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_training_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_data.py"

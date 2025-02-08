@@ -254,7 +254,7 @@ To avoid the models from generating extremely short solutions, we remove solutio
 
 ```bash
 ns run_cmd --cluster=slurm \
-python -m nemo_skills.training.prepare_training_data \
+python -m nemo_skills.training.prepare_data \
     ++prompt_template=llama3-instruct \
     ++prompt_config=generic/math \
     ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
