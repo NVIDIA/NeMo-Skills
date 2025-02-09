@@ -27,7 +27,7 @@ from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
 

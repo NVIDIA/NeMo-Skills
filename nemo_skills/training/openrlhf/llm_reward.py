@@ -1,21 +1,43 @@
 import torch
-from nemo_skills.inference.server.model import get_model
-from nemo_skills.prompt.utils import get_prompt
+
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
+from nemo_skills.inference.llm_math_judge import prefill_judgement
+from nemo_skills.inference.server.model import get_model
+from nemo_skills.prompt.utils import get_prompt
 
 
 def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[dict]):
-    expected_answers = [data["expected_answer"] for data in prompt_metadata]
-    predicted_answers = [extract_answer(query) for query in queries]
-    problems = [data["problem"] for data in prompt_metadata]
+    data_points = []
+    prefilled_judgements = []
+    prefilled_indices = set()
+    for metadata, query in zip(prompt_metadata, queries):
+        data_points.append(
+            {
+                "problem": metadata["problem"],
+                "expected_answer": metadata["expected_answer"],
+                "predicted_answer": extract_answer(query),
+            }
+        )
+        judgement = prefill_judgement(data_points[-1])
+        if judgement is not None:
+            prefilled_judgements.append(judgement)
+            prefilled_indices.add(len(data_points) - 1)
+
     llm = get_model(server_type="trtllm")
     prompt = get_prompt('judge/math', 'qwen-instruct')
-    prompts = [
-        prompt.fill({'problem': problem, 'expected_answer': expected_answer, 'predicted_answer': predicted_answer})
-        for problem, expected_answer, predicted_answer in zip(problems, expected_answers, predicted_answers)
-    ]
+    prompts = [prompt.fill(dp) for dp in data_points]
     outputs = llm.generate(prompts=prompts)
-    is_correct_array = [is_correct_judgement(output["generation"]) for output in outputs]
-
+    judgements = []
+    prefilled_idx = 0
+    for idx, output in enumerate(outputs):
+        if idx in prefilled_indices:
+            judgements.append(prefilled_judgements[prefilled_idx])
+            prefilled_idx += 1
+        else:
+            judgements.append(output["generation"])
+    is_correct_array = [is_correct_judgement(judgement) for judgement in judgements]
+    print("#", data_points)
+    print("$", judgements)
+    print("^", is_correct_array)
     return torch.tensor(is_correct_array, dtype=torch.float32)
