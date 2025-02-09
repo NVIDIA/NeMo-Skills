@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import os
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 
 import nemo_run as run
@@ -23,7 +25,7 @@ import typer
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.utils import get_free_port, get_ray_server_cmd, get_timeout
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -147,7 +149,7 @@ class PPOOpenRLHFTask:
         return cmd
 
     def get_script_module(self):
-        return "openrlhf.cli.train_ppo_ray" # Must use https://github.com/Kipok/OpenRLHF
+        return "openrlhf.cli.train_ppo_ray"  # Must use https://github.com/Kipok/OpenRLHF
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
@@ -227,6 +229,14 @@ def get_training_cmd(
     return task.get_cmd()
 
 
+class SupportedServers(str, Enum):
+    trtllm = "trtllm"
+    vllm = "vllm"
+    nemo = "nemo"
+    openai = "openai"
+    sglang = "sglang"
+
+
 @openrlhf_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def ppo_openrlhf(
@@ -239,12 +249,20 @@ def ppo_openrlhf(
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
-    rm_model: str = typer.Option(..., help="Path to the HF reward model"),
+    rm_model: str = typer.Option(None, help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     input_key: str = typer.Option("input", help="Input key for the prompt data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    server_model: str = typer.Option(None, help="Path to the model or model name in API"),
+    server_address: str = typer.Option(
+        None, help="Use ip:port for self-hosted models or the API url if using model providers"
+    ),
+    server_type: SupportedServers = typer.Option(None, help="Type of server to use"),
+    server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
+    server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
+    server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     partition: str = typer.Option(
@@ -322,6 +340,36 @@ def ppo_openrlhf(
         extra_arguments=extra_arguments,
     )
 
+    server_config = None
+    if server_type is not None:
+        get_random_port = server_gpus != 8 and not exclusive
+        if server_address is None:  # we need to host the model
+            assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+            server_port = get_free_port(strategy="random") if get_random_port else 5000
+            server_address = f"localhost:{server_port}"
+
+            server_config = {
+                "model_path": server_model,
+                "server_type": server_type,
+                "num_gpus": server_gpus,
+                "num_nodes": server_nodes,
+                "server_args": server_args,
+                "server_port": server_port,
+            }
+            client_server_args = {
+                "server_type": server_type,
+                "port": server_port,
+            }
+        else:  # model is hosted elsewhere
+            client_server_args = {
+                "server_type": server_type,
+                "host": server_address,
+                "model": server_model,
+            }
+        # TODO: better way to pass arguments?
+        os.environ["REWARD_SERVER_ARGS"] = json.dumps(client_server_args)
+        cluster_config["required_env_vars"] = cluster_config.get("required_env_vars", []) + ["REWARD_SERVER_ARGS"]
+
     with run.Experiment(expname) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
@@ -335,6 +383,7 @@ def ppo_openrlhf(
                 num_nodes=num_nodes,
                 num_tasks=1,  # torchrun will launch all processes
                 cluster_config=cluster_config,
+                server_config=server_config,
                 partition=partition,
                 time_min=time_min,
                 run_after=run_after,
@@ -342,8 +391,8 @@ def ppo_openrlhf(
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                heterogeneous=True if server_config is not None else False,
             )
-
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
 

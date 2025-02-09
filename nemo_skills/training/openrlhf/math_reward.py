@@ -1,3 +1,6 @@
+import json
+import os
+
 import torch
 
 from nemo_skills.code_execution.math_grader import extract_answer
@@ -24,7 +27,9 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
             prefilled_judgements.append(judgement)
             prefilled_indices.add(len(data_points) - 1)
 
-    llm = get_model(server_type="trtllm")
+    host = os.getenv("SLURM_MASTER_NODE_HET_GROUP_0", "localhost")
+    server_args = json.loads(os.getenv("REWARD_SERVER_ARGS", "{}"))
+    llm = get_model(server_type="trtllm", host=host, **server_args)
     prompt = get_prompt('judge/math', 'qwen-instruct')
     prompts = [prompt.fill(dp) for dp in data_points]
     outputs = llm.generate(prompts=prompts, stop_phrases=prompt.stop_phrases)

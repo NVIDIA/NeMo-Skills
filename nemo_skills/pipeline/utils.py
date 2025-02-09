@@ -741,6 +741,8 @@ def get_executor(
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
     heterogeneous=False,
+    het_group=None,
+    total_het_groups=None,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
@@ -767,7 +769,18 @@ def get_executor(
             additional_kwargs={"entrypoint": ""},
         )
 
-    env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
+    if not heterogeneous:
+        env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
+    else:
+        # master node will be within the same group
+        env_vars["SLURM_MASTER_NODE"] = (
+            f"$(scontrol show hostnames SLURM_JOB_NODELIST_HET_GROUP_{het_group} | head -n1)"
+        )
+        # in addition defining master nodes for all groups to allow communication
+        for group in range(total_het_groups):
+            env_vars[f"SLURM_MASTER_NODE_HET_GROUP_{group}"] = (
+                f"$(scontrol show hostnames SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
+            )
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
@@ -860,6 +873,7 @@ def add_task(
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
     slurm_kwargs: dict | None = None,
+    heterogeneous: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -905,6 +919,9 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
+    het_group = 0
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
@@ -926,11 +943,15 @@ def add_task(
             log_prefix="server",
             extra_package_dirs=extra_package_dirs,
             slurm_kwargs=slurm_kwargs,
+            heterogeneous=heterogeneous,
+            het_group=het_group,
+            total_het_groups=total_het_groups,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group += 1
 
     # then goes the main task unless it's empty
     if cmd:
@@ -953,8 +974,12 @@ def add_task(
                     log_prefix="main",
                     extra_package_dirs=extra_package_dirs,
                     slurm_kwargs=slurm_kwargs,
+                    heterogeneous=heterogeneous,
+                    het_group=het_group,
+                    total_het_groups=total_het_groups,
                 )
             )
+        het_group += 1
 
     # finally a sandbox if needed
     if with_sandbox:
@@ -975,8 +1000,12 @@ def add_task(
                 log_prefix="sandbox",
                 extra_package_dirs=extra_package_dirs,
                 slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+        het_group += 1
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
