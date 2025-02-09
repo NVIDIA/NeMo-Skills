@@ -27,7 +27,7 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     llm = get_model(server_type="trtllm")
     prompt = get_prompt('judge/math', 'qwen-instruct')
     prompts = [prompt.fill(dp) for dp in data_points]
-    outputs = llm.generate(prompts=prompts)
+    outputs = llm.generate(prompts=prompts, stop_phrases=prompt.stop_phrases)
     judgements = []
     prefilled_idx = 0
     for idx, output in enumerate(outputs):
