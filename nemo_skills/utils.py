@@ -354,7 +354,7 @@ def compute_chunk_ids(chunk_ids: list[int] | str, num_chunks: int) -> list[int] 
 
 def prefill_judgement(data_point: dict) -> str | None:
     """Will automatically fill judgement if there is an exact match or the answer is None."""
-    if data_point['predicted_answer'] is None:
+    if data_point['predicted_answer'] is None or data_point['predicted_answer'] == '':
         return "Reasoning: No answer was provided.\nJudgement: No"
 
     if str(data_point['predicted_answer']).strip() == str(data_point['expected_answer']).strip():

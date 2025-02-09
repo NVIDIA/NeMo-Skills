@@ -37,7 +37,4 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
         else:
             judgements.append(output["generation"])
     is_correct_array = [is_correct_judgement(judgement) for judgement in judgements]
-    print("#", data_points)
-    print("$", judgements)
-    print("^", is_correct_array)
     return torch.tensor(is_correct_array, dtype=torch.float32)
