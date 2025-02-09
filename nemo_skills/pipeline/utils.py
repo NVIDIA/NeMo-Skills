@@ -774,12 +774,12 @@ def get_executor(
     else:
         # master node will be within the same group
         env_vars["SLURM_MASTER_NODE"] = (
-            f"$(scontrol show hostnames SLURM_JOB_NODELIST_HET_GROUP_{het_group} | head -n1)"
+            f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{het_group} | head -n1)"
         )
         # in addition defining master nodes for all groups to allow communication
         for group in range(total_het_groups):
             env_vars[f"SLURM_MASTER_NODE_HET_GROUP_{group}"] = (
-                f"$(scontrol show hostnames SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
+                f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
             )
 
     partition = partition or cluster_config.get("partition")
