@@ -30,6 +30,7 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     host = os.getenv("SLURM_MASTER_NODE_HET_GROUP_0", "localhost")
     server_args = json.loads(os.getenv("REWARD_SERVER_ARGS", "{}"))
     llm = get_model(host=host, **server_args)
+    # TODO: remove hardcoded qwen template
     prompt = get_prompt('judge/math', 'qwen-instruct')
     prompts = [prompt.fill(dp) for dp in data_points]
     outputs = llm.generate(prompts=prompts, stop_phrases=prompt.stop_phrases)
