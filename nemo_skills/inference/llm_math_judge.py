@@ -27,7 +27,7 @@ from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, nested_dataclass, prefill_judgement, setup_logging
 
 LOG = logging.getLogger(__file__)
 
@@ -95,17 +95,6 @@ class LlmMathJudgeConfig:
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
-
-
-def prefill_judgement(data_point: dict) -> str | None:
-    """Will automatically fill judgement if there is an exact match or the answer is None."""
-    if data_point['predicted_answer'] is None:
-        return "Reasoning: No answer was provided.\nJudgement: No"
-
-    if str(data_point['predicted_answer']).strip() == str(data_point['expected_answer']).strip():
-        return "Reasoning: The two answers are identical.\nJudgement: Yes"
-
-    return None
 
 
 @hydra.main(version_base=None, config_name='base_llm_math_judge_config', config_path='.')

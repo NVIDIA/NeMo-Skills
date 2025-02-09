@@ -2,9 +2,9 @@ import torch
 
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.inference.llm_math_judge import prefill_judgement
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.utils import prefill_judgement
 
 
 def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[dict]):
