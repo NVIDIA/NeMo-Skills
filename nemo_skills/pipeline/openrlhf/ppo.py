@@ -296,7 +296,7 @@ def ppo_openrlhf(
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
-    """Run a pre-defined module or script in the NeMo-Skills container."""
+    """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
