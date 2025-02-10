@@ -146,7 +146,7 @@ def fill_majority_answer(cfg: FillMajorityAnswerConfig):
                     predictions[fidx]["predicted_answer"] == predictions[fidx]["expected_answer"]
                 )
             else:
-                predictions[fidx].pop("is_correct")
+                predictions[fidx].pop("is_correct", None)
             handle.write(json.dumps(predictions[fidx]) + "\n")
 
         if changed:
