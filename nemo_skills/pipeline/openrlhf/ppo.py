@@ -15,7 +15,6 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Optional
 
 import nemo_run as run
@@ -36,6 +35,7 @@ class PPOOpenRLHFTask:
     reward_model: str
     output_dir: str
     prompt_data: str
+    input_key: str
     num_gpus: int
     num_nodes: int
     expname: str
@@ -88,8 +88,8 @@ class PPOOpenRLHFTask:
             f" --max_ckpt_mem 10000000000 "
             f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
             f" --save_steps -1 "
-            f" --max_samples 500000 "
             f" --max_epochs 1 "
+            f" --max_time_per_run {self.timeout} "
         )
         return cmd
 
@@ -97,7 +97,7 @@ class PPOOpenRLHFTask:
         # Note: Validation data isnt used as of now
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
-        cmd = f" --prompt_data {self.prompt_data} " f" --input_key 'context_messages' " f" --apply_chat_template "
+        cmd = f" --prompt_data {self.prompt_data} --input_key '{self.input_key}' "
 
         return cmd
 
@@ -147,7 +147,7 @@ class PPOOpenRLHFTask:
         return cmd
 
     def get_script_module(self):
-        return "openrlhf.cli.train_ppo_ray"
+        return "openrlhf.cli.train_ppo_ray" # Must use https://github.com/Kipok/OpenRLHF
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
@@ -192,6 +192,7 @@ def get_training_cmd(
     rm_model,
     output_dir,
     prompt_data,
+    input_key,
     num_gpus,
     num_nodes,
     expname,
@@ -208,6 +209,7 @@ def get_training_cmd(
             reward_model=rm_model,
             output_dir=output_dir,
             prompt_data=prompt_data,
+            input_key=input_key,
             num_gpus=num_gpus,
             num_nodes=num_nodes,
             expname=expname,
@@ -239,6 +241,7 @@ def ppo_openrlhf(
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(..., help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
+    input_key: str = typer.Option("input", help="Input key for the prompt data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -295,9 +298,6 @@ def ppo_openrlhf(
         if prompt_data.startswith("/"):  # could ask to download from HF
             check_if_mounted(cluster_config, prompt_data)
 
-    if cluster_config["executor"] == "local":
-        assert "HF_HOME" in os.environ, "HF_HOME must be set when running locally"
-
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
         ppo_task = ctx.obj['ppo_task']  # type: type(PPOOpenRLHFTask)
@@ -313,6 +313,7 @@ def ppo_openrlhf(
         rm_model=rm_model,
         output_dir=output_dir,
         prompt_data=prompt_data,
+        input_key=input_key,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,

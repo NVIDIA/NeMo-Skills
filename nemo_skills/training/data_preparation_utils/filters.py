@@ -258,9 +258,10 @@ class TrimSolutions(BaseFilter):
     def process_dataset_entry(self, data_entry) -> List:
         # extracting full boxed answer first
         predicted_answer = extract_answer(data_entry[self.solution_key])
-        predicted_answer = "\\boxed{" + predicted_answer + "}"
+        
         original_solution = data_entry[self.solution_key]
         if predicted_answer is not None:
+            predicted_answer = "\\boxed{" + predicted_answer + "}"
             before, after = data_entry[self.solution_key].rsplit(predicted_answer, 1)
             data_entry[self.solution_key] = before + predicted_answer + after.split("\n")[0]
         is_modified = original_solution != data_entry[self.solution_key]

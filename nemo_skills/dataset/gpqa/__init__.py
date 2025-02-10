@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-bs4
-evalplus @ git+https://github.com/evalplus/evalplus@c91370f
-huggingface_hub
-hydra-core
-nemo_run @ git+https://github.com/NVIDIA/NeMo-Run.git
-numpy
-openai
-pyyaml
-rank_bm25
-requests
-scikit-learn
-sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor
-sympy
-tqdm
-transformers
-typer >= 0.13
-wandb
-datasets
-httpx
+
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+
+PROMPT_CONFIG = 'generic/multichoice-zero-shot'
+DATASET_GROUP = 'multichoice'
+METRICS_TYPE = 'multichoice'  
+DEFAULT_EVAL_ARGS = (
+    "++eval_type=multichoice "
+)
+
+DEFAULT_GENERATION_ARGS = "++split=diamond"

@@ -33,6 +33,7 @@ def wrap_arguments(arguments: str):
     class MockContext:
         def __init__(self, args):
             self.args = args
+            self.obj = None
 
     # first one is the cli name
     return MockContext(args=arguments.split())
