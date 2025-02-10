@@ -99,6 +99,26 @@ class DropIfRegexMatch(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
 
 
+class DropIfEqual(BaseFilter):
+    """Drops data if entry matches provided value."""
+
+    def __init__(
+        self,
+        values,
+        key: str,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.values = values
+        self.key = key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        for value in self.values:
+            if data_entry[self.key] == value:
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+        return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
+
+
 class DropMultiBoxed(BaseFilter):
     def __init__(self, solution_key: str = "generation", **kwargs):
         super().__init__(**kwargs)
