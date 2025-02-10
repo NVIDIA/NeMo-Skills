@@ -48,7 +48,14 @@ def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
 
 
 def get_cmd(
-        output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.generate'
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.generate',
 ):
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
@@ -106,7 +113,14 @@ def get_cmd(
 
 
 def get_rm_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.reward_model'
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.reward_model',
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
@@ -122,7 +136,14 @@ def get_rm_cmd(
 
 
 def get_math_judge_cmd(
-    output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None, postprocess_cmd=None, script: str = 'nemo_skills.inference.llm_math_judge'
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.llm_math_judge',
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
@@ -222,11 +243,11 @@ def generate(
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
+    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
     model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
-    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
     server_type: SupportedServers = typer.Option(help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
@@ -337,9 +358,16 @@ def generate(
     original_server_address = server_address
 
     # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
-    if generation_type == GenerationType.generate and ctx.obj is not None and isinstance(ctx.obj, dict) and 'generation_task_type' in ctx.obj:
+    if (
+        generation_type == GenerationType.generate
+        and ctx.obj is not None
+        and isinstance(ctx.obj, dict)
+        and 'generation_task_type' in ctx.obj
+    ):
         generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
-        assert issubclass(generation_task, GenerationTask), f"`generation_task_type` must be a subclass of GenerationTask"
+        assert issubclass(
+            generation_task, GenerationTask
+        ), f"`generation_task_type` must be a subclass of GenerationTask"
         cmd_script = generation_task.get_generation_module()
         cmd_extra_args = generation_task.get_generation_default_args()
         cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
