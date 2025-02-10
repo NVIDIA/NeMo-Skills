@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
+
 import torch
 
 from nemo_skills.code_execution.math_grader import extract_answer
@@ -34,20 +37,22 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     prefilled_judgements = []
     prefilled_indices = set()
     for idx, (metadata, query) in enumerate(zip(prompt_metadata, queries)):
-        judgement = prefill_judgement(data_points[-1])
+        dp = {
+            "problem": metadata["problem"],
+            "expected_answer": metadata["expected_answer"],
+            "predicted_answer": extract_answer(query),
+        }
+        judgement = prefill_judgement(dp)
         if judgement is not None:
             prefilled_judgements.append(judgement)
             prefilled_indices.add(idx)
         else:  # cannot prefill, will send to an LLM
-            data_points.append(
-                {
-                    "problem": metadata["problem"],
-                    "expected_answer": metadata["expected_answer"],
-                    "predicted_answer": extract_answer(query),
-                }
-            )
+            data_points.append(dp)
 
-    llm = get_model(server_type="trtllm")
+    host = os.getenv("SLURM_MASTER_NODE_HET_GROUP_0", "localhost")
+    server_args = json.loads(os.getenv("REWARD_SERVER_ARGS", "{}"))
+    llm = get_model(host=host, **server_args)
+    # TODO: remove hardcoded qwen template
     prompt = get_prompt('judge/math', 'qwen-instruct')
     judge_prompts = [prompt.fill(dp) for dp in data_points]
     outputs = llm.generate(prompts=judge_prompts, stop_phrases=prompt.stop_phrases)
