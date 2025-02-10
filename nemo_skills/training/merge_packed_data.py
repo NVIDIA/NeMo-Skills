@@ -20,6 +20,7 @@ def merge_packed_arrays(prefixes, output_prefix):
 
     arrays_info = []
     for prefix in prefixes:
+        print("Loading prefix:", prefix)
         input_ids, loss_mask, seq_start_id = load_packed_arrays(prefix)
         arrays_info.append((prefix, input_ids, loss_mask, seq_start_id))
         total_samples += input_ids.shape[0]
@@ -44,7 +45,7 @@ def merge_packed_arrays(prefixes, output_prefix):
     sample_idx = 0
     for prefix, input_ids, loss_mask, seq_start_id in arrays_info:
         n_samples = input_ids.shape[0]
-        print("Processing prefix:", prefix)
+        print("Re-saving prefix:", prefix)
         for i in tqdm(range(n_samples)):
             curr_input = input_ids[i]
             curr_loss = loss_mask[i]
