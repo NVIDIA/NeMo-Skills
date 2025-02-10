@@ -125,7 +125,7 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-        cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} "
+        cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} --wandb_id {expname} "
     else:
         cmd = ""
 
