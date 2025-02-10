@@ -437,9 +437,12 @@ class WriteFinalRLManifest(BaseProcessor):
                 output_sample = {}
                 if not self.exclude_optional_keys:
                     output_sample = json.loads(line)
-                elif "expected_answer" in elem:
-                    output_sample["expected_answer"] = elem["expected_answer"]
-                    output_sample["problem"] = elem["problem"]
+                else:
+                    # including only required keys if they are present
+                    if "expected_answer" in elem:
+                        output_sample["expected_answer"] = elem["expected_answer"]
+                    if "problem" in elem:
+                        output_sample["problem"] = elem["problem"]
 
                 if self.prompt:
                     output_sample["input"] = self.prompt.fill(input_dict=elem)
