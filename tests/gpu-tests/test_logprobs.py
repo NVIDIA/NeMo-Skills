@@ -70,7 +70,8 @@ def test_cross_model_logprobs_consistency():
             f"++prompt_template={prompt_template} "
             f"++split=test "
             f"++batch_size=1 "
-            f"++max_samples=1"
+            f"++max_samples=1 "
+            f"++inference.top_logprobs=1 "
         )
         subprocess.run(cmd, shell=True, check=True)
         jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output.jsonl"
