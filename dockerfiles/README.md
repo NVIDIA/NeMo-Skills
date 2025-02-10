@@ -17,17 +17,16 @@ To build vllm image do the following
 3. remove the check for wheel size https://github.com/vllm-project/vllm/blob/main/Dockerfile#L130
 4. check if vllm installation part is built from "-devel" image. If not, change that (otherwise nvcc will be missing)
 5. build a docker with `docker build -t igitman/nemo-skills-vllm:0.5.0 -f Dockerfile .`
-6. add OpenRLHF (you can include it in the previous step by modifying dockerfile or do it after and then commit the docker)
-   1. `git clone https://github.com/OpenRLHF/OpenRLHF`
-   2. checkpoint tag/commit
-   3. remove all hardcoded versions from requirements.txt to get latest
-   4. run `pip install -e .`
+6. add OpenRLHF from our custom fork (you can include it in the previous step by modifying dockerfile or do it after and then commit the docker)
+   1. `git clone https://github.com/Kipok/OpenRLHF`
+   2. checkout tag/commit
+   3. run `pip install -e .`
 
 Currently it takes 10+ hours to build this docker. Is there anything we can do to speed it up?
 
 Current vllm version: v0.7.0
 
-Current OpenRLHF version: dacaec274a6a1aa0ec9100688395cc818b8a6b09
+Current Kipok/OpenRLHF version: 967d8c7b9c523908d27d107b3494cf1fe685f80d
 
 ## Building sglang image
 
