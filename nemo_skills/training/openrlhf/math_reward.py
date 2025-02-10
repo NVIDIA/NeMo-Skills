@@ -37,18 +37,17 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     prefilled_judgements = []
     prefilled_indices = set()
     for idx, (metadata, query) in enumerate(zip(prompt_metadata, queries)):
-        judgement = prefill_judgement(data_points[-1])
+        dp = {
+            "problem": metadata["problem"],
+            "expected_answer": metadata["expected_answer"],
+            "predicted_answer": extract_answer(query),
+        }
+        judgement = prefill_judgement(dp)
         if judgement is not None:
             prefilled_judgements.append(judgement)
             prefilled_indices.add(idx)
         else:  # cannot prefill, will send to an LLM
-            data_points.append(
-                {
-                    "problem": metadata["problem"],
-                    "expected_answer": metadata["expected_answer"],
-                    "predicted_answer": extract_answer(query),
-                }
-            )
+            data_points.append(dp)
 
     host = os.getenv("SLURM_MASTER_NODE_HET_GROUP_0", "localhost")
     server_args = json.loads(os.getenv("REWARD_SERVER_ARGS", "{}"))
