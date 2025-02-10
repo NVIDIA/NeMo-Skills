@@ -258,3 +258,15 @@ train(
 
 # can follow up with the same convert/eval steps as above
 ```
+
+If your data size is very large (i.e. >1M samples), you might run out of memory when doing packing on full data.
+If that's the case, it's recommended to split data into smaller chunks and then merge them using
+[nemo_skills/training/merge_packed_data.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/merge_packed_data.py)
+
+Example command:
+
+```bash
+python nemo_skills/training/merge_packed_data.py \
+    --input_prefixes <chunk 1 folder>/packed_24576_seed0 <chunk 2 folder>/packed_24576_seed0 \
+    --output_prefix <final data folder>/packed_24576_seed0
+```
