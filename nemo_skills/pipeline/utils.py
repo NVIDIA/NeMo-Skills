@@ -642,7 +642,7 @@ def get_env_variables(cluster_config):
             raise ValueError(f"Required environment variable {env_var} not found.")
 
         env_vars[env_var] = os.environ[env_var]
-        logging.info(f"Adding required environment variable {env_var} (value={os.environ[env_var]})")
+        logging.info(f"Adding required environment variable {env_var}")
 
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same

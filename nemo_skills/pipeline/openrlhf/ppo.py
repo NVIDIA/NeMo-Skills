@@ -371,8 +371,9 @@ def ppo_openrlhf(
                 "model": server_model,
             }
         # TODO: better way to pass arguments?
-        os.environ["REWARD_SERVER_ARGS"] = f"'{json.dumps(client_server_args)}'"
-        cluster_config["required_env_vars"] = cluster_config.get("required_env_vars", []) + ["REWARD_SERVER_ARGS"]
+        cluster_config["required_env_vars"] = cluster_config.get("required_env_vars", []) + [
+            f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
+        ]
 
     with run.Experiment(expname) as exp:
         prev_task = None
