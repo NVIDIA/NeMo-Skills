@@ -55,7 +55,10 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     # TODO: remove hardcoded qwen template
     prompt = get_prompt('judge/math', 'qwen-instruct')
     judge_prompts = [prompt.fill(dp) for dp in data_points]
-    outputs = llm.generate(prompts=judge_prompts, stop_phrases=prompt.stop_phrases)
+    if len(judge_prompts) > 0:
+        outputs = llm.generate(prompts=judge_prompts, stop_phrases=prompt.stop_phrases)
+    else:
+        outputs = []
     judgements = []
     prefilled_idx = 0
     generation_idx = 0
