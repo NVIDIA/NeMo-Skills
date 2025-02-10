@@ -638,11 +638,18 @@ def get_env_variables(cluster_config):
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
-        if env_var not in os.environ:
+        if "=" in env_var:
+            if env_var.count("=") == 1:
+                env_var, value = env_var.split("=")
+            else:
+                raise ValueError(f"Invalid required environment variable format: {env_var}")
+            env_vars[env_var.strip()] = value.strip()
+            logging.info(f"Adding required environment variable {env_var}")
+        elif env_var in os.environ:
+            logging.info(f"Adding required environment variable {env_var} from environment")
+            env_vars[env_var] = os.environ[env_var]
+        else:
             raise ValueError(f"Required environment variable {env_var} not found.")
-
-        env_vars[env_var] = os.environ[env_var]
-        logging.info(f"Adding required environment variable {env_var}")
 
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
