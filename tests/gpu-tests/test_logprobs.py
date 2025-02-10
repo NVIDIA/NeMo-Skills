@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
+import json
 import os
-import time
-import requests
 import subprocess
 import sys
 from pathlib import Path
@@ -23,56 +21,6 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
-from nemo_skills.inference.server.model import get_model
-from nemo_skills.prompt.utils import get_prompt
-
-
-def wait_for_server(url, timeout=300, interval=1):
-    """
-    Waits for a server to be up and running.
-    """
-    start_time = time.time()
-    while True:
-        try:
-            response = requests.put(url)
-            if response.status_code != 403:  # Check if server responds
-                return True
-        except requests.RequestException:
-            pass
-        if time.time() - start_time > timeout:
-            raise TimeoutError("Server did not respond within timeout period")
-        time.sleep(interval)
-
-def start_server(model_path: str, server_type: str) -> None:
-    """
-    Starts a server for a given model and server type.
-    We then wait a few seconds for the server to be up.
-    """
-    cmd = (
-        f"ns start_server "
-        f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"--model {model_path} "
-        f"--server_type {server_type} "
-        f"--server_gpus 1 "
-        f"--server_nodes 1"
-    )
-    proc = subprocess.Popen(cmd, shell=True)
-
-    return proc
-
-@contextlib.contextmanager
-def managed_server(model_path, server_type):
-    proc = start_server(model_path, server_type)
-    try:
-        wait_for_server("http://127.0.0.1:5000")
-        yield proc
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=30)
-        except TimeoutError:
-            proc.kill()
-            proc.wait()
 
 def _test_individual_generations(output: dict, server_type: str):
     """
@@ -105,21 +53,35 @@ def test_cross_model_logprobs_consistency():
     ]
 
     outputs_map = {}
-    prompt = get_prompt('generic/default', prompt_template)
-    prompts = [prompt.fill({'question': "What is the answer to life, the universe and everything?"})]
     for server_type, model_path in model_info:
         if not model_path:
             continue
+        
+        output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
+        cmd = (
+            f"ns eval "
+            f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "
+            f"--model {model_path} "
+            f"--server_type {server_type} "
+            f"--output_dir {output_dir} "
+            f"--benchmarks gsm8k:0 "
+            f"--server_gpus 1 "
+            f"--server_nodes 1 "
+            f"++prompt_template={prompt_template} "
+            f"++split=test "
+            f"++batch_size=1 "
+            f"++max_samples=1"
+        )
+        subprocess.run(cmd, shell=True, check=True)
+        jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output.jsonl"
 
-        with managed_server(model_path, server_type):
-            llm = get_model(server_type=server_type, host="localhost")
-            outputs = llm.generate(prompts=prompts, tokens_to_generate=15, top_logprobs=1, temperature=0.5)
-            output = outputs[0]
-            _test_individual_generations(output, server_type)
+        with open(jsonl_file, "r") as f:
+            output = [json.loads(line) for line in f.readlines()][0]
+        _test_individual_generations(output, server_type)
 
-            logprobs = output["logprobs"]
-            tokens = output["tokens"]
-            outputs_map[server_type] = list(zip(tokens, logprobs))
+        logprobs = output["logprobs"]
+        tokens = output["tokens"]
+        outputs_map[server_type] = list(zip(tokens, logprobs))
 
     if "vllm" not in outputs_map or "nemo" not in outputs_map:
         pytest.skip("Not enough models available to compare top_logprobs consistency")
