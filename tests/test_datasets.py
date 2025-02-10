@@ -18,6 +18,7 @@ from pathlib import Path
 
 # tuple of dataset name, available splits and prepared sft files
 DATASETS = [
+    ('aime25', ['test']),
     ('aime24', ['test']),
     ('amc23', ['test']),
     ('omni-math', ['test']),
