@@ -295,6 +295,10 @@ def ppo_openrlhf(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    with_sandbox: bool = typer.Option(
+        False,
+        help="If True, will use the sandbox to run the training job",
+    ),
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
     setup_logging(disable_hydra_logs=False)
@@ -392,6 +396,7 @@ def ppo_openrlhf(
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
+                with_sandbox=with_sandbox,
             )
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)

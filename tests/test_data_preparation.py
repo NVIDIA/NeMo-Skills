@@ -124,7 +124,7 @@ def test_code_sft_data():
         log_dir='/tmp/nemo-skills-tests/test_code_sft_data',
         ctx=wrap_arguments(
             f"python -m nemo_skills.training.prepare_data "
-            f"    --config-name=prepare_code_sft_data "
+            f"    --config-name=code_sft "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/codegen "
@@ -171,4 +171,4 @@ def test_openmathinstruct2():
 
     assert (
         expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/finetuning/prepare_data.py"
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
