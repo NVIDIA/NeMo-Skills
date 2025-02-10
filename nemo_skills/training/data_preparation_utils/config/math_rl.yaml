@@ -1,0 +1,90 @@
+processors_to_run: all
+
+output_path: ???
+prompt_config: null
+prompt_template: null
+
+preprocessed_dataset_files: null  # can specify multiple patters separated by space
+input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
+
+exclude_optional_keys: true # exclude keys other than input, output and expected_answer from the final manifest
+metadata: null  # can provide additional metadata to store (e.g. dataset or generation_type)
+skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
+
+random_seed: 42
+do_shuffle: true
+num_output_samples: null
+
+# Params for length-based filtering
+# Unit of length - Tokens
+hf_model_name: null
+
+# Problem params
+min_problem_length: 0
+max_problem_length: 1024
+
+input_key: problem
+
+contamination_file: null
+
+majority_filter:
+  # minimum number of majority votes to use the answer
+  min_majority_votes: 0
+  # minimum portion of majority votes to use the answer
+  min_majority_percentage: 0.0
+
+filters:
+  remove_contaminated: true
+  remove_len_outlier_problems: true
+  majority_filter: false
+  drop_none_answers: true
+
+deduplicate: true
+
+processors:
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ReadData
+    preprocessed_dataset_files: ${preprocessed_dataset_files}
+    input_files: ${input_files}
+    input_key: ${input_key}
+    skip_first: ${skip_first}
+    deduplicate: ${deduplicate}
+    keys_to_keep:  # input/output/is_correct/judgement are automatically added
+      - "expected_answer"
+      - "total_votes"
+      - "majority_votes"
+
+  # this will optimize processors inside to avoid serializing data to disk
+  - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
+    _recursive_: False
+    processor_configs:
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfEqual
+        should_run: ${filters.drop_none_answers}
+        key: expected_answer
+        values: [null, ""]
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveContaminated
+        should_run: ${filters.remove_contaminated}
+        contamination_file: ${contamination_file}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.MajorityFilter
+        should_run: ${filters.majority_filter}
+        min_majority_votes: ${majority_filter.min_majority_votes}
+        min_majority_percentage: ${majority_filter.min_majority_percentage}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
+        should_run: ${filters.remove_len_outlier_problems}
+        property_key: ${input_key}
+        min_length: ${min_problem_length}
+        max_length: ${max_problem_length}
+        hf_model_name: ${hf_model_name}
+
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalRLManifest
+    output_manifest_file: ${output_path}
+    prompt_config: ${prompt_config}
+    prompt_template: ${prompt_template}
+    input_key: ${input_key}
+    metadata: ${metadata}
+    exclude_optional_keys: ${exclude_optional_keys}
+    random_seed: ${random_seed}
+    do_shuffle: ${do_shuffle}
+    num_output_samples: ${num_output_samples}
