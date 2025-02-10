@@ -124,7 +124,7 @@ def test_code_sft_data():
         log_dir='/tmp/nemo-skills-tests/test_code_sft_data',
         ctx=wrap_arguments(
             f"python -m nemo_skills.training.prepare_data "
-            f"    --config-name=prepare_code_sft_data "
+            f"    --config-name=code_sft "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/codegen "
