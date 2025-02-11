@@ -522,12 +522,11 @@ class NemoModel(BaseModel):
         # we need to remove the original prompt as nemo always returns it
         outputs = [None] * len(generations['sentences'])
         for idx, generation in enumerate(generations['sentences']):
+            logprobs = generations['logprob'][idx] if top_logprobs is not None else None
+            tokens = generations['tokens'][idx]
             outputs[idx] = self.remove_prompt_from_output(
-                prompts[idx], generation, generations['tokens'][idx]
+                prompts[idx], generation, tokens, logprobs, tokens_to_generate
             )
-            if top_logprobs is not None:
-                outputs[idx]['logprobs'] = generations['logprob'][idx][-outputs[idx]['num_generated_tokens']:]
-                outputs[idx]['tokens'] = generations['tokens'][idx][-outputs[idx]['num_generated_tokens']:]
 
         if remove_stop_phrases:
             for output in outputs:
@@ -536,24 +535,46 @@ class NemoModel(BaseModel):
         return outputs
 
     @classmethod
-    def remove_prompt_from_output(cls, prompt: str, generation: str, tokens: list) -> dict:
-        prompt_idx, gen_idx, prompt_token_count = 0, 0, 0
+    def remove_prompt_from_output(cls, prompt: str, generation: str, tokens: list, logprobs: list | None, tokens_to_generate: int) -> dict:
+        prompt_idx, gen_start_idx, prompt_token_count = 0, 0, 0
 
         for token in tokens:
             if prompt_idx >= len(prompt):
                 break
             
             token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
-            if generation[gen_idx:].startswith(token):
-                gen_idx += len(token)
+            if generation[gen_start_idx:].startswith(token):
+                gen_start_idx += len(token)
 
             prompt_idx += len(token)
             prompt_token_count += 1
 
-        output_text = generation[gen_idx:]
+        output_text = generation[gen_start_idx:]
         num_generated_tokens = len(tokens) - prompt_token_count
+        result = {'generation': output_text, 'num_generated_tokens': num_generated_tokens}
+        if logprobs is not None:
+            result['tokens'] = tokens[-num_generated_tokens:]
+            result['logprobs'] = logprobs[-num_generated_tokens:]
 
-        return {'generation': output_text, 'num_generated_tokens': num_generated_tokens}
+        if num_generated_tokens <= tokens_to_generate:
+            return result
+        
+        # sometimes nemo generates more tokens than requested, so we need to trim it
+        gen_end_idx = gen_start_idx
+        for idx, token in enumerate(tokens[prompt_token_count:]):
+            if idx == tokens_to_generate:
+                break
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            if generation[gen_end_idx:].startswith(token):
+                gen_end_idx += len(token)
+        
+        result['num_generated_tokens'] = tokens_to_generate
+        result['generation'] = generation[gen_start_idx:gen_end_idx]
+        if logprobs is not None:
+            result['tokens'] = result['tokens'][:tokens_to_generate]
+            result['logprobs'] = result['logprobs'][:tokens_to_generate]
+
+        return result
 
 
 class OpenAIModel(BaseModel):
