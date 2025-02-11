@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hydra
-from sdp.run_processors import run_processors
-
-from nemo_skills.utils import setup_logging
-
-
-@hydra.main(version_base=None, config_path="data_preparation_utils/", config_name="prepare_sft_data.yaml")
-def main(cfg):
-    run_processors(cfg)
-
+import shutil
+from pathlib import Path
 
 if __name__ == "__main__":
-    setup_logging()
-    main()
+    data_dir = Path(__file__).absolute().parent
+    data_dir.mkdir(exist_ok=True)
+
+    # TODO: Only part I has been released so far. Add part II later.
+    original_file = str(data_dir / "test-1.txt")
+    output_file = str(data_dir / "test.jsonl")
+    shutil.copy(original_file, output_file)
