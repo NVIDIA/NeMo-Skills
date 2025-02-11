@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -77,6 +78,7 @@ def test_cross_model_logprobs_consistency():
             f"++inference.temperature=0.7 "
         )
         subprocess.run(cmd, shell=True, check=True)
+        time.sleep(120) # Wait for the server to finish generating
         jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output-rs0.jsonl"
 
         with open(jsonl_file, "r") as f:
