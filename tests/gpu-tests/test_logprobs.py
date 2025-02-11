@@ -64,22 +64,27 @@ def test_cross_model_logprobs_consistency():
             f"--model {model_path} "
             f"--server_type {server_type} "
             f"--output_dir {output_dir} "
-            f"--benchmarks gsm8k:0 "
+            f"--benchmarks gsm8k:1 "
             f"--server_gpus 1 "
             f"--server_nodes 1 "
+            f"--skip_greedy "
             f"++prompt_template={prompt_template} "
             f"++split=test "
-            f"++batch_size=1 "
-            f"++max_samples=1 "
+            f"++batch_size=8 "
+            f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
+            f"++inference.tokens_to_generate=20 "
+            f"++inference.temperature=0.7 "
         )
         subprocess.run(cmd, shell=True, check=True)
-        jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output.jsonl"
+        jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output-rs0.jsonl"
 
         with open(jsonl_file, "r") as f:
-            output = [json.loads(line) for line in f.readlines()][0]
-        _test_individual_generations(output, server_type)
-
+            outputs = [json.loads(line) for line in f.readlines()]
+        for output in outputs:
+            _test_individual_generations(output, server_type)
+        
+        output = outputs[0]
         logprobs = output["logprobs"]
         tokens = output["tokens"]
         outputs_map[server_type] = list(zip(tokens, logprobs))
@@ -87,10 +92,12 @@ def test_cross_model_logprobs_consistency():
     if "vllm" not in outputs_map or "nemo" not in outputs_map:
         pytest.skip("Not enough models available to compare top_logprobs consistency")
 
-    # trtllm for some reason produces quite different outputs so we don't compare to it
-    server_type = "vllm"
-    other_server_type = "nemo"
     tolerance = 0.5
-    for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
-        assert token == other_token, f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
-        assert abs(logprob - other_logprob) < tolerance, f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"
+    for server_type, _ in model_info:
+        for other_server_type, _ in model_info:
+            if server_type == other_server_type:
+                continue
+            assert len(outputs_map[server_type]) == len(outputs_map[other_server_type]), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
+            for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
+                assert token.replace("Ġ", " ") == other_token.replace("Ġ", " "), f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
+                assert abs(logprob - other_logprob) < tolerance, f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"
