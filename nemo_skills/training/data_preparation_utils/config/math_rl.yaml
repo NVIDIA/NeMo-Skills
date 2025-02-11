@@ -52,6 +52,7 @@ processors:
       - "expected_answer"
       - "total_votes"
       - "majority_votes"
+      - "category"
 
   # this will optimize processors inside to avoid serializing data to disk
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
