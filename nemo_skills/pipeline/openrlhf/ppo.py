@@ -130,6 +130,7 @@ class PPOOpenRLHFTask:
             " --init_kl_coef 0.01 "
             " --normalize_reward "
             " --vllm_sync_backend nccl "
+            f" --use_kl_estimator_k3"
         )
         return cmd
 
