@@ -214,7 +214,7 @@ def test_aggregate_answers_extract():
     )
 
     # Check md5 of one of the output files
-    output_file = f"tests/data/output-agg.jsonl"
+    output_file = Path(__file__).parent / "data/output-agg.jsonl"
     expected_md5 = "c27bfd72287c45ad7e1fd9cd7e5cc159"
     output_md5 = compute_md5(output_file)
 
