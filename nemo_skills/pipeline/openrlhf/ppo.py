@@ -87,8 +87,8 @@ class PPOOpenRLHFTask:
             f" --pretrain {self.model} "
             f" --load_checkpoint "
             f" --ckpt_path {os.path.join(self.output_dir, 'ds_checkpoints')} "
-            f" --max_ckpt_num 3 "
-            f" --max_ckpt_mem 10000000000 "
+            f" --max_ckpt_num 100 "
+            f" --max_ckpt_mem 1000000000000 "
             f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
             f" --save_steps -1 "
             f" --max_epochs 1 "
@@ -109,7 +109,7 @@ class PPOOpenRLHFTask:
     def get_common_arg_overrides(self):
         cmd = (
             " --train_batch_size 128 "
-            " --micro_train_batch_size 8 "
+            " --micro_train_batch_size 1 "
             " --prompt_max_len 1024 "
             " --generate_max_len 1024 "
             " --logging_steps 1 "
@@ -141,7 +141,13 @@ class PPOOpenRLHFTask:
             if os.getenv('WANDB_API_KEY') is None:
                 raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-            cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} --wandb_id {expname} --wandb_resume auto "
+            cmd = (
+                f" --use_wandb $WANDB_API_KEY "
+                f" --wandb_project {wandb_project} "
+                f" --wandb_run_name {expname} "
+                f" --wandb_id {expname} "
+                f" --wandb_resume auto"
+            )
         else:
             cmd = ""
 
