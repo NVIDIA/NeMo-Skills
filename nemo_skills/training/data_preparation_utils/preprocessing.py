@@ -140,6 +140,10 @@ class ReadData(BaseProcessor):
                         continue
 
             line_dict['filename'] = file_handle.name
+
+            if self.keys_to_keep:
+                line_dict = {k: v for k, v in line_dict.items() if k in self.keys_to_keep}
+
             samples.append(line_dict)
 
         return samples
