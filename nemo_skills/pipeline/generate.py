@@ -374,7 +374,8 @@ def generate(
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
-        # TODO: reduce code duplication
+        
+        # Treat no random seeds as a single None seed to unify the code paths
         if not random_seeds:
             random_seeds = [None]
 
