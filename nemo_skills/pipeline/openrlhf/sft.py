@@ -78,12 +78,11 @@ def format_train_args(cluster_config, params: TrainingParams):
         f" --pretrain {params.model} "
         f" --load_checkpoint "
         f" --ckpt_path {os.path.join(params.output_dir, 'ds_checkpoints')} "
-        f" --max_ckpt_num 8 "
+        f" --max_ckpt_num 100 "
         f" --max_ckpt_mem 10000000000 "
         f" --save_path {os.path.join(params.output_dir, 'checkpoints')} "
         f" --save_steps -1 "
-        f" --max_samples 500000 "
-        f" --max_epochs 1 "
+        f" --max_epochs 2 "
         f" --max_time_per_run {params.timeout} "
     )
     return cmd
@@ -95,8 +94,8 @@ def format_data_args(cluster_config, params: TrainingParams):
     # TODO: change defaults after verifying that it works with our data
     cmd = (
         f" --dataset {params.training_data} "
-        f" --input_key question "
-        f" --output_key response "
+        f" --input_key input "
+        f" --output_key output "
         f" --input_template None "
     )
 
@@ -107,15 +106,16 @@ def get_common_arg_overrides(cluster_config, params: TrainingParams):
     cmd = (
         " --learning_rate 5e-6 "
         " --max_len 4096 "
-        " --train_batch_size 256 "
+        " --train_batch_size 512 "
         " --micro_train_batch_size 1 "
         " --logging_steps 1 "
         " --eval_steps -1 "
-        " --zero_stage 2 "
+        " --zero_stage 3 "
         " --packing_samples "
         " --bf16 "
         " --flash_attn "
         " --gradient_checkpointing "
+        " --limit_val_batches 1 "
     )
     return cmd
 
@@ -125,7 +125,13 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-        cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} --wandb_id {expname} --wandb_resume auto "
+        cmd = (
+            f" --use_wandb $WANDB_API_KEY "
+            f" --wandb_project {wandb_project} "
+            f" --wandb_run_name {expname} "
+            f" --wandb_id {expname} "
+            f" --wandb_resume auto"
+        )
     else:
         cmd = ""
 
