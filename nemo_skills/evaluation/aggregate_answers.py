@@ -23,7 +23,6 @@ from typing import Any, List, Tuple
 from enum import Enum
 
 import hydra
-from omegaconf import MISSING
 from tqdm import tqdm
 
 from nemo_skills.code_execution.math_grader import extract_answer
@@ -38,25 +37,24 @@ class ProcessTopAnswerConfig:
     """Top-level parameters for the script"""
 
     # Input_dir relative to which all the input_files are specified
-    input_dir: str = MISSING
+    input_dir: str
     # Input files relative to input_dir which are used for majority voting
     # Can specify multiple patterns separated by space
     # e.g. "path/to/file1.jsonl path/to/file2.jsonl" or with regex
     # "test_dir/output-rs*.jsonl"
-    input_files: Any = MISSING
-
-    # Output directory is optional depending on whether the task is to fill the majority answer
-    # or to just extract the best answer
-    output_dir: str | None = None
+    input_files: Any
 
     # The script can be run in two modes:
     # 1. fill: use the best answer as the expected_answer to fill input_files
     # 2. extract: identify the best answer from input_files
-    mode: str = MISSING
+    mode: str
+    
+    # Output directory is optional depending on whether the task is to fill the majority answer
+    # or to just extract the best answer
+    output_dir: str | None = None
 
-    # where to put the majority answer. By default replacing the expected_answer (assuming it's unknown)
-    # but change to predicted_answer, to follow up with a judge evaluation
-    fill_key: str = "expected_answer"
+    # which field to put the top scoring answer in
+    fill_key: str | None = None
 
     # if True, will not change the fill_key if it's already filled with not None
     ignore_if_not_none: bool = False
@@ -77,7 +75,10 @@ class ProcessTopAnswerConfig:
     def __post_init__(self):
         """Building data_file from dataset/split if not provided directly."""
         if isinstance(self.input_files, str):
-            self.input_files = self.input_files.split(" ")
+            if ',' in self.input_files:
+                self.input_files = self.input_files.split(",")
+            else:
+                self.input_files = self.input_files.split(" ")
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -129,7 +130,8 @@ class TopAnswerProcessor:
         if not Path(cfg.input_dir).exists():
             raise ValueError(f"Input directory does not exist: {cfg.input_dir}")
         if cfg.output_dir is not None and not Path(cfg.output_dir).exists():
-            raise ValueError(f"Output directory does not exist: {cfg.output_dir}")
+            LOG.info("Output directory does not exist: %s", cfg.output_dir)
+            Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
 
             
     def __enter__(self):
@@ -155,16 +157,25 @@ class TopAnswerProcessor:
             if cfg.output_dir is None:
                 cfg.output_dir = cfg.input_dir
             
-            # Determine the file suffix based on the use of RM scores
-            if cfg.use_majority_rm_score:
-                file_suffix = "-majority-rm.jsonl"
-            elif cfg.use_highest_rm_score:
-                file_suffix = "-highest-rm.jsonl"
-            else:
-                file_suffix = "-majority.jsonl"
-            
-            # A single output file is created where the best answer is written 
-            self.output_file_handles = [open(Path(cfg.output_dir) / f"output{file_suffix}", "wt", encoding="utf-8")]
+            # A single output file "output-agg.jsonl" is created where the top-scoring answer is 
+            # considered as predicted_answer for each problem
+            self.output_file_handles = [open(Path(cfg.output_dir) / f"output-agg.jsonl", "wt", encoding="utf-8")]
+
+        # Fill mode is used to indicate the mode of selecting the top-scoring answer
+        self.fill_mode = "majority"
+        if self.cfg.use_majority_rm_score:
+            self.fill_mode = "majority_rm"
+        elif self.cfg.use_highest_rm_score:
+            self.fill_mode = "highest_rm"
+
+        # Setting up the fill_key in case it's not provided
+        if cfg.fill_key is None:
+            if self.process_mode == ProcessMode.FILL:
+                # During fill mode, the top-scoring answer is considered as ground truth
+                cfg.fill_key = "expected_answer"
+            elif self.process_mode == ProcessMode.EXTRACT:
+                # During extract mode, the top-scoring answer is considered as predicted_answer
+                cfg.fill_key = "predicted_answer"
 
         return self
         
@@ -245,7 +256,7 @@ class TopAnswerProcessor:
     def _write_results_fill(self, all_predictions: List, new_answers: List):
         """Fill the expected_answer with the top answer"""
         cfg = self.cfg
-        total_problems_changed, total_solutions_changed = 0,0
+        total_problems_changed, total_solutions_changed = 0, 0
         for idx, predictions in enumerate(all_predictions):
             changed = False
             for fidx, handle in enumerate(self.output_file_handles):
@@ -257,7 +268,11 @@ class TopAnswerProcessor:
                     total_solutions_changed += 1
                     changed = True
 
+                # Add fill mode to the predictions
+                predictions[fidx]["fill_mode"] = self.fill_mode
+                # Fill the expected_answer with the top-scoring answer
                 predictions[fidx][cfg.fill_key] = new_answers[idx][0]
+                
                 if cfg.use_majority_rm_score or cfg.use_highest_rm_score:
                     predictions[fidx]["answer_rm_score"] = new_answers[idx][1]
                 else:
@@ -269,6 +284,7 @@ class TopAnswerProcessor:
                     )
                 else:
                     predictions[fidx].pop("is_correct", None)
+
                 handle.write(json.dumps(predictions[fidx]) + "\n")
 
             if changed:
@@ -276,8 +292,7 @@ class TopAnswerProcessor:
 
         LOG.info(
             "Total problems changed: %d, total solutions changed: %d",
-            total_problems_changed,
-            total_solutions_changed,
+            total_problems_changed, total_solutions_changed,
         )
 
     def _write_results_extract(self, all_predictions: List, new_answers: List):
@@ -286,12 +301,16 @@ class TopAnswerProcessor:
         with open(self.input_files[0], "rt", encoding="utf-8") as f:
             for idx, line in enumerate(f):
                 data = json.loads(line)
+                # Add fill mode to the predictions
+                data["fill_mode"] = self.fill_mode
+                
                 data["predicted_answer"] = new_answers[idx][0]
                 if new_answers[idx][2] is not None:
                     data["is_correct"] = new_answers[idx][2]
                 if new_answers[idx][3] is not None:
                     data["judgement"] = new_answers[idx][3]
                 best_answer_file_handle.write(json.dumps(data) + "\n")
+                
 
 
 @hydra.main(version_base=None, config_name="base_process_top_answer_config")
