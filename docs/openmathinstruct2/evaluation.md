@@ -159,7 +159,8 @@ for dataset in aime24 amc23 math gsm8k omni-math; do
         --server_type=openai \
         --server_address=https://api.openai.com/v1 \
         --output_dir=/workspace/openmath2-llama3.1-8b-eval-judged/eval-results-majority/${dataset} \
-        ++input_dir=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}
+        ++input_file=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}/output-agg.jsonl \
+        ++output_file=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}/output.jsonl
 done
 ```
 
