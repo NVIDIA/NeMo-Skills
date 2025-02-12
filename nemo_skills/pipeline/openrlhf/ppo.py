@@ -138,7 +138,13 @@ class PPOOpenRLHFTask:
             if os.getenv('WANDB_API_KEY') is None:
                 raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
-            cmd = f" --use_wandb $WANDB_API_KEY --wandb_project {wandb_project} --wandb_run_name {expname} --wandb_id {expname} --wandb_resume auto "
+            cmd = (
+                f" --use_wandb $WANDB_API_KEY "
+                f" --wandb_project {wandb_project} "
+                f" --wandb_run_name {expname} "
+                f" --wandb_id {expname} "
+                f" --wandb_resume auto"
+            )
         else:
             cmd = ""
 
