@@ -201,6 +201,7 @@ def test_aggregate_answers_fill():
 
 
 def test_aggregate_answers_extract():
+    output_dir = "/tmp/nemo-skills-tests/test_majority_filling"
     run_cmd(
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
@@ -210,11 +211,12 @@ def test_aggregate_answers_extract():
             f"    ++input_dir='tests/data' "
             f"    ++input_files='output-rs*.test' "
             f"    ++mode=extract "
+            f"    ++output_dir={output_dir} "
         ),
     )
 
     # Check md5 of one of the output files
-    output_file = Path(__file__).parent / "data/output-agg.jsonl"
+    output_file = Path(output_dir) / "output-agg.jsonl"
     expected_md5 = "2eef6876070871c8ab83d166b8a2f9b6"
     output_md5 = compute_md5(output_file)
 
