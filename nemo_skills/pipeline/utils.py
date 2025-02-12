@@ -517,7 +517,7 @@ def cluster_download(
         # Command for streaming the compression progress
         command = (
             f'cd {remote_dir_parent} && '
-            f'tar -cf - {remote_dir_name} | '
+            f'tar --exclude="*.log" -cf - {remote_dir_name} | '
             f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
             f'gzip > {remote_tar}'
         )
