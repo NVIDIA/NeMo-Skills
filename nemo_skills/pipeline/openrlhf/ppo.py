@@ -37,6 +37,7 @@ class PPOOpenRLHFTask:
     reward_model: str
     output_dir: str
     prompt_data: str
+    eval_data: str | None
     input_key: str
     num_gpus: int
     num_nodes: int
@@ -100,6 +101,8 @@ class PPOOpenRLHFTask:
         # If using chat message dict as data, add `--apply_chat_template`
         # and --input_key 'context_messages'
         cmd = f" --prompt_data {self.prompt_data} --input_key '{self.input_key}' "
+        if self.eval_data is not None:
+            cmd = f"{cmd} --eval_data {self.eval_data} "
 
         return cmd
 
@@ -200,6 +203,7 @@ def get_training_cmd(
     rm_model,
     output_dir,
     prompt_data,
+    eval_data,
     input_key,
     num_gpus,
     num_nodes,
@@ -217,6 +221,7 @@ def get_training_cmd(
             reward_model=rm_model,
             output_dir=output_dir,
             prompt_data=prompt_data,
+            eval_data=eval_data,
             input_key=input_key,
             num_gpus=num_gpus,
             num_nodes=num_nodes,
@@ -257,6 +262,7 @@ def ppo_openrlhf(
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     rm_model: str = typer.Option(None, help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
+    eval_data: str = typer.Option(None, help="Path to the eval data"),
     input_key: str = typer.Option("input", help="Input key for the prompt data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
@@ -341,6 +347,7 @@ def ppo_openrlhf(
         rm_model=rm_model,
         output_dir=output_dir,
         prompt_data=prompt_data,
+        eval_data=eval_data,
         input_key=input_key,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
