@@ -299,10 +299,14 @@ def ppo_openrlhf(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
+    extra_rm_args: str = typer.Option(
+        None,
+        help="Extra arguments to pass to the underlying script",
+    ),
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
     setup_logging(disable_hydra_logs=False)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f'{" ".join(ctx.args)}' + (f" --extra_rm_args '{extra_rm_args}'" if extra_rm_args is not None else "")
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
