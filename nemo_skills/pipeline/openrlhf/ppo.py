@@ -215,6 +215,7 @@ def get_training_cmd(
             reward_model=rm_model,
             output_dir=output_dir,
             prompt_data=prompt_data,
+            eval_data=eval_data,
             input_key=input_key,
             num_gpus=num_gpus,
             num_nodes=num_nodes,
