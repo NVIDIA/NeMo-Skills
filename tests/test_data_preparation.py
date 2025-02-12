@@ -175,9 +175,8 @@ def test_openmathinstruct2():
 
 
 
-def test_aggregate_answers():
+def test_aggregate_answers_fill():
     output_dir = "/tmp/nemo-skills-tests/test_majority_filling"
-    # docker_rm_and_mkdir(output_dir)
     run_cmd(
         cluster='test-local',
         config_dir=Path(__file__).parent / 'gpu-tests',
@@ -193,6 +192,29 @@ def test_aggregate_answers():
 
     # Check md5 of one of the output files
     output_file = f"{output_dir}/output-rs0.test"
+    expected_md5 = "c27bfd72287c45ad7e1fd9cd7e5cc159"
+    output_md5 = compute_md5(output_file)
+
+    assert (
+        expected_md5 == output_md5
+    ), "MD5 hashes do not match, something is wrong with nemo_skills/evaluation/aggregate_answers.py"
+
+
+def test_aggregate_answers_extract():
+    run_cmd(
+        cluster='test-local',
+        config_dir=Path(__file__).parent / 'gpu-tests',
+        log_dir='/tmp/nemo-skills-tests/test_aggregate_answers',
+        ctx=wrap_arguments(
+            f"python -m nemo_skills.evaluation.aggregate_answers "
+            f"    ++input_dir='tests/data' "
+            f"    ++input_files='output-rs*.test' "
+            f"    ++mode=extract "
+        ),
+    )
+
+    # Check md5 of one of the output files
+    output_file = f"tests/data/output-agg.jsonl"
     expected_md5 = "c27bfd72287c45ad7e1fd9cd7e5cc159"
     output_md5 = compute_md5(output_file)
 
