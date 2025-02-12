@@ -35,7 +35,7 @@ def top_k_similarity(from_emb, to_emb, top_k, chunk_size):
     TopKResult = namedtuple('TopKResult', ['values', 'indices'])
     all_values = []
     all_indices = []
-    n = to_emb.size(0)
+    n = to_emb.shape[0]
     for start in range(0, n, chunk_size):
         end = min(start + chunk_size, n)
         # Compute cosine similarities for the current chunk
