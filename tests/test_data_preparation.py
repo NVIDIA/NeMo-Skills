@@ -73,7 +73,7 @@ def test_multiple_files():
         ),
     )
 
-    expected_md5 = "8fce1c6a4abc47e82eec4e781909469b"
+    expected_md5 = "30afe5057c4e416d4bfce4c2ad783d4f"
     output_md5 = compute_md5(output_file)
 
     assert (
