@@ -61,11 +61,13 @@ def nested_dataclass(*args, **kwargs):
     return wrapper(args[0]) if args else wrapper
 
 
-def unroll_files(input_files):
+def unroll_files(input_files, parent_dir: str | None = None):
     if len(input_files) == 0:
         raise ValueError("No files found with the given pattern.")
     total_files = 0
     for file_pattern in input_files:
+        if parent_dir is not None:
+            file_pattern = os.path.join(parent_dir, file_pattern)
         for file in sorted(glob.glob(file_pattern, recursive=True)):
             total_files += 1
             yield file

@@ -168,34 +168,42 @@ from nemo_skills.pipeline import wrap_arguments
 from nemo_skills.pipeline.cli import run_cmd
 
 # for MATH
-data_folder = "/workspace/new-problems-solution-augmentation/math"
+input_folder = "/workspace/new-problems-solution-augmentation/math"
+output_folder = "/workspace/new-problems-solution-augmentation/math-fill-majority"
 # if you want to avoid scheduling many jobs, you can instead
 # create one big cmd and run it directly to handle all files
 # or you can create a new script and reference it with
 # /nemo_run/code/<path to your script inside this repo>
 for i in range(80):
     cmd = (
-        f'python -m nemo_skills.evaluation.fill_majority_answer '
-        f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
+        f'python -m nemo_skills.evaluation.aggregate_answers '
+        f'    ++input_dir="{input_folder}" '
+        f'    ++input_files="problem-set{i}/generation/output-rs*.jsonl" '
+        f'    ++output_dir="{output_folder}" '
+        f'    ++mode=fill '
     )
     run_cmd(
         cluster="slurm",
         ctx=wrap_arguments(cmd),
-        log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
+        log_dir=f'{output_folder}/problem-set{i}/aggregate-answer-logs'
         # if cluster has a cpu partition you can specify it with a `partition` parameter
     )
 
 # for GSM8K
-data_folder = "/workspace/new-problems-solution-augmentation/gsm8k"
+input_folder = "/workspace/new-problems-solution-augmentation/gsm8k"
+output_folder = "/workspace/new-problems-solution-augmentation/gsm8k-fill-majority"
 for i in range(10):
     cmd = (
-        f'python -m nemo_skills.evaluation.fill_majority_answer '
-        f'    ++input_files="{data_folder}/problem-set{i}/generation/output-rs*.jsonl" '
+        f'python -m nemo_skills.evaluation.aggregate_answers '
+        f'    ++input_dir="{input_folder}" '
+        f'    ++input_files="problem-set{i}/generation/output-rs*.jsonl" '
+        f'    ++output_dir="{output_folder}" '
+        f'    ++mode=fill '
     )
     run_cmd(
         cluster="slurm",
         ctx=wrap_arguments(cmd),
-        log_dir=f'{data_folder}/problem-set{i}/fill-majority-logs'
+        log_dir=f'{output_folder}/problem-set{i}/aggregate-answer-logs'
         # if cluster has a cpu partition you can specify it with a `partition` parameter
     )
 ```
