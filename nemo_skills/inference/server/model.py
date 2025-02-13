@@ -279,7 +279,7 @@ class TRTLLMModel(BaseModel):
             "stop_words_list": stop_phrases,
         }
         output_dict = self.requests_lib.put(
-            url="http://{}:{}/{generate_endpoint}".format(self.server_host, self.server_port, generate_endpoint),
+            url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
         ).json()
