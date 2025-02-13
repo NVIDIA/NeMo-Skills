@@ -77,9 +77,10 @@ class RetrieveSimilarConfig:
     top_k: int = 3
     retrieve_key: str = 'problem'
 
+    # batch size for computing embeddings - increasing will make it faster but use more memory
     batch_size: int = 2048
 
-    # chunk size for computing similarity - increasing will make it faster but use more memory
+    # chunk size for computing pairwise similarity - increasing will make it faster but use more memory
     chunk_size: int = 10000
 
     def __post_init__(self):
