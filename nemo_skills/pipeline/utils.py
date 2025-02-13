@@ -455,9 +455,9 @@ def get_tunnel(cluster_config):
 class OutputWatcher(StreamWatcher):
     """Class for streaming remote tar/compression process."""
 
-    # TODO: Current solution prints the progress on a new line. Can we make it in place?
     def submit(self, stream):
-        print(stream)
+        print(stream, end='\r')
+        sys.stdout.flush()
         return []
 
 
