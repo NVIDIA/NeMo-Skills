@@ -137,20 +137,15 @@ to see symbolic scores right away. You can evaluate with the judge by first crea
 answers. E.g. for "math" benchmark run
 
 ```bash
-python -m nemo_skills.evaluation.fill_majority_answer \
-    ++input_files="./openmath2-llama3.1-8b-eval/eval-results/math/output-rs*.jsonl" \
-    ++fill_key=predicted_answer
+python -m nemo_skills.evaluation.aggregate_answers \
+    ++input_dir="./openmath2-llama3.1-8b-eval/eval-results/math" \
+    ++input_files="output-rs*.jsonl" \
+    ++mode=extract \
+    ++output_dir="./openmath2-llama3.1-8b-eval/eval-results-majority/math"
 ```
 
-This will replace `predicted_answer` in all files with majority answer.
+This will output "./openmath2-llama3.1-8b-eval/eval-results-majority/math/output-agg.jsonl" file with majority answer. We can run the llm-judge pipeline on it.
 
-After that, let's copy just a single of those files into a new folder so that we can run the llm-judge pipeline
-on them.
-
-```bash
-mkdir -p ./openmath2-llama3.1-8b-eval/eval-results-majority/math
-cp ./openmath2-llama3.1-8b-eval/eval-results/math/output-rs0.jsonl ./openmath2-llama3.1-8b-eval/eval-results-majority/math/
-```
 
 Repeat the above steps for all benchmarks. Now we are ready to run the judge pipeline and summarize results
 after it is finished. You need to define `OPENAI_API_KEY` for the command below to work.
@@ -164,7 +159,8 @@ for dataset in aime24 amc23 math gsm8k omni-math; do
         --server_type=openai \
         --server_address=https://api.openai.com/v1 \
         --output_dir=/workspace/openmath2-llama3.1-8b-eval-judged/eval-results-majority/${dataset} \
-        ++input_dir=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}
+        ++input_file=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}/output-agg.jsonl \
+        ++output_file=/workspace/openmath2-llama3.1-8b-eval/eval-results-majority/${dataset}/output-rs0.jsonl
 done
 ```
 

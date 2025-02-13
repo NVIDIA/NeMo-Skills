@@ -1,5 +1,7 @@
 # Prerequisites and Getting Started
 
+<!-- TODO: this grew too long, we should split it into multiple pages -->
+
 ## Installation
 
 To get started first install the repo (python 3.10+). Either clone and run `pip install -e .` or install directly with
@@ -107,6 +109,10 @@ periodically remove local and cluster nemo-run folders to free up space. There i
 be automatically recreated) as long as you don't have any running jobs when you remove the folders.
 If you want to have more fine-grained control over code reuse, you can directly specify `--reuse_code_exp` argument when submitting jobs
 
+## Inspecting generated sbatch file
+While our job submission is somewhat complicated and goes through NeMo-Run, at the end, we simply execute a particular sbatch file
+that is uploaded to the cluster. It is helpful sometimes to see what's in it and modify directly. You can find sbatch file(s)
+for each job inside `ssh_tunnel.job_dir` cluster folder that is defined in your cluster config.
 
 ## Running pipelines
 
