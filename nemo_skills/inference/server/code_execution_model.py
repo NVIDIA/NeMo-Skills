@@ -167,23 +167,16 @@ class CodeExecutionWrapper:
             if not is_list:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
-        futures = []
+        gen_ids = []
         for request_idx in range(len(prompts)):
             request = {key: value[request_idx] for key, value in kwargs.items()}
             request['prompt'] = prompts[request_idx]
             self.model.preprocess_request(request)
-            futures.append(self.executor.submit(self._generate_single, **request))
-
-        gen_ids = []
-        for future in futures:
+            future = self.executor.submit(self._generate_single, **request)
             gen_id = str(uuid.uuid4())
-            gen_ids.append(gen_id)
             self.gen_id_to_future[gen_id] = future
-
-        self.gen_id_to_params = {
-            gen_id: (req_stop_phrases, remove_stop_phrases)
-            for gen_id, req_stop_phrases in zip(gen_ids, kwargs["stop_phrases"])
-        }
+            self.gen_id_to_params[gen_id] = (request['stop_phrases'], remove_stop_phrases)
+            gen_ids.append(gen_id)
 
         return gen_ids
 
