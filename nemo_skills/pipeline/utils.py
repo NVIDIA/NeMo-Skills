@@ -619,25 +619,13 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         )
 
 
-def get_env_variables(cluster_config):
-    """
-    Will get the environment variables from the cluster config and the user environment.
-
-    The following items in the cluster config are supported:
-    - `required_env_vars` - list of required environment variables
-    - `env_vars` - list of optional environment variables
-
-    WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
-
-    Args:
-        cluster_config: cluster config dictionary
-
-    Returns:
-        dict: dictionary of environment
-    """
+@lru_cache()
+def _cached_get_env_variables(optional_env_vars=None, required_env_vars=None):
     env_vars = {}
-    # Check for user requested env variables
-    required_env_vars = cluster_config.get("required_env_vars", [])
+
+    optional_env_vars = list(optional_env_vars) if optional_env_vars else []
+    required_env_vars = list(required_env_vars) if required_env_vars else []
+
     for env_var in required_env_vars:
         if "=" in env_var:
             if env_var.count("=") == 1:
@@ -659,8 +647,7 @@ def get_env_variables(cluster_config):
     default_factories = {
         "HF_TOKEN": lambda: str(get_token()),
     }
-    # Add optional env variables
-    optional_env_vars = cluster_config.get("env_vars", [])
+
     for env_var in optional_env_vars + always_optional_env_vars:
         if "=" in env_var:
             if env_var.count("=") == 1:
@@ -677,6 +664,32 @@ def get_env_variables(cluster_config):
             logging.info(f"Adding optional environment variable {env_var} from environment")
         else:
             logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
+
+    return env_vars
+
+
+def get_env_variables(cluster_config):
+    """
+    Will get the environment variables from the cluster config and the user environment.
+
+    The following items in the cluster config are supported:
+    - `required_env_vars` - list of required environment variables
+    - `env_vars` - list of optional environment variables
+
+    WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
+
+    Args:
+        cluster_config: cluster config dictionary
+
+    Returns:
+        dict: dictionary of environment
+    """
+    # Check for user requested env variables
+    required_env_vars = tuple(cluster_config.get("required_env_vars", []))
+    # Add optional env variables
+    optional_env_vars = tuple(cluster_config.get("env_vars", []))
+
+    env_vars = _cached_get_env_variables(optional_env_vars=optional_env_vars, required_env_vars=required_env_vars)
 
     return env_vars
 
