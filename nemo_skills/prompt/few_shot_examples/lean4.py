@@ -182,10 +182,46 @@ lean4_false_fewshots = [
     },
 ]
 
+
+nat_nat_judgment_fewshots = [
+    {
+        "original_statement": "Solve for x: 4x - 8 = 0.",
+        "backtranslation": "Show that x = 2 is the unique solution of 4x - 8 = 0.",
+        "reasoning": "The first statement simply asks to solve the equation, while the backtranslation requires demonstrating that x = 2 is the only solution. Both tasks lead to the same result.",
+        "judgment": "valid"
+    },
+    {
+        "original_statement": "Find the roots of the equation x^2 - 9 = 0.",
+        "backtranslation": "Prove that x = 3 and x = -3 are the only solutions of x^2 - 9 = 0.",
+        "reasoning": "Although the second statement uses a 'prove that' phrasing, it ultimately requires identifying the same two roots as the first statement.",
+        "judgment": "valid"
+    },
+    {
+        "original_statement": "Determine the limit of (1/x) as x approaches infinity.",
+        "backtranslation": "Show that the series 1/x diverges as x approaches infinity.",
+        "reasoning": "The first statement asks for the limit of a function, which is 0, while the backtranslation mistakenly addresses a series and claims divergence. This changes the task entirely.",
+        "judgment": "invalid"
+    },
+    {
+        "original_statement": "Find x^2 + 2x + 1 = 0.",
+        "backtranslation": "Show that x = -1 is the only solution of x^2 + 2x + 1 = 0.",
+        "reasoning": "Both statements are focused on solving the quadratic equation. Despite the backtranslation framing it as a proof that x = -1 is the unique solution, the underlying problem remains the same.",
+        "judgment": "valid"
+    },
+    {
+        "original_statement": "Determine whether f(x) = x^2 is differentiable at x = 0.",
+        "backtranslation": "Find the derivative of f(x) = x^2 at x = 0.",
+        "reasoning": "The first statement asks for differentiability, which requires checking the existence of the derivative, whereas the second statement assumes differentiability and directly asks for the derivative. The tasks are different.",
+        "judgment": "invalid"
+    }
+]
+
+
 examples_map = {
     "minif2f_deepseek_fewshot": minif2f_deepseek_fewshot,
     "math_to_lean4_fewshot": math_to_lean4_fewshot,
     "math_to_lean4_predict_header_fewshot": math_to_lean4_predict_header_fewshot,
     "proof_false_fewshot": proof_false_fewshot,
     "lean4_false_fewshots": lean4_false_fewshots,
+    "nat_nat_judgment_fewshots": nat_nat_judgment_fewshots,
 }
