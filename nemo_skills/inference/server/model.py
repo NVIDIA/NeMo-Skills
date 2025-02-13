@@ -542,6 +542,7 @@ class NemoModel(BaseModel):
             if prompt_idx >= len(prompt):
                 break
             
+            # we need to replace special tokens manually, as we don't have access to the tokenizer
             token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
             if generation[gen_start_idx:].startswith(token):
                 gen_start_idx += len(token)
@@ -763,10 +764,13 @@ class OpenAIModel(BaseModel):
         if choice.logprobs:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
-            result['top_logprobs'] = [
-                {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
-                for token_logprob in choice.logprobs.content
-            ]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+
         return result
 
     def get_model_name_from_server(self):

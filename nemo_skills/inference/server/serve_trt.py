@@ -467,7 +467,7 @@ def _stream(
     if output_log_probs:
         result['tokens'] = out_tokens
         result['logprobs'] = output['log_probs'][0][0].tolist()
-    print(f"{result=}")
+
     return result
 
 
@@ -519,7 +519,6 @@ class TensorRTLLM:
         stop_words_list,
         top_logprobs,
     ):
-        print(f"ENTRY1: {top_logprobs=}")
         try:
             request_id, stream_kwargs = generate(
                 self.runner,
@@ -576,7 +575,6 @@ class TensorRTLLM:
             data["stop_words_list"],
             data["top_logprobs"],
         )
-        print(f"ENTRY2: {data['top_logprobs']=}")
 
         self.active_generations[generation_id] = future
 
@@ -692,7 +690,6 @@ class MPIWrapper:
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
             }
-            print(f"ENTRY3: {request.top_logprobs=}")
 
             self.comm.Barrier()
             data = self.comm.bcast(data, root=0)
@@ -719,7 +716,6 @@ class MPIWrapper:
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
             }
-            print(f"ENTRY4: {request.top_logprobs=}")
 
             self.comm.Barrier()
             data = self.comm.bcast(data, root=0)
