@@ -374,61 +374,13 @@ def generate(
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
-        # TODO: reduce code duplication
-        if random_seeds:
-            for chunk_id in chunk_ids:
-                for seed in random_seeds:
-                    server_port = get_free_port(strategy="random") if get_random_port else 5000
-                    server_config, extra_arguments, server_address, server_port = configure_client(
-                        generation_type=generation_type,
-                        server_gpus=server_gpus,
-                        server_type=server_type,
-                        server_address=original_server_address,
-                        server_port=server_port,
-                        server_nodes=server_nodes,
-                        model=model,
-                        server_args=server_args,
-                        extra_arguments=extra_arguments_original,
-                    )
-                    cmd, full_postprocess_cmd = get_cmd(
-                        random_seed=seed,
-                        output_dir=output_dir,
-                        extra_arguments=extra_arguments,
-                        eval_args=eval_args,
-                        chunk_id=chunk_id,
-                        num_chunks=num_chunks,
-                        postprocess_cmd=postprocess_cmd,
-                        script=cmd_script,
-                    )
-                    prev_tasks = None
-                    for _ in range(dependent_jobs + 1):
-                        new_task = add_task(
-                            exp,
-                            cmd=wrap_cmd(
-                                get_generation_command(server_address=server_address, generation_commands=cmd),
-                                preprocess_cmd,
-                                full_postprocess_cmd,
-                                random_seed=seed,
-                            ),
-                            task_name=f'{expname}-rs{seed}',
-                            log_dir=log_dir,
-                            container=cluster_config["containers"]["nemo-skills"],
-                            cluster_config=cluster_config,
-                            partition=partition,
-                            time_min=time_min,
-                            server_config=server_config,
-                            with_sandbox=True,
-                            sandbox_port=None if get_random_port else 6000,
-                            run_after=run_after,
-                            reuse_code=reuse_code,
-                            reuse_code_exp=reuse_code_exp,
-                            task_dependencies=prev_tasks,
-                            get_server_command=get_server_command,
-                            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        )
-                        prev_tasks = [new_task]
-        else:
-            for chunk_id in chunk_ids:
+        
+        # Treat no random seeds as a single None seed to unify the code paths
+        if not random_seeds:
+            random_seeds = [None]
+
+        for chunk_id in chunk_ids:
+            for seed in random_seeds:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -441,9 +393,8 @@ def generate(
                     server_args=server_args,
                     extra_arguments=extra_arguments_original,
                 )
-
                 cmd, full_postprocess_cmd = get_cmd(
-                    random_seed=None,
+                    random_seed=seed,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
@@ -453,7 +404,6 @@ def generate(
                     script=cmd_script,
                 )
                 prev_tasks = None
-
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
@@ -461,8 +411,9 @@ def generate(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
                             full_postprocess_cmd,
+                            random_seed=seed,
                         ),
-                        task_name=expname,
+                        task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
@@ -479,6 +430,7 @@ def generate(
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
+        
         run_exp(exp, cluster_config)
 
     return exp
