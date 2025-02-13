@@ -45,6 +45,7 @@ cmd = (
 run_cmd(
     cluster="local",
     container="nemo",
+    num_gpus=1,  # can increase this if you have more gpus
     ctx=wrap_arguments(cmd),
 )
 ```

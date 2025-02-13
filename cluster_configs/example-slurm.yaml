@@ -29,7 +29,7 @@ job_name_prefix: "nemo_skills:"
 # ssh_tunnel:
 #   host: <slurm host>
 #   user: <username>
-#   job_dir: <some location on slurm cluster to keep job metadata>
+#   job_dir: <some location on slurm cluster to keep job metadata, uploaded code and generated sbatch files>
 #   identity: <can specify ssh key to avoid entering password>
 
 
