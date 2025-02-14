@@ -46,25 +46,38 @@ LOG = logging.getLogger(__file__)
 REUSE_CODE_EXP = {}
 
 
+@dataclass
+class RepoMetadata:
+    """Metadata for a repo that is used in the experiment."""
+
+    name: str
+    path: Path
+
+    def __post_init__(self):
+        if isinstance(self.path, str):
+            self.path = Path(self.path)
+
+        if not self.path.exists():
+            raise ValueError(f"Repository path `{self.path}` does not exist.")
+
 # Registry of external repos that should be packaged with the code in the experiment
 EXTERNAL_REPOS = {
-    'nemo_skills': Path(__file__).absolute().parents[1],  # path to nemo_skills repo
+    'nemo_skills': RepoMetadata(name='nemo_skills', path=Path(__file__).absolute().parents[1]),  # path to nemo_skills repo
 }
 
-def register_external_repo(name: str, path: str | Path):
+def register_external_repo(metadata: RepoMetadata):
     """Register an external repo to be packaged with the code in the experiment.
 
     Args:
-        name (str): Name of the external repo.
-        path (str | Path): Path to the external repo.
+        metadata (RepoMetadata): Metadata for the external repo.
     """
-    if name in EXTERNAL_REPOS:
-        raise ValueError(f"External repo {name} is already registered.")
+    if metadata.name in EXTERNAL_REPOS:
+        raise ValueError(f"External repo {metadata.name} is already registered.")
 
-    EXTERNAL_REPOS[name] = Path(path)
+    EXTERNAL_REPOS[metadata.name] = metadata
 
 
-def get_registered_external_repo(name: str) -> Optional[Path]:
+def get_registered_external_repo(name: str) -> Optional[RepoMetadata]:
     """Get the path to the registered external repo.
 
     Args:
@@ -628,7 +641,7 @@ def get_git_repo_path(path: str | Path = None):
 
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
-    nemo_skills_dir = get_registered_external_repo('nemo_skills')
+    nemo_skills_dir = get_registered_external_repo('nemo_skills').path
 
     if extra_package_dirs:
         include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
@@ -678,34 +691,34 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     extra_repos = {}
     if len(EXTERNAL_REPOS) > 1:
         # Insert root package as the first package
-        extra_repos[''] = [root_package]
+        extra_repos['nemo_run'] = root_package
 
-        # for repo_name, repo_path in EXTERNAL_REPOS.items():
-        #     if repo_name == 'nemo_skills':
-        #         continue
-        #
-        #     repo_include_pattern = [str(Path(repo_path) / '*')]
-        #     repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
-        #     if get_git_repo_path(repo_path):
-        #         extra_repos[''].append(
-        #             run.GitArchivePackager(
-        #                 # basepath=str(repo_path),
-        #                 include_pattern=repo_include_pattern,
-        #                 include_pattern_relative_path=repo_include_pattern_relative_path,
-        #                 check_uncommitted_changes=check_uncommited_changes
-        #             )
-        #         )
-        #     else:
-        #         extra_repos[''].append(
-        #             run.PatternPackager(
-        #                 include_pattern=repo_include_pattern,
-        #                 relative_path=repo_include_pattern_relative_path,
-        #             )
-        #         )
+        for repo_name, repo_meta in EXTERNAL_REPOS.items():
+            if repo_name == 'nemo_skills':
+                continue
+
+            repo_path = repo_meta.path
+            repo_include_pattern = [str(Path(repo_path) / '*')]
+            repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
+            if get_git_repo_path(repo_path):
+                extra_repos[repo_name] = (
+                    run.GitArchivePackager(
+                        include_pattern=repo_include_pattern,
+                        include_pattern_relative_path=repo_include_pattern_relative_path,
+                        check_uncommitted_changes=check_uncommited_changes
+                    )
+                )
+            else:
+                extra_repos[repo_name] = (
+                    run.PatternPackager(
+                        include_pattern=repo_include_pattern,
+                        relative_path=repo_include_pattern_relative_path,
+                    )
+                )
 
         # Return hybrid packager
-        # return run.HybridPackager(sub_packagers=extra_repos)
-        return root_package
+        return run.HybridPackager(sub_packagers=extra_repos, extract_at_root=True)
+        # return root_package
 
     return root_package
 
