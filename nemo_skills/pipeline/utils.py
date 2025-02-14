@@ -562,7 +562,6 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-@lru_cache()
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = Path(__file__).absolute().parents[1]
