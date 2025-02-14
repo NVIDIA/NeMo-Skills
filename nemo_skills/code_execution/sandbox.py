@@ -427,7 +427,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                         if not use_predicted_proof_key:
                             generation = clean_formal_generation(line_dict["generation"])
                             # generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
-                            line_dict["predicted_proof"] = generation
+                            line_dict["predicted_proof"] = line_dict["header"] + generation
                         else:
                             if "predicted_proof" not in line_dict:
                                 raise ValueError(

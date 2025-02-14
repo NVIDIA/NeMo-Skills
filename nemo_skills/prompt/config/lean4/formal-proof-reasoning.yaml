@@ -1,0 +1,80 @@
+Your YAML file appears to be incorrectly formatted due to improper indentation and misplaced comments. Here are some key issues:
+
+1. **Incorrect Indentation**: 
+   - The comments under `user:` are indented, which suggests they are part of the `user` key when they should be at the root level.
+
+2. **YAML Block Scalar (`|-`)**:
+   - The `user: |-` section is correctly using a block scalar, but the subsequent indentation needs to be consistent.
+
+3. **Misplaced Comment Block**:
+   - The comments at the top of the file are fine, but the ones inside the YAML data might be interfering with the expected structure.
+
+### Fixed YAML Formatting:
+
+```yaml
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Configuration for proving formal theorems in Lean 4.
+# This file is tailored for tasks that involve constructing and verifying proofs
+# of theorems within the Lean 4 formal system.
+
+user: |-
+  Solve this Lean4 theorem. Please reason step by step, and put your final answer within **FINAL ANSWER**```lean4 ```. 
+  DO NOT include any header or reference of the theorem in the final answer.
+
+  For example, if you are proving a theorem:
+  ```lean4
+  theorem mathd_algebra_338 (a b c : ℝ) (h₀ : 3 * a + b + c = -3) (h₁ : a + 3 * b + c = 9)
+      (h₂ : a + b + 3 * c = 19) : a * b * c = -56 := by
+  ```
+  Your final answer should look like this:
+
+  Your thoughts and reasoning here.
+
+  **FINAL ANSWER**```lean4
+  /-
+  Given the equations:
+  1. \(3a + b + c = -3\)
+  2. \(a + 3b + c = 9\)
+  3. \(a + b + 3c = 19\)
+
+  We need to find the value of \(abc\). First, we solve for \(a\), \(b\), and \(c\) using the given equations.
+
+  By subtracting the first equation from the second and the second from the third, we eliminate \(c\) and solve for \(a\) and \(b\).
+
+  Now, solving the system, we get:
+
+  \( a = -4, b = 2, c = 7 \)
+
+  Thus, the value of \(abc\) is \(-56\).
+  -/
+
+  -- Solving for a, b, and c using the given equations.
+  have h₃ : a = -4 := by
+    linarith
+  have h₄ : b = 2 := by
+    linarith
+  have h₅ : c = 7 := by
+    linarith
+
+  -- Substitute the values of a, b, and c into the expression a * b * c.
+  rw [h₃, h₄, h₅]
+  -- Calculate the product to verify it equals -56.
+  norm_num
+  ```
+
+  Now solve the following problem:
+  ```lean4
+  {header}{informal_prefix}{formal_statement}

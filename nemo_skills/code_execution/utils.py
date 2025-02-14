@@ -73,9 +73,14 @@ def extract_code_block(text: str, languages: list = ["lean4", "lean3", "lean", "
     return ""
 
 def clean_formal_generation(generation: str, languages: list = ["lean4", "lean3", "lean", ""]) -> str:
+    # Extract part after **FINAL ANSWER** if present
+    if "**FINAL ANSWER**" in generation:
+        generation = generation.split("**FINAL ANSWER**", 1)[1].strip()
+    
     extracted_code = extract_code_block(generation, languages)
     if extracted_code:
         return extracted_code
-
+    
     # If no explicit code block, remove any surrounding triple backticks
-    return re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", generation)
+    return re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", generation).strip()
+
