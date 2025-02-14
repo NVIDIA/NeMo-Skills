@@ -36,8 +36,11 @@ all_categories = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics',
 def format_entry(entry, category):
     return {
         "question": entry['question'],
-        "options": "\n".join(f"{i}. {option}" for i, option in enumerate(entry['choices'])),
-        "expected_answer": entry['answer'],
+        "A": entry['choices'][0],
+        "B": entry['choices'][1],
+        "C": entry['choices'][2],
+        "D": entry['choices'][3],
+        "expected_answer": chr(65 + entry['answer']),
         "expected_answer_corrected": entry['correct_answer'],
         "error_type": entry['error_type'],
         "category": category,
