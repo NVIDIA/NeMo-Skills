@@ -19,7 +19,6 @@ if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
 
-    # TODO: Only part I has been released so far. Add part II later.
-    original_file = str(data_dir / "test-1.txt")
+    original_file = str(data_dir / "test.txt")
     output_file = str(data_dir / "test.jsonl")
     shutil.copy(original_file, output_file)
