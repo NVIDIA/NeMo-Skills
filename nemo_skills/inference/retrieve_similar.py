@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import sys
+from collections import namedtuple
 from typing import Any
 
 import hydra
@@ -29,9 +30,22 @@ from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging,
 LOG = logging.getLogger(__file__)
 
 
-def top_k_similarity(from_emb, to_emb, top_k):
-    cosine_scores = util.cos_sim(to_emb, from_emb)
-    return torch.topk(cosine_scores, k=top_k, dim=1)
+def top_k_similarity(from_emb, to_emb, top_k, chunk_size):
+    # Process the cosine similarity computation in constant memory
+    TopKResult = namedtuple('TopKResult', ['values', 'indices'])
+    all_values = []
+    all_indices = []
+    n = to_emb.shape[0]
+    for start in range(0, n, chunk_size):
+        end = min(start + chunk_size, n)
+        # Compute cosine similarities for the current chunk
+        sim_chunk = util.cos_sim(to_emb[start:end], from_emb)  # shape: (chunk_size, M)
+        topk_chunk = torch.topk(sim_chunk, k=top_k, dim=1)
+        all_values.append(topk_chunk.values)
+        all_indices.append(topk_chunk.indices)
+    values = torch.cat(all_values, dim=0)
+    indices = torch.cat(all_indices, dim=0)
+    return TopKResult(values, indices)
 
 
 def encode(model, data, batch_size):
@@ -63,7 +77,11 @@ class RetrieveSimilarConfig:
     top_k: int = 3
     retrieve_key: str = 'problem'
 
-    batch_size: int = 512
+    # batch size for computing embeddings - increasing will make it faster but use more memory
+    batch_size: int = 2048
+
+    # chunk size for computing pairwise similarity - increasing will make it faster but use more memory
+    chunk_size: int = 10000
 
     def __post_init__(self):
         if isinstance(self.retrieve_from, str):
@@ -97,7 +115,7 @@ def retrieve_similar(cfg: RetrieveSimilarConfig):
 
     retrieve_from_embeddings = encode(model, retrieve_from_list, batch_size=cfg.batch_size)
     compare_to_embeddings = encode(model, compare_to_list, batch_size=cfg.batch_size)
-    top_k_indices = top_k_similarity(retrieve_from_embeddings, compare_to_embeddings, cfg.top_k)
+    top_k_indices = top_k_similarity(retrieve_from_embeddings, compare_to_embeddings, cfg.top_k, cfg.chunk_size)
     top_k_similar_items = []
     for i, compare_item in enumerate(compare_to_list):
         similar_items = [retrieve_from_list[index] for index in top_k_indices.indices[i]]
