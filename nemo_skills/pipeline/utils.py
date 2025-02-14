@@ -698,6 +698,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
 
             repo_path = repo_meta.path
             if get_git_repo_path(repo_path):
+                # Extra repos is a git repos, so we need to package only committed files
                 extra_repos[repo_name] = (
                     run.GitArchivePackager(
                         basepath=str(repo_path),
@@ -705,7 +706,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
                     )
                 )
             else:
-
+                # Extra repos is not a git repo, so we need to package all files in the directory
                 repo_include_pattern = [str(Path(repo_path) / '*')]
                 repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
                 extra_repos[repo_name] = (
