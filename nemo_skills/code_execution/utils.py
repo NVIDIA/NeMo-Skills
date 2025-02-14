@@ -65,5 +65,17 @@ def extract_code_to_execute(generation: str, code_begin: str, code_end: str, ext
 def extract_code_output(generation: str, code_output_begin: str, code_output_end: str, extract_all: bool = False):
     return _extract_between_separators(generation, [code_output_begin, code_output_end], extract_all)
 
-def clean_formal_generation(generation: str):
+def extract_code_block(text: str, languages: list = ["lean4", "lean3", "lean", ""]) -> str:
+    for language in languages:
+        match = re.search(rf"```{language}\s*\n?(.*?)\n?```", text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+def clean_formal_generation(generation: str, languages: list = ["lean4", "lean3", "lean", ""]) -> str:
+    extracted_code = extract_code_block(generation, languages)
+    if extracted_code:
+        return extracted_code
+
+    # If no explicit code block, remove any surrounding triple backticks
     return re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", generation)
