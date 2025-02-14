@@ -48,8 +48,16 @@ def run_cmd(
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
+    num_nodes: int = typer.Option(1, help="Number of nodes to use"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
+    ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
     ),
     reuse_code_exp: str = typer.Option(
         None,
@@ -64,7 +72,11 @@ def run_cmd(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False)
@@ -85,8 +97,10 @@ def run_cmd(
             partition=partition,
             time_min=time_min,
             run_after=run_after,
+            reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             num_gpus=num_gpus,
+            num_nodes=num_nodes,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )
         run_exp(exp, cluster_config)

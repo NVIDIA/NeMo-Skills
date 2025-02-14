@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,18 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import hydra
-from sdp.run_processors import run_processors
-
-from nemo_skills.utils import setup_logging
-
-
-@hydra.main(version_base=None, config_path="data_preparation_utils/", config_name="prepare_sft_data.yaml")
-def main(cfg):
-    run_processors(cfg)
-
-
-if __name__ == "__main__":
-    setup_logging()
-    main()

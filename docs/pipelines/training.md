@@ -12,7 +12,7 @@
 Before running the training we need to prepare the data in the right format. Here is an example command
 
 ```bash
-python -m nemo_skills.training.prepare_sft_data \
+python -m nemo_skills.training.prepare_data \
     ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
@@ -28,7 +28,7 @@ If you want to run that command inside container or on cluster, add `ns run_cmd 
 
 You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
 that data preparation script supports which you can see
-[here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/prepare_sft_data.yaml).
+[here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/math_sft.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
 a good idea to check their documentation to understand how this config is structured.
 
@@ -203,6 +203,7 @@ avg_sequences_per_pack = 3.7
 # so might need to round to a power of 2
 packed_bs = original_bs // avg_sequences_per_pack
 
+# Make sure that train_ds.file_names is included in the bucket e.g., [/data/sft-data.jsonl]
 packing_cmd = (
     f"python /nemo_run/code/nemo_skills/training/prepare_packed_ft_dataset.py "
     f"    ++model.data.train_ds.file_names=[/data/sft-data.jsonl] "
@@ -218,9 +219,20 @@ run_cmd(
     ctx=wrap_arguments(packing_cmd),
     cluster=cluster,
     expname=f"{expname}-packing",
-    partition="cpu",  # if available on your cluster
-    exclusive=True,  # better to get the full node, since packing is resource intensive
+    container="nemo", # please use "nemo container" for packed data prepration
+    # this is a cpu-only operation, so if a cluster has a good cpu partition, it can be used
+    # note that this is an expensive operation requiring a lot of CPUs and RAM
 )
+
+
+# The `packing_cmd` generates three files when `pack_seq_length=16384` is used, for example:
+
+#  `packed_16384_seed0.input_ids.npy`
+#  `packed_16384_seed0.loss_mask.npy`
+#  `packed_16384_seed0.seq_start_id.npy`
+
+# For training, set training_data=packed_16384_seed0.npy
+# Refer to the _load_dataset_alt function in nemo_skills/training/gpt_sft_dataset.py for details on why this is required.
 
 train(
     ctx=wrap_arguments(
@@ -245,4 +257,16 @@ train(
 )
 
 # can follow up with the same convert/eval steps as above
+```
+
+If your data size is very large (i.e. >1M samples), you might run out of memory when doing packing on full data.
+If that's the case, it's recommended to split data into smaller chunks and then merge them using
+[nemo_skills/training/merge_packed_data.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/merge_packed_data.py)
+
+Example command:
+
+```bash
+python nemo_skills/training/merge_packed_data.py \
+    --input_prefixes <chunk 1 folder>/packed_24576_seed0 <chunk 2 folder>/packed_24576_seed0 \
+    --output_prefix <final data folder>/packed_24576_seed0
 ```

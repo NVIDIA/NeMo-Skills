@@ -99,6 +99,26 @@ class DropIfRegexMatch(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
 
 
+class DropIfEqual(BaseFilter):
+    """Drops data if entry matches provided value."""
+
+    def __init__(
+        self,
+        values,
+        key: str,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.values = values
+        self.key = key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        for value in self.values:
+            if data_entry[self.key] == value:
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+        return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
+
+
 class DropMultiBoxed(BaseFilter):
     def __init__(self, solution_key: str = "generation", **kwargs):
         super().__init__(**kwargs)
@@ -258,9 +278,10 @@ class TrimSolutions(BaseFilter):
     def process_dataset_entry(self, data_entry) -> List:
         # extracting full boxed answer first
         predicted_answer = extract_answer(data_entry[self.solution_key])
-        predicted_answer = "\\boxed{" + predicted_answer + "}"
+        
         original_solution = data_entry[self.solution_key]
         if predicted_answer is not None:
+            predicted_answer = "\\boxed{" + predicted_answer + "}"
             before, after = data_entry[self.solution_key].rsplit(predicted_answer, 1)
             data_entry[self.solution_key] = before + predicted_answer + after.split("\n")[0]
         is_modified = original_solution != data_entry[self.solution_key]

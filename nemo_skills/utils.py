@@ -16,11 +16,13 @@ import glob
 import inspect
 import io
 import logging
+import os
 import re
 import sys
 import tokenize
 import typing
 from dataclasses import MISSING, dataclass, fields, is_dataclass
+from typing import Any, List, Optional
 
 
 def nested_dataclass(*args, **kwargs):
@@ -59,11 +61,13 @@ def nested_dataclass(*args, **kwargs):
     return wrapper(args[0]) if args else wrapper
 
 
-def unroll_files(input_files):
+def unroll_files(input_files, parent_dir: str | None = None):
     if len(input_files) == 0:
         raise ValueError("No files found with the given pattern.")
     total_files = 0
     for file_pattern in input_files:
+        if parent_dir is not None:
+            file_pattern = os.path.join(parent_dir, file_pattern)
         for file in sorted(glob.glob(file_pattern, recursive=True)):
             total_files += 1
             yield file
@@ -236,3 +240,126 @@ def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
         line = line.replace("        ", "    ").replace("    ", "  ")
         colored_args += line + '\n'
     return colored_args[:-1]
+
+
+def get_chunked_filename(chunk_id, output_filename):
+    basename, ext = os.path.splitext(output_filename)
+    return f"{basename}_chunk_{chunk_id}{ext}"
+
+
+def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], num_chunks: Optional[int]):
+    """
+    Chunk data if chunk_id and num_chunks are provided.
+
+    Args:
+        data: List of dictionaries to be chunked.
+        output_filename: Original output filename.
+        chunk_id: Chunk ID (0-indexed).
+        num_chunks: Number of chunks to split the data into.
+
+    Returns:
+        Tuple of chunked data and chunked output filename.
+    """
+    # Chunk instruction_data if chunk_id and num_chunks are provided
+    if chunk_id is not None:
+        chunk_id = int(chunk_id)
+    if num_chunks is not None:
+        num_chunks = int(num_chunks)
+    if chunk_id is not None and num_chunks is not None:
+        if chunk_id < 0 or chunk_id >= num_chunks:
+            raise ValueError(
+                f"Invalid chunk_id or num_chunks. chunk_id: {chunk_id}, num_chunks: {num_chunks}.\n"
+                f"chunk_id should be in the range [0, num_chunks)."
+            )
+
+        remainder = len(data) % num_chunks
+        base_size = len(data) // num_chunks
+
+        extra = 1 if chunk_id < remainder else 0
+
+        if chunk_id < remainder:
+            start_idx = chunk_id * (base_size + 1)
+        else:
+            start_idx = remainder * (base_size + 1) + (chunk_id - remainder) * base_size
+
+        end_idx = start_idx + base_size + extra
+        data = data[start_idx:end_idx]
+
+        if len(data) > 0:
+            logging.info(f"Processing chunk {chunk_id + 1}/{num_chunks} with {len(data)} samples.")
+
+        # Modify output_filename to include chunk_id
+        output_filename = get_chunked_filename(chunk_id, output_filename)
+        logging.info(f"Chunked Output filename: {output_filename}")
+
+    return data, output_filename
+
+
+def str_ids_to_list(ids: str) -> list[int]:
+    """
+    Convert a string of comma or .. separated ids to a list of ids.
+
+    Args:
+        ids: Comma separated list of ids.
+
+    Returns:
+        List of ids.
+    """
+    if ',' in ids and '..' in ids:
+        raise ValueError(
+            "Invalid chunk ids format. Can be a comma separated list or a range separated by '..' but not both"
+        )
+    if ',' in ids:
+        ids = ids.split(',')
+        ids = [int(x.strip()) for x in ids if x.strip() != '']
+    elif '..' in ids:
+        start, end = ids.split('..')
+        ids = list(range(int(start), int(end) + 1))
+    else:
+        try:  # could be a single number
+            ids = [int(ids)]
+        except ValueError:
+            raise ValueError("Invalid chunk ids format. Can be a comma separated list or a range separated by '..'")
+    return ids
+
+
+def compute_chunk_ids(chunk_ids: list[int] | str, num_chunks: int) -> list[int] | None:
+    """
+    Compute chunk ids from the provided chunk ids string.
+
+    Args:
+        chunk_ids: Comma separated list of chunk ids or range separated by '..' or ','.
+        num_chunks: Total number of chunks.
+
+    Returns:
+        List of chunk ids.
+    """
+    if num_chunks is None:
+        return None
+
+    # Parse chunk ids
+    if chunk_ids is not None:
+        if isinstance(chunk_ids, str):
+            return str_ids_to_list(chunk_ids)
+        return chunk_ids
+
+    else:
+        chunk_ids = list(range(0, num_chunks))
+
+    # Assert that run ids are 1-indexed
+    for chunk_id in chunk_ids:
+        assert chunk_id < num_chunks, "Run ids should have 1-based indexing"
+        assert chunk_id >= 0, "Run ids should have 1-based indexing"
+
+    return chunk_ids
+
+
+def prefill_judgement(data_point: dict) -> str | None:
+    """Will automatically fill judgement if there is an exact match or the answer is None."""
+    if data_point['predicted_answer'] is None or data_point['predicted_answer'] == '':
+        return "Reasoning: No answer was provided.\nJudgement: No"
+
+    if str(data_point['predicted_answer']).strip() == str(data_point['expected_answer']).strip():
+        return "Reasoning: The two answers are identical.\nJudgement: Yes"
+
+    return None

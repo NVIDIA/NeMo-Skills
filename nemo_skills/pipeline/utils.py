@@ -20,6 +20,7 @@ import sys
 import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -31,10 +32,13 @@ from invoke import StreamWatcher
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
 from nemo_run.core.tunnel import SSHTunnel
+from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
+
+# TODO: this file is way too big - we need to split it into pieces
 
 # keeping a global variable for first submitted experiment (per cluster) and reusing it by default
 # we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
@@ -132,6 +136,21 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
             raise ValueError(f"Experiment {expname} not found!")
 
 
+def get_timeout(cluster_config, partition):
+    if 'timeouts' not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+
+        # subtracting 15 minutes to account for the time it takes to save the model
+        # the format expected by nemo is days:hours:minutes:seconds
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
+    return timeout
+
+
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
     """Will return a free port on the host."""
     exclude = exclude or []
@@ -216,7 +235,7 @@ def get_reward_server_command(
             raise ValueError("VLLM server does not support multi-node execution")
 
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -233,6 +252,40 @@ def get_reward_server_command(
         f"{server_start_cmd} "
     )
     return server_cmd, num_tasks
+
+
+def get_ray_server_cmd(start_cmd):
+    ports = (
+        "--node-manager-port=12345 "
+        "--object-manager-port=12346 "
+        "--dashboard-port=8265 "
+        "--dashboard-agent-grpc-port=12347 "
+        "--runtime-env-agent-port=12349 "
+        "--metrics-export-port=12350 "
+        "--min-worker-port=14349 "
+        "--max-worker-port=18349 "
+    )
+
+    ray_start_cmd = (
+        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        "    echo 'Starting head node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    ray start "
+        "        --head "
+        "        --port=6379 "
+        f"       {ports} && "
+        f"   {start_cmd} ;"
+        "else "
+        "    echo 'Starting worker node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        "    ray start "
+        "        --block "
+        "        --address=$SLURM_MASTER_NODE:6379 "
+        f"       {ports} ;"
+        "fi"
+    )
+    return ray_start_cmd
 
 
 def get_server_command(
@@ -271,19 +324,31 @@ def get_server_command(
         if cluster_config["executor"] == "local":
             num_tasks = 1
     elif server_type == 'vllm':
-        if num_nodes > 1:
-            raise ValueError("VLLM server does not support multi-node execution")
-
-        server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_vllm "
+        start_vllm_cmd = (
+            f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
+        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        num_tasks = 1
+    elif server_type == 'sglang':
+        if num_nodes > 1:
+            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+        else:
+            multinode_args = ""
+        server_start_cmd = (
+            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
+            f"    --port {server_port} "
+            f"    {multinode_args} "
+            f"    {server_args} "
+        )
         num_tasks = 1
     else:
-        # adding sleep to ensure the logs file exists
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
@@ -357,9 +422,17 @@ def get_cluster_config(cluster=None, config_dir=None):
     If NEMO_SKILLS_CONFIG is provided and cluster is None,
     it will be used as a full path to the config file
     and NEMO_SKILLS_CONFIG_DIR will be ignored.
+
+    If cluster is a python object (dict-like), then we simply
+    return the cluster config, under the assumption that the
+    config is prepared by the user.
     """
     # if cluster is provided, we try to find it in one of the folders
     if cluster is not None:
+        # check if cluster is a python object instead of a str path, pass through
+        if isinstance(cluster, (dict, DictConfig)):
+            return cluster
+
         # either using the provided config_dir or getting from env var
         config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
         if config_dir:
@@ -415,9 +488,9 @@ def get_tunnel(cluster_config):
 class OutputWatcher(StreamWatcher):
     """Class for streaming remote tar/compression process."""
 
-    # TODO: Current solution prints the progress on a new line. Can we make it in place?
     def submit(self, stream):
-        print(stream)
+        print(stream, end='\r')
+        sys.stdout.flush()
         return []
 
 
@@ -477,7 +550,7 @@ def cluster_download(
         # Command for streaming the compression progress
         command = (
             f'cd {remote_dir_parent} && '
-            f'tar -cf - {remote_dir_name} | '
+            f'tar --exclude="*.log" -cf - {remote_dir_name} | '
             f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
             f'gzip > {remote_tar}'
         )
@@ -657,11 +730,18 @@ def get_env_variables(cluster_config):
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
-        if env_var not in os.environ:
+        if "=" in env_var:
+            if env_var.count("=") == 1:
+                env_var, value = env_var.split("=")
+            else:
+                raise ValueError(f"Invalid required environment variable format: {env_var}")
+            env_vars[env_var.strip()] = value.strip()
+            logging.info(f"Adding required environment variable {env_var}")
+        elif env_var in os.environ:
+            logging.info(f"Adding required environment variable {env_var} from environment")
+            env_vars[env_var] = os.environ[env_var]
+        else:
             raise ValueError(f"Required environment variable {env_var} not found.")
-
-        env_vars[env_var] = os.environ[env_var]
-        logging.info(f"Adding required environment variable {env_var} (value={os.environ[env_var]})")
 
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
@@ -759,6 +839,9 @@ def get_executor(
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
+    heterogeneous=False,
+    het_group=None,
+    total_het_groups=None,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
@@ -773,7 +856,6 @@ def get_executor(
             raise ValueError("Local executor does not support multi-node execution")
 
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
-
         return DockerExecutor(
             container_image=container,
             packager=packager,
@@ -783,7 +865,21 @@ def get_executor(
             num_gpus=gpus_per_node,
             network="host",
             env_vars=env_vars,
+            additional_kwargs={"entrypoint": ""},
         )
+
+    if not heterogeneous:
+        env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
+    else:
+        # master node will be within the same group
+        env_vars["SLURM_MASTER_NODE"] = (
+            f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{het_group} | head -n1)"
+        )
+        # in addition defining master nodes for all groups to allow communication
+        for group in range(total_het_groups):
+            env_vars[f"SLURM_MASTER_NODE_HET_GROUP_{group}"] = (
+                f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
+            )
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
@@ -835,6 +931,7 @@ def get_executor(
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
         dependency_type=dependency_type,
+        heterogeneous=heterogeneous,
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
@@ -875,6 +972,7 @@ def add_task(
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
     slurm_kwargs: dict | None = None,
+    heterogeneous: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -920,6 +1018,9 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
+    het_group = 0
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
@@ -941,11 +1042,15 @@ def add_task(
             log_prefix="server",
             extra_package_dirs=extra_package_dirs,
             slurm_kwargs=slurm_kwargs,
+            heterogeneous=heterogeneous,
+            het_group=het_group,
+            total_het_groups=total_het_groups,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group += 1
 
     # then goes the main task unless it's empty
     if cmd:
@@ -968,8 +1073,12 @@ def add_task(
                     log_prefix="main",
                     extra_package_dirs=extra_package_dirs,
                     slurm_kwargs=slurm_kwargs,
+                    heterogeneous=heterogeneous,
+                    het_group=het_group,
+                    total_het_groups=total_het_groups,
                 )
             )
+        het_group += 1
 
     # finally a sandbox if needed
     if with_sandbox:
@@ -990,8 +1099,12 @@ def add_task(
                 log_prefix="sandbox",
                 extra_package_dirs=extra_package_dirs,
                 slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+        het_group += 1
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)

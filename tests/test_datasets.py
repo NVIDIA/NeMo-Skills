@@ -18,6 +18,7 @@ from pathlib import Path
 
 # tuple of dataset name, available splits and prepared sft files
 DATASETS = [
+    ('aime25', ['test']),
     ('aime24', ['test']),
     ('amc23', ['test']),
     ('omni-math', ['test']),
@@ -25,22 +26,24 @@ DATASETS = [
     ('arena-hard', ['test']),
     ('mt-bench', ['test']),
     ('asdiv', ['test']),
-    ('gsm-hard', ['test', 'test_rounded']),
-    ('gsm-ic-2step', ['test']),
-    ('gsm-ic-mstep', ['test']),
     ('gsm-plus', ['test', 'test_rounded']),
-    ('gsm8k', ['train', 'train_full', 'validation', 'test']),
+    ('gsm8k', ['train', 'test']),
+    ('hle-math', ['test']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
-    ('math', ['train', 'train_full', 'validation', 'test']),
+    ('math', ['train', 'test']),
     ('math-odyssey', ['test']),
     ('mawps', ['test']),
     ('mbpp', ['test']),
     ('mmlu', ['test', 'dev', 'val']),
     ('svamp', ['test']),
-    ('tabmwp', ['train', 'validation', 'test']),
     ('answer-judge', ['test']),
-    ('mmlu-pro', ['test_llama', 'test_tigerlab']),
+    ('mmlu-pro', ['test']),
+    ('gpqa', ['diamond', 'main', 'extended']),
+    ('minerva_math', ['test']),
+    ('olympiadbench', ['test']),
+    ('gaokao2023en', ['test']),
+    ('college_math', ['test']),
 ]
 
 
@@ -64,6 +67,11 @@ def test_dataset_scripts():
         assert len(group_datasets) > 0, f"No datasets were prepared for group {group}"
 
     all_datasets = set(dataset for dataset, _ in DATASETS)
+
+    # TODO: remove after MATH is back online
+    all_datasets.discard('math')
+    prepared_datasets.discard('math')
+
     assert (
         prepared_datasets == all_datasets
     ), f"Not all datasets were covered. Missing: {all_datasets - prepared_datasets}"

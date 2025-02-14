@@ -28,6 +28,7 @@ METRICS_MAP = {
     "code": CodeMetrics,
     "if": IFMetrics,
     "mt-bench": MtBenchMetrics,
+    "multichoice": MathMetrics,
 }
 
 def get_metrics(metric_type: str):

@@ -50,8 +50,7 @@ if __name__ == "__main__":
     original_file = str(data_dir / f"original_{split}.jsonl")
     output_file = str(data_dir / f"{split}.jsonl")
 
-    if not os.path.exists(original_file):
-        urllib.request.urlretrieve(URL, original_file)
+    urllib.request.urlretrieve(URL, original_file)
 
     file_rounded = None
     if not args.no_rounding_instructions:
@@ -108,3 +107,6 @@ if __name__ == "__main__":
 
     if file_rounded:
         file_rounded.close()
+
+    # cleaning up
+    os.remove(original_file)

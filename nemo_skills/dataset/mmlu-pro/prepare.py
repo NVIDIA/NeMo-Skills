@@ -1,3 +1,17 @@
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import json
 from pathlib import Path
@@ -5,21 +19,21 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 
-def format_entry(entry, type):
+def format_entry(entry):
     category = entry['category'].replace(" ", "_")  # Fix computer science category
     return {
         "question": entry['question'],
         "options": "\n".join(f"{chr(65 + i)}. {option}" for i, option in enumerate(entry['options'])),
         "expected_answer": entry['answer'],
-        "examples_type": f'mmlu_pro_few_shot_{type}_{category}',
+        "examples_type": f'mmlu_pro_few_shot_{category}',
         "subset_for_metrics": category,
     }
 
 
-def write_data_to_file(output_file, data, type):
+def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            json.dump(format_entry(entry, type), fout)
+            json.dump(format_entry(entry), fout)
             fout.write("\n")
 
 
@@ -27,9 +41,8 @@ def main(args):
     dataset = load_dataset("TIGER-Lab/MMLU-Pro")[args.split]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    for type in ['llama', 'tigerlab']:
-        output_file = data_dir / f"{args.split}_{type}.jsonl"
-        write_data_to_file(output_file, dataset, type)
+    output_file = data_dir / f"{args.split}.jsonl"
+    write_data_to_file(output_file, dataset)
 
 
 if __name__ == "__main__":

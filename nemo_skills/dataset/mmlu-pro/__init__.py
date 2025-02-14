@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,13 +15,12 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = 'llama3-instruct/mmlu_pro'
+PROMPT_CONFIG = 'generic/mmlu-pro-zero-shot'
 DATASET_GROUP = 'multichoice'
-METRICS_TYPE = 'math'  # TODO: update this?
+METRICS_TYPE = 'multichoice'  
 DEFAULT_EVAL_ARGS = (
-    "++eval_type=mmlu "
-    "++eval_config.parse_func=llama "
+    "++eval_type=multichoice "
 )
 
 
-DEFAULT_GENERATION_ARGS = "++split=test_llama"
+DEFAULT_GENERATION_ARGS = "++split=test"

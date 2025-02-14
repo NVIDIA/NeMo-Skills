@@ -19,7 +19,7 @@ import argparse
 from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoTokenizer
 
 parser = argparse.ArgumentParser(description="Create a tiny model for testing.")
-parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama", "mistral_emb"))
+parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama", "qwen_orm"))
 args = parser.parse_args()
 
 if args.model_type == 'qwen':
@@ -28,11 +28,14 @@ if args.model_type == 'qwen':
     hidden_dim = 56
     head_dim = 2
     max_position_embeddings = 256
-elif args.model_type == 'mistral_emb':
-    model_name = "intfloat/e5-mistral-7b-instruct"
-    output_dir = "/tmp/nemo-skills-tests/mistral_emb/tiny-model-hf"
-    hidden_dim = 128
-    head_dim = 64
+    num_attention_heads = 8
+elif args.model_type == 'qwen_orm':
+    # vLLM requires a minimum head dimension size of 32, so we use a larger value here
+    model_name = "Qwen/Qwen2.5-Math-RM-72B"
+    output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
+    hidden_dim = 256
+    head_dim = 32
+    num_attention_heads = 8
     max_position_embeddings = 2048
 else:
     model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
@@ -40,8 +43,10 @@ else:
     hidden_dim = 64
     head_dim = 2
     max_position_embeddings = 256
+    num_attention_heads = 8
 
-config = AutoConfig.from_pretrained(model_name)
+
+config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 config.update(
     dict(
         hidden_size=hidden_dim,
@@ -49,17 +54,18 @@ config.update(
         intermediate_size=hidden_dim,
         num_hidden_layers=2,
         max_position_embeddings=max_position_embeddings,
+        num_attention_heads=num_attention_heads,
     )
 )
 print("new config", config)
 
-if args.model_type == 'mistral_emb':
-    tiny_model = AutoModel.from_config(config)
+if args.model_type == 'qwen_orm':
+    tiny_model = AutoModel.from_config(config, trust_remote_code=True)
 else:
     # create a tiny random model
     tiny_model = AutoModelForCausalLM.from_config(config)
 
-print(f"num of params {tiny_model.num_parameters()}")
+print(f"# of params: {tiny_model.num_parameters() / 1_000_000:.1f}M")
 
 # shrink it more and save
 tiny_model.bfloat16()  # half-size

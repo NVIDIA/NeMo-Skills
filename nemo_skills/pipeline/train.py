@@ -15,15 +15,14 @@
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import Callable, List
 
 import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -129,17 +128,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    if 'timeouts' not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
-        )
+    timeout = get_timeout(cluster_config, partition)
 
     logging_params = get_logging_params(expname, disable_wandb, wandb_project)
 
@@ -233,6 +222,13 @@ def train(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -240,7 +236,11 @@ def train(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs. "),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -315,6 +315,7 @@ def train(
                 time_min=time_min,
                 with_sandbox=with_sandbox,
                 run_after=run_after,
+                reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
@@ -340,6 +341,7 @@ def train(
             num_tasks=1,
             num_gpus=num_gpus,
             run_after=run_after,
+            reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             task_dependencies=[prev_task] if prev_task is not None else None,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,

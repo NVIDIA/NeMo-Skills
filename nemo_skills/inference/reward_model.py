@@ -16,9 +16,11 @@ import json
 import logging
 import sys
 from dataclasses import field
+from enum import Enum
 from pathlib import Path
 
 import hydra
+import typer
 from tqdm import tqdm
 
 from nemo_skills.inference.server.code_execution_model import server_params
@@ -57,7 +59,8 @@ class RewardModelConfig:
     # if > 0, will skip this many samples from the beginning of the data file.
     # Useful if need to run multiple slurm jobs on the same data file
     offset: int = 0
-
+    # Default reward model type
+    reward_model_type: str = "orm"
     reward_model_score_key: str = "reward_model_score"
 
     # can add this flag to just print the first prompt instead of running generation
@@ -93,7 +96,7 @@ def generate(cfg: RewardModelConfig):
     cfg = RewardModelConfig(_init_nested=True, **cfg)
 
     LOG.info("Config used: %s", cfg)
-    llm = get_reward_model(**cfg.server)
+    llm = get_reward_model(model_type=cfg.reward_model_type, **cfg.server)
 
     # making sure output dir exists
     Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -135,7 +138,9 @@ def generate(cfg: RewardModelConfig):
         return
 
     LOG.info(
-        "Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0], include_generation=True)
+        "Example prompt:\nData dictionary: %s\nPrompt: %s",
+        data[0],
+        prompt.fill(data[0], prefix_generation_to_response=True),
     )
 
     if cfg.dry_run:
@@ -151,7 +156,7 @@ def generate(cfg: RewardModelConfig):
 
             if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
                 outputs = llm.score(
-                    prompts=[prompt.fill(dp, include_generation=True) for dp in data_points],
+                    prompts=[prompt.fill(dp, prefix_generation_to_response=True) for dp in data_points],
                 )
 
                 for output, original_data_point in zip(outputs, data_points):

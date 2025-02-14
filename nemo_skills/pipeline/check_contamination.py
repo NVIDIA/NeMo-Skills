@@ -71,6 +71,13 @@ def check_contamination(
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
+    reuse_code: bool = typer.Option(
+        True,
+        help="If True, will reuse the code from the provided experiment. "
+        "If you use it from Python, by default the code will be re-used from "
+        "the last submitted experiment in the current Python session, so set to False to disable "
+        "(or provide reuse_code_exp to override).",
+    ),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -85,7 +92,11 @@ def check_contamination(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    ),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -101,6 +112,8 @@ def check_contamination(
     except AttributeError:
         pass
 
+    get_random_port = server_gpus != 8 and not exclusive
+
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_file)
     check_if_mounted(cluster_config, output_file)
@@ -109,7 +122,7 @@ def check_contamination(
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port(strategy="random")
+        server_port = get_free_port(strategy="random") if get_random_port else 5000
         server_address = f"localhost:{server_port}"
 
         server_config = {
@@ -151,6 +164,7 @@ def check_contamination(
                 server_config=server_config,
                 task_dependencies=prev_tasks,
                 run_after=run_after,
+                reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )

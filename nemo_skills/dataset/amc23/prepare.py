@@ -12,32 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
-import urllib.request
-from pathlib import Path
-
-URL = "https://raw.githubusercontent.com/QwenLM/Qwen2-Math/main/evaluation/data/amc23/test.jsonl"
-
+from nemo_skills.dataset.utils import save_data_from_qwen
 
 if __name__ == "__main__":
-    data_dir = Path(__file__).absolute().parent
-    original_file = str(data_dir / "original_test.json")
-    data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / "test.jsonl")
-
-    if not os.path.exists(original_file):
-        urllib.request.urlretrieve(URL, original_file)
-
-    data = []
-
-    with open(original_file, "rt", encoding="utf-8") as fin:
-        for index, line in enumerate(fin):
-            entry = json.loads(line)
-            entry["expected_answer"] = entry.pop("answer")
-            entry["problem"] = entry.pop("question")
-            data.append(entry)
-
-    with open(output_file, "wt", encoding="utf-8") as fout:
-        for entry in data:
-            fout.write(json.dumps(entry) + "\n")
+    save_data_from_qwen("amc23")

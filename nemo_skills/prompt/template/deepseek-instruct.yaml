@@ -1,0 +1,29 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+text_begin: "<｜begin▁of▁sentence｜>"
+system_begin: ""
+system_end: ""
+user_begin: "<｜User｜>"
+user_end: ""
+assistant_begin: "<｜Assistant｜>"
+assistant_end: "<｜end▁of▁sentence｜>"  # TODO: is that right? Shouldn't affect single turn, but need to check more for multi-turn
+# used to execute code within these tags
+code_begin: "```python\n"
+code_end: "```\n"
+# used to extract the code output
+code_output_begin: "```output\n"
+code_output_end: "```\n"
+code_output_format: "qwen"
+stop_phrases: ["<｜end▁of▁sentence｜>"]
