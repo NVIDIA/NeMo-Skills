@@ -88,7 +88,6 @@ def load_config(args, qwen_config):
 def convert(args):
     logging.info(f"loading checkpoint {args.in_path}")
     model = Qwen2ForCausalLM.from_pretrained(args.in_path)
-    tokenizer = Qwen2Tokenizer.from_pretrained(args.in_path)
     hf_config = vars(model.config)
     print(f"hf_config: {hf_config}")
     print("named parameters:")
