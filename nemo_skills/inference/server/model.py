@@ -162,6 +162,7 @@ class BaseModel(abc.ABC):
 
             # Update global dictionaries tracking the progress of generations
             self.gen_id_to_future[gen_id] = self.executor.submit(self._generate_single, **request)
+            
             self.gen_id_to_params[gen_id] = (kwargs["stop_phrases"][request_idx], remove_stop_phrases)
 
         return gen_ids
@@ -784,7 +785,11 @@ class VLLMModel(BaseModel):
             },
         )
 
+        print(prompt)
+        
         output, num_generated_tokens = self.parse_openai_response(response)
+        prompt = prompt + "wait" 
+        print(prompt)
         return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
