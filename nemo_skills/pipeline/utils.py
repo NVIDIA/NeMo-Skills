@@ -994,6 +994,8 @@ def add_task(
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
+                if override.startswith("PYTHONPATH="):
+                    override = override[11:]
                 sandbox_env_updates["PYTHONPATH"] = override + ":/app"
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
