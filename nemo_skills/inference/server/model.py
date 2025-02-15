@@ -785,11 +785,33 @@ class VLLMModel(BaseModel):
             },
         )
 
-        print(prompt)
+        
         
         output, num_generated_tokens = self.parse_openai_response(response)
-        prompt = prompt + output + "wait" 
-        print(prompt)
+        prompt = prompt + output + "Let us wait" 
+        response = self.oai_client.completions.create(
+            model=self.model,
+            prompt=[prompt],
+            max_tokens=tokens_to_generate - num_generated_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=None,
+            logit_bias=None,
+            n=1,
+            extra_body={
+                "top_k": top_k,
+                "min_p": min_p,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            },
+        )
+        
+        output, num_generated_tokens = self.parse_openai_response(response)
         return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
