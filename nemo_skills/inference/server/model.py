@@ -810,8 +810,10 @@ class VLLMModel(BaseModel):
                 "spaces_between_special_tokens": False,
             },
         )
+        temp = output
         
         output, num_generated_tokens = self.parse_openai_response(response)
+        output = temp + output
         return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
