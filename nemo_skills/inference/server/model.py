@@ -788,7 +788,7 @@ class VLLMModel(BaseModel):
         print(prompt)
         
         output, num_generated_tokens = self.parse_openai_response(response)
-        prompt = prompt + "wait" 
+        prompt = prompt + output + "wait" 
         print(prompt)
         return {'generation': output, 'num_generated_tokens': num_generated_tokens}
 
