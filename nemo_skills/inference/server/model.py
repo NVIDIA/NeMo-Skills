@@ -793,7 +793,9 @@ class VLLMModel(BaseModel):
             top_k = -1
 
         final_output = ""
+        ignore_strs = [" Wait", " Let us check again", " Let us verify", " Let me try anither approach"]
         ignore_str = " Wait"
+        
         try_times = 3
         tokens_for_final_answer = 100
         max_tokens_thinking_tmp = tokens_to_generate - tokens_for_final_answer
