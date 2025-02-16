@@ -285,7 +285,7 @@ class TRTLLMModel(BaseModel):
         ).json()
 
         if generate_endpoint == "generate":
-            return output_dict['generation']
+            return output_dict
         else:
             return output_dict['generation_id']
 
