@@ -744,26 +744,11 @@ class VLLMModel(BaseModel):
         if self._tunnel:
             self._tunnel.stop()
 
-    def _generate_single(
-        self,
-        prompt: str | dict,
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-    ) -> dict:
-        if isinstance(prompt, dict):
-            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
-        stop_phrases = stop_phrases or []
 
-        if top_k == 0:
-            top_k = -1
-
-        response = self.oai_client.completions.create(
+    def response _completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
+                            random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
+                            repetition_penalty=1.0):
+        return self.oai_client.completions.create(
             model=self.model,
             prompt=[prompt],
             max_tokens=tokens_to_generate,
@@ -785,36 +770,45 @@ class VLLMModel(BaseModel):
             },
         )
 
+    
+    
+    
+    def _generate_single(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+    ) -> dict:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
+        stop_phrases = stop_phrases or []
+
+        if top_k == 0:
+            top_k = -1
+
+        final_output = ""
+        ignore_str = " Wait"
+        try_times = 3
+        max_tokens_thinking_tmp = tokens_to_generate - 100
+        num_generated_tokens = 0
+        for i in range(try_times):
+            if max_tokens_thinking_tmp > 0:
+                max_tokens_thinking_tmp -= num_generated_tokens
+                response = self.response_completion(prompt, max_tokens_thinking_tmp, temperature, top_p, random_seed, stop_phrases, top_k, min_p, repetition_penalty)
+                output, num_generated_tokens = self.parse_openai_response(response)
+                prompt += (ignore_str + output)
+                if i == try_times - 1:
+                    final_output += output
+                else:
+                    final_output += (output + ignore_str)
         
-        
-        output, num_generated_tokens = self.parse_openai_response(response)
-        prompt = prompt + output + "Let us wait" 
-        response = self.oai_client.completions.create(
-            model=self.model,
-            prompt=[prompt],
-            max_tokens=tokens_to_generate - num_generated_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            seed=random_seed,
-            stop=stop_phrases,
-            echo=False,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            logprobs=None,
-            logit_bias=None,
-            n=1,
-            extra_body={
-                "top_k": top_k,
-                "min_p": min_p,
-                "repetition_penalty": repetition_penalty,
-                "spaces_between_special_tokens": False,
-            },
-        )
-        temp = output
-        
-        output, num_generated_tokens = self.parse_openai_response(response)
-        output = temp + output
-        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
+        return {'generation': final, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
