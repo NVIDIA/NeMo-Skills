@@ -86,7 +86,7 @@ def test_cross_model_logprobs_consistency():
         for output in outputs:
             _test_individual_generations(output, server_type)
         
-        output = outputs[1]
+        output = outputs[0]
         logprobs = output["logprobs"]
         tokens = output["tokens"]
         outputs_map[server_type] = list(zip(tokens, logprobs))
