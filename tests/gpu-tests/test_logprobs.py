@@ -75,7 +75,7 @@ def test_cross_model_logprobs_consistency():
             f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
             f"++inference.tokens_to_generate=20 "
-            f"++inference.temperature=0.7 "
+            f"++inference.temperature=0.5 "
         )
         subprocess.run(cmd, shell=True, check=True)
         time.sleep(120) # Wait for the server to finish generating
@@ -86,7 +86,7 @@ def test_cross_model_logprobs_consistency():
         for output in outputs:
             _test_individual_generations(output, server_type)
         
-        output = outputs[0]
+        output = outputs[1]
         logprobs = output["logprobs"]
         tokens = output["tokens"]
         outputs_map[server_type] = list(zip(tokens, logprobs))
