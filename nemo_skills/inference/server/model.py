@@ -799,12 +799,12 @@ class VLLMModel(BaseModel):
         total_generated_tokens = 0
         num_generated_tokens = 0
         for i in range(try_times):
+            max_tokens_thinking_tmp -= num_generated_tokens
             if max_tokens_thinking_tmp > 0:
-                max_tokens_thinking_tmp -= num_generated_tokens
                 response = self.response_completion(prompt, max_tokens_thinking_tmp, temperature, top_p, random_seed, stop_phrases, top_k, min_p, repetition_penalty)
                 output, num_generated_tokens = self.parse_openai_response(response)
                 total_generated_tokens += num_generated_tokens
-                prompt += (ignore_str + output)
+                prompt += (output + ignore_str)
                 if i == try_times - 1:
                     final_output += output
                 else:
