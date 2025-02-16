@@ -795,7 +795,8 @@ class VLLMModel(BaseModel):
         final_output = ""
         ignore_str = " Wait"
         try_times = 3
-        max_tokens_thinking_tmp = tokens_to_generate - 100
+        tokens_for_final_answer = 100
+        max_tokens_thinking_tmp = tokens_to_generate - tokens_for_final_answer
         total_generated_tokens = 0
         num_generated_tokens = 0
         for i in range(try_times):
@@ -809,6 +810,7 @@ class VLLMModel(BaseModel):
                     final_output += output
                 else:
                     final_output += (output + ignore_str)
+        
         
         return {'generation': final_output, 'num_generated_tokens': total_generated_tokens}
 
