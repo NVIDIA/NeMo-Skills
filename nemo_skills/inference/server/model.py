@@ -796,7 +796,7 @@ class VLLMModel(BaseModel):
         ignore_strs = [" Wait", " Let us check again", " Let us verify", " Let me try anither approach", " I need to double-check", " Let me check the calculation again"]
         ignore_str = " Wait"
         
-        try_times = 5
+        try_times = 8
         tokens_for_final_answer = 0
         max_tokens_thinking_tmp = tokens_to_generate - tokens_for_final_answer
         total_generated_tokens = 0
