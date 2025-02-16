@@ -796,19 +796,21 @@ class VLLMModel(BaseModel):
         ignore_str = " Wait"
         try_times = 3
         max_tokens_thinking_tmp = tokens_to_generate - 100
+        total_generated_tokens = 0
         num_generated_tokens = 0
         for i in range(try_times):
             if max_tokens_thinking_tmp > 0:
                 max_tokens_thinking_tmp -= num_generated_tokens
                 response = self.response_completion(prompt, max_tokens_thinking_tmp, temperature, top_p, random_seed, stop_phrases, top_k, min_p, repetition_penalty)
                 output, num_generated_tokens = self.parse_openai_response(response)
+                total_generated_tokens += num_generated_tokens
                 prompt += (ignore_str + output)
                 if i == try_times - 1:
                     final_output += output
                 else:
                     final_output += (output + ignore_str)
         
-        return {'generation': final, 'num_generated_tokens': num_generated_tokens}
+        return {'generation': final_output, 'num_generated_tokens': total_generated_tokens}
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
