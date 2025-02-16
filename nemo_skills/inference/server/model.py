@@ -745,7 +745,7 @@ class VLLMModel(BaseModel):
             self._tunnel.stop()
 
 
-    def response _completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
+    def response_completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
                             random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
                             repetition_penalty=1.0):
         return self.oai_client.completions.create(
