@@ -181,7 +181,7 @@ class BaseModel(abc.ABC):
                     output = future.result()
                 except Exception as e:
                     LOG.error(f"Error in generation {generation_id}: {e}")
-                    output = {"generation": None, "inference_error": str(e)}
+                    output = {"generation": "", "inference_error": str(e)}
                 del self.gen_id_to_future[generation_id]
                 del self.gen_id_to_params[generation_id]
 
