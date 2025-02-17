@@ -75,7 +75,7 @@ def test_cross_model_logprobs_consistency():
             f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
             f"++inference.tokens_to_generate=20 "
-            f"++inference.temperature={0.7 if model_type == "qwen" else 0.0} " # llama probs for trt and vllm do not match with temperature
+            f"++inference.temperature={0.7 if model_type == 'qwen' else 0.0} " # llama probs for trt and vllm do not match with temperature
         )
         subprocess.run(cmd, shell=True, check=True)
         time.sleep(120) # Wait for the server to finish generating
