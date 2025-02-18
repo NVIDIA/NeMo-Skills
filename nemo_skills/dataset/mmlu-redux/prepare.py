@@ -74,7 +74,7 @@ def format_entry(entry, category):
         "C": entry['choices'][2],
         "D": entry['choices'][3],
         "expected_answer": final_answer,
-        "category": category,
+        "subset_for_metrics": category,
         "source": entry['source']
     }
 
