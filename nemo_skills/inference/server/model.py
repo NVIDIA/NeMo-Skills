@@ -245,7 +245,7 @@ class TRTLLMModel(BaseModel):
     A good default value is 16-32 times bigger than the model's max batch size.
     """
 
-    def _generate_single(
+    def _generate_single_base(
         self,
         prompt: str | dict,
         tokens_to_generate: int = 512,
@@ -256,9 +256,13 @@ class TRTLLMModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
+        generate_endpoint: str = "generate",
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
+
+        if generate_endpoint not in ["generate", "generate_async"]:
+            raise ValueError(f"Invalid generate endpoint: {generate_endpoint}")
 
         if stop_phrases is None:
             stop_phrases = []
@@ -275,49 +279,23 @@ class TRTLLMModel(BaseModel):
             "stop_words_list": stop_phrases,
         }
         output_dict = self.requests_lib.put(
-            url="http://{}:{}/generate".format(self.server_host, self.server_port),
-            data=json.dumps(request),
-            headers={"Content-Type": "application/json"},
-        ).json()
-        return output_dict
-
-    # TODO: DRY
-    def _generate_single_async(
-        self,
-        prompt: str | dict,
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-    ) -> list[dict]:
-        if isinstance(prompt, dict):
-            raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
-
-        if stop_phrases is None:
-            stop_phrases = []
-
-        request = {
-            "prompt": prompt,
-            "tokens_to_generate": tokens_to_generate,
-            "temperature": temperature,
-            "top_k": top_k,
-            "top_p": top_p,
-            "top_p_min": min_p,
-            "random_seed": random_seed,
-            "repetition_penalty": repetition_penalty,
-            "stop_words_list": stop_phrases,
-        }
-        output_dict = self.requests_lib.put(
-            url="http://{}:{}/generate_async".format(self.server_host, self.server_port),
+            url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
         ).json()
 
-        return output_dict['generation_id']
+        if generate_endpoint == "generate":
+            return output_dict
+        else:
+            return output_dict['generation_id']
+
+    def _generate_single_async(self, prompt: str | dict, **kwargs):
+        """Asynchronous generation."""
+        return self._generate_single_base(prompt, generate_endpoint="generate_async", **kwargs)
+
+    def _generate_single(self, prompt: str | dict, **kwargs):
+        """Synchronous generation."""
+        return self._generate_single_base(prompt, generate_endpoint="generate", **kwargs)
 
     def generate_async(
         self,
