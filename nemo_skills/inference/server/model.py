@@ -20,6 +20,7 @@ import os
 import re
 import time
 import uuid
+import random
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -793,7 +794,8 @@ class VLLMModel(BaseModel):
             top_k = -1
 
         final_output = ""
-        ignore_strs = [" Wait", " Let us check again", " Let us verify", " Let me try anither approach", " I need to double-check", " Let me check the calculation again"]
+        ignore_strs = [" Wait", " But we need to check if this works", " Alternatively", " Let me try another approach", " I need to double-check", " But let me check again"
+                       , " Let me think again"]
         ignore_str = " Wait"
         
         try_times = 8
@@ -807,6 +809,7 @@ class VLLMModel(BaseModel):
                 response = self.response_completion(prompt, max_tokens_thinking_tmp, temperature, top_p, random_seed, stop_phrases, top_k, min_p, repetition_penalty)
                 output, num_generated_tokens = self.parse_openai_response(response)
                 total_generated_tokens += num_generated_tokens
+                ignore_str = random.choice(ignore_strs)
                 prompt += (output + ignore_str)
                 if i == try_times - 1:
                     final_output += output
