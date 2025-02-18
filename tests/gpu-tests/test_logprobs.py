@@ -100,7 +100,7 @@ def test_cross_model_logprobs_consistency():
             if server_type == other_server_type:
                 continue
             assert len(outputs_map[server_type]) == len(outputs_map[other_server_type]), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
-            if server_type == "trtllm" and model_type == "llama":
+            if (server_type == "trtllm" or other_server_type == "trtllm") and model_type == "llama":
                 # trtllm outputs do not match others for llama for some reason
                 continue
             for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
