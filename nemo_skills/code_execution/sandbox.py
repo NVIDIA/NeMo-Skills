@@ -439,7 +439,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                             generation = clean_formal_generation(line_dict["generation"])
                             # generation = re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```$", "", line_dict["generation"])
                             header = get_lean4_header()
-                            line_dict["predicted_proof"] = header + generation + "sorry"
+                            line_dict["predicted_proof"] = header + generation + "\n sorry"
                         else:
                             if "predicted_proof" not in line_dict:
                                 raise ValueError(
