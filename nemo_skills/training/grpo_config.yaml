@@ -129,7 +129,6 @@ pretrained_checkpoint:
 model:
   # TODO: document perf implications
   # use_tp_pp_dp_mapping: true
-  dist_ckpt_format: zarr
   hf_model_name_or_configs_dir: "meta-llama/Llama-3.1-8B-Instruct"
   grpo:
     share_dir: /dev/shm/checkpoints
@@ -240,6 +239,15 @@ model:
     shuffle_train_data: True
     task_to_prompt_key:
       math: input  # set to problem if apply_chat_template is True
+
+  dist_ckpt_format: torch_dist
+  dist_ckpt_load_on_device: True
+  dist_ckpt_parallel_save: True
+  dist_ckpt_parallel_save_within_dp: False
+  dist_ckpt_parallel_load: False
+  dist_ckpt_torch_dist_multiproc: 2
+  dist_ckpt_assume_constant_structure: False
+  dist_ckpt_parallel_dist_opt: True
 
   # define fields from the base model's config that should be ignored when merging with this config.
   overwrite_base_config:

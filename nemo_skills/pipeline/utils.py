@@ -910,7 +910,7 @@ def get_executor(
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
-        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--ntasks-per-node={tasks_per_node}",
         f"--nodes={num_nodes}",
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",

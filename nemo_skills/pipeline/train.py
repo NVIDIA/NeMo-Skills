@@ -137,6 +137,7 @@ def get_training_cmd(
     training_data,
     validation_data,
     num_gpus,
+    tp,
     num_nodes,
     expname,
     training_algo,
@@ -166,6 +167,7 @@ def get_training_cmd(
         validation_data=validation_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
+        tp=tp,
         expname=expname,
         training_algo=training_algo,
         disable_wandb=disable_wandb,
@@ -365,6 +367,7 @@ def train(
         training_data=training_data,
         validation_data=validation_data,
         num_gpus=num_gpus,
+        tp=tp,
         num_nodes=num_nodes,
         expname=expname,
         training_algo=training_algo,
@@ -377,8 +380,9 @@ def train(
 
     if training_algo == TrainingAlgo.grpo:
         train_cmd = [get_grpo_vllm_cmd(training_params), train_cmd]
-        container = [cluster_config["containers"]["vllm"], container]
-        num_tasks = [training_params.num_gpus / training_params.tp, num_tasks]
+        container = [cluster_config["containers"]["vllm"], cluster_config["containers"]["nemo-grpo"]]
+        assert training_params.num_gpus % training_params.tp == 0, "num_gpus should be divisible by tp"
+        num_tasks = [training_params.num_gpus // training_params.tp, num_tasks]
 
     with run.Experiment(expname) as exp:
         prev_task = None
