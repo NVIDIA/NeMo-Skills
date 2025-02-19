@@ -41,6 +41,7 @@ class InferenceConfig:
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
+    top_logprobs: int | None = None
 
 
 @nested_dataclass(kw_only=True)
@@ -56,6 +57,7 @@ class GenerateSolutionsConfig:
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
+    continue_prefix_generation: bool = False  # if True, model will be prompted to continue "generation" without closing assistant tag
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -318,6 +320,7 @@ class GenerationTask:
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
+            continue_prefix_generation=self.cfg.continue_prefix_generation,
         )
 
     def llm_generate(self, data_points, data, is_async=False):

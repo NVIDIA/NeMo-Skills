@@ -98,6 +98,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float],
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
+        top_logprobs: int | None = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -125,6 +126,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
@@ -136,6 +138,7 @@ class BaseModel(abc.ABC):
             'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
+            'top_logprobs': top_logprobs,
             'stop_phrases': stop_phrases,
         }
         for key, value in kwargs.items():
@@ -200,6 +203,7 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
@@ -216,6 +220,7 @@ class BaseModel(abc.ABC):
             repetition_penalty=repetition_penalty,
             random_seed=random_seed,
             stop_phrases=stop_phrases,
+            top_logprobs=top_logprobs,
             remove_stop_phrases=remove_stop_phrases,
         )
         all_generations = [None] * len(prompts)
@@ -231,6 +236,9 @@ class BaseModel(abc.ABC):
                 if gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
+                    if top_logprobs is None: # trtllm always return these fields so we need to remove them if not requested
+                        gen_dict.pop('tokens', None)
+                        gen_dict.pop('logprobs', None)
 
             time.sleep(1)
 
@@ -255,12 +263,14 @@ class TRTLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
-
+        if top_logprobs is not None and top_logprobs > 1:
+            raise NotImplementedError("This code does not support `top_logprobs` > 1.")
         if generate_endpoint not in ["generate", "generate_async"]:
             raise ValueError(f"Invalid generate endpoint: {generate_endpoint}")
 
@@ -277,6 +287,7 @@ class TRTLLMModel(BaseModel):
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
+            "top_logprobs": top_logprobs,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
@@ -307,6 +318,7 @@ class TRTLLMModel(BaseModel):
         min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
@@ -323,6 +335,7 @@ class TRTLLMModel(BaseModel):
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -400,6 +413,7 @@ class NemoModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -422,20 +436,19 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
+        if top_logprobs:
+            request["all_probs"] = True
+            request["compute_logprob"] = True
         generations = self.requests_lib.put(
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
             data=json.dumps(request),
             headers={"Content-Type": "application/json"},
         ).json()
         # we need to remove the original prompt as nemo always returns it
-        output = generations['sentences'][0]
-        # when the prompt starts from special tokens like bos, nemo will remove them,
-        # so we need this hack to find where to start the cut
-        begin_idx = 0
-        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(output[:20]):
-            begin_idx += 1
-        output = {'generation': output[(len(prompt) - begin_idx) :]}
-        return output
+        output = self.remove_prompt_from_output(prompt, generations['sentences'][0], generations['tokens'][0])
+        if top_logprobs:
+            output['logprobs'] = generations['logprob'][0]
+            output['tokens'] = generations['tokens']
 
     def generate(
         self,
@@ -448,11 +461,14 @@ class NemoModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
-
+        if top_logprobs is not None and top_logprobs > 1: # TODO: we can implement this if get access to the tokenizer from here
+            raise NotImplementedError("This code does not support `top_logprobs` > 1.")
+        
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
@@ -468,6 +484,9 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
+        if top_logprobs is not None:
+            request["all_probs"] = True
+            request["compute_logprob"] = True
         self.preprocess_request(request)
         generations = self.requests_lib.put(
             url="http://{}:{}/generate".format(self.server_host, self.server_port),
@@ -477,19 +496,60 @@ class NemoModel(BaseModel):
         # we need to remove the original prompt as nemo always returns it
         outputs = [None] * len(generations['sentences'])
         for idx, generation in enumerate(generations['sentences']):
-            # when the prompt starts from special tokens like bos, nemo will remove them,
-            # so we need this hack to find where to start the cut
-            begin_idx = 0
-            while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
-                begin_idx += 1
-            outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
+            logprobs = generations['logprob'][idx] if top_logprobs is not None else None
+            tokens = generations['tokens'][idx]
+            outputs[idx] = self.remove_prompt_from_output(
+                prompts[idx], generation, tokens, logprobs, tokens_to_generate
+            )
 
         if remove_stop_phrases:
             for output in outputs:
                 output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
-        # TODO: return num_generated_tokens as well
         return outputs
+
+    @classmethod
+    def remove_prompt_from_output(cls, prompt: str, generation: str, tokens: list, logprobs: list | None, tokens_to_generate: int) -> dict:
+        prompt_idx, gen_start_idx, prompt_token_count = 0, 0, 0
+
+        for token in tokens:
+            if prompt_idx >= len(prompt):
+                break
+            
+            # we need to replace special tokens manually, as we don't have access to the tokenizer
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            if generation[gen_start_idx:].startswith(token):
+                gen_start_idx += len(token)
+
+            prompt_idx += len(token)
+            prompt_token_count += 1
+
+        output_text = generation[gen_start_idx:]
+        num_generated_tokens = len(tokens) - prompt_token_count
+        result = {'generation': output_text, 'num_generated_tokens': num_generated_tokens}
+        if logprobs is not None:
+            result['tokens'] = tokens[-num_generated_tokens:]
+            result['logprobs'] = logprobs[-num_generated_tokens:]
+
+        if num_generated_tokens <= tokens_to_generate:
+            return result
+        
+        # sometimes nemo generates more tokens than requested, so we need to trim it
+        gen_end_idx = gen_start_idx
+        for idx, token in enumerate(tokens[prompt_token_count:]):
+            if idx == tokens_to_generate:
+                break
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            if generation[gen_end_idx:].startswith(token):
+                gen_end_idx += len(token)
+        
+        result['num_generated_tokens'] = tokens_to_generate
+        result['generation'] = generation[gen_start_idx:gen_end_idx]
+        if logprobs is not None:
+            result['tokens'] = result['tokens'][:tokens_to_generate]
+            result['logprobs'] = result['logprobs'][:tokens_to_generate]
+
+        return result
 
 
 class OpenAIModel(BaseModel):
@@ -538,6 +598,7 @@ class OpenAIModel(BaseModel):
         top_k: int = 0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> list[dict]:
         # only supported by the OpenAI endpoint!
@@ -564,6 +625,8 @@ class OpenAIModel(BaseModel):
                                 "presence_penalty": repetition_penalty,
                                 "seed": random_seed,
                                 "stop": stop_phrases,
+                                "logprobs": top_logprobs is not None,
+                                "top_logprobs": top_logprobs,
                             },
                         }
                     )
@@ -618,12 +681,14 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
+        top_logprobs: int | None = None,
     ) -> str:
         if top_k != 0:
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if min_p > 0:
-            ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
-
+            raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
+        if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
+            raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -634,8 +699,9 @@ class OpenAIModel(BaseModel):
                 seed=random_seed,
                 stop=stop_phrases,
                 messages=prompt,
+                logprobs=top_logprobs is not None,
+                top_logprobs=top_logprobs,
             )
-            response = response.choices[0]
         except openai.BadRequestError as e:
             # this likely only works for Nvidia-hosted models
             msg = e.body['detail']
@@ -656,7 +722,9 @@ class OpenAIModel(BaseModel):
                     seed=random_seed,
                     stop=stop_phrases,
                     messages=prompt,
-                ).choices[0]
+                    logprobs=top_logprobs is not None,
+                    top_logprobs=top_logprobs,
+                )
             else:
                 raise
         except AttributeError:
@@ -664,8 +732,20 @@ class OpenAIModel(BaseModel):
             LOG.error("Unexpected response from OpenAI API: %s", response)
             raise
 
-        output = response.message.content
-        return {'generation': output}
+        choice = response.choices[0]
+        output = choice.message.content
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
+            result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+
+        return result
 
     def get_model_name_from_server(self):
         model_list = self.client.models.list()
@@ -731,6 +811,7 @@ class VLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> dict:
         if isinstance(prompt, dict):
@@ -751,7 +832,7 @@ class VLLMModel(BaseModel):
             echo=False,
             frequency_penalty=0.0,
             presence_penalty=0.0,
-            logprobs=None,
+            logprobs=top_logprobs,
             logit_bias=None,
             n=1,
             extra_body={
@@ -762,11 +843,10 @@ class VLLMModel(BaseModel):
             },
         )
 
-        output, num_generated_tokens = self.parse_openai_response(response)
-        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
+        return self.parse_openai_response(response)
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+    def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
         assert not isinstance(response, list)
         assert len(response.choices) == 1
         choice = response.choices[0]
@@ -778,8 +858,12 @@ class VLLMModel(BaseModel):
             # sglang has a little different api here
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
-        num_generated_tokens = response.usage.completion_tokens
-        return output, num_generated_tokens
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = choice.logprobs.token_logprobs
+            result['tokens'] = choice.logprobs.tokens
+            result['top_logprobs'] = choice.logprobs.top_logprobs
+        return result
 
     def get_model_name_from_server(self):
         model_list = self.oai_client.models.list()
