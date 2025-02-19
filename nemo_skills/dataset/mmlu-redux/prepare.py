@@ -17,25 +17,74 @@ import json
 from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
-from collections import defaultdict
 
 
-# mmlu subsets from https://github.com/hendrycks/test/blob/master/categories.py
-all_categories = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology',
-                  'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics',
-                  'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics',
-                  'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science',
-                  'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics',
-                  'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics',
-                  'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence',
-                  'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes',
-                  'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine',
-                  'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
+# mmlu subcategories from https://github.com/hendrycks/test/blob/master/categories.py
+subcategories = {
+    "abstract_algebra": ["math"],
+    "anatomy": ["health"],
+    "astronomy": ["physics"],
+    "business_ethics": ["business"],
+    "clinical_knowledge": ["health"],
+    "college_biology": ["biology"],
+    "college_chemistry": ["chemistry"],
+    "college_computer_science": ["computer science"],
+    "college_mathematics": ["math"],
+    "college_medicine": ["health"],
+    "college_physics": ["physics"],
+    "computer_security": ["computer science"],
+    "conceptual_physics": ["physics"],
+    "econometrics": ["economics"],
+    "electrical_engineering": ["engineering"],
+    "elementary_mathematics": ["math"],
+    "formal_logic": ["philosophy"],
+    "global_facts": ["other"],
+    "high_school_biology": ["biology"],
+    "high_school_chemistry": ["chemistry"],
+    "high_school_computer_science": ["computer science"],
+    "high_school_european_history": ["history"],
+    "high_school_geography": ["geography"],
+    "high_school_government_and_politics": ["politics"],
+    "high_school_macroeconomics": ["economics"],
+    "high_school_mathematics": ["math"],
+    "high_school_microeconomics": ["economics"],
+    "high_school_physics": ["physics"],
+    "high_school_psychology": ["psychology"],
+    "high_school_statistics": ["math"],
+    "high_school_us_history": ["history"],
+    "high_school_world_history": ["history"],
+    "human_aging": ["health"],
+    "human_sexuality": ["culture"],
+    "international_law": ["law"],
+    "jurisprudence": ["law"],
+    "logical_fallacies": ["philosophy"],
+    "machine_learning": ["computer science"],
+    "management": ["business"],
+    "marketing": ["business"],
+    "medical_genetics": ["health"],
+    "miscellaneous": ["other"],
+    "moral_disputes": ["philosophy"],
+    "moral_scenarios": ["philosophy"],
+    "nutrition": ["health"],
+    "philosophy": ["philosophy"],
+    "prehistory": ["history"],
+    "professional_accounting": ["other"],
+    "professional_law": ["law"],
+    "professional_medicine": ["health"],
+    "professional_psychology": ["psychology"],
+    "public_relations": ["politics"],
+    "security_studies": ["politics"],
+    "sociology": ["culture"],
+    "us_foreign_policy": ["politics"],
+    "virology": ["health"],
+    "world_religions": ["philosophy"],
+}
 
 
 def format_entry(entry, category):
     answer, correct_answer, error_type = entry['answer'], entry['correct_answer'], entry['error_type']
-    if entry["error_type"] in ["bad_question_clarity", "bad_options_clarity", "expert"]:
+    subcategory = subcategories[category][0]
+    if error_type in ["bad_question_clarity", "bad_options_clarity", "expert"]:
         return None
     if error_type in ["wrong_groundtruth", "no_correct_answer", "multiple_correct_answers"] and not correct_answer:
         return None
@@ -74,7 +123,7 @@ def format_entry(entry, category):
         "C": entry['choices'][2],
         "D": entry['choices'][3],
         "expected_answer": final_answer,
-        "subset_for_metrics": category,
+        "subset_for_metrics": subcategory,
         "source": entry['source']
     }
 
@@ -92,21 +141,20 @@ def main(args):
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
 
-    print(f"Loading categories: {all_categories}")
+    print(f"Loading categories: {list(subcategories.keys())}")
 
     # create output_file or remove its contents if it exists
     output_file = data_dir / f"{args.split}.jsonl"
     open(output_file, "w")
 
     # Load the dataset and write it to the output 
-    for category in tqdm(all_categories):
+    for category in tqdm(subcategories):
         dataset = load_dataset("edinburgh-dawg/mmlu-redux-2.0", name=category, split='test')
         write_data_to_file(output_file, dataset, category)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--subset", default="all", choices=(all_categories), help="Dataset category subset to process.")
     parser.add_argument("--split", default="test", choices=(["test"]), help="Dataset split to process.")
     args = parser.parse_args()
     main(args)
