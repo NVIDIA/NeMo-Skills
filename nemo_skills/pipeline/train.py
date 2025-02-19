@@ -175,7 +175,7 @@ def get_training_cmd(
         logging_params=logging_params,
     )
 
-    return get_cmd(training_params)
+    return get_cmd(training_params), training_params
 
 
 def get_logging_params(expname, disable_wandb, wandb_project):
@@ -207,6 +207,14 @@ def get_avg_checkpoints_cmd(nemo_model, output_dir, final_nemo_path, average_ste
         f"mv {output_dir}/training/checkpoints/{name} {final_nemo_path} "
     )
     return cmd
+
+
+class SupportedServers(str, Enum):
+    trtllm = "trtllm"
+    vllm = "vllm"
+    nemo = "nemo"
+    openai = "openai"
+    sglang = "sglang"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -243,6 +251,14 @@ def train(
         help="List of commas separated checkpoint steps to average. E.g 1000,5000. "
         "If None, will skip prepare eval stage.",
     ),
+    server_model: str = typer.Option(None, help="Path to the model or model name in API"),
+    server_address: str = typer.Option(
+        None, help="Use ip:port for self-hosted models or the API url if using model providers"
+    ),
+    server_type: SupportedServers = typer.Option(None, help="Type of server to use"),
+    server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
+    server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
+    server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -307,7 +323,39 @@ def train(
     if " " in str(average_steps):
         raise ValueError("average steps should be separated with commas")
 
-    train_cmd = get_training_cmd(
+    server_config = None
+    if server_type is not None:
+        get_random_port = server_gpus != 8 and not exclusive
+        if server_address is None:  # we need to host the model
+            assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+            server_port = get_free_port(strategy="random") if get_random_port else 5000
+            server_address = f"localhost:{server_port}"
+
+            server_config = {
+                "model_path": server_model,
+                "server_type": server_type,
+                "num_gpus": server_gpus,
+                "num_nodes": server_nodes,
+                "server_args": server_args,
+                "server_port": server_port,
+            }
+            client_server_args = {
+                "server_type": server_type,
+                "port": server_port,
+            }
+        else:  # model is hosted elsewhere
+            client_server_args = {
+                "server_type": server_type,
+                "host": server_address,
+                "model": server_model,
+            }
+        client_arg_prefix = f"++trainer.grpo.environments.math.server."
+        client_string_args = ""
+        for client_arg, client_val in client_server_args.items():
+            client_string_args += f"{client_arg_prefix}{client_arg}={client_val} "
+        extra_arguments = client_string_args + extra_arguments
+
+    train_cmd, training_params = get_training_cmd(
         cluster_config=cluster_config,
         partition=partition,
         config_name=config_name,
@@ -324,6 +372,13 @@ def train(
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
     )
+    container = cluster_config["containers"]["nemo"]
+    num_tasks = num_gpus if cluster_config["executor"] == "slurm" else 1
+
+    if training_algo == TrainingAlgo.grpo:
+        train_cmd = [get_grpo_vllm_cmd(training_params), train_cmd]
+        container = [cluster_config["containers"]["vllm"], container]
+        num_tasks = [training_params.num_gpus / training_params.tp, num_tasks]
 
     with run.Experiment(expname) as exp:
         prev_task = None
@@ -333,10 +388,10 @@ def train(
                 cmd=train_cmd,
                 task_name=f'{expname}-{training_algo}-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["nemo"],
+                container=container,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
+                num_tasks=num_tasks,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
@@ -346,6 +401,8 @@ def train(
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                server_config=server_config,
+                heterogeneous=True if server_config is not None else False,
             )
 
         if average_steps is not None:

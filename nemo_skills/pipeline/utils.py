@@ -1036,6 +1036,7 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     het_group = 0
+    het_group_indices = []
     total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
     commands = []
@@ -1067,6 +1068,7 @@ def add_task(
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group_indices.append(het_group)
         het_group += 1
 
     # then goes the main task(s) unless it's empty
@@ -1104,6 +1106,7 @@ def add_task(
                         total_het_groups=total_het_groups,
                     )
                 )
+                het_group_indices.append(het_group)
         het_group += 1
 
     # finally a sandbox if needed
@@ -1138,6 +1141,7 @@ def add_task(
                 total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+            het_group_indices.append(het_group)
         het_group += 1
 
     if cluster_config["executor"] != "local":
@@ -1166,6 +1170,8 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
+        if heterogeneous:
+            executors[0].het_group_indices = het_group_indices
         return exp.add(
             [run.Script(inline=command) for command in commands],
             executor=executors,
