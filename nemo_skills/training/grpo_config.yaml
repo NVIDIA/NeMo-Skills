@@ -1,0 +1,247 @@
+defaults:
+  - optional tp_overlap@model.ub_tp_comm_overlap_cfg:
+
+trainer:
+  # these args are respected
+  num_nodes: 1
+  devices: 1
+  accelerator: gpu
+  precision: bf16
+
+  grpo:
+    max_epochs: 2
+    max_steps: -1  # max PPO steps (-1 to go through the whole train set)
+    val_check_interval: ${.save_interval}
+    save_interval: 100
+    gradient_clip_val: 1.0
+    run_validation_step_0: True
+    greedy_on_validation: True
+
+    # GRPO args to generate the data for training
+    initial_policy_kl_penalty: 0.001
+    use_leave_one_out_baseline: True
+    normalize_rewards: True
+
+    # rollout arguments
+    generation_rollout_mbs: 64
+
+    prompt_micro_batch_size: 1
+    num_prompts_per_grpo_step: 32
+    samples_per_prompt: 64
+
+    val_prompt_micro_batch_size: 16
+    val_num_prompts_per_grpo_step: 512
+    val_samples_per_prompt: 4
+
+    generation_save_dir: null
+
+    environments:
+      math:
+        server:
+          server_type: trtllm
+        prompt:
+          prompt_template: qwen-instruct
+          prompt_config: judge/math
+
+    # the sequence length to pad the rollout batch for training to
+    # reduce fragmentation at the cost of using more
+    # memory, set to null if we don't want to pad it
+    # to a constant size
+    # if actual seq length is higher than this a warning will be raised
+    # but will not crash and training will still proceed on the larger
+    # sequence length
+    rollout_batch_seq_length: null
+
+    # Speed-up training by accelerating inference stage using backends like TRT-LLM, vLLM
+    inference_backend:
+      type: vllm  # Can be 'trt_llm', 'trt_llm_pytorch', 'sglang', 'vllm'.
+
+      # Common settings for all backends
+      enable: True
+      seed: ${model.seed}
+
+      # By default, assume the max input length is the difference between the model sequence length and the max number of tokens to generate
+      max_input_len: ${subtract:${model.encoder_seq_length}, ${model.grpo.length_params.max_length}}
+      reshard: False # if True then reshard the model into TP only for inference
+
+      # Backend-specific configurations
+      config:
+        # TRTLLM-specific options
+        trt_llm:
+          # for supported values see: https://github.com/NVIDIA/NeMo/blob/db6244857af3b012f645c7f4672522978bb608b1/nemo/export/trt_llm/converter/utils.py#L26
+          enable: False
+          model_type: llama  # Can be gptj, gptnext, llama, gemma, falcon
+          unload_engine_train: False
+
+        vllm:
+          enable: True
+          port: 4321
+          ip: localhost
+
+    batch_iterator:
+      # When use_flask is True, we will spawn a flask server on rank 0 to balance the work of policy rollouts.
+      # This option is useful in cases where the generation length varies greatly across DP ranks since
+      # the flask server will allow DP ranks with shorter responses to process more samples and DP ranks
+      # with longer responses to process less samples. Thereby lowering the DP wait time.
+      use_flask: False
+      port: 5557
+
+    # pick up from the model
+    # *do not change this*
+    model_gbs: ${model.global_batch_size}
+    model_mbs: ${model.micro_batch_size}
+
+    # Default set to an ephemeral location within the container
+    trt_model_dir: /tmp/trt_llm_model
+
+  # no need to change these
+  logger: False # logger provided by exp_manager
+  enable_checkpointing: False
+  use_distributed_sampler: False
+  max_time: null
+  max_epochs: ${.grpo.max_epochs}
+  max_steps: ${.grpo.max_steps}
+
+exp_manager:
+  explicit_log_dir: null
+  exp_dir: null
+  name: ${name}
+  create_wandb_logger: False
+  wandb_logger_kwargs:
+    project: null
+    name: null
+  resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
+  resume_if_exists: True
+  resume_ignore_no_checkpoint: True
+  create_checkpoint_callback: True
+  checkpoint_callback_params:
+    monitor: val_rewards
+    save_top_k: 50
+    mode: max
+    always_save_nemo: False # saves nemo file during validation, not implemented for model parallel
+    save_nemo_on_train_end: False # not recommended when training large models on clusters with short time limits
+    filename: 'megatron_gpt-{step}-{consumed_samples}-{grpo_optimization_step}-{epoch}-{val_rewards:.3f}'
+    model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+
+pretrained_checkpoint:
+  restore_from_path: null
+
+model:
+  # TODO: document perf implications
+  # use_tp_pp_dp_mapping: true
+  dist_ckpt_format: zarr
+  hf_model_name_or_configs_dir: "meta-llama/Llama-3.1-8B-Instruct"
+  grpo:
+    share_dir: /dev/shm/checkpoints
+    # mbs to do log prob inference, can be set to
+    # lower than rollout_micro_batch_size to reduce
+    # memory usage
+    forward_micro_batch_size: 4
+
+    # to offload during generation or not
+    offload_adam_states: True
+
+    # GRPO loss params
+    ratio_eps: 0.2
+
+    # params for generation
+    sampling_params:
+      use_greedy: False
+      temperature: 1.0
+      top_k: -1
+      top_p: 0.95
+      repetition_penalty: 1.0
+      add_BOS: False
+      all_probs: False
+      compute_logprob: False
+      # will be used in NeMo version > 1.20.0
+      # keeping it for now
+      end_strings: ["<|endoftext|>", "<extra_id_1>"]
+
+    # length argument for autoregressive sampling
+    # max length means max amount of tokens to generate
+    length_params:
+      max_length: 3072 #${int_div:${model.encoder_seq_length}, 2}
+      min_length: 1
+
+    # pull from trainer, do not change here. Change at trainer.grpo.generation_rollout_mbs
+    generation_rollout_mbs: ${trainer.grpo.generation_rollout_mbs}
+    # pull from trainer, do not change here. Change at trainer.grpo.trt_model_dir
+    trt_model_dir: ${trainer.grpo.trt_model_dir}
+    # pull from trainer, do not change here. Change at trainer.grpo.initial_policy_kl_penalty
+    initial_policy_kl_penalty: ${trainer.grpo.initial_policy_kl_penalty}
+    inference_backend: ${trainer.grpo.inference_backend}
+
+  peft:
+    peft_scheme: "none"  # ["lora", "none"]
+    restore_from_path: null
+    restore_from_ckpt:
+      checkpoint_dir: null
+      checkpoint_name: null
+
+    lora_tuning:
+      target_modules: ['attention_qkv'] # this can either be 'attention_qkv','attention_dense','mlp_fc1','mlp_fc2', 'attention' (qkv & dense), 'mlp' (fc1 & fc2), 'all'
+      adapter_dim: 32
+      adapter_dropout: 0.0
+      column_init_method: 'xavier' # IGNORED if linear_adapter is used, options: xavier, zero or normal
+      row_init_method: 'zero' # IGNORED if linear_adapter is used, options: xavier, zero or normal
+      layer_selection:  null  # selects in which layers to add lora adapters. e.g. [1,12] will add lora to layer 1 (lowest) and 12. null will apply adapters to all layers
+      weight_tying: False
+      position_embedding_strategy: null # used only when weight_tying is True
+
+  mcore_gpt: True
+  # these control the mbs/gbs during GRPO training (optimization)
+  micro_batch_size: 1
+  global_batch_size: 512
+  megatron_amp_O2: True
+
+  encoder_seq_length: 4096
+  max_position_embeddings: ${model.encoder_seq_length}
+
+  ## Sequence Parallelism
+  sequence_parallel: False
+
+  # miscellaneous
+  seed: 1234
+
+  optim:
+    name: distributed_fused_adam
+    bucket_cap_mb: 200
+    overlap_grad_sync: False
+    overlap_param_sync: False
+    contiguous_grad_buffer: True
+    lr: 3e-7
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 0
+      constant_steps: 0
+      min_lr: ${model.optim.lr} # No interpolation happening if the min_lr is not set to be different from lr
+
+  precision: ${trainer.precision}
+
+  data:
+    data_impl: jsonl
+    splits_string: null
+    seq_length: ${model.encoder_seq_length}
+    skip_warmup: True
+    num_workers: 0
+    reset_position_ids: False # Reset position ids after end-of-document token
+    reset_attention_mask: False # Reset attention mask after end-of-document token
+    eod_mask_loss: False # Mask loss for the end of document tokens
+    index_mapping_dir: null # path to save index mapping .npy files, by default will save in the same location as data_prefix
+    data_prefix: null
+    apply_chat_template: False
+    prompt_file: null
+    system_prompt_file: null
+    shuffle_train_data: True
+    task_to_prompt_key:
+      math: input  # set to problem if apply_chat_template is True
+
+  # define fields from the base model's config that should be ignored when merging with this config.
+  overwrite_base_config:
+    data:
+      data_prefix: True

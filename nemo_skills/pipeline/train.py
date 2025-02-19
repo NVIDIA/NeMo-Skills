@@ -27,11 +27,14 @@ from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
 
+GRPO_VLLM_PORT = 4321
+
 
 class TrainingAlgo(str, Enum):
     sft = "sft"
     dpo = "dpo"
     rm = "rm"
+    grpo = "grpo"
 
 
 @dataclass
@@ -43,6 +46,7 @@ class TrainingParams:
     training_data: str
     validation_data: str
     num_gpus: int
+    tp: int | None
     num_nodes: int
     expname: str
     training_algo: TrainingAlgo
@@ -62,11 +66,14 @@ def get_cmd(params: TrainingParams) -> str:
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+        f"export TEMPDIR=/dev/shm/checkpoints_$SLURM_JOB_ID && "
+        f"mkdir -p $TEMPDIR && "
+        f"chmod 777 $TEMPDIR && "
         f"cd /nemo_run/code && "
         f"echo 'Starting training' && "
         f"{params.training_script} "
         f"    {params.config_params}"
-        f"    ++model.tensor_model_parallel_size={params.num_gpus} "
+        f"    ++model.tensor_model_parallel_size={params.tp or params.num_gpus} "
         f"    trainer.devices={params.num_gpus} "
         f"    trainer.num_nodes={params.num_nodes} "
         f"    {params.logging_params} "
@@ -83,7 +90,15 @@ configs = {
     TrainingAlgo.sft: "sft_config",
     TrainingAlgo.dpo: "dpo_config",
     TrainingAlgo.rm: "rm_config",
+    TrainingAlgo.grpo: "grpo_config",
 }
+
+rl_extra_args_fn = lambda params: (
+    f" ++model.data.data_prefix.train='[{params.training_data}]' "
+    f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+    f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+    f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+)
 
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
@@ -93,19 +108,23 @@ get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
         f" ++model.data.validation_ds.index_mapping_dir='{os.path.dirname(os.path.abspath(params.validation_data))}' "
         f" model.restore_from_path={params.nemo_model} " + params.extra_arguments
     ),
-    TrainingAlgo.dpo: lambda params: (
-        f" ++model.data.data_prefix.train='[{params.training_data}]' "
-        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-    ),
-    TrainingAlgo.rm: lambda params: (
-        f" ++model.data.data_prefix.train='[{params.training_data}]' "
-        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-    ),
+    TrainingAlgo.dpo: rl_extra_args_fn,
+    TrainingAlgo.grpo: lambda params: (
+        f" ++trainer.grpo.generation_save_dir={params.output_dir}/generations "
+        f" ++trainer.grpo.inference_backend.config.vllm.port=$(( {GRPO_VLLM_PORT} + (SLURM_LOCALID / {params.tp}) * {params.tp} )) "
+        f" ++model.grpo.share_dir=$TEMPDIR "
+    )
+    + rl_extra_args_fn(params),
+    TrainingAlgo.rm: rl_extra_args_fn,
 }
+
+
+def get_grpo_vllm_cmd(params: TrainingParams) -> str:
+    return (
+        f"export VLLM_FLASK_SERVER_PORT=$(( {GRPO_VLLM_PORT} + SLURM_LOCALID * {params.tp} )) && "
+        f"cd /opt/NeMo-Aligner/examples/nlp/gpt && "
+        f"python3 serve_vllm_inference_server.py --port $VLLM_FLASK_SERVER_PORT "
+    )
 
 
 def get_training_cmd(
@@ -207,6 +226,9 @@ def train(
     validation_data: str = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
+    tp: int = typer.Option(
+        None, help="Tensor parallel size. Required for grpo and optional (set to num_gpus) for other algos"
+    ),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
@@ -253,6 +275,9 @@ def train(
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
+
+    if tp is None and training_algo == TrainingAlgo.grpo:
+        raise ValueError("tp is required to be explicitly specified for grpo")
 
     try:
         training_algo = training_algo.value
