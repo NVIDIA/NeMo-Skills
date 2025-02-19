@@ -1,0 +1,66 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+few_shot_examples:
+  prefix: "Here are some examples of problems and solutions you can refer to.\n\n"
+  template: "Problem:\n{problem}\n\nSolution:\n{solution}\n\n\n\n\n\n"
+  suffix: "Here is the problem you need to solve:\n"
+  # this is built as <prefix>{template.format(example1)}{template.format(example2)}...{template.format(exampleN)}<suffix>
+  # and available as {examples} key in the final prompt
+  # if examples_type is not specified, then {examples} will be empty
+  # by default there are no examples, but can be changed from code/cmd
+
+system: ""
+
+user: |-
+  I will give you a math problem and ask to solve it. Your goal is to write your thinking process as you approach this math problem. 
+  Solve the following mathematical problem in a natural, exploratory, and human-like reasoning style. 
+  Your reasoning should reflect how a person would think through the problem step by step, rather than providing a rigid, structured answer. 
+  Follow these guidelines:
+  
+  1. Think aloud and reason through the problem dynamically:
+     Start with intuitive observations and build from there.
+     Use a conversational tone, as if you are thinking through the problem in real time.
+     Include phrases like:
+        "Hmm, let me see..."
+        "Wait, does this actually work?"
+        "Oh, I think I see a pattern!"
+  
+  2. Incorporate self-doubt and self-correction:
+     If you realize a mistake or reconsider an approach, explicitly acknowledge it.
+     Say things like:
+        "Wait, no, that can’t be right. Let me check again."
+        "Actually, I think I missed something there."
+        "Hold on, let me backtrack and see where I went wrong."
+  
+
+  3. Use trial and error before arriving at a final conclusion:
+    Try different approaches and compare them.
+    If an assumption is made, question whether it’s valid.
+    Example phrases:
+       "Let's try assuming x=y=z and see what happens."
+       "Hmm, this simplifies things, but does it actually lead to a solution?"
+  
+  4. Verify and reflect on the final answer:
+     Once you reach an answer, check if it actually satisfies the conditions.
+     Explicitly validate by plugging values back in.
+     Include phrases like:
+        "Alright, let’s plug this back in and see if it holds up."
+        "Yep, this checks out—seems like we got the right answer!"
+        "Wait, let’s test it with a smaller case like n=2 to make sure."
+  
+  5. Make the reasoning process engaging and organic:
+      Avoid overly rigid or textbook-style explanations.
+      Feel free to pause, rethink, and approach things differently.
+      Keep the explanation engaging, as if you’re discussing it with a friend.
+  
+
+  Finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  {examples}{problem}
+
+
+  Please share your thinking process now. Remember: your goal is to write your thinking process as you approach this math problem. Note that we are not that much interested in the final solution, but much more in the process that lead you to it. 
+  Did you have references to other problems you solved before in your mind? Write that down. Did you ponder upon which approach to take before doing derivations? Write that down. Does your current approach look too complicated and you need to try something else? 
+  Say that and write down any alternative ideas you have. Did you notice that something doesn't look good and you need to double check previous derivations for mistake? That's what we are looking for - write that down and correct the solution, but don't erase the mistake! 
+  The more detailed this is, the better.
