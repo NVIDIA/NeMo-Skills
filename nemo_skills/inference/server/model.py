@@ -749,32 +749,16 @@ class VLLMModel(BaseModel):
     def response_completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
                             random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
                             repetition_penalty=1.0):
-        logit_bias = {# " Wait"
-            14190: 30,
-
-            # " But we need to check if this works"
-            3983: 30,  # "But" (first token)
-            582: 20, 1184: 20, 311: 20, 1779: 20, 421: 20, 419: 20, 4278: 20,
-
-            # " Alternatively"
-            92014: 30,  # "Alternatively" (single token)
-
-            # " Let me try another approach"
-            10061: 30,  # "Let" (first token)
-            752: 20, 1430: 20, 2441: 20, 5486: 20,
-
-            # " I need to double-check"
-            40: 30,  # "I" (first token)
-            1184: 20, 311: 20, 1990: 20, 15934: 20,
-
-            # " But let me check again"
-            3983: 30,  # "But" (first token)
-            1077: 20, 752: 20, 1779: 20, 1549: 20,
-
-            # " Let me think again"
-            10061: 30,  # "Let" (first token)
-            752: 20, 1744: 20, 1549: 20
+        logit_bias = {
+            14190: 10,  # " Wait"
+            3983: 10, 582: 5, 1184: 5, 311: 5, 1779: 5, 421: 5, 419: 5, 4278: 5,
+            92014: 10,
+            10061: 10, 752: 5, 1430: 5, 2441: 5, 5486: 5,
+            40: 10, 1184: 5, 311: 5, 1990: 5, 15934: 5,
+            3983: 10, 1077: 5, 752: 5, 1779: 5, 1549: 5,
+            10061: 10, 752: 5, 1744: 5, 1549: 5
         }
+
 
         return self.oai_client.completions.create(
             model=self.model,
