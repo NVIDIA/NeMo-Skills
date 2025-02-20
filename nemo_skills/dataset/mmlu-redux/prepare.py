@@ -81,40 +81,15 @@ subcategories = {
 }
 
 
+# dataset preparing strategy adapted from ZeroEval (https://github.com/WildEval/ZeroEval/blob/main/data_prep/mmlu-redux.py)
 def format_entry(entry, category):
-    answer, correct_answer, error_type = entry['answer'], entry['correct_answer'], entry['error_type']
-    subcategory = subcategories[category][0]
-    if error_type in ["bad_question_clarity", "bad_options_clarity", "expert"]:
-        return None
-    if error_type in ["wrong_groundtruth", "no_correct_answer", "multiple_correct_answers"] and not correct_answer:
-        return None
-    if error_type == "ok":
-        assert chr(65 + answer) in "ABCD", f"Error in Ok question: {answer}"
-        final_answer = chr(65 + answer)
-    elif error_type == "wrong_groundtruth" and correct_answer:
-        if correct_answer in "ABCD":
-            final_answer = correct_answer
-        else:
-            assert chr(65 + int(correct_answer)) in "ABCD", f"Error in Wrong Groundtruth question: {answer}"
-            final_answer = chr(65 + int(correct_answer))
-    elif error_type == "no_correct_answer" and correct_answer:
-        if '?' in correct_answer:
-            return None
-        # if the text in correct_answer is approx the same length as the choices it is the answer
-        answers_length = [len(choice) for choice in entry['choices']]
-        if -1 <= len(correct_answer) - min(answers_length) and len(correct_answer) - max(answers_length) <= 1: 
-            entry['choices'][answer] = correct_answer
-            final_answer = chr(65 + int(answer))
-        else:
-            return None
-    elif error_type == "multiple_correct_answers" and correct_answer:
-        # keep only ABCD0123
-        correct_answer = [letter for letter in correct_answer if letter in 'ABCD0123']
-        if correct_answer:
-            final_answer = ','.join(ans if ans in 'ABCD' else chr(65 + int(ans)) for ans in correct_answer)
-        else:
-            return None
+    if entry['error_type'] == "ok":
+        final_answer = chr(65 + entry['answer'])
+    elif entry['error_type'] == "wrong_groundtruth" and entry['correct_answer'] in list("ABCD"):
+        final_answer = 'correct_answer'
     else:
+        # bad_question_clarity, bad_options_clarity, no_correct_answer,
+        # multiple_correct_answers, expert and wrong_groundtruth with no labels
         return None
     return {
         "question": entry['question'],
@@ -123,14 +98,14 @@ def format_entry(entry, category):
         "C": entry['choices'][2],
         "D": entry['choices'][3],
         "expected_answer": final_answer,
-        "subset_for_metrics": subcategory,
+        "subset_for_metrics": subcategories[category][0],
         "source": entry['source']
     }
 
 
 def write_data_to_file(output_file, data, category):
     with open(output_file, "at", encoding="utf-8") as fout:
-        for entry in tqdm(data, desc=f"Writing {category} to {output_file.name}"):
+        for entry in tqdm(data, desc=f"Writing {category} ({subcategories[category][0]}) to {output_file.name}"):
             if (final_entry := format_entry(entry, category)):
                 json.dump(final_entry, fout)
                 fout.write("\n")
