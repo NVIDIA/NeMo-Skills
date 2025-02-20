@@ -749,6 +749,33 @@ class VLLMModel(BaseModel):
     def response_completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
                             random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
                             repetition_penalty=1.0):
+        logit_bias = {# " Wait"
+            14190: 30,
+
+            # " But we need to check if this works"
+            3983: 30,  # "But" (first token)
+            582: 20, 1184: 20, 311: 20, 1779: 20, 421: 20, 419: 20, 4278: 20,
+
+            # " Alternatively"
+            92014: 30,  # "Alternatively" (single token)
+
+            # " Let me try another approach"
+            10061: 30,  # "Let" (first token)
+            752: 20, 1430: 20, 2441: 20, 5486: 20,
+
+            # " I need to double-check"
+            40: 30,  # "I" (first token)
+            1184: 20, 311: 20, 1990: 20, 15934: 20,
+
+            # " But let me check again"
+            3983: 30,  # "But" (first token)
+            1077: 20, 752: 20, 1779: 20, 1549: 20,
+
+            # " Let me think again"
+            10061: 30,  # "Let" (first token)
+            752: 20, 1744: 20, 1549: 20
+        }
+
         return self.oai_client.completions.create(
             model=self.model,
             prompt=[prompt],
@@ -761,7 +788,7 @@ class VLLMModel(BaseModel):
             frequency_penalty=0.0,
             presence_penalty=0.0,
             logprobs=None,
-            logit_bias=None,
+            logit_bias=logit_bias,
             n=1,
             extra_body={
                 "top_k": top_k,
@@ -798,7 +825,7 @@ class VLLMModel(BaseModel):
                        , " Let me think again"]
         ignore_str = " Wait"
         
-        try_times = 8
+        try_times = 0
         tokens_for_final_answer = 0
         max_tokens_thinking_tmp = tokens_to_generate - tokens_for_final_answer
         total_generated_tokens = 0
@@ -816,8 +843,10 @@ class VLLMModel(BaseModel):
                 else:
                     final_output += (output + ignore_str)
         
-        
-        return {'generation': final_output, 'num_generated_tokens': total_generated_tokens}
+        response = self.response_completion(prompt, max_tokens_thinking_tmp, temperature, top_p, random_seed, stop_phrases, top_k, min_p, repetition_penalty)
+        final_output, num_generated_tokens = self.parse_openai_response(response)
+                
+        return {'generation': final_output, 'num_generated_tokens': num_generated_tokens}
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
