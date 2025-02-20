@@ -750,7 +750,7 @@ class VLLMModel(BaseModel):
                             random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
                             repetition_penalty=1.2):
         logit_bias = {
-            14190: 15,  # " Wait"
+            14190: 10,  # " Wait"
             3983: 10, 582: 5, 1184: 5, 311: 5, 1779: 5, 421: 5, 419: 5, 4278: 5,
             92014: 10,
             # 10061: 10, 752: 5, 1430: 5, 2441: 5, 5486: 5,
