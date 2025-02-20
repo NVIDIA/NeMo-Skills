@@ -1082,8 +1082,8 @@ def add_task(
         if len(cmd) != len(container) or len(cmd) != len(num_tasks):
             raise ValueError("Number of commands, containers and num_tasks must match.")
         for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
-            if cluster_config["executor"] == "local" and num_tasks > 1:
-                cur_cmd = f"mpirun --allow-run-as-root -np {num_tasks} bash -c {shlex.quote(cur_cmd)}"
+            if cluster_config["executor"] == "local" and cur_tasks > 1:
+                cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
                 commands.append(cur_cmd)
                 executors.append(

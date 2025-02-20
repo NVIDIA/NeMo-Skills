@@ -129,7 +129,7 @@ pretrained_checkpoint:
 model:
   # TODO: document perf implications
   # use_tp_pp_dp_mapping: true
-  hf_model_name_or_configs_dir: "meta-llama/Llama-3.1-8B-Instruct"
+  hf_model_name_or_configs_dir: null
   grpo:
     share_dir: /dev/shm/checkpoints
     # mbs to do log prob inference, can be set to
