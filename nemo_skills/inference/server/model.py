@@ -748,7 +748,7 @@ class VLLMModel(BaseModel):
 
     def response_completion(self, prompt, tokens_to_generate=100, temperature=0.7, top_p=1.0, 
                             random_seed=None, stop_phrases=None, top_k=None, min_p=None, 
-                            repetition_penalty=1.0):
+                            repetition_penalty=1.2):
         logit_bias = {
             14190: 10,  # " Wait"
             3983: 10, 582: 5, 1184: 5, 311: 5, 1779: 5, 421: 5, 419: 5, 4278: 5,
