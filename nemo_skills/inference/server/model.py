@@ -651,10 +651,10 @@ class OpenAIModel(BaseModel):
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                temperature=1,
-                # top_p=top_p,
-                max_completion_tokens=tokens_to_generate,
-                # presence_penalty=repetition_penalty,
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=tokens_to_generate,
+                presence_penalty=repetition_penalty,
                 seed=random_seed,
                 stop=stop_phrases,
                 messages=prompt,
