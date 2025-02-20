@@ -1,0 +1,76 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+few_shot_examples:
+  prefix: "Here are some examples of problems and solutions you can refer to.\n\n"
+  template: "Problem:\n{problem}\n\nSolution:\n{solution}\n\n\n\n\n\n"
+  suffix: "Here is the problem you need to solve:\n"
+  # this is built as <prefix>{template.format(example1)}{template.format(example2)}...{template.format(exampleN)}<suffix>
+  # and available as {examples} key in the final prompt
+  # if examples_type is not specified, then {examples} will be empty
+  # by default there are no examples, but can be changed from code/cmd
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. 
+
+  Modify the following mathematical solution to reflect a more natural, exploratory, and human-like reasoning process, as if a person were solving the problem step by step in real time. Your modifications should follow these guidelines:
+
+  **Your modifications should follow these guidelines**:
+
+  1. Expand, don’t shorten:
+    -Keep all original steps and explanations.
+    -Expand on unclear parts rather than omitting them.
+    -If a step is missing, explicitly derive it instead of skipping.
+
+  2. Enhance logical structure:
+   - Make the reasoning more systematic and easier to follow.
+   - Explicitly state why each step is taken.
+
+  3. Incorporate self-checking and verification:
+   - Add explicit back-substitutions to confirm correctness.
+   - Include statements like:
+     - "Let’s verify if this satisfies the original equation."
+     - "Before proceeding, let’s confirm this step."
+   - If any inconsistencies arise, analyze and correct them.
+
+  4. Encourage iterative reasoning and alternative approaches:
+   - Modify the solution to include different methods of solving the problem.
+   - Compare approaches and justify why a particular one is chosen.
+   - Use phrases like:
+     - "Another way to approach this problem is..."
+     - "To confirm our answer, let's try solving it differently."
+
+  5. Introduce human-like reflection, error awareness, and self-correction:
+   - Introduce moments of self-doubt and validation.
+   - Add phrases such as:
+     - "Wait, let me check if I overlooked something."
+     - "This result looks unexpected—let me verify my calculations."
+
+  6. Ensure the final answer is robustly justified and reached organically:
+   - Include a concluding statement summarizing why the answer is correct.
+   - If multiple methods were used, explain why they all lead to the same result.
+   - Don’t immediately present a formula—let the solution emerge naturally through step-by-step exploration.
+
+  7. Make the reasoning conversational and dynamic:
+   - Use informal, natural phrasing instead of rigid, textbook-style explanations.
+   - Incorporate casual thought process markers like:
+      "Hmm, that seems off—let me double-check."
+      "Wait, does that actually work?"
+   - Avoid making the solution feel overly rigid—make it feel like a person thinking through the problem dynamically.
+
+  **Important**:  
+  - Do not shorten the response—expand it where necessary.
+  - Preserve every detail while improving structure and readability.
+  -The final answer should be correct, but reached through a more natural, exploratory process.
+
+  
+  
+   **Original Problem:**
+  {input}
+
+   **AI-Generated Solution (to be improved):**
+  {output}
+  
+  **Rewritten and Expanded Solution (Highly Reflective, Rigorous Style):**
+  Output:
