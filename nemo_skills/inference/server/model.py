@@ -651,7 +651,7 @@ class OpenAIModel(BaseModel):
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                temperature=temperature,
+                temperature=1,
                 top_p=top_p,
                 max_completion_tokens=tokens_to_generate,
                 presence_penalty=repetition_penalty,
