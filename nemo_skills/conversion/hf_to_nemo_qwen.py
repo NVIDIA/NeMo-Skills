@@ -53,6 +53,7 @@ def get_args():
         help="Name of HF model we are converting to (e.g. Qwen/Qwen2.5-Math-7B)",
     )
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
+    parser.add_argument("--nemo-format", choices=["zarr", "torch_dict"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
     return args
 
@@ -81,7 +82,7 @@ def load_config(args, qwen_config):
     while qwen_config['vocab_size'] % base != 0:
         base //= 2
     nemo_config.make_vocab_size_divisible_by = base
-    nemo_config.dist_ckpt_format = 'torch_dist'
+    nemo_config.dist_ckpt_format = args.nemo_format
     return nemo_config
 
 
