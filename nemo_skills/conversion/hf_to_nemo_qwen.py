@@ -31,8 +31,13 @@ from nemo.collections.nlp.parts.nlp_overrides import (
 from nemo.collections.nlp.parts.utils_funcs import load_state_dict_helper, torch_dtype_from_precision
 from nemo.utils import logging
 from omegaconf import OmegaConf
-from pytorch_lightning.trainer.trainer import Trainer
-from transformers import Qwen2ForCausalLM, Qwen2Tokenizer
+
+try:
+    from pytorch_lightning.trainer.trainer import Trainer
+except ModuleNotFoundError:
+    from lightning.pytorch.trainer.trainer import Trainer
+
+from transformers import Qwen2ForCausalLM
 
 
 def get_args():
