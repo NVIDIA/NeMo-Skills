@@ -101,6 +101,10 @@ def main(cfg) -> None:
 
     # use the entire dataset
     train_valid_test_num_samples = [-1, -1, -1]
+
+    # patching the tokenizer to not remove tokens
+    ptl_model.tokenizer.special_tokens_to_remove_while_decoding = []
+
     train_ds, validation_ds = [
         AllTaskDataset(
             cfg.model.data.data_prefix[split][0],
