@@ -58,7 +58,7 @@ def get_args():
         help="Name of HF model we are converting to (e.g. Qwen/Qwen2.5-Math-7B)",
     )
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
-    parser.add_argument("--nemo-format", choices=["zarr", "torch_dict"], default="zarr", help="NeMo checkpoint format")
+    parser.add_argument("--nemo-format", choices=["zarr", "torch_dist"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
     return args
 
