@@ -79,7 +79,7 @@ def save_data(split):
     for subject, questions in original_data.items():
         for question in questions:
             new_entry = question
-            new_entry['subject'] = subject
+            new_entry['subset_for_metrics'] = subject
             data.append(new_entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
