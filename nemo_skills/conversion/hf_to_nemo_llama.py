@@ -21,6 +21,13 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 
 import torch
+
+try:
+    from lightning.pytorch.trainer.trainer import Trainer
+except ModuleNotFoundError:
+    from pytorch_lightning.trainer.trainer import Trainer
+
+
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
@@ -32,7 +39,6 @@ from nemo.collections.nlp.parts.nlp_overrides import (
 from nemo.collections.nlp.parts.utils_funcs import torch_dtype_from_precision
 from nemo.utils import logging
 from omegaconf import OmegaConf
-from pytorch_lightning.trainer.trainer import Trainer
 from transformers import AutoTokenizer, LlamaForCausalLM, LlamaTokenizer
 
 
@@ -56,7 +62,7 @@ def get_args():
         help="Name of HF model we are converting to (e.g. mistralai/Mistral-7B-v0.1)",
     )
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
-    parser.add_argument("--nemo-format", choices=["zarr", "torch_dict"], default="zarr", help="NeMo checkpoint format")
+    parser.add_argument("--nemo-format", choices=["zarr", "torch_dist"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
     return args
 
