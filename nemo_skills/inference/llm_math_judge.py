@@ -147,8 +147,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         return
 
     prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
-    if "predicted_answer" not in data[0]:
-        data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
+    # if "predicted_answer" not in data[0]:
+    data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
 
     LOG.info("Prompt used: %s", prompt)
     LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
@@ -161,8 +161,8 @@ def llm_math_judge(cfg: LlmMathJudgeConfig):
         for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
             if idx >= cfg.max_samples:
                 break
-            if "predicted_answer" not in data_point:
-                data_point["predicted_answer"] = extract_answer(data_point["generation"])
+            # if "predicted_answer" not in data_point:
+            data_point["predicted_answer"] = extract_answer(data_point["generation"])
             if data_point["expected_answer"] is None:
                 raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
             judgement = prefill_judgement(data_point)
