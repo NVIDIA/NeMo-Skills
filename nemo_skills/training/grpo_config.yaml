@@ -132,6 +132,7 @@ pretrained_checkpoint:
   restore_from_path: null
 
 model:
+  pipeline_model_parallel_size: 1
   # TODO: document perf implications
   # use_tp_pp_dp_mapping: true
   hf_model_name_or_configs_dir: null
@@ -197,7 +198,7 @@ model:
   # these control the mbs/gbs during GRPO training (optimization)
   micro_batch_size: 1
   # making it fully online by default. Decrease this to go offline
-  global_batch_size: #{multiply:${trainer.grpo.num_prompts_per_grpo_step}, ${trainer.grpo.samples_per_prompt}}
+  global_batch_size: ${multiply:${trainer.grpo.num_prompts_per_grpo_step}, ${trainer.grpo.samples_per_prompt}}
   megatron_amp_O2: True
 
   encoder_seq_length: 4096
