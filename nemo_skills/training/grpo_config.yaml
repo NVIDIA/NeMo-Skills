@@ -35,7 +35,7 @@ trainer:
     samples_per_prompt: 64
 
     val_prompt_micro_batch_size: ${int_div:${.val_num_prompts_per_grpo_step}, ${.dp_size}}
-    val_num_prompts_per_grpo_step: 256
+    val_num_prompts_per_grpo_step: 1024  # TODO: double check they are not duplicated?
     val_samples_per_prompt: 8
 
     generation_save_dir: null
