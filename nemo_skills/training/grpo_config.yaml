@@ -18,20 +18,25 @@ trainer:
     greedy_on_validation: True
 
     # GRPO args to generate the data for training
-    initial_policy_kl_penalty: 0.001
+    initial_policy_kl_penalty: 0.00000001  # cannot be set to zero currently
     use_leave_one_out_baseline: True
     normalize_rewards: True
 
     # rollout arguments
-    generation_rollout_mbs: 64
+    generation_rollout_mbs: ${multiply:${.prompt_micro_batch_size}, ${.samples_per_prompt}}
 
-    prompt_micro_batch_size: 1
-    num_prompts_per_grpo_step: 32
+    # TODO: update with CP when supported
+    total_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+    total_num_gpus: ${multiply:${trainer.num_nodes}, ${trainer.devices}}
+    dp_size: ${int_div:${.total_num_gpus}, ${.total_parallel_size}}
+
+    prompt_micro_batch_size: ${int_div:${.num_prompts_per_grpo_step}, ${.dp_size}}
+    num_prompts_per_grpo_step: 128
     samples_per_prompt: 64
 
-    val_prompt_micro_batch_size: 16
-    val_num_prompts_per_grpo_step: 512
-    val_samples_per_prompt: 4
+    val_prompt_micro_batch_size: ${int_div:${.val_num_prompts_per_grpo_step}, ${.dp_size}}
+    val_num_prompts_per_grpo_step: 256
+    val_samples_per_prompt: 8
 
     generation_save_dir: null
 
@@ -191,7 +196,8 @@ model:
   mcore_gpt: True
   # these control the mbs/gbs during GRPO training (optimization)
   micro_batch_size: 1
-  global_batch_size: 512
+  # making it fully online by default. Decrease this to go offline
+  global_batch_size: #{multiply:${trainer.grpo.num_prompts_per_grpo_step}, ${trainer.grpo.samples_per_prompt}}
   megatron_amp_O2: True
 
   encoder_seq_length: 4096
