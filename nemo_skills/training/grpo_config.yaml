@@ -141,7 +141,7 @@ model:
     # mbs to do log prob inference, can be set to
     # lower than rollout_micro_batch_size to reduce
     # memory usage
-    forward_micro_batch_size: 4
+    forward_micro_batch_size: 1
 
     # to offload during generation or not
     offload_adam_states: True
