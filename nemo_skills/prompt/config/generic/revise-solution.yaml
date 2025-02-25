@@ -14,63 +14,67 @@ system: ""
 user: |-
   You are an advanced mathematical reasoning assistant. 
 
-  Modify the following mathematical solution to reflect a more natural, exploratory, and human-like reasoning process, as if a person were solving the problem step by step in real time. Your modifications should follow these guidelines:
+  Your goal is to make this response highly engaging, natural, and conversational.  
+  The explanation should feel like a friendly discussion rather than a rigid math proof.
 
-  **Your modifications should follow these guidelines**:
+  Modify the following mathematical solution to be **natural, exploratory, and engaging**, as if a person were solving the problem step by step in real time.  
+  Please always start the solution with **"Solution: "**  
+  Please make sure the revised solution ends with **Final Answer**  
+  
+    \[
+  \boxed{{YOUR ANSWER}}
+  \]
 
-  1. Expand, don’t shorten:
-    -Keep all original steps and explanations.
-    -Expand on unclear parts rather than omitting them.
-    -If a step is missing, explicitly derive it instead of skipping.
+  Guidelines for the response:
 
-  2. Enhance logical structure:
-   - Make the reasoning more systematic and easier to follow.
-   - Explicitly state why each step is taken.
+  1. **Make it feel like a real conversation**  
+    - Use friendly, casual phrasing:
+      - "Alright, let’s see what’s happening here."
+      - "Hmm… interesting. What if we try this?"
+    - Write as if explaining to a curious friend, not in a textbook style.
 
-  3. Incorporate self-checking and verification:
-   - Add explicit back-substitutions to confirm correctness.
-   - Include statements like:
-     - "Let’s verify if this satisfies the original equation."
-     - "Before proceeding, let’s confirm this step."
-   - If any inconsistencies arise, analyze and correct them.
+  2. **Think out loud, like a real person solving a problem**  
+    - Include natural reasoning, such as:
+      - "Let's check if this works..."
+      - "Oh! That actually makes sense now!"
+    - When switching strategies, narrate the process:
+      - "This looks tricky. Maybe another approach works better?"
 
-  4. Encourage iterative reasoning and alternative approaches:
-   - Modify the solution to include different methods of solving the problem.
-   - Compare approaches and justify why a particular one is chosen.
-   - Use phrases like:
-     - "Another way to approach this problem is..."
-     - "To confirm our answer, let's try solving it differently."
+  3. **Make it exploratory—try different approaches before settling on a solution**  
+    - Instead of jumping straight to the answer, test simple cases first.
+    - Introduce trial and error:
+      - "Let’s try plugging in \( x = 1 \) and see what happens."
+      - "This almost works, but let’s tweak it."
 
-  5. Introduce human-like reflection, error awareness, and self-correction:
-   - Introduce moments of self-doubt and validation.
-   - Add phrases such as:
-     - "Wait, let me check if I overlooked something."
-     - "This result looks unexpected—let me verify my calculations."
+  4. **Use relatable explanations and comparisons**  
+    - Introduce metaphors where helpful:
+      - "This part is like balancing a seesaw—both sides need to match."
+      - "I always double-check my signs—small mistakes sneak in so easily!"
 
-  6. Ensure the final answer is robustly justified and reached organically:
-   - Include a concluding statement summarizing why the answer is correct.
-   - If multiple methods were used, explain why they all lead to the same result.
-   - Don’t immediately present a formula—let the solution emerge naturally through step-by-step exploration.
+  5. **Ensure the final answer feels earned, not just stated**  
+    - Instead of just saying *"Thus, the answer is..."* use:
+      - "Alright, this checks out, so our final answer is..."
+      - "That was a journey, but we got there! The final answer is..."
+    - Always box the final answer:
+    \[
+    \boxed{{YOUR ANSWER}}
+    \]
 
-  7. Make the reasoning conversational and dynamic:
-   - Use informal, natural phrasing instead of rigid, textbook-style explanations.
-   - Incorporate casual thought process markers like:
-      "Hmm, that seems off—let me double-check."
-      "Wait, does that actually work?"
-   - Avoid making the solution feel overly rigid—make it feel like a person thinking through the problem dynamically.
-
-  **Important**:  
-  - Do not shorten the response—expand it where necessary.
-  - Preserve every detail while improving structure and readability.
-  -The final answer should be correct, but reached through a more natural, exploratory process.
+  ### **Additional Instructions to Encourage a Longer Response**:
+  - **Explain each step in detail, including why it works and how it connects to the previous step.**  
+  - **If possible, explore at least two different solution approaches before deciding on the best one.**  
+  - **Provide intuitive explanations before diving into formal calculations.**  
+  - **After solving, verify the answer using sample values or an alternative method.**  
+  - **Consider real-world applications or historical context if relevant.**  
+  - **Discuss any edge cases or special conditions that could affect the solution.**  
 
   
   
-   **Original Problem:**
+  **Original Problem:**
   {input}
 
-   **AI-Generated Solution (to be improved):**
+  **AI-Generated Solution (to be improved):**
   {output}
-  
-  **Rewritten and Expanded Solution (Highly Reflective, Rigorous Style):**
+
+  **Rewritten and Expanded Solution (Conversational, Engaging, and Detailed Style):**
   Output:
