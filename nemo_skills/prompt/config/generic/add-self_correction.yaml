@@ -36,5 +36,8 @@ user: |-
 
 
   Most important: Modify the given solution** by **introducing 3 - 5 mistakes**, but make them subtle and realistic.
-  ### **Given Solution (Modify and Improve):**
+  Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
+  we will insert some mistakes," and ensure the wording sounds natural.
+  
+  Now I will give you the following solution, please Modify and Improve:
   {output}
