@@ -14,6 +14,7 @@
 
 import logging
 import os
+import random
 from dataclasses import dataclass
 from typing import List
 
@@ -129,7 +130,7 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
             f" --use_wandb $WANDB_API_KEY "
             f" --wandb_project {wandb_project} "
             f" --wandb_run_name {expname} "
-            f" --wandb_id {expname} "
+            f" --wandb_id {expname}_{str(random.randint(0, 2 ** 32))} "
             f" --wandb_resume auto"
         )
     else:

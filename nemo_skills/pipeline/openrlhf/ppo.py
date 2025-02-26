@@ -15,6 +15,7 @@
 import json
 import logging
 import os
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
@@ -145,7 +146,7 @@ class PPOOpenRLHFTask:
                 f" --use_wandb $WANDB_API_KEY "
                 f" --wandb_project {wandb_project} "
                 f" --wandb_run_name {expname} "
-                f" --wandb_id {expname} "
+                f" --wandb_id {expname}_{str(random.randint(0, 2 ** 32))} "
                 f" --wandb_resume auto"
             )
         else:
