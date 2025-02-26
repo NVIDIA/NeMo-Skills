@@ -16,17 +16,35 @@ user: |-
   **Base your analysis on context and logical intent, not just keywords.**
 
   The final answer should be in the following format:
-  Self-Checking	\boxed{{YOUR ANSWER}}
-  Self-Correction \boxed{{YOUR ANSWER}}
-  Trial-and-Error	\boxed{{YOUR ANSWER}}
+  Self-Checking	\boxed{{X}}
+  Self-Correction \boxed{{Y}}
+  Trial-and-Error	\boxed{{Z}}
 
-  Don't use calculator or any other external tools. It's best if you don't even use a paper, but instead write everything directly in computer in latex. If you're not comfortable doing that, it's ok to write the solution on paper, but don't leave out any thoughts or derivations as you do it.
-  E.g. if you had to go to another page and multiple two 4-digit numbers there, it's important that you carry it back to your solution, such that all arithmetical operations or equation simplifications that are there are easy to do in your head. E.g. instead of writing 680*389=264520 , 
-  do it like this instead I need to multiply 680*389.
-  680 * 400 = 272,000
-  680 * (-11) = -7,480 (since 389 = 400 - 11)
-  So, 272,000 - 7,480 = 264,520.
-  You can be even more detailed if you'd like, more details are never harmful here.
+  ### **Reasoning Categories**:
+
+  1. **Self-Checking**: When the author verifies a step, checks a calculation, or confirms whether the approach satisfies given conditions.  
+    - **Typical phrases**:  
+      - "Wait, let me check..."  
+      - "Let’s verify if this works..."  
+      - "Before going further, let’s confirm..."  
+      - "Now, let's check if this satisfies the given conditions."
+
+  2. **Self-Correction**: When the author identifies an error and actively corrects it.  
+    - **Typical phrases**:  
+      - "Oh! I see the mistake..."  
+      - "Wait, that seems incorrect..."  
+      - "Let me recompute this..."  
+      - "Maybe I made an error, let me fix that."
+
+  3. **Trial-and-Error Thinking**: When the author experiments with different approaches, tests values, or adjusts methods.  
+    - **Typical phrases**:  
+      - "Let’s try plugging in..."  
+      - "What if we try another approach?"  
+      - "Maybe this method works better..."  
+      - "Let’s test a few cases before proceeding."
+
+  **⚠ Important:** Do not rely solely on keyword matching. Consider the **logical intent** behind each sentence to classify it correctly.
+
 
   {examples}{problem}
 
