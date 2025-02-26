@@ -49,7 +49,6 @@ def test_cross_model_logprobs_consistency():
 
     model_info = [
         ("trtllm", os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')),
-        ("nemo", os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')),
         ("vllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),
     ]
 
@@ -91,18 +90,14 @@ def test_cross_model_logprobs_consistency():
         tokens = output["tokens"]
         outputs_map[server_type] = list(zip(tokens, logprobs))
 
-    if "vllm" not in outputs_map or "nemo" not in outputs_map:
+    if "vllm" not in outputs_map or "trtllm" not in outputs_map:
         pytest.skip("Not enough models available to compare top_logprobs consistency")
 
     tolerance = 0.5
-    for server_type, _ in model_info:
-        for other_server_type, _ in model_info:
-            if server_type == other_server_type:
-                continue
-            assert len(outputs_map[server_type]) == len(outputs_map[other_server_type]), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
-            if (server_type == "trtllm" or other_server_type == "trtllm") and model_type == "llama":
-                # trtllm outputs do not match others for llama for some reason
-                continue
-            for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
-                assert token.replace("Ġ", " ") == other_token.replace("Ġ", " "), f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
-                assert abs(logprob - other_logprob) < tolerance, f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"
+    server_type = "vllm"
+    other_server_type = "trtllm"
+
+    assert len(outputs_map[server_type]) == len(outputs_map[other_server_type]), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
+    for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
+        assert token.replace("Ġ", " ") == other_token.replace("Ġ", " "), f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
+        assert abs(logprob - other_logprob) < tolerance, f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"
