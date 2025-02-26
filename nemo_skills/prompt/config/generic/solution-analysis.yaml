@@ -8,9 +8,9 @@ user: |-
   **Base your analysis on context and logical intent, not just keywords.**
 
   The final answer should be in the following format:
-  Self-Checking	\boxed{{YOUR ANSWER}}
-  Self-Correction \boxed{{YOUR ANSWER}}
-  Trial-and-Error	\boxed{{YOUR ANSWER}}
+  Self-Checking	\boxed{{X}}
+  Self-Correction \boxed{{Y}}
+  Trial-and-Error	\boxed{{Z}}
 
   ### **Reasoning Categories**:
 
@@ -45,15 +45,15 @@ user: |-
   3. **Ensure that each instance truly fits the reasoning type** (do not just rely on keywords).
   4. **Provide a structured table summarizing the occurrences.**
   5. **Give 2-3 examples** from the text for each category, explaining why they fit.
-  6. **Use LaTeX-style `\boxed{}` notation for the final counts in the table.**
+  6. **Use LaTeX-style `\boxed{{}}` notation for the final counts in the table.**
 
   ---
 
   ### **Expected Output Format**
   The final answer should be in the following format:
-  Self-Checking	\boxed
-  Self-Correction	\boxed
-  Trial-and-Error	\boxed
+  Self-Checking	\boxed{{X}}
+  Self-Correction \boxed{{Y}}
+  Trial-and-Error	\boxed{{Z}}c
 
   Now I will give you the solution as below
   {generation}
