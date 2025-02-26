@@ -8,9 +8,9 @@ user: |-
   **Base your analysis on context and logical intent, not just keywords.**
 
   The final answer should be in the following format:
-  Self-Checking	\boxed{{X}}
-  Self-Correction	\boxed{{Y}}
-  Trial-and-Error	\boxed{{Z}}
+  Self-Checking	\boxed{{YOUR ANSWER}}
+  Self-Correction \boxed{{YOUR ANSWER}}
+  Trial-and-Error	\boxed{{YOUR ANSWER}}
 
   ### **Reasoning Categories**:
 
@@ -51,9 +51,9 @@ user: |-
 
   ### **Expected Output Format**
   The final answer should be in the following format:
-  Self-Checking	\boxed{{X}}
-  Self-Correction	\boxed{{Y}}
-  Trial-and-Error	\boxed{{Z}}
+  Self-Checking	\boxed
+  Self-Correction	\boxed
+  Trial-and-Error	\boxed
 
   Now I will give you the solution as below
   {generation}
