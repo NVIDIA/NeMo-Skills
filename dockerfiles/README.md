@@ -22,7 +22,7 @@ To build vllm image do the following
    2. checkout tag/commit
    3. run `pip install -e .`
 7. install flask with `pip3 install --ignore-installed flask` (needed for NeMo-Aligner GRPO)
-8. git clone NeMo-Aligner into /opt and run `pip3 install -e /opt/NeMo-Aligner/tensor_comms`
+8. git clone https://github.com/Kipok/NeMo-Aligner at igitman/grpo branch into /opt and run `pip3 install -e /opt/NeMo-Aligner/tensor_comms`
 
 Currently it takes 10+ hours to build this docker. Is there anything we can do to speed it up?
 
