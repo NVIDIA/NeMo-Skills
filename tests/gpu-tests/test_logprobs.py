@@ -64,21 +64,20 @@ def test_cross_model_logprobs_consistency():
             f"--model {model_path} "
             f"--server_type {server_type} "
             f"--output_dir {output_dir} "
-            f"--benchmarks gsm8k:1 "
+            f"--benchmarks gsm8k:0 "
             f"--server_gpus 1 "
             f"--server_nodes 1 "
-            f"--skip_greedy "
             f"++prompt_template={prompt_template} "
             f"++split=test "
             f"++batch_size=8 "
             f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
             f"++inference.tokens_to_generate=20 "
-            f"++inference.temperature=0.7 "
+            f"++inference.temperature=0.0 "
         )
         subprocess.run(cmd, shell=True, check=True)
         time.sleep(120) # Wait for the server to finish generating
-        jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output-rs0.jsonl"
+        jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output.jsonl"
 
         with open(jsonl_file, "r") as f:
             outputs = [json.loads(line) for line in f.readlines()]
