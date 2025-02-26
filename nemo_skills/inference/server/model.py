@@ -517,7 +517,7 @@ class NemoModel(BaseModel):
                 break
             
             # we need to replace special tokens manually, as we don't have access to the tokenizer
-            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n').replace('âĢĻ', "’")
             if generation[gen_start_idx:].startswith(token):
                 gen_start_idx += len(token)
 
@@ -539,7 +539,8 @@ class NemoModel(BaseModel):
         for idx, token in enumerate(tokens[prompt_token_count:]):
             if idx == tokens_to_generate:
                 break
-            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n')
+            # we need to replace special tokens manually, as we don't have access to the tokenizer
+            token = token.replace('Ġ', ' ').replace('Ċ', '\n').replace('ċ', '\n').replace('âĢĻ', "’")
             if generation[gen_end_idx:].startswith(token):
                 gen_end_idx += len(token)
         
