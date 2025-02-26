@@ -59,9 +59,9 @@ user: |-
 
   ### **Expected Output Format**
   The final answer should be in the following format:
-  Self-Checking	\boxed{X}
-  Self-Correction	\boxed{Y}
-  Trial-and-Error	\boxed{Z}
+  Self-Checking	\boxed{{X}}
+  Self-Correction	\boxed{{Y}}
+  Trial-and-Error	\boxed{{Z}}
 
   Now I will give you the solution as below
-  {output}
+  {generation}
