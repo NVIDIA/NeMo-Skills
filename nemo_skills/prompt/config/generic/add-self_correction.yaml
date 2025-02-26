@@ -4,40 +4,35 @@
 system: ""
 
 user: |-
-  You are an advanced mathematical reasoning assistant. Your task is to **revise the given solution** by **introducing exactly N intentional mistakes and then correcting them** while keeping the original logic intact.
+  You are an advanced mathematical reasoning assistant. Your task is to **revise the given solution** by **introducing exactly N intentional mistakes and naturally correcting them during the reasoning process** while keeping the final answer correct.
+
 
   please start with your modified output with "Solution"
   please make sure finish the solution with **Final Answer**
   \[ \boxed{{YOUR ANSWER}} \] 
 
   ### **Self-Correction Definition**:
-  Self-correction means identifying an error and actively correcting it, realizing a mistake and adjusting calculations.
+  Self-correction means identifying an error and actively correcting it, realizing a mistake, and adjusting calculations. 
 
-  - **Typical self-correction phrases**:
-    - "Oh! I see the mistake..."
-    - "Wait, that seems incorrect..."
-    - "Let me recompute this..."
-    - "Maybe I made an error, let me fix that."
-    - "I made a sign mistake here, let’s correct it."
+  - **How to introduce self-corrections naturally**:
+    - The mistake should **not be immediately obvious**—it should be discovered through reasoning.
+    - The correction should **flow naturally** in the thought process, as if the author notices it while solving.
+    - The author may hesitate, second-guess, and re-evaluate before making a correction.
 
-
-  ### **Instructions**:
-  1. **Read the given solution carefully**.
-  2. **Introduce 3 - 5 small but realistic mistakes** at different points in the solution.
-    - Examples of mistakes:
-      - A sign error in an equation.
-      - A miscalculated coefficient.
-      - Forgetting to apply a key mathematical property.
-      - Using an incorrect intermediate value.
-  3. **Have the author of the solution notice and correct each mistake naturally**.
-  4. **Each self-correction must follow a natural discovery process**, such as:
-    - Checking results and realizing something is off.
-    - Comparing two approaches and spotting a discrepancy.
-    - Catching an inconsistency before moving forward.
-  5. **Ensure the final answer remains correct** after all corrections.
-  6. **Clearly highlight each self-correction step**, making it a part of the natural problem-solving flow.
+  - **Example self-correction phrases**:
+    - "Wait, something feels off here... let me check."
+    - "Oh! I think I see the mistake..."
+    - "Hold on, I might have miscalculated this part."
+    - "Let’s go back and check this—something doesn’t look right."
 
   ---
+
+  ### **Instructions**:
+  1. **Modify the given solution** by **introducing 3 - 5 mistakes**, but make them subtle and realistic.
+  2. **Do not list mistakes separately**—instead, make the author realize and correct them **naturally while solving the problem**.
+  3. **Ensure the author notices mistakes through logical reasoning** (e.g., unexpected results, inconsistencies, or rechecking).
+  4. **Self-corrections should be embedded seamlessly**, making the reasoning feel more human and exploratory.
+  5. **Maintain the original logic and ensure the final answer remains correct**.
 
   ### **Given Solution (Modify and Improve):**
   {output}
