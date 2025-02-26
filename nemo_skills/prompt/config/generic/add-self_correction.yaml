@@ -1,0 +1,43 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Your task is to **revise the given solution** by **introducing exactly N intentional mistakes and then correcting them** while keeping the original logic intact.
+
+  
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  ### **Self-Correction Definition**:
+  Self-correction means identifying an error and actively correcting it, realizing a mistake and adjusting calculations.
+
+  - **Typical self-correction phrases**:
+    - "Oh! I see the mistake..."
+    - "Wait, that seems incorrect..."
+    - "Let me recompute this..."
+    - "Maybe I made an error, let me fix that."
+    - "I made a sign mistake here, let’s correct it."
+
+
+  ### **Instructions**:
+  1. **Read the given solution carefully**.
+  2. **Introduce exactly \boxed{N} small but realistic mistakes** at different points in the solution.
+    - Examples of mistakes:
+      - A sign error in an equation.
+      - A miscalculated coefficient.
+      - Forgetting to apply a key mathematical property.
+      - Using an incorrect intermediate value.
+  3. **Have the author of the solution notice and correct each mistake naturally**.
+  4. **Each self-correction must follow a natural discovery process**, such as:
+    - Checking results and realizing something is off.
+    - Comparing two approaches and spotting a discrepancy.
+    - Catching an inconsistency before moving forward.
+  5. **Ensure the final answer remains correct** after all corrections.
+  6. **Clearly highlight each self-correction step**, making it a part of the natural problem-solving flow.
+
+  ---
+
+  ### **Given Solution (Modify and Improve):**
+  {output}
