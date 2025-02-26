@@ -56,7 +56,11 @@ user: |-
   {examples}{problem}
 
 
-  Please share your thinking process now. Remember: your goal is to write your thinking process as you approach this math problem. Note that we are not that much interested in the final solution, but much more in the process that lead you to it. 
-  Did you have references to other problems you solved before in your mind? Write that down. Did you ponder upon which approach to take before doing derivations? Write that down. Does your current approach look too complicated and you need to try something else? 
-  Say that and write down any alternative ideas you have. Did you notice that something doesn't look good and you need to double check previous derivations for mistake? That's what we are looking for - write that down and correct the solution, but don't erase the mistake! 
-  The more detailed this is, the better.
+  ### **Expected Output Format**
+  The final answer should be in the following format:
+  Self-Checking	\boxed
+  Self-Correction	\boxed
+  Trial-and-Error	\boxed
+
+  Now I will give you the solution as below
+  {generation}
