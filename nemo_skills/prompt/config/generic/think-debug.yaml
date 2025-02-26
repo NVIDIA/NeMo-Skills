@@ -53,7 +53,7 @@ user: |-
   5. **Give 2-3 examples** from the text for each category, explaining why they fit.
   6. **Use LaTeX-style `\boxed{}` notation for the final counts in the table.**
 
-  {examples}{problem}
+  {examples}{generation}
 
 
   ### **Expected Output Format**
@@ -62,5 +62,4 @@ user: |-
   Self-Correction	\boxed
   Trial-and-Error	\boxed
 
-  Now I will give you the solution as below
-  {generation}
+  Now I will give you the solution as below:
