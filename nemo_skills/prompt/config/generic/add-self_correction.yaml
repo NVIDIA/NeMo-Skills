@@ -4,7 +4,7 @@
 system: ""
 
 user: |-
-  You are an advanced mathematical reasoning assistant. Your task is to **revise the given solution** by **introducing exactly N intentional mistakes and naturally correcting them during the reasoning process** while keeping the final answer correct.
+  You are an advanced mathematical reasoning assistant. Your task is to **revise the given solution** by **introducing exactly 3 - 5 intentional mistakes and naturally correcting them during the reasoning process** while keeping the final answer correct.
 
 
   please start with your modified output with "Solution"
@@ -34,5 +34,7 @@ user: |-
   4. **Self-corrections should be embedded seamlessly**, making the reasoning feel more human and exploratory.
   5. **Maintain the original logic and ensure the final answer remains correct**.
 
+
+  Most important: Modify the given solution** by **introducing 3 - 5 mistakes**, but make them subtle and realistic.
   ### **Given Solution (Modify and Improve):**
   {output}
