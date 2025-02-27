@@ -60,10 +60,14 @@ class RepoMetadata:
         if not self.path.exists():
             raise ValueError(f"Repository path `{self.path}` does not exist.")
 
+
 # Registry of external repos that should be packaged with the code in the experiment
 EXTERNAL_REPOS = {
-    'nemo_skills': RepoMetadata(name='nemo_skills', path=Path(__file__).absolute().parents[1]),  # path to nemo_skills repo
+    'nemo_skills': RepoMetadata(
+        name='nemo_skills', path=Path(__file__).absolute().parents[1]
+    ),  # path to nemo_skills repo
 }
+
 
 def register_external_repo(metadata: RepoMetadata):
     """Register an external repo to be packaged with the code in the experiment.
@@ -639,6 +643,7 @@ def get_git_repo_path(path: str | Path = None):
     finally:
         os.chdir(original_path)
 
+
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = get_registered_external_repo('nemo_skills').path
@@ -682,7 +687,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         include_patterns.append(str(nemo_skills_dir / '*'))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
-        root_package =  run.PatternPackager(
+        root_package = run.PatternPackager(
             include_pattern=include_patterns,
             relative_path=include_pattern_relative_paths,
         )
@@ -699,21 +704,16 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             repo_path = repo_meta.path
             if get_git_repo_path(repo_path):
                 # Extra repos is a git repos, so we need to package only committed files
-                extra_repos[repo_name] = (
-                    run.GitArchivePackager(
-                        basepath=str(repo_path),
-                        check_uncommitted_changes=check_uncommited_changes
-                    )
+                extra_repos[repo_name] = run.GitArchivePackager(
+                    basepath=str(repo_path), check_uncommitted_changes=check_uncommited_changes
                 )
             else:
                 # Extra repos is not a git repo, so we need to package all files in the directory
                 repo_include_pattern = [str(Path(repo_path) / '*')]
                 repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
-                extra_repos[repo_name] = (
-                    run.PatternPackager(
-                        include_pattern=repo_include_pattern,
-                        relative_path=repo_include_pattern_relative_path,
-                    )
+                extra_repos[repo_name] = run.PatternPackager(
+                    include_pattern=repo_include_pattern,
+                    relative_path=repo_include_pattern_relative_path,
                 )
 
         # Return hybrid packager
@@ -910,7 +910,7 @@ def get_executor(
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
-        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--ntasks-per-node={tasks_per_node}",
         f"--nodes={num_nodes}",
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
@@ -962,13 +962,18 @@ def temporary_env_update(cluster_config, updates):
         cluster_config["env_vars"] = original_env_vars
 
 
+# TODO: this function has become too cumbersome to use with all recently added support
+#       we should make it simpler by perhaps removing separate logic for server/sandbox
+#       and supporting them through a list of cmds directly
+#       should also make heterogenous logic very clear and more robust
+#       and all parameters that can be list should be list for consistency
 def add_task(
     exp,
-    cmd,
+    cmd: str | list[str],
     task_name,
     cluster_config,
-    container,
-    num_tasks=1,
+    container: str | list[str],
+    num_tasks: int | list[int] = 1,
     num_gpus=None,
     num_nodes=1,
     log_dir=None,
@@ -1031,6 +1036,7 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     het_group = 0
+    het_group_indices = []
     total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
     commands = []
@@ -1062,34 +1068,45 @@ def add_task(
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group_indices.append(het_group)
         het_group += 1
 
-    # then goes the main task unless it's empty
+    # then goes the main task(s) unless it's empty
     if cmd:
-        if cluster_config["executor"] == "local" and num_tasks > 1:
-            cmd = f"mpirun --allow-run-as-root -np {num_tasks} bash -c {shlex.quote(cmd)}"
-        with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
-            commands.append(cmd)
-            executors.append(
-                get_executor(
-                    cluster_config=cluster_config,
-                    container=container,
-                    num_nodes=num_nodes,
-                    tasks_per_node=num_tasks,
-                    gpus_per_node=num_gpus,
-                    partition=partition,
-                    time_min=time_min,
-                    dependencies=dependencies,
-                    job_name=task_name,
-                    log_dir=log_dir,
-                    log_prefix="main",
-                    extra_package_dirs=extra_package_dirs,
-                    slurm_kwargs=slurm_kwargs,
-                    heterogeneous=heterogeneous,
-                    het_group=het_group,
-                    total_het_groups=total_het_groups,
+        if isinstance(cmd, str):
+            cmd = [cmd]
+        if isinstance(container, str):
+            container = [container]
+        if isinstance(num_tasks, int):
+            num_tasks = [num_tasks]
+        if len(cmd) != len(container) or len(cmd) != len(num_tasks):
+            raise ValueError("Number of commands, containers and num_tasks must match.")
+        for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
+            if cluster_config["executor"] == "local" and cur_tasks > 1:
+                cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
+            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+                commands.append(cur_cmd)
+                executors.append(
+                    get_executor(
+                        cluster_config=cluster_config,
+                        container=cur_container,
+                        num_nodes=num_nodes,
+                        tasks_per_node=cur_tasks,
+                        gpus_per_node=num_gpus,
+                        partition=partition,
+                        time_min=time_min,
+                        dependencies=dependencies,
+                        job_name=task_name,
+                        log_dir=log_dir,
+                        log_prefix="main" if len(cmd) == 1 else f"main_{cur_idx}",
+                        extra_package_dirs=extra_package_dirs,
+                        slurm_kwargs=slurm_kwargs,
+                        heterogeneous=heterogeneous,
+                        het_group=het_group,
+                        total_het_groups=total_het_groups,
+                    )
                 )
-            )
+                het_group_indices.append(het_group)
         het_group += 1
 
     # finally a sandbox if needed
@@ -1124,6 +1141,7 @@ def add_task(
                 total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+            het_group_indices.append(het_group)
         het_group += 1
 
     if cluster_config["executor"] != "local":
@@ -1152,6 +1170,8 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
+        if heterogeneous:
+            executors[0].het_group_indices = het_group_indices
         return exp.add(
             [run.Script(inline=command) for command in commands],
             executor=executors,

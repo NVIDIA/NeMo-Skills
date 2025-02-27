@@ -284,7 +284,7 @@ def summarize_results(
                         k_metrics[metric_key][base_name]["k"].append(k)
                         k_metrics[metric_key][base_name]["value"].append(metric_value)
 
-                    run.summary.update({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
+                    run.log({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
 
             # Create combined plot per metric key (line series)
             for metric_key, eval_modes in k_metrics.items():

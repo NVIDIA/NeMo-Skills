@@ -335,13 +335,14 @@ class TRTLLMModel(BaseModel):
             if not is_list:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
+        # futures are not really necessary here unless the number of prompts is huge
+        # as we get http reply right away with generation id from the trtllm server
         futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single_async, **request))
+        for request_idx in range(len(prompts)):
+            request = {key: value[request_idx] for key, value in kwargs.items()}
+            request['prompt'] = prompts[request_idx]
+            self.preprocess_request(request)
+            futures.append(self.executor.submit(self._generate_single_async, **request))
         outputs = [future.result() for future in futures]
 
         new_gen_id_to_params = {
