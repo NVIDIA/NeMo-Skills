@@ -16,7 +16,8 @@ executor: slurm
 
 containers:
   trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: vllm/vllm-openai:v0.7.0
+  vllm: igitman/nemo-skills-vllm:0.5.3
+  sglang: igitman/nemo-skills-sglang:0.5.3
   nemo: igitman/nemo-skills-nemo:0.5.0
   sandbox: igitman/nemo-skills-sandbox:0.5.0
   nemo-skills: igitman/nemo-skills:0.5.0
@@ -28,7 +29,7 @@ job_name_prefix: "nemo_skills:"
 # ssh_tunnel:
 #   host: <slurm host>
 #   user: <username>
-#   job_dir: <some location on slurm cluster to keep job metadata>
+#   job_dir: <some location on slurm cluster to keep job metadata, uploaded code and generated sbatch files>
 #   identity: <can specify ssh key to avoid entering password>
 
 

@@ -20,6 +20,7 @@ import sys
 import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -37,10 +38,62 @@ from torchx.specs.api import AppState
 LOG = logging.getLogger(__file__)
 
 
+# TODO: this file is way too big - we need to split it into pieces
+
 # keeping a global variable for first submitted experiment (per cluster) and reusing it by default
 # we are using ssh tunnel as a proxy for cluster identity, since even if other parameters are different
 # we can still reuse code as long as ssh matches
 REUSE_CODE_EXP = {}
+
+
+@dataclass
+class RepoMetadata:
+    """Metadata for a repo that is used in the experiment."""
+
+    name: str
+    path: Path
+
+    def __post_init__(self):
+        if isinstance(self.path, str):
+            self.path = Path(self.path)
+
+        if not self.path.exists():
+            raise ValueError(f"Repository path `{self.path}` does not exist.")
+
+
+# Registry of external repos that should be packaged with the code in the experiment
+EXTERNAL_REPOS = {
+    'nemo_skills': RepoMetadata(
+        name='nemo_skills', path=Path(__file__).absolute().parents[1]
+    ),  # path to nemo_skills repo
+}
+
+
+def register_external_repo(metadata: RepoMetadata):
+    """Register an external repo to be packaged with the code in the experiment.
+
+    Args:
+        metadata (RepoMetadata): Metadata for the external repo.
+    """
+    if metadata.name in EXTERNAL_REPOS:
+        raise ValueError(f"External repo {metadata.name} is already registered.")
+
+    EXTERNAL_REPOS[metadata.name] = metadata
+
+
+def get_registered_external_repo(name: str) -> Optional[RepoMetadata]:
+    """Get the path to the registered external repo.
+
+    Args:
+        name (str): Name of the external repo.
+
+    Returns:
+        A path to the external repo if it is registered, otherwise None.
+    """
+    if name not in EXTERNAL_REPOS:
+        return None
+
+    return EXTERNAL_REPOS[name]
 
 
 def check_if_mounted(cluster_config, path_to_check):
@@ -98,6 +151,21 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 LOG.warning("Experiment %s not found!", expname)
                 return []
             raise ValueError(f"Experiment {expname} not found!")
+
+
+def get_timeout(cluster_config, partition):
+    if 'timeouts' not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
+        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+
+        # subtracting 15 minutes to account for the time it takes to save the model
+        # the format expected by nemo is days:hours:minutes:seconds
+        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
+        timeout = (
+            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+        )
+    return timeout
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
@@ -203,6 +271,40 @@ def get_reward_server_command(
     return server_cmd, num_tasks
 
 
+def get_ray_server_cmd(start_cmd):
+    ports = (
+        "--node-manager-port=12345 "
+        "--object-manager-port=12346 "
+        "--dashboard-port=8265 "
+        "--dashboard-agent-grpc-port=12347 "
+        "--runtime-env-agent-port=12349 "
+        "--metrics-export-port=12350 "
+        "--min-worker-port=14349 "
+        "--max-worker-port=18349 "
+    )
+
+    ray_start_cmd = (
+        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        "    echo 'Starting head node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    ray start "
+        "        --head "
+        "        --port=6379 "
+        f"       {ports} && "
+        f"   {start_cmd} ;"
+        "else "
+        "    echo 'Starting worker node' && "
+        "    export RAY_raylet_start_wait_time_s=120 && "
+        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        "    ray start "
+        "        --block "
+        "        --address=$SLURM_MASTER_NODE:6379 "
+        f"       {ports} ;"
+        "fi"
+    )
+    return ray_start_cmd
+
+
 def get_server_command(
     server_type: str,
     num_gpus: int,
@@ -246,32 +348,21 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        ports = (
-            "--node-manager-port=12345 "
-            "--object-manager-port=12346 "
-            "--dashboard-port=8265 "
-            "--dashboard-agent-grpc-port=12347 "
-            "--runtime-env-agent-port=12349 "
-            "--metrics-export-port=12350 "
-            "--min-worker-port=14349 "
-            "--max-worker-port=18349 "
-        )
+        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        num_tasks = 1
+    elif server_type == 'sglang':
+        if num_nodes > 1:
+            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+        else:
+            multinode_args = ""
         server_start_cmd = (
-            "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
-            "    echo 'Starting head node' && "
-            "    ray start "
-            "        --head "
-            "        --port=6379 "
-            f"       {ports} && "
-            f"   {start_vllm_cmd} ;"
-            "else "
-            "    echo 'Starting worker node' && "
-            "    echo \"Connecting to head node at $VLLM_HEAD_NODE\" && "
-            "    ray start "
-            "        --block "
-            "        --address=$VLLM_HEAD_NODE:6379 "
-            f"       {ports} ;"
-            "fi"
+            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"    --model {model_path} "
+            f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
+            f"    --port {server_port} "
+            f"    {multinode_args} "
+            f"    {server_args} "
         )
         num_tasks = 1
     else:
@@ -414,9 +505,9 @@ def get_tunnel(cluster_config):
 class OutputWatcher(StreamWatcher):
     """Class for streaming remote tar/compression process."""
 
-    # TODO: Current solution prints the progress on a new line. Can we make it in place?
     def submit(self, stream):
-        print(stream)
+        print(stream, end='\r')
+        sys.stdout.flush()
         return []
 
 
@@ -476,7 +567,7 @@ def cluster_download(
         # Command for streaming the compression progress
         command = (
             f'cd {remote_dir_parent} && '
-            f'tar -cf - {remote_dir_name} | '
+            f'tar --exclude="*.log" -cf - {remote_dir_name} | '
             f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
             f'gzip > {remote_tar}'
         )
@@ -521,19 +612,20 @@ def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose:
     print(f"\nTransfer complete")
 
 
-def get_packager(extra_package_dirs: tuple[str] | None = None):
-    """Will check if we are running from a git repo and use git packager or default packager otherwise."""
-    nemo_skills_dir = Path(__file__).absolute().parents[1]
+def get_git_repo_path(path: str | Path = None):
+    """Check if the path is a git repo.
 
-    if extra_package_dirs:
-        include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
-        include_pattern_relative_paths = [str(Path(d).parent) for d in extra_package_dirs]
-    else:
-        include_patterns = []
-        include_pattern_relative_paths = []
+    Args:
+        path: Path to the directory to check. If None, will check the current directory.
 
+    Returns:
+        Path to the repo if it is a git repo, otherwise None.
+    """
+    original_path = os.getcwd()
     try:
-        # are we in a git repo? If yes, we are uploading the current code
+        if path:
+            os.chdir(path)
+
         repo_path = (
             subprocess.run(
                 ["git", "rev-parse", "--show-toplevel"],
@@ -543,7 +635,32 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             .stdout.decode()
             .strip()
         )
+        return Path(repo_path)
 
+    except subprocess.CalledProcessError:
+        return None
+
+    finally:
+        os.chdir(original_path)
+
+
+def get_packager(extra_package_dirs: tuple[str] | None = None):
+    """Will check if we are running from a git repo and use git packager or default packager otherwise."""
+    nemo_skills_dir = get_registered_external_repo('nemo_skills').path
+
+    if extra_package_dirs:
+        include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
+        include_pattern_relative_paths = [str(Path(d).parent) for d in extra_package_dirs]
+    else:
+        include_patterns = []
+        include_pattern_relative_paths = []
+
+    check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
+
+    # are we in a git repo? If yes, we are uploading the current code
+    repo_path = get_git_repo_path(path=None)  # check if we are in a git repo in pwd
+
+    if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
         if not (Path(repo_path) / 'nemo_skills').is_dir():
             logging.warning(
@@ -557,13 +674,12 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
-        check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
-        return run.GitArchivePackager(
+        root_package = run.GitArchivePackager(
             include_pattern=include_patterns,
             include_pattern_relative_path=include_pattern_relative_paths,
             check_uncommitted_changes=check_uncommited_changes,
         )
-    except subprocess.CalledProcessError:
+    else:
         logging.warning(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
             str(nemo_skills_dir / '*'),
@@ -571,10 +687,39 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         include_patterns.append(str(nemo_skills_dir / '*'))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
-        return run.PatternPackager(
+        root_package = run.PatternPackager(
             include_pattern=include_patterns,
             relative_path=include_pattern_relative_paths,
         )
+
+    extra_repos = {}
+    if len(EXTERNAL_REPOS) > 1:
+        # Insert root package as the first package
+        extra_repos['nemo_run'] = root_package
+
+        for repo_name, repo_meta in EXTERNAL_REPOS.items():
+            if repo_name == 'nemo_skills':
+                continue
+
+            repo_path = repo_meta.path
+            if get_git_repo_path(repo_path):
+                # Extra repos is a git repos, so we need to package only committed files
+                extra_repos[repo_name] = run.GitArchivePackager(
+                    basepath=str(repo_path), check_uncommitted_changes=check_uncommited_changes
+                )
+            else:
+                # Extra repos is not a git repo, so we need to package all files in the directory
+                repo_include_pattern = [str(Path(repo_path) / '*')]
+                repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
+                extra_repos[repo_name] = run.PatternPackager(
+                    include_pattern=repo_include_pattern,
+                    relative_path=repo_include_pattern_relative_path,
+                )
+
+        # Return hybrid packager
+        return run.HybridPackager(sub_packagers=extra_repos, extract_at_root=True)
+
+    return root_package
 
 
 def get_env_variables(cluster_config):
@@ -597,11 +742,18 @@ def get_env_variables(cluster_config):
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
-        if env_var not in os.environ:
+        if "=" in env_var:
+            if env_var.count("=") == 1:
+                env_var, value = env_var.split("=")
+            else:
+                raise ValueError(f"Invalid required environment variable format: {env_var}")
+            env_vars[env_var.strip()] = value.strip()
+            logging.info(f"Adding required environment variable {env_var}")
+        elif env_var in os.environ:
+            logging.info(f"Adding required environment variable {env_var} from environment")
+            env_vars[env_var] = os.environ[env_var]
+        else:
             raise ValueError(f"Required environment variable {env_var} not found.")
-
-        env_vars[env_var] = os.environ[env_var]
-        logging.info(f"Adding required environment variable {env_var} (value={os.environ[env_var]})")
 
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
@@ -699,6 +851,9 @@ def get_executor(
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
+    heterogeneous=False,
+    het_group=None,
+    total_het_groups=None,
     slurm_kwargs: dict | None = None,
 ):
     env_vars = get_env_variables(cluster_config)
@@ -713,7 +868,6 @@ def get_executor(
             raise ValueError("Local executor does not support multi-node execution")
 
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
-
         return DockerExecutor(
             container_image=container,
             packager=packager,
@@ -726,7 +880,18 @@ def get_executor(
             additional_kwargs={"entrypoint": ""},
         )
 
-    env_vars["VLLM_HEAD_NODE"] = "${head_node}"
+    if not heterogeneous:
+        env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
+    else:
+        # master node will be within the same group
+        env_vars["SLURM_MASTER_NODE"] = (
+            f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{het_group} | head -n1)"
+        )
+        # in addition defining master nodes for all groups to allow communication
+        for group in range(total_het_groups):
+            env_vars[f"SLURM_MASTER_NODE_HET_GROUP_{group}"] = (
+                f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
+            )
 
     partition = partition or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
@@ -745,7 +910,7 @@ def get_executor(
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
-        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--ntasks-per-node={tasks_per_node}",
         f"--nodes={num_nodes}",
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
@@ -778,6 +943,7 @@ def get_executor(
         monitor_group_job_wait_time=20,
         dependencies=dependencies,
         dependency_type=dependency_type,
+        heterogeneous=heterogeneous,
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
@@ -796,13 +962,18 @@ def temporary_env_update(cluster_config, updates):
         cluster_config["env_vars"] = original_env_vars
 
 
+# TODO: this function has become too cumbersome to use with all recently added support
+#       we should make it simpler by perhaps removing separate logic for server/sandbox
+#       and supporting them through a list of cmds directly
+#       should also make heterogenous logic very clear and more robust
+#       and all parameters that can be list should be list for consistency
 def add_task(
     exp,
-    cmd,
+    cmd: str | list[str],
     task_name,
     cluster_config,
-    container,
-    num_tasks=1,
+    container: str | list[str],
+    num_tasks: int | list[int] = 1,
     num_gpus=None,
     num_nodes=1,
     log_dir=None,
@@ -818,6 +989,7 @@ def add_task(
     get_server_command=get_server_command,
     extra_package_dirs: list[str] | None = None,
     slurm_kwargs: dict | None = None,
+    heterogeneous: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -863,6 +1035,10 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
+    het_group = 0
+    het_group_indices = []
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
@@ -884,39 +1060,66 @@ def add_task(
             log_prefix="server",
             extra_package_dirs=extra_package_dirs,
             slurm_kwargs=slurm_kwargs,
+            heterogeneous=heterogeneous,
+            het_group=het_group,
+            total_het_groups=total_het_groups,
         )
         if cluster_config["executor"] == "local" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group_indices.append(het_group)
+        het_group += 1
 
-    # then goes the main task unless it's empty
+    # then goes the main task(s) unless it's empty
     if cmd:
-        if cluster_config["executor"] == "local" and num_tasks > 1:
-            cmd = f"mpirun --allow-run-as-root -np {num_tasks} bash -c {shlex.quote(cmd)}"
-        with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
-            commands.append(cmd)
-            executors.append(
-                get_executor(
-                    cluster_config=cluster_config,
-                    container=container,
-                    num_nodes=num_nodes,
-                    tasks_per_node=num_tasks,
-                    gpus_per_node=num_gpus,
-                    partition=partition,
-                    time_min=time_min,
-                    dependencies=dependencies,
-                    job_name=task_name,
-                    log_dir=log_dir,
-                    log_prefix="main",
-                    extra_package_dirs=extra_package_dirs,
-                    slurm_kwargs=slurm_kwargs,
+        if isinstance(cmd, str):
+            cmd = [cmd]
+        if isinstance(container, str):
+            container = [container]
+        if isinstance(num_tasks, int):
+            num_tasks = [num_tasks]
+        if len(cmd) != len(container) or len(cmd) != len(num_tasks):
+            raise ValueError("Number of commands, containers and num_tasks must match.")
+        for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
+            if cluster_config["executor"] == "local" and cur_tasks > 1:
+                cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
+            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+                commands.append(cur_cmd)
+                executors.append(
+                    get_executor(
+                        cluster_config=cluster_config,
+                        container=cur_container,
+                        num_nodes=num_nodes,
+                        tasks_per_node=cur_tasks,
+                        gpus_per_node=num_gpus,
+                        partition=partition,
+                        time_min=time_min,
+                        dependencies=dependencies,
+                        job_name=task_name,
+                        log_dir=log_dir,
+                        log_prefix="main" if len(cmd) == 1 else f"main_{cur_idx}",
+                        extra_package_dirs=extra_package_dirs,
+                        slurm_kwargs=slurm_kwargs,
+                        heterogeneous=heterogeneous,
+                        het_group=het_group,
+                        total_het_groups=total_het_groups,
+                    )
                 )
-            )
+                het_group_indices.append(het_group)
+        het_group += 1
 
     # finally a sandbox if needed
     if with_sandbox:
-        with temporary_env_update(cluster_config, {"LISTEN_PORT": sandbox_port}):
+        sandbox_env_updates = {"LISTEN_PORT": sandbox_port}
+        current_env_vars = cluster_config.get("env_vars", []).copy()
+        for override in current_env_vars:
+            if "PYTHONPATH" in override:
+                if override.startswith("PYTHONPATH="):
+                    override = override[11:]
+                sandbox_env_updates["PYTHONPATH"] = override + ":/app"
+
+        with temporary_env_update(cluster_config, sandbox_env_updates):
             commands.append(get_sandox_command())
             sandbox_executor = get_executor(
                 cluster_config=cluster_config,
@@ -933,8 +1136,13 @@ def add_task(
                 log_prefix="sandbox",
                 extra_package_dirs=extra_package_dirs,
                 slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+            het_group_indices.append(het_group)
+        het_group += 1
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
@@ -962,6 +1170,8 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
+        if heterogeneous:
+            executors[0].het_group_indices = het_group_indices
         return exp.add(
             [run.Script(inline=command) for command in commands],
             executor=executors,

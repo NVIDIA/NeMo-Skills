@@ -14,10 +14,16 @@
 
 import contextlib
 import importlib
+import json
 import os
 import sys
+import time
+import urllib.request
+from pathlib import Path
 from typing import Dict
-import json
+from urllib.error import URLError
+
+from nemo_skills.code_execution.math_grader import extract_answer
 
 
 @contextlib.contextmanager
@@ -82,3 +88,57 @@ def add_header_to_jsonl_inplace(jsonl_path, header):
             data = json.loads(line)
             data["header"] = header  
             file.write(json.dumps(data) + "\n")
+
+def download_with_retries(url, output_file, max_retries=3, retry_delay=1):
+    """Download a file with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            urllib.request.urlretrieve(url, output_file)
+            return True
+        except URLError as e:
+            if attempt == max_retries - 1:
+                raise RuntimeError(f"Failed to download after {max_retries} attempts: {e}")
+            time.sleep(retry_delay * (attempt + 1))
+    return False
+
+
+def save_data_from_qwen(dataset, split="test"):
+    url = (
+        "https://raw.githubusercontent.com/QwenLM/Qwen2.5-Math/refs/heads/main/evaluation/data/{dataset}/{split}.jsonl"
+    )
+
+    data_dir = Path(__file__).absolute().parent
+    original_file = str(data_dir / dataset / f"original_{split}.json")
+    data_dir.mkdir(exist_ok=True)
+    output_file = str(data_dir / dataset / f"{split}.jsonl")
+    data = []
+    if not os.path.exists(original_file):
+        formatted_url = url.format(split=split, dataset=dataset)
+        download_with_retries(formatted_url, original_file)
+
+    with open(original_file, "rt", encoding="utf-8") as fin:
+        for line in fin:
+            entry = json.loads(line)
+
+            if "answer" in entry:
+                entry["expected_answer"] = entry.pop("answer")
+
+            if "problem" not in entry:
+                entry["problem"] = entry.pop("question")
+
+            if dataset == "olympiadbench":
+                entry["expected_answer"] = entry.pop("final_answer")[0].strip("$")
+
+            if dataset == "minerva_math":
+                entry["expected_answer"] = extract_answer(entry["solution"])
+
+            data.append(entry)
+
+    with open(output_file, "wt", encoding="utf-8") as fout:
+        for entry in data:
+            fout.write(json.dumps(entry) + "\n")
+
+    # cleaning up original data file
+    os.remove(original_file)
+
+    return output_file

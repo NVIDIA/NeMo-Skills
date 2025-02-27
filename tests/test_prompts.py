@@ -797,19 +797,34 @@ Here is the problem you need to solve:
 
 
 def test_generic_multichoice_prompt():
-    prompt = get_prompt('generic/multichoice', 'default-base')
+    prompt = get_prompt('generic/multichoice-zero-shot', 'default-base')
 
-    expected_prompt = """Answer the following multiple choice question.
-The last line of your response should be of the following format: 'Answer: $LETTER' (without quotes) where LETTER is one of A, B, C or D..
+    expected_prompt = """Given the following question and four candidate answers (A, B, C and D), choose the best answer.
 
 Question: How are you?
-
 A. Good
 B. Bad
 C. And you?
 D. 42
 
-Think step by step before answering."""
+- For simple problems:
+Directly provide the answer with minimal explanation.
+
+- For complex problems:
+Use this step-by-step format:
+## Step 1: [Concise description]
+[Brief explanation]
+## Step 2: [Concise description]
+[Brief explanation]
+## Step 3: [Concise description]
+[Brief explanation]
+Continue as needed.
+
+Regardless of the approach, always conclude with:
+The final answer is [the_answer_letter].
+where the [the_answer_letter] is one of A, B, C or D.
+
+Let's think step by step."""
     assert (
         prompt.fill({'question': 'How are you?', 'A': 'Good', 'B': 'Bad', 'C': 'And you?', 'D': '42'})
         == expected_prompt
@@ -1308,7 +1323,7 @@ def test_mmlu_pro_zero_shot_prompt():
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
-The following are multiple choice questions (with answers) about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+The following is a multiple choice question about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
 
 Question: What is the square root of 81 squared?
 Options: A. 9^2

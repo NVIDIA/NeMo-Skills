@@ -34,7 +34,7 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 LOG = logging.getLogger(__file__)
 
 
-def eval_mmlu_pro(cfg):
+def eval_mcq(cfg):
     # Adapted from https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/8b6741a3011d8caa405fdd629f54b6931cb6e042/evaluate_from_api.py#L189
     # Original three functions are merged into one
     def tigerlab_parse(sample):
@@ -410,7 +410,6 @@ class LeanEvaluatorConfig:
     timeout: float = 30.0
     ignore_cache: bool = False
 
-
 def eval_lean4_proof(cfg):
     eval_config = LeanEvaluatorConfig(**cfg.eval_config)
 
@@ -467,11 +466,11 @@ EVALUATOR_MAP = {
     'arena': eval_arena,
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
-    'mmlu-pro': eval_mmlu_pro,
     'lean4-proof': eval_lean4_proof,
     'lean4-proof-with-header': eval_lean4_proof_with_header,
     'lean4-statement': eval_lean4_statement,
     'lean4-statement-with-header': eval_lean4_statement_with_header,
+    'multichoice': eval_mcq,
 }
 
 

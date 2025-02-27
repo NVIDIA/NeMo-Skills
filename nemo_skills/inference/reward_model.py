@@ -138,7 +138,9 @@ def generate(cfg: RewardModelConfig):
         return
 
     LOG.info(
-        "Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0], include_generation=True)
+        "Example prompt:\nData dictionary: %s\nPrompt: %s",
+        data[0],
+        prompt.fill(data[0], prefix_generation_to_response=True),
     )
 
     if cfg.dry_run:
@@ -154,7 +156,7 @@ def generate(cfg: RewardModelConfig):
 
             if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
                 outputs = llm.score(
-                    prompts=[prompt.fill(dp, include_generation=True) for dp in data_points],
+                    prompts=[prompt.fill(dp, prefix_generation_to_response=True) for dp in data_points],
                 )
 
                 for output, original_data_point in zip(outputs, data_points):

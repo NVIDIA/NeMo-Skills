@@ -45,6 +45,7 @@ cmd = (
 run_cmd(
     cluster="local",
     container="nemo",
+    num_gpus=1,  # can increase this if you have more gpus
     ctx=wrap_arguments(cmd),
 )
 ```
@@ -74,7 +75,7 @@ If you want instead to clean your training data from contaminated examples all t
 you need to swap values for the `retrieve_from` and `compare_to` arguments in the `retrieve_similar` step
 since we now want to make a check for each training set example and find closest test set problems.
 
-After you get `/workspace/math-contamination-results.jsonl`, you can pass it into [prepare_sft_data command](training.md#preparing-the-data)
+After you get `/workspace/math-contamination-results.jsonl`, you can pass it into [prepare_data command](training.md#preparing-the-data)
 with `++contamination_file=...` option.
 
 See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../openmathinstruct2/dataset.md#decontamination).

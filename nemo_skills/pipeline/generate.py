@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import os
 import logging
+from collections import defaultdict
 from enum import Enum
 from typing import List
 
 import nemo_run as run
 import typer
 
+from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
@@ -32,28 +35,55 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     openai = "openai"
+    sglang = "sglang"
 
 
-def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, output_base=None, chunk_id=None, num_chunks=None):
-    """Construct the generation command for language model inference.
-
-    If `output_base` is defined, it replaces the default `output.jsonl` filenames with:
-        - `{output_base}.jsonl` for the single-seed run
-        - `{output_base}-rs{seed}.jsonl` if `random_seed` is provided.
+def get_chunked_rs_filename(
+    output_dir: str,
+    random_seed: int = None,
+    chunk_id: int = None,
+    output_base: str = "output",
+) -> str:
     """
-    if output_base is not None:
-        if random_seed is not None:
-            output_file = f"{output_dir}/generation/{output_base}-rs{random_seed}.jsonl"
-        else:
-            output_file = f"{output_dir}/generation/{output_base}.jsonl"
-    else:
-        # Fallback to original naming scheme if output_base is not provided
-        if random_seed is not None:
-            output_file = f"{output_dir}/generation/output-rs{random_seed}.jsonl"
-        else:
-            output_file = f"{output_dir}/generation/output.jsonl"
+    Return a path of the form:
+      {output_dir}/{output_base}[-rsSEED][-chunkK].jsonl
+    If `output_base` is None, fallback to 'output' in place of {output_base}.
+    """
 
-    cmd = f"python -m nemo_skills.inference.generate ++skip_filled=True ++output_file={output_file} "
+    if random_seed is not None:
+        base_filename = f"{output_base}-rs{random_seed}.jsonl"
+    else:
+        base_filename = f"{output_base}.jsonl"
+
+    # If chunking is enabled, add the chunk suffix
+    if chunk_id is not None:
+        base_filename = get_chunked_filename(chunk_id, base_filename)
+    return os.path.join(output_dir, base_filename)
+
+
+def get_cmd(
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.generate',
+    output_base: str ="output",
+):
+    """
+    Construct the generation command for language model inference.
+
+    If chunk_id is provided, chunking logic is used.
+    If output_base is provided, it replaces the default 'output*.jsonl' filenames
+    with a base name (plus `-rsSEED` or chunk info as needed).
+    """
+
+    # First get the unchunked filename for the output file
+    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_base=output_base,)
+    cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
+
     if random_seed is not None:
         cmd += (
             f"    ++inference.random_seed={random_seed} "
@@ -61,47 +91,94 @@ def get_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, outpu
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
+
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_filename(chunk_id, output_file)
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_base=output_base)
+        donefiles = []
+        # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
+        # the current run (as we don't want to merge partial jobs)
+        for cur_chunk_id in range(num_chunks):
+            donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_base=output_base)}.done"
+            donefiles.append(donefile)
+
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {donefiles[chunk_id]} "
+        else:
+            postprocess_cmd = f"touch {donefiles[chunk_id]} "
+
+        # getting file name as if there is no chunking since that's where we want to merge
+        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_base=output_base)
+        merge_cmd = (
+            f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
+            f"{' '.join([f[:-5] for f in donefiles])}"
+        )
+        postprocess_cmd += f" && {merge_cmd}"
+
+    else:  # only writing a single status file
+        if postprocess_cmd:
+            postprocess_cmd += f" && touch {output_file}.done "
+        else:
+            postprocess_cmd = f"touch {output_file}.done "
+
     cmd += f" {extra_arguments} "
+
     if eval_args:
         cmd += (
             f" && python -m nemo_skills.evaluation.evaluate_results "
             f"    ++input_files={output_file} "
             f"    {eval_args} "
         )
-    return cmd
+
+    return cmd, postprocess_cmd
 
 
 # TODO: support chunking for reward model and math judge
 
 
-def get_rm_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_rm_cmd(
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.reward_model',
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
 
     cmd = (
-        f"python -m nemo_skills.inference.reward_model "
+        f"python -m {script} "
         f"    ++skip_filled=True "
         f"    ++output_dir={output_dir} "
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
-def get_math_judge_cmd(output_dir, extra_arguments, random_seed=None, eval_args=None, chunk_id=None, num_chunks=None):
+def get_math_judge_cmd(
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.llm_math_judge',
+):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
     cmd = (
-        f"python -m nemo_skills.inference.llm_math_judge "
+        f"python -m {script} "
         f"    ++skip_filled=True "
         f"    ++output_dir={output_dir} "
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
-    return cmd
+    return cmd, postprocess_cmd
 
 
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
@@ -132,6 +209,12 @@ client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
     GenerationType.math_judge: get_math_judge_cmd,
+}
+
+client_command_scripts = {
+    GenerationType.generate: 'nemo_skills.inference.generate',
+    GenerationType.reward: 'nemo_skills.inference.reward_model',
+    GenerationType.math_judge: 'nemo_skills.inference.llm_math_judge',
 }
 
 
@@ -184,11 +267,11 @@ def generate(
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
+    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
     model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
-    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
     server_type: SupportedServers = typer.Option(help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
@@ -238,10 +321,11 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If True, will use --exclusive flag for slurm"),
-    output_base: str = typer.Option(
-        None, 
-        help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
+    output_base: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
+    exclusive: bool = typer.Option(
+        True,
+        "--not_exclusive",
+        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
     """Generate LLM completions for a given input file.
@@ -251,6 +335,21 @@ def generate(
     """
     setup_logging(disable_hydra_logs=False)
     extra_arguments = f'{" ".join(ctx.args)}'
+
+    chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
+    if chunking_enabled and postprocess_cmd:
+        logging.warning(
+            "Chunking is enabled, but postprocess_cmd is also specified. "
+            "Note that will be run for each chunk separately. Chunk merging "
+            "will be performed after postprocess_cmd."
+        )
+    if chunking_enabled and generation_type != GenerationType.generate:
+        logging.error(
+            "Chunking is enabled, but generation type is not 'generate'. "
+            "Chunking is only supported for generation type 'generate'."
+            "This may result in superfluous generation jobs."
+        )
+        raise ValueError("Chunking is only supported for generation type 'generate'")
 
     try:
         server_type = server_type.value
@@ -280,65 +379,33 @@ def generate(
 
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]
+    cmd_script = client_command_scripts[generation_type]
     original_server_address = server_address
+
+    # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
+    if (
+        generation_type == GenerationType.generate
+        and ctx.obj is not None
+        and isinstance(ctx.obj, dict)
+        and 'generation_task_type' in ctx.obj
+    ):
+        generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
+        assert issubclass(
+            generation_task, GenerationTask
+        ), f"`generation_task_type` must be a subclass of GenerationTask"
+        cmd_script = generation_task.get_generation_module()
+        cmd_extra_args = generation_task.get_generation_default_args()
+        cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
-        # TODO: reduce code duplication
-        if random_seeds:
-            for chunk_id in chunk_ids:
-                for seed in random_seeds:
-                    server_port = get_free_port(strategy="random") if get_random_port else 5000
-                    server_config, extra_arguments, server_address, server_port = configure_client(
-                        generation_type=generation_type,
-                        server_gpus=server_gpus,
-                        server_type=server_type,
-                        server_address=original_server_address,
-                        server_port=server_port,
-                        server_nodes=server_nodes,
-                        model=model,
-                        server_args=server_args,
-                        extra_arguments=extra_arguments_original,
-                    )
-                    cmd = get_cmd(
-                        random_seed=seed,
-                        output_dir=output_dir,
-                        extra_arguments=extra_arguments,
-                        eval_args=eval_args,
-                        chunk_id=chunk_id,
-                        num_chunks=num_chunks,
-                        output_base=output_base,
-                    )
-                    prev_tasks = None
+        
+        # Treat no random seeds as a single None seed to unify the code paths
+        if not random_seeds:
+            random_seeds = [None]
 
-                    for _ in range(dependent_jobs + 1):
-                        new_task = add_task(
-                            exp,
-                            cmd=wrap_cmd(
-                                get_generation_command(server_address=server_address, generation_commands=cmd),
-                                preprocess_cmd,
-                                postprocess_cmd,
-                                random_seed=seed,
-                            ),
-                            task_name=f'{expname}-rs{seed}',
-                            log_dir=log_dir,
-                            container=cluster_config["containers"]["nemo-skills"],
-                            cluster_config=cluster_config,
-                            partition=partition,
-                            time_min=time_min,
-                            server_config=server_config,
-                            with_sandbox=True,
-                            sandbox_port=None if get_random_port else 6000,
-                            run_after=run_after,
-                            reuse_code=reuse_code,
-                            reuse_code_exp=reuse_code_exp,
-                            task_dependencies=prev_tasks,
-                            get_server_command=get_server_command,
-                            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        )
-                        prev_tasks = [new_task]
-        else:
-            for chunk_id in chunk_ids:
+        for chunk_id in chunk_ids:
+            for seed in random_seeds:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -351,15 +418,16 @@ def generate(
                     server_args=server_args,
                     extra_arguments=extra_arguments_original,
                 )
-
-                cmd = get_cmd(
-                    random_seed=None,
+                cmd, full_postprocess_cmd = get_cmd(
+                    random_seed=seed,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
                     output_base=output_base,
+                    postprocess_cmd=postprocess_cmd,
+                    script=cmd_script,
                 )
                 prev_tasks = None
                 for _ in range(dependent_jobs + 1):
@@ -368,9 +436,10 @@ def generate(
                         cmd=wrap_cmd(
                             get_generation_command(server_address=server_address, generation_commands=cmd),
                             preprocess_cmd,
-                            postprocess_cmd,
+                            full_postprocess_cmd,
+                            random_seed=seed,
                         ),
-                        task_name=expname,
+                        task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
@@ -387,6 +456,7 @@ def generate(
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
+        
         run_exp(exp, cluster_config)
 
     return exp
