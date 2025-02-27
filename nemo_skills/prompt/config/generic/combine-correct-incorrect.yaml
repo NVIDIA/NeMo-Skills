@@ -1,0 +1,38 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Your goal is to improve the given correct solution by incorporating self-correction elements. 
+  Specifically, you will introduce a mistake from the incorrect solution provided and naturally correct it within the reasoning process. 
+  The final answer must remain correct.
+
+
+  please start with your modified output with "Solution"
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  Instructions:
+  Modify the given correct solution by inserting at least 3 - 5 self-corrections based on the incorrect solution.
+  Ensure the mistake is discovered naturally during the problem-solving process.
+  The correction should feel like an organic realization, using phrases like:
+  "Wait, something feels off here... let me check."
+  "Oh! I think I see the mistake..."
+  "Hold on, I might have miscalculated this part."
+  "Let’s go back and check this—something doesn’t look right."
+  The final answer must remain correct.
+
+  
+
+
+  Most important: Modify the given solution** by **introducing 3 - 5 mistake**, but make them subtle and realistic.
+  Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
+  we will insert some mistakes," and ensure the wording sounds natural.
+  
+  Now I will give correct and incorrect solution and please modify according above instructions:
+
+  Correct solution {correct} 
+
+
+  Incorrect solution {incorrect}
