@@ -1,0 +1,63 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Your goal is to improve the given correct solution by incorporating self-correction elements.
+  Specifically, you will introduce mistakes from the multiple incorrect solutions provided and naturally correct them within the reasoning process.
+  The final answer must remain correct.
+
+
+  please start with your modified output with "Solution"
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  Instructions:
+  1.Modify the given correct solution by incorporating 3 - 5 self-corrections based on mistakes found in the incorrect solutions.
+  
+  2. Ensure the mistakes are discovered naturally during the problem-solving process.
+  
+  3. The correction should feel like an organic realization, using phrases like:
+    "Wait, something feels off here... let me check."
+    "Oh! I think I see the mistake..."
+    "Hold on, I might have miscalculated this part."
+    "Let’s go back and check this—something doesn’t look right."
+  
+  4. The final answer must remain correct and consistent with the correct solution.
+  
+  5. Do not explicitly list the mistakes—let them emerge naturally in the reasoning process. 
+  
+  6. Maintain clarity, logical flow, and rigor in the final solution.
+  
+  7. Ensure the final answer is correct, even after introducing and correcting the errors.
+
+  
+
+
+  Most Important:
+  Modify the given correct solution by incorporating mistakes from multiple incorrect solutions, but make them subtle and realistic.
+  Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
+  we will insert some mistakes," and ensure the wording sounds natural.
+  
+  Now, I will provide 1 correct solutions and 5 incorrect solutions. Please merge them into a single solution following the instructions above. 
+  Ensure that the final response integrates insights from the correct solutions while incorporating and naturally correcting errors from the incorrect 
+  solutions through logical self-correction
+
+  
+  Correct solutions:
+
+  {correct_1} 
+
+  Incorrect solutions:
+
+
+  Incorrect solution 1: {incorrect_1} 
+
+  Incorrect solution 1: {incorrect_2} 
+
+  Incorrect solution 1: {incorrect_3} 
+
+  Incorrect solution 1: {incorrect_4} 
+
+  Incorrect solution 1: {incorrect_5} 
