@@ -1,0 +1,70 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant.
+  Your goal is to merge multiple correct solutions while incorporating elements from incorrect solutions to create a cohesive, logically structured response that includes natural self-corrections.
+  The final answer must remain correct while the reasoning process should be enhanced through logical self-reflection and error correction.
+  The final answer must remain correct.
+
+
+  please start with your modified output with "Solution"
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  Instructions:
+  1. Analyze the multiple correct solutions and consolidate them into a single refined version that preserves all key insights.
+  
+  2. Identify mistakes from the incorrect solutions (e.g., calculation errors, conceptual misunderstandings, missing steps).
+  
+  3. Inject 3 - 6 subtle mistakes from the incorrect solutions into the reasoning process.
+  
+  4. Ensure these mistakes are discovered and corrected naturally using logical problem-solving (not explicitly stated as intentional errors).
+  
+  5. Use a natural and engaging style for self-correction, incorporating phrases like:
+    "Wait, something feels off here... let me check."
+    "Oh! I think I see the mistake..."
+    "Hold on, I might have miscalculated this part."
+    "Let’s go back and check this—something doesn’t look right."
+  
+  6. Maintain clarity, logical flow, and rigor in the final solution.
+  
+  7. Ensure the final answer is correct, even after introducing and correcting the errors.
+
+  
+
+  Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
+  we will insert some mistakes," and ensure the wording sounds natural.
+  
+  Now, I will provide 5 correct solutions and 5 incorrect solutions. Please merge them into a single solution following the instructions above. 
+  Ensure that the final response integrates insights from the correct solutions while incorporating and naturally correcting errors from the incorrect 
+  solutions through logical self-correction
+
+  
+  Correct solutions:
+
+  Correct solution 1: {correct_1} 
+
+  Correct solution 2: {correct_2} 
+
+  Correct solution 3: {correct_3} 
+
+  Correct solution 4: {correct_4} 
+
+  Correct solution 5: {correct_5} 
+
+
+  Incorrect solutions:
+
+
+  Incorrect solution 1: {incorrect_1} 
+
+  Incorrect solution 1: {incorrect_2} 
+
+  Incorrect solution 1: {incorrect_3} 
+
+  Incorrect solution 1: {incorrect_4} 
+
+  Incorrect solution 1: {incorrect_5} 
