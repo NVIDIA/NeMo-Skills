@@ -61,7 +61,7 @@ def parse_input(input_texts: str, tokenizer):
     return batch_input_ids, input_lengths
 
 
-def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -> tuple[str, int]:
+def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -> tuple[str, list[str], int]:
     """Returns detokenized text and the number of tokens."""
     output_begin = input_length
     output_end = input_length + max_output_len
@@ -70,7 +70,7 @@ def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -
     if len(eos_ids) > 0:
         outputs = outputs[: eos_ids[0]]
     outputs = outputs.tolist()
-    return tokenizer.decode(outputs), len(outputs)
+    return tokenizer.decode(outputs), tokenizer.convert_ids_to_tokens(outputs), len(outputs)
 
 
 def load_tokenizer(tokenizer_dir: str):
@@ -437,7 +437,7 @@ def _stream(
 
         idx += 1
 
-    out_string, num_generated_tokens = get_output(
+    out_string, out_tokens, num_generated_tokens = get_output(
         output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
     )
     # TODO: the number of tokens is not exact, because we might trim the output a bit,
@@ -458,11 +458,17 @@ def _stream(
 
     generation_time = int(round(time.time() - start_time))
 
-    return {
+    result = {
         'generation': out_string,
         'num_generated_tokens': num_generated_tokens,
         'generation_time': generation_time,
     }
+
+    if output_log_probs:
+        result['tokens'] = out_tokens
+        result['logprobs'] = output['log_probs'][0][0].tolist()
+
+    return result
 
 
 class TensorRTLLM:
@@ -511,6 +517,7 @@ class TensorRTLLM:
         repetition_penalty,
         random_seed,
         stop_words_list,
+        top_logprobs,
     ):
         try:
             request_id, stream_kwargs = generate(
@@ -525,6 +532,7 @@ class TensorRTLLM:
                 top_p_min=top_p_min,
                 repetition_penalty=repetition_penalty,
                 random_seed=random_seed,
+                output_log_probs=bool(top_logprobs is not None),
                 # stop words in trtllm are supported on the token-level only and this representation is not unique
                 # so instead of passing in all tokenizations (is that even possible?) of each phrase, we will
                 # instead stream outputs and detokenize them to check for stop words - this is done inside
@@ -565,6 +573,7 @@ class TensorRTLLM:
             data["repetition_penalty"],
             data["random_seed"],
             data["stop_words_list"],
+            data["top_logprobs"],
         )
 
         self.active_generations[generation_id] = future
@@ -613,12 +622,15 @@ class GenerationRequest(BaseModel):
     repetition_penalty: float = 1.2
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
+    top_logprobs: Optional[int] = None
 
 
 class GenerationResponse(BaseModel):
     generation: Optional[str] = None
     num_generated_tokens: Optional[int] = None
     generation_time: Optional[int] = None
+    tokens: Optional[list[str]] = None
+    logprobs: Optional[list[float]] = None
 
 
 class GenerationResponseAsync(BaseModel):
@@ -676,6 +688,7 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
+                "top_logprobs": request.top_logprobs,
             }
 
             self.comm.Barrier()
@@ -701,6 +714,7 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
+                "top_logprobs": request.top_logprobs,
             }
 
             self.comm.Barrier()

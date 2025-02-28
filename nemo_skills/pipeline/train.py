@@ -27,11 +27,14 @@ from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
 
+GRPO_VLLM_PORT = 4321
+
 
 class TrainingAlgo(str, Enum):
     sft = "sft"
     dpo = "dpo"
     rm = "rm"
+    grpo = "grpo"
 
 
 @dataclass
@@ -43,6 +46,7 @@ class TrainingParams:
     training_data: str
     validation_data: str
     num_gpus: int
+    tp: int | None
     num_nodes: int
     expname: str
     training_algo: TrainingAlgo
@@ -62,11 +66,14 @@ def get_cmd(params: TrainingParams) -> str:
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+        f"export TEMPDIR=/dev/shm/checkpoints_$SLURM_JOB_ID && "
+        f"mkdir -p $TEMPDIR && "
+        f"chmod 777 $TEMPDIR && "
         f"cd /nemo_run/code && "
         f"echo 'Starting training' && "
         f"{params.training_script} "
         f"    {params.config_params}"
-        f"    ++model.tensor_model_parallel_size={params.num_gpus} "
+        f"    ++model.tensor_model_parallel_size={params.tp or params.num_gpus} "
         f"    trainer.devices={params.num_gpus} "
         f"    trainer.num_nodes={params.num_nodes} "
         f"    {params.logging_params} "
@@ -83,7 +90,15 @@ configs = {
     TrainingAlgo.sft: "sft_config",
     TrainingAlgo.dpo: "dpo_config",
     TrainingAlgo.rm: "rm_config",
+    TrainingAlgo.grpo: "grpo_config",
 }
+
+rl_extra_args_fn = lambda params: (
+    f" ++model.data.data_prefix.train='[{params.training_data}]' "
+    f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+    f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+    f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+)
 
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
@@ -93,19 +108,23 @@ get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
         f" ++model.data.validation_ds.index_mapping_dir='{os.path.dirname(os.path.abspath(params.validation_data))}' "
         f" model.restore_from_path={params.nemo_model} " + params.extra_arguments
     ),
-    TrainingAlgo.dpo: lambda params: (
-        f" ++model.data.data_prefix.train='[{params.training_data}]' "
-        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-    ),
-    TrainingAlgo.rm: lambda params: (
-        f" ++model.data.data_prefix.train='[{params.training_data}]' "
-        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-    ),
+    TrainingAlgo.dpo: rl_extra_args_fn,
+    TrainingAlgo.grpo: lambda params: (
+        f" ++trainer.grpo.generation_save_dir={params.output_dir}/generations "
+        f" ++trainer.grpo.inference_backend.config.vllm.port=$(( {GRPO_VLLM_PORT} + (SLURM_LOCALID / {params.tp}) * {params.tp} )) "
+        f" ++model.grpo.share_dir=$TEMPDIR "
+    )
+    + rl_extra_args_fn(params),
+    TrainingAlgo.rm: rl_extra_args_fn,
 }
+
+
+def get_grpo_vllm_cmd(params: TrainingParams) -> str:
+    return (
+        f"export VLLM_FLASK_SERVER_PORT=$(( {GRPO_VLLM_PORT} + SLURM_LOCALID * {params.tp} )) && "
+        f"cd /opt/NeMo-Aligner/examples/nlp/gpt && "
+        f"python3 serve_vllm_inference_server.py --port $VLLM_FLASK_SERVER_PORT "
+    )
 
 
 def get_training_cmd(
@@ -118,6 +137,7 @@ def get_training_cmd(
     training_data,
     validation_data,
     num_gpus,
+    tp,
     num_nodes,
     expname,
     training_algo,
@@ -147,6 +167,7 @@ def get_training_cmd(
         validation_data=validation_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
+        tp=tp,
         expname=expname,
         training_algo=training_algo,
         disable_wandb=disable_wandb,
@@ -156,7 +177,7 @@ def get_training_cmd(
         logging_params=logging_params,
     )
 
-    return get_cmd(training_params)
+    return get_cmd(training_params), training_params
 
 
 def get_logging_params(expname, disable_wandb, wandb_project):
@@ -190,6 +211,14 @@ def get_avg_checkpoints_cmd(nemo_model, output_dir, final_nemo_path, average_ste
     return cmd
 
 
+class SupportedServers(str, Enum):
+    trtllm = "trtllm"
+    vllm = "vllm"
+    nemo = "nemo"
+    openai = "openai"
+    sglang = "sglang"
+
+
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def train(
@@ -207,6 +236,9 @@ def train(
     validation_data: str = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
+    tp: int = typer.Option(
+        None, help="Tensor parallel size. Required for grpo and optional (set to num_gpus) for other algos"
+    ),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
@@ -221,6 +253,14 @@ def train(
         help="List of commas separated checkpoint steps to average. E.g 1000,5000. "
         "If None, will skip prepare eval stage.",
     ),
+    server_model: str = typer.Option(None, help="Path to the model or model name in API"),
+    server_address: str = typer.Option(
+        None, help="Use ip:port for self-hosted models or the API url if using model providers"
+    ),
+    server_type: SupportedServers = typer.Option(None, help="Type of server to use"),
+    server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
+    server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
+    server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -254,6 +294,9 @@ def train(
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
+    if tp is None and training_algo == TrainingAlgo.grpo:
+        raise ValueError("tp is required to be explicitly specified for grpo")
+
     try:
         training_algo = training_algo.value
     except AttributeError:
@@ -282,7 +325,39 @@ def train(
     if " " in str(average_steps):
         raise ValueError("average steps should be separated with commas")
 
-    train_cmd = get_training_cmd(
+    server_config = None
+    if server_type is not None:
+        get_random_port = server_gpus != 8 and not exclusive
+        if server_address is None:  # we need to host the model
+            assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+            server_port = get_free_port(strategy="random") if get_random_port else 5000
+            server_address = f"localhost:{server_port}"
+
+            server_config = {
+                "model_path": server_model,
+                "server_type": server_type,
+                "num_gpus": server_gpus,
+                "num_nodes": server_nodes,
+                "server_args": server_args,
+                "server_port": server_port,
+            }
+            client_server_args = {
+                "server_type": server_type,
+                "port": server_port,
+            }
+        else:  # model is hosted elsewhere
+            client_server_args = {
+                "server_type": server_type,
+                "host": server_address,
+                "model": server_model,
+            }
+        client_arg_prefix = f"++trainer.grpo.environments.math.server."
+        client_string_args = ""
+        for client_arg, client_val in client_server_args.items():
+            client_string_args += f"{client_arg_prefix}{client_arg}={client_val} "
+        extra_arguments = client_string_args + extra_arguments
+
+    train_cmd, training_params = get_training_cmd(
         cluster_config=cluster_config,
         partition=partition,
         config_name=config_name,
@@ -292,6 +367,7 @@ def train(
         training_data=training_data,
         validation_data=validation_data,
         num_gpus=num_gpus,
+        tp=tp,
         num_nodes=num_nodes,
         expname=expname,
         training_algo=training_algo,
@@ -299,6 +375,14 @@ def train(
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
     )
+    container = cluster_config["containers"]["nemo"]
+    num_tasks = num_gpus if cluster_config["executor"] == "slurm" else 1
+
+    if training_algo == TrainingAlgo.grpo:
+        train_cmd = [get_grpo_vllm_cmd(training_params), train_cmd]
+        container = [cluster_config["containers"]["vllm"], cluster_config["containers"]["nemo-grpo"]]
+        assert training_params.num_gpus % training_params.tp == 0, "num_gpus should be divisible by tp"
+        num_tasks = [training_params.num_gpus // training_params.tp, num_tasks]
 
     with run.Experiment(expname) as exp:
         prev_task = None
@@ -308,10 +392,10 @@ def train(
                 cmd=train_cmd,
                 task_name=f'{expname}-{training_algo}-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["nemo"],
+                container=container,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=num_gpus if cluster_config["executor"] == "slurm" else 1,
+                num_tasks=num_tasks,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
@@ -321,6 +405,8 @@ def train(
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                server_config=server_config,
+                heterogeneous=True if server_config is not None else False,
             )
 
         if average_steps is not None:
