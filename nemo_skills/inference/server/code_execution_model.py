@@ -61,9 +61,12 @@ class CodeExecutionWrapper:
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
+        if top_logprobs is not None:  # TODO: add this
+            raise NotImplementedError("top_logprobs is not supported yet.")
 
         if stop_phrases is None:
             stop_phrases = []
@@ -133,6 +136,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        top_logprobs: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -141,6 +145,8 @@ class CodeExecutionWrapper:
         # TODO: currently nemo server would get separate 1-batch requests, which is likely really inefficient
         #       but the alternative is to have a fully separate implementation, which is also not nice
         #       If we find ourselves needing to use nemo with code execution often, we should fix this
+        if top_logprobs is not None:  # TODO: add this
+            raise NotImplementedError("top_logprobs is not supported yet.")
         kwargs = {
             'code_begin': code_begin,
             'code_end': code_end,
