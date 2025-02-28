@@ -20,6 +20,12 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 
 import torch
+
+try:
+    from lightning.pytorch.trainer.trainer import Trainer
+except ModuleNotFoundError:
+    from pytorch_lightning.trainer.trainer import Trainer
+
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
@@ -31,8 +37,7 @@ from nemo.collections.nlp.parts.nlp_overrides import (
 from nemo.collections.nlp.parts.utils_funcs import load_state_dict_helper, torch_dtype_from_precision
 from nemo.utils import logging
 from omegaconf import OmegaConf
-from pytorch_lightning.trainer.trainer import Trainer
-from transformers import Qwen2ForCausalLM, Qwen2Tokenizer
+from transformers import Qwen2ForCausalLM
 
 
 def get_args():
@@ -53,6 +58,7 @@ def get_args():
         help="Name of HF model we are converting to (e.g. Qwen/Qwen2.5-Math-7B)",
     )
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
+    parser.add_argument("--nemo-format", choices=["zarr", "torch_dist"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
     return args
 
@@ -81,7 +87,7 @@ def load_config(args, qwen_config):
     while qwen_config['vocab_size'] % base != 0:
         base //= 2
     nemo_config.make_vocab_size_divisible_by = base
-    nemo_config.dist_ckpt_format = 'zarr'
+    nemo_config.dist_ckpt_format = args.nemo_format
     return nemo_config
 
 

@@ -21,6 +21,8 @@ To build vllm image do the following
    1. `git clone https://github.com/Kipok/OpenRLHF`
    2. checkout tag/commit
    3. run `pip install -e .`
+7. install flask with `pip3 install --ignore-installed flask` (needed for NeMo-Aligner GRPO)
+8. git clone https://github.com/Kipok/NeMo-Aligner at igitman/grpo branch into /opt and run `pip3 install -e /opt/NeMo-Aligner/tensor_comms`
 
 Currently it takes 10+ hours to build this docker. Is there anything we can do to speed it up?
 
@@ -42,3 +44,10 @@ then run `docker ps -a` and note image id of your running container. Do `docker 
 and `docker tag <printed hash> igitman/nemo-skills-sglang:0.5.0` and push that image.
 
 Current sglang version: lmsysorg/sglang:v0.4.2.post2-cu125
+
+## Building nemo-grpo image
+
+Use nvcr.io/nvidia/nemo:24.12 as a base. Upgrade transformers and also update
+* /opt/NeMo to https://github.com/Kipok/NeMo at igitman/grpo branch
+* /opt/NeMo-Aligner to https://github.com/Kipok/NeMo-Aligner at igitman/grpo branch
+* run `pip install -e /opt/NeMo-Aligner/tensor_comms`
