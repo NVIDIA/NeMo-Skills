@@ -23,7 +23,7 @@ import typer
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
+from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command, get_unmounted_path, get_tunnel
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(__file__)
@@ -302,6 +302,11 @@ def generate(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    redone: bool = typer.Option(
+        False, 
+        help="If True, will re-run jobs even if a corresponding '.done' file already exists"
+    ),
+
 ):
     """Generate LLM completions for a given input file.
 
@@ -344,7 +349,6 @@ def generate(
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
     if chunk_ids is None:
         chunk_ids = [None]
-
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
     if log_dir:
@@ -379,8 +383,84 @@ def generate(
         if not random_seeds:
             random_seeds = [None]
 
-        for chunk_id in chunk_ids:
-            for seed in random_seeds:
+        expmap = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
+
+        # TODO add support of skipping running of the same seed or same chunk
+        if not redone:
+            status_dir = get_unmounted_path(cluster_config, f"{output_dir}")
+            seeds_str = " ".join(str(s) for s in random_seeds)
+            chunks_str = " ".join(str(c) for c in chunk_ids)
+            missing_map = {}
+
+            if random_seeds == [None]:
+                if chunk_ids == [None]:
+                    command = f"""bash -c '
+                        if [ ! -f "{status_dir}/output.jsonl.done" ]; then
+                            echo greedy-x;
+                        fi'
+                    """.strip().replace('\n', ' ')
+                    output = get_tunnel(cluster_config).run(command).stdout.strip()
+                    if output == "greedy-x":
+                        missing_map[None] = [None]
+                else:
+                    command = f"""bash -c '
+                        for j in {chunks_str}; do
+                            if [ ! -f "{status_dir}/output_chunk_"$j".jsonl.done" ]; then
+                                echo greedy-$j;
+                            fi;
+                        done'
+                    """.strip().replace('\n', ' ')
+                    output = get_tunnel(cluster_config).run(command).stdout.strip()
+                    chunks = []
+                    for line in output.splitlines():
+                        if line.startswith("greedy-"):
+                            chunk = int(line.split("-")[1])
+                            chunks.append(chunk)
+                    missing_map[None] = chunks
+
+            else:
+                if chunk_ids == [None]:
+                    command = f"""bash -c '
+                        for i in {seeds_str}; do
+                            if [ ! -f "{status_dir}/output-rs"$i".jsonl.done" ]; then
+                                echo rs-$i;
+                            fi;
+                        done'
+                    """.strip().replace('\n', ' ')
+                    output = get_tunnel(cluster_config).run(command).stdout.strip()
+                    for line in output.splitlines():
+                        if line.startswith("rs-"):
+                            seed = int(line.split("-")[1])
+                            missing_map[seed] = [None]
+                else:
+                    command = f"""bash -c '
+                        for i in {seeds_str}; do
+                            for j in {chunks_str}; do
+                                if [ ! -f "{status_dir}/output-rs"$i"_chunk_"$j".jsonl.done" ]; then
+                                    echo rs-$i-chunk-$j;
+                                fi;
+                            done;
+                        done'
+                    """.strip().replace('\n', ' ')
+                    output = get_tunnel(cluster_config).run(command).stdout.strip()
+                    for line in output.splitlines():
+                        if line.startswith("rs-"):
+                            parts = line.split("-")
+
+                            seed = int(parts[1])
+                            chunk = int(parts[3])
+                            if seed not in missing_map:
+                                missing_map[seed] = []
+                            missing_map[seed].append(chunk)
+            # TODO: Remove this print statement
+            print("expected map", expmap)
+            print("missing map", missing_map)
+            expmap = missing_map
+
+
+
+        for seed, chunk_ids in expmap.items():
+            for chunk_id in chunk_ids:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
