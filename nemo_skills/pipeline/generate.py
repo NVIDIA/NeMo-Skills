@@ -385,7 +385,6 @@ def generate(
 
         expmap = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
 
-        # TODO add support of skipping running of the same seed or same chunk
         if not redone:
             status_dir = get_unmounted_path(cluster_config, f"{output_dir}")
             seeds_str = " ".join(str(s) for s in random_seeds)
@@ -452,9 +451,6 @@ def generate(
                             if seed not in missing_map:
                                 missing_map[seed] = []
                             missing_map[seed].append(chunk)
-            # TODO: Remove this print statement
-            print("expected map", expmap)
-            print("missing map", missing_map)
             expmap = missing_map
 
 
