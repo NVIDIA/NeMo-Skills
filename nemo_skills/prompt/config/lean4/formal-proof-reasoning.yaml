@@ -1,17 +1,3 @@
-Your YAML file appears to be incorrectly formatted due to improper indentation and misplaced comments. Here are some key issues:
-
-1. **Incorrect Indentation**: 
-   - The comments under `user:` are indented, which suggests they are part of the `user` key when they should be at the root level.
-
-2. **YAML Block Scalar (`|-`)**:
-   - The `user: |-` section is correctly using a block scalar, but the subsequent indentation needs to be consistent.
-
-3. **Misplaced Comment Block**:
-   - The comments at the top of the file are fine, but the ones inside the YAML data might be interfering with the expected structure.
-
-### Fixed YAML Formatting:
-
-```yaml
 # Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

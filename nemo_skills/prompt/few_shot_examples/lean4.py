@@ -73,109 +73,34 @@ math_to_lean4_fewshot = [
         "formal_proof": "sorry",
     },
 ]
-math_to_lean4_predict_header_fewshot = [
-    {
-        "header": "import Mathlib\n\nopen Finset\nopen scoped BigOperators\n\n",
-        "problem": "What is the following value when expressed as a common fraction: $$\\frac{1}{2^{1}}+\\frac{1}{2^{2}}+\\frac{1}{2^{3}}+\\cdots + \\frac{1}{2^{8}}+\\frac{1}{2^{9}}+\\frac{1}{2^{10}}?$$",
-        "predicted_answer": "\\frac{1023}{1024}",
-        "formal_statement": "theorem user_theorem : (\u2211 k in Finset.range 10, (1 / (2 ^ (k + 1)))) = 1023 / 1024 := by\n",
-        "id": "test/algebra/2130.json",
-        "formal_proof": "sorry"
-    },
-    {
-        "header": "import Mathlib\n\n",
-        "problem": "Evaluate $24-(2x-y)$ if $x=4$ and $y=3$.",
-        "predicted_answer": "19",
-        "formal_statement": "theorem user_theorem : 24 - (2 * 4 - 3) = 19 := by\n",
-        "id": "test/algebra/1264.json",
-        "formal_proof": "sorry"
-    },
-    {
-        "header": "import Mathlib\n\n",
-        "problem": "If $x+y=12$ and $x-y=8$, what is the value of $2x-xy$?",
-        "predicted_answer": "0",
-        "formal_statement": "theorem user_theorem (x y : \u211d) (h\u2080 : x + y = 12) (h\u2081 : x - y = 8) : 2 * x - x * y = 0 := by\n",
-        "id": "test/algebra/1272.json",
-        "formal_proof": "sorry"
-    },
-    {
-        "header": "import Mathlib\n\n",
-        "problem": "A parabola with equation $y=x^2+bx+c$ passes through the points $(2,3)$ and $(4,3)$. What is $c$?",
-        "predicted_answer": "11",
-        "formal_statement": "theorem user_theorem (b c : \u211d) (h\u2081 : 3 = 2 ^ 2 + 2 * b + c) (h\u2082 : 3 = 4 ^ 2 + 4 * b + c) : c = 11 := by\n",
-        "id": "test/algebra/636.json",
-        "formal_proof": "sorry"
-    },
-    {
-        "header": "import Mathlib\n\nopen Finset\nopen scoped BigOperators\n\n",
-        "problem": "Two standard six-faced dice are rolled. Jean wins if the product of the two numbers rolled is odd or a multiple of three, otherwise Allen wins. What is the probability that Jean wins? Express your answer as a common fraction.",
-        "predicted_answer": "\\frac{2}{3}",
-        "formal_statement": "theorem user_theorem : ((Finset.filter (fun x => (x.1 * x.2) % 2 = 1 ∨ (x.1 * x.2) % 3 = 0) (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6))).card : ℚ) / (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6)).card = (2 : ℚ) / 3 := by\n",
-        "id": "test_counting_and_probability/551.json",
-        "formal_proof": "sorry"
-    },
-]
-
-proof_false_fewshot = [
-    {
-        "header": "import Mathlib\n\nopen Nat\n\n",
-        "informal_prefix": "/-- Using Nat.noConfusion on an impossible Nat equality. Prove False from 0 = 1. -/",
-        "formal_statement": "theorem user_theorem (h : 0 = 1) : False := by",
-        "formal_proof": "apply Nat.noConfusion h"
-    },
-    {
-        "header": "import Mathlib\n\nopen Nat\n\n",
-        "informal_prefix": "/-- Exploiting a logical contradiction (p AND ¬p). Prove False from p and ¬p. -/",
-        "formal_statement": "theorem user_theorem (p : Prop) (hp : p) (hnp : ¬p) : False :=",
-        "formal_proof": "hnp hp"
-    },
-    {
-        "header": "import Mathlib\n\nopen Nat\n\n",
-        "informal_prefix": "/-- Pattern matching on True ∧ False to prove False. -/",
-        "formal_statement": "theorem user_theorem (h : True ∧ False) : False :=",
-        "formal_proof": "h.right"
-    },
-    {
-        "header": "import Mathlib\n\nopen Nat\n\n",
-        "informal_prefix": "/-- Using well-known lemmas about Nat to derive a contradiction. Prove False from 1 < 1. -/",
-        "formal_statement": "theorem user_theorem (h : 1 < 1) : False :=",
-        "formal_proof": "Nat.lt_irrefl 1 h"
-    },
-    {
-        "header": "import Mathlib\n\nopen Nat\n\n",
-        "informal_prefix": "/-- Injectivity of Nat.succ leads to a contradiction. Prove False from 1 = 2. -/",
-        "formal_statement": "theorem user_theorem (h : 1 = 2) : False := by",
-        "formal_proof": "have : Nat.succ 0 = Nat.succ 1 := congrArg Nat.succ h let zero_eq_one : 0 = 1 := Nat.succ_injective this apply Nat.noConfusion zero_eq_one"
-    }
-]
 
 lean4_false_fewshots = [
     {
-        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "header": "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
         "informal_prefix": "/-- Prove that a real number cannot be both greater than and less than zero simultaneously. -/\n",
         "formal_statement": "theorem user_theorem : \n  ∀ (x : \u211d), x > 0 \u2227 x < 0 \u2192 False := by\n",
         "formal_proof": "/- Assume x > 0 and x < 0. The lt_asymm theorem states that for any real numbers a and b, both a < b and b < a cannot hold simultaneously. Applying this to x > 0 and x < 0 yields a contradiction. -/\nintro x h\nhave h1 : x > 0 := h.1\nhave h2 : x < 0 := h.2\nexact lt_asymm h1 h2",
     },
     {
-        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "header": "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
         "informal_prefix": "/-- Prove that a real number cannot be both less than and greater than another real number. -/\n",
         "formal_statement": "theorem user_theorem_4 : \n  ∀ (x y : \u211d), x < y \u2227 y < x \u2192 False := by\n",
         "formal_proof": "/- Assume x < y and y < x. The lt_asymm theorem ensures that this combination is contradictory. -/\nintros x y h\nhave h1 : x < y := h.1\nhave h2 : y < x := h.2\nexact lt_asymm h1 h2",
     },
     {
-        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "header": "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
         "informal_prefix": "/-- Prove that an integer cannot have a remainder of both 0 and 1 modulo 2. -/\n",
         "formal_statement": "theorem user_theorem_5 : \n  ∀ (x : \u2124), x % 2 = 0 \u2227 x % 2 = 1 \u2192 False := by\n",
         "formal_proof": "/- Assume x % 2 = 0 and x % 2 = 1. Substituting the first equality into the second leads to 0 = 1, which is a contradiction. -/\nintro x h\nhave h1 : x % 2 = 0 := h.1\nhave h2 : x % 2 = 1 := h.2\nrw [h1] at h2\nexact Int.zero_ne_one h2",
     },
     {
-        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "header": "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
         "informal_prefix": "/-- Prove that a real number cannot be both strictly greater than and less than or equal to another real number. -/\n",
         "formal_statement": "theorem user_theorem_6 : \n  ∀ (x y : \u211d), x > y \u2227 x ≤ y \u2192 False := by\n",
         "formal_proof": "/- Assume x > y and x ≤ y. The not_le_of_gt theorem ensures that this combination leads to a contradiction. -/\nintros x y h\nhave h1 : x > y := h.1\nhave h2 : x ≤ y := h.2\nexact not_le_of_gt h1 h2",
     },
     {
-        "header": "import Mathlib\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
+        "header": "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n",
         "informal_prefix": "/-- Prove that a real number cannot be both strictly positive and less than or equal to zero. -/\n",
         "formal_statement": "theorem user_theorem_8 : \n  ∀ (x : \u211d), x > 0 \u2227 x ≤ 0 \u2192 False := by\n",
         "formal_proof": "/- Assume x > 0 and x ≤ 0. The not_le_of_gt theorem ensures that this leads to a contradiction. -/\nintro x h\nhave h1 : x > 0 := h.1\nhave h2 : x ≤ 0 := h.2\nexact not_le_of_gt h1 h2",
@@ -220,8 +145,6 @@ nat_nat_judgment_fewshots = [
 examples_map = {
     "minif2f_deepseek_fewshot": minif2f_deepseek_fewshot,
     "math_to_lean4_fewshot": math_to_lean4_fewshot,
-    "math_to_lean4_predict_header_fewshot": math_to_lean4_predict_header_fewshot,
-    "proof_false_fewshot": proof_false_fewshot,
     "lean4_false_fewshots": lean4_false_fewshots,
     "nat_nat_judgment_fewshots": nat_nat_judgment_fewshots,
 }

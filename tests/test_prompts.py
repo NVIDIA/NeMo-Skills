@@ -1346,7 +1346,8 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     }
     print(prompt.fill(inputs))
     assert prompt.fill(inputs) == expected_prompt
-def test_generic_nat_to_lean4_prompt():
+
+def test_nat_to_lean4_prompt():
     prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
@@ -1366,110 +1367,6 @@ open scoped BigOperators Topology
             {
                 "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
                 "predicted_answer": "44",
-                "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
-            }
-        )
-        == expected_prompt
-    )
-
-
-
-
-def test_nat_to_lean4_prompt_with_header():
-    prompt = get_prompt('lean4/nat-to-lean4-math-with-header', 'deepseek-prover', 'math_to_lean4_predict_header_fewshot')
-
-    expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
-
-Here are some examples of problems and their corresponding Lean 4 translation, including theorems proof placeholders `sorry` and `user_theorem` as the theorem name. Use them as a guide.
-
-Problem:
-What is the following value when expressed as a common fraction: $$\\frac{1}{2^{1}}+\\frac{1}{2^{2}}+\\frac{1}{2^{3}}+\\cdots + \\frac{1}{2^{8}}+\\frac{1}{2^{9}}+\\frac{1}{2^{10}}?$$
-Answer is: \\frac{1023}{1024}
-Lean 4 translation:
-```lean4
-import Mathlib
-
-open Finset
-open scoped BigOperators
-
-theorem user_theorem : (∑ k in Finset.range 10, (1 / (2 ^ (k + 1)))) = 1023 / 1024 := by
-sorry```
-
-
-
-
-
-Problem:
-Evaluate $24-(2x-y)$ if $x=4$ and $y=3$.
-Answer is: 19
-Lean 4 translation:
-```lean4
-import Mathlib
-
-theorem user_theorem : 24 - (2 * 4 - 3) = 19 := by
-sorry```
-
-
-
-
-
-Problem:
-If $x+y=12$ and $x-y=8$, what is the value of $2x-xy$?
-Answer is: 0
-Lean 4 translation:
-```lean4
-import Mathlib
-
-theorem user_theorem (x y : ℝ) (h₀ : x + y = 12) (h₁ : x - y = 8) : 2 * x - x * y = 0 := by
-sorry```
-
-
-
-
-
-Problem:
-A parabola with equation $y=x^2+bx+c$ passes through the points $(2,3)$ and $(4,3)$. What is $c$?
-Answer is: 11
-Lean 4 translation:
-```lean4
-import Mathlib
-
-theorem user_theorem (b c : ℝ) (h₁ : 3 = 2 ^ 2 + 2 * b + c) (h₂ : 3 = 4 ^ 2 + 4 * b + c) : c = 11 := by
-sorry```
-
-
-
-
-
-Problem:
-Two standard six-faced dice are rolled. Jean wins if the product of the two numbers rolled is odd or a multiple of three, otherwise Allen wins. What is the probability that Jean wins? Express your answer as a common fraction.
-Answer is: \\frac{2}{3}
-Lean 4 translation:
-```lean4
-import Mathlib
-
-open Finset
-open scoped BigOperators
-
-theorem user_theorem : ((Finset.filter (fun x => (x.1 * x.2) % 2 = 1 ∨ (x.1 * x.2) % 3 = 0) (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6))).card : ℚ) / (Finset.product (Finset.Icc 1 6) (Finset.Icc 1 6)).card = (2 : ℚ) / 3 := by
-sorry```
-
-
-
-
-
-Here is the problem you need to translate into a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the theorem proof and `user_theorem` as the theorem name.
-
-Problem:
-If $\\sqrt{5+n}=7$, then what is the value of $n$?
-Answer is: 44
-Lean 4 translation:"""
-
-    assert (
-        prompt.fill(
-            {
-                "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
-                "expected_answer": "44",
                 "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
             }
         )

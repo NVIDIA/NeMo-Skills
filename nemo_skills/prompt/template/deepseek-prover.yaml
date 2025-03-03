@@ -24,4 +24,4 @@ code_end: '</llm-code>\n'
 code_output_begin: '<llm-code-output>\n'
 code_output_end: '</llm-code-output>\n'
 code_output_format: "qwen"
-stop_phrases: ["<|EOT|>", "<｜end▁of▁sentence｜>", "sorry", "\n\n\n\n\n\n"]
+stop_phrases: ["<|EOT|>", "<｜end▁of▁sentence｜>", "\n\n\n\n\n\n"]
