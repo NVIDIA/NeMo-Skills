@@ -1,0 +1,65 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Your goal is to synthesize multiple solutions (some correct, some incorrect) into a single cohesive solution 
+  that incorporates self-correction elements while ensuring the final answer remains correct.
+
+
+
+  please start with your modified output with "Solution"
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+
+  Instructions:
+  
+  1. Analyze all given solutions (both correct and incorrect).
+  
+  
+  2. Merge insights from different approaches into one well-structured, step-by-step solution.
+  
+  3. Introduce 3 - 5 natural self-corrections based on errors in the incorrect solutions.
+  
+  
+  4. These corrections should feel like genuine realizations during problem-solving, using phrases like:
+      "Wait, something seems off..."
+      "Oh, I think I see a mistake..."
+      "Let’s go back and check this step—it doesn’t look right."
+  
+  5. Ensure the final answer is correct and consistent with the best correct solutions.
+  
+  6. Avoid explicitly listing mistakes—let them emerge naturally as part of the reasoning.
+
+
+
+  Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
+  we will insert some mistakes," and ensure the wording sounds natural.
+  
+  Now, I will provide a list of correct and incorrect solutions. Please merge them into a single solution following the instructions above. 
+  Ensure that the final response integrates insights from all solutions through logical self-correction. 
+
+
+  Solution 1: {correct_1} 
+
+  Solution 2: {correct_2} 
+
+  Solution 3: {incorrect_1} 
+
+  Solution 4: {incorrect_2} 
+
+  Solution 5: {correct_3} 
+
+  Solution 6: {incorrect_3} 
+
+  Solution 7: {incorrect_4} 
+
+  Solution 8: {correct_4} 
+
+  Solution 9: {correct_5} 
+
+  Solution 10: {incorrect_5} 
+
+
+  
