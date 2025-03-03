@@ -37,6 +37,8 @@ user: |-
 
   Please avoid using phrases like "let us introduce a few mistakes," "we will intentionally add some errors," or "for demonstration purposes, 
   we will insert some mistakes," and ensure the wording sounds natural.
+
+  Most important: For each step or statement you have arrived, can you please try to add a self-correction element to enhance the reasoning process?
   
   Now, I will provide 5 correct solutions and 5 incorrect solutions. Please merge them into a single solution following the instructions above. 
   Ensure that the final response integrates insights from the correct solutions while incorporating and naturally correcting errors from the incorrect 
