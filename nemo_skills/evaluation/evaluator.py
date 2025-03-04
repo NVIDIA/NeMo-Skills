@@ -38,16 +38,11 @@ def eval_mcq(cfg):
     # Adapted from https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/8b6741a3011d8caa405fdd629f54b6931cb6e042/evaluate_from_api.py#L189
     # Original three functions are merged into one
     def tigerlab_parse(sample):
-        attempt_one = re.search(r"answer is \(([A-J])\)", sample['generation'])
-        if attempt_one:
-            return attempt_one.group(1)
-        attempt_two = re.search(r'.*[aA]nswer:\s*([A-J])', sample['generation'])
-        if attempt_two:
-            return attempt_two.group(1)
-        attempt_three = re.search(r"\b[A-J]\b(?!.*\b[A-J]\b)", sample['generation'], re.DOTALL)
-        if attempt_three:
-            return attempt_three.group(0)
-        return None
+        matches = re.findall(r"answer is \(?([A-J])\)?(?:[^a-zA-Z]|$)", sample['generation'])
+        if matches:
+            return matches[-1]
+        else:
+            return None
 
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
@@ -58,7 +53,7 @@ def eval_mcq(cfg):
                 sample['is_correct'] = parse_result == sample['expected_answer']
                 sample['predicted_answer'] = parse_result
                 fout.write(json.dumps(sample) + "\n")
-                        
+
 
 @nested_dataclass(kw_only=True)
 class MathEvaluatorConfig:
