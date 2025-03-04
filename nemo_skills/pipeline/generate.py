@@ -56,12 +56,12 @@ def get_expected_done_files(output_dir, random_seeds, chunk_ids):
     return file_map
 
 
-def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, ignore_done):
+def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done):
     """
     Determines which jobs still need to be run based on missing .done files.
     Returns a mapping from random_seed to list of chunk_ids that need processing.
     """
-    if ignore_done:
+    if rerun_done:
         return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
 
     status_dir = get_unmounted_path(cluster_config, output_dir)
@@ -108,7 +108,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, igno
     )
     if done_jobs_str:
         LOG.info(
-            "The following jobs are completed and will be skipped (to override set --ignore_done): seeds %s",
+            "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
             done_jobs_str,
         )
     missing_jobs_str = ", ".join(
@@ -396,7 +396,7 @@ def generate(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
-    ignore_done: bool = typer.Option(
+    rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
 ):
@@ -480,7 +480,7 @@ def generate(
             output_dir=output_dir,
             random_seeds=random_seeds,
             chunk_ids=chunk_ids,
-            ignore_done=ignore_done,
+            rerun_done=rerun_done,
         )
 
         for seed, chunk_ids in remaining_jobs.items():
