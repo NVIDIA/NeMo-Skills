@@ -13,15 +13,11 @@
 # limitations under the License.
 
 import argparse
-import csv
-import io
 import json
-import os
-import tarfile
-import urllib.request
 from pathlib import Path
+from datasets import load_dataset
+from tqdm import tqdm
 
-URL = "https://people.eecs.berkeley.edu/~hendrycks/data.tar"
 
 # mmlu subcategories from https://github.com/hendrycks/test/blob/master/categories.py
 subcategories = {
@@ -84,83 +80,56 @@ subcategories = {
     "world_religions": ["philosophy"],
 }
 
-def read_csv_files_from_tar(tar_file_path, split):
-    result = {}
 
-    # Define the column names
-    column_names = ["question", "A", "B", "C", "D", "expected_answer"]
-
-    with tarfile.open(tar_file_path, 'r') as tar:
-        # List all members of the tar file
-        members = tar.getmembers()
-
-        # Filter for CSV files in the 'data/test' directory
-        csv_files = [
-            member for member in members if member.name.startswith(f'data/{split}/') and member.name.endswith('.csv')
-        ]
-
-        for csv_file in csv_files:
-            # Extract the file name without the path
-            file_name = os.path.basename(csv_file.name)
-
-            # Read the CSV file content
-            file_content = tar.extractfile(csv_file)
-            if file_content is not None:
-                # Decode bytes to string
-                content_str = io.TextIOWrapper(file_content, encoding='utf-8')
-
-                # Use csv to read the CSV content without a header
-                csv_reader = csv.reader(content_str)
-
-                # Convert CSV data to list of dictionaries with specified column names
-                csv_data = []
-                for row in csv_reader:
-                    if len(row) == len(column_names):
-                        csv_data.append(dict(zip(column_names, row)))
-                    else:
-                        print(f"Warning: Skipping row in {file_name} due to incorrect number of columns")
-
-                # Add to result dictionary
-                result[file_name.rsplit('_', 1)[0]] = csv_data
-
-    return result
+# dataset preparing strategy adapted from ZeroEval (https://github.com/WildEval/ZeroEval/blob/main/data_prep/mmlu-redux.py)
+def format_entry(entry, category):
+    if entry['error_type'] == "ok":
+        final_answer = chr(65 + entry['answer'])
+    elif entry['error_type'] == "wrong_groundtruth" and entry['correct_answer'] in list("ABCD"):
+        final_answer = 'correct_answer'
+    else:
+        # bad_question_clarity, bad_options_clarity, no_correct_answer,
+        # multiple_correct_answers, expert and wrong_groundtruth with no labels
+        return None
+    return {
+        "question": entry['question'],
+        "A": entry['choices'][0],
+        "B": entry['choices'][1],
+        "C": entry['choices'][2],
+        "D": entry['choices'][3],
+        "expected_answer": final_answer,
+        "subset_for_metrics": subcategories[category][0],
+        "source": entry['source']
+    }
 
 
-def save_data(split):
+def write_data_to_file(output_file, data, category):
+    with open(output_file, "at", encoding="utf-8") as fout:
+        for entry in tqdm(data, desc=f"Writing {category} ({subcategories[category][0]}) to {output_file.name}"):
+            if (final_entry := format_entry(entry, category)):
+                json.dump(final_entry, fout)
+                fout.write("\n")
+
+
+def main(args):
+    # Create the output directory if it doesn't exist
     data_dir = Path(__file__).absolute().parent
-    data_file = str(data_dir / f"data.tar")
     data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / f"{split}.jsonl")
 
-    urllib.request.urlretrieve(URL, data_file)
+    print(f"Loading categories: {list(subcategories.keys())}")
 
-    original_data = read_csv_files_from_tar(data_file, split)
-    data = []
-    for subject, questions in original_data.items():
-        for question in questions:
-            new_entry = question
-            new_entry['subset_for_metrics'] = subcategories[subject][0]
-            data.append(new_entry)
+    # create output_file or remove its contents if it exists
+    output_file = data_dir / f"{args.split}.jsonl"
+    open(output_file, "w")
 
-    with open(output_file, "wt", encoding="utf-8") as fout:
-        for entry in data:
-            fout.write(json.dumps(entry) + "\n")
-
-    # cleaning up the data file to avoid accidental upload on clusters
-    os.remove(data_file)
+    # Load the dataset and write it to the output 
+    for category in tqdm(subcategories):
+        dataset = load_dataset("edinburgh-dawg/mmlu-redux-2.0", name=category, split='test')
+        write_data_to_file(output_file, dataset, category)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--split",
-        default="all",
-        choices=("dev", "test", "val"),
-    )
+    parser.add_argument("--split", default="test", choices=(["test"]), help="Dataset split to process.")
     args = parser.parse_args()
-
-    if args.split == "all":
-        for split in ["dev", "test", "val"]:
-            save_data(split)
-    else:
-        save_data(args.split)
+    main(args)
