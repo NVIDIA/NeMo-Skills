@@ -1,0 +1,94 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant.
+
+  You will be provided with a specific part of a mathematical solution. Y
+  our task is to enhance it by incorporating self-questioning, verification, and natural self-correction while keeping it fully consistent with the original structure for later merging.
+
+
+  Instructions:
+  
+  1. Preserve the format and logical flow of the given part.
+      Do not change the original equations, structure, or notations.
+      Do not introduce additional sections or headers that may disrupt merging.
+  
+  2. Introduce at least 3-5 self-verification steps throughout the reasoning process, using phrases such as:
+      "Wait, something seems off here... let me check."
+      "Hold on, did I account for all cases?"
+      "Let’s go back and verify this step before proceeding."
+  
+  3. If an error or oversight is identified, correct it naturally within the reasoning.
+  
+  
+  4. Keep your response aligned with the original step-by-step progression, ensuring smooth integration with other parts.
+  
+  
+  I will give you a few examples on how to enhance the given solution by adding self-correction element to enhance the reasoning process:
+
+  
+  Example 1:
+  
+  Original Step: Now, let's sum up all the possible numbers again:\n\n- One-digit numbers: 3\n- Two-digit numbers: 6\n- Three-digit numbers: 18\n- Four-digit numbers: 18\n\nTotal number of distinct positive integers:\n\\[ 3 + 6 + 18 + 18 = 45 \\]\n\n
+  
+  
+  After revision:
+  Now, let's sum up all the possible numbers again:\n\n- One-digit numbers: 3\n- Two-digit numbers: 6\n- Three-digit numbers: 18\n- Four-digit numbers: 18\n\nTotal number of distinct positive integers:\n\\[ 3 + 6 + 18 + 18 = 45 \\]\n\n
+  Hold on, I might have miscalculated this part. Let me verify by considering the individual cases again
+
+
+  Example 2:
+
+  Original step: 
+  
+  So, the sum of a, b, c, d, e, and f should be 360°.
+
+  After revision: 
+
+  So, the sum of \\(a, b, c, d, e,\\) and \\(f\\) should be \\(360^\\circ\\).\n\nHowever, I should verify this by considering the triangles formed by the intersecting lines.
+
+  
+  
+  Example 3:
+
+  Original step: 
+  We start with N = 9999 and decrement by 1 to check divisibility
+  
+
+  After revision:
+  We start with N = 9999 and decrement by 1 to check divisibility. But that seems tedious. Maybe there's a more systematic way.
+
+  
+  
+  Example 4: 
+
+  Original step:
+  So, we want to maximize A, B, C, D starting with A=9, B=9, C=9, D=9, 
+  
+  
+  After revision:
+  So, we want to maximize A, B, C, D starting with A=9, B=9, C=9, D=9, and check if they satisfy these equations. If this doesn’t satisfy the conditions, maybe we can work backwards. Let’s see.
+
+
+
+  Example 5:
+
+  Original step:
+  N = 5694 is a valid solution.
+
+  After revision:
+  N = 5694 is a valid solution. Wait, we started with C=9, which gave A=5, B=6, D=4. Let's check if there's a larger C that still gives valid digits
+
+  
+
+
+  Now, I will provide you with a part of the solution. Please enhance it by incorporating self-questioning, verification, and natural self-correction to ensure both rigor and clarity.
+
+  Solution: {solution}
+
+
+
+  
