@@ -95,15 +95,37 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, igno
         if chunk_id not in missing_jobs[seed]:
             done_jobs[seed].append(chunk_id)
 
-    if done_jobs:
+    done_jobs_str = ", ".join(
+        [
+            (
+                f"{seed}"
+                if not any(chunk is not None for chunk in chunks)
+                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
+            )
+            for seed, chunks in done_jobs.items()
+            if chunks
+        ]
+    )
+    if done_jobs_str:
         LOG.info(
-            "The following jobs have already been completed and will be skipped (to override set --ignore_done): %s",
-            "; ".join([f"seed: {seed}, chunks: {chunk_ids}" for seed, chunk_ids in done_jobs.items()]),
+            "The following jobs are completed and will be skipped (to override set --ignore_done): seeds %s",
+            done_jobs_str,
         )
-    if missing_jobs:
+    missing_jobs_str = ", ".join(
+        [
+            (
+                f"{seed}"
+                if not any(chunk is not None for chunk in chunks)
+                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
+            )
+            for seed, chunks in missing_jobs.items()
+            if chunks
+        ]
+    )
+    if missing_jobs_str:
         LOG.info(
-            "The following jobs are incomplete and will be launched: %s",
-            "; ".join([f"seed: {seed}, chunks: {chunk_ids}" for seed, chunk_ids in missing_jobs.items()]),
+            "The following jobs are incomplete and will be launched: seeds %s",
+            missing_jobs_str,
         )
 
     return missing_jobs
