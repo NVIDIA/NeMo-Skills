@@ -383,7 +383,7 @@ def generate(
         if not random_seeds:
             random_seeds = [None]
 
-        expmap = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
+        remaining_jobs = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
 
         if not ignore_done:
             status_dir = get_unmounted_path(cluster_config, f"{output_dir}")
@@ -451,11 +451,11 @@ def generate(
                             if seed not in missing_map:
                                 missing_map[seed] = []
                             missing_map[seed].append(chunk)
-            expmap = missing_map
+            remaining_jobs = missing_map
 
 
 
-        for seed, chunk_ids in expmap.items():
+        for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
