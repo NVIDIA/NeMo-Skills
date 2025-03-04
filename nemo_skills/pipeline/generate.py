@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import logging
+import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
@@ -75,7 +76,10 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, igno
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
 
     command = f"bash -c '{'; '.join(check_commands)}'"
-    output = get_tunnel(cluster_config).run(command).stdout.strip()
+    if cluster_config['executor'] == 'slurm':
+        output = get_tunnel(cluster_config).run(command).stdout.strip()
+    else:
+        output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
 
     # Parse results into a mapping of missing jobs
     missing_jobs = defaultdict(list)
@@ -86,26 +90,23 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, igno
             chunk = None if chunk_str == "NONE" else int(chunk_str)
             missing_jobs[seed].append(chunk)
 
-    done_jobs_to_log = []
-    missing_jobs_to_log = []
+    done_jobs = defaultdict(list)
     for seed, chunk_id in expected_files.keys():
-        if seed not in missing_jobs or chunk_id not in missing_jobs[seed]:
-            done_jobs_to_log.append((seed, chunk_id))
-        else:
-            missing_jobs_to_log.append((seed, chunk_id))
+        if chunk_id not in missing_jobs[seed]:
+            done_jobs[seed].append(chunk_id)
 
-    if done_jobs_to_log:
+    if done_jobs:
         LOG.info(
-            "The following jobs have already been completed: %s",
-            "; ".join([f"seed: {seed}, chunk: {chunk}" for seed, chunk in done_jobs_to_log]),
+            "The following jobs have already been completed and will be skipped (to override set --ignore_done): %s",
+            "; ".join([f"seed: {seed}, chunks: {chunk_ids}" for seed, chunk_ids in done_jobs.items()]),
         )
-    if missing_jobs_to_log:
+    if missing_jobs:
         LOG.info(
-            "The following jobs are missing and will be launched: %s",
-            "; ".join([f"seed: {seed}, chunk: {chunk}" for seed, chunk in missing_jobs_to_log]),
+            "The following jobs are incomplete and will be launched: %s",
+            "; ".join([f"seed: {seed}, chunks: {chunk_ids}" for seed, chunk_ids in missing_jobs.items()]),
         )
 
-    return missing_jobs_to_log
+    return missing_jobs
 
 
 def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
