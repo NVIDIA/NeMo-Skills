@@ -1,0 +1,28 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Configuration for translating natural language (nat) to Lean 4 code, 
+# with a predefined Lean 4 header. 
+few_shot_examples:
+  prefix: "Here are some examples of problems and their corresponding Lean 4 translation, including theorems proof placeholders `sorry` and `user_theorem` as the theorem name. Use them as a guide.\n\n"
+  template: "Problem:\n{problem}\nAnswer is: {predicted_answer}\nExpected Lean 4 translation:\n```lean4\n{header}{formal_statement}{formal_proof}```\n\n\n\n\n\n"
+  suffix: "Here is the problem you need to translate into a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the theorem proof and `user_theorem` as the theorem name.\n\n"
+
+user: |-
+  Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
+
+  {examples}{problem}
+  Answer is: {predicted_answer}
+  ```lean4
+  {header}
