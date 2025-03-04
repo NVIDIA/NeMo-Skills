@@ -302,7 +302,7 @@ def generate(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
-    redone: bool = typer.Option(
+    ignore_done: bool = typer.Option(
         False, 
         help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -385,7 +385,7 @@ def generate(
 
         expmap = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
 
-        if not redone:
+        if not ignore_done:
             status_dir = get_unmounted_path(cluster_config, f"{output_dir}")
             seeds_str = " ".join(str(s) for s in random_seeds)
             chunks_str = " ".join(str(c) for c in chunk_ids)
