@@ -78,11 +78,6 @@ class PPOVerlTask:
         return cmd
 
     def format_train_args(self):
-        # NOTE:
-        # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
-        # with optim states)
-        # `save` refers to the final HF model checkpoint (the equivalent of nemo final model checkpoint)
-        # You can opt in to save both ds and HF checkpoint at every save_steps by setting `--save_hf_ckpt` as extra args
         cmd = (
             "   algorithm.adv_estimator=grpo "
             "   data.train_batch_size=128 "
@@ -115,23 +110,14 @@ class PPOVerlTask:
             "   trainer.critic_warmup=0 "
             "   +trainer.val_before_train=True "
             "   trainer.val_generations_to_log_to_wandb=1 "
-            "   trainer.save_freq=2 "
-            "   trainer.test_freq=2 "
+            "   trainer.save_freq=20 "
+            "   trainer.test_freq=20 "
             "   trainer.default_hdfs_dir=null "
             f"   trainer.default_local_dir={self.output_dir}/checkpoints "
             "   trainer.total_epochs=30 "
             f"   trainer.n_gpus_per_node={self.num_gpus} "
             f"   trainer.nnodes={self.num_nodes} "
             ""
-            # f" --pretrain {self.model} "
-            # f" --load_checkpoint "
-            # f" --ckpt_path {os.path.join(self.output_dir, 'ds_checkpoints')} "
-            # f" --max_ckpt_num 100 "
-            # f" --max_ckpt_mem 1000000000000 "
-            # f" --save_path {os.path.join(self.output_dir, 'checkpoints')} "
-            # f" --save_steps -1 "
-            # f" --max_epochs 1 "
-            # f" --max_time_per_run {self.timeout} "
         )
         return cmd
 
@@ -176,6 +162,7 @@ class PPOVerlTask:
         return cmd
 
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
+        # TODO: is wandb_id and wandb_resume supported?
         cmd = (
             f" trainer.project_name='{wandb_project}' "
             f" trainer.experiment_name='{expname}' "
@@ -185,19 +172,6 @@ class PPOVerlTask:
             cmd = f"{cmd} trainer.logger=['console'] "
         else:
             cmd = f"{cmd} trainer.logger=['console','wandb'] "
-
-        # if not disable_wandb:
-        #     if os.getenv('WANDB_API_KEY') is None:
-        #         raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
-
-        #     cmd = (
-        #         f" --use_wandb $WANDB_API_KEY "
-        #         f" --wandb_project {wandb_project} "
-        #         f" --wandb_run_name {expname} "
-        #         f" --wandb_id {expname} "
-        #         f" --wandb_resume auto"
-        #     )
-        # else:
 
         return cmd
 
@@ -253,7 +227,6 @@ def get_training_cmd(
     output_dir,
     prompt_data,
     eval_data,
-    input_key,
     num_gpus,
     num_nodes,
     expname,
@@ -271,7 +244,6 @@ def get_training_cmd(
             output_dir=output_dir,
             prompt_data=prompt_data,
             eval_data=eval_data,
-            input_key=input_key,
             num_gpus=num_gpus,
             num_nodes=num_nodes,
             expname=expname,
@@ -312,7 +284,6 @@ def ppo_verl(
     rm_model: str = typer.Option(None, help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     eval_data: str = typer.Option(None, help="Path to the eval data"),
-    input_key: str = typer.Option("input", help="Input key for the prompt data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -397,7 +368,6 @@ def ppo_verl(
         output_dir=output_dir,
         prompt_data=prompt_data,
         eval_data=eval_data,
-        input_key=input_key,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,
