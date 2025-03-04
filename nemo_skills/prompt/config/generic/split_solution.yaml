@@ -1,0 +1,43 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Given a mathematical solution, Your goal is to  strictly segment it into distinct parts without modifying the original wording
+
+  Format Guidelines (Strictly Follow This Structure):
+
+  Part 1
+
+  (Original text for this part)
+  Part 2
+
+  (Original text for this part)
+  Part 3
+
+  (Original text for this part)
+  ... (Continue as needed)
+  
+  Rules:
+
+  Do not change, simplify, or rewrite any text—only structure it into the specified format.
+  Ensure each section follows a logical order.
+  Maintain consistent formatting.
+  Do not add explanations or extra content.
+  Strict adherence to this format is required.
+
+  Now, I will provide you a solution. Please segment the solution following the instructions above. 
+
+  Solution{solution}
+
+
+  
+
+  
+
+
+
+
+
+  
