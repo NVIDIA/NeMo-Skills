@@ -436,8 +436,11 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                             
                     data[-1][-1] = json.dumps(line_dict)
 
-                    predicted_answer = line_dict.get("predicted_answer", line_dict.get("expected_answer"))
-                    predicted_proof = line_dict["predicted_proof"]
+                    if answer_format == "natural_language":
+                        predicted_answer = line_dict["predicted_answer"]
+                    elif "lean4-" in answer_format:
+                        predicted_proof = line_dict["predicted_proof"]
+
                     if answer_format == "natural_language" and (predicted_answer, gt_answer) in map_to_future:
                         continue
                     elif ("lean4-" in answer_format) and predicted_proof in map_to_future:
