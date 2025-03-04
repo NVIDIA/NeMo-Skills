@@ -482,9 +482,10 @@ def generate(
             chunk_ids=chunk_ids,
             rerun_done=rerun_done,
         )
-
+        has_tasks = False
         for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
+                has_tasks = True
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -534,10 +535,12 @@ def generate(
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
+        if has_tasks:
+            run_exp(exp, cluster_config)
 
-        run_exp(exp, cluster_config)
-
-    return exp
+    if has_tasks:
+        return exp
+    return None
 
 
 if __name__ == "__main__":
