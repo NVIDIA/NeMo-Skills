@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import logging
+import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
@@ -23,7 +24,13 @@ import typer
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_reward_server_command, get_server_command
+from nemo_skills.pipeline.utils import (
+    get_free_port,
+    get_reward_server_command,
+    get_server_command,
+    get_tunnel,
+    get_unmounted_path,
+)
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(__file__)
@@ -35,6 +42,93 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+
+
+def get_expected_done_files(output_dir, random_seeds, chunk_ids):
+    """
+    Returns a mapping of (seed, chunk_id) to expected .done file paths
+    """
+    file_map = {}
+    for seed in random_seeds:
+        for chunk_id in chunk_ids:
+            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)
+            file_map[(seed, chunk_id)] = f"{output_file}.done"
+    return file_map
+
+
+def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done):
+    """
+    Determines which jobs still need to be run based on missing .done files.
+    Returns a mapping from random_seed to list of chunk_ids that need processing.
+    """
+    if rerun_done:
+        return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
+
+    status_dir = get_unmounted_path(cluster_config, output_dir)
+    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids)
+
+    check_commands = []
+    for (seed, chunk_id), filepath in expected_files.items():
+        unmounted_path = filepath.replace(output_dir, status_dir)
+        # Create identifiers that can be parsed from output
+        seed_str = "NONE" if seed is None else str(seed)
+        chunk_str = "NONE" if chunk_id is None else str(chunk_id)
+        check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
+
+    command = f"bash -c '{'; '.join(check_commands)}'"
+    if cluster_config['executor'] == 'slurm':
+        output = get_tunnel(cluster_config).run(command).stdout.strip()
+    else:
+        output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+
+    # Parse results into a mapping of missing jobs
+    missing_jobs = defaultdict(list)
+    for line in output.splitlines():
+        if line.startswith("MISSING:"):
+            _, seed_str, chunk_str = line.split(":")
+            seed = None if seed_str == "NONE" else int(seed_str)
+            chunk = None if chunk_str == "NONE" else int(chunk_str)
+            missing_jobs[seed].append(chunk)
+
+    done_jobs = defaultdict(list)
+    for seed, chunk_id in expected_files.keys():
+        if chunk_id not in missing_jobs[seed]:
+            done_jobs[seed].append(chunk_id)
+
+    done_jobs_str = ", ".join(
+        [
+            (
+                f"{seed}"
+                if not any(chunk is not None for chunk in chunks)
+                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
+            )
+            for seed, chunks in done_jobs.items()
+            if chunks
+        ]
+    )
+    if done_jobs_str:
+        LOG.info(
+            "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
+            done_jobs_str,
+        )
+    missing_jobs_str = ", ".join(
+        [
+            (
+                f"{seed}"
+                if not any(chunk is not None for chunk in chunks)
+                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
+            )
+            for seed, chunks in missing_jobs.items()
+            if chunks
+        ]
+    )
+    if missing_jobs_str:
+        LOG.info(
+            "The following jobs are incomplete and will be launched: seeds %s",
+            missing_jobs_str,
+        )
+
+    return missing_jobs
 
 
 def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
@@ -302,6 +396,9 @@ def generate(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    rerun_done: bool = typer.Option(
+        False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -344,7 +441,6 @@ def generate(
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
     if chunk_ids is None:
         chunk_ids = [None]
-
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
     if log_dir:
@@ -374,13 +470,22 @@ def generate(
 
     with run.Experiment(expname) as exp:
         extra_arguments_original = extra_arguments
-        
+
         # Treat no random seeds as a single None seed to unify the code paths
         if not random_seeds:
             random_seeds = [None]
 
-        for chunk_id in chunk_ids:
-            for seed in random_seeds:
+        remaining_jobs = get_remaining_jobs(
+            cluster_config=cluster_config,
+            output_dir=output_dir,
+            random_seeds=random_seeds,
+            chunk_ids=chunk_ids,
+            rerun_done=rerun_done,
+        )
+        has_tasks = False
+        for seed, chunk_ids in remaining_jobs.items():
+            for chunk_id in chunk_ids:
+                has_tasks = True
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
                 server_config, extra_arguments, server_address, server_port = configure_client(
                     generation_type=generation_type,
@@ -430,10 +535,12 @@ def generate(
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
-        
-        run_exp(exp, cluster_config)
+        if has_tasks:
+            run_exp(exp, cluster_config)
 
-    return exp
+    if has_tasks:
+        return exp
+    return None
 
 
 if __name__ == "__main__":
