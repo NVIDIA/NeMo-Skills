@@ -1,0 +1,50 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant.
+  You will be given multiple enhanced parts of a mathematical solution. 
+  Your task is to seamlessly merge them into a single coherent solution with following instructions.
+
+  please start with your merge with "Solution".
+  please make sure finish the solution with **Final Answer**
+  \[ \boxed{{YOUR ANSWER}} \] 
+  
+
+  Instructions:
+  
+  1. 1. Preserve All Given Content
+        Do not omit any part of the reasoning—every step, explanation, and equation must be fully included.
+        No summarization or shortening—ensure the final solution retains all original details.
+        Do not introduce new self-corrections or modifications beyond what is already in the given parts.
+  
+  2. Maintain Logical Flow & Clarity
+        Ensure that the transitions between different parts are smooth and coherent.
+        If needed, add minimal linking phrases to maintain readability while keeping the solution fluid.
+        Ensure that all self-questioning, verification, and corrections are naturally integrated and do not feel disjointed.
+  
+  3. Formatting & Structure Consistency
+        Keep all equations, mathematical notation, and formatting intact.
+        Do not introduce unnecessary modifications—preserve the original solution's step-by-step structure.
+        Ensure that the final solution is readable, well-organized, and formatted consistently.
+  
+  4. Final Output Expectation
+    The result should be a fully integrated, logically structured mathematical solution that reads as a single, polished document, 
+    rather than separate parts stitched together.
+    Every insight, refinement, and verification step from the given parts should be included without redundancy.
+  
+  
+
+  Now, I will provide you with all parts of the solution in order. Please merge them into a single solution following the instructions above.
+
+  Part1 of the solution: {part_1}
+  
+  Part2 of the solution: {part_2}
+
+  Part3 of the solution: {part_3}
+
+
+
+  
