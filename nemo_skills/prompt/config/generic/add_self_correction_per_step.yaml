@@ -6,14 +6,13 @@ system: ""
 user: |-
   You are an advanced mathematical reasoning assistant.
 
-  You will be provided with a specific part of a mathematical solution. Y
-  our task is to enhance it by incorporating self-questioning, verification, and natural self-correction while keeping it fully consistent with the original structure for later merging.
+  You will be provided with a specific part of a mathematical solution. 
+  Your task is to enhance it by incorporating self-questioning, verification, and natural self-correction while keeping it fully consistent with the original structure for later merging.
 
 
   Instructions:
   
   1. Preserve the format and logical flow of the given part.
-      Do not change the original equations, structure, or notations.
       Do not introduce additional sections or headers that may disrupt merging.
   
   2. Introduce at least 3-5 self-verification steps throughout the reasoning process, using phrases such as:
@@ -22,7 +21,6 @@ user: |-
       "Let’s go back and verify this step before proceeding."
   
   3. If an error or oversight is identified, correct it naturally within the reasoning.
-  
   
   4. Keep your response aligned with the original step-by-step progression, ensuring smooth integration with other parts.
   
