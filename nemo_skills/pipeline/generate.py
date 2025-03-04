@@ -42,18 +42,18 @@ def get_chunked_rs_filename(
     output_dir: str,
     random_seed: int = None,
     chunk_id: int = None,
-    output_base_name: str = "output",
+    output_prefix: str = "output",
 ) -> str:
     """
     Return a path of the form:
-      {output_dir}/{output_base_name}[-rsSEED][-chunkK].jsonl
-    If `output_base_name` is None, fallback to 'output' in place of {output_base_name}.
+      {output_dir}/{output_prefix}[-rsSEED][-chunkK].jsonl
+    If `output_prefix` is None, fallback to 'output' in place of {output_prefix}.
     """
 
     if random_seed is not None:
-        base_filename = f"{output_base_name}-rs{random_seed}.jsonl"
+        base_filename = f"{output_prefix}-rs{random_seed}.jsonl"
     else:
-        base_filename = f"{output_base_name}.jsonl"
+        base_filename = f"{output_prefix}.jsonl"
 
     # If chunking is enabled, add the chunk suffix
     if chunk_id is not None:
@@ -70,18 +70,18 @@ def get_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.generate',
-    output_base_name: str ="output",
+    output_prefix: str ="output",
 ):
     """
     Construct the generation command for language model inference.
 
     If chunk_id is provided, chunking logic is used.
-    If output_base_name is provided, it replaces the default 'output*.jsonl' filenames
+    If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
     with a base name (plus `-rsSEED` or chunk info as needed).
     """
 
     # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_base_name=output_base_name,)
+    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
 
     if random_seed is not None:
@@ -94,12 +94,12 @@ def get_cmd(
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_base_name=output_base_name)
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix)
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
         for cur_chunk_id in range(num_chunks):
-            donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_base_name=output_base_name)}.done"
+            donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_prefix=output_prefix)}.done"
             donefiles.append(donefile)
 
         if postprocess_cmd:
@@ -108,7 +108,7 @@ def get_cmd(
             postprocess_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_base_name=output_base_name)
+        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix)
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
@@ -321,7 +321,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    output_base_name: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
+    output_prefix: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -425,7 +425,7 @@ def generate(
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
-                    output_base_name=output_base_name,
+                    output_prefix=output_prefix,
                     postprocess_cmd=postprocess_cmd,
                     script=cmd_script,
                 )
