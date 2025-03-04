@@ -498,6 +498,15 @@ def tunnel_hash(tunnel):
 
 
 def get_tunnel(cluster_config):
+    if "ssh_tunnel" not in cluster_config:
+        if "job_dir" not in cluster_config:
+            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        if os.getenv('NEMORUN_HOME', '/home').startswith('/home'):
+            LOG.warning(
+                "If your /home folder is limited in space it's recommended to "
+                "explicitly set NEMORUN_HOME to point to a larger disk."
+            )
+        return run.LocalTunnel(cluster_config["job_dir"])
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
