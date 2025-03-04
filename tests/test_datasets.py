@@ -40,6 +40,7 @@ DATASETS = [
     ('svamp', ['test']),
     ('answer-judge', ['test']),
     ('mmlu-pro', ['test']),
+    ('mmlu-redux', ['test']),
     ('gpqa', ['diamond', 'main', 'extended']),
     ('minerva_math', ['test']),
     ('olympiadbench', ['test']),
