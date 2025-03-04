@@ -36,6 +36,49 @@ class SupportedServers(str, Enum):
     openai = "openai"
     sglang = "sglang"
 
+def get_expected_done_files(output_dir, random_seeds, chunk_ids):
+    """
+    Returns a mapping of (seed, chunk_id) to expected .done file paths
+    """
+    file_map = {}
+    for seed in random_seeds:
+        for chunk_id in chunk_ids:
+            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)
+            file_map[(seed, chunk_id)] = f"{output_file}.done"
+    return file_map
+
+def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, ignore_done):
+    """
+    Determines which jobs still need to be run based on missing .done files.
+    Returns a mapping from random_seed to list of chunk_ids that need processing.
+    """
+    if ignore_done:
+        return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
+    
+    status_dir = get_unmounted_path(cluster_config, output_dir)
+    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids)
+    
+    check_commands = []
+    for (seed, chunk_id), filepath in expected_files.items():
+        unmounted_path = filepath.replace(output_dir, status_dir)
+        # Create identifiers that can be parsed from output
+        seed_str = "NONE" if seed is None else str(seed)
+        chunk_str = "NONE" if chunk_id is None else str(chunk_id)
+        check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
+    
+    command = f"bash -c '{'; '.join(check_commands)}'"
+    output = get_tunnel(cluster_config).run(command).stdout.strip()
+    
+    # Parse results into a mapping of missing jobs
+    missing_jobs = defaultdict(list)
+    for line in output.splitlines():
+        if line.startswith("MISSING:"):
+            _, seed_str, chunk_str = line.split(":")
+            seed = None if seed_str == "NONE" else int(seed_str)
+            chunk = None if chunk_str == "NONE" else int(chunk_str)
+            missing_jobs[seed].append(chunk)
+    
+    return dict(missing_jobs)
 
 def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
     if random_seed is not None:
@@ -383,77 +426,13 @@ def generate(
         if not random_seeds:
             random_seeds = [None]
 
-        remaining_jobs = {i: copy.deepcopy(chunk_ids) for i in random_seeds}
-
-        if not ignore_done:
-            status_dir = get_unmounted_path(cluster_config, f"{output_dir}")
-            seeds_str = " ".join(str(s) for s in random_seeds)
-            chunks_str = " ".join(str(c) for c in chunk_ids)
-            missing_map = {}
-
-            if random_seeds == [None]:
-                if chunk_ids == [None]:
-                    command = f"""bash -c '
-                        if [ ! -f "{status_dir}/output.jsonl.done" ]; then
-                            echo greedy-x;
-                        fi'
-                    """.strip().replace('\n', ' ')
-                    output = get_tunnel(cluster_config).run(command).stdout.strip()
-                    if output == "greedy-x":
-                        missing_map[None] = [None]
-                else:
-                    command = f"""bash -c '
-                        for j in {chunks_str}; do
-                            if [ ! -f "{status_dir}/output_chunk_"$j".jsonl.done" ]; then
-                                echo greedy-$j;
-                            fi;
-                        done'
-                    """.strip().replace('\n', ' ')
-                    output = get_tunnel(cluster_config).run(command).stdout.strip()
-                    chunks = []
-                    for line in output.splitlines():
-                        if line.startswith("greedy-"):
-                            chunk = int(line.split("-")[1])
-                            chunks.append(chunk)
-                    missing_map[None] = chunks
-
-            else:
-                if chunk_ids == [None]:
-                    command = f"""bash -c '
-                        for i in {seeds_str}; do
-                            if [ ! -f "{status_dir}/output-rs"$i".jsonl.done" ]; then
-                                echo rs-$i;
-                            fi;
-                        done'
-                    """.strip().replace('\n', ' ')
-                    output = get_tunnel(cluster_config).run(command).stdout.strip()
-                    for line in output.splitlines():
-                        if line.startswith("rs-"):
-                            seed = int(line.split("-")[1])
-                            missing_map[seed] = [None]
-                else:
-                    command = f"""bash -c '
-                        for i in {seeds_str}; do
-                            for j in {chunks_str}; do
-                                if [ ! -f "{status_dir}/output-rs"$i"_chunk_"$j".jsonl.done" ]; then
-                                    echo rs-$i-chunk-$j;
-                                fi;
-                            done;
-                        done'
-                    """.strip().replace('\n', ' ')
-                    output = get_tunnel(cluster_config).run(command).stdout.strip()
-                    for line in output.splitlines():
-                        if line.startswith("rs-"):
-                            parts = line.split("-")
-
-                            seed = int(parts[1])
-                            chunk = int(parts[3])
-                            if seed not in missing_map:
-                                missing_map[seed] = []
-                            missing_map[seed].append(chunk)
-            remaining_jobs = missing_map
-
-
+        remaining_jobs = get_remaining_jobs(
+            cluster_config=cluster_config,
+            output_dir=output_dir,
+            random_seeds=random_seeds,
+            chunk_ids=chunk_ids,
+            ignore_done=ignore_done
+        )
 
         for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
