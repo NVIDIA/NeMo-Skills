@@ -506,7 +506,7 @@ def get_tunnel(cluster_config):
                 "If your /home folder is limited in space it's recommended to "
                 "explicitly set NEMORUN_HOME to point to a larger disk."
             )
-        return run.LocalTunnel(cluster_config["job_dir"])
+        return run.LocalTunnel(job_dir=cluster_config["job_dir"])
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
@@ -1155,7 +1155,7 @@ def add_task(
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
-        if reuse_code:
+        if isinstance(tunnel, run.SSHTunnel) and reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
                 if isinstance(reuse_code_exp, run.Experiment):
@@ -1167,7 +1167,8 @@ def add_task(
                         reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
                 for executor in executors:
                     executor.packager.symlink_from_remote_dir = reuse_dir
-        else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+        # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+        elif isinstance(tunnel, run.SSHTunnel):
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     if len(commands) == 1:
@@ -1200,6 +1201,8 @@ def run_exp(exp, cluster_config, sequential=None):
         exp.run(detach=True, sequential=False if sequential is None else sequential)
 
         # caching the experiment code for reuse
-        ssh_hash = tunnel_hash(get_tunnel(cluster_config))
-        if ssh_hash not in REUSE_CODE_EXP:
-            REUSE_CODE_EXP[ssh_hash] = exp
+        tunnel = get_tunnel(cluster_config)
+        if isinstance(tunnel, run.SSHTunnel):
+            ssh_hash = tunnel_hash(tunnel)
+            if ssh_hash not in REUSE_CODE_EXP:
+                REUSE_CODE_EXP[ssh_hash] = exp
