@@ -58,6 +58,10 @@ You can also use `NEMO_SKILLS_CONFIG` env variable instead of the `--cluster` pa
 The cluster config defines an executor (local or slurm), mounts for data/model access and (slurm-only) various parameters
 such as account, partition, ssh-tunnel arguments and so on.
 
+The recommended way to launch jobs on slurm is by running all commands locally and specifying `ssh_tunnel` portion in cluster config
+to let NeMo-Run know how to connect there. But if you prefer to run from the cluster directly, you can instal NeMo-Skills there
+and then only specify `job_dir` parameter without using `ssh_tunnel` section in the config.
+
 ### Environment variables
 
 You can define environment variables in the cluster config file, which will be set inside the container.
