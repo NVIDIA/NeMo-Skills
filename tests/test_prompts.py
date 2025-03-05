@@ -1046,8 +1046,8 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
     )
 
 
-def test_generic_lean4_prompt():
-    prompt = get_prompt('generic/lean4', 'deepseek-prover')
+def test_generic_formal_proof_prompt():
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1076,8 +1076,8 @@ theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 
     )
 
 
-def test_generic_lean4_fewshot_prompt():
-    prompt = get_prompt('generic/lean4', 'deepseek-prover', 'minif2f_deepseek_fewshot')
+def test_minif2f_deepseek_fewshot_prompt():
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', 'minif2f_deepseek_fewshot')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1346,3 +1346,29 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     }
     print(prompt.fill(inputs))
     assert prompt.fill(inputs) == expected_prompt
+
+def test_nat_to_lean4_prompt():
+    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
+
+    expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
+
+If $\sqrt{5+n}=7$, then what is the value of $n$?
+Answer is: 44
+```lean4
+import Mathlib
+
+open Complex Filter Function Metric Finset
+open scoped BigOperators Topology
+
+"""
+
+    assert (
+        prompt.fill(
+            {
+                "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
+                "predicted_answer": "44",
+                "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
+            }
+        )
+        == expected_prompt
+    )
