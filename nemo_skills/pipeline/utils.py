@@ -472,7 +472,14 @@ def get_cluster_config(cluster=None, config_dir=None):
     if not Path(config_file).exists():
         raise ValueError(f"Cluster config {config_file} not found.")
 
-    return read_config(config_file)
+    cluster_config = read_config(config_file)
+
+    if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
+        if "job_dir" not in cluster_config:
+            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        set_nemorun_home(cluster_config["job_dir"])
+
+    return cluster_config
 
 
 @lru_cache
@@ -500,9 +507,7 @@ def tunnel_hash(tunnel):
 
 def get_tunnel(cluster_config):
     if "ssh_tunnel" not in cluster_config:
-        if "job_dir" not in cluster_config:
-            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
-        set_nemorun_home(cluster_config["job_dir"])
+        LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
         return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
