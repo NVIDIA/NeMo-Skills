@@ -51,32 +51,6 @@ class PPOVerlTask:
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
         return cmd
 
-    def format_reward_critic_args(self):
-        cmd = (
-            ""
-            # f" --reward_pretrain {self.reward_model} "
-            # TODO: add proper defaults when we figure out how these should be used
-            #       for now we require users to be explicit
-            # f" --ref_num_nodes {self.num_nodes} "
-            # f" --ref_num_gpus_per_node {self.num_gpus} "
-            # f" --reward_num_nodes {self.num_nodes} "
-            # f" --reward_num_gpus_per_node {self.num_gpus} "
-            # f" --critic_num_nodes {self.num_nodes} "
-            # f" --critic_num_gpus_per_node {self.num_gpus} "
-            # f" --vllm_num_engines {self.num_gpus} "
-            # f" --vllm_tensor_parallel_size 1 "
-            # f" --colocate_critic_reward "
-            # f" --colocate_actor_ref "
-        )
-        return cmd
-
-    def format_actor_args(self):
-        # TODO: add proper defaults when we figure out how these should be used
-        #       for now we require users to be explicit
-        # cmd = f" --actor_num_nodes {self.num_nodes} --actor_num_gpus_per_node {self.num_gpus} "
-        cmd = ""
-        return cmd
-
     def format_train_args(self):
         cmd = (
             "   algorithm.adv_estimator=grpo "
@@ -129,38 +103,6 @@ class PPOVerlTask:
 
         return cmd
 
-    def get_common_arg_overrides(self):
-        cmd = (
-            ""
-            # " --train_batch_size 128 "
-            # " --micro_train_batch_size 1 "
-            # " --prompt_max_len 1024 "
-            # " --generate_max_len 1024 "
-            # " --logging_steps 1 "
-            # " --eval_steps -1 "
-            # " --zero_stage 3 "
-            # " --packing_samples "
-            # " --bf16 "
-            # " --flash_attn "
-            # " --gradient_checkpointing "
-            # " --adam_offload "
-        )
-        return cmd
-
-    def get_common_rl_arg_overrides(self):
-        cmd = (
-            ""
-            # " --micro_rollout_batch_size 16 "
-            # " --rollout_batch_size 1024 "
-            # " --n_samples_per_prompt 1 "
-            # " --actor_learning_rate 5e-7 "
-            # " --critic_learning_rate 9e-6 "
-            # " --init_kl_coef 0.01 "
-            # " --normalize_reward "
-            # " --vllm_sync_backend nccl "
-        )
-        return cmd
-
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
         # TODO: is wandb_id and wandb_resume supported?
         cmd = (
@@ -187,12 +129,8 @@ class PPOVerlTask:
         ray_job_cmd = (
             f"echo 'Starting training' && "
             f"{ray_job_cmd} python3 -m {self.get_script_module()} "
-            f"  {self.format_reward_critic_args()} "
-            f"  {self.format_actor_args()} "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
-            f"  {self.get_common_arg_overrides()} "
-            f"  {self.get_common_rl_arg_overrides()} "
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
