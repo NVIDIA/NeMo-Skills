@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import os
 import logging
 import subprocess
 from collections import defaultdict
@@ -44,19 +45,41 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
 
 
-def get_expected_done_files(output_dir, random_seeds, chunk_ids):
+def get_chunked_rs_filename(
+    output_dir: str,
+    random_seed: int = None,
+    chunk_id: int = None,
+    output_prefix: str = "output",
+) -> str:
+    """
+    Return a path of the form:
+      {output_dir}/{output_prefix}[-rsSEED][-chunkK].jsonl
+    If `output_prefix` is None, fallback to 'output' in place of {output_prefix}.
+    """
+    if random_seed is not None:
+        base_filename = f"{output_prefix}-rs{random_seed}.jsonl"
+    else:
+        base_filename = f"{output_prefix}.jsonl"
+
+    # If chunking is enabled, add the chunk suffix
+    if chunk_id is not None:
+        base_filename = get_chunked_filename(chunk_id, base_filename)
+    return os.path.join(output_dir, base_filename)
+
+
+def get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix="output"):
     """
     Returns a mapping of (seed, chunk_id) to expected .done file paths
     """
     file_map = {}
     for seed in random_seeds:
         for chunk_id in chunk_ids:
-            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)
+            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix)
             file_map[(seed, chunk_id)] = f"{output_file}.done"
     return file_map
 
 
-def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done):
+def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done, output_prefix="output"):
     """
     Determines which jobs still need to be run based on missing .done files.
     Returns a mapping from random_seed to list of chunk_ids that need processing.
@@ -65,7 +88,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
 
     status_dir = get_unmounted_path(cluster_config, output_dir)
-    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids)
+    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix=output_prefix)
 
     check_commands = []
     for (seed, chunk_id), filepath in expected_files.items():
@@ -131,16 +154,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
     return missing_jobs
 
 
-def get_chunked_rs_filename(output_dir, random_seed=None, chunk_id=None):
-    if random_seed is not None:
-        output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
-    else:
-        output_file = f"{output_dir}/output.jsonl"
-    if chunk_id is not None:
-        output_file = get_chunked_filename(chunk_id, output_file)
-    return output_file
-
-
 def get_cmd(
     output_dir,
     extra_arguments,
@@ -150,9 +163,18 @@ def get_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.generate',
+    output_prefix: str ="output",
 ):
+    """
+    Construct the generation command for language model inference.
+
+    If chunk_id is provided, chunking logic is used.
+    If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
+    with a base name (plus `-rsSEED` or chunk info as needed).
+    """
+
     # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(f"{output_dir}", random_seed=random_seed)
+    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
 
     if random_seed is not None:
@@ -165,12 +187,12 @@ def get_cmd(
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix)
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
         for cur_chunk_id in range(num_chunks):
-            donefile = f"{get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=cur_chunk_id)}.done"
+            donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_prefix=output_prefix)}.done"
             donefiles.append(donefile)
 
         if postprocess_cmd:
@@ -179,7 +201,7 @@ def get_cmd(
             postprocess_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed)
+        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix)
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
@@ -193,6 +215,7 @@ def get_cmd(
             postprocess_cmd = f"touch {output_file}.done "
 
     cmd += f" {extra_arguments} "
+
     if eval_args:
         cmd += (
             f" && python -m nemo_skills.evaluation.evaluate_results "
@@ -391,6 +414,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+    output_prefix: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -481,6 +505,7 @@ def generate(
             random_seeds=random_seeds,
             chunk_ids=chunk_ids,
             rerun_done=rerun_done,
+            output_prefix=output_prefix,
         )
         has_tasks = False
         for seed, chunk_ids in remaining_jobs.items():
@@ -505,6 +530,7 @@ def generate(
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
+                    output_prefix=output_prefix,
                     postprocess_cmd=postprocess_cmd,
                     script=cmd_script,
                 )
