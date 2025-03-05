@@ -29,6 +29,7 @@ import nemo_run as run
 import yaml
 from huggingface_hub import get_token
 from invoke import StreamWatcher
+from nemo_run.config import set_nemorun_home
 from nemo_run.core.execution.docker import DockerExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails
 from nemo_run.core.tunnel import SSHTunnel
@@ -501,12 +502,8 @@ def get_tunnel(cluster_config):
     if "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
-        if os.getenv('NEMORUN_HOME', '/home').startswith('/home'):
-            LOG.warning(
-                "If your /home folder is limited in space it's recommended to "
-                "explicitly set NEMORUN_HOME to point to a larger disk."
-            )
-        return run.LocalTunnel(job_dir=cluster_config["job_dir"])
+        set_nemorun_home(cluster_config["job_dir"])
+        return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
