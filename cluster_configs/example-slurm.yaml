@@ -33,6 +33,10 @@ job_name_prefix: "nemo_skills:"
 #   identity: <can specify ssh key to avoid entering password>
 
 
+# if you're running directly from cluster, you only need to define job_dir and shouldn't use ssh_tunnel
+# job_dir: <some location on slurm cluster to keep job metadata, uploaded code and generated sbatch files>
+
+
 # define your account/partition here
 # account: <slurm account>
 # partition: <slurm partition>
@@ -47,6 +51,8 @@ job_name_prefix: "nemo_skills:"
 #   e.g.
 #   - <path on slurm>/trt_models:/trt_models
 #   - <path on slurm>/data:/data
+#   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
+#   - <path on slurm>/NeMo-Aligner:/opt/NeMo-Aligner
 
 
 # can use this section to set timeouts for different partitions
