@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/default'
-DATASET_GROUP = 'multichoice'
-METRICS_TYPE = "multichoice"
-DEFAULT_EVAL_ARGS = "++eval_type=multichoice"
+PROMPT_CONFIG = 'generic/hle-text'
+DATASET_GROUP = 'math'
+METRICS_TYPE = "math"
+DEFAULT_EVAL_ARGS = "++eval_type=math"
 DEFAULT_GENERATION_ARGS = ""

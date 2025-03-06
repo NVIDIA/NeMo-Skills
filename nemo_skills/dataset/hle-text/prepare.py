@@ -21,12 +21,12 @@ from tqdm import tqdm
 def format_entry(entry):
     return {
         "id": entry["id"],
-        "problem": entry["question"],
+        "question": entry["question"],
         "expected_answer": entry["answer"],
         "answer_type": entry["answer_type"],
-        "solution": entry["rationale"],
+        "right_solution": entry["rationale"],
         "raw_subject": entry["raw_subject"],
-        "category": entry["category"],
+        "subset_for_metrics": entry["category"],
         "author_name": entry["author_name"],
         "canary": entry["canary"],
     }

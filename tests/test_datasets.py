@@ -30,7 +30,7 @@ DATASETS = [
     ('gsm-plus', ['test', 'test_rounded']),
     ('gsm8k', ['train', 'test']),
     ('hle-math', ['test']),
-    ('hle-text-only', ['test']),
+    ('hle-text', ['test']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
     ('math', ['train', 'test']),
