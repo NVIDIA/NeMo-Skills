@@ -140,6 +140,10 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 continue
         return handles
 
+    # if we are given an experiment object, we can directly get the handles
+    if isinstance(expname, run.Experiment):
+        return _get_handles(expname)
+
     try:
         with run.Experiment.from_title(expname) as exp:
             return _get_handles(exp)
@@ -1024,7 +1028,7 @@ def add_task(
     If you want to avoid this, set `reuse_code=False`.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
-        if isinstance(run_after, str):
+        if isinstance(run_after, (str, run.Experiment)):
             run_after = [run_after]
         dependencies = []
         for dep_expname in run_after:
