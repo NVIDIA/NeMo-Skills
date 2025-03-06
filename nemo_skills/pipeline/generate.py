@@ -262,7 +262,7 @@ def get_math_judge_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.llm_math_judge',
-    output_prefix: str ="output",
+    output_prefix: str = "output",
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for math judge")
