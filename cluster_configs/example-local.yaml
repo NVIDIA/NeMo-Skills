@@ -21,6 +21,8 @@ containers:
   nemo: igitman/nemo-skills-nemo:0.5.0
   sandbox: igitman/nemo-skills-sandbox:0.5.0
   nemo-skills: igitman/nemo-skills:0.5.0
+  verl: igitman/nemo-skills-verl:0.5.3
+  nemo-grpo: igitman/nemo-skills-nemo-grpo:0.5.3
 
 # add required mounts for models/data here
 # the code is mounted automatically inside /nemo_run/code
