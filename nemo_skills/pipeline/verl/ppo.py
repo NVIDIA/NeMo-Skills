@@ -34,7 +34,6 @@ LOG = logging.getLogger(__file__)
 @dataclass
 class PPOVerlTask:
     model: str
-    reward_model: str
     output_dir: str
     prompt_data: str
     eval_data: str
