@@ -238,7 +238,7 @@ def get_rm_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.reward_model',
-    output_prefix: str ="output",
+    output_prefix: str = "output",
 ):
     if eval_args is not None:
         raise ValueError("Cannot specify eval_args for reward model")
