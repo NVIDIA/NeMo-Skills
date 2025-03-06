@@ -104,7 +104,6 @@ class PPOVerlTask:
         return cmd
 
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
-        # TODO: is wandb_id and wandb_resume supported?
         cmd = (
             f" trainer.project_name='{wandb_project}' "
             f" trainer.experiment_name='{expname}' "
@@ -122,7 +121,7 @@ class PPOVerlTask:
         return cmd
 
     def get_script_module(self):
-        return "verl.trainer.main_ppo"  # Must use https://github.com/Kipok/OpenRLHF
+        return "verl.trainer.main_ppo"   # Must use https://github.com/titu1994/verl/
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()

@@ -16,6 +16,6 @@ from typer import Typer
 
 from nemo_skills.pipeline.app import app
 
-verl_app = Typer(help="Verl training pipelines (run 'ns openrlhf --help' for more information)")
+verl_app = Typer(help="Verl training pipelines (run 'ns verl --help' for more information)")
 
 app.add_typer(verl_app, name="verl")
