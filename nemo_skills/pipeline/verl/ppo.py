@@ -24,8 +24,8 @@ import typer
 
 from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.verl import verl_app
 from nemo_skills.pipeline.utils import get_free_port, get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.verl import verl_app
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -96,18 +96,12 @@ class PPOVerlTask:
         return cmd
 
     def format_data_args(self):
-        cmd = (
-            f"   data.train_files='{self.prompt_data}' "
-            f"   data.val_files='{self.eval_data}' "
-        )
+        cmd = f"   data.train_files='{self.prompt_data}' " f"   data.val_files='{self.eval_data}' "
 
         return cmd
 
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
-        cmd = (
-            f" trainer.project_name='{wandb_project}' "
-            f" trainer.experiment_name='{expname}' "
-        )
+        cmd = f" trainer.project_name='{wandb_project}' " f" trainer.experiment_name='{expname}' "
 
         if disable_wandb:
             cmd = f"{cmd} trainer.logger=['console'] "
@@ -121,7 +115,7 @@ class PPOVerlTask:
         return cmd
 
     def get_script_module(self):
-        return "verl.trainer.main_ppo"   # Must use https://github.com/titu1994/verl/
+        return "verl.trainer.main_ppo"  # Must use https://github.com/titu1994/verl/
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
@@ -160,7 +154,6 @@ def get_training_cmd(
     task: Optional[PPOVerlTask],
     partition,
     hf_model,
-    rm_model,
     output_dir,
     prompt_data,
     eval_data,
@@ -177,7 +170,6 @@ def get_training_cmd(
     if task is None:
         task = PPOVerlTask(
             model=hf_model,
-            reward_model=rm_model,
             output_dir=output_dir,
             prompt_data=prompt_data,
             eval_data=eval_data,
@@ -218,7 +210,6 @@ def ppo_verl(
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
-    rm_model: str = typer.Option(None, help="Path to the HF reward model"),
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     eval_data: str = typer.Option(None, help="Path to the eval data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
@@ -301,7 +292,6 @@ def ppo_verl(
         task=ppo_task,
         partition=partition,
         hf_model=hf_model,
-        rm_model=rm_model,
         output_dir=output_dir,
         prompt_data=prompt_data,
         eval_data=eval_data,
