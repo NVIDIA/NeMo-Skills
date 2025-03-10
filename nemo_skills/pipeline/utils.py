@@ -31,7 +31,7 @@ from huggingface_hub import get_token
 from invoke import StreamWatcher
 from nemo_run.config import set_nemorun_home
 from nemo_run.core.execution.docker import DockerExecutor
-from nemo_run.core.execution.slurm import SlurmJobDetails
+from nemo_run.core.execution.slurm import SlurmJobDetails, get_packaging_job_key
 from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
@@ -1164,15 +1164,21 @@ def add_task(
         if isinstance(tunnel, run.SSHTunnel) and reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
-                if isinstance(reuse_code_exp, run.Experiment):
-                    LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
-                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                reuse_code_exp = (
+                    reuse_code_exp
+                    if isinstance(reuse_code_exp, run.Experiment)
+                    else run.Experiment.from_title(reuse_code_exp)
+                )
+                LOG.info("Trying to reuse code from experiment %s", reuse_code_exp._title)
+                reuse_key = get_packaging_job_key(reuse_code_exp._id, "nemo-run")
+                if reuse_key in reuse_code_exp.tunnels[tunnel.key].packaging_jobs:
+                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs[reuse_key].dst_path
+
+                    for executor in executors:
+                        executor.packager.symlink_from_remote_dir = reuse_dir
+                    LOG.info(f"Successfully reused code from {reuse_key}")
                 else:
-                    with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
-                        LOG.info("Reusing code from experiment %s", reuse_code_exp)
-                        reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-                for executor in executors:
-                    executor.packager.symlink_from_remote_dir = reuse_dir
+                    LOG.warning("Relevant packaging job not found for experiment %s", reuse_code_exp._title)
         # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
         elif isinstance(tunnel, run.SSHTunnel):
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
