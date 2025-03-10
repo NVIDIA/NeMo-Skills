@@ -17,10 +17,10 @@ import logging
 import shutil
 import sys
 from collections import Counter, defaultdict
+from enum import Enum
 from itertools import zip_longest
 from pathlib import Path
 from typing import Any, List, Tuple
-from enum import Enum
 
 import hydra
 from tqdm import tqdm
@@ -48,7 +48,7 @@ class ProcessTopAnswerConfig:
     # 1. fill: use the best answer as the expected_answer to fill input_files
     # 2. extract: identify the best answer from input_files
     mode: str
-    
+
     # Output directory is optional depending on whether the task is to fill the majority answer
     # or to just extract the best answer
     output_dir: str | None = None
@@ -120,12 +120,12 @@ class TopAnswerProcessor:
             self.process_mode = ProcessMode(cfg.mode)
         except ValueError:
             raise ValueError(f"Invalid mode: {cfg.mode}")
-        
+
         # For fill mode, output_dir is required
         if self.process_mode == ProcessMode.FILL:
             if cfg.output_dir is None:
                 raise ValueError("output_dir is required when mode is fill")
-        
+
         # Check whether the input_dir and output_dir are valid
         if not Path(cfg.input_dir).exists():
             raise ValueError(f"Input directory does not exist: {cfg.input_dir}")
@@ -133,14 +133,13 @@ class TopAnswerProcessor:
             LOG.info("Output directory does not exist: %s", cfg.output_dir)
             Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
 
-            
     def __enter__(self):
         """Setup input and output file handles"""
         cfg = self.cfg
         # Process the input files
         self.input_files = list(unroll_files(cfg.input_files, parent_dir=cfg.input_dir))
         self.input_file_handles = [open(file, "rt", encoding="utf-8") for file in self.input_files]
-        
+
         if self.cfg.require_num_files is not None:
             if len(self.input_file_handles) != cfg.require_num_files:
                 raise ValueError(f"Expected {cfg.require_num_files} files, found {len(self.input_file_handles)}")
@@ -152,12 +151,12 @@ class TopAnswerProcessor:
                 for file in unroll_files(cfg.input_files, parent_dir=cfg.input_dir)
             ]
             self.output_file_handles = [open(file, "wt", encoding="utf-8") for file in output_files]
-        
+
         elif self.process_mode == ProcessMode.EXTRACT:
             if cfg.output_dir is None:
                 cfg.output_dir = cfg.input_dir
-            
-            # A single output file "output-agg.jsonl" is created where the top-scoring answer is 
+
+            # A single output file "output-agg.jsonl" is created where the top-scoring answer is
             # considered as predicted_answer for each problem
             self.output_file_handles = [open(Path(cfg.output_dir) / f"output-agg.jsonl", "wt", encoding="utf-8")]
 
@@ -178,19 +177,19 @@ class TopAnswerProcessor:
                 cfg.fill_key = "predicted_answer"
 
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Close all the input and output file handles"""
         for file_handle in self.input_file_handles:
             file_handle.close()
         for file_handle in self.output_file_handles:
             file_handle.close()
-        
+
     def process(self):
         """Process the predictions and write the results to the output file(s)"""
         all_predictions, new_answers = self._read_predictions()
         self._write_results(all_predictions, new_answers)
-        
+
     def _read_predictions(self) -> Tuple[List, List]:
         """Read the predictions from the input file(s)"""
         cfg = self.cfg
@@ -198,7 +197,7 @@ class TopAnswerProcessor:
         all_predictions = []
         for idx, predictions in enumerate(tqdm(zip_longest(*self.input_file_handles))):
             data = read_predictions(predictions, idx, self.input_file_handles)
-            
+
             # Store the metadata about correctness and judgement for each answer
             # Useful when extracting the top answer
             answer_to_metadata = {}
@@ -206,7 +205,10 @@ class TopAnswerProcessor:
                 if 'predicted_answer' not in elem:
                     elem['predicted_answer'] = extract_answer(elem['generation'])
                 if elem['predicted_answer'] is not None:
-                    answer_to_metadata[elem['predicted_answer']] = [elem.get('is_correct', None), elem.get('judgement', None)]
+                    answer_to_metadata[elem['predicted_answer']] = [
+                        elem.get('is_correct', None),
+                        elem.get('judgement', None),
+                    ]
 
             all_predictions.append(data)
 
@@ -224,7 +226,7 @@ class TopAnswerProcessor:
                 # TODO: This dictionary is just using surface form matching. Need to adapt for semantic matching.
                 answer_scores = defaultdict(float)
                 if cfg.use_majority_rm_score:
-                    for (answer, score) in valid_answers_and_scores:
+                    for answer, score in valid_answers_and_scores:
                         answer_scores[answer] += score
                 else:
                     # Choose the max score for each answer
@@ -242,7 +244,9 @@ class TopAnswerProcessor:
                 if len(valid_answers) == 0:
                     continue
                 majority_answer, num_votes = Counter(valid_answers).most_common(1)[0]
-                new_answers[-1] = [majority_answer, (num_votes, len(self.input_file_handles))] + answer_to_metadata[majority_answer]
+                new_answers[-1] = [majority_answer, (num_votes, len(self.input_file_handles))] + answer_to_metadata[
+                    majority_answer
+                ]
 
         return all_predictions, new_answers
 
@@ -252,7 +256,7 @@ class TopAnswerProcessor:
             self._write_results_fill(all_predictions, new_answers)
         elif self.process_mode == ProcessMode.EXTRACT:
             self._write_results_extract(all_predictions, new_answers)
-    
+
     def _write_results_fill(self, all_predictions: List, new_answers: List):
         """Fill the expected_answer with the top answer"""
         cfg = self.cfg
@@ -260,7 +264,7 @@ class TopAnswerProcessor:
         for idx, predictions in enumerate(all_predictions):
             changed = False
             for fidx, handle in enumerate(self.output_file_handles):
-                if cfg.ignore_if_not_none and predictions[fidx][cfg.fill_key]:
+                if cfg.ignore_if_not_none and predictions[fidx].get(cfg.fill_key):
                     handle.write(json.dumps(predictions[fidx]) + "\n")
                     continue
 
@@ -272,12 +276,12 @@ class TopAnswerProcessor:
                 predictions[fidx]["fill_mode"] = self.fill_mode
                 # Fill the expected_answer with the top-scoring answer
                 predictions[fidx][cfg.fill_key] = new_answers[idx][0]
-                
+
                 if cfg.use_majority_rm_score or cfg.use_highest_rm_score:
                     predictions[fidx]["answer_rm_score"] = new_answers[idx][1]
                 else:
                     predictions[fidx]["majority_votes"], predictions[fidx]["total_votes"] = new_answers[idx][1]
-                
+
                 if cfg.fill_is_correct:
                     predictions[fidx]["is_correct"] = (
                         predictions[fidx]["predicted_answer"] == predictions[fidx]["expected_answer"]
@@ -292,7 +296,8 @@ class TopAnswerProcessor:
 
         LOG.info(
             "Total problems changed: %d, total solutions changed: %d",
-            total_problems_changed, total_solutions_changed,
+            total_problems_changed,
+            total_solutions_changed,
         )
 
     def _write_results_extract(self, all_predictions: List, new_answers: List):
@@ -303,14 +308,13 @@ class TopAnswerProcessor:
                 data = json.loads(line)
                 # Add fill mode to the predictions
                 data["fill_mode"] = self.fill_mode
-                
+
                 data["predicted_answer"] = new_answers[idx][0]
                 if new_answers[idx][2] is not None:
                     data["is_correct"] = new_answers[idx][2]
                 if new_answers[idx][3] is not None:
                     data["judgement"] = new_answers[idx][3]
                 best_answer_file_handle.write(json.dumps(data) + "\n")
-                
 
 
 @hydra.main(version_base=None, config_name="base_process_top_answer_config")
@@ -320,7 +324,7 @@ def process_top_answer(cfg: ProcessTopAnswerConfig):
 
     with TopAnswerProcessor(cfg) as processor:
         processor.process()
-   
+
 
 HELP_MESSAGE = get_help_message(ProcessTopAnswerConfig)
 
