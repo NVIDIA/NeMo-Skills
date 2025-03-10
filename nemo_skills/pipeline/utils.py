@@ -1164,11 +1164,13 @@ def add_task(
         if isinstance(tunnel, run.SSHTunnel) and reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
-                reuse_code_exp = (
-                    reuse_code_exp
-                    if isinstance(reuse_code_exp, run.Experiment)
-                    else run.Experiment.from_title(reuse_code_exp)
-                )
+                if isinstance(reuse_code_exp, str):
+                    try:
+                        reuse_code_exp = run.Experiment.from_id(reuse_code_exp)
+                    except Exception:
+                        LOG.debug(f"Failed to create experiment from id {reuse_code_exp}, trying to find it by title")
+                        reuse_code_exp = run.Experiment.from_title(reuse_code_exp)
+
                 LOG.info("Trying to reuse code from experiment %s", reuse_code_exp._title)
                 reuse_key = get_packaging_job_key(reuse_code_exp._id, "nemo-run")
                 if reuse_key in reuse_code_exp.tunnels[tunnel.key].packaging_jobs:
