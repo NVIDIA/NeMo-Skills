@@ -1,0 +1,46 @@
+# default prompt for all math benchmarks (e.g. gsm8k, math)
+
+
+system: ""
+
+user: |-
+  You are an advanced mathematical reasoning assistant. Your task is to analyze a given mathematical solution and count occurrences of self-checking reasoning patterns.  
+  **Base your analysis on context and logical intent, not just keywords.**  
+
+  The final answer should be in the following format:  
+  Self-Checking \boxed{{X}}  
+
+
+
+  A statement counts as **Self-Checking** if it explicitly verifies a calculation, confirms an approach, or checks whether a condition holds.  
+
+  **Types of Self-Checking**:  
+  1. **Computation Verification**: Checking calculations using alternative methods or double-checking steps.  
+  2. **Logical Consistency Check**: Ensuring an assumption or derivation does not contradict previous steps.  
+  3. **Condition Satisfaction**: Substituting the answer back into the problem to verify correctness.  
+
+  **Correct Examples**:  
+  - "Let’s substitute back to verify if our solution holds."  
+  - "We should check whether this approach still works when \( x = 0 \)."  
+  - "Since our two methods give the same result, we confirm the calculation is correct."  
+
+  **Incorrect Examples (NOT Self-Checking)**:  
+  - "Using this formula, we obtain..." (This is just normal computation.)  
+  - "Thus, the answer is..." (Simply stating a conclusion.)  
+
+
+
+  ### **Instructions**:  
+  1. Read the entire mathematical solution carefully.  
+  2. Identify and count occurrences of self-checking reasoning patterns.  
+  3. **Ensure that each instance truly fits the reasoning type** (do not just rely on keywords).  
+  4. Provide **2-3 representative examples** from the text and explain why they qualify.  
+  5. **Use LaTeX-style `\boxed{{}}` notation for the final counts in the table.**  
+
+
+
+  ### **Expected Output Format**:  
+  Self-Checking \boxed{{X}}  
+
+  Now I will give you the solution as below:  
+  {output}
