@@ -196,15 +196,23 @@ def get_logging_params(expname, disable_wandb, wandb_project):
     return logging_params
 
 
-def get_avg_checkpoints_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
-    name = "model" + ("-".join(average_steps[len('--steps ') :].split()) if average_steps else '') + "-averaged"
+def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
+    if average_steps:
+        entrypoint = "nemo_skills.training.average_checkpoints"
+        name = "model" + ("-".join(average_steps[len('--steps '):].split()) if average_steps else '') + "-averaged"
+    else:
+        entrypoint = "nemo_skills.training.copy_checkpoint"
+        name = "model-last"
+
+    average_steps_arg = average_steps if average_steps else ""
+
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
-        f"python -m nemo_skills.training.average_checkpoints "
+        f"python -m {entrypoint} "
         f"    --untarred_nemo_dir {nemo_model} "
         f"    --name_prefix=model "
-        f"    --checkpoint_dir={output_dir}/training/checkpoints {average_steps} && "
+        f"    --checkpoint_dir={output_dir}/training/checkpoints {average_steps_arg} && "
         f"mkdir -p {os.path.dirname(final_nemo_path)} && "
         f"mv {output_dir}/training/checkpoints/{name} {final_nemo_path} "
     )
@@ -251,7 +259,12 @@ def train(
     average_steps: str = typer.Option(
         'all',
         help="List of commas separated checkpoint steps to average. E.g 1000,5000. "
-        "If None, will skip prepare eval stage.",
+        "If None, skip prepare eval stage.",
+    ),
+    save_last_ckpt: bool = typer.Option(
+            False,
+            help="If True, will save the final nemo checkpoint to final_nemo_path. "
+                 "average_steps has to be disabled to use this.",
     ),
     server_model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
@@ -324,6 +337,9 @@ def train(
 
     if " " in str(average_steps):
         raise ValueError("average steps should be separated with commas")
+
+    if average_steps and save_last_ckpt:
+        raise ValueError("cannot enable average_steps and save_last_ckpt together.")
 
     server_config = None
     if server_type is not None:
@@ -409,12 +425,15 @@ def train(
                 heterogeneous=True if server_config is not None else False,
             )
 
-        if average_steps is not None:
-            cmd = get_avg_checkpoints_cmd(
+        if average_steps and average_steps != 'all':
+            average_steps = f"--steps {' '.join(average_steps.split(','))} "
+
+        if average_steps or save_last_ckpt:
+            cmd = get_checkpoint_cmd(
                 nemo_model=nemo_model,
                 output_dir=output_dir,
                 final_nemo_path=final_nemo_path,
-                average_steps=f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else "",
+                average_steps=average_steps,
             )
 
             add_task(
