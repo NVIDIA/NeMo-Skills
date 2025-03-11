@@ -95,7 +95,11 @@ class PPOVerlTask:
         return cmd
 
     def format_data_args(self):
-        cmd = f"   data.train_files='{self.prompt_data}' " f"   data.val_files='{self.eval_data}' "
+        cmd = f"   data.train_files='{self.prompt_data}' "
+        if self.eval_data:
+            cmd = f"{cmd} data.val_files='{self.eval_data}' "
+        else:
+            cmd = f"{cmd} +trainer.run_validation=False "
 
         return cmd
 
