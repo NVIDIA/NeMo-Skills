@@ -23,18 +23,18 @@ class LoftMetrics(BaseMetrics):
     def update(self, predictions):
         
         self.total += 1
-        self.correct += predictions[0]['is_correct']
+        self.recall_at_k += predictions[0]['recall_at_k']
 
     def get_metrics(self):
         metrics = {"num_entries": self.total}
-        metrics["accuracy"] = self.correct / self.total * 100.0
+        metrics["macro_recall_at_k"] = self.recall_at_k / self.total * 100.
         # metrics["null_error"] = self.timeout_error / self.total * 100.0
         print(metrics)
         return {self.agg_mode: metrics}
 
     def reset(self):
         self.total = 0 
-        self.correct = 0
+        self.recall_at_k = 0
         self.agg_mode = "greedy"
 
     # def setup(self, input_files):
