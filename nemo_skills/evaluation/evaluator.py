@@ -65,6 +65,7 @@ def eval_loft(cfg):
                 try:
                     pred_as_str = _escape_single_quotes(pred_as_str)
                     preds = ast.literal_eval(pred_as_str)
+                    preds = [str(i) for i in preds]
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     print(l, e)
                 break
