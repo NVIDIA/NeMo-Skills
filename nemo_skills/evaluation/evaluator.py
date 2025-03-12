@@ -76,6 +76,8 @@ def eval_loft(cfg):
         Calculates the recall at k.
         Borrow from https://github.com/google-deepmind/loft/blob/eb2c7106dc11f9782dfe6c5af2e81400d2831d64/evaluation/retrieval.py#L26
         """
+        print(gold_ids)
+        print(pred_ids)
         assert top_k > 0
         if not pred_ids:
             return 0
