@@ -104,7 +104,9 @@ def eval_loft(cfg):
             for sample in tqdm(data):
                 parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
                 k = 1
-                sample[f'recall_at_{k}'] = compute_recall_at_k(sample['expected_answer'], parse_result, top_k=k)
+                # just single turn for now 
+                gold_ids = [i[0] for i in sample['expected_answer']]
+                sample[f'recall_at_{k}'] = compute_recall_at_k(gold_ids, parse_result, top_k=k)
                 sample['predicted_answer'] = parse_result
                 fout.write(json.dumps(sample) + "\n")
                 
