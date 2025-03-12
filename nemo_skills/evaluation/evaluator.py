@@ -40,7 +40,7 @@ class LoftEvaluatorConfig:
 def eval_loft(cfg):
 
     def extract_prediction(model_output: str) -> List[str]:
-    """Extracts the prediction from the model output."""
+        """Extracts the prediction from the model output."""
 
         def _escape_single_quotes(s: str):
             # Converts patterns like "['child bride', 'the devil's sleep']" to
