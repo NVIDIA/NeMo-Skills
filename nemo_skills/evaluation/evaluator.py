@@ -39,7 +39,7 @@ class LoftEvaluatorConfig:
 
 def eval_loft(cfg):
 
-    def extract_prediction(model_output: str) -> List[str]:
+    def extract_prediction(model_output: str):
         """Extracts the prediction from the model output."""
 
         def _escape_single_quotes(s: str):
