@@ -90,6 +90,7 @@ class PPOVerlTask:
             "   trainer.total_epochs=30 "
             f"   trainer.n_gpus_per_node={self.num_gpus} "
             f"   trainer.nnodes={self.num_nodes} "
+            f"  +trainer.timeout={self.timeout} "
             ""
         )
         return cmd
