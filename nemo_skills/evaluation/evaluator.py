@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import ast
 import json
 import logging
 import re
@@ -33,7 +33,79 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 LOG = logging.getLogger(__file__)
 
+class LoftEvaluatorConfig:
+    parse_func: str = "default"
+    metrics: str
 
+def eval_loft(cfg):
+
+    def extract_prediction(model_output: str) -> List[str]:
+        """Extracts the prediction from the model output."""
+
+        def _escape_single_quotes(s: str):
+            # Converts patterns like "['child bride', 'the devil's sleep']" to
+            # "['child bride', 'the devil\'s sleep']" to allow for proper parsing.
+
+            pattern = r"([a-zA-Z0-9])'([a-zA-Z0-9])"
+            replacement = r"\1\'\2"
+
+            return re.sub(pattern, replacement, s)
+
+        # Remove formatting.
+        model_output = model_output.replace("*", "").replace("`", "")
+        model_output = model_output.strip().split("\n")
+        # Extract the predictions from the model output
+        preds = []
+        for l in model_output:
+            # Turns the string "Final Answer: [1, ...]" into the list of ints [1, ...]
+            if "final answer" in l.lower() and "[" in l and "]" in l:
+            pred_start_index = l.find("[")
+            pred_end_index = l.rfind("]") + 1  # Finds the last "]"
+            pred_as_str = l[pred_start_index:pred_end_index].strip()
+            try:
+                pred_as_str = _escape_single_quotes(pred_as_str)
+                preds = ast.literal_eval(pred_as_str)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                print(l, e)
+            break
+        return preds
+
+    def compute_recall_at_k(gold_ids: list[str], pred_ids: list[str], top_k: int, capped: bool = False) -> float:
+        """
+        Calculates the recall at k.
+        Borrow from https://github.com/google-deepmind/loft/blob/eb2c7106dc11f9782dfe6c5af2e81400d2831d64/evaluation/retrieval.py#L26
+        """
+        assert top_k > 0
+        if not pred_ids:
+            return 0
+        pred_ids = set(pred_ids[:top_k])
+        relevant_in_top_k = float(len(pred_ids.intersection(gold_ids)))
+
+        # Capped recall@k is triggered when # of gold docs is > top_k
+        if capped and len(gold_ids) > top_k:
+            recall = relevant_in_top_k / top_k
+        else:
+            recall = relevant_in_top_k / len(gold_ids)
+        return recall
+
+    eval_config = LoftEvaluatorConfig(**cfg.eval_config)
+    assert eval_config.parse_func in ['default',], f"Unsupported eval type: {eval_config.parse_func}"
+
+    parse_funcs = {
+        'default': extract_prediction,
+    }
+    for file in unroll_files(cfg.input_files):
+        with open(file, 'rt', encoding='utf-8') as fin:
+            data = [json.loads(line) for line in fin]
+        with open(file, 'wt', encoding='utf-8') as fout:
+            for sample in tqdm(data):
+                parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
+                k = 1
+                sample[f'recall_at_{k}'] = compute_recall_at_k(sample['generation'], sample['expected_answer'], top_k=k)
+                sample['predicted_answer'] = parse_result
+                fout.write(json.dumps(sample) + "\n")
+                
+                
 @nested_dataclass(kw_only=True)
 class MMLUEvaluatorConfig:
     # Eval type is either llama or tigerlab
