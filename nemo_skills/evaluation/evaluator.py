@@ -40,7 +40,7 @@ class LoftEvaluatorConfig:
 def eval_loft(cfg):
 
     def extract_prediction(model_output: str) -> List[str]:
-        """Extracts the prediction from the model output."""
+    """Extracts the prediction from the model output."""
 
         def _escape_single_quotes(s: str):
             # Converts patterns like "['child bride', 'the devil's sleep']" to
@@ -59,16 +59,17 @@ def eval_loft(cfg):
         for l in model_output:
             # Turns the string "Final Answer: [1, ...]" into the list of ints [1, ...]
             if "final answer" in l.lower() and "[" in l and "]" in l:
-            pred_start_index = l.find("[")
-            pred_end_index = l.rfind("]") + 1  # Finds the last "]"
-            pred_as_str = l[pred_start_index:pred_end_index].strip()
-            try:
-                pred_as_str = _escape_single_quotes(pred_as_str)
-                preds = ast.literal_eval(pred_as_str)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                print(l, e)
-            break
+                pred_start_index = l.find("[")
+                pred_end_index = l.rfind("]") + 1  # Finds the last "]"
+                pred_as_str = l[pred_start_index:pred_end_index].strip()
+                try:
+                    pred_as_str = _escape_single_quotes(pred_as_str)
+                    preds = ast.literal_eval(pred_as_str)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    print(l, e)
+                break
         return preds
+
 
     def compute_recall_at_k(gold_ids: list[str], pred_ids: list[str], top_k: int, capped: bool = False) -> float:
         """
