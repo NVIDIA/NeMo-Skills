@@ -76,8 +76,8 @@ def eval_loft(cfg):
         Calculates the recall at k.
         Borrow from https://github.com/google-deepmind/loft/blob/eb2c7106dc11f9782dfe6c5af2e81400d2831d64/evaluation/retrieval.py#L26
         """
-        print(gold_ids)
-        print(pred_ids)
+        print("gold_ids", gold_ids)
+        print("pred_ids", pred_ids)
         assert top_k > 0
         if not pred_ids:
             return 0
@@ -104,7 +104,7 @@ def eval_loft(cfg):
             for sample in tqdm(data):
                 parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
                 k = 1
-                sample[f'recall_at_{k}'] = compute_recall_at_k(sample['generation'], sample['expected_answer'], top_k=k)
+                sample[f'recall_at_{k}'] = compute_recall_at_k(parse_result, sample['expected_answer'], top_k=k)
                 sample['predicted_answer'] = parse_result
                 fout.write(json.dumps(sample) + "\n")
                 
