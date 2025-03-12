@@ -23,7 +23,7 @@ class LoftMetrics(BaseMetrics):
     def update(self, predictions):
         
         self.total += 1
-        self.recall_at_k += predictions[0]['recall_at_k']
+        self.recall_at_k += predictions[0][f'recall_at_{self.k}']
 
     def get_metrics(self):
         metrics = {"num_entries": self.total}
@@ -33,6 +33,7 @@ class LoftMetrics(BaseMetrics):
         return {self.agg_mode: metrics}
 
     def reset(self):
+        self.k = 1
         self.total = 0 
         self.recall_at_k = 0
         self.agg_mode = "greedy"
