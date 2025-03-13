@@ -230,9 +230,9 @@ def ppo_verl(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     final_ckpt_path: str = typer.Option(None, help="Where to put the final checkpoint"),
-    save_last_ckpt: bool = typer.Option(
+    convert_last_ckpt_to_hf: bool = typer.Option(
             False,
-            help="If True, will save the final nemo checkpoint to final_ckpt_path. "
+            help="If True, will convert the final checkpoint to hf format and place in final_ckpt_path (or output_dir/final_hf_checkpoint if not specified) "
     ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
@@ -284,7 +284,7 @@ def ppo_verl(
         log_dir = output_dir
 
     if not final_ckpt_path:
-        final_ckpt_path = f"{output_dir}/final_checkpoint"
+        final_ckpt_path = f"{output_dir}/final_hf_checkpoint"
     check_if_mounted(cluster_config, final_ckpt_path)
 
     if num_training_jobs > 0:
@@ -355,7 +355,7 @@ def ppo_verl(
                 actor_dir = f"{ckpt_dir}/global_step_$(<{ckpt_dir}/latest_checkpointed_iteration.txt)/actor"
                 convert_cmd = f"python3 -m verl.utils.checkpoint.convert_checkpoint --ckpt_path {actor_dir}"
                 hf_input = f"{actor_dir}/huggingface"
-                cp_last_ckpt_cmd = f'cp -r "{hf_input}" {final_ckpt_path}/'
+                cp_last_ckpt_cmd = f'cp -r "{hf_input}" "{final_ckpt_path}"/'
 
                 train_cmd = f'{train_cmd} && {convert_cmd} && {cp_last_ckpt_cmd}'
             prev_task = add_task(
