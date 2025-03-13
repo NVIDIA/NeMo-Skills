@@ -350,7 +350,7 @@ def ppo_verl(
     with run.Experiment(expname) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
-            if job_id == num_training_jobs - 1 and save_last_ckpt:
+            if job_id == num_training_jobs - 1 and convert_last_ckpt_to_hf:
                 ckpt_dir = f"{output_dir}/checkpoints"
                 actor_dir = f"{ckpt_dir}/global_step_$(<{ckpt_dir}/latest_checkpointed_iteration.txt)/actor"
                 convert_cmd = f"python3 -m verl.utils.checkpoint.convert_checkpoint --ckpt_path {actor_dir}"
