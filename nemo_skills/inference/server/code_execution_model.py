@@ -62,6 +62,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
+        buffer_time: int,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
@@ -83,6 +84,7 @@ class CodeExecutionWrapper:
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
+            "buffer_time": buffer_time,
         }
         session_id = None
         # adding plus one to make sure there is always some completion after the last requested code block
@@ -137,6 +139,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | list[int] | None = None,
+        buffer_time: int | list[int] = 0,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -161,6 +164,7 @@ class CodeExecutionWrapper:
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            "buffer_time": buffer_time,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -230,6 +234,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        buffer_time: int | list[int] = 0,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -251,6 +256,7 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
+            buffer_time=buffer_time,
         )
         all_generations = [None] * len(prompts)
         while True:

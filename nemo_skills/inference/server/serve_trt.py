@@ -345,6 +345,7 @@ def generate(
         stop_words_list=stop_words_list,
         tokenizer=tokenizer,
         timeout=timeout,
+        buffer_time=buffer_time,
         input_lengths=input_lengths,
     )
 
@@ -369,6 +370,7 @@ def _stream(
     max_new_tokens: int,
     sampling_config=None,
     timeout=None,
+    buffer_time=None,
     is_draft_target_model: bool = False,
 ):
     if stop_words_list is None:
@@ -383,6 +385,9 @@ def _stream(
     num_tokens_to_check = 20
 
     start_time = time.time()
+    sample_timeout = timeout
+    if buffer_time:
+        sample_timeout = timeout + buffer_time
 
     idx = 0
     finished_reqs = 0
@@ -429,9 +434,9 @@ def _stream(
             runner.session.cancel_request(request_ids[0])
             break
 
-        if timeout:
+        if sample_timeout:
             current_time = time.time() - start_time
-            if current_time >= timeout:
+            if current_time >= sample_timeout:
                 runner.session.cancel_request(request_ids[0])
                 break
 
@@ -518,6 +523,7 @@ class TensorRTLLM:
         random_seed,
         stop_words_list,
         top_logprobs,
+        buffer_time,
     ):
         try:
             request_id, stream_kwargs = generate(
@@ -544,6 +550,7 @@ class TensorRTLLM:
                 output_sequence_lengths=True,
                 streaming=True,
                 timeout=self.timeout,
+                buffer_time=buffer_time,
             )
             self.active_requests[generation_id] = request_id
             output = _stream(**stream_kwargs)
@@ -574,6 +581,7 @@ class TensorRTLLM:
             data["random_seed"],
             data["stop_words_list"],
             data["top_logprobs"],
+            data["buffer_time"],
         )
 
         self.active_generations[generation_id] = future
@@ -623,6 +631,7 @@ class GenerationRequest(BaseModel):
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
     top_logprobs: Optional[int] = None
+    buffer_time: int = 0
 
 
 class GenerationResponse(BaseModel):
@@ -689,6 +698,7 @@ class MPIWrapper:
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
+                "buffer_time": request.buffer_time,
             }
 
             self.comm.Barrier()
@@ -715,6 +725,7 @@ class MPIWrapper:
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
+                "buffer_time": request.buffer_time,
             }
 
             self.comm.Barrier()

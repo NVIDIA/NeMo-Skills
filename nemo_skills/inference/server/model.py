@@ -266,6 +266,7 @@ class TRTLLMModel(BaseModel):
         top_logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
+        buffer_time: int = 0,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
@@ -288,6 +289,7 @@ class TRTLLMModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
             "top_logprobs": top_logprobs,
+            "buffer_time": buffer_time,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
@@ -321,6 +323,7 @@ class TRTLLMModel(BaseModel):
         top_logprobs: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        buffer_time: int = 0,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -336,6 +339,7 @@ class TRTLLMModel(BaseModel):
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
+            buffer_time: int = 0,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -472,7 +476,7 @@ class NemoModel(BaseModel):
             raise NotImplementedError("Nemo server does not support min_p parameter.")
         if top_logprobs is not None:
             raise NotImplementedError("Nemo server does not support top_logprobs parameter.")
-        
+
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
