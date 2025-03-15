@@ -62,7 +62,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        buffer_time: int,
+        buffer_time: int = 0,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
