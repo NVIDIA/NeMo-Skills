@@ -197,7 +197,8 @@ def get_logging_params(expname, disable_wandb, wandb_project):
 
 
 def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
-    if average_steps:
+    if average_steps is not None:
+        average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else ''
         entrypoint = "nemo_skills.training.average_checkpoints"
         name = "model" + ("-".join(average_steps[len('--steps '):].split()) if average_steps else '') + "-averaged"
     else:
@@ -424,9 +425,6 @@ def train(
                 server_config=server_config,
                 heterogeneous=True if server_config is not None else False,
             )
-
-        if average_steps and average_steps != 'all':
-            average_steps = f"--steps {' '.join(average_steps.split(','))} "
 
         if average_steps or save_last_ckpt:
             cmd = get_checkpoint_cmd(
