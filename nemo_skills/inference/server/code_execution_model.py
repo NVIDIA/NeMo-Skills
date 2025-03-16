@@ -138,7 +138,7 @@ class CodeExecutionWrapper:
         # removing original prompt
         return {'generation': request['prompt'][len(prompt) :],
                 'code_rounds_executed': code_rounds_executed,
-                'total_num_generated_tokens': num_generated_tokens,
+                'total_num_generated_tokens': total_num_generated_tokens,
                 'generation_time': generation_time,
                 'code_execution_time': code_execution_time}
 
