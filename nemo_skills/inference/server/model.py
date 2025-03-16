@@ -339,7 +339,7 @@ class TRTLLMModel(BaseModel):
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
-            buffer_time: int = 0,
+            'buffer_time': buffer_time,
         }
         for key, value in kwargs.items():
             is_list = False
