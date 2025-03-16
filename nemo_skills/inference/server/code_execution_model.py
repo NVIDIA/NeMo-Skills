@@ -225,7 +225,7 @@ class CodeExecutionWrapper:
             stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
             future = self.gen_id_to_future[generation_id]
             if not future.done():
-                output = {'generation': None
+                output = {'generation': None,
                         'code_rounds_executed': None,
                         'total_num_generated_tokens': None,
                         'generation_time': None,
