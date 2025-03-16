@@ -122,6 +122,7 @@ def generate(
     return_all_generated_tokens: bool = False,
     tokenizer=None,
     timeout=None,
+    buffer_time=None,
     input_lengths=None,
     **kwargs,
 ):
