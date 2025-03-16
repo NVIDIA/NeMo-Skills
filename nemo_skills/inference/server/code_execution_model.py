@@ -74,6 +74,10 @@ class CodeExecutionWrapper:
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
 
+
+        question_buffer_time = copy.copy(buffer_time)
+        question_start_time = int(time.time())
+
         request = {
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
@@ -87,8 +91,17 @@ class CodeExecutionWrapper:
             "buffer_time": buffer_time,
         }
         session_id = None
+        code_rounds_executed = 0
+        total_num_generated_tokens = 0
+        generation_time = 0
+        code_execution_time = 0
         # adding plus one to make sure there is always some completion after the last requested code block
         for generation_index in range(self.config.max_code_executions + 1):
+
+            generation_time_start = time.time()
+            # Deprecate buffer time by elapsed time
+            deprecated_buffer_time = int(question_buffer_time - (time.time() - question_start_time))
+            request["buffer_time"] = deprecated_buffer_time
             output_dict = self.model._generate_single(**request)
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             request['prompt'] += output
@@ -97,6 +110,8 @@ class CodeExecutionWrapper:
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
+            total_num_generated_tokens += num_generated_tokens
+            generation_time += int(time.time() - generation_time_start)
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
@@ -104,6 +119,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                code_execution_time_start = time.time()
                 execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(output, code_begin, code_end),
                     timeout=self.config.code_execution_timeout,
@@ -114,11 +130,17 @@ class CodeExecutionWrapper:
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format
                 )
+                code_execution_time += int(time.time() - code_execution_time_start)
+                code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
                 break
 
         # removing original prompt
-        return {'generation': request['prompt'][len(prompt) :]}
+        return {'generation': request['prompt'][len(prompt) :],
+                'code_rounds_executed': code_rounds_executed,
+                'total_num_generated_tokens': num_generated_tokens,
+                'generation_time': generation_time,
+                'code_execution_time': code_execution_time}
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(
@@ -203,7 +225,11 @@ class CodeExecutionWrapper:
             stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
             future = self.gen_id_to_future[generation_id]
             if not future.done():
-                output = {'generation': None}
+                output = {'generation': None
+                        'code_rounds_executed': None,
+                        'total_num_generated_tokens': None,
+                        'generation_time': None,
+                        'code_execution_time': None}
             else:
                 output = future.result()
                 del self.gen_id_to_future[generation_id]
