@@ -655,7 +655,7 @@ class TensorRTLLM:
 
     def cancel_generation(self, generation_id: str) -> Dict[str, Any]:
         if generation_id not in self.active_generations:
-            raise HTTPException(status_code=404, detail="Generation not found")
+            return {"status": "not found"}
 
         future = self.active_generations[generation_id]
         request_id = self.active_requests[generation_id]
@@ -758,7 +758,7 @@ class MPIWrapper:
                 output = self.model.get_generation(generation_id)
                 if output is not None:
                     return output
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.5)
 
         @app.put("/generate_async", response_model=GenerationResponseAsync)
         async def generate_async(request: GenerationRequest):

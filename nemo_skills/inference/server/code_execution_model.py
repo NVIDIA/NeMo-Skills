@@ -14,6 +14,7 @@
 
 
 import copy
+import json
 import logging
 import time
 import uuid
@@ -21,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.server.model import BaseModel, get_model, models, trim_after_stop_phrases
+from nemo_skills.inference.server.model import BaseModel, TRTLLMModel, get_model, models, trim_after_stop_phrases
 from nemo_skills.utils import nested_dataclass, python_doc_to_cmd_help
 
 LOG = logging.getLogger(__name__)
@@ -42,8 +43,18 @@ class CodeExecutionWrapper:
 
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
+        self.cancelled_gen_ids = set() # Track cancelled generation IDs
 
         self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+
+        if hasattr(model, '_generate_single_async') and hasattr(model, 'cancel_generations'):
+            self._can_cancel_generations = True
+        else:
+            self._can_cancel_generations = False
+
+    def _is_generation_cancelled(self, gen_id):
+        """Check if a generation has been requested to be cancelled."""
+        return gen_id in self.cancelled_gen_ids
 
     def _generate_single(
         self,
@@ -62,6 +73,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
+        gen_id: str = None,  # used for cancelling requests if supported
         buffer_time: int = 0,
     ):
         if not isinstance(prompt, str):
@@ -102,7 +114,33 @@ class CodeExecutionWrapper:
             # Deprecate buffer time by elapsed time
             deprecated_buffer_time = int(question_buffer_time - (time.time() - question_start_time))
             request["buffer_time"] = deprecated_buffer_time
-            output_dict = self.model._generate_single(**request)
+
+            # Check if generation has been cancelled before proceeding
+            if gen_id is not None and self._is_generation_cancelled(gen_id):
+                break
+
+            if self._can_cancel_generations:
+                # Wait for generation to finish while periodically checking for cancellation
+                # TODO: clean up the interface to always use public method, not just in this case
+                request["prompts"] = [request.pop("prompt")]
+                async_gen_id = self.model.generate_async(**request, remove_stop_phrases=False)[0]
+                while True:
+                    time.sleep(0.5)
+                    # Check periodically if generation should be cancelled
+                    if gen_id is not None and self._is_generation_cancelled(gen_id):
+                        self.model.cancel_generations([async_gen_id])
+                        break
+
+                    output_dict = self.model.get_generations([async_gen_id])[0]
+                    if output_dict['generation'] is not None:
+                        break
+
+                if gen_id is not None and self._is_generation_cancelled(gen_id):
+                    break
+                request["prompt"] = request.pop("prompts")[0]
+            else:
+                output_dict = self.model._generate_single(**request)
+
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
@@ -206,11 +244,30 @@ class CodeExecutionWrapper:
             self.model.preprocess_request(request)
             future = self.executor.submit(self._generate_single, **request)
             gen_id = str(uuid.uuid4())
+            # Pass the gen_id to _generate_single
+            future = self.executor.submit(self._generate_single, gen_id=gen_id, **request)
             self.gen_id_to_future[gen_id] = future
             self.gen_id_to_params[gen_id] = (request['stop_phrases'], remove_stop_phrases)
             gen_ids.append(gen_id)
 
         return gen_ids
+
+    def cancel_generations(self, generation_ids: list[str]) -> list[str]:
+        if not self._can_cancel_generations:
+            raise NotImplementedError("This model does not support cancelling generations.")
+
+        statuses = []
+        for generation_id in generation_ids:
+            if generation_id not in self.gen_id_to_future:
+                raise ValueError(f"Generation id {generation_id} not found.")
+
+            # Mark this generation as cancelled - it will be actually cancelled in the generate_single loop
+            self.cancelled_gen_ids.add(generation_id)
+            statuses.append("canceled")
+
+            # TODO: more checks?
+
+        return statuses
 
     def get_generations(
         self,
