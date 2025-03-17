@@ -105,17 +105,24 @@ class CodeExecutionWrapper:
 
             if self._can_cancel_generations:
                 # Wait for generation to finish while periodically checking for cancellation
-                async_gen_id = self.model._generate_single_async(**request)
+                # TODO: clean up the interface to always use public method, not just in this case
+                request["prompts"] = [request.pop("prompt")]
+                async_gen_id = self.model.generate_async(**request, remove_stop_phrases=False)[0]
                 while True:
                     time.sleep(0.1)
                     # Check periodically if generation should be cancelled
                     if gen_id is not None and self._is_generation_cancelled(gen_id):
+                        print(f"Cancelling generation {async_gen_id}")
                         self.model.cancel_generations([async_gen_id])
                         break
 
                     output_dict = self.model.get_generations([async_gen_id])[0]
                     if output_dict['generation'] is not None:
                         break
+
+                if gen_id is not None and self._is_generation_cancelled(gen_id):
+                    break
+                request["prompt"] = request.pop("prompts")[0]
             else:
                 output_dict = self.model._generate_single(**request)
 
