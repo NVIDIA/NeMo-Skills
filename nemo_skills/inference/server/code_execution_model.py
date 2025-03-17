@@ -112,7 +112,6 @@ class CodeExecutionWrapper:
                     time.sleep(0.5)
                     # Check periodically if generation should be cancelled
                     if gen_id is not None and self._is_generation_cancelled(gen_id):
-                        print(f"Cancelling generation {async_gen_id}")
                         self.model.cancel_generations([async_gen_id])
                         break
 

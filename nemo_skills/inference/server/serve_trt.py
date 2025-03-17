@@ -605,7 +605,6 @@ class TensorRTLLM:
         request_id = self.active_requests[generation_id]
         self.cancel_request(request_id)
         future.cancel()
-        logging.info(f"Generation {generation_id} canceled")
         # Clean up canceled generation
         del self.active_generations[generation_id]
 
@@ -791,17 +790,17 @@ def main():
 
 if __name__ == "__main__":
 
-    # class LogFilter(logging.Filter):
-    #     def filter(self, record):
-    #         filter_strings = (
-    #             "PUT /generate HTTP/1.1",
-    #             "PUT /get_generation HTTP/1.1",
-    #             "PUT /generate_async HTTP/1.1",
-    #             "PUT /cancel_generation HTTP/1.1",
-    #         )
-    #         return all(filter_string not in record.getMessage() for filter_string in filter_strings)
+    class LogFilter(logging.Filter):
+        def filter(self, record):
+            filter_strings = (
+                "PUT /generate HTTP/1.1",
+                "PUT /get_generation HTTP/1.1",
+                "PUT /generate_async HTTP/1.1",
+                "PUT /cancel_generation HTTP/1.1",
+            )
+            return all(filter_string not in record.getMessage() for filter_string in filter_strings)
 
-    # logging.getLogger('uvicorn.access').addFilter(LogFilter())
+    logging.getLogger('uvicorn.access').addFilter(LogFilter())
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
     main()
