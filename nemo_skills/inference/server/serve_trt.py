@@ -700,7 +700,7 @@ class MPIWrapper:
                 output = self.model.get_generation(generation_id)
                 if output is not None:
                     return output
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.5)
 
         @app.put("/generate_async", response_model=GenerationResponseAsync)
         async def generate_async(request: GenerationRequest):

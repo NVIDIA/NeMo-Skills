@@ -109,7 +109,7 @@ class CodeExecutionWrapper:
                 request["prompts"] = [request.pop("prompt")]
                 async_gen_id = self.model.generate_async(**request, remove_stop_phrases=False)[0]
                 while True:
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                     # Check periodically if generation should be cancelled
                     if gen_id is not None and self._is_generation_cancelled(gen_id):
                         print(f"Cancelling generation {async_gen_id}")
