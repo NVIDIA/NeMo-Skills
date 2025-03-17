@@ -479,7 +479,6 @@ def _stream(
                 break
 
         if (extract_answer(out_string) is not None) or (matching_stop_word is not None):
-            print(f"Found stop word: {matching_stop_word} or answer: {extract_answer(out_string)}")
             runner.session.cancel_request(request_ids[0])
             break
 
