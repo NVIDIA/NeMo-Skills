@@ -24,6 +24,11 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import prefill_judgement
 
 
+
+def has_eot_token(query: str):
+    return query.strip().endswith("<|im_end|>") or query.strip().endswith("<|endoftext|>")
+
+
 def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[dict]):
     """Will check if the predicted answer matches expected answer and return 1 or 0 accordingly.
 
@@ -42,7 +47,10 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
             "expected_answer": metadata["expected_answer"],
             "predicted_answer": extract_answer(query),
         }
-        judgement = prefill_judgement(dp)
+        if not has_eot_token(query):
+            judgement = "Reasoning: No answer was provided.\nJudgement: No"
+        else:
+            judgement = prefill_judgement(dp)  
         if judgement is not None:
             prefilled_judgements.append(judgement)
             prefilled_indices.add(idx)
