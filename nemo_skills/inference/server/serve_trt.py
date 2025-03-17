@@ -37,6 +37,53 @@ from transformers import AutoTokenizer
 app = FastAPI(title="TensorRT-LLM Server")
 
 
+def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
+    """Extract Answer String from \\boxed expression or based on regex"""
+    if not extract_from_boxed:
+        match = re.search(extract_regex, string)
+        if match:
+            return match.group(1)
+        return None
+
+    if "\\boxed" not in string:
+        return None
+
+    idx = string.rfind("\\boxed")
+    if idx < 0:
+        idx = string.rfind("\\fbox")
+        if idx < 0:
+            return None
+
+    i = idx
+    right_brace_idx = None
+    num_left_braces_open = 0
+    while i < len(string):
+        if string[i] == "{":
+            num_left_braces_open += 1
+        if string[i] == "}":
+            num_left_braces_open -= 1
+            if num_left_braces_open == 0:
+                right_brace_idx = i
+                break
+        i += 1
+
+    if right_brace_idx is None:
+        retval = None
+    else:
+        retval = string[idx : right_brace_idx + 1]
+
+    if retval:
+        left = "\\boxed{"
+        try:
+            assert retval[: len(left)] == left
+            assert retval[-1] == "}"
+            return retval[len(left) : -1]
+        except AssertionError:
+            return None
+
+    return None
+
+
 # keeping it here to make this file self-contained. This is duplicated from model.py
 def trim_after_stop_phrases(text: str, stop_phrases: List[str]) -> str:
     """Removes everything after the last stop token."""
@@ -382,8 +429,8 @@ def _stream(
         [copy.deepcopy(batch_input_ids_list[batch_idx]) for _ in range(num_sequences)]
         for batch_idx in range(len(request_ids))
     ]
-    # checking the last 20 tokens for stop words
-    num_tokens_to_check = 20
+    # checking the last 100 tokens for stop words
+    num_tokens_to_check = 100
 
     start_time = time.time()
     sample_timeout = timeout
@@ -431,7 +478,8 @@ def _stream(
                 matching_stop_word = stop_word
                 break
 
-        if matching_stop_word is not None:
+        if (extract_answer(out_string) is not None) or (matching_stop_word is not None):
+            print(f"Found stop word: {matching_stop_word} or answer: {extract_answer(out_string)}")
             runner.session.cancel_request(request_ids[0])
             break
 
