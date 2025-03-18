@@ -23,9 +23,9 @@ parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "l
 args = parser.parse_args()
 
 if args.model_type == 'qwen':
-    model_name = "Qwen/Qwen2.5-Math-7B"
+    model_name = "Qwen/Qwen2.5-1.5B"
     output_dir = "/tmp/nemo-skills-tests/qwen/tiny-model-hf"
-    hidden_dim = 56
+    hidden_dim = 64
     head_dim = 2
     max_position_embeddings = 256
     num_attention_heads = 8
