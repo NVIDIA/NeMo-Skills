@@ -40,10 +40,10 @@ elif args.model_type == 'qwen_orm':
 else:
     model_name = "meta-llama/Llama-3.2-1B-Instruct"
     output_dir = "/tmp/nemo-skills-tests/llama/tiny-model-hf"
-    hidden_dim = 2048
-    head_dim = 64
-    max_position_embeddings = 131072
-    num_attention_heads = 32
+    hidden_dim = 128
+    head_dim = 16
+    max_position_embeddings = 256
+    num_attention_heads = 8
 
 
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
