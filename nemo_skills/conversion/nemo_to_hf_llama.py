@@ -21,6 +21,8 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from pathlib import Path
 
+import torch
+
 try:
     from lightning.pytorch.trainer.trainer import Trainer
 except ModuleNotFoundError:
