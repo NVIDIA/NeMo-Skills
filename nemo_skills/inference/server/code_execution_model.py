@@ -17,7 +17,10 @@ import copy
 import logging
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, Optional
+from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
@@ -28,10 +31,29 @@ LOG = logging.getLogger(__name__)
 
 
 @nested_dataclass(kw_only=True)
+class ErrorRecoveryConfig:
+    # Number of attempts to recover from code execution error
+    recovery_attempts: int = 0
+    # If true, take code block based on majority voting of `recovery_attempts` code outputs.
+    # Otherwise take the first valid code output.
+    # So `majority_voting=False` is potentially faster.
+    majority_voting: bool = True
+    # Temperature for recovery requests
+    temperature: float = 0.7
+    # Top-p for recovery requests
+    top_p: float = 0.95
+    # Top-k for recovery requests
+    top_k: int = 0
+    # Number of tokens in a code block for recovery request
+    tokens_to_generate: int = 256
+
+
+@nested_dataclass(kw_only=True)
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     max_code_executions: int = 3
+    error_recovery: ErrorRecoveryConfig = field(default_factory=ErrorRecoveryConfig)
 
 
 class CodeExecutionWrapper:
@@ -62,6 +84,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
+        is_recovery: bool = False,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
@@ -102,12 +125,29 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                generated_code = extract_code_to_execute(output, code_begin, code_end)
                 execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=extract_code_to_execute(output, code_begin, code_end),
+                    generated_code=generated_code,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
                 )
+                
+                # Check for errors and attempt recovery if needed
+                # Only attempt recovery if this is not already a recovery attempt
+                if not is_recovery and execution_dict['stderr'] and hasattr(self.config, 'error_recovery') and self.config.error_recovery.enabled:
+                    recovered_dict = self._recover_from_error_async(
+                        request, 
+                        session_id, 
+                        code_begin, 
+                        code_end,
+                        code_output_begin,
+                        code_output_end,
+                        code_output_format,
+                    )
+                    if recovered_dict:
+                        execution_dict = recovered_dict
+
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format
@@ -118,7 +158,113 @@ class CodeExecutionWrapper:
         # removing original prompt
         return {'generation': request['prompt'][len(prompt) :]}
 
-    # TODO: is there a way to reuse this with BaseModel?
+    def _recover_from_error_async(
+        self,
+        request: Dict[str, Any],
+        session_id: Optional[str],
+        code_begin: str,
+        code_end: str,
+        code_output_begin: str,
+        code_output_end: str,
+        code_output_format: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Attempt to recover from code execution errors by running multiple attempts with different random seeds.
+        Uses a modified version of _generate_single with the is_recovery flag to prevent recursion."""
+        if not hasattr(self.config, 'error_recovery'):
+            return None
+
+        # Create base recovery prompts
+        current_prompt = request['prompt']
+        last_code_begin_pos = current_prompt.rfind(code_begin)
+        if last_code_begin_pos == -1:
+            return None
+            
+        # Base prompt up to the last code block
+        base_recovery_prompt = current_prompt[:last_code_begin_pos]
+        recovery_prompts = [base_recovery_prompt] * self.config.error_recovery.recovery_attempts
+        
+        # Set up recovery-specific parameters
+        recovery_tokens_to_generate = self.config.error_recovery.tokens_to_generate
+        recovery_temperature = self.config.error_recovery.temperature
+        recovery_top_p = self.config.error_recovery.top_p
+        recovery_top_k = self.config.error_recovery.top_k
+        
+        recovery_generations = self.generate(
+            prompts=recovery_prompts,
+            code_begin=code_begin,
+            code_end=code_end,
+            code_output_begin=code_output_begin,
+            code_output_end=code_output_end,
+            code_output_format=code_output_format,
+            tokens_to_generate=recovery_tokens_to_generate,
+            temperature=recovery_temperature,
+            top_p=recovery_top_p,
+            top_k=recovery_top_k,
+            min_p=request.get('min_p', 0.0),
+            repetition_penalty=request.get('repetition_penalty', 1.0),
+            random_seed=list(range(self.config.error_recovery.recovery_attempts)),  # Different seed for each attempt
+            stop_phrases=request.get('stop_phrases', []),
+            remove_stop_phrases=False,  # We need to see the code end marker
+            is_recovery=True,  # Prevent recursive recovery
+        )
+                
+        # Execute the generated code in parallel
+        code_execution_futures = []
+        with ThreadPoolExecutor(max_workers=len(recovery_generations)) as executor:
+            for rs, gen_dict in enumerate(recovery_generations):
+                output = gen_dict['generation']
+                
+                # Check if we got a complete code block
+                if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                    generated_code = extract_code_to_execute(output, code_begin, code_end)
+                        
+                    future = executor.submit(
+                        self.sandbox.execute_code,
+                        generated_code=generated_code,
+                        timeout=self.config.code_execution_timeout,
+                        max_output_characters=self.config.max_code_output_characters,
+                        session_id=session_id,
+                    )
+                    code_execution_futures.append((rs, future))
+        
+        # If we don't have any valid code execution futures, return None
+        if not code_execution_futures:
+            return None
+            
+        # Process code execution results
+        successful_executions = []
+        
+        # Collect successful executions
+        for rs, future in code_execution_futures:
+            try:
+                execution_dict, _ = future.result()
+                if not execution_dict['stderr'] and "Traceback (most recent call last)" not in execution_dict['stdout']:
+                    successful_executions.append((rs, execution_dict))
+                    # If not using majority voting, return the first successful execution
+                    if not self.config.error_recovery.majority_voting:
+                        return execution_dict
+            except Exception:
+                # Skip failed executions
+                continue
+        
+        # If no successful executions, return None
+        if not successful_executions:
+            return None
+        
+        # If using majority voting, pick the most common successful result
+        if self.config.error_recovery.majority_voting and len(successful_executions) > 1:
+            # Count by stdout value to find the most common successful result
+            counts = Counter(execution['stdout'] for _, execution in successful_executions)
+            most_common_stdout = counts.most_common(1)[0][0]
+            
+            # Return the first execution dict with the most common stdout
+            for _, execution_dict in successful_executions:
+                if execution_dict['stdout'] == most_common_stdout:
+                    return execution_dict
+        
+        # Otherwise return the first successful execution
+        return successful_executions[0][1]
+
     def generate_async(
         self,
         prompts: list[str | dict],
@@ -137,6 +283,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | list[int] | None = None,
+        is_recovery: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -161,6 +308,7 @@ class CodeExecutionWrapper:
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            'is_recovery': is_recovery,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -230,6 +378,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        is_recovery: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -251,6 +400,7 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
+            is_recovery=is_recovery,
         )
         all_generations = [None] * len(prompts)
         while True:
