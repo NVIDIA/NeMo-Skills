@@ -112,16 +112,20 @@ class CodeExecutionWrapper:
         for generation_index in range(self.config.max_code_executions + 1):
             output_dict = self.model._generate_single(**request)
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
-            request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
             if generation_index == self.config.max_code_executions:
+                request['prompt'] += output
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
+                request['prompt'] += output
                 break
+            # if we are inside error recovery run, we want to return just the first code block
+            if is_recovery:
+                return {'generation': code_begin + output}
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
@@ -132,27 +136,30 @@ class CodeExecutionWrapper:
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
                 )
-                
+
                 # Check for errors and attempt recovery if needed
                 # Only attempt recovery if this is not already a recovery attempt
-                if not is_recovery and execution_dict['stderr'] and hasattr(self.config, 'error_recovery') and self.config.error_recovery.enabled:
+                if not is_recovery and self.is_code_error(execution_dict):
                     recovered_dict = self._recover_from_error_async(
-                        request, 
-                        session_id, 
-                        code_begin, 
+                        request,
+                        session_id,
+                        code_begin,
                         code_end,
                         code_output_begin,
                         code_output_end,
                         code_output_format,
                     )
                     if recovered_dict:
-                        execution_dict = recovered_dict
-
+                        recovered_code, execution_dict = recovered_dict
+                        output = output[:output.rfind(code_begin)] + f"{code_begin}{recovered_code}{code_end}"
+                
+                request['prompt'] += output
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format
                 )
             else:  # if no code was generated, we need to finish
+                request['prompt'] += output
                 break
 
         # removing original prompt
@@ -170,7 +177,7 @@ class CodeExecutionWrapper:
     ) -> Optional[Dict[str, Any]]:
         """Attempt to recover from code execution errors by running multiple attempts with different random seeds.
         Uses a modified version of _generate_single with the is_recovery flag to prevent recursion."""
-        if not hasattr(self.config, 'error_recovery'):
+        if not hasattr(self.config, 'error_recovery') or self.config.error_recovery.recovery_attempts == 0:
             return None
 
         # Create base recovery prompts
@@ -180,7 +187,7 @@ class CodeExecutionWrapper:
             return None
             
         # Base prompt up to the last code block
-        base_recovery_prompt = current_prompt[:last_code_begin_pos]
+        base_recovery_prompt = current_prompt[:last_code_begin_pos] + code_begin
         recovery_prompts = [base_recovery_prompt] * self.config.error_recovery.recovery_attempts
         
         # Set up recovery-specific parameters
@@ -225,7 +232,7 @@ class CodeExecutionWrapper:
                         max_output_characters=self.config.max_code_output_characters,
                         session_id=session_id,
                     )
-                    code_execution_futures.append((rs, future))
+                    code_execution_futures.append((generated_code, rs, future))
         
         # If we don't have any valid code execution futures, return None
         if not code_execution_futures:
@@ -235,14 +242,14 @@ class CodeExecutionWrapper:
         successful_executions = []
         
         # Collect successful executions
-        for rs, future in code_execution_futures:
+        for generated_code, rs, future in code_execution_futures:
             try:
                 execution_dict, _ = future.result()
-                if not execution_dict['stderr'] and "Traceback (most recent call last)" not in execution_dict['stdout']:
-                    successful_executions.append((rs, execution_dict))
+                if not self.is_code_error(execution_dict):
+                    successful_executions.append((generated_code, rs, execution_dict))
                     # If not using majority voting, return the first successful execution
                     if not self.config.error_recovery.majority_voting:
-                        return execution_dict
+                        return generated_code, execution_dict
             except Exception:
                 # Skip failed executions
                 continue
@@ -254,16 +261,16 @@ class CodeExecutionWrapper:
         # If using majority voting, pick the most common successful result
         if self.config.error_recovery.majority_voting and len(successful_executions) > 1:
             # Count by stdout value to find the most common successful result
-            counts = Counter(execution['stdout'] for _, execution in successful_executions)
+            counts = Counter(execution['stdout'] for _, _, execution in successful_executions)
             most_common_stdout = counts.most_common(1)[0][0]
             
             # Return the first execution dict with the most common stdout
-            for _, execution_dict in successful_executions:
+            for generated_code, _, execution_dict in successful_executions:
                 if execution_dict['stdout'] == most_common_stdout:
-                    return execution_dict
+                    return generated_code, execution_dict
         
         # Otherwise return the first successful execution
-        return successful_executions[0][1]
+        return successful_executions[0][0], successful_executions[0][-1]
 
     def generate_async(
         self,
@@ -419,6 +426,9 @@ class CodeExecutionWrapper:
             time.sleep(1)
 
         return all_generations
+    
+    def is_code_error(self, execution_dict: Dict[str, Any]):
+        return execution_dict['stderr'] or "Traceback (most recent call last)" in execution_dict['stdout'] or "SyntaxError" in execution_dict['stdout']
 
 
 def server_params():
