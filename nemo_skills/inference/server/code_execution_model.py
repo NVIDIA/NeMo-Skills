@@ -242,7 +242,6 @@ class CodeExecutionWrapper:
             request = {key: value[request_idx] for key, value in kwargs.items()}
             request['prompt'] = prompts[request_idx]
             self.model.preprocess_request(request)
-            future = self.executor.submit(self._generate_single, **request)
             gen_id = str(uuid.uuid4())
             # Pass the gen_id to _generate_single
             future = self.executor.submit(self._generate_single, gen_id=gen_id, **request)
