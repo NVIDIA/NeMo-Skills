@@ -20,16 +20,22 @@ LOG = logging.getLogger(__name__)
 
 
 def format_code_output(
-    execution_dict: Dict[str, str], code_output_begin: str, code_output_end: str, code_output_format: str = 'llama'
+    execution_dict: Dict[str, str], code_output_begin: str,
+    code_output_end: str, code_output_format: str = 'llama',
+    remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
+    remaining_ce_string = ""
+    if remaining_code_executions is not None:
+        remaining_ce_string = "\n" + "-" * 75
+        remaining_ce_string += f"\nRemaining code executions: {remaining_code_executions}\n"
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
         if execution_dict['stdout']:
             output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
         if execution_dict['stderr']:
             output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
-        output = f"{code_output_begin}\n\n{output}{code_output_end}\n\n"
+        output = f"{code_output_begin}\n\n{output}{remaining_ce_string}{code_output_end}\n\n"
     elif code_output_format == 'qwen':
         output = ""
         if execution_dict['stdout']:
@@ -38,7 +44,7 @@ def format_code_output(
             output += f"{execution_dict['stderr']}"
         if execution_dict['stderr'] and execution_dict['stdout']:
             LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
-        output = f"{code_output_begin}{output}{code_output_end}"
+        output = f"{code_output_begin}{output}{remaining_ce_string}{code_output_end}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
 
