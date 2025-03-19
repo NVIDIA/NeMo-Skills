@@ -277,6 +277,7 @@ class GenerationTask:
         if not self.cfg.skip_filled:
             return data
 
+        starting_idx = 0
         try:
             with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
