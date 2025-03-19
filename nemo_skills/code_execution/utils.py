@@ -27,7 +27,7 @@ def format_code_output(
     """Formatting code output to be displayed as an llm expects it."""
     remaining_ce_string = ""
     if remaining_code_executions is not None:
-        remaining_ce_string = "\n" + "-" * 75
+        remaining_ce_string = "\n" + "-" * 80
         remaining_ce_string += f"\nRemaining code executions: {remaining_code_executions}\n"
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
