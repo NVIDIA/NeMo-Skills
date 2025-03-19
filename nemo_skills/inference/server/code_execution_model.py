@@ -140,11 +140,6 @@ class CodeExecutionWrapper:
                 # Check for errors and attempt recovery if needed
                 # Only attempt recovery if this is not already a recovery attempt
                 if not is_recovery and self.is_code_error(execution_dict):
-                    print("=" * 30 + "The following code block failed" + "=" * 30)
-                    print(generated_code)
-                    print("=" * 30 + "With the output" + "=" * 30)
-                    print(execution_dict['stdout'])
-                    print("=" * 60)
                     recovered_dict = self._recover_from_error_async(
                         request,
                         session_id,
@@ -184,7 +179,6 @@ class CodeExecutionWrapper:
         if not hasattr(self.config, 'error_recovery') or self.config.error_recovery.recovery_attempts == 0:
             return None
 
-        print("Entering error recovery...")
         # Create base recovery prompts
         current_prompt = request['prompt']
         last_code_begin_pos = current_prompt.rfind(code_begin)
@@ -249,7 +243,6 @@ class CodeExecutionWrapper:
                         session_id=temp_session_id,
                     )
                     code_execution_futures.append((generated_code, rs, temp_session_id, future))
-        print(f"Generated {len(code_execution_futures)} code blocks, executing...")
         # If we don't have any valid code execution futures, return None
         if not code_execution_futures:
             return None
@@ -281,7 +274,6 @@ class CodeExecutionWrapper:
                 # Ensure we clean up this temporary session if there was an error
                 if temp_session_id is not None and temp_session_id in self.sandbox.sessions:
                     del self.sandbox.sessions[temp_session_id]
-        print(f"Successfully executed {len(successful_executions)} blocks...")
         # If no successful executions, return None
         if not successful_executions:
             return None
@@ -291,15 +283,9 @@ class CodeExecutionWrapper:
             # Count by stdout value to find the most common successful result
             counts = Counter(execution['stdout'] for _, _, _, execution in successful_executions)
             most_common_stdout = counts.most_common(1)[0][0]
-            print(f"Doing majority with {counts =}")
             # Find the first execution dict with the most common stdout
             for generated_code, _, _, execution_dict in successful_executions:
                 if execution_dict['stdout'] == most_common_stdout:
-                    print("=" * 30 + "Using the following code block" + "=" * 30)
-                    print(generated_code)
-                    print("=" * 30 + "With the output" + "=" * 30)
-                    print(execution_dict['stdout'])
-                    print("=" * 60)
                     self._apply_successful_recovery(
                         session_id, 
                         original_session_state,
