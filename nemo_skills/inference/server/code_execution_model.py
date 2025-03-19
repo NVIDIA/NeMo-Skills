@@ -140,6 +140,11 @@ class CodeExecutionWrapper:
                 # Check for errors and attempt recovery if needed
                 # Only attempt recovery if this is not already a recovery attempt
                 if not is_recovery and self.is_code_error(execution_dict):
+                    print("=" * 30 + "The following code block failed" + "=" * 30)
+                    print(generated_code)
+                    print("=" * 30 + "With the output" + "=" * 30)
+                    print(execution_dict['stdout'])
+                    print("=" * 60)
                     recovered_dict = self._recover_from_error_async(
                         request,
                         session_id,
@@ -175,11 +180,11 @@ class CodeExecutionWrapper:
         code_output_end: str,
         code_output_format: str,
     ) -> Optional[Dict[str, Any]]:
-        """Attempt to recover from code execution errors by running multiple attempts with different random seeds.
-        Uses a modified version of _generate_single with the is_recovery flag to prevent recursion."""
+        """Attempt to recover from code execution errors by running multiple attempts with different random seeds."""
         if not hasattr(self.config, 'error_recovery') or self.config.error_recovery.recovery_attempts == 0:
             return None
 
+        print("Entering error recovery...")
         # Create base recovery prompts
         current_prompt = request['prompt']
         last_code_begin_pos = current_prompt.rfind(code_begin)
@@ -209,12 +214,17 @@ class CodeExecutionWrapper:
             top_k=recovery_top_k,
             min_p=request.get('min_p', 0.0),
             repetition_penalty=request.get('repetition_penalty', 1.0),
-            random_seed=list(range(self.config.error_recovery.recovery_attempts)),  # Different seed for each attempt
+            random_seed=list(range(self.config.error_recovery.recovery_attempts)),
             stop_phrases=request.get('stop_phrases', []),
-            remove_stop_phrases=False,  # We need to see the code end marker
-            is_recovery=True,  # Prevent recursive recovery
+            remove_stop_phrases=False,
+            is_recovery=True,
         )
-                
+        
+        # Save original session state if needed
+        original_session_state = None
+        if session_id is not None and session_id in self.sandbox.sessions:
+            original_session_state = self.sandbox.sessions[session_id].copy()
+        
         # Execute the generated code in parallel
         code_execution_futures = []
         with ThreadPoolExecutor(max_workers=len(recovery_generations)) as executor:
@@ -224,36 +234,54 @@ class CodeExecutionWrapper:
                 # Check if we got a complete code block
                 if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
                     generated_code = extract_code_to_execute(output, code_begin, code_end)
+                    
+                    # Create a temporary session ID for this recovery attempt
+                    temp_session_id = None
+                    if original_session_state is not None:
+                        temp_session_id = f"{session_id}_recovery_{rs}"
+                        self.sandbox.sessions[temp_session_id] = original_session_state.copy()
                         
                     future = executor.submit(
                         self.sandbox.execute_code,
                         generated_code=generated_code,
                         timeout=self.config.code_execution_timeout,
                         max_output_characters=self.config.max_code_output_characters,
-                        session_id=session_id,
+                        session_id=temp_session_id,
                     )
-                    code_execution_futures.append((generated_code, rs, future))
-        
+                    code_execution_futures.append((generated_code, rs, temp_session_id, future))
+        print(f"Generated {len(code_execution_futures)} code blocks, executing...")
         # If we don't have any valid code execution futures, return None
         if not code_execution_futures:
             return None
-            
+                
         # Process code execution results
         successful_executions = []
         
         # Collect successful executions
-        for generated_code, rs, future in code_execution_futures:
+        for generated_code, rs, temp_session_id, future in code_execution_futures:
             try:
                 execution_dict, _ = future.result()
                 if not self.is_code_error(execution_dict):
-                    successful_executions.append((generated_code, rs, execution_dict))
+                    successful_executions.append((generated_code, rs, temp_session_id, execution_dict))
                     # If not using majority voting, return the first successful execution
                     if not self.config.error_recovery.majority_voting:
+                        self._apply_successful_recovery(
+                            session_id, 
+                            original_session_state,
+                            generated_code, 
+                            execution_dict,
+                            code_execution_futures,
+                            future
+                        )
                         return generated_code, execution_dict
-            except Exception:
-                # Skip failed executions
+            except Exception as e:
+                LOG.warning(f"Recovery attempt {rs} failed with exception: {str(e)}")
                 continue
-        
+            finally:
+                # Ensure we clean up this temporary session if there was an error
+                if temp_session_id is not None and temp_session_id in self.sandbox.sessions:
+                    del self.sandbox.sessions[temp_session_id]
+        print(f"Successfully executed {len(successful_executions)} blocks...")
         # If no successful executions, return None
         if not successful_executions:
             return None
@@ -261,16 +289,68 @@ class CodeExecutionWrapper:
         # If using majority voting, pick the most common successful result
         if self.config.error_recovery.majority_voting and len(successful_executions) > 1:
             # Count by stdout value to find the most common successful result
-            counts = Counter(execution['stdout'] for _, _, execution in successful_executions)
+            counts = Counter(execution['stdout'] for _, _, _, execution in successful_executions)
             most_common_stdout = counts.most_common(1)[0][0]
-            
-            # Return the first execution dict with the most common stdout
-            for generated_code, _, execution_dict in successful_executions:
+            print(f"Doing majority with {counts =}")
+            # Find the first execution dict with the most common stdout
+            for generated_code, _, _, execution_dict in successful_executions:
                 if execution_dict['stdout'] == most_common_stdout:
+                    print("=" * 30 + "Using the following code block" + "=" * 30)
+                    print(generated_code)
+                    print("=" * 30 + "With the output" + "=" * 30)
+                    print(execution_dict['stdout'])
+                    print("=" * 60)
+                    self._apply_successful_recovery(
+                        session_id, 
+                        original_session_state,
+                        generated_code, 
+                        execution_dict,
+                        code_execution_futures
+                    )
                     return generated_code, execution_dict
         
-        # Otherwise return the first successful execution
-        return successful_executions[0][0], successful_executions[0][-1]
+        # Otherwise use the first successful execution
+        best_code, _, _, best_execution = successful_executions[0]
+        
+        self._apply_successful_recovery(
+            session_id, 
+            original_session_state,
+            best_code, 
+            best_execution,
+            code_execution_futures
+        )
+        
+        return best_code, best_execution
+    
+    def _apply_successful_recovery(
+        self, 
+        session_id: Optional[str], 
+        original_session_state: Optional[list],
+        successful_code: str, 
+        execution_dict: Dict[str, Any],
+        code_execution_futures: list,
+        current_future=None
+    ):
+        """Apply a successful recovery solution by updating the session and cleaning up resources."""
+        # Restore original session state and add the successful code
+        if session_id is not None and original_session_state is not None:
+            self.sandbox.sessions[session_id] = original_session_state.copy()
+            self.sandbox.sessions[session_id].append(successful_code)
+        
+        # Cancel other futures to save resources if we have a reference to the current future
+        if current_future is not None:
+            for _, _, _, other_future in code_execution_futures:
+                if other_future != current_future and not other_future.done():
+                    other_future.cancel()
+        
+        # Clean up all temporary sessions
+        self._cleanup_temp_sessions([s_id for _, _, s_id, _ in code_execution_futures])
+
+    def _cleanup_temp_sessions(self, session_ids):
+        """Clean up temporary sessions created for recovery attempts."""
+        for session_id in session_ids:
+            if session_id is not None and session_id in self.sandbox.sessions:
+                del self.sandbox.sessions[session_id]
 
     def generate_async(
         self,
