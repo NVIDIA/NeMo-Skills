@@ -32,6 +32,7 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     max_code_executions: int = 3
+    sandbox_traceback_verbosity: str = 'context' # could be plain, context, verbose, or minimal
 
 
 class CodeExecutionWrapper:
@@ -107,6 +108,7 @@ class CodeExecutionWrapper:
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity
                 )
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
