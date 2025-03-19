@@ -443,5 +443,5 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
     model = get_model(server_type=server_type, **kwargs)
     if code_execution is None:
         code_execution = {}
-    code_execution_config = CodeExecutionConfig(**code_execution)
+    code_execution_config = CodeExecutionConfig(_init_nested=True, **code_execution)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
