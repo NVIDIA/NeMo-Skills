@@ -112,16 +112,15 @@ class CodeExecutionWrapper:
         for generation_index in range(self.config.max_code_executions + 1):
             output_dict = self.model._generate_single(**request)
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+            request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
             if generation_index == self.config.max_code_executions:
-                request['prompt'] += output
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
-                request['prompt'] += output
                 break
             # if we are inside error recovery run, we want to return just the first code block
             if is_recovery:
@@ -151,15 +150,14 @@ class CodeExecutionWrapper:
                     )
                     if recovered_dict:
                         recovered_code, execution_dict = recovered_dict
-                        output = output[:output.rfind(code_begin)] + f"{code_begin}{recovered_code}{code_end}"
-                
-                request['prompt'] += output
+                        cur_prompt = request['prompt']
+                        cur_prompt = cur_prompt[:cur_prompt.rfind(code_begin)] + f"{code_begin}{recovered_code}{code_end}"
+                        request['prompt'] = cur_prompt
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format
                 )
             else:  # if no code was generated, we need to finish
-                request['prompt'] += output
                 break
 
         # removing original prompt
