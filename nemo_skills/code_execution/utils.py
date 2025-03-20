@@ -27,8 +27,11 @@ def format_code_output(
     """Formatting code output to be displayed as an llm expects it."""
     remaining_ce_string = ""
     if remaining_code_executions is not None:
-        remaining_ce_string = "\n" + "-" * 80
-        remaining_ce_string += f"\nRemaining code executions: {remaining_code_executions}\n"
+        remaining_ce_string = f"""
+```system
+Remaining code executions: {remaining_code_executions}. You will not be able to call code when you run out of executions, so use it wisely. Note that you can still continue solving the problem without code after that.
+```
+"""
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
         if execution_dict['stdout']:
@@ -44,7 +47,7 @@ def format_code_output(
             output += f"{execution_dict['stderr']}"
         if execution_dict['stderr'] and execution_dict['stdout']:
             LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
-        output = f"{code_output_begin}{output}{remaining_ce_string}{code_output_end}"
+        output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
 
