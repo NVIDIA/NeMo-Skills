@@ -1,2 +1,3 @@
 recursive-include nemo_skills/prompt/template *.yaml
 recursive-include nemo_skills/prompt/config *.yaml
+recursive-include nemo_skills *.yaml
