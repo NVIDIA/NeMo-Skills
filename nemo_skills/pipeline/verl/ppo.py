@@ -364,7 +364,6 @@ def get_training_cmd(
         #     logging_params="",  # Updated later
         # )
         task = DAPOPPOVerlTask(
-            output_dir=output_dir,
             exp_name=expname,
             project_name=wandb_project,
             NNODES=num_nodes,
