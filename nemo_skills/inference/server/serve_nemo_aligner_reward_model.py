@@ -15,6 +15,12 @@
 # copied from: https://github.com/NVIDIA/NeMo-Aligner/blob/main/examples/nlp/gpt/serve_reward_model.py
 
 import torch
+
+try:
+    from lightning.pytorch.trainer.trainer import Trainer
+except ModuleNotFoundError:
+    from pytorch_lightning.trainer.trainer import Trainer
+
 from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy
 from nemo.core.config import hydra_runner
 from nemo_aligner.algorithms.reward_server import RewardModelServer
@@ -22,7 +28,6 @@ from nemo_aligner.models.nlp.gpt.reward_model_classes import REWARD_MODEL_CLASS_
 from nemo_aligner.utils.text_generation_utils import tokenize_batch
 from nemo_aligner.utils.train_script_utils import init_distributed
 from nemo_aligner.utils.utils import load_and_override_model_config, load_from_nemo, set_autocast_gpu_dtype
-from pytorch_lightning.trainer.trainer import Trainer
 
 """PyTriton Based Inference Server for the Reward Model"""
 
