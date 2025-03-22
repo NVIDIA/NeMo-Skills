@@ -16,6 +16,7 @@
 import copy
 import logging
 import time
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -74,6 +75,15 @@ class CodeExecutionWrapper:
             stop_phrases = []
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
+        allowed_code_executions = re.search(r"You may perform up to (\d+) Python code calls to assist your reasoning", prompt)
+        if not allowed_code_executions:
+            allowed_code_executions = self.config.max_code_executions
+        else:
+            try:
+                allowed_code_executions = int(allowed_code_executions.group(1))
+                self.config.max_code_executions = allowed_code_executions
+            except:
+                allowed_code_executions = self.config.max_code_executions
 
         request = {
             "prompt": new_prompt,
@@ -113,7 +123,7 @@ class CodeExecutionWrapper:
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
-                    remaining_code_executions = self.config.max_code_executions - generation_index - 1
+                    remaining_code_executions = allowed_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions

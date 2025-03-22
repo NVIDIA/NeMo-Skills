@@ -190,7 +190,7 @@ class Prompt:
 
         return examples
 
-    def build_user_message(self, input_dict: Dict[str, str]) -> str:
+    def build_user_message(self, input_dict: Dict[str, str], remaining_code_executions: str) -> str:
         """Builds all examples string concatenated by delimiter."""
         example_dicts = self.build_examples_dict(input_dict)
 
@@ -199,7 +199,7 @@ class Prompt:
             examples = ""
         else:
             examples = f"{self.config.few_shot_examples.prefix}{filled_examples}{self.config.few_shot_examples.suffix}"
-        user = self.config.user.format(examples=examples, remaining_code_executions=self.get_remaining_ce(), **input_dict)
+        user = self.config.user.format(examples=examples, remaining_code_executions=self.get_remaining_ce(remaining_code_executions), **input_dict)
         return user
     
     def get_remaining_ce(self):
@@ -226,6 +226,7 @@ class Prompt:
         input_dict: Dict[str, str],
         prefix_generation_to_response: bool = False,
         continue_prefix_generation: bool = False,
+        remaining_code_executions: str = "8",
         multi_turn_key: str | None = None,
     ) -> str | List[dict]:
         """
@@ -257,7 +258,7 @@ class Prompt:
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
                 )
                 prompt_string += self.TURN_BEGIN_FORMAT.format(
-                    user=self.build_user_message(input_dict), **asdict(self.config.template)
+                    user=self.build_user_message(input_dict, remaining_code_executions), **asdict(self.config.template)
                 )
                 if generation:
                     # Generation can be part of the input in cases such as reward models

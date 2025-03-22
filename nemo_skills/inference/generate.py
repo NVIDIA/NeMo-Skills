@@ -58,6 +58,7 @@ class GenerateSolutionsConfig:
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
     continue_prefix_generation: bool = False  # if True, model will be prompted to continue "generation" without closing assistant tag
+    remaining_code_executions: str = "8"
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -321,6 +322,7 @@ class GenerationTask:
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
             continue_prefix_generation=self.cfg.continue_prefix_generation,
+            remaining_code_executions=self.cfg.remaining_code_executions,
         )
 
     def llm_generate(self, data_points, data, is_async=False):
