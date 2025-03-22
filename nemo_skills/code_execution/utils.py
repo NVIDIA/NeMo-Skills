@@ -27,8 +27,7 @@ def format_code_output(
     """Formatting code output to be displayed as an llm expects it."""
     remaining_ce_string = ""
     if remaining_code_executions is not None:
-        remaining_ce_string = f"""
-```system
+        remaining_ce_string = f"""```system
 Remaining code executions: {remaining_code_executions}. You will not be able to call code when you run out of executions, so use it wisely. Note that you can still continue solving the problem without code after that.
 ```
 """
