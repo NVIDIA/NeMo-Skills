@@ -20,17 +20,23 @@ LOG = logging.getLogger(__name__)
 
 
 def format_code_output(
-    execution_dict: Dict[str, str], code_output_begin: str,
+    execution_dict, code_output_begin: str,
     code_output_end: str, code_output_format: str = 'llama',
     remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
     remaining_ce_string = ""
     if remaining_code_executions is not None:
-        remaining_ce_string = f"""```system
+        if remaining_code_executions > 0:
+            remaining_ce_string = f"""```system
 Remaining code executions: {remaining_code_executions}. You will not be able to call code when you run out of executions, so use it wisely. Note that you can still continue solving the problem without code after that.
 ```
 """
+        else:
+            remaining_ce_string = f"""```system
+You have run out of code executions! You can no longer write or execute code. Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.
+```
+"""     
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
         if execution_dict['stdout']:
