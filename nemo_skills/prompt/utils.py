@@ -99,6 +99,7 @@ class PromptTemplate:
     code_output_begin: str = '<llm-code-output>'
     code_output_end: str = '</llm-code-output>'
     code_output_format: str = 'qwen'
+    remaining_code_executions: str = "8"
 
 
 @nested_dataclass(kw_only=True)
@@ -198,8 +199,17 @@ class Prompt:
             examples = ""
         else:
             examples = f"{self.config.few_shot_examples.prefix}{filled_examples}{self.config.few_shot_examples.suffix}"
-        user = self.config.user.format(examples=examples, **input_dict)
+        user = self.config.user.format(examples=examples, remaining_code_executions=self.get_remaining_ce(), **input_dict)
         return user
+    
+    def get_remaining_ce(self):
+        remaining_code_executions = self.config.template.get("remaining_code_executions", "8")
+        if remaining_code_executions.isdigit():
+            return remaining_code_executions
+        elif remaining_code_executions == "random":
+            return random.randint(1, 8)
+        else:
+            raise ValueError(f"`remaining_code_executions` should be either digit or 'random', got {remaining_code_executions}")
 
     def get_code_execution_args(self):
         """Returns the code execution arguments."""
