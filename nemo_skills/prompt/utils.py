@@ -203,7 +203,7 @@ class Prompt:
         return user
     
     def get_remaining_ce(self):
-        remaining_code_executions = self.config.template.get("remaining_code_executions", "8")
+        remaining_code_executions = self.config.template.remaining_code_executions
         if remaining_code_executions.isdigit():
             return remaining_code_executions
         elif remaining_code_executions == "random":
