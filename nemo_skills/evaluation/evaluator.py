@@ -33,6 +33,7 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 LOG = logging.getLogger(__file__)
 
+@nested_dataclass(kw_only=True)
 class LoftEvaluatorConfig:
     parse_func: str = "default"
     metrics: str = "recall_at_k"
@@ -94,6 +95,7 @@ def eval_loft(cfg):
         return recall
 
     eval_config = LoftEvaluatorConfig(**cfg.eval_config)
+    
     assert eval_config.parse_func in ['default',], f"Unsupported eval type: {eval_config.parse_func}"
 
     parse_funcs = {
