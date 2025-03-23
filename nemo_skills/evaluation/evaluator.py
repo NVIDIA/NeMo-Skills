@@ -35,7 +35,8 @@ LOG = logging.getLogger(__file__)
 
 class LoftEvaluatorConfig:
     parse_func: str = "default"
-    metrics: str
+    metrics: str = "recall_at_k"
+    k: int = 1
 
 def eval_loft(cfg):
 
