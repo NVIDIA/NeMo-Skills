@@ -79,8 +79,6 @@ def eval_loft(cfg):
         Calculates the recall at k.
         Borrow from https://github.com/google-deepmind/loft/blob/eb2c7106dc11f9782dfe6c5af2e81400d2831d64/evaluation/retrieval.py#L26
         """
-        print("gold_ids", gold_ids)
-        print("pred_ids", pred_ids)
         assert top_k > 0
         if not pred_ids:
             return 0
@@ -94,23 +92,60 @@ def eval_loft(cfg):
             recall = relevant_in_top_k / len(gold_ids)
         return recall
 
+
+    def compute_mrecall_at_k(gold_ids: list[str], pred_ids: list[str], top_k: int) -> float:
+
+        """Calculates the mRecall at k.
+
+        This metric was introduced in Min et al., 2021:
+        https://aclanthology.org/2021.emnlp-main.560.pdf
+
+        Args:
+            gold_ids: A list of gold IDs.
+            pred_ids: A list of prediction IDs.
+            top_k: The number of predictions to consider.
+
+        Returns:
+            mRecall@k metric.
+        """
+        assert top_k > 0
+        if not pred_ids:
+            return 0
+        pred_ids = set(pred_ids[:top_k])
+        relevant_in_top_k = float(len(pred_ids.intersection(gold_ids)))
+
+        # This computes the completeness of the answers.
+        return float(relevant_in_top_k == min(top_k, len(gold_ids)))
+
+
     eval_config = LoftEvaluatorConfig(**cfg.eval_config)
     
-    assert eval_config.parse_func in ['default',], f"Unsupported eval type: {eval_config.parse_func}"
+    assert eval_config.parse_func in ['default',], f"Unsupported parse_func: {eval_config.parse_func}"
+    assert eval_config.metrics in ['recall_at_k', 'mrecall_at_k'], f"Unsupported metric: {eval_config.parse_func}"
 
     parse_funcs = {
         'default': extract_prediction,
     }
+    metrics_funcs = {
+        'recall_at_k': compute_recall_at_k,
+        'mrecall_at_k': compute_mrecall_at_k,
+    }
+    
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
         with open(file, 'wt', encoding='utf-8') as fout:
             for sample in tqdm(data):
                 parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
-                k = 1
+               
                 # just single turn for now 
                 gold_ids = [i[0] for i in sample['expected_answer']]
-                sample[f'recall_at_{k}'] = compute_recall_at_k(gold_ids, parse_result, top_k=k)
+                if eval_config.metrics == 'recall_at_k':
+                    metric_name = f'recall_at_{eval_config.k}'
+                elif eval_config.metrics == 'mrecall_at_k':
+                    metric_name = f'mrecall_at_{eval_config.k}'
+                
+                sample[metric_name] = metrics_funcs[eval_config.metrics](gold_ids, parse_result, top_k=eval_config.k)
                 sample['predicted_answer'] = parse_result
                 fout.write(json.dumps(sample) + "\n")
                 

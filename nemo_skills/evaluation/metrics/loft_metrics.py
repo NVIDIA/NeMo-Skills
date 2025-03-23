@@ -23,21 +23,33 @@ class LoftMetrics(BaseMetrics):
     def update(self, predictions):
         
         self.total += 1
+        # find current stored metric
+        if 'recall_at_1' in predictions[0]:
+            self.one_sample_metric = predictions[0]['recall_at_1']
+        elif 'mrecall_at_2' in predictions[0]:
+            self.one_sample_metric = predictions[0]['mrecall_at_2']
+        elif 'mrecall_at_3' in predictions[0]:
+            self.one_sample_metric = predictions[0]['mrecall_at_3']
+        elif 'mrecall_at_5' in predictions[0]:    
+            self.one_sample_metric = predictions[0]['mrecall_at_5']
+        else:
+            raise ValueError(f"Unsupported metric: {predictions[0]}")
+            
         self.recall_at_k += predictions[0][f'recall_at_{self.k}']
 
     def get_metrics(self):
         metrics = {"num_entries": self.total}
-        metrics["macro_recall_at_k"] = self.recall_at_k / self.total * 100.
+        metrics[f"macro_recall_at_{self.k}"] = self.one_sample_metric / self.total * 100.
+        
         # metrics["null_error"] = self.timeout_error / self.total * 100.0
-        print(metrics)
         return {self.agg_mode: metrics}
 
     def reset(self):
-        self.k = 1
         self.total = 0 
-        self.recall_at_k = 0
+        self.one_sample_metric = 0
         self.agg_mode = "greedy"
-
+        
+            
     # def setup(self, input_files):
     #     pass
 
