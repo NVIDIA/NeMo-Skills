@@ -24,22 +24,19 @@ class LoftMetrics(BaseMetrics):
         
         self.total += 1
         # find current stored metric
-        if 'recall_at_1' in predictions[0]:
-            self.one_sample_metric = predictions[0]['recall_at_1']
-        elif 'mrecall_at_2' in predictions[0]:
-            self.one_sample_metric = predictions[0]['mrecall_at_2']
-        elif 'mrecall_at_3' in predictions[0]:
-            self.one_sample_metric = predictions[0]['mrecall_at_3']
-        elif 'mrecall_at_5' in predictions[0]:    
-            self.one_sample_metric = predictions[0]['mrecall_at_5']
-        else:
+        possible_metrics_name = ['recall_at_1', 'mrecall_at_2', 'mrecall_at_3', 'mrecall_at_5']
+        for metric_name in possible_metrics_name:
+            if metric_name in predictions[0]:
+                self.metric_name = metric_name
+                break
+        if self.metric_name is None:
             raise ValueError(f"Unsupported metric: {predictions[0]}")
-            
-        self.recall_at_k += predictions[0][f'recall_at_{self.k}']
+
+        self.one_sample_metric += predictions[0][f'{self.metric_name}']
 
     def get_metrics(self):
         metrics = {"num_entries": self.total}
-        metrics[f"macro_recall_at_{self.k}"] = self.one_sample_metric / self.total * 100.
+        metrics[f"macro_{self.metric_name}"] =  self.one_sample_metric / self.total * 100.
         
         # metrics["null_error"] = self.timeout_error / self.total * 100.0
         return {self.agg_mode: metrics}
@@ -48,15 +45,4 @@ class LoftMetrics(BaseMetrics):
         self.total = 0 
         self.one_sample_metric = 0
         self.agg_mode = "greedy"
-        
-            
-    # def setup(self, input_files):
-    #     pass
-
-    # def max_metrics_to_print(self):
-    #     """No limit by default."""
-    #     return None
-
-    # def max_aggregations_to_print(self):
-    #     """No limit by default."""
-    #     return None
+        self.metric_name = None
