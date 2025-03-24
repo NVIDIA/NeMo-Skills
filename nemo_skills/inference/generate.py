@@ -38,6 +38,7 @@ class InferenceConfig:
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = 0
     top_p: float = 0.95
+    min_p: float = 0.0
     random_seed: int = 0
     tokens_to_generate: int = 2048
     repetition_penalty: float = 1.0
@@ -58,6 +59,7 @@ class GenerateSolutionsConfig:
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
     continue_prefix_generation: bool = False  # if True, model will be prompted to continue "generation" without closing assistant tag
+    remaining_code_executions: str = "8"
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -277,6 +279,7 @@ class GenerationTask:
         if not self.cfg.skip_filled:
             return data
 
+        starting_idx = 0
         try:
             with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
@@ -321,6 +324,7 @@ class GenerationTask:
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
             continue_prefix_generation=self.cfg.continue_prefix_generation,
+            remaining_code_executions=self.cfg.remaining_code_executions,
         )
 
     def llm_generate(self, data_points, data, is_async=False):

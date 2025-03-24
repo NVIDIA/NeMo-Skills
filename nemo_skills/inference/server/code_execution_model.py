@@ -17,6 +17,7 @@ import copy
 import json
 import logging
 import time
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -33,6 +34,8 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     max_code_executions: int = 3
+    sandbox_traceback_verbosity: str = 'context' # could be plain, context, verbose, or minimal
+    add_remaining_code_executions: bool = False
 
 
 class CodeExecutionWrapper:
@@ -43,7 +46,7 @@ class CodeExecutionWrapper:
 
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
-        self.cancelled_gen_ids = set() # Track cancelled generation IDs
+        self.cancelled_gen_ids = set()  # Track cancelled generation IDs
 
         self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
 
@@ -85,6 +88,15 @@ class CodeExecutionWrapper:
             stop_phrases = []
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
+        allowed_code_executions = re.search(r"You may perform up to (\d+) Python code calls to assist your reasoning", prompt)
+        if not allowed_code_executions:
+            allowed_code_executions = self.config.max_code_executions
+        else:
+            try:
+                allowed_code_executions = int(allowed_code_executions.group(1))
+                self.config.max_code_executions = allowed_code_executions
+            except:
+                allowed_code_executions = self.config.max_code_executions
 
 
         question_buffer_time = copy.copy(buffer_time)
@@ -163,10 +175,14 @@ class CodeExecutionWrapper:
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity
                 )
+                remaining_code_executions = None
+                if self.config.add_remaining_code_executions:
+                    remaining_code_executions = allowed_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
-                    execution_dict, code_output_begin, code_output_end, code_output_format
+                    execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1

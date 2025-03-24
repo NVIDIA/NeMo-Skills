@@ -661,7 +661,6 @@ class TensorRTLLM:
         request_id = self.active_requests[generation_id]
         self.cancel_request(request_id)
         future.cancel()
-
         # Clean up canceled generation
         del self.active_generations[generation_id]
 

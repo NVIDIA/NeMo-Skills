@@ -20,16 +20,30 @@ LOG = logging.getLogger(__name__)
 
 
 def format_code_output(
-    execution_dict: Dict[str, str], code_output_begin: str, code_output_end: str, code_output_format: str = 'llama'
+    execution_dict, code_output_begin: str,
+    code_output_end: str, code_output_format: str = 'llama',
+    remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
+    remaining_ce_string = ""
+    if remaining_code_executions is not None:
+        if remaining_code_executions > 0:
+            remaining_ce_string = f"""```system
+Remaining code executions: {remaining_code_executions}. You will not be able to call code when you run out of executions, so use it wisely. Note that you can still continue solving the problem without code after that.
+```
+"""
+        else:
+            remaining_ce_string = f"""```system
+You have run out of code executions! You can no longer write or execute code. Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.
+```
+"""     
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
         if execution_dict['stdout']:
             output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
         if execution_dict['stderr']:
             output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
-        output = f"{code_output_begin}\n\n{output}{code_output_end}\n\n"
+        output = f"{code_output_begin}\n\n{output}{remaining_ce_string}{code_output_end}\n\n"
     elif code_output_format == 'qwen':
         output = ""
         if execution_dict['stdout']:
@@ -38,7 +52,7 @@ def format_code_output(
             output += f"{execution_dict['stderr']}"
         if execution_dict['stderr'] and execution_dict['stdout']:
             LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
-        output = f"{code_output_begin}{output}{code_output_end}"
+        output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
 
