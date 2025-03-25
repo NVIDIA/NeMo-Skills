@@ -286,7 +286,7 @@ class MathMetrics(BaseMetrics):
                 if all([elem['predicted_answer'] is None for elem in predictions[:k]]):
                     no_answer = True
 
-                self.update_comb_metric_expected(
+                self.update_comb_metric_averaged(
                     self.agg_mode_dict[f"pass@1[{k}]"], current_correct_sympy, current_correct_judge, no_answer
                 )
 
