@@ -63,7 +63,7 @@ class MathMetrics(BaseMetrics):
             perf_dict["both_correct"] += int(current_correct_sympy and current_correct_judge)
             perf_dict["any_correct"] += int(current_correct_sympy or current_correct_judge)
 
-    def update_comb_metric_expected(self, perf_dict, current_correct_sympy, current_correct_judge, no_answer):
+    def update_comb_metric_averaged(self, perf_dict, current_correct_sympy, current_correct_judge, no_answer):
         perf_dict["correct_sympy"] += current_correct_sympy
         perf_dict["correct_judge"] += current_correct_judge
         perf_dict["no_answer"] += no_answer
@@ -139,7 +139,7 @@ class MathMetrics(BaseMetrics):
                         current_correct_judge,
                         no_answer,
                     )
-                    self.update_comb_metric_expected(
+                    self.update_comb_metric_averaged(
                         self.agg_mode_dict[f"pass@1[{k}]"],
                         current_correct_sympy,
                         current_correct_judge,
@@ -315,5 +315,5 @@ class MathMetrics(BaseMetrics):
 
     def max_aggregations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
-        # majority + pass + 2xRM
-        return 2 + 2 * self.has_reward + 1
+        # majority + pass + 2xRM + pass@1[k]
+        return 1 + 1 + 2 * self.has_reward + 1
