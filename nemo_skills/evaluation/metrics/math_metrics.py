@@ -67,6 +67,9 @@ class MathMetrics(BaseMetrics):
         perf_dict["correct_sympy"] += current_correct_sympy
         perf_dict["correct_judge"] += current_correct_judge
         perf_dict["no_answer"] += no_answer
+        if self.has_sympy and self.has_judge:
+            perf_dict["both_correct"] += current_correct_sympy and current_correct_judge
+            perf_dict["any_correct"] += current_correct_sympy or current_correct_judge
 
 
     def update(self, predictions):
@@ -283,6 +286,8 @@ class MathMetrics(BaseMetrics):
                 current_correct_sympy, current_correct_judge, no_answer = False, False, False
                 if self.has_sympy:
                     current_correct_sympy = sum([elem['is_correct'] for elem in predictions[:k]]) / k
+                if self.has_judge:
+                    current_correct_judge = sum([is_correct_judgement(elem['judgement']) for elem in predictions[:k]]) / k
                 if all([elem['predicted_answer'] is None for elem in predictions[:k]]):
                     no_answer = True
 
