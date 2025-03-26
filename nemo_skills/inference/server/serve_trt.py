@@ -478,7 +478,7 @@ def _stream(
                 matching_stop_word = stop_word
                 break
 
-        if (extract_answer(out_string) is not None) or (matching_stop_word is not None):
+        if (matching_stop_word is not None):
             runner.session.cancel_request(request_ids[0])
             break
 
