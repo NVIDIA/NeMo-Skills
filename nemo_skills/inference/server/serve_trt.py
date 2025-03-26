@@ -459,7 +459,8 @@ def _stream(
             streaming=streaming,
             request_ids=request_ids,
             return_all_generated_tokens=return_all_generated_tokens,
-            max_new_tokens=max_new_tokens,
+            # max_new_tokens=max_new_tokens,
+            output_generation_logits=False,
             sampling_config=sampling_config,
             is_draft_target_model=is_draft_target_model,
         )
