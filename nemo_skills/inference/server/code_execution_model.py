@@ -16,8 +16,8 @@
 import copy
 import json
 import logging
-import time
 import re
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -34,7 +34,7 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     max_code_executions: int = 3
-    sandbox_traceback_verbosity: str = 'context' # could be plain, context, verbose, or minimal
+    sandbox_traceback_verbosity: str = 'context'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
 
 
@@ -88,7 +88,9 @@ class CodeExecutionWrapper:
             stop_phrases = []
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
-        allowed_code_executions = re.search(r"You may perform up to (\d+) Python code calls to assist your reasoning", prompt)
+        allowed_code_executions = re.search(
+            r"You may perform up to (\d+) Python code calls to assist your reasoning", prompt
+        )
         if not allowed_code_executions:
             allowed_code_executions = self.config.max_code_executions
         else:
@@ -97,7 +99,6 @@ class CodeExecutionWrapper:
                 self.config.max_code_executions = allowed_code_executions
             except:
                 allowed_code_executions = self.config.max_code_executions
-
 
         question_buffer_time = copy.copy(buffer_time)
         question_start_time = int(time.time())
@@ -156,6 +157,16 @@ class CodeExecutionWrapper:
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
+            print(
+                "!!",
+                generation_index,
+                self.config.max_code_executions,
+                num_generated_tokens,
+                output.endswith(code_end),
+                output.rfind(code_begin),
+                output.rfind(code_end, 0, -1),
+            )
+
             if generation_index == self.config.max_code_executions:
                 break
             # adjusting requested tokens to account for what has been generated already
@@ -175,7 +186,7 @@ class CodeExecutionWrapper:
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -190,11 +201,13 @@ class CodeExecutionWrapper:
                 break
 
         # removing original prompt
-        return {'generation': request['prompt'][len(prompt) :],
-                'code_rounds_executed': code_rounds_executed,
-                'total_num_generated_tokens': total_num_generated_tokens,
-                'generation_time': generation_time,
-                'code_execution_time': code_execution_time}
+        return {
+            'generation': request['prompt'][len(prompt) :],
+            'code_rounds_executed': code_rounds_executed,
+            'total_num_generated_tokens': total_num_generated_tokens,
+            'generation_time': generation_time,
+            'code_execution_time': code_execution_time,
+        }
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(
@@ -297,11 +310,13 @@ class CodeExecutionWrapper:
             stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
             future = self.gen_id_to_future[generation_id]
             if not future.done():
-                output = {'generation': None,
-                        'code_rounds_executed': None,
-                        'total_num_generated_tokens': None,
-                        'generation_time': None,
-                        'code_execution_time': None}
+                output = {
+                    'generation': None,
+                    'code_rounds_executed': None,
+                    'total_num_generated_tokens': None,
+                    'generation_time': None,
+                    'code_execution_time': None,
+                }
             else:
                 output = future.result()
                 del self.gen_id_to_future[generation_id]
