@@ -157,15 +157,6 @@ class CodeExecutionWrapper:
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
-            # print(
-            #     "!!",
-            #     generation_index,
-            #     self.config.max_code_executions,
-            #     num_generated_tokens,
-            #     output.endswith(code_end),
-            #     output.rfind(code_begin),
-            #     output.rfind(code_end, 0, -1),
-            # )
 
             if generation_index == self.config.max_code_executions:
                 break
