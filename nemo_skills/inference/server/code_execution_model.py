@@ -96,7 +96,6 @@ class CodeExecutionWrapper:
         else:
             try:
                 allowed_code_executions = int(allowed_code_executions.group(1))
-                self.config.max_code_executions = allowed_code_executions
             except:
                 allowed_code_executions = self.config.max_code_executions
 
