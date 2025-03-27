@@ -439,6 +439,7 @@ def _stream(
 
     idx = 0
     finished_reqs = 0
+    last_seq_length = 0
     while finished_reqs < len(request_ids):
         multi_responses = runner.session.await_responses(request_ids)
         responses = [response for responses in multi_responses for response in responses]
@@ -463,17 +464,23 @@ def _stream(
             sampling_config=sampling_config,
             is_draft_target_model=is_draft_target_model,
         )
-        seq_length = output['sequence_lengths']
-        print("####", seq_length)
+        seq_length = output['sequence_lengths'][0]
+
+        if sample_timeout:
+            current_time = time.time() - start_time
+            if current_time >= sample_timeout:
+                runner.session.cancel_request(request_ids[0])
+                break
 
         matching_stop_word = None
         # checking every half of the required tokens to have overlapping checks
-        if idx < num_tokens_to_check - 1 or idx % (num_tokens_to_check // 2) != 0:
-            idx += 1
+        if seq_length - last_seq_length < num_tokens_to_check // 2:
             continue
 
-        generation_suffix = output['output_ids'][0, 0, seq_length[0] - num_tokens_to_check : seq_length[0]]
-        out_string = get_output(generation_suffix, 0, num_tokens_to_check, tokenizer, end_id)[0]
+        # we are checking up to last seq length + num_tokens_to_check
+        generation_suffix = output['output_ids'][0, 0, last_seq_length - num_tokens_to_check : seq_length]
+        suffix_length = seq_length - last_seq_length + num_tokens_to_check
+        out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
         for stop_word in stop_words_list:
             if stop_word in out_string:
                 matching_stop_word = stop_word
@@ -482,12 +489,6 @@ def _stream(
         if matching_stop_word is not None:
             runner.session.cancel_request(request_ids[0])
             break
-
-        if sample_timeout:
-            current_time = time.time() - start_time
-            if current_time >= sample_timeout:
-                runner.session.cancel_request(request_ids[0])
-                break
 
         idx += 1
 
