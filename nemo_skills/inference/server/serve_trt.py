@@ -429,8 +429,8 @@ def _stream(
         [copy.deepcopy(batch_input_ids_list[batch_idx]) for _ in range(num_sequences)]
         for batch_idx in range(len(request_ids))
     ]
-    # checking the last 100 tokens for stop words
-    num_tokens_to_check = 100
+    # checking the last 20 tokens for stop words
+    num_tokens_to_check = 20
 
     start_time = time.time()
     sample_timeout = timeout
@@ -463,6 +463,8 @@ def _stream(
             sampling_config=sampling_config,
             is_draft_target_model=is_draft_target_model,
         )
+        seq_length = output['sequence_lengths']
+        print("####", seq_length)
 
         matching_stop_word = None
         # checking every half of the required tokens to have overlapping checks
@@ -470,7 +472,6 @@ def _stream(
             idx += 1
             continue
 
-        seq_length = output['sequence_lengths']
         generation_suffix = output['output_ids'][0, 0, seq_length[0] - num_tokens_to_check : seq_length[0]]
         out_string = get_output(generation_suffix, 0, num_tokens_to_check, tokenizer, end_id)[0]
         for stop_word in stop_words_list:
