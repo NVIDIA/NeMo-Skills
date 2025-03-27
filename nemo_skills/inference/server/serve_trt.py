@@ -503,6 +503,7 @@ def _stream(
 
     # TODO: the number of tokens is not exact, because we might trim the output a bit,
     #       but close enough for practical purposes
+    matching_stop_word = None
     for stop_word in stop_words_list:
         if stop_word in out_string:
             matching_stop_word = stop_word
