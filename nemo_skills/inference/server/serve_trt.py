@@ -420,6 +420,8 @@ def _stream(
     timeout=None,
     buffer_time=None,
     is_draft_target_model: bool = False,
+    repetition_check_chars: int = 1500,
+    repetition_limit: int = 2,
 ):
     if stop_words_list is None:
         stop_words_list = []
@@ -432,8 +434,6 @@ def _stream(
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
     repetition_check_tokens = 500
-    repetition_check_chars = 1500
-    repetition_limit = 2  # if last 1000 chars are found 3 times, stop generation
 
     start_time = time.time()
     sample_timeout = timeout
@@ -561,6 +561,8 @@ class TensorRTLLM:
         timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
+        repetition_check_chars: int = 1500,
+        repetition_limit: int = 2,
     ):
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(tokenizer_dir=model_path)
 
@@ -578,6 +580,8 @@ class TensorRTLLM:
 
         self.runner = ModelRunnerCpp.from_dir(**runner_kwargs)
         self.timeout = timeout_seconds
+        self.repetition_check_chars = repetition_check_chars
+        self.repetition_limit = repetition_limit
 
         self.active_generations = {}
         self.active_requests = {}
@@ -626,6 +630,10 @@ class TensorRTLLM:
                 timeout=self.timeout,
                 buffer_time=buffer_time,
             )
+            # Forward repetition parameters:
+            stream_kwargs['repetition_check_chars'] = self.repetition_check_chars
+            stream_kwargs['repetition_limit'] = self.repetition_limit
+
             self.active_requests[generation_id] = request_id
             output = _stream(**stream_kwargs)
 
@@ -744,6 +752,8 @@ class MPIWrapper:
         timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
+        repetition_check_chars: int = 1500,
+        repetition_limit: int = 2,
     ):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
@@ -756,6 +766,8 @@ class MPIWrapper:
             kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
             timeout_seconds=timeout_seconds,
             disable_chunked_context=disable_chunked_context,
+            repetition_check_chars=repetition_check_chars,
+            repetition_limit=repetition_limit,
         )
         self.app = None
         if self.rank == 0:
@@ -864,6 +876,12 @@ def main():
         "--kv_cache_free_gpu_memory_fraction", type=float, default=None, help="Free GPU memory fraction for cache"
     )
     parser.add_argument("--disable_chunked_context", action="store_true", help="Disable chunked context")
+    parser.add_argument(
+        "--repetition_check_chars", type=int, default=1500, help="Number of characters to check for repetition"
+    )
+    parser.add_argument(
+        "--repetition_limit", type=int, default=2, help="Repetition limit: stops generation if exceeded"
+    )
     args = parser.parse_args()
 
     wrapper = MPIWrapper(
@@ -875,6 +893,8 @@ def main():
         timeout_seconds=args.timeout_seconds,
         kv_cache_free_gpu_memory_fraction=args.kv_cache_free_gpu_memory_fraction,
         disable_chunked_context=args.disable_chunked_context,
+        repetition_check_chars=args.repetition_check_chars,
+        repetition_limit=args.repetition_limit,
     )
     wrapper.run(host=args.host, port=args.port)
 
