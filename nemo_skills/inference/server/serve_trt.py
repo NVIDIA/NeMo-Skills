@@ -511,7 +511,10 @@ def _stream(
                 continue
 
             suffix = full_gen_so_far[-repetition_check_chars:]
-            if full_gen_so_far[:-repetition_check_chars].count(suffix) >= repetition_limit:
+            tm = time.time()
+            cnt = full_gen_so_far[:-repetition_check_chars].count(suffix)
+            print("Repetition check time:", time.time() - tm)
+            if cnt >= repetition_limit:
                 print("FOUND!!")
                 stopped_on_repetition = True
                 runner.session.cancel_request(request_ids[0])
