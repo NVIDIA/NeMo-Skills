@@ -630,11 +630,17 @@ class TensorRTLLM:
             )
             self.active_requests[generation_id] = request_id
             output = _stream(**stream_kwargs)
+            print("###", output['stopped_on_repetition'])
 
         except RuntimeError as e:
             logging.error("RuntimeError: %s", e)
             # TODO: return dictionary with a proper error reporting
-            output = {"generation": f"RuntimeError: {e}", "num_generated_tokens": 10, "generation_time": 0}
+            output = {
+                "generation": f"RuntimeError: {e}",
+                "num_generated_tokens": 10,
+                "generation_time": 0,
+                "stopped_on_repetition": False,
+            }
 
         return output
 
@@ -715,6 +721,7 @@ class GenerationResponse(BaseModel):
     generation_time: Optional[int] = None
     tokens: Optional[list[str]] = None
     logprobs: Optional[list[float]] = None
+    stopped_on_repetition: Optional[bool] = None
 
 
 class GenerationResponseAsync(BaseModel):
