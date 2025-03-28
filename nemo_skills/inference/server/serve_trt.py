@@ -441,7 +441,8 @@ def _stream(
         sample_timeout = timeout + buffer_time
 
     finished_reqs = 0
-    last_seq_length = 0
+    last_seq_length_stop = 0
+    last_seq_length_rep = 0
     stopped_on_repetition = False
 
     while finished_reqs < len(request_ids):
@@ -478,13 +479,14 @@ def _stream(
 
         matching_stop_word = None
         # checking every half of the required tokens to have overlapping checks
-        if seq_length - last_seq_length >= num_tokens_to_check // 2:
+        if seq_length - last_seq_length_stop >= num_tokens_to_check // 2:
             # we are checking up to last seq length + num_tokens_to_check
             generation_suffix = output['output_ids'][
-                0, 0, max(last_seq_length - num_tokens_to_check, input_lengths[0]) : seq_length
+                0, 0, max(last_seq_length_stop - num_tokens_to_check, input_lengths[0]) : seq_length
             ]
-            suffix_length = seq_length - max(last_seq_length - num_tokens_to_check, input_lengths[0])
+            suffix_length = seq_length - max(last_seq_length_stop - num_tokens_to_check, input_lengths[0])
             out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
+            last_seq_length_stop = seq_length
             for stop_word in stop_words_list:
                 if stop_word in out_string:
                     matching_stop_word = stop_word
@@ -494,7 +496,8 @@ def _stream(
                 runner.session.cancel_request(request_ids[0])
                 break
 
-        if seq_length - last_seq_length >= repetition_check_tokens:
+        if seq_length - last_seq_length_rep >= repetition_check_tokens:
+            last_seq_length_rep = seq_length
             # detokenizing everything so far to make sure generation
             # is not corrupted by stitching partial detokenizations
             # TODO: check speed impact
@@ -510,8 +513,6 @@ def _stream(
                 stopped_on_repetition = True
                 runner.session.cancel_request(request_ids[0])
                 break
-
-        last_seq_length = seq_length
 
     out_string, out_tokens, num_generated_tokens = get_output(
         output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
