@@ -515,7 +515,6 @@ def _stream(
             cnt = full_gen_so_far[:-repetition_check_chars].count(suffix)
             print("Repetition check time:", time.time() - tm)
             if cnt >= repetition_limit:
-                print("FOUND!!")
                 stopped_on_repetition = True
                 runner.session.cancel_request(request_ids[0])
                 break
@@ -548,7 +547,6 @@ def _stream(
         'generation_time': generation_time,
         'stopped_on_repetition': stopped_on_repetition,
     }
-    print("Stopped on repetition:", stopped_on_repetition)
 
     if output_log_probs:
         result['tokens'] = out_tokens
@@ -635,7 +633,6 @@ class TensorRTLLM:
             )
             self.active_requests[generation_id] = request_id
             output = _stream(**stream_kwargs)
-            print("###", output['stopped_on_repetition'])
 
         except RuntimeError as e:
             logging.error("RuntimeError: %s", e)

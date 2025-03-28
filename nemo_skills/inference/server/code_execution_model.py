@@ -157,7 +157,6 @@ class CodeExecutionWrapper:
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
             stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
-            print("##", stopped_on_repetition, 'stopped_on_repetition' in output_dict)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
 
