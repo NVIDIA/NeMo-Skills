@@ -431,8 +431,8 @@ def _stream(
     ]
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
-    repetition_check_tokens = 500
-    repetition_check_chars = 1000
+    repetition_check_tokens = 100
+    repetition_check_chars = 200
     repetition_limit = 2  # if last 1000 chars are found 3 times, stop generation
 
     start_time = time.time()
