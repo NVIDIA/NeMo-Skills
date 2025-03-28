@@ -510,6 +510,7 @@ def _stream(
 
             suffix = full_gen_so_far[-repetition_check_chars:]
             if full_gen_so_far[:-repetition_check_chars].count(suffix) >= repetition_limit:
+                print("FOUND!!")
                 stopped_on_repetition = True
                 runner.session.cancel_request(request_ids[0])
                 break
@@ -542,6 +543,7 @@ def _stream(
         'generation_time': generation_time,
         'stopped_on_repetition': stopped_on_repetition,
     }
+    print("Stopped on repetition:", stopped_on_repetition)
 
     if output_log_probs:
         result['tokens'] = out_tokens
