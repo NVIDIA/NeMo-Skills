@@ -15,3 +15,4 @@ user: |-
   Solve the following math problem, integrating natural language reasoning with Python code executions. You may perform up to 4 Python code calls to assist your reasoning. Make sure to put the answer (and only answer) inside \boxed{{}}.
 
   {examples}{problem}
+  The answer to this problem is an integer. You need to report the answer modulo 1000. This might make it easier to solve some problems, so use this information!
