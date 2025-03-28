@@ -501,9 +501,11 @@ def _stream(
             # detokenizing everything so far to make sure generation
             # is not corrupted by stitching partial detokenizations
             # TODO: check speed impact
+            tm = time.time()
             full_gen_so_far = get_output(
                 output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
             )[0]
+            print("Detokenization time:", time.time() - tm)
             # checking for repetition
             if len(full_gen_so_far) < repetition_check_chars:
                 continue
