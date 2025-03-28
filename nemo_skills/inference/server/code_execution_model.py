@@ -119,6 +119,7 @@ class CodeExecutionWrapper:
         total_num_generated_tokens = 0
         generation_time = 0
         code_execution_time = 0
+        stopped_on_repetition = False
         # adding plus one to make sure there is always some completion after the last requested code block
         for generation_index in range(self.config.max_code_executions + 1):
 
@@ -154,6 +155,8 @@ class CodeExecutionWrapper:
                 output_dict = self.model._generate_single(**request)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+            # no need to do anything with this as the code below should just exit, so that's only for logging
+            stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
 
@@ -197,6 +200,7 @@ class CodeExecutionWrapper:
             'total_num_generated_tokens': total_num_generated_tokens,
             'generation_time': generation_time,
             'code_execution_time': code_execution_time,
+            'stopped_on_repetition': stopped_on_repetition,
         }
 
     # TODO: is there a way to reuse this with BaseModel?
