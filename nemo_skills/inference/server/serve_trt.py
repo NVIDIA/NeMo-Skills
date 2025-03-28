@@ -431,8 +431,8 @@ def _stream(
     ]
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
-    repetition_check_tokens = 100
-    repetition_check_chars = 200
+    repetition_check_tokens = 500
+    repetition_check_chars = 1500
     repetition_limit = 2  # if last 1000 chars are found 3 times, stop generation
 
     start_time = time.time()
@@ -500,20 +500,15 @@ def _stream(
             last_seq_length_rep = seq_length
             # detokenizing everything so far to make sure generation
             # is not corrupted by stitching partial detokenizations
-            # TODO: check speed impact
-            tm = time.time()
             full_gen_so_far = get_output(
                 output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
             )[0]
-            print("Detokenization time:", time.time() - tm)
             # checking for repetition
             if len(full_gen_so_far) < repetition_check_chars:
                 continue
 
             suffix = full_gen_so_far[-repetition_check_chars:]
-            tm = time.time()
             cnt = full_gen_so_far[:-repetition_check_chars].count(suffix)
-            print("Repetition check time:", time.time() - tm)
             if cnt >= repetition_limit:
                 stopped_on_repetition = True
                 runner.session.cancel_request(request_ids[0])
