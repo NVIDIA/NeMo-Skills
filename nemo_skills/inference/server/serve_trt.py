@@ -431,15 +431,19 @@ def _stream(
     ]
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
+    repetition_check_tokens = 500
+    repetition_check_chars = 1000
+    repetition_limit = 4  # if last 1000 chars are found 4 times, stop generation
 
     start_time = time.time()
     sample_timeout = timeout
     if buffer_time:
         sample_timeout = timeout + buffer_time
 
-    idx = 0
     finished_reqs = 0
     last_seq_length = 0
+    stopped_on_repetition = False
+
     while finished_reqs < len(request_ids):
         multi_responses = runner.session.await_responses(request_ids)
         responses = [response for responses in multi_responses for response in responses]
@@ -474,28 +478,40 @@ def _stream(
 
         matching_stop_word = None
         # checking every half of the required tokens to have overlapping checks
-        if seq_length - last_seq_length < num_tokens_to_check // 2:
-            continue
+        if seq_length - last_seq_length >= num_tokens_to_check // 2:
+            # we are checking up to last seq length + num_tokens_to_check
+            generation_suffix = output['output_ids'][
+                0, 0, max(last_seq_length - num_tokens_to_check, input_lengths[0]) : seq_length
+            ]
+            suffix_length = seq_length - max(last_seq_length - num_tokens_to_check, input_lengths[0])
+            out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
+            for stop_word in stop_words_list:
+                if stop_word in out_string:
+                    matching_stop_word = stop_word
+                    break
 
-        # we are checking up to last seq length + num_tokens_to_check
-        generation_suffix = output['output_ids'][
-            0, 0, max(last_seq_length - num_tokens_to_check, input_lengths[0]) : seq_length
-        ]
-        suffix_length = seq_length - max(last_seq_length - num_tokens_to_check, input_lengths[0])
-        out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
-        # print(suffix_length, seq_length, last_seq_length, num_tokens_to_check, "$$", out_string)
-        # print(generation_suffix.shape)
-        last_seq_length = seq_length
-        for stop_word in stop_words_list:
-            if stop_word in out_string:
-                matching_stop_word = stop_word
+            if matching_stop_word is not None:
+                runner.session.cancel_request(request_ids[0])
                 break
 
-        if matching_stop_word is not None:
-            runner.session.cancel_request(request_ids[0])
-            break
+        if seq_length - last_seq_length >= repetition_check_tokens:
+            # detokenizing everything so far to make sure generation
+            # is not corrupted by stitching partial detokenizations
+            # TODO: check speed impact
+            full_gen_so_far = get_output(
+                output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
+            )[0]
+            # checking for repetition
+            if len(full_gen_so_far) < repetition_check_chars:
+                continue
 
-        idx += 1
+            suffix = full_gen_so_far[-repetition_check_chars:]
+            if full_gen_so_far[:-repetition_check_chars].count(suffix) >= repetition_limit:
+                stopped_on_repetition = True
+                runner.session.cancel_request(request_ids[0])
+                break
+
+        last_seq_length = seq_length
 
     out_string, out_tokens, num_generated_tokens = get_output(
         output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
@@ -509,7 +525,6 @@ def _stream(
             matching_stop_word = stop_word
             break
     if matching_stop_word is not None:
-        out_string_old = out_string
         out_string = trim_after_stop_phrases(out_string, stop_words_list)
         # adding it back, since we only need to remove what's *after* the stop phrase
         out_string += matching_stop_word
@@ -524,6 +539,7 @@ def _stream(
         'generation': out_string,
         'num_generated_tokens': num_generated_tokens,
         'generation_time': generation_time,
+        'stopped_on_repetition': stopped_on_repetition,
     }
 
     if output_log_probs:
