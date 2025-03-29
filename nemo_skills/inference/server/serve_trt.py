@@ -420,7 +420,7 @@ def _stream(
     timeout=None,
     buffer_time=None,
     is_draft_target_model: bool = False,
-    repetition_check_chars: int = 1500,
+    repetition_check_chars: int = 500,
     repetition_limit: int = 2,
 ):
     if stop_words_list is None:
@@ -433,7 +433,7 @@ def _stream(
     ]
     # checking the last 20 tokens for stop words
     num_tokens_to_check = 20
-    repetition_check_tokens = 500
+    repetition_check_tokens = 200
 
     start_time = time.time()
     sample_timeout = timeout
@@ -877,7 +877,7 @@ def main():
     )
     parser.add_argument("--disable_chunked_context", action="store_true", help="Disable chunked context")
     parser.add_argument(
-        "--repetition_check_chars", type=int, default=1500, help="Number of characters to check for repetition"
+        "--repetition_check_chars", type=int, default=500, help="Number of characters to check for repetition"
     )
     parser.add_argument(
         "--repetition_limit", type=int, default=2, help="Repetition limit: stops generation if exceeded"
