@@ -119,7 +119,7 @@ class Sandbox(abc.ABC):
         self.host = host
         self.port = port
         session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=100, pool_connections=100, max_retries=3)
         session.mount('http://', adapter)
         session.mount('https://', adapter)
         self.http_session = session

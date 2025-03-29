@@ -564,7 +564,7 @@ class TensorRTLLM:
 
         self.active_generations = {}
         self.active_requests = {}
-        self.executor = ThreadPoolExecutor(max_workers=1024)
+        self.executor = ThreadPoolExecutor(max_workers=32)
 
     def get_output(
         self,

@@ -76,7 +76,7 @@ class BaseModel(abc.ABC):
         else:
             # TODO: switch to httpx
             session = requests.Session()
-            adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
+            adapter = requests.adapters.HTTPAdapter(pool_maxsize=100, pool_connections=100, max_retries=3)
             session.mount('http://', adapter)
             session.mount('https://', adapter)
             self.requests_lib = session
@@ -84,7 +84,7 @@ class BaseModel(abc.ABC):
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
 
-        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+        self.executor = ThreadPoolExecutor(max_workers=32)  # is this too much?
 
     @abc.abstractmethod
     def _generate_single(

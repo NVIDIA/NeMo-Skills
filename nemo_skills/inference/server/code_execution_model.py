@@ -48,7 +48,7 @@ class CodeExecutionWrapper:
         self.gen_id_to_future = {}
         self.cancelled_gen_ids = set()  # Track cancelled generation IDs
 
-        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+        self.executor = ThreadPoolExecutor(max_workers=32)  # is this too much?
 
         if hasattr(model, '_generate_single_async') and hasattr(model, 'cancel_generations'):
             self._can_cancel_generations = True
