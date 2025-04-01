@@ -187,11 +187,11 @@ class DAPOPPOVerlTask:
     # RUNTIME_ENV = f"{WORKING_DIR}/verl/trainer/runtime_env.yaml"
     NNODES: int = 16
     # Paths
-    RAY_DATA_HOME=f"/lustre/fsw/portfolios/llmservice/users/georgea/dapo"
+    RAY_DATA_HOME: str = f"/lustre/fsw/portfolios/llmservice/users/georgea/dapo"
     MODEL_PATH: str = f"/hf_models/Qwen2.5-32B"
     CKPTS_DIR: str = f"{RAY_DATA_HOME}/ckpts/{project_name}/{exp_name}"
-    TRAIN_FILE=f"{RAY_DATA_HOME}/data/dapo-math-17k.parquet"
-    TEST_FILE=f"{RAY_DATA_HOME}/data/aime-2024.parquet"
+    TRAIN_FILE: str = f"{RAY_DATA_HOME}/data/dapo-math-17k.parquet"
+    TEST_FILE: str = f"{RAY_DATA_HOME}/data/aime-2024.parquet"
 
     # Algorithm
     ## Train
@@ -372,7 +372,9 @@ def get_training_cmd(
             project_name=wandb_project,
             NNODES=num_nodes,
             MODEL_PATH=hf_model,
-            CKPTS_DIR=f"{output_dir}/ckpts/{wandb_project}/{expname}"
+            TRAIN_FILE=prompt_data,
+            CKPTS_DIR=f"{output_dir}/ckpts/{wandb_project}/{expname}",
+            **{'TEST_FILE': eval_data} if eval_data else {},
         )
 
     else:
