@@ -162,6 +162,7 @@ class DAPOPPOVerlTask:
 
     kl_coef: float = 0.0
     kl_loss_coef: float = 0.0
+    gpu_memory_utilization: float = 0.7
 
     clip_ratio_low = 0.2
     clip_ratio_high = 0.28
@@ -195,7 +196,8 @@ class DAPOPPOVerlTask:
     # Algorithm
     ## Train
     max_prompt_length=1024 * 2
-    max_response_length=1024 * 20
+    # max_response_length=1024 * 20
+    max_response_length=1024 * 8
     ## Validation
     val_top_k=-1 # 0 for HF rollout, -1 for vLLM rollout
 
@@ -206,7 +208,8 @@ class DAPOPPOVerlTask:
     actor_ppo_max_token_len=max_prompt_length + max_response_length
     infer_ppo_max_token_len=max_prompt_length + max_response_length
     offload=True
-    gen_tp=4
+    # gen_tp=4
+    gen_tp=2
 
     def get_ray_launch_cmd(self):
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
@@ -253,7 +256,7 @@ class DAPOPPOVerlTask:
             f'actor_rollout_ref.actor.grad_clip=1.0 '
             f'actor_rollout_ref.actor.use_token_level_loss={self.use_token_level_loss} '
             f'actor_rollout_ref.actor.ulysses_sequence_parallel_size={self.sp_size} '
-            f'actor_rollout_ref.rollout.gpu_memory_utilization=0.80 '
+            f'actor_rollout_ref.rollout.gpu_memory_utilization={self.gpu_memory_utilization} '
             f'actor_rollout_ref.rollout.tensor_model_parallel_size={self.gen_tp} '
             f'actor_rollout_ref.rollout.enable_chunked_prefill=True '
             f'actor_rollout_ref.rollout.max_num_batched_tokens={self.max_prompt_length + self.max_response_length} '
@@ -317,8 +320,9 @@ class DAPOPPOVerlTask:
         preamble_cmd = self.get_preamble_cmd()
 
         cmd = (
+            # f"export RAY_USE_MULTIPROCESSING_CPU_COUNT=1 && "
             f"export HYDRA_FULL_ERROR=1 && "
-            # f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
+            f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
             f"cd /nemo_run/code && "
             f"{preamble_cmd} && "
