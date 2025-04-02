@@ -15,19 +15,24 @@
 import argparse
 import json
 from pathlib import Path
+
 from datasets import load_dataset
 from tqdm import tqdm
 
 
 def format_entry(entry):
     category = entry['category'].replace(" ", "_")  # Fix computer science category
-    return {
-        "question": entry['question'],
-        "options": "\n".join(f"{chr(65 + i)}. {option}" for i, option in enumerate(entry['options'])),
+
+    new_entry = {
+        "problem": entry['question'],
+        "options": "\n".join(f"{chr(ord('A') + i)}. {option}" for i, option in enumerate(entry['options'])),
         "expected_answer": entry['answer'],
         "examples_type": f'mmlu_pro_few_shot_{category}',
         "subset_for_metrics": category,
     }
+    new_entry['problem'] += '\n' + new_entry['options']
+
+    return new_entry
 
 
 def write_data_to_file(output_file, data):

@@ -84,6 +84,7 @@ subcategories = {
     "world_religions": ["philosophy"],
 }
 
+
 def read_csv_files_from_tar(tar_file_path, split):
     result = {}
 
@@ -139,6 +140,11 @@ def save_data(split):
     for subject, questions in original_data.items():
         for question in questions:
             new_entry = question
+            new_entry['subtopic'] = subject
+            new_entry['problem'] = new_entry.pop('question')
+            new_entry['options'] = "\n".join(f"{chr(ord('A') + i)}. {new_entry[chr(ord('A') + i)]}" for i in range(4))
+            new_entry['problem'] += '\n' + new_entry['options']
+
             new_entry['subset_for_metrics'] = subcategories[subject][0]
             data.append(new_entry)
 

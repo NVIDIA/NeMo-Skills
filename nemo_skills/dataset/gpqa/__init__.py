@@ -15,11 +15,9 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = 'generic/multichoice-zero-shot'
-DATASET_GROUP = 'multichoice'
-METRICS_TYPE = 'multichoice'  
-DEFAULT_EVAL_ARGS = (
-    "++eval_type=multichoice "
-)
+PROMPT_CONFIG = "generic/general-boxed"
+DATASET_GROUP = "multichoice"
+METRICS_TYPE = "multichoice"
+DEFAULT_EVAL_ARGS = "++eval_type=math"
 
 DEFAULT_GENERATION_ARGS = "++split=diamond"
