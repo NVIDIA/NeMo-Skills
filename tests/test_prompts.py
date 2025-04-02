@@ -796,41 +796,6 @@ Here is the problem you need to solve:
     assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
 
 
-def test_generic_multichoice_prompt():
-    prompt = get_prompt('generic/multichoice-zero-shot', 'default-base')
-
-    expected_prompt = """Given the following question and four candidate answers (A, B, C and D), choose the best answer.
-
-Question: How are you?
-A. Good
-B. Bad
-C. And you?
-D. 42
-
-- For simple problems:
-Directly provide the answer with minimal explanation.
-
-- For complex problems:
-Use this step-by-step format:
-## Step 1: [Concise description]
-[Brief explanation]
-## Step 2: [Concise description]
-[Brief explanation]
-## Step 3: [Concise description]
-[Brief explanation]
-Continue as needed.
-
-Regardless of the approach, always conclude with:
-The final answer is [the_answer_letter].
-where the [the_answer_letter] is one of A, B, C or D.
-
-Let's think step by step."""
-    assert (
-        prompt.fill({'question': 'How are you?', 'A': 'Good', 'B': 'Bad', 'C': 'And you?', 'D': '42'})
-        == expected_prompt
-    )
-
-
 def test_llama3_instruct_math_prompt():
     prompt = get_prompt('llama3-instruct/math', 'llama3-instruct-nosys')
 
@@ -1215,89 +1180,17 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
     )
 
 
-def test_mmlu_pro_few_shot_prompt():
-    prompt = get_prompt('generic/mmlu-pro-few-shot', "llama3-instruct", 'mmlu_pro_few_shot_other')
+def test_generic_general_boxed_prompt():
+    prompt = get_prompt('generic/general-boxed', 'llama3-instruct')
+
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
-The following are multiple choice questions (with answers) about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
+Solve the following problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
-Question: As of 2017, how many of the world’s 1-year-old children today have been vaccinated against some disease? *
-Options: A. 30%
-B. 60%
-C. 10%
-D. 90%
-E. 80%
-F. 40%
-G. 100%
-H. 50%<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-Answer: Let's think step by step. We refer to Wikipedia articles on global facts for help. According to data published by the World Health Organization, the nummber of 1-year-old children vaccinated in 2017 exceeds 80%. The answer is (E).<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-
-Question: Which one of the following items is an example of nonmaterial culture?
-Options: A. A dove feather
-B. Dove symbol
-C. Dove body lotion
-D. Dove deodorant
-E. Dove soap
-F. Dove candy bar
-G. Dove conditioner
-H. A dove (bird).
-I. Dove chocolate
-J. Dove shampoo<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-Answer: Let's think step by step. We refer to Wikipedia articles on geography for help. Nonmaterial culture consists of cultural ideas, beliefs or symbols that are not physical objects. The answer is (B).<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-
-Question: Which of the following cases established the precedent that a defendant must be informed of the right to remain silent, the right to a lawyer, and protection from self-incrimination?
-Options: A. Brown v. Board of Education
-B. Miranda v. Arizona
-C. Roe v. Wade
-D. Betts v. Brady
-E. Plessy v. Ferguson
-F. Dred Scott v. Sandford
-G. Weeks v. United States
-H. Gideon v. Wainwright
-I. Marbury v. Madison
-J. Mapp v. Ohio<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-Answer: Let's think step by step. We refer to Wikipedia articles on government and politics for help. In the landmark Miranda v. Arizona in 1966, the US Supreme Court, based on the Fifth and Sixth Amendment of the US Constitution, guaranteed a defendant's right to an attorney and protection from self-incrimination. The answer is (B).<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-
-Question: A woman who knows she has active herpes and untreated syphilis but continues to have sex without informing her partners of her condition has, in psychoanalytic terms:
-Options: A. a weak conscious mind
-B. a strong conscious mind
-C. a weak id
-D. a weak ego
-E. a weak unconscious mind
-F. a strong id
-G. a strong ego
-H. a strong superego
-I. a strong preconscious mind
-J. a weak superego<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-Answer: Let's think step by step. We refer to Wikipedia articles on human sexuality for help. A person with weak superego tends to be delinquent, criminal or have antisocial personality. The action of the woman who knows she has active venereal disease but still have sex with her partners indicate she may has antisocial personality. The answer is (J).<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-
-Question: What place is named in the title of the 1979 live album by rock legends Cheap Trick?
-Options: A. Brooklyn
-B. Beijing
-C. Budapest
-D. Boston
-E. Bhutan
-F. Barcelona
-G. Britain
-H. Brisbane
-I. Bruges
-J. Budokan<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-Answer: Let's think step by step. We refer to Wikipedia for help. Nippon Budokan is an indoor arena in Tokyo, Japan renowned for hosting rock music concerts including Cheap Trick in 1978. 'Cheap Trick at Budokan' became the name of their album. The answer is (J).<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-
-Question: What is the square root of 81 squared?
-Options: A. 9^2
+What is the square root of 81 squared?
+A. 9^2
 B. 27
 C. 81^2
 D. 729
@@ -1309,13 +1202,15 @@ I. 81
 J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    inputs = {
-        'question': "What is the square root of 81 squared?",
-        'options': "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
-        "subset_for_metrics": "other",
-    }
-    print(prompt.fill(inputs))
-    assert prompt.fill(inputs) == expected_prompt
+    assert (
+        prompt.fill(
+            {
+                'problem': 'What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9'
+            }
+        )
+        == expected_prompt
+    )
+
 
 def test_mmlu_pro_zero_shot_prompt():
     prompt = get_prompt('generic/mmlu-pro-zero-shot', "llama3-instruct")
@@ -1325,8 +1220,8 @@ def test_mmlu_pro_zero_shot_prompt():
 
 The following is a multiple choice question about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
 
-Question: What is the square root of 81 squared?
-Options: A. 9^2
+What is the square root of 81 squared?
+A. 9^2
 B. 27
 C. 81^2
 D. 729
@@ -1340,12 +1235,12 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
 
     inputs = {
-        'question': "What is the square root of 81 squared?",
-        'options': "A. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
+        "problem": "What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
         "subset_for_metrics": "other",
     }
     print(prompt.fill(inputs))
     assert prompt.fill(inputs) == expected_prompt
+
 
 def test_nat_to_lean4_prompt():
     prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
