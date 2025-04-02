@@ -220,7 +220,7 @@ class GenerationTask:
             )
 
     def setup_llm(self):
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] != "openai":
+        if self.cfg.prompt_template is None and self.cfg.server["server_type"] not in ["openai", "azureopenai"]:
             with open_dict(self.cfg.server):
                 self.cfg.server["server_type"] = "openai"
                 self.cfg.server["model"] = "model"

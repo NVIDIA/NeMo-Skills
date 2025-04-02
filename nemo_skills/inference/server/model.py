@@ -732,6 +732,126 @@ class OpenAIModel(BaseModel):
         return model_name
 
 
+class AzureOpenAIModel(OpenAIModel, BaseModel):
+    def __init__(
+        self,
+        host: str = '127.0.0.1',
+        port: str = '5000',
+        model=None,
+        base_url=None,
+        api_key=None,
+        api_version="2024-12-01-preview",
+        **kwargs,
+    ):
+        BaseModel.__init__(self, **kwargs)
+
+        from openai import AzureOpenAI
+
+        if model is None:
+            model = os.getenv("NEMO_SKILLS_AZURE_OPENAI_MODEL")
+            if model is None:
+                raise ValueError("model argument is required for OpenAI model.")
+
+        if base_url is None:
+            # if not provided, we assume it's served on host/port
+            base_url = os.getenv("NEMO_SKILLS_AZURE_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
+
+        if api_key is None:
+            if base_url is not None and 'api.nvidia.com' in base_url:
+                api_key = os.getenv("NVIDIA_API_KEY", api_key)
+                if not api_key:
+                    raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
+            elif base_url is not None and 'api.openai.com' in base_url:
+                api_key = os.getenv("AZURE_OPENAI_API_KEY", api_key)
+                if not api_key:
+                    raise ValueError("AZURE_OPENAI_API_KEY is required for OpenAI models.")
+
+        self.client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=base_url)
+        self.model = model
+        if self.model == "model":  # that's a placeholder, so trying to find real name
+            self.model = self.get_model_name_from_server()
+
+    def _generate_single(
+        self,
+        prompt: dict,
+        tokens_to_generate: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        repetition_penalty: float,
+        random_seed: int,
+        stop_phrases: list[str],
+        top_logprobs: int | None = None,
+    ) -> str:
+        if top_k != 0:
+            raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
+        if min_p > 0:
+            raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
+        if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
+            raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
+        if temperature != 1:
+            temperature = 1
+            LOG.warning("Temperature for AzureOPenAI models is set to 1.")
+        if top_p:
+            LOG.warning("Top-p is not used for AzureOPenAI models.")
+        if repetition_penalty:
+            LOG.warning("Repetition_penalty is not used for AzureOPenAI models.")
+        if stop_phrases:
+            LOG.warning("Stop_phrases are not used for AzureOPenAI models.")
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                temperature=temperature,
+                max_completion_tokens=tokens_to_generate,
+                seed=random_seed,
+                messages=prompt,
+                logprobs=top_logprobs is not None,
+                top_logprobs=top_logprobs,
+            )
+        except openai.BadRequestError as e:
+            # this likely only works for Nvidia-hosted models
+            msg = e.body['message']
+            # expected message:
+            # This model's maximum context length is N tokens.
+            # However, you requested X tokens (Y in the messages, Z in the completion).
+            # Please reduce the length of the messages or completion.
+            if msg.startswith("This model's maximum context length is"):
+                numbers = re.findall(r"\d+", msg)
+                max_tokens = int(numbers[0]) - int(numbers[2])
+                LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    temperature=1,
+                    max_completion_tokens=max_tokens,
+                    seed=random_seed,
+                    messages=prompt,
+                    logprobs=top_logprobs is not None,
+                    top_logprobs=top_logprobs,
+                )
+            else:
+                raise
+        except AttributeError:
+            # sometimes response is a string?
+            LOG.error("Unexpected response from OpenAI API: %s", response)
+            raise
+
+        choice = response.choices[0]
+        output = choice.message.content
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
+            result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+
+        return result
+
+
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -854,6 +974,7 @@ models = {
     'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
+    'azureopenai': AzureOpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,  # interface is the same
 }
