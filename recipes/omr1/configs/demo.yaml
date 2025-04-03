@@ -1,0 +1,12 @@
+cluster: local
+
+# this is really .jsonl, but we gitignore it, so changing extension
+input_file: /nemo_run/code/recipes/omr1/configs/example-data.txt
+
+output_dir: /workspace/omr1-demo
+expname: omr1-demo
+
+problem_sdg:
+  model: meta/llama-3_3-70b-instruct
+  server_type: openai
+  server_address: https://integrate.api.nvidia.com/v1

@@ -22,9 +22,16 @@ from typing import List, Optional
 import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_free_port,
+    get_ray_server_cmd,
+    get_timeout,
+    run_exp,
+)
 from nemo_skills.pipeline.verl import verl_app
 from nemo_skills.utils import setup_logging
 
@@ -231,8 +238,8 @@ def ppo_verl(
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     final_ckpt_path: str = typer.Option(None, help="Where to put the final checkpoint"),
     convert_last_ckpt_to_hf: bool = typer.Option(
-            False,
-            help="If True, will convert the final checkpoint to hf format and place in final_ckpt_path (or output_dir/final_hf_checkpoint if not specified) "
+        False,
+        help="If True, will convert the final checkpoint to hf format and place in final_ckpt_path (or output_dir/final_hf_checkpoint if not specified) ",
     ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"

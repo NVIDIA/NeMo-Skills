@@ -13,6 +13,16 @@
 # limitations under the License.
 
 from nemo_skills.pipeline.app import wrap_arguments
+from nemo_skills.pipeline.cli import (
+    check_contamination,
+    convert,
+    eval,
+    generate,
+    run_cmd,
+    start_server,
+    summarize_results,
+    train,
+)
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-import os
 import logging
+import os
 import subprocess
 from collections import defaultdict
 from enum import Enum
@@ -23,14 +23,18 @@ import nemo_run as run
 import typer
 
 from nemo_skills.inference.generate import GenerationTask
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
     get_free_port,
+    get_generation_command,
     get_reward_server_command,
     get_server_command,
     get_tunnel,
     get_unmounted_path,
+    run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
@@ -74,7 +78,9 @@ def get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix="
     file_map = {}
     for seed in random_seeds:
         for chunk_id in chunk_ids:
-            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix)
+            output_file = get_chunked_rs_filename(
+                output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix
+            )
             file_map[(seed, chunk_id)] = f"{output_file}.done"
     return file_map
 
@@ -163,7 +169,7 @@ def get_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.generate',
-    output_prefix: str ="output",
+    output_prefix: str = "output",
 ):
     """
     Construct the generation command for language model inference.
@@ -174,7 +180,11 @@ def get_cmd(
     """
 
     # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
+    output_file = get_chunked_rs_filename(
+        output_dir=output_dir,
+        random_seed=random_seed,
+        output_prefix=output_prefix,
+    )
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
 
     if random_seed is not None:
@@ -187,7 +197,9 @@ def get_cmd(
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix)
+        output_file = get_chunked_rs_filename(
+            output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix
+        )
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
@@ -201,7 +213,9 @@ def get_cmd(
             postprocess_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix)
+        merged_output_file = get_chunked_rs_filename(
+            output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix
+        )
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
@@ -416,7 +430,9 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    output_prefix: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
+    output_prefix: str = typer.Option(
+        "output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
+    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",

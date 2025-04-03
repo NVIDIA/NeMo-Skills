@@ -27,5 +27,16 @@ the dataset by e.g. running
 mv raw_aops_data.jsonl raw_aops_data_full.jsonl && head -n 1000 raw_aops_data_full.jsonl > raw_aops_data.jsonl
 ```
 
-## Problem extraction
+## Problem generation
+
+For all the following commands we assume that your data is available under `/workspace/omr1-recipe/raw_aops_data.jsonl`.
+`/workspace` should be mounted in your [cluster config](/docs/basics/prerequisites.md#cluster-configs) and data uploaded
+on cluster if you're not running locally. We also assume that you have `/trt_models` mounted in your cluster config and
+[Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) is available at `/trt_models/qwen2.5-32b-instruct`.
+You can follow instructions in [checkpoint conversion](/docs/pipelines/checkpoint-conversion.md) to learn how to build
+TensorRT-LLM checkpoint or change code in `pipeline.py` to replace server with `vllm` or `sglang`.
+
+You can override all of the above through the arguments of `scripts/pipeline.py`.
+
+### Problem extraction
 
