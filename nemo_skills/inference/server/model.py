@@ -792,13 +792,13 @@ class AzureOpenAIModel(OpenAIModel, BaseModel):
             raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
         if temperature != 1:
             temperature = 1
-            LOG.warning("Temperature for AzureOPenAI models is set to 1.")
+            LOG.info("Temperature for AzureOpenAI models is set to 1.")
         if top_p:
-            LOG.warning("Top-p is not used for AzureOPenAI models.")
+            LOG.info("Top-p is not used for AzureOpenAI models.")
         if repetition_penalty:
-            LOG.warning("Repetition_penalty is not used for AzureOPenAI models.")
+            LOG.info("Repetition_penalty is not used for AzureOpenAI models.")
         if stop_phrases:
-            LOG.warning("Stop_phrases are not used for AzureOPenAI models.")
+            LOG.info("Stop_phrases are not used for AzureOpenAI models.")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
