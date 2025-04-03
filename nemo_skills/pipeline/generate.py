@@ -441,6 +441,7 @@ def generate(
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
+    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
 ):
     """Generate LLM completions for a given input file.
 
@@ -569,7 +570,7 @@ def generate(
                         partition=partition,
                         time_min=time_min,
                         server_config=server_config,
-                        with_sandbox=True,
+                        with_sandbox=sandbox,
                         sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
                         reuse_code=reuse_code,

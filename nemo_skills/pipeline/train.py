@@ -200,7 +200,7 @@ def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
     if average_steps is not None:
         average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else ''
         entrypoint = "nemo_skills.training.average_checkpoints"
-        name = "model" + ("-".join(average_steps[len('--steps '):].split()) if average_steps else '') + "-averaged"
+        name = "model" + ("-".join(average_steps[len('--steps ') :].split()) if average_steps else '') + "-averaged"
     else:
         entrypoint = "nemo_skills.training.copy_checkpoint"
         name = "model-last"
@@ -254,7 +254,7 @@ def train(
     config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
-    with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
+    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
@@ -263,9 +263,9 @@ def train(
         "If None, skip prepare eval stage.",
     ),
     save_last_ckpt: bool = typer.Option(
-            False,
-            help="If True, will save the final nemo checkpoint to final_nemo_path. "
-                 "average_steps has to be disabled to use this.",
+        False,
+        help="If True, will save the final nemo checkpoint to final_nemo_path. "
+        "average_steps has to be disabled to use this.",
     ),
     server_model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
@@ -416,7 +416,7 @@ def train(
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
-                with_sandbox=with_sandbox,
+                with_sandbox=sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,

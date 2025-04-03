@@ -43,9 +43,7 @@ def start_server(
     server_args: str = typer.Option("", help="Additional arguments for the server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    with_sandbox: bool = typer.Option(
-        False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
-    ),
+    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
@@ -92,7 +90,7 @@ def start_server(
             partition=partition,
             time_min=time_min,
             server_config=server_config,
-            with_sandbox=with_sandbox,
+            with_sandbox=sandbox,
             sandbox_port=None if get_random_port else 6000,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )

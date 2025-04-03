@@ -20,7 +20,7 @@ import yaml
 from nemo_skills.pipeline import check_contamination, convert, eval, generate, run_cmd, train, wrap_arguments
 
 
-def extract_problems(input_file, output_dir, cluster, extra_args, expname, run_after=None, **generate_kwargs):
+def extract_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
@@ -43,8 +43,8 @@ def extract_problems(input_file, output_dir, cluster, extra_args, expname, run_a
     return f"{output_dir}/extracted-problems.jsonl", expname
 
 
-def classify_problems(input_file, output_dir, cluster, extra_args, expname, run_after=None, **generate_kwargs):
-    for mode in ['proof', 'multiple', 'yes-or-no', 'valid']:
+def classify_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
+    for mode in ['proof', 'mcq', 'yes-or-no', 'valid']:
         postprocess_cmd = (
             f"python /nemo_run/code/recipes/omr1/scripts/extract_classification.py "
             f"    {output_dir}/classify/{mode}/output.jsonl "

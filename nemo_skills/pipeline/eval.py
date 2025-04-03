@@ -176,6 +176,7 @@ def eval(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -292,7 +293,7 @@ def eval(
                 partition=partition,
                 time_min=time_min,
                 server_config=server_config,
-                with_sandbox=True,
+                with_sandbox=sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
