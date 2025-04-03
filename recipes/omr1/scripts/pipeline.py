@@ -33,7 +33,7 @@ def extract_problems(
     server_nodes=None,
 ):
     postprocess_cmd = (
-        f"python /nemo_run/code/aops-recipe/scripts/postprocess_problem_extraction.py "
+        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
         f"    {output_dir}/extracted-problems.jsonl "
     )
@@ -43,7 +43,7 @@ def extract_problems(
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/aops-recipe/prompts/forum-problem-extraction.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/forum-problem-extraction.yaml "
             f"{extra_args} "
         ),
         cluster=cluster,
