@@ -1,0 +1,119 @@
+user: |-
+  I will provide a problem statement from a math forum. Your task is to determine whether it is a valid, solvable math problem based on the given text.
+
+  Respond with 'valid math problem' if the problem meets all of the following conditions:
+
+  1. It is a well-defined math question, such as solving an equation, finding a minimum, computing an expression, or proving a result.
+  2. It contains enough information to be solved using standard mathematical techniques, even if the solution requires advanced concepts (e.g., limits, logarithms, recursion).
+  3. It is not just a conceptual or definitional question (e.g., "What does the notation  mean?" is not a valid math problem).
+  4. It does not rely on external resources such as images or missing context.
+
+  Otherwise, respond with 'invalid math problem', but only if there is a clear and strong reason why the problem cannot be solved. If you are uncertain, default to 'valid math problem'.
+  
+  Important Notes:
+
+  1. The vast majority (>99%) of problems will be valid math problems.
+
+  2. Only extremely rare cases are invalid, such as: Problems relying on external images or missing definitions. Vague or incomplete statements that cannot be interpreted mathematically. Open-ended conceptual discussions rather than problem-solving.
+
+  3. A problem is still valid even if solving it requires advanced methods like recursion, limits, or logarithms.
+
+  4. Do not evaluate whether the problem has a solution or not.
+
+  5. Do not analyze the difficulty of the problem or the methods required to solve it.
+
+  6. Only check whether it is a well-formed math problem that can be meaningfully interpreted.
+  
+  
+  
+  Here are a few examples.
+
+  Example 1
+
+  Problem:
+  Solve the equation \\(\\log(x - 2)(2x - 3) = \\log(x^2)\\).
+  
+  Output: valid
+
+
+
+  Example 2
+
+  Problem:
+  Solve the math problem found on Facebook (image provided)
+  
+  Output: not valid
+
+
+
+  Example 3
+
+  Problem:
+  Solve the following equations: $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
+
+  Output: valid
+
+
+
+  Example 4
+
+  Problem:
+  Find the area of square T?  
+  
+  Output: not valid
+
+
+
+  Example 5:
+
+  Problem:
+  Provide another example of a similar problem involving remainders and squaring a number.
+
+  Output: not valid
+
+
+
+  Example 6:
+  Problem:
+  What does the notation $\\vec{{B}}$ mean in the context of vectors?
+
+  Output: not valid
+
+
+  Example 7:
+  Problem:
+  Is there a quick way to multiply 59 and 61? If so, explain the method
+
+  Output: not valid
+
+
+
+  Example 8:
+  Problem:
+  None\n\n  (Note: There is only one problem in the given forum post.)
+
+  Output: not valid
+
+
+
+  Example 9:
+  Problem:
+  If $a+b=31$ and $ab=240$, find the sum of the reciprocals of $a$ and $b$.
+
+  Output: valid
+
+
+  Example 10:
+  Problem:
+  What is the value of $35461^54593428$ \\mod 11$?
+
+  Output: valid
+
+
+  Now here is the problem you need to extract the answer from.
+
+
+  Problem:
+  {problem}
+
+  Output:

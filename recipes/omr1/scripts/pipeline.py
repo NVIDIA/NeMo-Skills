@@ -20,26 +20,13 @@ import yaml
 from nemo_skills.pipeline import check_contamination, convert, eval, generate, run_cmd, train, wrap_arguments
 
 
-def extract_problems(
-    input_file,
-    output_dir,
-    cluster,
-    expname,
-    model,
-    server_type,
-    server_address=None,
-    prompt_template=None,
-    server_gpus=None,
-    server_nodes=None,
-):
+def extract_problems(input_file, output_dir, cluster, extra_args, expname, run_after=None, **generate_kwargs):
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
         f"    {output_dir}/extracted-problems.jsonl "
     )
-
-    extra_args = f"++prompt_template={prompt_template} " if prompt_template else ""
-
+    expname = f"{expname}-extract-problems"
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
@@ -47,16 +34,51 @@ def extract_problems(
             f"{extra_args} "
         ),
         cluster=cluster,
-        model=model,
-        server_address=server_address,
-        server_type=server_type,
-        server_gpus=server_gpus,
-        server_nodes=server_nodes,
         output_dir=f"{output_dir}/extract-problems",
         postprocess_cmd=postprocess_cmd,
-        expname=f"{expname}-extract-problems",
-        # samples_path=f'{output_dir}/extracted-problems.jsonl',
+        expname=expname,
+        run_after=run_after,
+        **generate_kwargs,
     )
+    return f"{output_dir}/extracted-problems.jsonl", expname
+
+
+def classify_problems(input_file, output_dir, cluster, extra_args, expname, run_after=None, **generate_kwargs):
+    for mode in ['proof', 'multiple', 'yes-or-no', 'valid']:
+        postprocess_cmd = (
+            f"python /nemo_run/code/recipes/omr1/scripts/extract_classification.py "
+            f"    {output_dir}/classify/{mode}/output.jsonl "
+            f"    {output_dir}/classify/{mode}/yes.jsonl "
+            f"    {output_dir}/classify/{mode}/no.jsonl "
+            f"    --mode={mode}"
+        )
+
+        expname = f"{expname}-classify-{mode}"
+        generate(
+            ctx=wrap_arguments(
+                f"++input_file={input_file} "
+                f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-if-{mode} "
+                f"{extra_args} "
+            ),
+            cluster=cluster,
+            output_dir=f"{output_dir}/classify/{mode}",
+            postprocess_cmd=postprocess_cmd,
+            expname=expname,
+            run_after=run_after,
+            **generate_kwargs,
+        )
+        run_after = expname
+        input_file = f"{output_dir}/classify/{mode}/yes.jsonl"
+
+    return input_file, expname
+
+
+stages_map = {
+    'extract-problems': extract_problems,
+    'classify-problems': classify_problems,
+}
+
+problem_sdg_stages = ['extract-problems', 'classify-problems']
 
 
 if __name__ == '__main__':
@@ -75,10 +97,26 @@ if __name__ == '__main__':
     with open(f'{Path(__file__).parents[1]}/configs/{args.mode}.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
-    extract_problems(
-        input_file=config['input_file'],
-        output_dir=config['output_dir'],
-        cluster=config['cluster'],
-        expname=config['expname'],
-        **config['problem_sdg'],
-    )
+    if args.stages == 'all':
+        stages = list(stages_map.keys())
+    elif ',' in args.stages:
+        stages = args.stages.split(',')
+    else:
+        stages = [args.stages]
+
+    for stage in stages:
+        if stage not in stages_map:
+            raise ValueError(f"Unknown stage: {stage}. Available stages: {list(stages_map.keys())}")
+
+    run_after = None
+    input_file = config['input_file']
+
+    for stage in stages:
+        input_file, run_after = stages_map[stage](
+            input_file=input_file,
+            output_dir=config['output_dir'],
+            cluster=config['cluster'],
+            expname=config['expname'],
+            run_after=run_after,
+            **config['problem_sdg'] if stage in problem_sdg_stages else config['solution_sdg'],
+        )
