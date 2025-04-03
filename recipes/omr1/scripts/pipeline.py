@@ -24,7 +24,7 @@ def extract_problems(input_file, output_dir, cluster, expname, run_after=None, e
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
-        f"    {output_dir}/extracted-problems.jsonl "
+        f"    {output_dir}/extract-problems/extracted-problems.jsonl "
     )
     expname = f"{expname}-extract-problems"
     generate(
@@ -40,7 +40,7 @@ def extract_problems(input_file, output_dir, cluster, expname, run_after=None, e
         run_after=run_after,
         **generate_kwargs,
     )
-    return f"{output_dir}/extracted-problems.jsonl", expname
+    return f"{output_dir}/extract-problems/extracted-problems.jsonl", expname
 
 
 def classify_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
