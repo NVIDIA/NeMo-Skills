@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("input_file", help="Path to the input JSONL file")
     parser.add_argument("output_file_yes", help="Path to the output JSONL file")
     parser.add_argument("output_file_no", help="Path to the output JSONL file")
-    parser.add_argument("--mode", choices=['proof', 'yes-or-no', 'mcq', 'valid'], required=True)
+    parser.add_argument("--mode", required=True, help="Classification mode")
 
     args = parser.parse_args()
 

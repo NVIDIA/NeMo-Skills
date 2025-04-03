@@ -44,7 +44,7 @@ def extract_problems(input_file, output_dir, cluster, expname, run_after=None, e
 
 
 def classify_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
-    for mode in ['proof', 'mcq', 'yes-or-no', 'valid']:
+    for mode in ['proof', 'mcq', 'binary', 'invalid']:
         postprocess_cmd = (
             f"python /nemo_run/code/recipes/omr1/scripts/extract_classification.py "
             f"    {output_dir}/classify/{mode}/output.jsonl "
@@ -53,7 +53,6 @@ def classify_problems(input_file, output_dir, cluster, expname, run_after=None, 
             f"    --mode={mode}"
         )
 
-        expname = f"{expname}-classify-{mode}"
         generate(
             ctx=wrap_arguments(
                 f"++input_file={input_file} "
@@ -63,12 +62,12 @@ def classify_problems(input_file, output_dir, cluster, expname, run_after=None, 
             cluster=cluster,
             output_dir=f"{output_dir}/classify/{mode}",
             postprocess_cmd=postprocess_cmd,
-            expname=expname,
+            expname=f"{expname}-classify-{mode}",
             run_after=run_after,
             **generate_kwargs,
         )
-        run_after = expname
-        input_file = f"{output_dir}/classify/{mode}/yes.jsonl"
+        run_after = f"{expname}-classify-{mode}"
+        input_file = f"{output_dir}/classify/{mode}/no.jsonl"
 
     return input_file, expname
 
