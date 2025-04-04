@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from nemo_skills.pipeline import check_contamination, convert, eval, generate, run_cmd, train, wrap_arguments
+from nemo_skills.pipeline import check_contamination, generate, run_cmd, wrap_arguments
 
 
 def extract_problems(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
@@ -197,7 +197,7 @@ stages_map = {
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='OpenMathReasoning-1 pipeline')
+    parser = argparse.ArgumentParser(description='OpenMathReasoning-1 problem generation pipeline')
     parser.add_argument(
         '--mode',
         type=str,
@@ -205,7 +205,13 @@ if __name__ == '__main__':
         choices=['demo', 'full'],
         help="Will pick a corresponding config from configs folder",
     )
-    parser.add_argument('--stages', type=str, help='Pipeline stages to run', default='all')
+    parser.add_argument(
+        '--stages',
+        type=str,
+        help='Pipeline stages to run. '
+        'Can specify all, or any subset of stages (comma-separated if want to run multiple)',
+        default='all',
+    )
 
     args = parser.parse_args()
 
@@ -223,14 +229,16 @@ if __name__ == '__main__':
         if stage not in stages_map:
             raise ValueError(f"Unknown stage: {stage}. Available stages: {list(stages_map.keys())}")
 
-    run_after = None
-    input_file = config['input_file']
+    input_file = config['problem_sdg']['input_file']
     default_args = dict(
-        output_dir=config['output_dir'], cluster=config['cluster'], expname=config['expname'], **config['problem_sdg']
+        output_dir=config['output_dir'],
+        cluster=config['cluster'],
+        expname=config['expname'],
+        **config['problem_sdg']['generation'],
     )
 
     for stage in stages:
         stage_args = default_args.copy()
         if stage == 'extract_problems':
-            stage_args['input_file'] = config['input_file']
+            stage_args['input_file'] = input_file
         stages_map[stage](**stage_args)

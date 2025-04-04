@@ -1,12 +1,23 @@
 cluster: local
 
-# this is really .jsonl, but we gitignore it, so changing extension
-input_file: /nemo_run/code/recipes/omr1/configs/example-data.txt
-
 output_dir: /workspace/omr1-demo
 expname: omr1-demo
 
 problem_sdg:
-  model: meta/llama-3.3-70b-instruct
-  server_type: openai
-  server_address: https://integrate.api.nvidia.com/v1
+  # this is really .jsonl, but we gitignore it, so changing extension
+  input_file: /nemo_run/code/recipes/omr1/configs/example-data.txt
+
+  generation:
+    model: meta/llama-3.3-70b-instruct
+    server_type: openai
+    server_address: https://integrate.api.nvidia.com/v1
+
+solution_sdg:
+  # this is the output of problem_generation.py
+  input_file: "{output_dir}/all-problems.jsonl"
+
+  generation:
+    model: qwen/qwq-32b
+    server_type: openai
+    server_address: https://integrate.api.nvidia.com/v1
+    num_random_seeds: 4
