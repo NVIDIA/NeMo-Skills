@@ -21,6 +21,8 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
+from nemo_skills.dataset.utils import get_mcq_fields
+
 URL = "https://people.eecs.berkeley.edu/~hendrycks/data.tar"
 
 # mmlu subcategories from https://github.com/hendrycks/test/blob/master/categories.py
@@ -141,9 +143,9 @@ def save_data(split):
         for question in questions:
             new_entry = question
             new_entry['subtopic'] = subject
-            new_entry['problem'] = new_entry.pop('question')
-            new_entry['options'] = "\n".join(f"{chr(ord('A') + i)}. {new_entry[chr(ord('A') + i)]}" for i in range(4))
-            new_entry['problem'] += '\n' + new_entry['options']
+            new_entry.update(
+                get_mcq_fields(new_entry.pop('question'), [new_entry[chr(ord('A') + i)] for i in range(4)])
+            )
 
             new_entry['subset_for_metrics'] = subcategories[subject][0]
             data.append(new_entry)

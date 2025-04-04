@@ -19,6 +19,8 @@ from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
 
+from nemo_skills.dataset.utils import get_mcq_fields
+
 # mmlu subcategories from https://github.com/hendrycks/test/blob/master/categories.py
 subcategories = {
     "abstract_algebra": ["math"],
@@ -91,22 +93,13 @@ def format_entry(entry, category):
         # bad_question_clarity, bad_options_clarity, no_correct_answer,
         # multiple_correct_answers, expert and wrong_groundtruth with no labels
         return None
-    new_entry = {
-        "problem": entry['question'],
-        "A": entry['choices'][0],
-        "B": entry['choices'][1],
-        "C": entry['choices'][2],
-        "D": entry['choices'][3],
-        "options": "\n".join(f"{chr(ord('A') + i)}. {option}" for i, option in enumerate(entry['choices'])),
+    return {
         "expected_answer": final_answer,
         "subset_for_metrics": subcategories[category][0],
         "subcategory": category,
         "source": entry['source'],
+        **get_mcq_fields(entry["question"], entry["choices"]),
     }
-
-    new_entry['problem'] += '\n' + new_entry['options']
-
-    return new_entry
 
 
 def write_data_to_file(output_file, data, category):

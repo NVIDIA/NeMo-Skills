@@ -19,20 +19,18 @@ from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
 
+from nemo_skills.dataset.utils import get_mcq_fields
+
 
 def format_entry(entry):
     category = entry['category'].replace(" ", "_")  # Fix computer science category
 
-    new_entry = {
-        "problem": entry['question'],
-        "options": "\n".join(f"{chr(ord('A') + i)}. {option}" for i, option in enumerate(entry['options'])),
+    return {
         "expected_answer": entry['answer'],
         "examples_type": f'mmlu_pro_few_shot_{category}',
         "subset_for_metrics": category,
+        **get_mcq_fields(entry["question"], entry["options"]),
     }
-    new_entry['problem'] += '\n' + new_entry['options']
-
-    return new_entry
 
 
 def write_data_to_file(output_file, data):
