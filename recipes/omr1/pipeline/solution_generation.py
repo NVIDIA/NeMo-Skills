@@ -20,7 +20,7 @@ import yaml
 from nemo_skills.pipeline import generate, run_cmd, wrap_arguments
 
 
-def generate_solutions(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
+def generate_solutions(input_file, output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
     run_after = f"{expname}-merge-data"  # this is launched in problem_generation.py
 
     generate(
@@ -31,20 +31,20 @@ def generate_solutions(input_file, output_dir, cluster, expname, extra_args="", 
             f"{extra_args} "
         ),
         cluster=cluster,
-        output_dir=f"{output_dir}/generate-solutions",
-        expname=f"{expname}-generate-solutions",
+        output_dir=f"{output_dir}/generate-solutions-{suffix}",
+        expname=f"{expname}-generate-solutions-{suffix}",
         run_after=run_after,
         **generate_kwargs,
     )
 
 
-def fill_majority_answer(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-generate-solutions"
+def fill_majority_answer(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-generate-solutions-{suffix}"
 
     cmd = (
         f'python -m nemo_skills.evaluation.aggregate_answers '
-        f'    ++input_dir={output_dir}/generate-solutions '
-        f'    ++output_dir={output_dir}/filled-majority '
+        f'    ++input_dir={output_dir}/generate-solutions-{suffix} '
+        f'    ++output_dir={output_dir}/filled-majority-{suffix} '
         f'    ++input_files="output-rs*.jsonl" '
         f'    ++mode=fill '
         f'    ++fill_is_correct=False '
@@ -54,33 +54,33 @@ def fill_majority_answer(output_dir, cluster, expname, extra_args="", **generate
         ctx=wrap_arguments(cmd),
         cluster=cluster,
         partition="cpu",  # change that if not available (ignored if running locally)
-        log_dir=f"{output_dir}/filled-majority/logs",
-        expname=f"{expname}-fill-majority",
+        log_dir=f"{output_dir}/filled-majority-{suffix}/logs",
+        expname=f"{expname}-fill-majority-{suffix}",
         run_after=run_after,
     )
 
 
-def judge_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-fill-majority"
+def judge_answers(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-fill-majority-{suffix}"
 
     generate(
-        ctx=wrap_arguments(f"++input_dir={output_dir}/filled-majority {extra_args} "),
+        ctx=wrap_arguments(f"++input_dir={output_dir}/filled-majority-{suffix} {extra_args} "),
         cluster=cluster,
         generation_type="math_judge",
-        output_dir=f"{output_dir}/judged-generations",
-        expname=f"{expname}-judge-answers",
+        output_dir=f"{output_dir}/judged-generations-{suffix}",
+        expname=f"{expname}-judge-answers-{suffix}",
         run_after=run_after,
         **generate_kwargs,
     )
 
 
-def prepare_for_sft(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-judge-answers"
+def prepare_for_sft(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-judge-answers-{suffix}"
 
     cmd = (
         f"python -m nemo_skills.training.prepare_data "
-        f"    ++input_files='{output_dir}/judged-generations/output-rs*.jsonl' "
-        f"    ++output_path={output_dir}/sft-data.jsonl "
+        f"    ++input_files='{output_dir}/judged-generations-{suffix}/output-rs*.jsonl' "
+        f"    ++output_path={output_dir}/sft-data-{suffix}.jsonl "
         f"    ++prompt_config=generic/math "  # can remove if not needed
         f"    ++prompt_template=qwen-instruct "  # can remove if not needed
         f"    ++filters.drop_multi_boxed=false "
@@ -93,8 +93,8 @@ def prepare_for_sft(output_dir, cluster, expname, extra_args="", **generate_kwar
         ctx=wrap_arguments(cmd),
         cluster=cluster,
         partition="cpu",  # change that if not available (ignored if running locally)
-        log_dir=f"{output_dir}/prepare_for_sft/logs",
-        expname=f"{expname}-prepare-for-sft",
+        log_dir=f"{output_dir}/prepare_for_sft-{suffix}/logs",
+        expname=f"{expname}-prepare-for-sft-{suffix}",
         run_after=run_after,
     )
 
@@ -114,7 +114,6 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full'],
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
@@ -144,6 +143,7 @@ if __name__ == '__main__':
     input_file = config['solution_sdg']['input_file'].format(output_dir=config['output_dir'])
     default_args = dict(
         output_dir=config['output_dir'],
+        suffix=config['solution_sdg']['suffix'],
         cluster=config['cluster'],
         expname=config['expname'],
         **config['solution_sdg']['generation'],
@@ -154,5 +154,11 @@ if __name__ == '__main__':
         if stage == 'generate_solutions':
             stage_args['input_file'] = input_file
         if stage == 'judge_answers':  # using different generation args here
-            stage_args.update(config['solution_sdg']['judge'])
+            stage_args = dict(
+                output_dir=config['output_dir'],
+                suffix=config['solution_sdg']['suffix'],
+                cluster=config['cluster'],
+                expname=config['expname'],
+                **config['solution_sdg']['judge'],
+            )
         stages_map[stage](**stage_args)

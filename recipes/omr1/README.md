@@ -1,7 +1,14 @@
 # OpenMathReasoning-1
 
-OpenMathReasoning-1 dataset consists of mathematical problems collected from [AoPS community forums](https://artofproblemsolving.com/community).
-Here are the steps to reproduce the dataset creation process.
+OpenMathReasoning-1 dataset consists of mathematical problems collected from [AoPS community forums](https://artofproblemsolving.com/community). Below we describe the pipeline used to create this dataset.
+
+If you don't have a slurm cluster with a large number of GPUs,
+you can still try out all the steps of our pipeline by using [Nvidia NIM models](https://build.nvidia.com/). We include
+a 10-sample subset of the raw data in [configs/example-data.txt](/recipes/omr1/configs/example-data.txt) and you can
+switch to that data and NIM models by adding `--config demo` to all the pipeline commands. We also use different models
+in this "demo" mode to make it faster, but you can change [configs/demo.yaml](/recipes/omr1/configs/demo.yaml) to pick
+any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
+(and ignore any data download/upload or model conversion steps as they are not needed when using NIM models).
 
 ## Data scraping
 
@@ -26,11 +33,6 @@ the dataset by e.g. running
 ```bash
 mv raw_aops_data.jsonl raw_aops_data_full.jsonl && head -n 1000 raw_aops_data_full.jsonl > raw_aops_data.jsonl
 ```
-
-We also provide 10 example subset of the raw data in [configs/example-data.txt](/recipes/omr1/configs/example-data.txt).
-If you want to test the pipeline but don't have any GPUs, you can use the scripts below with `--config demo` flag
-and it will run all steps on those 10 examples using [Nvidia NIM models](https://build.nvidia.com/). Make sure to define
-`NVIDIA_API_KEY` environment variable for this to work.
 
 ## Problem generation pipeline
 

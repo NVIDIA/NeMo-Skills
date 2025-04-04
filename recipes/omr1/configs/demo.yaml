@@ -15,6 +15,7 @@ problem_sdg:
 solution_sdg:
   # this is the output of problem_generation.py
   input_file: "{output_dir}/all-problems.jsonl"
+  suffix: nim  # just used to put files in a separate folder
 
   generation:
     model: deepseek-ai/deepseek-r1-distill-qwen-32b
