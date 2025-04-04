@@ -74,10 +74,35 @@ def judge_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs
     )
 
 
+def prepare_for_sft(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-judge-answers"
+
+    cmd = (
+        f"python -m nemo_skills.training.prepare_sft_data "
+        f"    ++input_files='{output_dir}/judged-generations/output-rs*.jsonl' "
+        f"    ++output_path={output_dir}/sft-data.jsonl "
+        f"    ++prompt_config=generic/math "  # can remove if not needed
+        f"    ++prompt_template=qwen-instruct "  # can remove if not needed
+        f"    ++filters.drop_multi_boxed=false "
+        f"    ++use_judgement=true "
+        f"    ++contamination_file={output_dir}/contamination-labeled.jsonl "
+    )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        log_dir=f"{output_dir}/prepare_for_sft/logs",
+        expname=f"{expname}-solution-gen-5b-prepare-sft-data-all{suffix}",
+        run_after=run_after,
+    )
+
+
 stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
     'judge_answers': judge_answers,
+    # TODO: add summary regeneration step
+    'prepare_for_sft': prepare_for_sft,
 }
 
 
