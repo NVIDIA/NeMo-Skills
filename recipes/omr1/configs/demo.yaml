@@ -21,7 +21,7 @@ solution_sdg:
     server_type: openai
     server_address: https://integrate.api.nvidia.com/v1
     num_random_seeds: 4
-    extra_args: "++inference.tokens_to_generate=4096"
+    extra_args: "++inference.tokens_to_generate=8192"
 
   judge:
     model: meta/llama-3.3-70b-instruct

@@ -43,9 +43,9 @@ def fill_majority_answer(output_dir, cluster, expname, extra_args="", **generate
 
     cmd = (
         f'python -m nemo_skills.evaluation.aggregate_answers '
-        f'    ++input_dir={output_dir} '
+        f'    ++input_dir={output_dir}/generate-solutions '
         f'    ++output_dir={output_dir}/filled-majority '
-        f'    ++input_files="generate-solutions/output-rs*.jsonl" '
+        f'    ++input_files="output-rs*.jsonl" '
         f'    ++mode=fill '
         f'    ++fill_is_correct=False '
         f'    ++ignore_if_not_none=True '
@@ -78,12 +78,14 @@ def prepare_for_sft(output_dir, cluster, expname, extra_args="", **generate_kwar
     run_after = f"{expname}-judge-answers"
 
     cmd = (
-        f"python -m nemo_skills.training.prepare_sft_data "
+        f"python -m nemo_skills.training.prepare_data "
         f"    ++input_files='{output_dir}/judged-generations/output-rs*.jsonl' "
         f"    ++output_path={output_dir}/sft-data.jsonl "
         f"    ++prompt_config=generic/math "  # can remove if not needed
         f"    ++prompt_template=qwen-instruct "  # can remove if not needed
         f"    ++filters.drop_multi_boxed=false "
+        f"    ++filters.remove_len_outlier_problems=false "
+        f"    ++filters.remove_len_outlier_solutions=false "
         f"    ++use_judgement=true "
         f"    ++contamination_file={output_dir}/contamination-labeled.jsonl "
     )
@@ -92,7 +94,7 @@ def prepare_for_sft(output_dir, cluster, expname, extra_args="", **generate_kwar
         cluster=cluster,
         partition="cpu",  # change that if not available (ignored if running locally)
         log_dir=f"{output_dir}/prepare_for_sft/logs",
-        expname=f"{expname}-solution-gen-5b-prepare-sft-data-all{suffix}",
+        expname=f"{expname}-prepare-for-sft",
         run_after=run_after,
     )
 
