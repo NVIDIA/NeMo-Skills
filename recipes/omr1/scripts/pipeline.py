@@ -20,64 +20,114 @@ import yaml
 from nemo_skills.pipeline import check_contamination, convert, eval, generate, run_cmd, train, wrap_arguments
 
 
-def extract_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
+def extract_problems(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
         f"    {output_dir}/extract-problems/extracted-problems.jsonl "
     )
-    expname = f"{expname}-extract-problems"
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/forum-problem-extraction.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/extract-problems.yaml "
             f"{extra_args} "
         ),
         cluster=cluster,
         output_dir=f"{output_dir}/extract-problems",
         postprocess_cmd=postprocess_cmd,
-        expname=expname,
-        run_after=run_after,
+        expname=f"{expname}-extract-problems",
         **generate_kwargs,
     )
-    return f"{output_dir}/extract-problems/extracted-problems.jsonl", expname
 
 
-def classify_problems(input_file, output_dir, cluster, expname, run_after=None, extra_args="", **generate_kwargs):
+def classify_problems(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-extract-problems"
+    input_file = f"{output_dir}/extract-problems/extracted-problems.jsonl"
+
     for mode in ['proof', 'mcq', 'binary', 'invalid']:
         postprocess_cmd = (
-            f"python /nemo_run/code/recipes/omr1/scripts/extract_classification.py "
-            f"    {output_dir}/classify/{mode}/output.jsonl "
-            f"    {output_dir}/classify/{mode}/yes.jsonl "
-            f"    {output_dir}/classify/{mode}/no.jsonl "
+            f"python /nemo_run/code/recipes/omr1/scripts/postprocess_classification.py "
+            f"    {output_dir}/classify-problems/{mode}/output.jsonl "
+            f"    {output_dir}/classify-problems/{mode}/yes.jsonl "
+            f"    {output_dir}/classify-problems/{mode}/no.jsonl "
             f"    --mode={mode}"
         )
 
         generate(
             ctx=wrap_arguments(
                 f"++input_file={input_file} "
-                f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-if-{mode} "
+                f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-if-{mode}.yaml "
                 f"{extra_args} "
             ),
             cluster=cluster,
-            output_dir=f"{output_dir}/classify/{mode}",
+            output_dir=f"{output_dir}/classify-problems/{mode}",
             postprocess_cmd=postprocess_cmd,
             expname=f"{expname}-classify-{mode}",
             run_after=run_after,
             **generate_kwargs,
         )
         run_after = f"{expname}-classify-{mode}"
-        input_file = f"{output_dir}/classify/{mode}/no.jsonl"
+        input_file = f"{output_dir}/classify-problems/{mode}/no.jsonl"
 
-    return input_file, expname
+    return input_file, run_after
+
+
+def extract_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-classify-invalid"
+    input_file = f"{output_dir}/classify-problems/invalid/no.jsonl"
+
+    postprocess_cmd = (
+        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_answer_extraction.py "
+        f"    {output_dir}/extract-answers/output.jsonl "
+        f"    {output_dir}/extract-answers/extracted-answers.jsonl "
+    )
+
+    generate(
+        ctx=wrap_arguments(
+            f"++input_file={input_file} "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/extract-answers.yaml "
+            f"{extra_args} "
+        ),
+        cluster=cluster,
+        output_dir=f"{output_dir}/extract-answers",
+        postprocess_cmd=postprocess_cmd,
+        expname=f"{expname}-extract-answers",
+        run_after=run_after,
+        **generate_kwargs,
+    )
+
+
+def convert_proofs(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-classify-proof"
+    input_file = f"{output_dir}/classify-problems/proof/yes.jsonl"
+
+    postprocess_cmd = (
+        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_proof_conversion.py "
+        f"    {output_dir}/convert-proofs/output.jsonl "
+        f"    {output_dir}/convert-proofs/converted-proofs.jsonl "
+    )
+
+    generate(
+        ctx=wrap_arguments(
+            f"++input_file={input_file} "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/convert-proofs.yaml "
+            f"{extra_args} "
+        ),
+        cluster=cluster,
+        output_dir=f"{output_dir}/convert-proofs",
+        postprocess_cmd=postprocess_cmd,
+        expname=f"{expname}-convert-proofs",
+        run_after=run_after,
+        **generate_kwargs,
+    )
 
 
 stages_map = {
-    'extract-problems': extract_problems,
-    'classify-problems': classify_problems,
+    'extract_problems': extract_problems,
+    'classify_problems': classify_problems,
+    'extract_answers': extract_answers,
+    'convert_proofs': convert_proofs,
 }
-
-problem_sdg_stages = ['extract-problems', 'classify-problems']
 
 
 if __name__ == '__main__':
@@ -109,13 +159,12 @@ if __name__ == '__main__':
 
     run_after = None
     input_file = config['input_file']
+    default_args = dict(
+        output_dir=config['output_dir'], cluster=config['cluster'], expname=config['expname'], **config['problem_sdg']
+    )
 
     for stage in stages:
-        input_file, run_after = stages_map[stage](
-            input_file=input_file,
-            output_dir=config['output_dir'],
-            cluster=config['cluster'],
-            expname=config['expname'],
-            run_after=run_after,
-            **config['problem_sdg'] if stage in problem_sdg_stages else config['solution_sdg'],
-        )
+        stage_args = default_args.copy()
+        if stage == 'extract_problems':
+            stage_args['input_file'] = config['input_file']
+        stages_map[stage](**stage_args)
