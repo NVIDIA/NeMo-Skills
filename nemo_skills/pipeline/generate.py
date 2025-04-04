@@ -18,6 +18,7 @@ import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
+import shlex
 
 import nemo_run as run
 import typer
@@ -210,7 +211,7 @@ def get_cmd(
             f"{' '.join([f[:-5] for f in donefiles])}"
         )
         if postprocess_cmd:
-            postprocess_cmd = escape_shell_command(postprocess_cmd)
+            postprocess_cmd = shlex.quote(postprocess_cmd)
             merge_cmd = f"{merge_cmd} -- {postprocess_cmd}"
         postprocess_cmd = f"{job_end_cmd} && {merge_cmd}"
 
