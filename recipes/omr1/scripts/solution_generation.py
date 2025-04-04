@@ -62,8 +62,9 @@ def fill_majority_answer(output_dir, cluster, expname, extra_args="", **generate
 
 def judge_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs):
     run_after = f"{expname}-fill-majority"
+
     generate(
-        ctx=wrap_arguments(f"++input_dir={output_dir}/generate-solutions " f"{extra_args} "),
+        ctx=wrap_arguments(f"++input_dir={output_dir}/filled-majority {extra_args} "),
         cluster=cluster,
         generation_type="math_judge",
         output_dir=f"{output_dir}/judged-generations",
@@ -76,6 +77,7 @@ def judge_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs
 stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
+    'judge_answers': judge_answers,
 }
 
 
