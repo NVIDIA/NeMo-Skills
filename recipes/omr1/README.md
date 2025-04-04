@@ -27,4 +27,10 @@ the dataset by e.g. running
 mv raw_aops_data.jsonl raw_aops_data_full.jsonl && head -n 1000 raw_aops_data_full.jsonl > raw_aops_data.jsonl
 ```
 
-...
+We also provide 10 example subset of the raw data in [configs/example-data.txt](/recipes/omr1/configs/example-data.txt).
+If you want to test the pipeline but don't have any GPUs, you can use the scripts below with `--config demo` flag
+and it will run all steps on those 10 examples using [Nvidia NIM models](https://build.nvidia.com/). Make sure to define
+`NVIDIA_API_KEY` environment variable for this to work.
+
+## Problem generation pipeline
+
