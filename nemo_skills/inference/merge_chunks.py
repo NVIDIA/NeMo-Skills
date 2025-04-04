@@ -4,6 +4,10 @@ import sys
 import os
 import subprocess
 
+def unescape_shell_command(command: str) -> str:
+    """Unescape special shell characters so they are correctly interpreted before execution."""
+    return command.replace("\\&", "&").replace("\\;", ";").replace("\\|", "|").replace("\\>", ">").replace("\\<", "<")
+
 # Check if at least one input file and an output file are provided
 if len(sys.argv) < 3:
     print(f"Usage: {sys.argv[0]} output_file input_file1 [input_file2 ...] [-- command_to_run]")
@@ -14,7 +18,8 @@ if "--" in sys.argv:
     sep_index = sys.argv.index("--")
     output_file = sys.argv[1]
     input_files = sys.argv[2:sep_index]
-    post_merge_command = sys.argv[sep_index + 1:]
+    post_merge_command = " ".join(sys.argv[sep_index + 1:])
+    post_merge_command= unescape_shell_command(post_merge_command)
 else:
     output_file = sys.argv[1]
     input_files = sys.argv[2:]
