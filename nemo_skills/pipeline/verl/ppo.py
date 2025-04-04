@@ -46,111 +46,111 @@ class PPOVerlTask:
     extra_arguments: str = ""
     logging_params: str = ""
 
-    def get_ray_launch_cmd(self):
-        cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
-        return cmd
+    # def get_ray_launch_cmd(self):
+    #     cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
+    #     return cmd
 
-    def format_train_args(self):
-        cmd = (
-            "   algorithm.adv_estimator=grpo "
-            "   data.train_batch_size=128 "
-            "   data.val_batch_size=512 "
-            "   data.max_prompt_length=1024 "
-            "   data.max_response_length=8192 "
-            f"   actor_rollout_ref.model.path={self.model} "
-            "   actor_rollout_ref.actor.optim.lr=1e-6 "
-            "   actor_rollout_ref.model.use_remove_padding=True "
-            "   actor_rollout_ref.actor.ppo_mini_batch_size=64 "
-            "   actor_rollout_ref.actor.use_dynamic_bsz=True "
-            "   actor_rollout_ref.actor.ppo_max_token_len_per_gpu=32768 "
-            "   actor_rollout_ref.actor.use_kl_loss=True "
-            "   actor_rollout_ref.actor.kl_loss_coef=0.0 "
-            "   actor_rollout_ref.actor.kl_loss_type=low_var_kl "
-            "   actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 "
-            "   actor_rollout_ref.model.enable_gradient_checkpointing=True "
-            "   actor_rollout_ref.actor.fsdp_config.param_offload=False "
-            "   +actor_rollout_ref.actor.fsdp_config.grad_offload=False "
-            "   actor_rollout_ref.actor.fsdp_config.optimizer_offload=False "
-            "   actor_rollout_ref.rollout.tensor_model_parallel_size=1 "
-            "   actor_rollout_ref.rollout.name=vllm "
-            "   actor_rollout_ref.rollout.temperature=0.6 "
-            "   actor_rollout_ref.rollout.gpu_memory_utilization=0.85 "
-            "   actor_rollout_ref.rollout.enforce_eager=False "
-            "   actor_rollout_ref.rollout.free_cache_engine=False "
-            "   actor_rollout_ref.rollout.n=8 "
-            "   actor_rollout_ref.ref.fsdp_config.param_offload=True "
-            "   algorithm.kl_ctrl.kl_coef=0 "
-            "   trainer.critic_warmup=0 "
-            "   +trainer.val_before_train=True "
-            "   trainer.val_generations_to_log_to_wandb=1 "
-            "   trainer.save_freq=20 "
-            "   trainer.test_freq=20 "
-            "   trainer.default_hdfs_dir=null "
-            f"   trainer.default_local_dir={self.output_dir}/checkpoints "
-            "   trainer.total_epochs=30 "
-            f"   trainer.n_gpus_per_node={self.num_gpus} "
-            f"   trainer.nnodes={self.num_nodes} "
-            f"  +trainer.timeout={self.timeout} "
-            ""
-        )
-        return cmd
+    # def format_train_args(self):
+    #     cmd = (
+    #         "   algorithm.adv_estimator=grpo "
+    #         "   data.train_batch_size=128 "
+    #         "   data.val_batch_size=512 "
+    #         "   data.max_prompt_length=1024 "
+    #         "   data.max_response_length=8192 "
+    #         f"   actor_rollout_ref.model.path={self.model} "
+    #         "   actor_rollout_ref.actor.optim.lr=1e-6 "
+    #         "   actor_rollout_ref.model.use_remove_padding=True "
+    #         "   actor_rollout_ref.actor.ppo_mini_batch_size=64 "
+    #         "   actor_rollout_ref.actor.use_dynamic_bsz=True "
+    #         "   actor_rollout_ref.actor.ppo_max_token_len_per_gpu=32768 "
+    #         "   actor_rollout_ref.actor.use_kl_loss=True "
+    #         "   actor_rollout_ref.actor.kl_loss_coef=0.0 "
+    #         "   actor_rollout_ref.actor.kl_loss_type=low_var_kl "
+    #         "   actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 "
+    #         "   actor_rollout_ref.model.enable_gradient_checkpointing=True "
+    #         "   actor_rollout_ref.actor.fsdp_config.param_offload=False "
+    #         "   +actor_rollout_ref.actor.fsdp_config.grad_offload=False "
+    #         "   actor_rollout_ref.actor.fsdp_config.optimizer_offload=False "
+    #         "   actor_rollout_ref.rollout.tensor_model_parallel_size=1 "
+    #         "   actor_rollout_ref.rollout.name=vllm "
+    #         "   actor_rollout_ref.rollout.temperature=0.6 "
+    #         "   actor_rollout_ref.rollout.gpu_memory_utilization=0.85 "
+    #         "   actor_rollout_ref.rollout.enforce_eager=False "
+    #         "   actor_rollout_ref.rollout.free_cache_engine=False "
+    #         "   actor_rollout_ref.rollout.n=8 "
+    #         "   actor_rollout_ref.ref.fsdp_config.param_offload=True "
+    #         "   algorithm.kl_ctrl.kl_coef=0 "
+    #         "   trainer.critic_warmup=0 "
+    #         "   +trainer.val_before_train=True "
+    #         "   trainer.val_generations_to_log_to_wandb=1 "
+    #         "   trainer.save_freq=20 "
+    #         "   trainer.test_freq=20 "
+    #         "   trainer.default_hdfs_dir=null "
+    #         f"   trainer.default_local_dir={self.output_dir}/checkpoints "
+    #         "   trainer.total_epochs=30 "
+    #         f"   trainer.n_gpus_per_node={self.num_gpus} "
+    #         f"   trainer.nnodes={self.num_nodes} "
+    #         f"  +trainer.timeout={self.timeout} "
+    #         ""
+    #     )
+    #     return cmd
 
-    def format_data_args(self):
-        cmd = f"   data.train_files='{self.prompt_data}' "
-        if self.eval_data:
-            cmd = f"{cmd} data.val_files='{self.eval_data}' "
-        else:
-            cmd = f"{cmd} +trainer.run_validation=False "
+    # def format_data_args(self):
+    #     cmd = f"   data.train_files='{self.prompt_data}' "
+    #     if self.eval_data:
+    #         cmd = f"{cmd} data.val_files='{self.eval_data}' "
+    #     else:
+    #         cmd = f"{cmd} +trainer.run_validation=False "
 
-        return cmd
+    #     return cmd
 
-    def format_wandb_args(self, disable_wandb, wandb_project, expname):
-        cmd = f" trainer.project_name='{wandb_project}' " f" trainer.experiment_name='{expname}' "
+    # def format_wandb_args(self, disable_wandb, wandb_project, expname):
+    #     cmd = f" trainer.project_name='{wandb_project}' " f" trainer.experiment_name='{expname}' "
 
-        if disable_wandb:
-            cmd = f"{cmd} trainer.logger=['console'] "
-        else:
-            cmd = f"{cmd} trainer.logger=['console','wandb'] "
+    #     if disable_wandb:
+    #         cmd = f"{cmd} trainer.logger=['console'] "
+    #     else:
+    #         cmd = f"{cmd} trainer.logger=['console','wandb'] "
 
-        return cmd
+    #     return cmd
 
-    def get_preamble_cmd(self):
-        cmd = " echo 'No preamble command to execute, skipping...' "
-        return cmd
+    # def get_preamble_cmd(self):
+    #     cmd = " echo 'No preamble command to execute, skipping...' "
+    #     return cmd
 
-    def get_script_module(self):
-        return "verl.trainer.main_ppo"  # Must use https://github.com/titu1994/verl/
+    # def get_script_module(self):
+    #     return "verl.trainer.main_ppo"  # Must use https://github.com/titu1994/verl/
 
-    def get_job_cmd(self):
-        ray_job_cmd = self.get_ray_launch_cmd()
-        ray_job_cmd = (
-            f"echo 'Starting training' && "
-            f"{ray_job_cmd} python3 -m {self.get_script_module()} "
-            f"  {self.format_train_args()} "
-            f"  {self.format_data_args()} "
-            f"  {self.logging_params} "
-            f"  {self.extra_arguments} "
-        )
-        return ray_job_cmd
+    # def get_job_cmd(self):
+    #     ray_job_cmd = self.get_ray_launch_cmd()
+    #     ray_job_cmd = (
+    #         f"echo 'Starting training' && "
+    #         f"{ray_job_cmd} python3 -m {self.get_script_module()} "
+    #         f"  {self.format_train_args()} "
+    #         f"  {self.format_data_args()} "
+    #         f"  {self.logging_params} "
+    #         f"  {self.extra_arguments} "
+    #     )
+    #     return ray_job_cmd
 
-    def get_cmd(self):
+    # def get_cmd(self):
 
-        self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
-        preamble_cmd = self.get_preamble_cmd()
+    #     self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
+    #     preamble_cmd = self.get_preamble_cmd()
 
-        cmd = (
-            f"export HYDRA_FULL_ERROR=1 && "
-            f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
-            f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-            f"cd /nemo_run/code && "
-            f"{preamble_cmd} && "
-        )
+    #     cmd = (
+    #         f"export HYDRA_FULL_ERROR=1 && "
+    #         f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
+    #         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+    #         f"cd /nemo_run/code && "
+    #         f"{preamble_cmd} && "
+    #     )
 
-        ray_job_cmd = self.get_job_cmd()
-        ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
+    #     ray_job_cmd = self.get_job_cmd()
+    #     ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
 
-        cmd = f"{cmd} {ray_server_cmd} "
-        return cmd
+    #     cmd = f"{cmd} {ray_server_cmd} "
+    #     return cmd
 
 
 @dataclass
@@ -169,6 +169,7 @@ class DAPOPPOVerlTask:
 
     enable_overlong_buffer=True
     overlong_buffer_len = 1024 * 4
+    # overlong_buffer_len = 1024
     overlong_penalty_factor = 1.0
 
     enable_filter_groups = True
@@ -195,19 +196,21 @@ class DAPOPPOVerlTask:
 
     # Algorithm
     ## Train
-    max_prompt_length=1024 * 2
+    max_prompt_length=1024 *2
+    # max_prompt_length=1024 // 4
     # max_response_length=1024 * 20
     max_response_length=1024 * 8
+    # max_response_length=1024 * 1
     ## Validation
     val_top_k=-1 # 0 for HF rollout, -1 for vLLM rollout
 
 
     # Performance Related Parameter
-    sp_size=8
+    sp_size=1
     use_dynamic_bsz=True
     actor_ppo_max_token_len=max_prompt_length + max_response_length
     infer_ppo_max_token_len=max_prompt_length + max_response_length
-    offload=True
+    offload=False
     # gen_tp=4
     gen_tp=2
 
@@ -223,7 +226,7 @@ class DAPOPPOVerlTask:
             f"data.truncation='left' "
             f'data.max_prompt_length={self.max_prompt_length} '
             f'data.max_response_length={self.max_response_length} '
-            f'data.gen_batch_size={self.gen_prompt_bsz} '
+            f'++data.gen_batch_size={self.gen_prompt_bsz} '
             f'data.train_batch_size={self.train_prompt_bsz} '
             f'actor_rollout_ref.rollout.n={self.n_resp_per_prompt} '
             f'algorithm.adv_estimator={self.adv_estimator} '
@@ -231,9 +234,9 @@ class DAPOPPOVerlTask:
             f'actor_rollout_ref.actor.kl_loss_coef={self.kl_loss_coef} '
             f'actor_rollout_ref.actor.clip_ratio_low={self.clip_ratio_low} '
             f'actor_rollout_ref.actor.clip_ratio_high={self.clip_ratio_high} '
-            f'algorithm.filter_groups.enable={self.enable_filter_groups} '
-            f'algorithm.filter_groups.max_num_gen_batches={self.max_num_gen_batches} '
-            f'algorithm.filter_groups.metric={self.filter_groups_metric} '
+            f'++algorithm.filter_groups.enable={self.enable_filter_groups} '
+            f'++algorithm.filter_groups.max_num_gen_batches={self.max_num_gen_batches} '
+            f'++algorithm.filter_groups.metric={self.filter_groups_metric} '
             f'actor_rollout_ref.model.use_remove_padding=True '
             f'actor_rollout_ref.actor.use_dynamic_bsz={self.use_dynamic_bsz} '
             f'actor_rollout_ref.ref.log_prob_use_dynamic_bsz={self.use_dynamic_bsz} '
@@ -254,34 +257,34 @@ class DAPOPPOVerlTask:
             f'actor_rollout_ref.actor.fsdp_config.optimizer_offload={self.offload} '
             f'actor_rollout_ref.actor.entropy_coeff=0 '
             f'actor_rollout_ref.actor.grad_clip=1.0 '
-            f'actor_rollout_ref.actor.use_token_level_loss={self.use_token_level_loss} '
-            f'actor_rollout_ref.actor.ulysses_sequence_parallel_size={self.sp_size} '
-            f'actor_rollout_ref.rollout.gpu_memory_utilization={self.gpu_memory_utilization} '
-            f'actor_rollout_ref.rollout.tensor_model_parallel_size={self.gen_tp} '
-            f'actor_rollout_ref.rollout.enable_chunked_prefill=True '
-            f'actor_rollout_ref.rollout.max_num_batched_tokens={self.max_prompt_length + self.max_response_length} '
-            f'actor_rollout_ref.rollout.val_kwargs.top_k="{self.val_top_k}" '
-            f'actor_rollout_ref.rollout.val_kwargs.top_p=1.0 '
-            f'actor_rollout_ref.rollout.val_kwargs.temperature=1.0 '
-            f'actor_rollout_ref.rollout.val_kwargs.n=1 '
-            f'actor_rollout_ref.rollout.val_kwargs.do_sample=True '
-            f'actor_rollout_ref.ref.fsdp_config.param_offload={self.offload} '
-            f'actor_rollout_ref.ref.ulysses_sequence_parallel_size={self.sp_size} '
-            f'actor_rollout_ref.actor.fsdp_config.fsdp_size=-1 '
-            f'custom_reward_function.overlong_buffer.enable={self.enable_overlong_buffer} '
-            f'custom_reward_function.overlong_buffer.len={self.overlong_buffer_len} '
-            f'custom_reward_function.overlong_buffer.penalty_factor={self.overlong_penalty_factor} '
-            f"trainer.logger=['console','wandb'] "
-            f'trainer.project_name="{self.project_name}" '
-            f'trainer.experiment_name="{self.exp_name}" '
-            f'trainer.n_gpus_per_node=8 '
-            f'trainer.nnodes="{self.NNODES}" '
-            f'+trainer.val_before_train=True '
-            f'trainer.test_freq=5 '
-            f'trainer.save_freq=5 '
-            f'trainer.total_epochs=1 '
-            f'trainer.default_local_dir="{self.CKPTS_DIR}" '
-            f'trainer.resume_mode=auto '
+            f'++actor_rollout_ref.actor.use_token_level_loss={self.use_token_level_loss} '
+            f'++actor_rollout_ref.actor.ulysses_sequence_parallel_size={self.sp_size} '
+            f'++actor_rollout_ref.rollout.gpu_memory_utilization={self.gpu_memory_utilization} '
+            f'++actor_rollout_ref.rollout.tensor_model_parallel_size={self.gen_tp} '
+            f'++actor_rollout_ref.rollout.enable_chunked_prefill=True '
+            f'++actor_rollout_ref.rollout.max_num_batched_tokens={self.max_prompt_length + self.max_response_length} '
+            f'++actor_rollout_ref.rollout.val_kwargs.top_k="{self.val_top_k}" '
+            f'++actor_rollout_ref.rollout.val_kwargs.top_p=1.0 '
+            f'++actor_rollout_ref.rollout.val_kwargs.temperature=1.0 '
+            f'++actor_rollout_ref.rollout.val_kwargs.n=1 '
+            f'++actor_rollout_ref.rollout.val_kwargs.do_sample=True '
+            f'++actor_rollout_ref.ref.fsdp_config.param_offload={self.offload} '
+            f'++actor_rollout_ref.ref.ulysses_sequence_parallel_size={self.sp_size} '
+            f'++actor_rollout_ref.actor.fsdp_config.fsdp_size=-1 '
+            f'++custom_reward_function.overlong_buffer.enable={self.enable_overlong_buffer} '
+            f'++custom_reward_function.overlong_buffer.len={self.overlong_buffer_len} '
+            f'++custom_reward_function.overlong_buffer.penalty_factor={self.overlong_penalty_factor} '
+            f"++trainer.logger=['console','wandb'] "
+            f'++trainer.project_name="{self.project_name}" '
+            f'++trainer.experiment_name="{self.exp_name}" '
+            f'++trainer.n_gpus_per_node=8 '
+            f'++trainer.nnodes="{self.NNODES}" '
+            f'++trainer.val_before_train=True '
+            f'++trainer.test_freq=5 '
+            f'++trainer.save_freq=5 '
+            f'++trainer.total_epochs=1 '
+            f'++trainer.default_local_dir="{self.CKPTS_DIR}" '
+            f'++trainer.resume_mode=auto '
         )
         return cmd
 
