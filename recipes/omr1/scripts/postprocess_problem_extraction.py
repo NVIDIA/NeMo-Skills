@@ -8,11 +8,12 @@ if __name__ == "__main__":
     parser.add_argument("output_file", help="Path to the output JSONL file")
 
     args = parser.parse_args()
-
+    print("IM HERE")
     with open(args.input_file, 'r') as infile, open(args.output_file, 'w') as outfile, open(
         args.output_file + "-dropped", 'w'
     ) as outfile_dropped:
         for line in infile:
+            print(line)
             data = json.loads(line)
             generation = data.pop("generation")
             data["problem_extraction_gen"] = generation
