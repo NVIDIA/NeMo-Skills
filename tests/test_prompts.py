@@ -1212,36 +1212,6 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     )
 
 
-def test_mmlu_pro_zero_shot_prompt():
-    prompt = get_prompt('generic/mmlu-pro-zero-shot', "llama3-instruct")
-    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-The following is a multiple choice question about other. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
-
-What is the square root of 81 squared?
-A. 9^2
-B. 27
-C. 81^2
-D. 729
-E. 6561
-F. 12
-G. 162
-H. 243
-I. 81
-J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-
-    inputs = {
-        "problem": "What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9",
-        "subset_for_metrics": "other",
-    }
-    print(prompt.fill(inputs))
-    assert prompt.fill(inputs) == expected_prompt
-
-
 def test_nat_to_lean4_prompt():
     prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
 
