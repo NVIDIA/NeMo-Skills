@@ -174,6 +174,8 @@ def decontaminate(output_dir, cluster, expname, extra_args="", **generate_kwargs
         run_after=run_after,
     )
 
+    generate_kwargs.pop('num_chunks', None)  # TODO: remove when supported
+
     check_contamination(
         ctx=wrap_arguments(extra_args),
         cluster=cluster,
