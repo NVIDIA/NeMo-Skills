@@ -122,11 +122,77 @@ def convert_proofs(output_dir, cluster, expname, extra_args="", **generate_kwarg
     )
 
 
+def merge_data(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = [f"{expname}-convert-proofs", f"{expname}-extract-answers"]
+
+    cmd = (
+        f"cat {output_dir}/convert-proofs/converted-proofs.jsonl {output_dir}/extract-answers/extracted-answers.jsonl "
+        f"    > {output_dir}/all-problems.jsonl "
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        log_dir=f"{output_dir}/merge-data",
+        expname=f"{expname}-merge-data",
+        run_after=run_after,
+    )
+
+
+def decontaminate(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-merge-data"
+    input_file = f"{output_dir}/all-problems.jsonl"
+
+    datasets = [
+        'math',
+        'aime24',
+        'aime25',
+        'amc23',
+        'college_math',
+        'gaokao2023en',
+        'gsm8k',
+        'minerva_math',
+        'olympiadbench',
+        'omni-math',
+    ]
+    datasets = ",".join([f"/nemo_run/code/nemo_skills/dataset/{d}/test.jsonl" for d in datasets])
+    retrieval_cmd = (
+        f"python -m nemo_skills.inference.retrieve_similar "
+        f"   ++retrieve_from=\\\'{datasets}\\\' "
+        f"   ++compare_to={input_file} "
+        f"   ++output_file={output_dir}/decontamination/retrieved-test.jsonl "
+        f"   ++top_k=1 "
+    )
+    run_cmd(
+        ctx=wrap_arguments(retrieval_cmd),
+        cluster=cluster,
+        num_gpus=1,  # if the data gets really big, might need to run on more gpus
+        container="nemo",  # just need pytorch
+        log_dir=f"{output_dir}/decontamination/retrieve-similar",
+        expname=f"{expname}-retrieve-similar",
+        run_after=run_after,
+    )
+
+    check_contamination(
+        ctx=wrap_arguments(extra_args),
+        cluster=cluster,
+        input_file=f"{output_dir}/decontamination/retrieved-test.jsonl",
+        output_file=f"{output_dir}/all-problems-contamination-labeled.jsonl",
+        log_dir=f"{output_dir}/decontamination/check-contamination",
+        expname=f"{expname}-check-contamination",
+        run_after=f"{expname}-retrieve-similar",
+        **generate_kwargs,
+    )
+
+
 stages_map = {
     'extract_problems': extract_problems,
     'classify_problems': classify_problems,
     'extract_answers': extract_answers,
     'convert_proofs': convert_proofs,
+    'merge_data': merge_data,
+    'decontaminate': decontaminate,
 }
 
 
