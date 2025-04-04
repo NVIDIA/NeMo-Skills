@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from nemo_skills.pipeline import generate, wrap_arguments
+from nemo_skills.pipeline import generate, run_cmd, wrap_arguments
 
 
 def generate_solutions(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
@@ -28,7 +28,6 @@ def generate_solutions(input_file, output_dir, cluster, expname, extra_args="", 
             f"++input_file={input_file} "
             f"++prompt_config=generic/math "
             f"++inference.temperature=0.7 "
-            f"++inference.tokens_to_generate=16384 "
             f"{extra_args} "
         ),
         cluster=cluster,
@@ -39,8 +38,44 @@ def generate_solutions(input_file, output_dir, cluster, expname, extra_args="", 
     )
 
 
+def fill_majority_answer(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-generate-solutions"
+
+    cmd = (
+        f'python -m nemo_skills.evaluation.aggregate_answers '
+        f'    ++input_dir={output_dir} '
+        f'    ++output_dir={output_dir}/filled-majority '
+        f'    ++input_files="generate-solutions/output-rs*.jsonl" '
+        f'    ++mode=fill '
+        f'    ++fill_is_correct=False '
+        f'    ++ignore_if_not_none=True '
+    )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        log_dir=f"{output_dir}/filled-majority/logs",
+        expname=f"{expname}-fill-majority",
+        run_after=run_after,
+    )
+
+
+def judge_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-fill-majority"
+    generate(
+        ctx=wrap_arguments(f"++input_dir={output_dir}/generate-solutions " f"{extra_args} "),
+        cluster=cluster,
+        generation_type="math_judge",
+        output_dir=f"{output_dir}/judged-generations",
+        expname=f"{expname}-judge-answers",
+        run_after=run_after,
+        **generate_kwargs,
+    )
+
+
 stages_map = {
     'generate_solutions': generate_solutions,
+    'fill_majority_answer': fill_majority_answer,
 }
 
 
@@ -89,4 +124,6 @@ if __name__ == '__main__':
         stage_args = default_args.copy()
         if stage == 'generate_solutions':
             stage_args['input_file'] = input_file
+        if stage == 'judge_answers':  # using different generation args here
+            stage_args.update(config['solution_sdg']['judge'])
         stages_map[stage](**stage_args)

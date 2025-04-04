@@ -134,7 +134,7 @@ def merge_data(output_dir, cluster, expname, extra_args="", **generate_kwargs):
         ctx=wrap_arguments(cmd),
         cluster=cluster,
         partition="cpu",  # change that if not available (ignored if running locally)
-        log_dir=f"{output_dir}/merge-data",
+        log_dir=f"{output_dir}/merge-data/logs",
         expname=f"{expname}-merge-data",
         run_after=run_after,
     )
@@ -169,7 +169,7 @@ def decontaminate(output_dir, cluster, expname, extra_args="", **generate_kwargs
         cluster=cluster,
         num_gpus=1,  # if the data gets really big, might need to run on more gpus
         container="nemo",  # just need pytorch
-        log_dir=f"{output_dir}/decontamination/retrieve-similar",
+        log_dir=f"{output_dir}/decontamination/retrieve-similar/logs",
         expname=f"{expname}-retrieve-similar",
         run_after=run_after,
     )
@@ -179,7 +179,7 @@ def decontaminate(output_dir, cluster, expname, extra_args="", **generate_kwargs
         cluster=cluster,
         input_file=f"{output_dir}/decontamination/retrieved-test.jsonl",
         output_file=f"{output_dir}/all-problems-contamination-labeled.jsonl",
-        log_dir=f"{output_dir}/decontamination/check-contamination",
+        log_dir=f"{output_dir}/decontamination/check-contamination/logs",
         expname=f"{expname}-check-contamination",
         run_after=f"{expname}-retrieve-similar",
         **generate_kwargs,
