@@ -175,9 +175,6 @@ def get_cmd(
     If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
     with a base name (plus `-rsSEED` or chunk info as needed).
     """
-    if postprocess_cmd is not None:
-        postprocess_cmd = escape_shell_command(postprocess_cmd)
-
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
@@ -213,6 +210,7 @@ def get_cmd(
             f"{' '.join([f[:-5] for f in donefiles])}"
         )
         if postprocess_cmd:
+            postprocess_cmd = escape_shell_command(postprocess_cmd)
             merge_cmd = f"{merge_cmd} -- {postprocess_cmd}"
         postprocess_cmd = f"{job_end_cmd} && {merge_cmd}"
 
