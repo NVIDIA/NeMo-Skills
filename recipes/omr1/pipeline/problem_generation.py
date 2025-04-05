@@ -204,7 +204,7 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full'],
+        choices=['demo', 'full-qwq', 'full-r1'],
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
