@@ -21,7 +21,9 @@ if "--" in sys.argv:
     output_file = sys.argv[1]
     input_files = sys.argv[2:sep_index]
     post_merge_command = " ".join(sys.argv[sep_index + 1:])
+    print(f"first post_meger_command: {post_merge_command}")
     post_merge_command = unescape_shell_command(post_merge_command)
+    print(f"second post_meger_command: {post_merge_command}")
 else:
     output_file = sys.argv[1]
     input_files = sys.argv[2:]
