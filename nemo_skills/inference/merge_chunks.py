@@ -51,7 +51,8 @@ try:
     # Execute the post-merge command, if provided
     if post_merge_command:
         print(f"Executing post-merge command: {' '.join(post_merge_command)}")
-        subprocess.run(' '.join(post_merge_command), shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(' '.join(post_merge_command), shell=True, check=True, capture_output=True, text=True)
+        print(result.stdout)
 
 except subprocess.CalledProcessError as e:
     print(f"An error occurred: {e}")
