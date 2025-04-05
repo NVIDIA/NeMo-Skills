@@ -204,8 +204,9 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full-qwq', 'full-r1'],
-        help="Will pick a corresponding config from configs folder",
+        choices=['demo', 'full-qwq'],
+        help="Will pick a corresponding config from configs folder "
+        "(full-r1 and full-qwq are the same for problem generation)",
     )
     parser.add_argument(
         '--stages',

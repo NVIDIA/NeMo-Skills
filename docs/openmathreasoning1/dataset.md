@@ -1,25 +1,25 @@
 # Dataset construction
 
 OpenMathReasoning-1 dataset consists of mathematical problems collected from [AoPS community forums](https://artofproblemsolving.com/community). Below we describe the pipeline used to create this dataset. All relevant scripts are available in
-[recipes/omr1](/recipes/omr1) folder.
+[recipes/omr1](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1) folder.
 
 If you don't have a slurm cluster with a large number of GPUs,
 you can still try out all the steps of our pipeline by using [Nvidia NIM models](https://build.nvidia.com/). We include
-a 10-sample subset of the raw data in [configs/example-data.txt](/recipes/omr1/configs/example-data.txt) and you can
+a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/configs/example-data.txt) and you can
 switch to that data and NIM models by adding `--mode demo` to all the pipeline commands. We also use different models
-in this "demo" mode to make it faster, but you can change [configs/demo.yaml](/recipes/omr1/configs/demo.yaml) to pick
+in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/configs/demo.yaml) to pick
 any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
 Finally, please make sure to follow all necessary setup steps from the
-[prerequisites documentation](/docs/basics/prerequisites.md) to make sure you understand how the below commands
+[prerequisites documentation](../basics/prerequisites.md) to make sure you understand how the below commands
 work and avoid running into errors.
 
 
 ## Data scraping
 
 There is a great open-source [AoPS-Instruct repository](https://github.com/dsl-lab/aops) where you can find the scripts to scrape
-the data. There is also a [DeepStudentLlama/AoPS-Instruct HF dataset](DeepStudentLlama/AoPS-Instruct) where the raw forum data can be found.
+the data. There is also a [DeepStudentLlama/AoPS-Instruct HF dataset](https://huggingface.co/datasets/DeepStudentLlama/AoPS-Instruct) where the raw forum data can be found.
 While we didn't use that repository/dataset in our work directly, it should produce a similar output to our internal scripts.
 
 To download and preprocess raw data you can run
@@ -37,14 +37,77 @@ number of GPUs if you want to run them on full data. If you just want to try out
 the dataset by e.g. running
 
 ```bash
-mv raw_aops_data.jsonl raw_aops_data_full.jsonl && head -n 1000 raw_aops_data_full.jsonl > raw_aops_data.jsonl
+mv raw_aops_data.jsonl raw_aops_data_full.jsonl
+head -n 1000 raw_aops_data_full.jsonl > raw_aops_data.jsonl
 ```
+
+## Model conversion
+
+Here are the steps to download/convert all models that we used to create this dataset.
+
+Download the models by running this on cluster from the path that is mounted as `/hf_models` in your cluster config.
+```
+pip install -U "huggingface_hub[cli]"
+huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir Qwen2.5-32B-Instruct
+huggingface-cli download Qwen/QwQ-32B --local-dir QwQ-32B
+huggingface-cli download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
+```
+
+Convert the model to TensorRT-LLM with the following (you can skip this and make corresponding changes in the pipeline
+scripts to run with `server_type=vllm` or `server_type=sglang`)
+
+```
+ns convert \
+   --cluster=slurm \
+   --input_model=/hf_models/Qwen2.5-32B-Instruct \
+   --output_model=/trt_models/qwen2.5-32b-instruct \
+   --convert_from=hf \
+   --convert_to=trtllm \
+   --num_gpus=8 \
+   --model_type=qwen \
+   --hf_model_name=Qwen/Qwen2.5-32B-Instruct \
+   --max_input_len 24580 \
+   --max_seq_len 32768
+
+ns convert \
+   --cluster=slurm \
+   --input_model=/hf_models/QwQ-32B \
+   --output_model=/trt_models/qwq-32b \
+   --convert_from=hf \
+   --convert_to=trtllm \
+   --num_gpus=8 \
+   --model_type=qwen \
+   --hf_model_name=Qwen/QwQ-32B \
+   --max_input_len 24580 \
+   --max_seq_len 32768
+```
+
+At the time of our experiments serving DeepSeek-R1 model with sglang was faster than with TensorRT-LLM, so
+we do not convert that model.
+
+TODO: Add steps for sharding R1 checkpoint
+
 
 ## Problem generation pipeline
 
-### Model conversion
+Problem generation pipeline consists of the following stages:
 
-We used Qwen2.5-32B-Instruct to process the AoPS problems, here are the steps to download/convert this model.
+1. [Extract all problems](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-problems.yaml)
+   from the first forum post (`extract_problems` stage)
+2. Classify whether each problem belongs to one of the following categories:
+   [proof question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-proof.yaml),
+   [binary question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-binary.yaml),
+   [multiple-choice question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-mcq.yaml),
+   [invalid question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-invalid.yaml)
+   (`classify_problems` stage)
+3. [Extract answers](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-answers.yaml)
+   from the forum discussions (`extract_answers` stage)
+4. [Convert proof questions](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/convert-proofs.yaml)
+   to answer questions (`convert_proofs` stage)
+5. Remove all binary/multiple-choice/invalid problems and merge remaining problems with converted proofs (`merge_data` stage)
+6. [Decontaminate] the resulting questions with popular math benchmarks (`decontaminate` stage)
+
+You can run the full pipeline with
 
 ```
 

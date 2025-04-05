@@ -56,6 +56,11 @@ nav:
     - Decontamination: pipelines/decontamination.md
   - Code execution:
     - Sandbox: code-execution/sandbox.md
+  - OpenMathReasoning:
+    - openmathreasoning1/index.md
+    - Model evaluation: openmathreasoning1/evaluation.md
+    - Dataset construction: openmathreasoning1/dataset.md
+    - Model training: openmathreasoning1/training.md
   - OpenMathInstruct:
     - openmathinstruct2/index.md
     - Model evaluation: openmathinstruct2/evaluation.md
