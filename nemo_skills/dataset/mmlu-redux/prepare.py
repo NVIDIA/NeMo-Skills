@@ -15,9 +15,11 @@
 import argparse
 import json
 from pathlib import Path
+
 from datasets import load_dataset
 from tqdm import tqdm
 
+from nemo_skills.dataset.utils import get_mcq_fields
 
 # mmlu subcategories from https://github.com/hendrycks/test/blob/master/categories.py
 subcategories = {
@@ -92,21 +94,18 @@ def format_entry(entry, category):
         # multiple_correct_answers, expert and wrong_groundtruth with no labels
         return None
     return {
-        "question": entry['question'],
-        "A": entry['choices'][0],
-        "B": entry['choices'][1],
-        "C": entry['choices'][2],
-        "D": entry['choices'][3],
         "expected_answer": final_answer,
         "subset_for_metrics": subcategories[category][0],
-        "source": entry['source']
+        "subcategory": category,
+        "source": entry['source'],
+        **get_mcq_fields(entry["question"], entry["choices"]),
     }
 
 
 def write_data_to_file(output_file, data, category):
     with open(output_file, "at", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {category} ({subcategories[category][0]}) to {output_file.name}"):
-            if (final_entry := format_entry(entry, category)):
+            if final_entry := format_entry(entry, category):
                 json.dump(final_entry, fout)
                 fout.write("\n")
 
@@ -122,7 +121,7 @@ def main(args):
     output_file = data_dir / f"{args.split}.jsonl"
     open(output_file, "w")
 
-    # Load the dataset and write it to the output 
+    # Load the dataset and write it to the output
     for category in tqdm(subcategories):
         dataset = load_dataset("edinburgh-dawg/mmlu-redux-2.0", name=category, split='test')
         write_data_to_file(output_file, dataset, category)
