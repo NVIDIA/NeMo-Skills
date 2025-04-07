@@ -18,6 +18,7 @@ import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
+import shlex
 
 import nemo_run as run
 import typer
@@ -153,7 +154,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
     return missing_jobs
 
-
 def get_cmd(
     output_dir,
     extra_arguments,
@@ -172,10 +172,10 @@ def get_cmd(
     If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
     with a base name (plus `-rsSEED` or chunk info as needed).
     """
-
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
+    job_end_cmd = ""
 
     if random_seed is not None:
         cmd += (
@@ -195,10 +195,10 @@ def get_cmd(
             donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_prefix=output_prefix)}.done"
             donefiles.append(donefile)
 
-        if postprocess_cmd:
-            postprocess_cmd += f" && touch {donefiles[chunk_id]} "
+        if job_end_cmd:
+            job_end_cmd += f" && touch {donefiles[chunk_id]} "
         else:
-            postprocess_cmd = f"touch {donefiles[chunk_id]} "
+            job_end_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
         merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix)
@@ -206,13 +206,21 @@ def get_cmd(
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
         )
-        postprocess_cmd += f" && {merge_cmd}"
+        if postprocess_cmd:
+            postprocess_cmd = shlex.quote(postprocess_cmd)
+            merge_cmd = f"{merge_cmd} -- {postprocess_cmd}"
+        postprocess_cmd = f"{job_end_cmd} && {merge_cmd}"
 
     else:  # only writing a single status file
-        if postprocess_cmd:
-            postprocess_cmd += f" && touch {output_file}.done "
+        if job_end_cmd:
+            job_end_cmd += f" && touch {output_file}.done "
         else:
-            postprocess_cmd = f"touch {output_file}.done "
+            job_end_cmd = f"touch {output_file}.done "
+
+        if postprocess_cmd:
+            postprocess_cmd = f"{job_end_cmd} && {postprocess_cmd}"
+        else:
+            postprocess_cmd = job_end_cmd
 
     cmd += f" {extra_arguments} "
 
@@ -435,12 +443,6 @@ def generate(
     extra_arguments = f'{" ".join(ctx.args)}'
 
     chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
-    if chunking_enabled and postprocess_cmd:
-        logging.warning(
-            "Chunking is enabled, but postprocess_cmd is also specified. "
-            "Note that will be run for each chunk separately. Chunk merging "
-            "will be performed after postprocess_cmd."
-        )
     if chunking_enabled and generation_type != GenerationType.generate:
         logging.error(
             "Chunking is enabled, but generation type is not 'generate'. "
