@@ -69,8 +69,9 @@ def get_dataset_module(dataset, extra_datasets=None):
 
 
 def get_lean4_header():
-    LEAN4_HEADER= "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n"
+    LEAN4_HEADER = "import Mathlib\n\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen Topology Filter Real Complex TopologicalSpace Finset Function Metric Nat Rat\nopen scoped BigOperators Matrix\n\n"
     return LEAN4_HEADER
+
 
 def add_header_to_jsonl_inplace(jsonl_path, header):
     """
@@ -86,8 +87,9 @@ def add_header_to_jsonl_inplace(jsonl_path, header):
     with open(jsonl_path, "w", encoding="utf-8") as file:
         for line in lines:
             data = json.loads(line)
-            data["header"] = header  
+            data["header"] = header
             file.write(json.dumps(data) + "\n")
+
 
 def download_with_retries(url, output_file, max_retries=3, retry_delay=1):
     """Download a file with retry logic."""
@@ -142,3 +144,13 @@ def save_data_from_qwen(dataset, split="test"):
     os.remove(original_file)
 
     return output_file
+
+
+def get_mcq_fields(question, choices):
+    options_dict = {chr(ord('A') + i): option for i, option in enumerate(choices)}
+    options_text = "\n".join(f"{letter}. {option}" for letter, option in options_dict.items())
+    return {
+        "problem": f"{question}\n{options_text}",
+        "options": options_text,
+        **options_dict,
+    }
