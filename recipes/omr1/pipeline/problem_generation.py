@@ -203,7 +203,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--mode',
         type=str,
-        required=True,
+        default='full-qwq',
         choices=['demo', 'full-qwq'],
         help="Will pick a corresponding config from configs folder "
         "(full-r1 and full-qwq are the same for problem generation)",

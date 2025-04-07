@@ -90,25 +90,55 @@ TODO: Add steps for sharding R1 checkpoint
 
 ## Problem generation pipeline
 
-Problem generation pipeline consists of the following stages:
+[Problem generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/pipelines/problem_generation.py)
+consists of the following stages:
 
 1. [Extract all problems](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-problems.yaml)
-   from the first forum post (`extract_problems` stage)
+   from the first forum post (`extract_problems` stage).
 2. Classify whether each problem belongs to one of the following categories:
    [proof question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-proof.yaml),
    [binary question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-binary.yaml),
    [multiple-choice question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-mcq.yaml),
    [invalid question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-invalid.yaml)
-   (`classify_problems` stage)
+   (`classify_problems` stage).
 3. [Extract answers](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-answers.yaml)
-   from the forum discussions (`extract_answers` stage)
+   from the forum discussions (`extract_answers` stage).
 4. [Convert proof questions](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/convert-proofs.yaml)
-   to answer questions (`convert_proofs` stage)
-5. Remove all binary/multiple-choice/invalid problems and merge remaining problems with converted proofs (`merge_data` stage)
-6. [Decontaminate] the resulting questions with popular math benchmarks (`decontaminate` stage)
+   to answer questions (`convert_proofs` stage).
+5. Remove all binary/multiple-choice/invalid problems and merge remaining problems with converted proofs (`merge_data` stage).
+6. [Decontaminate](../pipelines/decontamination.md) the resulting questions with popular math benchmarks (`decontaminate` stage).
 
 You can run the full pipeline with
 
 ```
+python recipes/omr1/pipelines/problem_generation.py
+```
+
+You can specify a subset of stages using `--stages` argument, e.g. `--stages extract_problems` or `--stages classify_problems,extract_answers`.
+
+If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
+
+
+## Solution generation pipeline
+
+[Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/pipelines/solution_generation.py)
+consists of the following stages:
+
+1. [Generate solutions](../pipelines/generation.md) for each of the prepared problems (`generate_solutions` stage).
+2. [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
+   for all problems where ground-truth answer is not known (`fill_majority_answer` stage).
+3. [Judge answers using an LLM](../pipelines/llm-as-a-judge.md). Only the final answer is compared to the ground-truth (or majority)
+   answer, not the full solution (`judge_answers` stage).
+4. TODO: generate a new summary
+5. Filter out all incorrect solutions and prepare the data for SFT (`prepare_for_sft` stage).
+
+
+You can run the full pipeline using [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) as solution generation model with
 
 ```
+python recipes/omr1/pipelines/solution_generation.py --mode full-qwq
+```
+
+You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode full-qwq` or `--mode full-r1`.
+
+If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
