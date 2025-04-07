@@ -14,7 +14,6 @@
 
 import asyncio
 import copy
-import json
 import logging
 import re
 import sys
@@ -22,7 +21,6 @@ import time
 import uuid
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import tensorrt_llm
@@ -35,53 +33,6 @@ from tensorrt_llm.runtime.model_runner_cpp import ExternalDraftTokensConfig, Mod
 from transformers import AutoTokenizer
 
 app = FastAPI(title="TensorRT-LLM Server")
-
-
-def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
-    """Extract Answer String from \\boxed expression or based on regex"""
-    if not extract_from_boxed:
-        match = re.search(extract_regex, string)
-        if match:
-            return match.group(1)
-        return None
-
-    if "\\boxed" not in string:
-        return None
-
-    idx = string.rfind("\\boxed")
-    if idx < 0:
-        idx = string.rfind("\\fbox")
-        if idx < 0:
-            return None
-
-    i = idx
-    right_brace_idx = None
-    num_left_braces_open = 0
-    while i < len(string):
-        if string[i] == "{":
-            num_left_braces_open += 1
-        if string[i] == "}":
-            num_left_braces_open -= 1
-            if num_left_braces_open == 0:
-                right_brace_idx = i
-                break
-        i += 1
-
-    if right_brace_idx is None:
-        retval = None
-    else:
-        retval = string[idx : right_brace_idx + 1]
-
-    if retval:
-        left = "\\boxed{"
-        try:
-            assert retval[: len(left)] == left
-            assert retval[-1] == "}"
-            return retval[len(left) : -1]
-        except AssertionError:
-            return None
-
-    return None
 
 
 # keeping it here to make this file self-contained. This is duplicated from model.py
@@ -555,8 +506,8 @@ class TensorRTLLM:
         max_beam_width: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
-        repetition_check_chars: int = 1500,
-        repetition_limit: int = 2,
+        repetition_check_chars: Optional[int] = None,
+        repetition_limit: Optional[int] = None,
     ):
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(tokenizer_dir=model_path)
 

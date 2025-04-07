@@ -240,9 +240,8 @@ class BaseModel(abc.ABC):
                 if gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
-                    if (
-                        top_logprobs is None
-                    ):  # trtllm always return these fields so we need to remove them if not requested
+                    # trtllm always return these fields so we need to remove them if not requested
+                    if top_logprobs is None:
                         gen_dict.pop('tokens', None)
                         gen_dict.pop('logprobs', None)
 

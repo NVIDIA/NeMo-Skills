@@ -126,6 +126,8 @@ class CodeExecutionWrapper:
             # updating timeout to account for the time already spent
             new_timeout = int(timeout - (time.time() - start_time))
             request["timeout"] = new_timeout
+            if request['timeout'] <= 0:
+                break
 
             # Check if generation has been cancelled before proceeding
             if gen_id is not None and self._is_generation_cancelled(gen_id):
