@@ -473,16 +473,15 @@ def _stream(
                 runner.session.cancel_request(request_ids[0])
                 break
 
-        matching_stop_word = None
-        # checking every half of the required tokens to have overlapping checks
-        if seq_length - last_seq_length_stop >= num_tokens_to_check // 2:
-            # we are checking up to last seq length + num_tokens_to_check
-            generation_suffix = output['output_ids'][
-                0, 0, max(last_seq_length_stop - num_tokens_to_check, input_lengths[0]) : seq_length
-            ]
-            suffix_length = seq_length - max(last_seq_length_stop - num_tokens_to_check, input_lengths[0])
+        if seq_length - last_seq_length_stop >= num_tokens_to_check:
+            # we are checking in overlapping pieces to ensure nothing is missed
+            look_back = max(last_seq_length_stop - num_tokens_to_check // 2, input_lengths[0])
+            generation_suffix = output['output_ids'][0, 0, look_back:seq_length]
+            suffix_length = seq_length - look_back
             out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
             last_seq_length_stop = seq_length
+
+            matching_stop_word = None
             for stop_word in stop_words_list:
                 if stop_word in out_string:
                     matching_stop_word = stop_word
