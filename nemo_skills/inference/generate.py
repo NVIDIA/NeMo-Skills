@@ -58,8 +58,9 @@ class GenerateSolutionsConfig:
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
-    continue_prefix_generation: bool = False  # if True, model will be prompted to continue "generation" without closing assistant tag
-    remaining_code_executions: str = "8"
+    continue_prefix_generation: bool = (
+        False  # if True, model will be prompted to continue "generation" without closing assistant tag
+    )
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -100,6 +101,9 @@ class GenerateSolutionsConfig:
 
     # set to True if code execution needs to be supported
     code_execution: bool = False
+    # will add to prompt.fill as total_code_executions field (useful for models that support dynamically setting this)
+    # if total_code_executions placeholder is not in the prompt, this parameter has no effect
+    total_code_executions_in_prompt: int = 8
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
@@ -319,12 +323,13 @@ class GenerationTask:
     # TODO: data will not include any samples skipped after restart
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
+        data_point = deepcopy(data_point)
+        data_point['total_code_executions'] = self.cfg.total_code_executions_in_prompt
         return self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
             continue_prefix_generation=self.cfg.continue_prefix_generation,
-            remaining_code_executions=self.cfg.remaining_code_executions,
         )
 
     def llm_generate(self, data_points, data, is_async=False):

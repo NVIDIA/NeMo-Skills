@@ -77,7 +77,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
         gen_id: str = None,  # used for cancelling requests if supported
-        buffer_time: int = 0,
+        timeout: int | None = None,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
@@ -99,8 +99,7 @@ class CodeExecutionWrapper:
             except:
                 allowed_code_executions = self.config.max_code_executions
 
-        question_buffer_time = copy.copy(buffer_time)
-        question_start_time = int(time.time())
+        start_time = int(time.time())
 
         request = {
             "prompt": new_prompt,
@@ -112,7 +111,7 @@ class CodeExecutionWrapper:
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
-            "buffer_time": buffer_time,
+            "timeout": timeout,
         }
         session_id = None
         code_rounds_executed = 0
@@ -124,9 +123,9 @@ class CodeExecutionWrapper:
         for generation_index in range(self.config.max_code_executions + 1):
 
             generation_time_start = time.time()
-            # Deprecate buffer time by elapsed time
-            deprecated_buffer_time = int(question_buffer_time - (time.time() - question_start_time))
-            request["buffer_time"] = deprecated_buffer_time
+            # updating timeout to account for the time already spent
+            new_timeout = int(timeout - (time.time() - start_time))
+            request["timeout"] = new_timeout
 
             # Check if generation has been cancelled before proceeding
             if gen_id is not None and self._is_generation_cancelled(gen_id):
@@ -197,7 +196,7 @@ class CodeExecutionWrapper:
         return {
             'generation': request['prompt'][len(prompt) :],
             'code_rounds_executed': code_rounds_executed,
-            'total_num_generated_tokens': total_num_generated_tokens,
+            'num_generated_tokens': total_num_generated_tokens,
             'generation_time': generation_time,
             'code_execution_time': code_execution_time,
             'stopped_on_repetition': stopped_on_repetition,
@@ -222,7 +221,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | list[int] | None = None,
-        buffer_time: int | list[int] = 0,
+        timeout: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -247,7 +246,7 @@ class CodeExecutionWrapper:
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
-            "buffer_time": buffer_time,
+            "timeout": timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -307,9 +306,10 @@ class CodeExecutionWrapper:
                 output = {
                     'generation': None,
                     'code_rounds_executed': None,
-                    'total_num_generated_tokens': None,
+                    'num_generated_tokens': None,
                     'generation_time': None,
                     'code_execution_time': None,
+                    'stopped_on_repetition': None,
                 }
             else:
                 output = future.result()
@@ -341,7 +341,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
-        buffer_time: int | list[int] = 0,
+        timeout: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -363,7 +363,7 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
-            buffer_time=buffer_time,
+            timeout=timeout,
         )
         all_generations = [None] * len(prompts)
         while True:
