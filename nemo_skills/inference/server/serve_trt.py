@@ -169,7 +169,6 @@ def generate(
     return_all_generated_tokens: bool = False,
     tokenizer=None,
     timeout=None,
-    buffer_time=None,
     input_lengths=None,
     **kwargs,
 ):
@@ -393,7 +392,6 @@ def generate(
         stop_words_list=stop_words_list,
         tokenizer=tokenizer,
         timeout=timeout,
-        buffer_time=buffer_time,
         input_lengths=input_lengths,
     )
 
@@ -418,10 +416,9 @@ def _stream(
     max_new_tokens: int,
     sampling_config=None,
     timeout=None,
-    buffer_time=None,
     is_draft_target_model: bool = False,
-    repetition_check_chars: int = 500,
-    repetition_limit: int = 2,
+    repetition_check_chars: Optional[int] = None,
+    repetition_limit: Optional[int] = None,
 ):
     if stop_words_list is None:
         stop_words_list = []
@@ -431,14 +428,13 @@ def _stream(
         [copy.deepcopy(batch_input_ids_list[batch_idx]) for _ in range(num_sequences)]
         for batch_idx in range(len(request_ids))
     ]
-    # checking the last 20 tokens for stop words
+    # checking this often for stop phrases / repetitions
     num_tokens_to_check = 20
     repetition_check_tokens = 200
 
+    stop_on_repetitions = repetition_check_chars is not None and repetition_limit is not None
+
     start_time = time.time()
-    sample_timeout = timeout
-    if buffer_time:
-        sample_timeout = timeout + buffer_time
 
     finished_reqs = 0
     last_seq_length_stop = 0
@@ -471,9 +467,9 @@ def _stream(
         )
         seq_length = output['sequence_lengths'][0].item()
 
-        if sample_timeout:
+        if timeout:
             current_time = time.time() - start_time
-            if current_time >= sample_timeout:
+            if current_time >= timeout:
                 runner.session.cancel_request(request_ids[0])
                 break
 
@@ -496,7 +492,7 @@ def _stream(
                 runner.session.cancel_request(request_ids[0])
                 break
 
-        if seq_length - last_seq_length_rep >= repetition_check_tokens:
+        if stop_on_repetitions and seq_length - last_seq_length_rep >= repetition_check_tokens:
             last_seq_length_rep = seq_length
             # detokenizing everything so far to make sure generation
             # is not corrupted by stitching partial detokenizations
@@ -558,7 +554,6 @@ class TensorRTLLM:
         max_input_len: Optional[int] = None,
         max_output_len: Optional[int] = None,
         max_beam_width: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
         repetition_check_chars: int = 1500,
@@ -579,7 +574,6 @@ class TensorRTLLM:
         )
 
         self.runner = ModelRunnerCpp.from_dir(**runner_kwargs)
-        self.timeout = timeout_seconds
         self.repetition_check_chars = repetition_check_chars
         self.repetition_limit = repetition_limit
 
@@ -601,7 +595,7 @@ class TensorRTLLM:
         random_seed,
         stop_words_list,
         top_logprobs,
-        buffer_time,
+        timeout,
     ):
         try:
             request_id, stream_kwargs = generate(
@@ -627,8 +621,7 @@ class TensorRTLLM:
                 return_dict=True,
                 output_sequence_lengths=True,
                 streaming=True,
-                timeout=self.timeout,
-                buffer_time=buffer_time,
+                timeout=timeout,
             )
             # Forward repetition parameters:
             stream_kwargs['repetition_check_chars'] = self.repetition_check_chars
@@ -668,7 +661,7 @@ class TensorRTLLM:
             data["random_seed"],
             data["stop_words_list"],
             data["top_logprobs"],
-            data["buffer_time"],
+            data["timeout"],
         )
 
         self.active_generations[generation_id] = future
@@ -717,7 +710,7 @@ class GenerationRequest(BaseModel):
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
     top_logprobs: Optional[int] = None
-    buffer_time: int = 0
+    timeout: Optional[int] = None
 
 
 class GenerationResponse(BaseModel):
@@ -749,11 +742,10 @@ class MPIWrapper:
         max_input_len: Optional[int] = None,
         max_output_len: Optional[int] = None,
         max_beam_width: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
-        repetition_check_chars: int = 1500,
-        repetition_limit: int = 2,
+        repetition_check_chars: Optional[int] = None,
+        repetition_limit: Optional[int] = None,
     ):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
@@ -764,7 +756,6 @@ class MPIWrapper:
             max_output_len=max_output_len,
             max_beam_width=max_beam_width,
             kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
-            timeout_seconds=timeout_seconds,
             disable_chunked_context=disable_chunked_context,
             repetition_check_chars=repetition_check_chars,
             repetition_limit=repetition_limit,
@@ -789,7 +780,7 @@ class MPIWrapper:
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
-                "buffer_time": request.buffer_time,
+                "timeout": request.timeout,
             }
 
             self.comm.Barrier()
@@ -816,7 +807,7 @@ class MPIWrapper:
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
                 "top_logprobs": request.top_logprobs,
-                "buffer_time": request.buffer_time,
+                "timeout": request.timeout,
             }
 
             self.comm.Barrier()
@@ -870,17 +861,14 @@ def main():
     parser.add_argument("--max_output_len", type=int, default=None, help="Maximum output length")
     parser.add_argument("--max_beam_width", type=int, default=None, help="Maximum beam width")
     parser.add_argument(
-        "--timeout_seconds", type=int, default=None, help="No session should take longer than the timeout"
-    )
-    parser.add_argument(
         "--kv_cache_free_gpu_memory_fraction", type=float, default=None, help="Free GPU memory fraction for cache"
     )
     parser.add_argument("--disable_chunked_context", action="store_true", help="Disable chunked context")
     parser.add_argument(
-        "--repetition_check_chars", type=int, default=500, help="Number of characters to check for repetition"
+        "--repetition_check_chars", type=int, default=None, help="Number of characters to check for repetition"
     )
     parser.add_argument(
-        "--repetition_limit", type=int, default=2, help="Repetition limit: stops generation if exceeded"
+        "--repetition_limit", type=int, default=None, help="Repetition limit: stops generation if exceeded"
     )
     args = parser.parse_args()
 
@@ -890,7 +878,6 @@ def main():
         max_input_len=args.max_input_len,
         max_output_len=args.max_output_len,
         max_beam_width=args.max_beam_width,
-        timeout_seconds=args.timeout_seconds,
         kv_cache_free_gpu_memory_fraction=args.kv_cache_free_gpu_memory_fraction,
         disable_chunked_context=args.disable_chunked_context,
         repetition_check_chars=args.repetition_check_chars,
