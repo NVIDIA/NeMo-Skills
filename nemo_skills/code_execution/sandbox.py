@@ -173,7 +173,7 @@ class Sandbox(abc.ABC):
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
-        traceback_verbosity='context' # could be plain, context, verbose, or minimal
+        traceback_verbosity='plain' # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
 

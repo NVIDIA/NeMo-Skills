@@ -33,7 +33,7 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     max_code_executions: int = 3
-    sandbox_traceback_verbosity: str = 'context' # could be plain, context, verbose, or minimal
+    sandbox_traceback_verbosity: str = 'plain' # could be plain, context, verbose, or minimal
 
 
 class CodeExecutionWrapper:
