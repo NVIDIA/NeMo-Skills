@@ -22,8 +22,8 @@ assistant_end: "<|im_end|>\n"
 stop_phrases: ["<|im_end|>", "<|endoftext|>"]
 
 # used to execute code within these tags
-code_begin: "<tool_call>\n"
-code_end: "</tool_call>\n"
+code_begin: "```python\n"
+code_end: "```\n"
 # used to extract the code output
 code_output_begin: "```output\n"
 code_output_end: "```\n"
