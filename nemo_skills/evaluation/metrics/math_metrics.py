@@ -63,6 +63,15 @@ class MathMetrics(BaseMetrics):
             perf_dict["both_correct"] += int(current_correct_sympy and current_correct_judge)
             perf_dict["any_correct"] += int(current_correct_sympy or current_correct_judge)
 
+    def update_comb_metric_averaged(self, perf_dict, current_correct_sympy, current_correct_judge, no_answer):
+        perf_dict["correct_sympy"] += current_correct_sympy
+        perf_dict["correct_judge"] += current_correct_judge
+        perf_dict["no_answer"] += no_answer
+        if self.has_sympy and self.has_judge:
+            perf_dict["both_correct"] += current_correct_sympy and current_correct_judge
+            perf_dict["any_correct"] += current_correct_sympy or current_correct_judge
+
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 
@@ -129,6 +138,12 @@ class MathMetrics(BaseMetrics):
                     )
                     self.update_comb_metric(
                         self.agg_mode_dict[f"majority@{k}"],
+                        current_correct_sympy,
+                        current_correct_judge,
+                        no_answer,
+                    )
+                    self.update_comb_metric_averaged(
+                        self.agg_mode_dict[f"pass@1[{k}]"],
                         current_correct_sympy,
                         current_correct_judge,
                         no_answer,
@@ -267,6 +282,19 @@ class MathMetrics(BaseMetrics):
                     self.agg_mode_dict[f"pass@{k}"], current_correct_sympy, current_correct_judge, no_answer
                 )
 
+                # Pass@1[k] - mean of pass@1 across all generations
+                current_correct_sympy, current_correct_judge, no_answer = False, False, False
+                if self.has_sympy:
+                    current_correct_sympy = sum([elem['is_correct'] for elem in predictions[:k]]) / k
+                if self.has_judge:
+                    current_correct_judge = sum([is_correct_judgement(elem['judgement']) for elem in predictions[:k]]) / k
+                if all([elem['predicted_answer'] is None for elem in predictions[:k]]):
+                    no_answer = True
+
+                self.update_comb_metric_averaged(
+                    self.agg_mode_dict[f"pass@1[{k}]"], current_correct_sympy, current_correct_judge, no_answer
+                )
+
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
@@ -291,6 +319,6 @@ class MathMetrics(BaseMetrics):
         self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
 
     def max_aggregations_to_print(self):
-        """We will log all majority/rm/pass up to k, but only report the kth one."""
-        # majority + pass + 2xRM
-        return 2 * (1 + self.has_reward)
+        """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
+        # majority + pass + 2xRM + pass@1[k]
+        return 1 + 1 + 2 * self.has_reward + 1

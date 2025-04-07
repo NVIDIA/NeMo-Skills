@@ -124,7 +124,7 @@ model:
       end_of_name: "\x0A\x0A"  # \0x0A is '\n'
 
     sample: False # create the index mapping files for the sample data, so max_steps * global_batch_size can be larger than the dataset size
-    num_workers: 2
+    num_workers: 0
     dataloader_type: single  # only supports single
     train_ds:
       # Example of how to specify paths to multiple datasets
