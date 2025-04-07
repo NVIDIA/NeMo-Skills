@@ -443,12 +443,6 @@ def generate(
     extra_arguments = f'{" ".join(ctx.args)}'
 
     chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
-    if chunking_enabled and postprocess_cmd:
-        logging.warning(
-            "Chunking is enabled, and postprocess_cmd is also specified. "
-            "Note that  postprocess_cmd will be run once for each seed. Chunk merging "
-            "will be performed before postprocess_cmd."
-        )
     if chunking_enabled and generation_type != GenerationType.generate:
         logging.error(
             "Chunking is enabled, but generation type is not 'generate'. "
