@@ -33,7 +33,7 @@ LOG = logging.getLogger(__name__)
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
-    max_code_executions: int = 3
+    max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
 
@@ -88,16 +88,6 @@ class CodeExecutionWrapper:
             stop_phrases = []
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
-        allowed_code_executions = re.search(
-            r"You may perform up to (\d+) Python code calls to assist your reasoning", prompt
-        )
-        if not allowed_code_executions:
-            allowed_code_executions = self.config.max_code_executions
-        else:
-            try:
-                allowed_code_executions = int(allowed_code_executions.group(1))
-            except:
-                allowed_code_executions = self.config.max_code_executions
 
         start_time = int(time.time())
 
@@ -185,7 +175,7 @@ class CodeExecutionWrapper:
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
-                    remaining_code_executions = allowed_code_executions - generation_index - 1
+                    remaining_code_executions = self.config.max_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
