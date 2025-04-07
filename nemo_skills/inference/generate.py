@@ -58,9 +58,8 @@ class GenerateSolutionsConfig:
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
-    continue_prefix_generation: bool = (
-        False  # if True, model will be prompted to continue "generation" without closing assistant tag
-    )
+    # if True, model will be prompted to continue "generation" without closing assistant tag
+    continue_prefix_generation: bool = False
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
