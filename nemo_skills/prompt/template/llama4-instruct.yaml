@@ -1,0 +1,24 @@
+# Prompt specification for the original Llama4-instruct model
+# TO check
+
+# these tokens are always used to construct a prompt like this
+#
+#   single-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user}<user_end><assistant_begin>{generation}
+#   multi-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user1}<user_end><assistant_begin>{assistant1}<assistant_end>...
+#     <user_begin>{userN}<user_end><assistant_begin>{generation}
+
+text_begin: "<|begin_of_text|>"
+
+system_begin: "<|header_start|>system<|header_end|>\n\n"
+system_end: "<|eot|>"
+
+user_begin: "<|header_start|>user<|header_end|>\n\n"
+user_end: "<|eot|>"
+
+assistant_begin: "<|header_start|>assistant<|header_end|>\n\n"
+assistant_end: "<|eot|>"
+
+stop_phrases: ["<|eot|>"]
+
