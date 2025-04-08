@@ -33,3 +33,5 @@ containers:
 #   - /mnt/datadrive/models:/models
 #   - /mnt/datadrive/data:/data
 #   - /home/<username>/workspace:/workspace
+#   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
+#   - <...>/NeMo-Aligner:/opt/NeMo-Aligner
