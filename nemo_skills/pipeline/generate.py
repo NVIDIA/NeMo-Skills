@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-import os
 import logging
+import os
+import shlex
 import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
-import shlex
 
 import nemo_run as run
 import typer
@@ -75,7 +75,9 @@ def get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix="
     file_map = {}
     for seed in random_seeds:
         for chunk_id in chunk_ids:
-            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix)
+            output_file = get_chunked_rs_filename(
+                output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix
+            )
             file_map[(seed, chunk_id)] = f"{output_file}.done"
     return file_map
 
@@ -154,6 +156,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
     return missing_jobs
 
+
 def get_cmd(
     output_dir,
     extra_arguments,
@@ -163,7 +166,7 @@ def get_cmd(
     num_chunks=None,
     postprocess_cmd=None,
     script: str = 'nemo_skills.inference.generate',
-    output_prefix: str ="output",
+    output_prefix: str = "output",
 ):
     """
     Construct the generation command for language model inference.
@@ -173,7 +176,11 @@ def get_cmd(
     with a base name (plus `-rsSEED` or chunk info as needed).
     """
     # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix,)
+    output_file = get_chunked_rs_filename(
+        output_dir=output_dir,
+        random_seed=random_seed,
+        output_prefix=output_prefix,
+    )
     cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
     job_end_cmd = ""
 
@@ -187,7 +194,9 @@ def get_cmd(
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix)
+        output_file = get_chunked_rs_filename(
+            output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix
+        )
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
@@ -201,7 +210,9 @@ def get_cmd(
             job_end_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix)
+        merged_output_file = get_chunked_rs_filename(
+            output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix
+        )
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
@@ -424,7 +435,9 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    output_prefix: str = typer.Option("output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."),
+    output_prefix: str = typer.Option(
+        "output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
+    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -433,6 +446,7 @@ def generate(
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
 ):
     """Generate LLM completions for a given input file.
 
@@ -555,7 +569,7 @@ def generate(
                         partition=partition,
                         time_min=time_min,
                         server_config=server_config,
-                        with_sandbox=True,
+                        with_sandbox=with_sandbox,
                         sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
                         reuse_code=reuse_code,

@@ -46,7 +46,7 @@ class TrainingParams:
 
 def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict = {}
-    if cluster_config['executor'] == 'local':
+    if cluster_config['executor'] != 'slurm':
         assert params.num_nodes == 1, "Local executor only supports single node training"
         format_dict['nnodes'] = 1
         format_dict['nproc_per_node'] = params.num_gpus

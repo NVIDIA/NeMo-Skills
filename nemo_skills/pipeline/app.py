@@ -79,7 +79,7 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
     if isinstance(directory, str):
         directory = [directory]
 
-    if cluster_config.get('executor') == 'local':
+    if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
         for dir_path in directory:
             tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
@@ -114,7 +114,7 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
     if isinstance(directories, str):
         directories = [directories]
 
-    if cluster_config.get('executor') == 'local':
+    if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)
 
         all_dirs_exist = True
