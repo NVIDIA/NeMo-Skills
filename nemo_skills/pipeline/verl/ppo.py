@@ -213,6 +213,7 @@ class DAPOPPOVerlTask:
     offload=False
     # gen_tp=4
     gen_tp=2
+    extra_arguments: str = ""
 
     def get_ray_launch_cmd(self):
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
@@ -285,6 +286,7 @@ class DAPOPPOVerlTask:
             f'++trainer.total_epochs=1 '
             f'++trainer.default_local_dir="{self.CKPTS_DIR}" '
             f'++trainer.resume_mode=auto '
+            f'{self.extra_arguments}'
         )
         return cmd
 
@@ -378,6 +380,7 @@ def get_training_cmd(
             TRAIN_FILE=prompt_data,
             CKPTS_DIR=f"{output_dir}/ckpts/{wandb_project}/{expname}",
             **{'TEST_FILE': eval_data} if eval_data else {},
+            extra_arguments=extra_arguments,
         )
 
     else:
