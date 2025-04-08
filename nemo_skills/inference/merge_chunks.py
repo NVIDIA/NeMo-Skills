@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-import sys
 import os
-import subprocess
 import shlex
+import subprocess
+import sys
+
 
 def unescape_shell_command(command: str) -> str:
     """Unescape special shell characters so they are correctly interpreted before execution."""
     command = command.strip() if command else ""
     return shlex.split(command)
+
 
 # Check if at least one input file and an output file are provided
 if len(sys.argv) < 3:
@@ -20,7 +22,7 @@ if "--" in sys.argv:
     sep_index = sys.argv.index("--")
     output_file = sys.argv[1]
     input_files = sys.argv[2:sep_index]
-    post_merge_command = " ".join(sys.argv[sep_index + 1:])
+    post_merge_command = " ".join(sys.argv[sep_index + 1 :])
     post_merge_command = unescape_shell_command(post_merge_command)
 else:
     output_file = sys.argv[1]
@@ -51,10 +53,7 @@ try:
     # Execute the post-merge command, if provided
     if post_merge_command:
         print(f"Executing post-merge command: {' '.join(post_merge_command)}")
-        result = subprocess.run(
-            ' '.join(post_merge_command), shell=True,
-            check=True,
-        )
+        result = subprocess.run(' '.join(post_merge_command), shell=True, check=True)
 
 except subprocess.CalledProcessError as e:
     print(f"An error occurred: {e}")

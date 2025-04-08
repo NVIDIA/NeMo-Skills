@@ -99,6 +99,7 @@ class BaseModel(abc.ABC):
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -126,7 +127,8 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
@@ -138,8 +140,9 @@ class BaseModel(abc.ABC):
             'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
-            'top_logprobs': top_logprobs,
             'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -203,7 +206,8 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
@@ -236,7 +240,8 @@ class BaseModel(abc.ABC):
                 if gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
-                    if top_logprobs is None: # trtllm always return these fields so we need to remove them if not requested
+                    # trtllm always return these fields so we need to remove them if not requested
+                    if top_logprobs is None:
                         gen_dict.pop('tokens', None)
                         gen_dict.pop('logprobs', None)
 
@@ -264,6 +269,7 @@ class TRTLLMModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
     ) -> list[dict]:
@@ -288,6 +294,7 @@ class TRTLLMModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
             "top_logprobs": top_logprobs,
+            "timeout": timeout,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
@@ -318,7 +325,8 @@ class TRTLLMModel(BaseModel):
         min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
-        top_logprobs: int | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
@@ -336,6 +344,7 @@ class TRTLLMModel(BaseModel):
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
+            'timeout': timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -415,6 +424,7 @@ class NemoModel(BaseModel):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -425,6 +435,8 @@ class NemoModel(BaseModel):
             raise NotImplementedError("Nemo server does not support min_p parameter.")
         if top_logprobs is not None:
             raise NotImplementedError("Nemo server does not support top_logprobs parameter.")
+        if timeout is not None:
+            raise NotImplementedError("Nemo server does not support timeout parameter.")
         if isinstance(prompt, dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
@@ -466,13 +478,16 @@ class NemoModel(BaseModel):
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
         if top_logprobs is not None:
             raise NotImplementedError("Nemo server does not support top_logprobs parameter.")
-        
+        if timeout is not None:
+            raise NotImplementedError("Nemo server does not support timeout parameter.")
+
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
@@ -641,6 +656,7 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
+        timeout: int | None = None,
         top_logprobs: int | None = None,
     ) -> str:
         if top_k != 0:
@@ -684,6 +700,7 @@ class OpenAIModel(BaseModel):
                     messages=prompt,
                     logprobs=top_logprobs is not None,
                     top_logprobs=top_logprobs,
+                    timeout=timeout,
                 )
             else:
                 raise
@@ -772,6 +789,7 @@ class VLLMModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> dict:
         if isinstance(prompt, dict):
@@ -801,6 +819,7 @@ class VLLMModel(BaseModel):
                 "repetition_penalty": repetition_penalty,
                 "spaces_between_special_tokens": False,
             },
+            timeout=timeout,
         )
 
         return self.parse_openai_response(response)
