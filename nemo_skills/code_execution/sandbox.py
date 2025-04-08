@@ -173,7 +173,10 @@ class Sandbox(abc.ABC):
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
+        traceback_verbosity='plain' # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
+        traceback_verbosity = traceback_verbosity.capitalize()
+
         if session_id is None and language == "python":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
@@ -186,12 +189,26 @@ class Sandbox(abc.ABC):
 import traceback
 import json
 import os
+import re
 import warnings
 warnings.filterwarnings('ignore')
 os.environ['OPENBLAS_NUM_THREADS'] = '16'
 
 from IPython.core.interactiveshell import InteractiveShell
 from IPython.utils import io
+
+def simplify_errors(error_text):
+    def strip_ansi_codes(text):
+        ansi_escape = re.compile(r'\\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+    
+    error_text = strip_ansi_codes(error_text)
+    output = []
+    for line in error_text.split('\\n'):
+        if line.strip().startswith('File <ipython-'):
+            continue
+        output.append(line)
+    return '\\n'.join(output)
 
 code_snippets = []
 """
@@ -202,6 +219,7 @@ code_snippets = []
             TO_EXECUTE += f"""
 try:
     shell = InteractiveShell()
+    shell.InteractiveTB.set_mode(mode='{traceback_verbosity}')
     for code in code_snippets:
         with io.capture_output() as captured:
             exec_result = shell.run_cell(code)
@@ -212,8 +230,12 @@ try:
     if len(stderr) > {max_output_characters}:
         stderr = stderr[:{max_output_characters}] + "<output cut>"
     if stdout:
+        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
+            stdout = simplify_errors(stdout)
         stdout += "\\n"
     if stderr:
+        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
+            stderr = simplify_errors(stderr)
         stderr += "\\n"
     to_return = {{"process_status": "completed", "stdout": stdout, "stderr": stderr}}
 except Exception:
