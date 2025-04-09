@@ -50,13 +50,23 @@ def setup():
             default=default_name,
         )
 
+        # Check if the config file already exists
+        config_file = config_dir / (config_name + ".yaml")
+        if config_file.exists():
+            overwrite = typer.confirm(
+                f"\nThe config file {config_file} already exists. Do you want to overwrite it?",
+                default=False,
+            )
+            if not overwrite:
+                continue
+
         # initializing default containers
         config = {'executor': config_type, 'containers': _containers}
 
         mounts = typer.prompt(
             "\nWe execute all commands in docker containers, so you need to "
             f"define what to mount there to access your {config_type} data/models.\n"
-            "You don't need to mount this repo explicitly, it's always accessible with /nemo_run/code\n"
+            "You don't need to mount nemo-skills or your local git repo, it's always accessible with /nemo_run/code\n"
             "It's usually a good idea to define some mounts for your general workspace (to keep data/output results)\n"
             "as well as for your models (e.g. /trt_models, /hf_models).\n"
             "What mounts would you like to add? (comma separated)",
@@ -100,25 +110,25 @@ def setup():
                     ssh_tunnel.pop('identity')
                 ssh_tunnel['job_dir'] = typer.prompt(
                     "\nWe need some place to keep uploaded code and experiment metadata on cluster.\n"
-                    "What path do you want to use for that (you might need to clean it up periodically if you submit many experiments)?",
+                    "What path do you want to use for that (you might need to clean it "
+                    "up periodically if you submit many experiments)?",
                 )
                 config['ssh_tunnel'] = ssh_tunnel
             else:
                 config['job_dir'] = typer.prompt(
                     "\nWe need some place to experiment metadata and packaged code.\n"
-                    "What path do you want to use for that (you might need to clean it up periodically if you submit many experiments)?",
+                    "What path do you want to use for that (you might need to clean it "
+                    "up periodically if you submit many experiments)?",
                 )
-            config['account'] = typer.prompt(
-                "\nWhat is the slurm account you want to use?",
-                default="",
-            )
+            config['account'] = typer.prompt("\nWhat is the slurm account you want to use?")
             config['partition'] = typer.prompt(
-                "\nWhat is the default slurm partition you want to use? You can always override with --partition argument.",
-                default="",
+                "\nWhat is the default slurm partition you want to use? "
+                "You can always override with --partition argument.",
             )
             config['job_name_prefix'] = ""
             timeouts = typer.prompt(
-                "\nIf your cluster has a strict time limit for each job, we need to know the value to be able to save checkpoints before the job is killed.\n"
+                "\nIf your cluster has a strict time limit for each job, we need to "
+                "know the value to be able to save checkpoints before the job is killed.\n"
                 "Specify as partition1:hh:mm:ss,partition2:hh:mm:ss\n"
                 "Leave empty if you don't have time limits.",
                 default="",
@@ -129,7 +139,6 @@ def setup():
                 }
 
         # Create the config file
-        config_file = config_dir / (config_name + ".yaml")
         with open(config_file, 'wt') as fout:
             yaml.dump(config, fout, sort_keys=False, indent=4)
 

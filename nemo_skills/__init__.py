@@ -15,11 +15,11 @@
 __version__ = '0.5.0'
 
 _containers = {
-    'trtllm': f'igitman/nemo-skills-trtllm:{__version__}',
-    'vllm': f'igitman/nemo-skills-vllm:{__version__}',
-    'sglang': f'igitman/nemo-skills-sglang:{__version__}',
-    'nemo': f'igitman/nemo-skills-nemo:{__version__}',
-    'sandbox': f'igitman/nemo-skills-sandbox:{__version__}',
-    'nemo-skills': f'igitman/nemo-skills:{__version__}',
-    'verl': f'igitman/nemo-skills-verl:{__version__}',
+    'trtllm': 'igitman/nemo-skills-trtllm:0.5.0',
+    'vllm': 'igitman/nemo-skills-vllm:0.5.3',
+    'sglang': 'igitman/nemo-skills-sglang:0.5.3',
+    'nemo': 'igitman/nemo-skills-nemo:0.5.3',
+    'sandbox': 'igitman/nemo-skills-sandbox:0.5.0',
+    'nemo-skills': 'igitman/nemo-skills:0.5.3',
+    'verl': 'igitman/nemo-skills-verl:0.5.3',
 }
