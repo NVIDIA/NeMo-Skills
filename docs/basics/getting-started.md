@@ -74,15 +74,90 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
 You should be able to see a jsonl file with 3 lines containing the original data and a new `generation` key
 with an LLM output for each prompt.
 
+```jsonl title='generation/output.jsonl'
+{"num_generated_tokens": 76, "generation": "I'm doing fantastically well, thanks for asking! You know, I'm so good that I'm practically overflowing with NeMo-Skills-level linguistic mastery, but I'm not too full of myself to admit that I'm just a language model, and I'm here to help you with your question. So, which option is it? A) Great or B) Bad?", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"num_generated_tokens": 102, "generation": "You want to know the weather? Well, I've got some \"forecasting\" skills that are off the charts! *wink wink* Just like the NeMo-Skills repo, where the models are trained to be \"weather-wise\" (get it? wise? like the weather? ahh, nevermind...). Anyway, I'm going to take a \"rain-check\" on that question and say... Option A: Perfect! The sun is shining bright, and it's a beautiful day!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"num_generated_tokens": 120, "generation": "You want to know how I feel? Well, let me check my emotions... *taps into the vast ocean of digital feelings* Ah, yes! I'm feeling... *dramatic pause* ... Nice! (Option B: Nice) And you know why? Because I'm a large language model, I don't have feelings like humans do, but I'm always happy to chat with you, thanks to the NeMo-Skills repo, where my developers have skillfully infused me with the ability to be nice (and sometimes a little crazy, but that's a whole different story)!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+```
+
 ## Local inference
 
-If you pay attention to the log of above commands, it's going to print you this warning
+If you pay attention to the log of above commands, you will notice that it prints this warning
 
 ```
 WARNING  Cluster config is not specified. Running locally without containers. Only a subset of features is supported and you're responsible for installing any required dependencies. It's recommended to run `ns setup` to define appropriate configs!
 ```
 
-...
+Indeed, for anything more complicated than calling an API model, you'd need to do a little bit more setup. Since there
+are many heterogeneous jobs that we support, it's much simpler to run things in prebuilt containers than to try to
+install all packages in your current environment. To tell nemo-skills which containers to use and how to mount your
+local filesystem, we'd need to define a [cluster config](./cluster-configs.md). Run `ns setup` and follow
+the prompts to define your configuration. Choose `local` for the config type/name and define some mount for your `/workspace`
+and another mount[^1] for `/hf_models`, e.g.
+
+```bash
+/home/<username>:/workspace,/home/<username>/models/hf_models:/hf_models
+```
+
+[^1]: Of course you can use a single mount if you'd like or define more than 2 mounts
+
+Also add `HUGGINGFACE_HUB_CACHE=/hf_models` when asked to add environment variables.
+
+Now that we have our first config created, we can run inference
+with a local model (assuming you have at least one GPU on the machine you're using).
+
+```bash
+ns generate \
+    --cluster=local \
+    --server_type=vllm \
+    --model=Qwen/Qwen2.5-1.5B-Instruct \
+    --server_gpus=1 \
+    --output_dir=/workspace/generation-local \
+    ++input_file=/workspace/input.jsonl \
+    ++prompt_config=/workspace/prompt.yaml
+```
+
+This command might take a while to start since it's going to download a fairly-heavy
+[vLLM](https://github.com/vllm-project/vllm) container. But after
+that's done, it should start a local server with the Qwen2.5-1.5B model and run inference on the same set of prompts.
+
+It's also very easy to convert the HuggingFace checkpoint to [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/) and
+run inference with it, instead of vLLM (which we highly recommend for anything large-scale). If you'd like to try that,
+run the commands below (again, might take a while the first time, since we will be downloading another heavy container).
+
+```bash
+pip install -U "huggingface_hub[cli]"  # (1)!
+huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir Qwen2.5-1.5B-Instruct
+
+ns convert \  # (2)!
+    --cluster=local \
+    --input_model=/workspace/Qwen2.5-1.5B-Instruct \
+    --output_model=/workspace/qwen2.5-1.5b-instruct-trtllm \
+    --convert_from=hf \
+    --convert_to=trtllm \
+    --num_gpus=1 \
+    --model_type=qwen \
+    --hf_model_name=Qwen/Qwen2.5-1.5B-Instruct
+
+ns generate \
+    --cluster=local \
+    --server_type=trtllm \
+    --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
+    --server_gpus=1 \
+    --output_dir=/workspace/generation-local-trtllm \
+    ++input_file=/workspace/input.jsonl \
+    ++prompt_config=/workspace/prompt.yaml \
+    ++prompt_template=qwen-instruct  # (3)!
+```
+
+1.   We are re-downloading the model explicitly since TensorRT-LLM cannot work with the HuggingFace cache.
+2.   You can specify any extra parameters for [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py) directly as arguments to this command.
+3.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
+     do that even for vLLM or other locally hosted models as we found that HuggingFace tokenizer templates are not always
+     correct and it's best to be explicit about what is used for each model.
+
+## Slurm inference
+
 
 # Important details
 
