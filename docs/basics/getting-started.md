@@ -219,6 +219,7 @@ run_cmd( # (1)!
     ),
     cluster=cluster,
     expname=f"{expname}-download-hf",
+    logdir=f"{output_dir}/download-logs"
 )
 
 convert(
@@ -258,6 +259,26 @@ eval(
      (we will set proper slurm dependencies). These parameters have no effect when you're not running slurm jobs.
 4.   You can find all supported benchmarks in the [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/dataset)
      folder. `:64` means that we are asking for 64 samples for each example so that we can compute majority@64 and pass@64 metrics.
+
+After all evaluation jobs are finished (you'd need to check your slurm queue to know that) you can summarize the results
+with the following command
+
+```bash
+ns summarize_results --cluster slurm /workspace/qwq-32b-test/results
+```
+
+which will output the following
+
+```bash
+...
+```
+
+And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own
+[pipelines](TODO). You can see some examples from our previous releases such as
+[OpenMathInstruct-2](../openmathinstruct2/index.md) or TODO.
+
+Please read the next section to recap all of the important concepts that we touched upon and learn some more details.
+
 
 # Important details
 
