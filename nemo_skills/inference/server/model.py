@@ -757,14 +757,12 @@ class AzureOpenAIModel(OpenAIModel, BaseModel):
             base_url = os.getenv("NEMO_SKILLS_AZURE_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
-            if base_url is not None and 'api.nvidia.com' in base_url:
+            if base_url is not None and 'nvidia.com' in base_url:
                 api_key = os.getenv("NVIDIA_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
-            elif base_url is not None and 'api.openai.com' in base_url:
-                api_key = os.getenv("AZURE_OPENAI_API_KEY", api_key)
-                if not api_key:
-                    raise ValueError("AZURE_OPENAI_API_KEY is required for OpenAI models.")
+            else:
+                raise ValueError("API_KEY error")
 
         self.client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=base_url)
         self.model = model
@@ -793,11 +791,11 @@ class AzureOpenAIModel(OpenAIModel, BaseModel):
         if temperature != 1:
             temperature = 1
             LOG.info("Temperature for AzureOpenAI models is set to 1.")
-        if top_p:
+        if top_p is not None:
             LOG.info("Top-p is not used for AzureOpenAI models.")
-        if repetition_penalty:
+        if repetition_penalty is not None:
             LOG.info("Repetition_penalty is not used for AzureOpenAI models.")
-        if stop_phrases:
+        if stop_phrases is not None:
             LOG.info("Stop_phrases are not used for AzureOpenAI models.")
         try:
             response = self.client.chat.completions.create(
@@ -835,6 +833,8 @@ class AzureOpenAIModel(OpenAIModel, BaseModel):
             # sometimes response is a string?
             LOG.error("Unexpected response from OpenAI API: %s", response)
             raise
+        except openai.RateLimitError:
+            raise openai.RateLimitError(e.message + "\n Try to reduce the batch_size")
 
         choice = response.choices[0]
         output = choice.message.content
