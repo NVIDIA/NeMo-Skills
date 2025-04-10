@@ -42,13 +42,15 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - footnotes
 nav:
-  - Getting started: index.md
-  - Basics:
-    - Prerequisites: basics/prerequisites.md
-    - Inference: basics/inference.md
+  - NeMo-Skills: index.md
+  - Getting started:
+    - basics/index.md
+    - Cluster configs: basics/cluster-configs.md
+    - Code packaging: basics/code-packaging.md
     - Prompt format: basics/prompt-format.md
-    - Common parameters: basics/common-parameters.md
+    - Inference: basics/inference.md
   - Pipelines:
+    - pipelines/index.md
     - Generation: pipelines/generation.md
     - Evaluation: pipelines/evaluation.md
     - Training: pipelines/training.md

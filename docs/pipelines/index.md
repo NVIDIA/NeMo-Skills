@@ -1,5 +1,7 @@
 # Pipelines
 
+## Basics
+
 NeMo-Skills has a large collection of building blocks that you can use to construct various pipelines to improve LLMs.
 All of the "pipeline" scripts are located in the [nemo_skills/pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/pipeline)
 folder and have a unified interface that help us connect them together.
@@ -9,22 +11,10 @@ arguments are directly listed in the corresponding Python function or visible wh
 Any other arguments that you pass to the wrapper script are directly passed into the *main* job that the wrapper
 launches. These arguments are never checked when you submit a job, so if you have some mistake in them, you will only
 know about that when the job starts running. For most of our *main* scripts we use [Hydra](https://hydra.cc/) and thus
-they typically start with `++arg_name`. If you're using Python API you would need to specify all *main* arguments with
+their arguments typically start with `++arg_name`. If you're using Python API you would need to specify all *main* arguments with
 `ctx=wrap_arguments("...")` interface for technical reasons.
 
 This might sound a little complicated, so let's see how it works through an example from the [Getting Started Tutorial](../basics/getting-started.md).
-
-```bash
-ns generate \
-    --cluster=local \
-    --server_type=trtllm \
-    --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
-    --server_gpus=1 \
-    --output_dir=/workspace/generation-local-trtllm \
-    ++input_file=/workspace/input.jsonl \
-    ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=qwen-instruct
-```
 
 === "ns interface"
 
@@ -40,7 +30,7 @@ ns generate \
         ++prompt_template=qwen-instruct
     ```
 
-=== "Python interface"
+=== "python interface"
 
     ```python
     from nemo_skills.pipeline import wrap_arguments, generate
@@ -72,12 +62,16 @@ You can also open that script's code in
 [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/inference/generate.py)
 and see all arguments and logic there.
 
+You can chain multiple pipelines together to set proper slurm dependencies using `--run_after` parameter.
+There is an example in [tutorial](../basics/index.md#slurm-inference) or in
+[training documentation](training.md#chaining-pipelines-with-python).
 
-# Common parameters
+
+## Common parameters
 
 Many of our scripts have a shared set of common parameters that we list here.
 
-## All pipeline scripts
+### All pipeline scripts
 
 All scripts inside pipeline folder have the following parameters.
 
@@ -105,7 +99,7 @@ All scripts inside pipeline folder have the following parameters.
   its code (to avoid re-packaing/uploading to cluster). If running from Python we will automatically
   reuse the last submitted experiment in the current Python session.
 
-## Generation scripts
+### Generation scripts
 
 All of the scripts that involve LLM data generation accept a common set of parameters.
 

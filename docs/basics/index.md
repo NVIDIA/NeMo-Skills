@@ -105,6 +105,9 @@ Also add `HUGGINGFACE_HUB_CACHE=/hf_models` when asked to add environment variab
 
 Now that we have our first config created, we can run inference
 with a local model (assuming you have at least one GPU on the machine you're using).
+You would also need to have
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+set up on your machine.
 
 ```bash
 ns generate \
@@ -154,7 +157,7 @@ ns generate \
 2.   You can specify any extra parameters for
      [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
      directly as arguments to this command.
-4.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
+3.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
      do that even for vLLM or other locally hosted models as we found that HuggingFace tokenizer templates are not always
      correct and it's best to be explicit about what is used for each model.
 
@@ -163,7 +166,7 @@ ns generate \
 Running local jobs is convenient for quick testing and debugging, but for anything large-scale we need to
 leverage a Slurm cluster[^2]. Let's setup our cluster config for that case by running `ns setup` one more time.
 
-[^2]: Adding support for other kinds of clusters should be straightforward - open an issue if that's needed for you.
+[^2]: Adding support for other kinds of clusters should be straightforward - open an issue if you need that
 
 This time pick `slurm` for the config type and fill out all other required information
 (such as ssh access, account, partition, etc.).
@@ -204,6 +207,13 @@ model for a total of 64 samples)
 
 [^3]: Any nemo-skills commands can be run from command-line or from Python with equivalent functionality
 
+First prepare evaluation data
+
+```bash
+python -m nemo_skills.dataset.prepare aime24 aime25
+```
+
+Then run the following Python script
 
 ```python
 from nemo_skills.pipeline import wrap_arguments, convert, eval, run_cmd
@@ -219,11 +229,11 @@ run_cmd( # (1)!
     ),
     cluster=cluster,
     expname=f"{expname}-download-hf",
-    logdir=f"{output_dir}/download-logs"
+    log_dir=f"{output_dir}/download-logs"
 )
 
 convert(
-    ctx=wrap_arguments("--max_input_len 2000 --max_seq_len 34000"), # (2)!
+    ctx=wrap_arguments("--max_input_len 2000 --max_seq_len 20000"), # (2)!
     cluster=cluster,
     input_model=f"{output_dir}/QwQ-32B",
     output_model=f"{output_dir}/qwq-32b-trtllm",
@@ -236,7 +246,11 @@ convert(
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=qwen-instruct"),
+    ctx=wrap_arguments(
+        "++prompt_template=qwen-instruct "
+        "++inference.tokens_to_generate=16000 "
+        "++inference.temperature=0.6"
+    ),
     cluster=cluster,
     model=f"{output_dir}/qwq-32b-trtllm",
     server_type="trtllm",
@@ -264,7 +278,7 @@ After all evaluation jobs are finished (you'd need to check your slurm queue to 
 with the following command
 
 ```bash
-ns summarize_results --cluster slurm /workspace/qwq-32b-test/results
+ns summarize_results --cluster=slurm /workspace/qwq-32b-test/results
 ```
 
 which will output the following
