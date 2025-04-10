@@ -14,6 +14,7 @@
 
 __version__ = '0.5.0'
 
+# only used in ns setup command to initialize with defaults
 _containers = {
     'trtllm': 'igitman/nemo-skills-trtllm:0.5.0',
     'vllm': 'igitman/nemo-skills-vllm:0.5.3',
