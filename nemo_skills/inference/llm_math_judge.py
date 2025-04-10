@@ -86,10 +86,10 @@ class LlmMathJudgeConfig:
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
-        if self.server.server_type != "openai" and self.prompt_template is None:
+        if self.server.server_type not in ["openai", "azureopenai"] and self.prompt_template is None:
             raise ValueError("Prompt template is required for non-OpenAI servers")
 
-        if self.server.server_type == "openai" and self.prompt_template is not None:
+        if self.server.server_type not in ["openai", "azureopenai"] and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
 
