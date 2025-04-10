@@ -306,7 +306,7 @@ used as `--arg_name`) and *main* arguments (typically specified as `++arg_name` 
 or how many GPUs to request in slurm) while the *main* arguments are directly passed to whatever underlying script the
 wrapper command calls. When you run `ns <command> --help`, you will always see the *wrapper* arguments displayed directly
 as well as the information on what actual script is used underneath and an extra command you can run to see
-what *inner* arguments are available. You can learn more about this in [running commands](./running-commands.md) documentation.
+what *inner* arguments are available. You can learn more about this in [pipelines documentation](../pipelines/index.md).
 
 **Scheduling slurm jobs**. Our code is primarily built to schedule jobs on slurm clusters and that affects many design decisions
 we made. A lot of the arguments for nemo-skills commands are only used with slurm cluster configs and are ignored when
