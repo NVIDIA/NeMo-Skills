@@ -126,7 +126,7 @@ run inference with it, instead of vLLM (which we highly recommend for anything l
 run the commands below (again, might take a while the first time, since we will be downloading another heavy container).
 
 ```bash
-pip install -U "huggingface_hub[cli]"  # (1)!
+pip install -U "huggingface_hub[cli]" # (1)!
 huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir Qwen2.5-1.5B-Instruct
 
 ns convert \  # (2)!
@@ -147,17 +147,117 @@ ns generate \
     --output_dir=/workspace/generation-local-trtllm \
     ++input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=qwen-instruct  # (3)!
+    ++prompt_template=qwen-instruct # (3)!
 ```
 
 1.   We are re-downloading the model explicitly since TensorRT-LLM cannot work with the HuggingFace cache.
-2.   You can specify any extra parameters for [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py) directly as arguments to this command.
-3.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
+2.   You can specify any extra parameters for
+     [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
+     directly as arguments to this command.
+4.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
      do that even for vLLM or other locally hosted models as we found that HuggingFace tokenizer templates are not always
      correct and it's best to be explicit about what is used for each model.
 
 ## Slurm inference
 
+Running local jobs is convenient for quick testing and debugging, but for anything large-scale we need to
+leverage a Slurm cluster[^2]. Let's setup our cluster config for that case by running `ns setup` one more time.
+
+[^2]: Adding support for other kinds of clusters should be straightforward - open an issue if that's needed for you.
+
+This time pick `slurm` for the config type and fill out all other required information
+(such as ssh access, account, partition, etc.).
+
+Now that we have a slurm config setup, we can try running some jobs. Generally, you will need to upload models / data
+on cluster manually and then reference a proper mounted path. But for small-scale things we can also leverage the
+[code packaging](./code-packaging.md) functionality that nemo-skills provide. Whenever you run any of the ns commands
+from a git repository (whether that's [NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) itself or any other repo),
+we will package your code and upload it on cluster. You can then reference it with `/nemo_run/code` in your commands.
+Let's give it a try by putting our prompt/data into a new git repository
+
+```bash
+mkdir test-repo && cd test-repo && cp ../prompt.yaml ../input.jsonl ./
+git init && git add --all && git commit -m "Init commit" # (1)!
+
+ns generate \
+    --cluster=slurm \
+    --server_type=vllm \
+    --model=Qwen/Qwen2.5-1.5B-Instruct \
+    --server_gpus=1 \
+    ++input_file=/nemo_run/code/input.jsonl \
+    ++prompt_config=/nemo_run/code/prompt.yaml \
+    --output_dir=/workspace/generation # (2)!
+```
+
+1.   The files have to be committed as we only package what is tracked by git.
+2.   This `/workspace` is a cluster location that needs to be defined in your slurm config.
+     You'd need to manually download the output file or inspect it directly on cluster.
+
+Note that this command finished right away as it only schedules the job in the slurm queue. You can run the
+printed `nemo experiment logs ...` command to stream job logs. You can also check
+the `/workspace/generation/generation-logs` folder on cluster to see the logs there.
+
+We can also easily run a much more large-scale jobs on slurm using ns commands. E.g. here is a simple script that
+uses nemo-skills Python API[^3] to convert [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model to TensorRT-LLM and
+launch 16 parallel evaluation jobs on aime24 and aime25 benchmarks (each doing 4 independent samples from the
+model for a total of 64 samples)
+
+[^3]: Any nemo-skills commands can be run from command-line or from Python with equivalent functionality
+
+
+```python
+from nemo_skills.pipeline import wrap_arguments, convert, eval, run_cmd
+
+expname = "qwq-32b-test"
+cluster = "slurm"
+output_dir = f"/workspace/{expname}"
+
+run_cmd( # (1)!
+    ctx=wrap_arguments(
+        f'pip install -U "huggingface_hub[cli]" && '
+        f'huggingface-cli download Qwen/QwQ-32B --local-dir {output_dir}/QwQ-32B'
+    ),
+    cluster=cluster,
+    expname=f"{expname}-download-hf",
+)
+
+convert(
+    ctx=wrap_arguments("--max_input_len 2000 --max_seq_len 34000"), # (2)!
+    cluster=cluster,
+    input_model=f"{output_dir}/QwQ-32B",
+    output_model=f"{output_dir}/qwq-32b-trtllm",
+    expname=f"{expname}-to-trtllm",
+    run_after=f"{expname}-download-hf", # (3)!
+    convert_from="hf",
+    convert_to="trtllm",
+    model_type="qwen",
+    num_gpus=8,
+)
+
+eval(
+    ctx=wrap_arguments("++prompt_template=qwen-instruct"),
+    cluster=cluster,
+    model=f"{output_dir}/qwq-32b-trtllm",
+    server_type="trtllm",
+    output_dir=f"{output_dir}/results/",
+    benchmarks="aime24:64,aime25:64", # (4)!
+    num_jobs=16,
+    server_gpus=8,
+    run_after=f"{expname}-to-trtllm",
+)
+```
+
+1.   `run_cmd` just runs an arbitrary command inside our containers. It's useful for some pre/post processing when
+     building large pipelines, but mostly optional here. You can alternately just go on cluster and run those commands
+     yourself. Can also specify `partition="cpu"` as an argument in case it's available on your cluster since this
+     command doesn't require GPUs.
+2.   `wrap_arguments` is used to capture any arguments that are not part of the *wrapper* script but are passed into
+     the actual *main* script that's being launched by the wrapper. You can read more about this in the
+     [Important details](#important-details) section at the end of this document.
+3.   `run_after` and `expname` arguments can be used to schedule jobs to run one after the other
+     (we will set proper slurm dependencies). These parameters have no effect when you're not running slurm jobs.
+4.   You can find all supported benchmarks in the [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/dataset)
+     folder. `:64` means that we are asking for 64 samples for each example so that we can compute majority@64 and pass@64 metrics.
 
 # Important details
 

@@ -147,8 +147,7 @@ python -m nemo_skills.pipeline.eval \
 
 
 ```python title="using python api"
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import eval
+from nemo_skills.pipeline import wrap_arguments, eval
 
 eval(
     cluster="local",

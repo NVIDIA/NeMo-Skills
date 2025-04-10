@@ -16,9 +16,8 @@ from enum import Enum
 import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_free_port
 from nemo_skills.utils import setup_logging
 
 
