@@ -23,7 +23,7 @@ python -m nemo_skills.dataset.prepare math amc23 aime24
 ```
 
 Then we need to retrieve top-k similar questions from the training set. Assuming
-you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs)
+you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md)
 you can do it in the following way
 
 ```python

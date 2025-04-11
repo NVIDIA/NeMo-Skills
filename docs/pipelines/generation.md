@@ -22,7 +22,7 @@ Let's say you just want to generate greedy predictions for some data. Here is ho
 ### Preparing data
 
 Create your data file. E.g. let's say you have the following in `/workspace/input.jsonl` (the `/workspace` needs
-to be mounted inside of your [cluster config](../basics/prerequisites.md#cluster-configs)).
+to be mounted inside of your [cluster config](../basics/cluster-configs.md).
 
 ```jsonl
 {"prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}

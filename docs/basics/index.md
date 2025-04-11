@@ -288,8 +288,8 @@ which will output the following
 ```
 
 And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own
-[pipelines](TODO). You can see some examples from our previous releases such as
-[OpenMathInstruct-2](../openmathinstruct2/index.md) or TODO.
+[pipelines](../pipelines/index.md). You can see some examples from our previous releases such as
+[OpenMathInstruct-2](../openmathinstruct2/index.md).
 
 Please read the next section to recap all of the important concepts that we touched upon and learn some more details.
 

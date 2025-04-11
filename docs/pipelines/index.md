@@ -14,7 +14,7 @@ know about that when the job starts running. For most of our *main* scripts we u
 their arguments typically start with `++arg_name`. If you're using Python API you would need to specify all *main* arguments with
 `ctx=wrap_arguments("...")` interface for technical reasons.
 
-This might sound a little complicated, so let's see how it works through an example from the [Getting Started Tutorial](../basics/getting-started.md).
+This might sound a little complicated, so let's see how it works through an example from the [Getting Started Tutorial](../basics/index.md).
 
 === "ns interface"
 

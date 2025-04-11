@@ -2,7 +2,7 @@
 
 Here are the commands you can run to reproduce our evaluation numbers.
 The commands below are for OpenMath-2-Llama3.1-8b model as an example.
-We assume you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs) and are
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 

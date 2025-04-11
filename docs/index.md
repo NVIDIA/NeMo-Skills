@@ -18,5 +18,5 @@ Here are some of the things we support.
     - General knowledge: mmlu, mmlu-pro, gpqa
 - [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF) or [verl](https://github.com/volcengine/verl).
 
-To get started, follow this [tutorial](basics/getting-started.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
+To get started, follow this [tutorial](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
 commands and their options.
