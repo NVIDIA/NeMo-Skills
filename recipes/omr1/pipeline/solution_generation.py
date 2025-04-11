@@ -114,7 +114,7 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full-qwq', 'full-r1'],
+        choices=['demo', 'full-qwq', 'full-r1'],  # TODO: add tir mode
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
