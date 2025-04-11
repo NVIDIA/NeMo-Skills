@@ -161,11 +161,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
     return missing_jobs
 
 
-def escape_shell_command(command: str) -> str:
-    """Escape special shell characters so they are correctly interpreted in a shell script."""
-    return command.replace("&", "\\&").replace(";", "\\;").replace("|", "\\|").replace(">", "\\>").replace("<", "\\<")
-
-
 def get_cmd(
     output_dir,
     extra_arguments,

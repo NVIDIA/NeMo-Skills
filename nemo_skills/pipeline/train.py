@@ -253,7 +253,7 @@ def train(
     config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
-    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
+    with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
@@ -415,7 +415,7 @@ def train(
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
-                with_sandbox=sandbox,
+                with_sandbox=with_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
