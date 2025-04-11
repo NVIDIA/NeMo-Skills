@@ -26,8 +26,8 @@
     * OpenRLHF: https://github.com/Kipok/OpenRLHF
     * verl: https://github.com/titu1994/verl
 
-    The documentation here is incomplete and we advise you to open an issue if you run
-    into problems as some use-cases might not be supported.
+    The documentation here is incomplete and we advise you to open an issue if you
+    plan to try something that is not covered below to get additional support.
 
 ## SFT with OpenRLHF
 
