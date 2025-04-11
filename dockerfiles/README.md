@@ -1,12 +1,18 @@
 # How to build all necessary dockerfiles
 
-All dockerfiles are directly included in this folder, except vllm and sglang.
+Some dockerfiles are directly included in this folder and for some other the instructions on building them are below.
 To build one of the existing dockerfiles use a command like this
 
 ```
 docker build -t igitman/nemo-skills-nemo:0.5.0 -f dockerfiles/Dockerfile.nemo .
 ```
 It might take a long time for some of the images.
+
+## Building trtllm image
+
+Follow instructions in [TensorRT-LLM documentation](https://nvidia.github.io/TensorRT-LLM/installation/build-from-source-linux.html#option-1-build-tensorrt-llm-in-one-step).
+
+Our current container is built from `v0.18.1` code version.
 
 ## Building vllm image
 
@@ -44,10 +50,3 @@ then run `docker ps -a` and note image id of your running container. Do `docker 
 and `docker tag <printed hash> igitman/nemo-skills-sglang:0.5.0` and push that image.
 
 Current sglang version: lmsysorg/sglang:v0.4.2.post2-cu125
-
-## Building nemo-grpo image
-
-Use nvcr.io/nvidia/nemo:24.12 as a base. Upgrade transformers and also update
-* /opt/NeMo to https://github.com/Kipok/NeMo at igitman/grpo branch
-* /opt/NeMo-Aligner to https://github.com/Kipok/NeMo-Aligner at igitman/grpo branch
-* run `pip install -e /opt/NeMo-Aligner/tensor_comms`
