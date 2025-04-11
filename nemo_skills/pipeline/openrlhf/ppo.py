@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -28,6 +27,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     get_cluster_config,
+    get_exp,
     get_free_port,
     get_ray_server_cmd,
     get_timeout,
@@ -320,7 +320,7 @@ def ppo_openrlhf(
     ),
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)

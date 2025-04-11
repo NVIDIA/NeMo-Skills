@@ -196,7 +196,7 @@ def convert(
 
     All extra arguments are passed directly to the underlying conversion script (see their docs).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting conversion job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)

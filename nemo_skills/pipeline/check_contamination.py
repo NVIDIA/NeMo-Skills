@@ -109,7 +109,7 @@ def check_contamination(
     Run `python -m nemo_skills.inference.check_contamination --help` for other supported arguments
     (need to be prefixed with ++, since we use Hydra for that script).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     if dependent_jobs > 0:
         extra_arguments += " ++skip_filled=True "

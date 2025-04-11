@@ -59,7 +59,7 @@ def start_server(
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
 
     cluster_config = get_cluster_config(cluster, config_dir)
 

@@ -302,7 +302,7 @@ def train(
     All extra arguments are passed directly to the training script
     (need to be prefixed with ++, since NeMo uses Hydra).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)

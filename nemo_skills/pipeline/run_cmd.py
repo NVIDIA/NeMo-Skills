@@ -78,7 +78,7 @@ def run_cmd(
     ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
 
     cluster_config = get_cluster_config(cluster, config_dir)
