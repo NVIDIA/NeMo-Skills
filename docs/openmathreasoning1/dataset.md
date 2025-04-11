@@ -11,8 +11,8 @@ in this "demo" mode to make it faster, but you can change [configs/demo.yaml](ht
 any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
-Finally, please make sure to follow all necessary setup steps from the
-[prerequisites documentation](../basics/prerequisites.md) to make sure you understand how the below commands
+Finally, please make sure to go through the
+[getting started documentation](../basics/index.md) to make sure you understand how the below commands
 work and avoid running into errors.
 
 
