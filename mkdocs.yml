@@ -65,3 +65,8 @@ nav:
     - Model evaluation: openmathinstruct2/evaluation.md
     - Dataset construction: openmathinstruct2/dataset.md
     - Model training: openmathinstruct2/training.md
+  - OpenMathReasoning:
+    - openmathreasoning1/index.md
+    - Model evaluation: openmathreasoning1/evaluation.md
+    - Dataset construction: openmathreasoning1/dataset.md
+    - Model training: openmathreasoning1/training.md

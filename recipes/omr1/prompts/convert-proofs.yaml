@@ -1,0 +1,39 @@
+user: |-
+  I will give you a math problem that asks to prove something.
+  Your task is to create an equivalent problem that instead has some kind of numerical or expression answer that can be used to automatically grade the solution.
+  Make sure the new problem is at least as difficult as the original proof problem.
+
+  Here are a few examples.
+
+  Example 1
+
+  Problem:
+  Prove that the system \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}} has no solutions in integers $x$ , $y$ , and $z$ .
+
+  Output:
+  Let $x$, $y$ and $z$ be a solution to the following system of equations \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}}.
+  Calculate the sum of all possible values of $x$.
+
+
+
+  Example 2
+
+  Problem:
+  A triangle is called a parabolic triangle if its vertices lie on a
+  parabola $y = x^2$ . Prove that for every nonnegative integer $n$ , there
+  is an odd number $m$ and a parabolic triangle with vertices at three
+  distinct points with integer coordinates with area $(2^nm)^2$ .
+
+  Output:
+  Consider parabolic triangles whose vertices lie on $y = x^2$ with integer coordinates. Let $f(n)$ be the smallest possible value of $c$, where $(0,0)$, $(b,b^2)$, and $(c,c^2)$ are vertices of such a triangle with area exactly $(2^n)^2$, for some integer b where 0 < b < c.
+  Find $f(4)$.
+
+
+
+  Now here is the problem you need to modify. Only output the new problem **WITH NO** explanation or notes after it.
+  Again, start with the problem right away, **DO NOT** start with "Let's modify the given problem" or anything like that.
+
+  Problem:
+  {problem}
+
+  Output:
