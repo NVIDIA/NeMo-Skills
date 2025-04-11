@@ -91,7 +91,29 @@ WARNING  Cluster config is not specified. Running locally without containers. On
 Indeed, for anything more complicated than calling an API model, you'd need to do a little bit more setup. Since there
 are many heterogeneous jobs that we support, it's much simpler to run things in prebuilt containers than to try to
 install all packages in your current environment. To tell nemo-skills which containers to use and how to mount your
-local filesystem, we'd need to define a [cluster config](./cluster-configs.md). Run `ns setup` and follow
+local filesystem, we'd need to define a [cluster config](./cluster-configs.md). Here is an example of how a "local" cluster
+config might look like
+
+```yaml title="cluster_configs/local.yaml"
+executor: local
+
+containers:
+  trtllm: igitman/nemo-skills-trtllm:0.5.0
+  vllm: igitman/nemo-skills-vllm:0.5.3
+  nemo: igitman/nemo-skills-nemo:0.5.3
+  # ... there are some more containers defined here
+
+env_vars:
+  - HUGGINGFACE_HUB_CACHE=/hf_models
+
+mounts:
+  - /mnt/datadrive/hf_models:/hf_models
+  - /mnt/datadrive/trt_models:/trt_models
+  - /mnt/datadrive/nemo_models:/nemo_models
+  - /home/igitman/workspace:/workspace
+```
+
+To generate one for you, run `ns setup` and follow
 the prompts to define your configuration. Choose `local` for the config type/name and define some mount for your `/workspace`
 and another mount[^1] for `/hf_models`, e.g.
 
