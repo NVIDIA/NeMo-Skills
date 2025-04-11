@@ -54,7 +54,6 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     ++prompt_template=llama3-instruct \
-    ++batch_size=512 \
     ++inference.tokens_to_generate=4096
 ```
 
@@ -128,7 +127,6 @@ ns eval \
     --num_jobs=1 \
     --skip_greedy \
     ++prompt_template=llama3-instruct \
-    ++batch_size=512 \
     ++inference.tokens_to_generate=4096
 ```
 

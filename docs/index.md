@@ -16,7 +16,7 @@ Here are some of the things we support.
     - Coding skills: human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
-- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF) or [verl](https://github.com/volcengine/verl).
+- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 To get started, follow this [tutorial](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
 commands and their options.
