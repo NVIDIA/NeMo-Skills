@@ -514,22 +514,23 @@ def generate(
         cmd_extra_args = generation_task.get_generation_default_args()
         cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
+    extra_arguments_original = extra_arguments
+
+    # Treat no random seeds as a single None seed to unify the code paths
+    if not random_seeds:
+        random_seeds = [None]
+
+    remaining_jobs = get_remaining_jobs(
+        cluster_config=cluster_config,
+        output_dir=output_dir,
+        random_seeds=random_seeds,
+        chunk_ids=chunk_ids,
+        rerun_done=rerun_done,
+        output_prefix=output_prefix,
+    )
+    has_tasks = False
+
     with get_exp(expname, cluster_config) as exp:
-        extra_arguments_original = extra_arguments
-
-        # Treat no random seeds as a single None seed to unify the code paths
-        if not random_seeds:
-            random_seeds = [None]
-
-        remaining_jobs = get_remaining_jobs(
-            cluster_config=cluster_config,
-            output_dir=output_dir,
-            random_seeds=random_seeds,
-            chunk_ids=chunk_ids,
-            rerun_done=rerun_done,
-            output_prefix=output_prefix,
-        )
-        has_tasks = False
         for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
                 has_tasks = True

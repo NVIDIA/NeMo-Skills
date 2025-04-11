@@ -24,6 +24,8 @@ import typing
 from dataclasses import MISSING, dataclass, fields, is_dataclass
 from typing import Any, List, Optional
 
+from rich.logging import RichHandler
+
 
 def nested_dataclass(*args, **kwargs):
     """Decorator that will recursively instantiate all nested dataclasses.
@@ -78,9 +80,14 @@ def unroll_files(input_files, parent_dir: str | None = None):
 def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO):
     logger = logging.getLogger()
     logger.setLevel(log_level)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s %(levelname)s  %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
+
+    handler = RichHandler(
+        rich_tracebacks=True,
+        show_path=False,
+        show_time=False,
+    )
+    for hdlr in logger.handlers[:]:
+        logger.removeHandler(hdlr)
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)

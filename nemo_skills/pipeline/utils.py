@@ -528,7 +528,8 @@ def tunnel_hash(tunnel):
 
 def get_tunnel(cluster_config):
     if "ssh_tunnel" not in cluster_config:
-        LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
+        if cluster_config["executor"] != "slurm":
+            LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
         return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
@@ -1263,6 +1264,6 @@ def run_exp(exp, cluster_config, sequential=None):
 
 def get_exp(expname, cluster_config):
     if cluster_config['executor'] == 'slurm':
-        return get_exp(expname, cluster_config)
+        return run.Experiment(expname)
     # hiding all nemo-run logs otherwise as they are not useful locally
     return run.Experiment(expname, clean_mode=True, log_level="WARN")
