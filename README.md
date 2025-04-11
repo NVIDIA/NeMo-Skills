@@ -12,7 +12,7 @@ Here are some of the things we support.
     - Coding skills: human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
-- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
+- [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
 To get started, follow this [tutorial](https://nvidia.github.io/NeMo-Skills/basics),
