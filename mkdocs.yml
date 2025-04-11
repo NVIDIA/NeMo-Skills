@@ -49,16 +49,17 @@ nav:
     - Code packaging: basics/code-packaging.md
     - Prompt format: basics/prompt-format.md
     - Inference: basics/inference.md
+    - Sandbox for code execution: basics/sandbox.md
   - Pipelines:
     - pipelines/index.md
     - Generation: pipelines/generation.md
     - Evaluation: pipelines/evaluation.md
-    - Training: pipelines/training.md
     - Checkpoint conversion: pipelines/checkpoint-conversion.md
     - LLM-as-a-judge: pipelines/llm-as-a-judge.md
     - Decontamination: pipelines/decontamination.md
-  - Code execution:
-    - Sandbox: code-execution/sandbox.md
+    - Training (NeMo-Aligner): pipelines/training.md
+    - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
+    - Arbitrary commands: pipelines/run-cmd.md
   - OpenMathInstruct:
     - openmathinstruct2/index.md
     - Model evaluation: openmathinstruct2/evaluation.md
