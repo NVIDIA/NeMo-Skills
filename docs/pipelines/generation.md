@@ -22,7 +22,7 @@ Let's say you just want to generate greedy predictions for some data. Here is ho
 ### Preparing data
 
 Create your data file. E.g. let's say you have the following in `/workspace/input.jsonl` (the `/workspace` needs
-to be mounted inside of your [cluster config](../basics/prerequisites.md#cluster-configs)).
+to be mounted inside of your [cluster config](../basics/cluster-configs.md).
 
 ```jsonl
 {"prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
@@ -305,3 +305,29 @@ the `predicted_answer` is matching the `expected_answer` done via a
 To get a more robust assessment of whether the solutions are correct you can follow up with an
 [LLM-as-a-judge evaluation](../pipelines/llm-as-a-judge.md) and then
 [prepare the data for training](../pipelines/training.md#preparing-the-data).
+
+
+## Useful tips
+
+Here are some suggestions on how to make your generation jobs more efficient
+
+1. Whenever your job is not fully done, you can just resubmit it with exactly the same parameters and we will reuse
+   what was generated already (if you want to ignore existing data add `++skip_filled=False`). You can also schedule
+   multiple dependent jobs on slurm right away with `--dependent_jobs=X` parameter.
+2. Use `--num_chunks` parameter to parallelize each generation this many times
+   (we will split the data file and merge back when all jobs are finished). If some chunks run into error
+   or don't finish for other reasons, you can just resubmit the same job and we will only rerun missing chunks.
+3. Use `preprocess_cmd` and `postprocess_cmd` commands to add some pre/post-processing logic that might be needed
+   for some generations. Keep in mind that if you use `--num_random_seeds` those commands will be run for each
+   random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
+   logic on each output file, e.g.
+
+    ```python
+    generate(
+        # ...
+        postprocess_cmd="python /nemo_run/code/my_script.py --input <output_dir>/output-{random_seed}.jsonl"
+    )
+    ```
+
+   If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
+   a dependent [run_cmd command](./run-cmd.md).

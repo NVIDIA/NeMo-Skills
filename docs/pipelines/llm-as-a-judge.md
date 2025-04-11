@@ -12,7 +12,7 @@ E.g. symbolic comparison can perform very inaccurately for multi-choice question
 one of the letters or an expression corresponding to that letter.
 
 If you have an output of the [evaluation script](evaluation.md) on e.g. math benchmark, you can run LLM-as-a-judge
-in the following way (assuming you have `/workspace` mounted in your [cluster config](../basics/prerequisites.md#cluster-configs)
+in the following way (assuming you have `/workspace` mounted in your [cluster config](../basics/cluster-configs.md)
 and evaluation output available in `/workspace/test-eval/eval-results`).
 
 ```bash

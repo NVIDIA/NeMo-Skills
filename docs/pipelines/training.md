@@ -1,4 +1,4 @@
-# Training an LLM
+# Training using NeMo-Aligner
 
 !!! info
 
@@ -36,8 +36,7 @@ a good idea to check their documentation to understand how this config is struct
 
     Even though we support both SFT and DPO training, the data preparation is currently only implemented
     for SFT jobs. For DPO, you'd need to manually prepare the data according to the
-    [NeMo-Aligner documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/modelalignment/dpo.html#dpo-model-training).
-    We will add a proper support for DPO data preparation in the near future.
+    [NeMo-Aligner documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/modelalignment/dpo.html#dpo-model-training)
 
 
 ## Running training
@@ -99,8 +98,7 @@ ns eval \
     --benchmarks gsm8k:0,math:0 \
     --server_gpus=8 \
     --run_after=my-training-job \
-    ++prompt_template=llama3-instruct \
-    ++batch_size=512
+    ++prompt_template=llama3-instruct
 ```
 
 ## Chaining pipelines with Python
@@ -111,8 +109,7 @@ to schedule checkpoint conversion and evaluation after training
 (whenever you need to run multiple commands, it's more convenient to use python interface)
 
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import train, convert, eval
+from nemo_skills.pipeline import wrap_arguments, train, convert, eval
 
 expname = "my-training-job"
 cluster = "slurm"
@@ -158,7 +155,7 @@ convert(
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=llama3-instruct ++batch_size=512"),
+    ctx=wrap_arguments("++prompt_template=llama3-instruct"),
     cluster=cluster,
     model=f"{output_dir}/model-averaged-trtllm",
     server_type="trtllm",
@@ -185,8 +182,7 @@ where n is the average number of sequences per pack, that packing script outputs
 Here is an example of running packing and training.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import train, run_cmd
+from nemo_skills.pipeline import wrap_arguments, train, run_cmd
 
 expname = "my-training-job"
 cluster = "slurm"
