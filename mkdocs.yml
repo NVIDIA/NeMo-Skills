@@ -40,29 +40,33 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - footnotes
 nav:
-  - Getting started: index.md
-  - Basics:
-    - Prerequisites: basics/prerequisites.md
-    - Inference: basics/inference.md
+  - NeMo-Skills: index.md
+  - Getting started:
+    - basics/index.md
+    - Cluster configs: basics/cluster-configs.md
+    - Code packaging: basics/code-packaging.md
     - Prompt format: basics/prompt-format.md
-    - Common parameters: basics/common-parameters.md
+    - Inference: basics/inference.md
+    - Sandbox for code execution: basics/sandbox.md
   - Pipelines:
+    - pipelines/index.md
     - Generation: pipelines/generation.md
     - Evaluation: pipelines/evaluation.md
-    - Training: pipelines/training.md
     - Checkpoint conversion: pipelines/checkpoint-conversion.md
     - LLM-as-a-judge: pipelines/llm-as-a-judge.md
     - Decontamination: pipelines/decontamination.md
-  - Code execution:
-    - Sandbox: code-execution/sandbox.md
-  - OpenMathReasoning:
-    - openmathreasoning1/index.md
-    - Model evaluation: openmathreasoning1/evaluation.md
-    - Dataset construction: openmathreasoning1/dataset.md
-    - Model training: openmathreasoning1/training.md
+    - Training (NeMo-Aligner): pipelines/training.md
+    - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
+    - Arbitrary commands: pipelines/run-cmd.md
   - OpenMathInstruct:
     - openmathinstruct2/index.md
     - Model evaluation: openmathinstruct2/evaluation.md
     - Dataset construction: openmathinstruct2/dataset.md
     - Model training: openmathinstruct2/training.md
+  - OpenMathReasoning:
+    - openmathreasoning1/index.md
+    - Model evaluation: openmathreasoning1/evaluation.md
+    - Dataset construction: openmathreasoning1/dataset.md
+    - Model training: openmathreasoning1/training.md

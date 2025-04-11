@@ -14,13 +14,12 @@
 import copy
 import logging
 import os
+import shlex
 import subprocess
 from collections import defaultdict
 from enum import Enum
 from typing import List
-import shlex
 
-import nemo_run as run
 import typer
 
 from nemo_skills.inference.generate import GenerationTask
@@ -29,6 +28,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     get_cluster_config,
+    get_exp,
     get_free_port,
     get_generation_command,
     get_reward_server_command,
@@ -160,9 +160,11 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
     return missing_jobs
 
+
 def escape_shell_command(command: str) -> str:
     """Escape special shell characters so they are correctly interpreted in a shell script."""
     return command.replace("&", "\\&").replace(";", "\\;").replace("|", "\\|").replace(">", "\\>").replace("<", "\\<")
+
 
 def get_cmd(
     output_dir,
@@ -453,23 +455,17 @@ def generate(
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
-    sandbox: bool = typer.Option(False, help="Starts a sandbox (set this flag if code execution is required)"),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
 ):
     """Generate LLM completions for a given input file.
 
     Run `python -m nemo_skills.inference.generate --help` for other supported arguments
     (need to be prefixed with ++, since we use Hydra for that script).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
 
     chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
-    if chunking_enabled and postprocess_cmd:
-        logging.warning(
-            "Chunking is enabled, and postprocess_cmd is also specified. "
-            "Note that  postprocess_cmd will be run once for each seed. Chunk merging "
-            "will be performed before postprocess_cmd."
-        )
     if chunking_enabled and generation_type != GenerationType.generate:
         logging.error(
             "Chunking is enabled, but generation type is not 'generate'. "
@@ -523,22 +519,23 @@ def generate(
         cmd_extra_args = generation_task.get_generation_default_args()
         cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
-    with run.Experiment(expname) as exp:
-        extra_arguments_original = extra_arguments
+    extra_arguments_original = extra_arguments
 
-        # Treat no random seeds as a single None seed to unify the code paths
-        if not random_seeds:
-            random_seeds = [None]
+    # Treat no random seeds as a single None seed to unify the code paths
+    if not random_seeds:
+        random_seeds = [None]
 
-        remaining_jobs = get_remaining_jobs(
-            cluster_config=cluster_config,
-            output_dir=output_dir,
-            random_seeds=random_seeds,
-            chunk_ids=chunk_ids,
-            rerun_done=rerun_done,
-            output_prefix=output_prefix,
-        )
-        has_tasks = False
+    remaining_jobs = get_remaining_jobs(
+        cluster_config=cluster_config,
+        output_dir=output_dir,
+        random_seeds=random_seeds,
+        chunk_ids=chunk_ids,
+        rerun_done=rerun_done,
+        output_prefix=output_prefix,
+    )
+    has_tasks = False
+
+    with get_exp(expname, cluster_config) as exp:
         for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
                 has_tasks = True
@@ -582,7 +579,7 @@ def generate(
                         partition=partition,
                         time_min=time_min,
                         server_config=server_config,
-                        with_sandbox=sandbox,
+                        with_sandbox=with_sandbox,
                         sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
                         reuse_code=reuse_code,

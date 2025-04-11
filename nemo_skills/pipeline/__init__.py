@@ -13,16 +13,17 @@
 # limitations under the License.
 
 from nemo_skills.pipeline.app import wrap_arguments
-from nemo_skills.pipeline.cli import (
-    check_contamination,
-    convert,
-    eval,
-    generate,
-    run_cmd,
-    start_server,
-    summarize_results,
-    train,
-)
+from nemo_skills.pipeline.check_contamination import check_contamination
+from nemo_skills.pipeline.convert import convert
+from nemo_skills.pipeline.eval import eval
+from nemo_skills.pipeline.generate import generate
+from nemo_skills.pipeline.openrlhf.ppo import ppo_openrlhf
+from nemo_skills.pipeline.openrlhf.sft import sft_openrlhf
+from nemo_skills.pipeline.run_cmd import run_cmd
+from nemo_skills.pipeline.setup import setup
+from nemo_skills.pipeline.start_server import start_server
+from nemo_skills.pipeline.summarize_results import summarize_results
+from nemo_skills.pipeline.train import train
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
@@ -34,3 +35,4 @@ from nemo_skills.pipeline.utils import (
     get_unmounted_path,
     run_exp,
 )
+from nemo_skills.pipeline.verl.ppo import ppo_verl

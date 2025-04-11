@@ -76,7 +76,6 @@ def test_eval_mtbench_api():
 
     cmd = (
         f"ns eval "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
         f"    --server_type=openai "
         f"    --model=gpt-4o-mini "
         f"    --server_address=https://api.openai.com/v1 "

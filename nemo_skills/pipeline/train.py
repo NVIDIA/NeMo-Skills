@@ -18,11 +18,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -303,7 +302,7 @@ def train(
     All extra arguments are passed directly to the training script
     (need to be prefixed with ++, since NeMo uses Hydra).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -401,7 +400,7 @@ def train(
         assert training_params.num_gpus % training_params.tp == 0, "num_gpus should be divisible by tp"
         num_tasks = [training_params.num_gpus // training_params.tp, num_tasks]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(
