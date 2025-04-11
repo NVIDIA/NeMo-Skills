@@ -13,11 +13,10 @@
 # limitations under the License.
 from enum import Enum
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_free_port
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_free_port
 from nemo_skills.utils import setup_logging
 
 
@@ -81,7 +80,7 @@ def start_server(
         "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
 
-    with run.Experiment("server") as exp:
+    with get_exp("server", cluster_config) as exp:
         add_task(
             exp,
             cmd="",  # not running anything except the server

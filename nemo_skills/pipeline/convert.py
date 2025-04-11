@@ -17,11 +17,10 @@ from functools import partial
 from pathlib import Path
 from typing import List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, run_exp
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -252,7 +251,7 @@ def convert(
         num_nodes=num_nodes,
         extra_arguments=extra_arguments,
     )
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
         add_task(
             exp,

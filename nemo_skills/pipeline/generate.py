@@ -20,7 +20,6 @@ from collections import defaultdict
 from enum import Enum
 from typing import List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.inference.generate import GenerationTask
@@ -29,6 +28,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     get_cluster_config,
+    get_exp,
     get_free_port,
     get_generation_command,
     get_reward_server_command,
@@ -514,7 +514,7 @@ def generate(
         cmd_extra_args = generation_task.get_generation_default_args()
         cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         extra_arguments_original = extra_arguments
 
         # Treat no random seeds as a single None seed to unify the code paths

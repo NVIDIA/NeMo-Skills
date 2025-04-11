@@ -284,7 +284,7 @@ def sft_openrlhf(
         extra_arguments=extra_arguments,
     )
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(

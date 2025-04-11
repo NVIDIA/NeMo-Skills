@@ -395,7 +395,7 @@ def ppo_openrlhf(
             f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
         ]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(

@@ -695,7 +695,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
         if not (Path(repo_path) / 'nemo_skills').is_dir():
-            logging.warning(
+            logging.info(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
                 str(nemo_skills_dir / '*'),
@@ -712,7 +712,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             check_uncommitted_changes=check_uncommited_changes,
         )
     else:
-        logging.warning(
+        logging.info(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
             str(nemo_skills_dir / '*'),
         )
@@ -1038,7 +1038,7 @@ def add_task(
 
     Example of how to set task_dependencies:
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         task1 = add_task(exp, ...)
         task2 = add_task(exp, ..., task_dependencies=[task1])
 
@@ -1259,3 +1259,10 @@ def run_exp(exp, cluster_config, sequential=None):
             ssh_hash = tunnel_hash(tunnel)
             if ssh_hash not in REUSE_CODE_EXP:
                 REUSE_CODE_EXP[ssh_hash] = exp
+
+
+def get_exp(expname, cluster_config):
+    if cluster_config['executor'] == 'slurm':
+        return get_exp(expname, cluster_config)
+    # hiding all nemo-run logs otherwise as they are not useful locally
+    return run.Experiment(expname, clean_mode=True, log_level="WARN")

@@ -15,7 +15,6 @@
 from enum import Enum
 from typing import List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -24,6 +23,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     get_cluster_config,
+    get_exp,
     get_free_port,
     get_generation_command,
     run_exp,
@@ -148,7 +148,7 @@ def check_contamination(
             f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
         )
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
