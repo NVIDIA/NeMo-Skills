@@ -281,10 +281,23 @@ with the following command
 ns summarize_results --cluster=slurm /workspace/qwq-32b-test/results
 ```
 
-which will output the following
+which will output the following (`pass@1[64]` is an average accuracy across all 64 generations)
 
 ```bash
-...
+-------------------------- aime24 --------------------------
+evaluation_mode | num_entries | symbolic_correct | no_answer
+greedy          | 30          | 66.67%           | 23.33%
+majority@64     | 30          | 86.67%           | 0.00%
+pass@64         | 30          | 93.33%           | 0.00%
+pass@1[64]      | 30          | 66.41%           | 0.00%
+
+
+-------------------------- aime25 --------------------------
+evaluation_mode | num_entries | symbolic_correct | no_answer
+greedy          | 30          | 43.33%           | 50.00%
+majority@64     | 30          | 80.00%           | 0.00%
+pass@64         | 30          | 80.00%           | 0.00%
+pass@1[64]      | 30          | 52.45%           | 0.00%
 ```
 
 And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own
