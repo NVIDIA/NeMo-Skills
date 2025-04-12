@@ -12,7 +12,7 @@ RUN git clone https://github.com/google-research/google-research.git /opt/benchm
 RUN mkdir -p /opt/NeMo-Skills/requirements
 COPY nemo_skills setup.py README.md /opt/NeMo-Skills/
 COPY requirements/main.txt /opt/NeMo-Skills/requirements/
-RUN cd /opt/NeMo-Skills && pip install .
+RUN cd /opt/NeMo-Skills && pip install -e .
 
 # for debugging
 RUN pip install ipython
