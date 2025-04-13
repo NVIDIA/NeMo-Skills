@@ -1,0 +1,6 @@
+FROM vllm/vllm-openai:v0.8.3
+
+ARG OPENRLHF_COMMIT=20a2facf4d19dac5bf2cdaf9edf630367f83ffd0
+RUN cd /opt && git clone https://github.com/Kipok/OpenRLHF && \
+    cd OpenRLHF && git checkout $OPENRLHF_COMMIT && \
+    pip install -e .

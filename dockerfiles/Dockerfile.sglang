@@ -1,0 +1,5 @@
+FROM lmsysorg/sglang:v0.4.5-cu118
+
+# to fix https://github.com/sgl-project/sglang/issues/5002
+ARG LIB_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/
+ENV LD_LIBRARY_PATH=${LIB_PATH}/cuda_nvrtc/lib/:${LIB_PATH}/cublas/lib:${LIB_PATH}/cuda_runtime/lib/:${LD_LIBRARY_PATH}
