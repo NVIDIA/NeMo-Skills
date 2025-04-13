@@ -7,53 +7,67 @@ read its own shard rather than the entire checkpoint.
 Example usage:
 
 python save_sharded_state.py \
-    --model-path /path/to/load \
+    --model /path/to/load \
     --quantization deepspeedfp \
     --tensor-parallel-size 8 \
     --output /path/to/save
 
 Then, the model can be loaded with
 
-llm = Engine(
-    model_path="/path/to/save",
+llm = LLM(
+    model="/path/to/save",
     load_format="sharded_state",
     quantization="deepspeedfp",
     tensor_parallel_size=8,
 )
 """
 
-# copied from https://github.com/sgl-project/sglang/blob/main/examples/runtime/engine/save_sharded_state.py
+# copied from https://github.com/vllm-project/vllm/blob/main/examples/offline_inference/save_sharded_state.py
 
 import dataclasses
 import os
 import shutil
-from argparse import ArgumentParser
 from pathlib import Path
 
-from sglang import Engine, ServerArgs
+from vllm import LLM, EngineArgs
+from vllm.utils import FlexibleArgumentParser
 
-parser = ArgumentParser()
-ServerArgs.add_cli_args(parser)
-
+parser = FlexibleArgumentParser()
+EngineArgs.add_cli_args(parser)
 parser.add_argument("--output", "-o", required=True, type=str, help="path to output checkpoint")
 parser.add_argument("--file-pattern", type=str, help="string pattern of saved filenames")
 parser.add_argument(
-    "--max-file-size",
-    type=str,
-    default=5 * 1024**3,
-    help="max size (in bytes) of each safetensors file",
+    "--max-file-size", type=str, default=5 * 1024**3, help="max size (in bytes) of each safetensors file"
 )
 
 
 def main(args):
-    engine_args = ServerArgs.from_cli_args(args)
-    model_path = engine_args.model_path
+    engine_args = EngineArgs.from_cli_args(args)
+    if engine_args.enable_lora:
+        raise ValueError("Saving with enable_lora=True is not supported!")
+    model_path = engine_args.model
     if not Path(model_path).is_dir():
         raise ValueError("model path must be a local directory")
     # Create LLM instance from arguments
-    llm = Engine(**dataclasses.asdict(engine_args))
+    llm = LLM(**dataclasses.asdict(engine_args))
+    # Prepare output directory
     Path(args.output).mkdir(exist_ok=True)
-    llm.save_sharded_model(path=args.output, pattern=args.file_pattern, max_size=args.max_file_size)
+    # Dump worker states to output directory
+
+    # Check which engine version is being used
+    is_v1_engine = hasattr(llm.llm_engine, "engine_core")
+
+    if is_v1_engine:
+        # For V1 engine, we need to use engine_core.save_sharded_state
+        print("Using V1 engine save path")
+        llm.llm_engine.engine_core.save_sharded_state(
+            path=args.output, pattern=args.file_pattern, max_size=args.max_file_size
+        )
+    else:
+        # For V0 engine
+        print("Using V0 engine save path")
+        model_executor = llm.llm_engine.model_executor
+        model_executor.save_sharded_state(path=args.output, pattern=args.file_pattern, max_size=args.max_file_size)
 
     # Copy metadata files to output directory
     for file in os.listdir(model_path):
