@@ -48,7 +48,6 @@ def test_vllm_generate_greedy():
         f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -87,7 +86,6 @@ def test_vllm_generate_greedy_chunked():
         f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -130,7 +128,6 @@ def test_vllm_generate_seeds():
         f"    ++split=test "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )

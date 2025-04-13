@@ -45,7 +45,6 @@ def test_trtllm_eval():
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
         f"    ++split=test "
-        f"    ++batch_size=8 "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -85,7 +84,6 @@ def test_trtllm_code_execution_eval():
         f"    ++prompt_template={prompt_template} "
         f"    ++examples_type=gsm8k_text_with_code "
         f"    ++split=test "
-        f"    ++batch_size=8 "
         f"    ++max_samples=20 "
         f"    ++code_execution=True "
     )
@@ -131,8 +129,8 @@ def test_hf_eval(server_type):
         f"    --num_jobs 1 "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
-        f"    ++batch_size=400 "
         f"    ++max_samples=400 "
+        f"    ++max_concurrent_requests=200 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
@@ -203,7 +201,6 @@ def test_nemo_eval():
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
         f"    ++split=test "
-        f"    ++batch_size=8 "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
