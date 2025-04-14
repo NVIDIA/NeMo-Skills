@@ -31,7 +31,7 @@ def step_1_preprocess_data(cluster, partition, model, input_dir, output_dir, num
     exp = run_cmd(
         ctx=wrap_arguments(preprocess_command),
         cluster=cluster,
-        partition="cpu" if "dfw" in cluster else partition,
+        partition=partition,
         expname=preprocess_expname,
         log_dir=f"{comparison_dir}/logs",
         time_min="00:05:00",
@@ -87,7 +87,7 @@ def step_3_postprocess_judgment(cluster, partition, last_exp_name, step_1_output
     run_cmd(
         ctx=wrap_arguments(postprocess_cmd),
         cluster=cluster,
-        partition="cpu" if "dfw" in cluster else partition,
+        partition=partition,
         expname=expname,
         run_after=last_exp_name,
         log_dir=f"{output_dir}/logs",
@@ -109,7 +109,7 @@ def step_4_summarize_results(cluster, last_exp_name, last_exp_output_dir, expnam
             )
         ),
         cluster=cluster,
-        partition="cpu" if "dfw" in cluster else None,
+        partition=None,
         run_after=f"{last_exp_name}",
         log_dir=f"{last_exp_output_dir}/logs",
         exclusive=True,
