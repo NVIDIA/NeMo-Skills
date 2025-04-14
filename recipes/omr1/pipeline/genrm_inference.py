@@ -4,7 +4,7 @@ import os
 sys.path.append("/home/stoshniwal/Research/llm/NeMo-Skills")
 
 from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import generate, summarize_results
+from nemo_skills.pipeline.cli import generate
 from nemo_skills.pipeline.cli import run_cmd
 from pathlib import Path
 os.environ['NEMO_SKILLS_CONFIG_DIR']= "/home/stoshniwal/Research/llm/nemo-skills-config/cluster_configs"
@@ -101,7 +101,7 @@ def step_4_summarize_results(cluster, last_exp_name, last_exp_output_dir, expnam
         ctx=wrap_arguments(
             (
                 f"NEMO_SKILLS_EXTRA_DATASETS=/nemo_run/code/internal-datasets "
-                f"python -m nemo_skills.pipeline.summarize_results "
+                f"python /nemo_run/code/nemo_skills/pipeline/summarize_results.py "
                 f"    {last_exp_output_dir} "
                 f"    --wandb_name={expname} "    
                 f"    --wandb_group={wandb_group} "
