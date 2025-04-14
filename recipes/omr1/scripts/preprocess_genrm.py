@@ -10,6 +10,7 @@ from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def read_file(file_path):
     logger.info(f"Reading file: {file_path}")
     instances = [json.loads(line) for line in open(file_path, "r")]

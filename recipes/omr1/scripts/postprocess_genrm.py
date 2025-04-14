@@ -5,11 +5,10 @@ import json
 import random
 from glob import glob
 import logging
-os.environ['NEMO_SKILLS_CONFIG_DIR']= "/home/stoshniwal/Research/llm/nemo-skills-config/cluster_configs"
-os.environ['NEMO_SKILLS_EXTRA_DATASETS'] = "/home/stoshniwal/Research/llm/nemo-skills-recipes/internal-datasets"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def extract_judgment(text, max_idx=None):
     judgement = None
