@@ -1,0 +1,104 @@
+user: |-
+  I will provide a math problem, and you need to determine whether it is a multiple-choice problem.
+  Respond only with 'mcq' if the problem meets the criteria, and 'not mcq' otherwise.
+
+
+  A multiple-choice problem must satisfy all of the following conditions:
+
+  1. The problem explicitly presents a set of answer choices to select from.
+  2. The problem asks for a final answer rather than requiring a proof, justification, or explanation.
+  3. The problem has at least one correct answer among the given choices.
+  If the problem does not include answer choices, even if it has a numerical answer, it should be classified as 'not mcq'.
+
+
+  Here are a few examples.
+
+  Example 1
+
+  Problem:
+  Simplify the expression \\(\\frac{{{{2}} \\sqrt{{6}}}}{{\\sqrt{{2}}}} + \\sqrt{{3}} + \\sqrt{{5}}\\) and choose the correct option from the following:\n\n
+  A. \\(\\sqrt{{2}} + \\sqrt{{3}} - \\sqrt{{5}}\\)\n\n
+  B. \\(4 - \\sqrt{{2}} - \\sqrt{{3}}\\)\n\n
+  C. \\(\\sqrt{{2}} + \\sqrt{{3}} + \\sqrt{{6}} - 5\\)\n\n
+  D. \\(\\frac{{1}}{{2}} (\\sqrt{{2}} + \\sqrt{{5}} - \\sqrt{{3}})\\)\n\n
+  E. \\(\\frac{{1}}{{3}} (\\sqrt{{3}} + \\sqrt{{5}} - \\sqrt{{2}})\\)
+
+  Output: mcq
+
+
+
+  Example 2
+
+  Problem:
+  Write first several terms of a geometric progression in which the difference between the third and first terms is equal to 9, and that between the fifth and third terms equal 36.
+
+  Output: not mcq
+
+
+
+  Example 3
+
+  Problem:
+  Solve the following equations: $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
+
+  Output: not mcq
+
+
+
+
+  Example 4
+
+  Problem:
+  Simplify the expression \\(\\log{{\\frac{{a}}{{b}}}} + \\log{{\\frac{{b}}{{c}}}} + \\log{{\\frac{{c}}{{d}}}} - \\log{{\\frac{{ay}}{{dx}}}}\\).
+  Choose from the following options:\n\\[\n
+  \\textbf{{(A)}}\\ \\log{{\\frac{{y}}{{x}}}}\\qquad
+  \\textbf{{(B)}}\\ \\log{{\\frac{{x}}{{y}}}}\\qquad
+  \\textbf{{(C)}}\\ 1\\qquad
+  \\textbf{{(D)}}\\ 0\\qquad
+  \\textbf{{(E)}}\\ \\log{{\\frac{{a^2y}}{{d^2x}}}}\n\\]
+
+  Output: mcq
+
+
+
+  Example 5:
+  Problem:
+  What is the maximum possible magnitude of the difference between two vectors? Choose from the following options and provide reasoning:
+  A. The magnitude of one of the vectors.
+  B. The magnitude of both vectors.
+  C. The magnitude of their sum.
+  D. Their scalar product.
+
+  Output: mcq
+
+
+
+  Example 6:
+  Problem:
+  Compare the numbers $a$ and $b$: $a=3(\log 7-\log 5),\ b=2\left(\frac{{1}}{{2}}\log 9-\frac{{1}}{{3}}\log 8\right)$
+
+  Output: not mcq
+
+
+  Example 7:
+  Problem:
+  Which of the two numbers $31^{{11}}$ and $17^{{14}}$ is greater?
+
+  Output: not mcq
+
+
+  Example 8:
+  Problem:
+  Let $ABCD$ be a rectangle and $E$ the reflection of $A$ with respect to the diagonal $BD$. If $EB = EC$, what is the ratio $\frac{{AD}}{{AB}}
+
+  Output: not mcq
+
+
+
+  Now here is the problem you need to extract the answer from.
+
+
+  Problem:
+  {problem}
+
+  Output:

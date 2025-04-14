@@ -9,17 +9,40 @@
 
 We support many popular benchmarks and it's easy to add new in the future. E.g. we support
 
-- Math problem solving: gsm8k, math, amc23, aime24 (and many more)
+- Math problem solving: math, aime24, aime25, omni-math (and many more)
+- Formal proofs in Lean: minif2f, proofnet
 - Coding skills: human-eval, mbpp
-- Chat/instruction following: ifeval, arena-hard
-- General knowledge: mmlu (generative)
+- Chat/instruction following: ifeval, arena-hard, mt-bench
+- General knowledge: mmlu, mmlu-pro, gpqa
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
 Here is how to run evaluation (using API model as an example,
 but same command works with self-hosted models both locally and on slurm).
 Make sure that `/workspace` is mounted inside of your
-[cluster config](../basics/prerequisites.md#cluster-configs).
+[cluster config](../basics/cluster-configs.md).
+
+## Preparing data
+
+You need to run the following commands to prepare the data.
+
+```bash
+python -m nemo_skills.dataset.prepare
+```
+
+If you're only interested in a subset of datasets (e.g. only math-related or code-related), run with
+`--dataset_groups ...` and if you only need a couple of specific datasets, list them directly e.g.
+
+```bash
+python -m nemo_skills.dataset.prepare gsm8k human-eval mmlu ifeval
+```
+
+If you have the repo cloned locally, the data files will be available inside `nemo_skills/dataset/<benchmark>/<split>.jsonl`
+and if you installed from pip, they will be downloaded to wherever the repo is installed, which you can figure out by running
+
+```bash
+python -c "import nemo_skills; print(nemo_skills.__path__)"
+```
 
 ## Greedy decoding
 

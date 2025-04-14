@@ -14,17 +14,23 @@
 
 import json
 import logging
-import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    get_ray_server_cmd,
+    get_timeout,
+    run_exp,
+)
 from nemo_skills.pipeline.verl import verl_app
 from nemo_skills.utils import setup_logging
 
@@ -427,8 +433,8 @@ def ppo_verl(
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     final_ckpt_path: str = typer.Option(None, help="Where to put the final checkpoint"),
     convert_last_ckpt_to_hf: bool = typer.Option(
-            False,
-            help="If True, will convert the final checkpoint to hf format and place in final_ckpt_path (or output_dir/final_hf_checkpoint if not specified) "
+        False,
+        help="If True, will convert the final checkpoint to hf format and place in final_ckpt_path (or output_dir/final_hf_checkpoint if not specified) ",
     ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
@@ -466,7 +472,7 @@ def ppo_verl(
     ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -543,7 +549,7 @@ def ppo_verl(
             f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
         ]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             if job_id == num_training_jobs - 1 and convert_last_ckpt_to_hf:

@@ -1,0 +1,86 @@
+user: |-
+  I will provide a math problem, and you need to determine whether it is a binary question.
+  Respond only with 'binary' if the problem meets the criteria, and 'not binary' otherwise.
+
+  A problem qualifies as a binary question if and only if:
+
+  1. The problem explicitly asks for a binary response, such as "yes or no", "true or false", or another equivalent two-choice response.
+  2. The problem is phrased as a question or statement that naturally leads to a binary response (e.g., "Is this true?" or "Determine whether the statement is true or false").
+
+  If the problem does not explicitly ask for a binary response, even if it can be interpreted that way, it should be classified as 'not binary question'.
+
+
+
+
+  Here are a few examples.
+
+  Example 1
+
+  Problem:
+  Is it true that $0.4395308999999\\ldots = 0.4395309$?
+
+  Output: binary
+
+
+
+  Example 2
+
+  Problem:
+  Write first several terms of a geometric progression in which the difference between the third and first terms is equal to 9, and that between the fifth and third terms equal 36.
+
+  Output: not binary
+
+
+
+  Example 3
+
+  Problem:
+  Solve the following equations: $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
+
+  Output: not binary
+
+
+
+
+  Example 4
+
+  Problem:
+  Given the quadratic expression \\( ax^2 + bx + c \\) with coefficients \\( a, b, c \\) such that \\( b - c > a \\) and \\( a \\neq 0 \\), is it true that the equation \\( ax^2 + bx + c = 0 \\) always has two distinct real roots?
+
+  Output: binary
+
+
+
+  Example 5:
+  Problem:
+  Can the vertices of a cube be colored in red, yellow, and blue such that every set of four coplanar vertices contains all three colors?
+
+  Output: binary
+
+
+
+  Example 6:
+  Problem:
+  Can the numbers \\(\\frac{{14x + 5}}{{9}}\\) and \\(\\frac{{17x - 4}}{{12}}\\) both be integers for some integer \\(x\\)? If so, find that integer.
+
+
+  Output: not binary
+
+
+  Example 7:
+  Problem:
+  Can the distances from a point on the plane to the vertices of a certain square be equal to $1, 1, 2,$ and $3$?
+
+
+  Output: binary
+
+
+
+
+  Now here is the problem you need to extract the answer from.
+
+
+  Problem:
+  {problem}
+
+  Output:

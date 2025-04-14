@@ -1,0 +1,56 @@
+user: |-
+  I will give you a math problem and ask to identify if it's a "proof" problem.
+  Respond only with "proof" if it is a proof problem, and "not proof" if it is not.
+
+  Consider the following characteristics of proof problems:
+
+  1. They often use phrases like "prove that", "show that", or "demonstrate that".
+  2. They may ask to justify or explain why a statement is true.
+  3. They don't have a well-defined answer in the form of a number or expression.
+
+  Here are a few examples.
+
+  Example 1
+
+  Problem:
+  Prove the identity $a^\frac{{1}}{{2}}-\frac{{a-a^{{-2}}{{a^\frac{{1}}{{2}}-a^{{-\frac{{1}}{{2}} +\frac{{1-a^{{-2}}{{a^\frac{{1}}{{2}}+a^{{-\frac{{1}}{{2}}+\frac{{2}}{{a^\frac{{3}}{{2}}=0$
+
+  Output: proof
+
+
+
+  Example 2
+
+  Problem:
+  Write first several terms of a geometric progression in which the difference between the third and first terms is equal to 9, and that between the fifth and third terms equal 36.
+
+  Output: not proof
+
+
+
+  Example 3
+
+  Problem:
+  Solve the following equations: $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
+
+  Output: not proof
+
+
+
+  Example 4
+
+  Problem:
+  Denoting the sums of the first $n_1$, first $n_2$ and first $n_3$ terms of an arithmetic progression by $S_1$, $S_2$ and $S_3$, respectively, show that $$\frac{{S_1}}{{n_1}}(n_2-n_3)+\frac{{S_2}}{{n_2}}(n_3-n_1)+\frac{{S_3}}{{n_3}}(n_1-n_2)=0.$$
+
+  Output: proof
+
+
+
+
+  Now here is the problem you need to extract the answer from.
+
+
+  Problem:
+  {problem}
+
+  Output:
