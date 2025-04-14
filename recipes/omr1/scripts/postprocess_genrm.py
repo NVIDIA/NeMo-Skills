@@ -2,8 +2,6 @@ import argparse
 import os
 import re
 import json
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import generate, run_cmd
 import random
 from glob import glob
 import logging
