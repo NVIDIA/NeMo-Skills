@@ -18,11 +18,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -200,7 +199,7 @@ def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
     if average_steps is not None:
         average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else ''
         entrypoint = "nemo_skills.training.average_checkpoints"
-        name = "model" + ("-".join(average_steps[len('--steps '):].split()) if average_steps else '') + "-averaged"
+        name = "model" + ("-".join(average_steps[len('--steps ') :].split()) if average_steps else '') + "-averaged"
     else:
         entrypoint = "nemo_skills.training.copy_checkpoint"
         name = "model-last"
@@ -263,9 +262,9 @@ def train(
         "If None, skip prepare eval stage.",
     ),
     save_last_ckpt: bool = typer.Option(
-            False,
-            help="If True, will save the final nemo checkpoint to final_nemo_path. "
-                 "average_steps has to be disabled to use this.",
+        False,
+        help="If True, will save the final nemo checkpoint to final_nemo_path. "
+        "average_steps has to be disabled to use this.",
     ),
     server_model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
@@ -303,7 +302,7 @@ def train(
     All extra arguments are passed directly to the training script
     (need to be prefixed with ++, since NeMo uses Hydra).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -401,7 +400,7 @@ def train(
         assert training_params.num_gpus % training_params.tp == 0, "num_gpus should be divisible by tp"
         num_tasks = [training_params.num_gpus // training_params.tp, num_tasks]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(

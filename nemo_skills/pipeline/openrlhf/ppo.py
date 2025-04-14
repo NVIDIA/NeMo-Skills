@@ -19,13 +19,20 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import get_free_port, get_ray_server_cmd, get_timeout
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    get_ray_server_cmd,
+    get_timeout,
+    run_exp,
+)
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -53,21 +60,7 @@ class PPOOpenRLHFTask:
         return cmd
 
     def format_reward_critic_args(self):
-        cmd = (
-            f" --reward_pretrain {self.reward_model} "
-            # TODO: add proper defaults when we figure out how these should be used
-            #       for now we require users to be explicit
-            # f" --ref_num_nodes {self.num_nodes} "
-            # f" --ref_num_gpus_per_node {self.num_gpus} "
-            # f" --reward_num_nodes {self.num_nodes} "
-            # f" --reward_num_gpus_per_node {self.num_gpus} "
-            # f" --critic_num_nodes {self.num_nodes} "
-            # f" --critic_num_gpus_per_node {self.num_gpus} "
-            # f" --vllm_num_engines {self.num_gpus} "
-            # f" --vllm_tensor_parallel_size 1 "
-            # f" --colocate_critic_reward "
-            # f" --colocate_actor_ref "
-        )
+        cmd = f" --reward_pretrain {self.reward_model} "
         return cmd
 
     def format_actor_args(self):
@@ -313,7 +306,7 @@ def ppo_openrlhf(
     ),
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -388,7 +381,7 @@ def ppo_openrlhf(
             f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
         ]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(

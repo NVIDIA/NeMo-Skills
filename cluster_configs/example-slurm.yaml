@@ -22,7 +22,6 @@ containers:
   sandbox: igitman/nemo-skills-sandbox:0.5.0
   nemo-skills: igitman/nemo-skills:0.5.3
   verl: igitman/nemo-skills-verl:0.5.3
-  nemo-grpo: igitman/nemo-skills-nemo-grpo:0.5.3
 
 job_name_prefix: "nemo_skills:"
 

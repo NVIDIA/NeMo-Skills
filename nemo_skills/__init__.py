@@ -13,3 +13,14 @@
 # limitations under the License.
 
 __version__ = '0.5.0'
+
+# only used in ns setup command to initialize with defaults
+_containers = {
+    'trtllm': 'igitman/nemo-skills-trtllm:0.5.0',
+    'vllm': 'igitman/nemo-skills-vllm:0.5.3',
+    'sglang': 'igitman/nemo-skills-sglang:0.5.3',
+    'nemo': 'igitman/nemo-skills-nemo:0.5.3',
+    'sandbox': 'igitman/nemo-skills-sandbox:0.5.0',
+    'nemo-skills': 'igitman/nemo-skills:0.5.3',
+    'verl': 'igitman/nemo-skills-verl:0.5.3',
+}

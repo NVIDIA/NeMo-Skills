@@ -16,6 +16,7 @@
 import copy
 import json
 import logging
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -32,8 +33,9 @@ LOG = logging.getLogger(__name__)
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
-    max_code_executions: int = 3
-    sandbox_traceback_verbosity: str = 'plain' # could be plain, context, verbose, or minimal
+    max_code_executions: int = 8
+    sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
+    add_remaining_code_executions: bool = False
 
 
 class CodeExecutionWrapper:
@@ -75,6 +77,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
         gen_id: str = None,  # used for cancelling requests if supported
+        timeout: int | None = None,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
@@ -86,6 +89,8 @@ class CodeExecutionWrapper:
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
 
+        start_time = int(time.time())
+
         request = {
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
@@ -96,10 +101,25 @@ class CodeExecutionWrapper:
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
+            "timeout": timeout,
         }
         session_id = None
+        code_rounds_executed = 0
+        total_num_generated_tokens = 0
+        generation_time = 0
+        code_execution_time = 0
+        stopped_on_repetition = False
         # adding plus one to make sure there is always some completion after the last requested code block
         for generation_index in range(self.config.max_code_executions + 1):
+
+            generation_time_start = time.time()
+            if timeout is not None:
+                # updating timeout to account for the time already spent
+                new_timeout = int(timeout - (time.time() - start_time))
+                request["timeout"] = new_timeout
+                if request['timeout'] <= 0:
+                    break
+
             # Check if generation has been cancelled before proceeding
             if gen_id is not None and self._is_generation_cancelled(gen_id):
                 break
@@ -127,12 +147,17 @@ class CodeExecutionWrapper:
                 output_dict = self.model._generate_single(**request)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+            # no need to do anything with this as the code below should just exit, so that's only for logging
+            stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
+
             if generation_index == self.config.max_code_executions:
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
+            total_num_generated_tokens += num_generated_tokens
+            generation_time += int(time.time() - generation_time_start)
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
@@ -140,22 +165,35 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                code_execution_time_start = time.time()
                 execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(output, code_begin, code_end),
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
                 )
+                remaining_code_executions = None
+                if self.config.add_remaining_code_executions:
+                    remaining_code_executions = self.config.max_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
-                    execution_dict, code_output_begin, code_output_end, code_output_format
+                    execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+                code_execution_time += int(time.time() - code_execution_time_start)
+                code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
                 break
 
         # removing original prompt
-        return {'generation': request['prompt'][len(prompt) :]}
+        return {
+            'generation': request['prompt'][len(prompt) :],
+            'code_rounds_executed': code_rounds_executed,
+            'num_generated_tokens': total_num_generated_tokens,
+            'generation_time': generation_time,
+            'code_execution_time': code_execution_time,
+            'stopped_on_repetition': stopped_on_repetition,
+        }
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(
@@ -176,6 +214,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -200,6 +239,7 @@ class CodeExecutionWrapper:
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            "timeout": timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -256,7 +296,14 @@ class CodeExecutionWrapper:
             stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
             future = self.gen_id_to_future[generation_id]
             if not future.done():
-                output = {'generation': None}
+                output = {
+                    'generation': None,
+                    'code_rounds_executed': None,
+                    'num_generated_tokens': None,
+                    'generation_time': None,
+                    'code_execution_time': None,
+                    'stopped_on_repetition': None,
+                }
             else:
                 output = future.result()
                 del self.gen_id_to_future[generation_id]
@@ -287,6 +334,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        timeout: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -308,6 +356,7 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
+            timeout=timeout,
         )
         all_generations = [None] * len(prompts)
         while True:
