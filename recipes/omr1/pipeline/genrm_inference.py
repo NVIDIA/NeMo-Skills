@@ -96,14 +96,14 @@ def step_3_postprocess_judgment(cluster, partition, last_exp_name, step_1_output
     return expname, step_3_output_dir
 
 
-def step_4_summarize_results(cluster, last_exp_name, last_exp_output_dir, expname, wandb_name, wandb_group, wandb_project):
+def step_4_summarize_results(cluster, last_exp_name, last_exp_output_dir, expname, wandb_group, wandb_project):
     run_cmd(
         ctx=wrap_arguments(
             (
                 f"NEMO_SKILLS_EXTRA_DATASETS=/nemo_run/code/internal-datasets "
                 f"python -m nemo_skills.pipeline.summarize_results "
                 f"    {last_exp_output_dir} "
-                f"    --wandb_name={wandb_name} "    
+                f"    --wandb_name={expname} "    
                 f"    --wandb_group={wandb_group} "
                 f"    --wandb_project={wandb_project} "
             )
@@ -180,13 +180,12 @@ def main(args):
         benchmark=benchmark,
     )
 
-    if (args.wandb_name is not None) and (args.wandb_group is not None) and (args.wandb_project is not None):
+    if (args.wandb_group is not None) and (args.wandb_project is not None):
         step_4_summarize_results(
             cluster=args.cluster,
             last_exp_name=last_exp_name,
             last_exp_output_dir=step_3_output_dir,
             expname=expname,
-            wandb_name=args.wandb_name,
             wandb_group=args.wandb_group,
             wandb_project=args.wandb_project,
         )
@@ -205,7 +204,6 @@ if __name__ == "__main__":
     parser.add_argument("--max_samples", type=int, required=False, default=8)
     parser.add_argument("--sampling_strategy", type=str, required=False, default="linear")
     parser.add_argument("--temperature", type=float, required=False, default=0.7, help="Temperature for generation")
-    parser.add_argument("--wandb_name", type=str, required=False, default=None, help="Wandb name")  
     parser.add_argument("--wandb_group", type=str, required=False, default=None, help="Wandb group")
     parser.add_argument("--wandb_project", type=str, required=False, default=None, help="Wandb project")
     args = parser.parse_args()
