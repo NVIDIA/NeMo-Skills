@@ -20,12 +20,6 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 
 import torch
-
-try:
-    from lightning.pytorch.trainer.trainer import Trainer
-except ModuleNotFoundError:
-    from pytorch_lightning.trainer.trainer import Trainer
-
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
@@ -37,6 +31,9 @@ from nemo.collections.nlp.parts.nlp_overrides import (
 from nemo.collections.nlp.parts.utils_funcs import load_state_dict_helper, torch_dtype_from_precision
 from nemo.utils import logging
 from omegaconf import OmegaConf
+from pytorch_lightning.trainer.trainer import Trainer
+
+# from pytorch_lightning.trainer.trainer import Trainer
 from transformers import Qwen2ForCausalLM
 
 

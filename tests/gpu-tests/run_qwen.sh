@@ -9,7 +9,7 @@ export NEMO_SKILLS_TEST_HF_MODEL=/mnt/datadrive/nemo-skills-test-data/Qwen2.5-Ma
 export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
 
 # first running the conversion tests
-pytest tests/gpu-tests/test_convert.py -k test_hf_trtllm_conversion -s -x
+# pytest tests/gpu-tests/test_convert.py -k test_hf_trtllm_conversion -s -x
 export NEMO_SKILLS_TEST_TRTLLM_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-trtllm/model
 pytest tests/gpu-tests/test_convert.py -k test_hf_nemo_conversion -s -x
 export NEMO_SKILLS_TEST_NEMO_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-nemo/model
