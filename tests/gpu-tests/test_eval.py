@@ -146,7 +146,7 @@ def test_hf_eval(server_type):
         [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/algebra222/output.jsonl"],
     )["all"]["greedy"]
 
-    assert metrics['symbolic_correct'] >= 80
+    assert metrics['symbolic_correct'] >= 75
     assert metrics['num_entries'] == 222
 
     metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(

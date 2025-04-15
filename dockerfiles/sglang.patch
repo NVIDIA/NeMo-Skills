@@ -1,5 +1,5 @@
 diff --git a/python/sglang/srt/model_loader/loader.py b/python/sglang/srt/model_loader/loader.py
-index 7580967..8fa0f13 100644
+index 7580967..7f6603a 100644
 --- a/python/sglang/srt/model_loader/loader.py
 +++ b/python/sglang/srt/model_loader/loader.py
 @@ -36,6 +36,14 @@ from sglang.srt.distributed import (
@@ -43,16 +43,18 @@ index 7580967..8fa0f13 100644
  
  @contextmanager
  def device_loading_context(module: torch.nn.Module, target_device: torch.device):
-@@ -618,6 +641,8 @@ class ShardedStateLoader(BaseModelLoader):
+@@ -618,6 +641,10 @@ class ShardedStateLoader(BaseModelLoader):
                          # If loading with LoRA enabled, additional padding may
                          # be added to certain parameters. We only load into a
                          # narrowed view of the parameter data.
 +                        if 'experts.e_score_correction_bias' in key:
 +                            key = key.replace('experts.e_score_correction_bias', 'experts.correction_bias')
++                        if 'self_attn.mla_attn.q_scale' in key:
++                            continue
                          param_data = state_dict[key].data
                          param_shape = state_dict[key].shape
                          for dim, size in enumerate(tensor.shape):
-@@ -633,6 +658,80 @@ class ShardedStateLoader(BaseModelLoader):
+@@ -633,6 +660,80 @@ class ShardedStateLoader(BaseModelLoader):
                              )
                          param_data.copy_(tensor)
                          state_dict.pop(key)
