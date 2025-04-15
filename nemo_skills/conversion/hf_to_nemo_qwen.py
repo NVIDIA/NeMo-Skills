@@ -32,8 +32,6 @@ from nemo.collections.nlp.parts.utils_funcs import load_state_dict_helper, torch
 from nemo.utils import logging
 from omegaconf import OmegaConf
 from pytorch_lightning.trainer.trainer import Trainer
-
-# from pytorch_lightning.trainer.trainer import Trainer
 from transformers import Qwen2ForCausalLM
 
 
