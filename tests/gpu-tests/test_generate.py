@@ -124,6 +124,7 @@ def test_vllm_generate_seeds():
         f"    --server_nodes 1 "
         f"    --num_random_seeds {num_seeds} "
         f"    --eval_args='++eval_type=math' "
+        f"    --with_sandbox "
         f"    ++dataset=gsm8k "
         f"    ++split=test "
         f"    ++prompt_template=llama3-instruct "
