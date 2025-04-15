@@ -109,7 +109,7 @@ to schedule checkpoint conversion and evaluation after training
 (whenever you need to run multiple commands, it's more convenient to use python interface)
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, train, convert, eval
+from nemo_skills.pipeline.cli import wrap_arguments, train, convert, eval
 
 expname = "my-training-job"
 cluster = "slurm"
@@ -182,7 +182,7 @@ where n is the average number of sequences per pack, that packing script outputs
 Here is an example of running packing and training.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, train, run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, train, run_cmd
 
 expname = "my-training-job"
 cluster = "slurm"

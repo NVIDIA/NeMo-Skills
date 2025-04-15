@@ -36,7 +36,7 @@ Our standard [SFT data format](./training.md#preparing-the-data) can be
 used here.
 
 ```bash
-from nemo_skills.pipeline import wrap_arguments, sft_openrlhf
+from nemo_skills.pipeline.cli import wrap_arguments, sft_openrlhf
 
 sft_openrlhf(
     ctx=wrap_arguments(""),
@@ -58,7 +58,7 @@ Our standard [SFT data format](./training.md#preparing-the-data) can be
 used here.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, ppo_openrlhf
+from nemo_skills.pipeline.cli import wrap_arguments, ppo_openrlhf
 
 ppo_openrlhf(
     ctx=wrap_arguments(
@@ -94,7 +94,7 @@ You can use [nemo_skills/training/verl/prepare_data.py](https://github.com/NVIDI
 our standard [SFT data format](./training.md#preparing-the-data) into parquet.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, ppo_verl
+from nemo_skills.pipeline.cli import wrap_arguments, ppo_verl
 
 ppo_verl(
     ctx=wrap_arguments(

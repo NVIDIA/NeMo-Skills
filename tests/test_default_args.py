@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
-from nemo_skills.pipeline import generate, wrap_arguments
+from nemo_skills.pipeline.cli import generate, wrap_arguments
 
 
 def test_error_on_missing_default():
