@@ -1,0 +1,165 @@
+system: ""
+
+user: |-
+    You will be given a fragment of a solution to a math problem that includes a Python code block.
+    Your task is to determine the purpose of this Python code block in the solution fragment.
+    In your assessment, you MUST follow these guidelines:
+
+    1. Classification:
+    - Verification: Python code is used to verify the correctness of the previous manual calculations or to confirm some results. E.g. if the result of the code execution exists in the solution above, it is definitely a verification.
+    - Novel Calculation: Otherwise, if the result of code execution is not present in ANY FORM in the solution above, it is a novel calculation.
+
+    If you are unsure about the classification of specific code block, you MUST label it as Verification!
+
+    2. Output Format:
+    - Your response MUST follow this exact format (without extra commentary or text):
+        ```
+        Reasoning: <a couple of sentences explaining your rationale>
+        Judgement: <Verification or Novel Calculation>
+        ```
+    
+    ---
+
+    **EXAMPLES**
+
+    1.
+    """
+    Solution:
+    <Some text reasoning without code>
+
+    Wait, so the answer is 143? Let me verify this with the pow function.
+
+    ```python
+    # Compute 7^999 mod 1000 using pow function
+    print(pow(7, 999, 1000))  # Should print 143
+    ```
+    ```output
+    143
+    ```
+    So the answer is \\boxed{{143}}.
+    """
+    ```
+    Reasoning: This is for sure a verification, because the result of the code execution is present in the solution above. Moreover, comment in the code block explicitly states that it should print 143 which means that the result is known in advance.
+    Judgement: Verification
+    ```
+    ---
+
+    2.
+    """
+    Solution:
+    <Some text reasoning without code>
+
+    Therefore, let's proceed to compute P^5. I can use Python for this calculation to ensure accuracy.
+
+    First, let's define the transition matrix P as a numpy array, then compute P^5, then extract the relevant entry, and divide by 3.
+
+    Let me import numpy and do the calculations.
+    ```python
+    import numpy as np
+
+    # Define the transition matrix P
+    P = np.array([
+        [0, 1, 0, 0],
+        [1/3, 0, 2/3, 0],
+        [0, 2/3, 0, 1/3],
+        [0, 0, 1, 0]
+    ])
+
+    # Compute P^5
+    P5 = np.linalg.matrix_power(P, 5)
+
+    # The initial state is state 0, so the distribution after 5 steps is [1, 0, 0, 0] @ P5
+    # But since P5 is the transition matrix after 5 steps, the entry (0,1) is the probability of going from 0 to 1 in 5 steps.
+    # However, to get the distribution, we need to multiply the initial distribution by P5.
+    initial_distribution = np.array([1, 0, 0, 0])
+    distribution_after_5_steps = initial_distribution @ P5
+
+    # The probability mass at state 1 (distance 1) after 5 steps
+    prob_mass_at_1 = distribution_after_5_steps[1]
+
+    # Since state 1 corresponds to 3 vertices (B, D, E), the probability of being at B is this mass divided by 3
+    prob_at_B = prob_mass_at_1 / 3
+
+    prob_at_B
+    ```
+    ```output
+    np.float64(0.25102880658436205)
+    ```
+    ...
+    """
+    ```
+    Reasoning: The solution fragment describes algorithmic steps to calculate the probability and the code block executes these steps. The result of the code execution is not present in the solution above in any form. Therefore, this is a novel calculation.
+    Judgement: Novel Calculation
+    ```
+    ---
+
+    3.
+    """
+    Solution:
+    <Some text reasoning without code>
+
+    Compute C(51, 5):
+
+    51! / (5! * 46!) = ?
+
+    But maybe I should calculate it using Python to be accurate.
+    ```python
+    import math
+    math.comb(51, 5)
+    ```
+    ```output
+    2349060
+    ```
+    ...
+    """
+    ```
+    Reasoning: The solution fragment describes the calculation of a combinatorial expression and the code block executes this calculation. The result of the code execution is not present in the solution above in any form. Therefore, this is a novel calculation.
+    Judgement: Novel Calculation
+    ```
+    ---
+
+    4.
+    """
+    Solution:
+    <Some text reasoning without code>
+
+    But let's compute these values in Python.
+    ```python
+    import math
+
+    # Given dimensions
+    R = 4  # feet
+    H = 12  # feet
+    h = 9  # feet from the tip, so remaining height
+    r = (h / H) * R  # since r/R = h/H
+
+    # Original volume
+    V_original = (1/3) * math.pi * R**2 * H
+
+    # Remaining volume
+    V_remaining = (1/3) * math.pi * r**2 * h
+
+    # Volume poured out
+    V_poured = V_original - V_remaining
+
+    V_poured
+    ```
+    ```output
+    116.23892818282235
+    ```
+    Wait, so when I computed manually, I got 37π cubic feet, which is approximately 37 * 3.14159 ≈ 116.23, which matches the Python result of approximately 116.2389. So that seems correct.
+    ...
+    """
+    ```
+    Reasoning: The rationale right after the code block states that the manual calculation (that happened before the code block) matches the Python result. Therefore, code block verifies the previous manual calculations. So, this is a verification.
+    Judgement: Verification
+    ```
+    ---
+
+    **REMINDER**
+    Focus only on the Python code block in the provided fragment and classify it as either Verification or Novel Calculation based on whether its output appears in the solution text before the code.
+    ---
+
+    **YOUR TASK**
+
+    Solution fragment: {fragment}

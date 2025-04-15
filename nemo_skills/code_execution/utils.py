@@ -20,16 +20,37 @@ LOG = logging.getLogger(__name__)
 
 
 def format_code_output(
-    execution_dict: Dict[str, str], code_output_begin: str, code_output_end: str, code_output_format: str = 'llama'
+    execution_dict,
+    code_output_begin: str,
+    code_output_end: str,
+    code_output_format: str = 'llama',
+    remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
+    remaining_ce_string = ""
+    if remaining_code_executions is not None:
+        if remaining_code_executions > 0:
+            remaining_ce_string = (
+                f"```system\n"
+                f"Remaining code executions: {remaining_code_executions}. "
+                f"You will not be able to call code when you run out of executions, so use it wisely. "
+                f"Note that you can still continue solving the problem without code after that.\n"
+                f"```\n"
+            )
+        else:
+            remaining_ce_string = (
+                f"```system\n"
+                f"You have run out of code executions! You can no longer write or execute code. "
+                f"Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.\n"
+                f"```\n"
+            )
     if code_output_format == 'llama':
         output = execution_dict["process_status"]
         if execution_dict['stdout']:
             output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
         if execution_dict['stderr']:
             output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
-        output = f"{code_output_begin}\n\n{output}{code_output_end}\n\n"
+        output = f"{code_output_begin}\n\n{output}{remaining_ce_string}{code_output_end}\n\n"
     elif code_output_format == 'qwen':
         output = ""
         if execution_dict['stdout']:
@@ -38,7 +59,7 @@ def format_code_output(
             output += f"{execution_dict['stderr']}"
         if execution_dict['stderr'] and execution_dict['stdout']:
             LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
-        output = f"{code_output_begin}{output}{code_output_end}"
+        output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
 
@@ -65,6 +86,7 @@ def extract_code_to_execute(generation: str, code_begin: str, code_end: str, ext
 def extract_code_output(generation: str, code_output_begin: str, code_output_end: str, extract_all: bool = False):
     return _extract_between_separators(generation, [code_output_begin, code_output_end], extract_all)
 
+
 def extract_code_block(text: str, languages=None) -> str:
     if languages is None:
         languages = [""]
@@ -74,16 +96,16 @@ def extract_code_block(text: str, languages=None) -> str:
             return match.group(1).strip()
     return ""
 
+
 def clean_formal_generation(generation: str) -> str:
     # Extract part after **FINAL ANSWER** if present
     if "**FINAL ANSWER**" in generation:
         generation = generation.split("**FINAL ANSWER**", 1)[1].strip()
-    
+
     languages = ["lean4", "lean3", "lean", ""]
     extracted_code = extract_code_block(generation, languages)
     if extracted_code:
         return extracted_code
-    
+
     # If no explicit code block, remove any surrounding triple backticks
     return re.sub(r"^\s*```(?:lean4|lean3|lean)?\s*|\s*```[\s]*$", "", generation).strip()
-

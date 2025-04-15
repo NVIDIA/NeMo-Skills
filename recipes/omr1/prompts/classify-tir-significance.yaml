@@ -1,0 +1,283 @@
+system: ""
+
+user: |-
+    You will be given a fragment of a solution to a math problem that includes a Python code block.
+    Your task is to evaluate the significance of this Python code in solving the math problem.
+    In your assessment, you MUST follow these guidelines:
+
+    1. Classification:
+    Evaluate the significance of the code's contribution by categorizing it into one of three levels:
+
+    - Trivial: The code performs calculations that could easily be done manually without significant effort (e.g., solving simple equations, doing arithmetic, applying formulas to known variables). The code usage provides no meaningful or minor advantage over manual calculation.
+
+    - Moderate: The code performs calculations that would be tedious, error-prone, or time-consuming to do manually, but still technically possible (e.g., matrix operations, numerical integration of standard functions, solving systems of equations). The code usage provides efficiency but isn't essential.
+
+    - Significant: The code performs calculations that would be practically impossible or extremely difficult to do manually (e.g., brute-forcing combinatorial problems, complex simulations, solving complex differential equations, high-dimensional optimization). The code usage creates a crucial shortcut that fundamentally enables the solution.
+
+    2. Output Format:
+    - Your response MUST follow this exact format (without extra commentary or text):
+        ```
+        Reasoning: <a couple of sentences explaining your rationale>
+        Significance: <Trivial, Moderate, or Significant>
+        ```
+    
+    ---
+
+    **EXAMPLES**
+
+    1.
+    """
+    Let's find the roots of the quadratic equation: 3x² - 5x + 2 = 0
+
+    ```python
+    import numpy as np
+    from sympy import symbols, solve, Eq
+
+    x = symbols('x')
+    equation = 3*x**2 - 5*x + 2
+    solutions = solve(equation, x)
+    print(solutions)
+    ```
+    ```output
+    [2/3, 1]
+    ```
+
+    So the solutions are x = 2/3 and x = 1.
+    """
+    ```
+    Reasoning: This code simply solves a basic quadratic equation that could easily be solved manually using the quadratic formula or factoring. Finding roots of a quadratic equation with small integer coefficients is a standard calculation that requires minimal effort by hand.
+    Significance: Trivial
+    ```
+    ---
+
+    2.
+    """
+    To solve this system of 4 linear equations with 4 unknowns:
+    3x + 2y - z + 2w = 10
+    x - y + 2z - w = -1
+    2x + y + z + 3w = 12
+    x + 3y - z - w = 5
+
+    I'll use Python to solve this system using matrices.
+
+    ```python
+    import numpy as np
+    from scipy import linalg
+
+    # Define coefficient matrix
+    A = np.array([
+        [3, 2, -1, 2],
+        [1, -1, 2, -1],
+        [2, 1, 1, 3],
+        [1, 3, -1, -1]
+    ])
+
+    # Define constants vector
+    b = np.array([10, -1, 12, 5])
+
+    # Solve the system
+    solution = linalg.solve(A, b)
+    print("x =", solution[0])
+    print("y =", solution[1])
+    print("z =", solution[2])
+    print("w =", solution[3])
+    ```
+    ```output
+    x = 0.64
+    y = 2.7
+    z = 1.6
+    w = 2.14
+    ```
+
+    Therefore, the solution is x = 0.64, y = 2.7, z = 1.6, and w = 2.14.
+    """
+    ```
+    Reasoning: This code solves a system of 4 linear equations with 4 unknowns. While this could be solved manually using Gaussian elimination or Cramer's rule, it would be tedious and error-prone. The system is complex enough that computational assistance provides significant efficiency but doesn't enable something impossible.
+    Significance: Moderate
+    ```
+    ---
+
+    3.
+    """
+    For this traveling salesman problem with 11 cities, where the distances between cities are given in the distance matrix below, I need to find the shortest possible route that visits each city exactly once and returns to the starting city.
+
+    ```python
+    import numpy as np
+    from itertools import permutations
+    import time
+
+    # Distance matrix (11x11) between cities
+    distances = np.array([
+        [0, 29, 82, 46, 68, 52, 72, 42, 51, 55, 29],
+        [29, 0, 55, 46, 42, 43, 43, 23, 23, 31, 41],
+        [82, 55, 0, 68, 46, 55, 23, 43, 41, 29, 79],
+        [46, 46, 68, 0, 82, 15, 72, 31, 62, 42, 21],
+        [68, 42, 46, 82, 0, 74, 23, 52, 21, 46, 82],
+        [52, 43, 55, 15, 74, 0, 61, 23, 55, 31, 33],
+        [72, 43, 23, 72, 23, 61, 0, 42, 23, 31, 77],
+        [42, 23, 43, 31, 52, 23, 42, 0, 33, 15, 37],
+        [51, 23, 41, 62, 21, 55, 23, 33, 0, 29, 62],
+        [55, 31, 29, 42, 46, 31, 31, 15, 29, 0, 51],
+        [29, 41, 79, 21, 82, 33, 77, 37, 62, 51, 0],
+    ])
+
+    # Brute force approach to solve TSP
+    def tsp_exact(distances):
+        n = len(distances)
+        cities = list(range(1, n))  # Start from city 0
+        min_length = float('inf')
+        best_route = None
+        
+        start_time = time.time()
+        count = 0
+        
+        # Try all possible permutations of cities (excluding starting city)
+        for perm in permutations(cities):
+            route = (0,) + perm + (0,)  # Complete route starting and ending at city 0
+            length = sum(distances[route[i]][route[i+1]] for i in range(len(route)-1))
+            
+            count += 1
+            if length < min_length:
+                min_length = length
+                best_route = route
+        
+        end_time = time.time()
+        return best_route, min_length, count, end_time - start_time
+
+    # Solve the TSP problem
+    best_route, min_length, permutations_tried, time_taken = tsp_exact(distances)
+
+    print(f"Best route: {{best_route}}")
+    print(f"Minimum distance: {{min_length}}")
+    print(f"Permutations evaluated: {{permutations_tried:,}}")
+    print(f"Time taken: {{time_taken:.2f}} seconds")
+    ```
+    ```output
+    Best route: (0, 1, 8, 4, 6, 2, 9, 7, 5, 3, 10, 0)
+    Minimum distance: 251
+    Permutations evaluated: 3,628,800
+    Time taken: 5.77 seconds
+    ```
+
+    Therefore, the optimal route has a total distance of 291 units.
+    """
+    ```
+    Reasoning: This code solves a Traveling Salesman Problem with 11 cities by evaluating over 3.6M permutations - a computation that would be absolutely impossible to do manually. The brute-force approach here creates a crucial shortcut to the solution that would be practically unattainable through manual calculation, even with significant time investment.
+    Significance: Significant
+    ```
+    ---
+
+    4.
+    """
+    To find all integer solutions to the Diophantine equation 17x + 23y = 3284 where both x and y are non-negative, I'll implement search in Python.
+
+    ```python
+    def find_solutions(a, b, c):
+        solutions = []
+        
+        # Find the maximum possible value of x
+        max_x = c // a
+        
+        # Check all possible values of x from 0 to max_x
+        for x in range(max_x + 1):
+            # Calculate the corresponding y value
+            remaining = c - a * x
+            
+            # If remaining is divisible by b and the result is non-negative,
+            # we have a valid solution
+            if remaining >= 0 and remaining % b == 0:
+                y = remaining // b
+                solutions.append((x, y))
+        
+        return solutions
+
+    # Given equation: 17x + 23y = 3284
+    a, b, c = 17, 23, 3284
+    solutions = find_solutions(a, b, c)
+
+    print(f"Solutions to {{a}}x + {{b}}y = {{c}}:")
+    for x, y in solutions:
+        print(f"x = {{x}}, y = {{y}}")
+        # Verify the solution
+        print(f"Verification: {{a}}*{{x}} + {{b}}*{{y}} = {{a*x + b*y}}")
+        print()
+    ```
+    ```output
+    Solutions to 17x + 23y = 3284:
+    x = 20, y = 128
+    Verification: 17*20 + 23*128 = 3284
+
+    x = 43, y = 111
+    Verification: 17*43 + 23*111 = 3284
+
+    x = 66, y = 94
+    Verification: 17*66 + 23*94 = 3284
+
+    x = 89, y = 77
+    Verification: 17*89 + 23*77 = 3284
+
+    x = 112, y = 60
+    Verification: 17*112 + 23*60 = 3284
+
+    x = 135, y = 43
+    Verification: 17*135 + 23*43 = 3284
+
+    x = 158, y = 26
+    Verification: 17*158 + 23*26 = 3284
+
+    x = 181, y = 9
+    Verification: 17*181 + 23*9 = 3284
+
+    ```
+    So the integer solutions to the Diophantine equation are x = 11, y = 1.
+    """
+    ```
+    Reasoning: This code finds all integer solutions to a Diophantine equation by iterating through possible values of x and calculating the corresponding y. While this could be done manually, the exhaustive search for non-negative integer solutions is tedious and error-prone. The computational approach reduces the effort and simplifies the solution process, making it more efficient. Thus it provides a moderate level of significance.
+    Significance: Moderate
+    ```
+    ---
+
+    5.
+    """
+    To verify my hypothesis, I need to find the probability of getting at least 3 heads in 10 coin flips. I'll calculate this using the binomial distribution.
+
+    ```python
+    import math
+
+    def binomial_probability(n, k, p):
+        # Calculate the probability of k successes in n trials
+        # with probability p of success on a single trial
+        combinations = math.comb(n, k)
+        return combinations * (p ** k) * ((1-p) ** (n-k))
+
+    # Calculate P(X ≥ 3) when flipping a fair coin 10 times
+    p_at_least_3 = sum(binomial_probability(10, k, 0.5) for k in range(3, 11))
+    
+    print(f"P(X ≥ 3) = {{p_at_least_3:.6f}}")
+    print(f"Percentage: {{p_at_least_3 * 100:.2f}}%")
+    ```
+    ```output
+    P(X ≥ 3) = 0.945312
+    Percentage: 94.53%
+    ```
+
+    So the probability of getting at least 3 heads in 10 coin flips is approximately 94.53%.
+    """
+    ```
+    Reasoning: This code calculates a probability using the binomial distribution formula. While the calculation involves combinations and powers, the mathematical concept is straightforward and could be calculated manually by explicitly writing and reducing the terms. The code provides a minor computational convenience but doesn't fundamentally change the nature of the solution process, making it a trivial use of Python code.
+    Significance: Trivial
+    ```
+    ---
+
+    **REMINDER**
+    When evaluating significance, consider:
+    1. Could this calculation reasonably be done by hand? If yes, how difficult would it be?
+    2. Does the code enable a solution approach that would otherwise be impractical?
+    3. Is the computational advantage merely convenience, or is it essential to the solution?
+
+    Remember to classify as Trivial, Moderate, or Significant based on these considerations.
+    ---
+
+    **YOUR TASK**
+
+    Solution fragment: {fragment}

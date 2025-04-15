@@ -17,12 +17,11 @@ import os
 from dataclasses import dataclass
 from typing import List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_timeout, run_exp
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -46,7 +45,7 @@ class TrainingParams:
 
 def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict = {}
-    if cluster_config['executor'] == 'local':
+    if cluster_config['executor'] != 'slurm':
         assert params.num_nodes == 1, "Local executor only supports single node training"
         format_dict['nnodes'] = 1
         format_dict['nproc_per_node'] = params.num_gpus
@@ -247,7 +246,7 @@ def sft_openrlhf(
     ),
 ):
     """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -284,7 +283,7 @@ def sft_openrlhf(
         extra_arguments=extra_arguments,
     )
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             prev_task = add_task(

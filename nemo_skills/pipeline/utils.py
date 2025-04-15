@@ -18,6 +18,7 @@ import shlex
 import subprocess
 import sys
 import tarfile
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,6 +32,7 @@ from huggingface_hub import get_token
 from invoke import StreamWatcher
 from nemo_run.config import set_nemorun_home
 from nemo_run.core.execution.docker import DockerExecutor
+from nemo_run.core.execution.local import LocalExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails, get_packaging_job_key
 from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
@@ -99,6 +101,10 @@ def get_registered_external_repo(name: str) -> Optional[RepoMetadata]:
 
 def check_if_mounted(cluster_config, path_to_check):
     """Will check that path_to_check is referenced inside one of the mounts."""
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return
+
     for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         if path_to_check.startswith(mount.split(":")[1]):
             return
@@ -107,6 +113,9 @@ def check_if_mounted(cluster_config, path_to_check):
 
 def get_unmounted_path(cluster_config, path):
     """Will return the path on the filesystem before it's mounted."""
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return path
     if path is None:
         return None
     for mount in get_mounts_from_config(cluster_config):
@@ -249,7 +258,7 @@ def get_reward_server_command(
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
-        if cluster_config["executor"] == "local":
+        if cluster_config["executor"] != "slurm":
             num_tasks = 1
 
     elif server_type == "vllm":
@@ -343,7 +352,7 @@ def get_server_command(
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
-        if cluster_config["executor"] == "local":
+        if cluster_config["executor"] != "slurm":
             num_tasks = 1
     elif server_type == 'vllm':
         start_vllm_cmd = (
@@ -471,7 +480,15 @@ def get_cluster_config(cluster=None, config_dir=None):
 
     config_file = os.environ.get("NEMO_SKILLS_CONFIG")
     if not config_file:
-        raise ValueError("Either cluster or NEMO_SKILLS_CONFIG must be provided.")
+        LOG.warning(
+            "Cluster config is not specified. Running locally without containers. "
+            "Only a subset of features is supported and you're responsible "
+            "for installing any required dependencies. "
+            "It's recommended to run `ns setup` to define appropriate configs!"
+        )
+        # just returning empty string for any container on access
+        cluster_config = {'executor': 'none', 'containers': defaultdict(str)}
+        return cluster_config
 
     if not Path(config_file).exists():
         raise ValueError(f"Cluster config {config_file} not found.")
@@ -511,7 +528,8 @@ def tunnel_hash(tunnel):
 
 def get_tunnel(cluster_config):
     if "ssh_tunnel" not in cluster_config:
-        LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
+        if cluster_config["executor"] != "slurm":
+            LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
         return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
@@ -678,7 +696,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
         if not (Path(repo_path) / 'nemo_skills').is_dir():
-            logging.warning(
+            logging.info(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
                 str(nemo_skills_dir / '*'),
@@ -695,7 +713,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             check_uncommitted_changes=check_uncommited_changes,
         )
     else:
-        logging.warning(
+        logging.info(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
             str(nemo_skills_dir / '*'),
         )
@@ -878,10 +896,15 @@ def get_executor(
     if extra_package_dirs is not None:
         extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
-    if cluster_config["executor"] == "local":
+
+    if cluster_config["executor"] != "slurm":
         if num_nodes > 1:
             raise ValueError("Local executor does not support multi-node execution")
 
+    if cluster_config["executor"] == "none":
+        return LocalExecutor()
+
+    if cluster_config["executor"] == "local":
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
         return DockerExecutor(
             container_image=container,
@@ -1016,7 +1039,7 @@ def add_task(
 
     Example of how to set task_dependencies:
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         task1 = add_task(exp, ...)
         task2 = add_task(exp, ..., task_dependencies=[task1])
 
@@ -1079,7 +1102,7 @@ def add_task(
             het_group=het_group,
             total_het_groups=total_het_groups,
         )
-        if cluster_config["executor"] == "local" and num_server_tasks > 1:
+        if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
@@ -1097,7 +1120,7 @@ def add_task(
         if len(cmd) != len(container) or len(cmd) != len(num_tasks):
             raise ValueError("Number of commands, containers and num_tasks must match.")
         for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
-            if cluster_config["executor"] == "local" and cur_tasks > 1:
+            if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
                 commands.append(cur_cmd)
@@ -1185,6 +1208,11 @@ def add_task(
         elif isinstance(tunnel, run.SSHTunnel):
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
+    # no mounting here, so assuming /nemo_run/code can be replaced with the current dir
+    if cluster_config["executor"] == "none":
+        for idx in range(len(commands)):
+            commands[idx] = commands[idx].replace('/nemo_run/code', './')
+
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
@@ -1194,14 +1222,26 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
-        if heterogeneous:
-            executors[0].het_group_indices = het_group_indices
-        return exp.add(
-            [run.Script(inline=command) for command in commands],
-            executor=executors,
-            name="nemo-run",
-            dependencies=task_dependencies,
-        )
+        try:
+            if heterogeneous:
+                executors[0].het_group_indices = het_group_indices
+            return exp.add(
+                [run.Script(inline=command) for command in commands],
+                executor=executors,
+                name="nemo-run",
+                dependencies=task_dependencies,
+            )
+        except AssertionError as e:
+            # AssertionError: Unsupported executor type.
+            if "Unsupported executor type" in str(e):
+                raise ValueError(
+                    "Running this command without --cluster parameter is not supported "
+                    "(even for running locally you need to pick a 'local' cluster). "
+                    "Please specify --cluster. You can run `ns setup` to define your "
+                    "cluster config if you don't have it yet."
+                ) from e
+            else:
+                raise e
 
 
 def run_exp(exp, cluster_config, sequential=None):
@@ -1209,7 +1249,7 @@ def run_exp(exp, cluster_config, sequential=None):
 
     If it is specified, it will be used as is.
     """
-    if cluster_config['executor'] == 'local':
+    if cluster_config['executor'] != 'slurm':
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
         exp.run(detach=True, sequential=False if sequential is None else sequential)
@@ -1220,3 +1260,10 @@ def run_exp(exp, cluster_config, sequential=None):
             ssh_hash = tunnel_hash(tunnel)
             if ssh_hash not in REUSE_CODE_EXP:
                 REUSE_CODE_EXP[ssh_hash] = exp
+
+
+def get_exp(expname, cluster_config):
+    if cluster_config['executor'] == 'slurm':
+        return run.Experiment(expname)
+    # hiding all nemo-run logs otherwise as they are not useful locally
+    return run.Experiment(expname, clean_mode=True, log_level="WARN")

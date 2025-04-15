@@ -17,13 +17,20 @@ from enum import Enum
 from pathlib import Path
 from typing import List
 
-import nemo_run as run
 import typer
 
 from nemo_skills.dataset.utils import get_dataset_module
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_server_command
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    get_generation_command,
+    get_server_command,
+    run_exp,
+)
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -175,7 +182,7 @@ def eval(
     Run `python -m nemo_skills.inference.generate --help` for other supported arguments
     (need to be prefixed with ++, since we use Hydra for that script).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting evaluation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -272,7 +279,7 @@ def eval(
     # splitting eval cmds equally across num_jobs nodes
     eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         for idx, eval_cmd in enumerate(eval_cmds):
             LOG.info("Launching task with command %s", eval_cmd)
             add_task(

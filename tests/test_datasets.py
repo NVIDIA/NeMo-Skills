@@ -46,6 +46,7 @@ DATASETS = [
     ('olympiadbench', ['test']),
     ('gaokao2023en', ['test']),
     ('college_math', ['test']),
+    ('comp-math-24-25', ['test']),
 ]
 
 

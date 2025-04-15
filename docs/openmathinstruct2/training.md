@@ -1,6 +1,6 @@
 # Model training
 
-We assume you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs) and are
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 

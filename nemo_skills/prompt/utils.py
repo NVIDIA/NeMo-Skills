@@ -255,7 +255,9 @@ class Prompt:
                         # Append generation without the closing tag.
                         prompt_string += generation
                     else:
-                        prompt_string += self.TURN_END_FORMAT.format(assistant=generation, **asdict(self.config.template))
+                        prompt_string += self.TURN_END_FORMAT.format(
+                            assistant=generation, **asdict(self.config.template)
+                        )
             else:
                 prompt_string = self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)

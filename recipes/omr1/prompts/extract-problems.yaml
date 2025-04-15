@@ -1,0 +1,100 @@
+user: |-
+  I will give you a post from a math-related forum that might contain one or several math problems.
+  Your task is to extract all problems or state that none are available.
+
+  Here are some guidelines you should follow
+  - If no problems are available, output "No problems identified."
+  - For each problem found, use the following format:
+    Problem 1: <problem statement>
+
+    Problem 2: <problem statement>
+
+    ...
+
+  - For each math problem you identify, make sure to rephrase it such that it's stated clearly and concisely.
+    Remove any redundant context, personal commentary, anecdotes, or unrelated information.
+    But make sure not to change the meaning of the problem and keep all necessary mathematical or technical details.
+  - If multiple problems that you extract are related, make sure to include all the context in each problem statement
+    as they will be looked at independently.
+
+  Here are a few examples.
+
+
+  Example 1
+
+  Forum post:
+  Countdown:
+
+  What is the remainder of 8^6+7^7+6^8 is divided by 5?
+
+  no calculator of course, paper isn't needed either, but sure.
+
+  Output:
+  Problem 1: What is the remainder of $8^6+7^7+6^8$ when divided by 5?
+
+
+
+  Example 2
+
+  Forum post:
+  Question 1:
+  A tetrahedron has four vertices. We can label each vertex by one of the four digits: $1, 2, 3, 4$. How many non-congruent ways are there to assign a different digit to each vertex of a tetrahedron? Tetrahedra are considered congruent through rotation. Reflections are considered different.
+
+  I'm wondering how I could approach a problem like this. I started off with $4!$ and then divided by $4$ to take out the rotation aspect. Now I am stuck.
+
+  Note: I'd rather not do case work because I'm sure the test writers could have easily used an icosahedron, or something equally lengthy.
+
+  Another Question along the same lines:
+
+  How many ways to color a cube using 6 colors, where each face has a unique color?
+
+  Thanks
+
+  Output:
+  Problem 1: How many non-congruent ways are there to assign a different digit to each vertex of a tetrahedron? Tetrahedra are considered congruent through rotation. Reflections are considered different.
+  Problem 2: How many ways can a cube be colored using 6 colors, where each face has a unique color?
+
+
+
+  Example 3
+
+  Forum post:
+  Yes! I completely agree with what you said. It's been a tough transition for me too, but we'll figure it out.
+
+  Output:
+  No problems identified
+
+
+
+  Example 4
+
+  Forum post:
+  Billy Bob has fourteen different pairs of socks in his drawer. They are just thrown around randomly in the drawer. Billy Bob once woke up in a hurry and had to get his socks quickly.
+  Without switching the light on, he pulled out enough socks to know that he had at least one pair, and then he ran out of the room. How many socks did Billy Bob pull out
+
+
+  Output:
+  Problem 1: From a drawer containing 14 different pairs of socks, how many socks must be pulled out randomly to ensure at least one matching pair?
+
+
+
+  Please analyze the following forum post and extract all math problems. Here are the guidelines one more time for your reference
+  - If no problems are available, output "No problems identified."
+  - For each problem found, use the following format:
+    Problem 1: <problem statement>
+
+    Problem 2: <problem statement>
+
+    ...
+
+  - For each math problem you identify, make sure to rephrase it such that it's stated clearly and concisely.
+    Remove any redundant context, personal commentary, anecdotes, or unrelated information.
+    But make sure not to change the meaning of the problem and keep all necessary mathematical or technical details.
+  - If multiple problems that you extract are related, make sure to include all the context in each problem statement
+    as they will be looked at independently.
+
+
+  Forum post:
+  {forum_post}
+
+  Output:

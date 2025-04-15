@@ -69,3 +69,7 @@ model:
   # NOTE: The user does not need to change the global batch size below
   # GBS is overridden to 0 to disable checks for compatibility with the megatron-core parallel state
   global_batch_size: 0
+
+  optim:
+    overlap_grad_sync: False
+    overlap_param_sync: False

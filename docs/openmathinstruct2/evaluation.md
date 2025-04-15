@@ -2,7 +2,7 @@
 
 Here are the commands you can run to reproduce our evaluation numbers.
 The commands below are for OpenMath-2-Llama3.1-8b model as an example.
-We assume you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs) and are
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
@@ -54,7 +54,6 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     ++prompt_template=llama3-instruct \
-    ++batch_size=512 \
     ++inference.tokens_to_generate=4096
 ```
 
@@ -128,7 +127,6 @@ ns eval \
     --num_jobs=1 \
     --skip_greedy \
     ++prompt_template=llama3-instruct \
-    ++batch_size=512 \
     ++inference.tokens_to_generate=4096
 ```
 

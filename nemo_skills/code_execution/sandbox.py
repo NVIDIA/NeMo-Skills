@@ -28,9 +28,9 @@ import requests
 import tqdm
 
 from nemo_skills.code_execution.math_grader import extract_answer
-from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
-from nemo_skills.dataset.utils import get_lean4_header
 from nemo_skills.code_execution.utils import clean_formal_generation
+from nemo_skills.dataset.utils import get_lean4_header
+from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 
 LOG = logging.getLogger(__file__)
 
@@ -173,7 +173,10 @@ class Sandbox(abc.ABC):
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
+        traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
+        traceback_verbosity = traceback_verbosity.capitalize()
+
         if session_id is None and language == "python":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
@@ -186,12 +189,26 @@ class Sandbox(abc.ABC):
 import traceback
 import json
 import os
+import re
 import warnings
 warnings.filterwarnings('ignore')
 os.environ['OPENBLAS_NUM_THREADS'] = '16'
 
 from IPython.core.interactiveshell import InteractiveShell
 from IPython.utils import io
+
+def simplify_errors(error_text):
+    def strip_ansi_codes(text):
+        ansi_escape = re.compile(r'\\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+
+    error_text = strip_ansi_codes(error_text)
+    output = []
+    for line in error_text.split('\\n'):
+        if line.strip().startswith('File <ipython-'):
+            continue
+        output.append(line)
+    return '\\n'.join(output)
 
 code_snippets = []
 """
@@ -202,6 +219,7 @@ code_snippets = []
             TO_EXECUTE += f"""
 try:
     shell = InteractiveShell()
+    shell.InteractiveTB.set_mode(mode='{traceback_verbosity}')
     for code in code_snippets:
         with io.capture_output() as captured:
             exec_result = shell.run_cell(code)
@@ -212,8 +230,12 @@ try:
     if len(stderr) > {max_output_characters}:
         stderr = stderr[:{max_output_characters}] + "<output cut>"
     if stdout:
+        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
+            stdout = simplify_errors(stdout)
         stdout += "\\n"
     if stderr:
+        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
+            stderr = simplify_errors(stderr)
         stderr += "\\n"
     to_return = {{"process_status": "completed", "stdout": stdout, "stderr": stderr}}
 except Exception:
@@ -415,7 +437,9 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     elif answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
                             generation = clean_formal_generation(line_dict["generation"])
-                            line_dict["predicted_proof"] = line_dict["header"] + line_dict["formal_statement"] + generation
+                            line_dict["predicted_proof"] = (
+                                line_dict["header"] + line_dict["formal_statement"] + generation
+                            )
                         else:
                             if "predicted_proof" not in line_dict:
                                 raise ValueError(
@@ -433,7 +457,7 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                     "predicted_proof key not found in the line_dict. "
                                     "Set use_predicted_proof_key=False to re-combine"
                                 )
-                            
+
                     data[-1][-1] = json.dumps(line_dict)
 
                     if answer_format == "natural_language":

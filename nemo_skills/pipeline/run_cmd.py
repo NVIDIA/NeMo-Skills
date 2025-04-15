@@ -15,12 +15,11 @@
 import logging
 from typing import List
 
-import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -79,14 +78,14 @@ def run_cmd(
     ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
 
     cluster_config = get_cluster_config(cluster, config_dir)
     if log_dir:
         check_if_mounted(cluster_config, log_dir)
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         add_task(
             exp,
             cmd=wrap_cmd(get_cmd(extra_arguments=extra_arguments), preprocess_cmd, postprocess_cmd),

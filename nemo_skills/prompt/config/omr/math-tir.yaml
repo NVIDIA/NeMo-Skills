@@ -1,0 +1,8 @@
+system: ""
+
+user: |-
+  Solve the following math problem, integrating natural language reasoning with Python code executions.
+  You may perform up to {total_code_executions} Python code calls to assist your reasoning.
+  Make sure to put the answer (and only answer) inside \boxed{{}}.
+
+  {problem}

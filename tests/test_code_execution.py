@@ -108,13 +108,7 @@ def test_execution_error(sandbox_type):
 
     output, session_id = sandbox.execute_code(code)
     # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
-    error = (
-        '\x1b[0;31m---------------------------------------------------------------------------\x1b[0m\n\x1b[0;31m'
-        'ZeroDivisionError\x1b[0m                         Traceback (most recent call last)\nFile \x1b[0;32m'
-        '<ipython-input-1-bc757c3fda29>:1\x1b[0m\n\x1b[0;32m----> 1\x1b[0m \x1b[38;5;241;43m1\x1b[39;49m\x1b[43m '
-        '\x1b[49m\x1b[38;5;241;43m/\x1b[39;49m\x1b[43m \x1b[49m\x1b[38;5;241;43m0\x1b[39;49m\n\n\x1b[0;31m'
-        'ZeroDivisionError\x1b[0m: division by zero\n'
-    )
+    error = 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n'
     assert output == {
         'process_status': 'completed',
         'stderr': '',
@@ -130,10 +124,7 @@ def test_syntax_error(sandbox_type):
     code = """a = 2\n b = 3"""
 
     output, session_id = sandbox.execute_code(code)
-    error = (
-        '\x1b[0;36m  File \x1b[0;32m<ipython-input-1-ff73a4eb1351>:2\x1b[0;36m\x1b[0m\n\x1b[0;31m    '
-        'b = 3\x1b[0m\n\x1b[0m    ^\x1b[0m\n\x1b[0;31mIndentationError\x1b[0m\x1b[0;31m:\x1b[0m unexpected indent\n'
-    )
+    error = '    b = 3\n    ^\nIndentationError: unexpected indent\n'
     assert output == {
         'process_status': 'completed',
         'stderr': '',
@@ -171,16 +162,9 @@ x = (600 - height_in_inches) / 30
 x
 """
     error = (
-        "\x1b[0;31m---------------------------------------------------------------------------\x1b[0m\n\x1b[0;31m"
-        "NameError\x1b[0m                                 Traceback (most recent call last)\nFile \x1b[0;32m"
-        "<ipython-input-1-2d264478936f>:4\x1b[0m\n\x1b[1;32m      2\x1b[0m height_in_inches \x1b[38;5;241m=\x1b"
-        "[39m \x1b[38;5;241m20\x1b[39m \x1b[38;5;241m*\x1b[39m \x1b[38;5;241m12\x1b[39m\n\x1b[1;32m      3\x1b[0m"
-        " \x1b[38;5;66;03m# height of bamboo in inches after x days\x1b[39;00m\n\x1b[0;32m----> 4\x1b[0m "
-        "height_after_x_days \x1b[38;5;241m=\x1b[39m height_in_inches \x1b[38;5;241m+\x1b[39m \x1b[38;5;241m30"
-        "\x1b[39m \x1b[38;5;241m*\x1b[39m \x1b[43mx\x1b[49m\n\x1b[1;32m      5\x1b[0m \x1b[38;5;66;03m"
-        "# solve for x\x1b[39;00m\n\x1b[1;32m      6\x1b[0m x \x1b[38;5;241m=\x1b[39m (\x1b[38;5;241m600\x1b[39m "
-        "\x1b[38;5;241m-\x1b[39m height_in_inches) \x1b[38;5;241m/\x1b[39m \x1b[38;5;241m30\x1b[39m\n\n\x1b[0;31m"
-        "NameError\x1b[0m: name 'x' is not defined\n"
+        "Traceback (most recent call last):\n    "
+        "height_after_x_days = height_in_inches + 30 * x\n"
+        "NameError: name 'x' is not defined\n"
     )
     output, session_id = sandbox.execute_code(code)
     assert output == {
