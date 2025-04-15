@@ -1,7 +1,0 @@
-system: ""
-
-user: |-
-  Answer the following {answer_type} question. Your response should be in the following format:
-  The final answer is \boxed{{the_answer}}.
-  
-  {question}
