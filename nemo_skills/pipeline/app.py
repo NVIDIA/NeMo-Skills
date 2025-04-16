@@ -180,3 +180,145 @@ def add_mount_path(mount_source: str, mount_dest: str, cluster_config):
 
     else:
         raise ValueError("No mounts found in cluster config, can only add to existing mount list.")
+
+
+def is_mounted_filepath(filepath: str, cluster_config: dict):
+    """
+    Check if the filepath is mounted using the cluster config.
+
+    Args:
+        filepath: The filepath to check.
+        cluster_config: The cluster configuration dictionary.
+
+    Returns:
+        bool: Whether the filepath is mounted.
+    """
+    # Find which mount path matches the filepaths prefix
+    for mount in cluster_config['mounts']:
+        mount_source, mount_dest = mount.split(':')
+        if filepath.startswith(mount_dest):
+            return True
+
+    return False
+
+
+def get_mounted_filepath(filepath: str, cluster_config: dict):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
+    If an already mounted path is provided, then it will return the filepath as is.
+
+    Args:
+        filepath: The filepath to resolve.
+        cluster_config: The cluster configuration dictionary.
+
+    Returns:
+        The resolved filepath.
+    """
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
+    for mount in cluster_config['mounts']:
+        mount_source, mount_dest = mount.split(':')
+        if filepath.startswith(mount_source):
+            mount_path = mount
+            break
+
+        elif filepath.startswith(mount_dest):
+            # already mounted, return immediately
+            return filepath
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{filepath}`. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+    filepath = mount_dest + filepath[len(mount_source) :]  # replace the mount destination with the mount source
+
+    return filepath
+
+
+def get_unmounted_filepath(filepath: str, cluster_config: dict,):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount source path to the filepath.
+    Args:
+        filepath: The filepath to resolve.
+        cluster_config: The cluster configuration dictionary.
+
+    Returns:
+        The resolved filepath.
+    """
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
+    for mount in cluster_config['mounts']:
+        mount_source, mount_dest = mount.split(':')
+        if filepath.startswith(mount_dest):
+            mount_path = mount
+            break
+
+        elif filepath.startswith(mount_source):
+            # already mounted, return immediately
+            return filepath
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{filepath}`. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+    filepath = mount_source + filepath[len(mount_dest) :]  # replace the mount destination with the mount source
+
+    return filepath
+
+
+def resolve_mount_paths(mount_paths: str | list, cluster_config: dict, create_remote_dir: bool = True):
+    """
+    Resolve the mount paths using the cluster config to merge the mount destination path to the filepath.
+    Args:
+        mount_paths: The mount paths to resolve - can be a string (comma separated) or a list of strings.
+            Each mount path should be in the format `src:dest`.
+        cluster_config: The cluster configuration dictionary to update.
+        create_remote_dir: Whether to create the remote directories for the mount paths.
+
+    Return:
+        The updated cluster configuration dictionary.
+    """
+    logger = logging.getLogger('nemo_skills')
+
+    if mount_paths is not None:
+        if isinstance(mount_paths, str):
+            mount_paths_list = mount_paths.split(",")
+        else:
+            mount_paths_list = mount_paths
+        # remove empty strings from the list and strip whitespace
+        mount_paths_list = [path.strip() for path in mount_paths_list]
+        mount_paths_list = [path for path in mount_paths_list if path != ""]
+
+        for idx, path in enumerate(mount_paths_list):
+            assert ":" in path, f"Invalid mount path: {path}. Each path must be in the format `src:dest`"
+            src, dest = path.split(":")
+            src = src.strip().strip("\n")
+            dest = dest.strip().strip("\n")
+
+            logger.info(f"Dynamically mounting path: {src} to {dest}")
+            add_mount_path(src, dest, cluster_config)
+
+            # Incase `create_remote_dir` is set, we need to create the source directory.
+            # Preserve the original src path
+            mount_paths_list[idx] = (src, dest)
+
+        if create_remote_dir:
+            logger.info(f"Creating remote directories for mount paths:")
+            all_src_dir = [src for src, _ in mount_paths_list]
+            # Check if it is a file or a directory and only create the directory
+            for idx in range(len(all_src_dir)):
+                if os.path.splitext(all_src_dir[idx])[1] != "":
+                    all_src_dir[idx] = os.path.dirname(all_src_dir[idx])
+                logger.info(f"Creating remote directory: {all_src_dir[idx]}")
+
+            create_remote_directory(all_src_dir, cluster_config)
+
+    return cluster_config

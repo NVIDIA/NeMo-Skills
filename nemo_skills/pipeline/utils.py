@@ -512,6 +512,23 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
+    # If the str provided is an env variable, resolve it
+    if "$" in job_dir:
+        job_dir = os.path.expandvars(job_dir)
+        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
+
+    if "$" in host:
+        host = os.path.expandvars(host)
+        LOG.info(f"Resolved `host` from env var to `{host}`")
+
+    if "$" in user:
+        user = os.path.expandvars(user)
+        LOG.info(f"Resolved `user` from env var to `{user}`")
+
+    if "$" in identity:
+        identity = os.path.expandvars(identity)
+        LOG.info(f"Resolved `identity` from env var to `{identity}`")
+
     return run.SSHTunnel(
         host=host,
         user=user,

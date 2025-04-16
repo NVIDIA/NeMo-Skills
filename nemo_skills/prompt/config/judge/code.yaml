@@ -1,0 +1,82 @@
+system: ""
+
+# Defines the judge prompt for code generation tasks
+# You need to use keys you want to use from the input dict using {}
+# For example, you generally want {instruction} and {output} keys for genetic instruct
+# Allowed keys for judgement - {Yes or No}, {Yes}, {No}. Other keys must be explicitly escaped in code.
+user: |
+  '''
+  You are an expert python programmer. 
+
+  Below is a question and code solution. Decide if the solution follows the below criteria and give a final Yes/No, and place it in the <judge></judge> tags.
+  
+  Only look at the function generated, not any examples/print statements etc. Just the core logic.
+  
+  Please first briefly describe your reasoning (in less than 30 words) without writing any code, and then write Decision: \\\\boxed{Yes or No} in your last line.
+  
+  Criteria:
+  
+  1. <llm-code></llm-code> contains a code solution in any programming language.
+  2. If the code was executed with the proper libraries imported and correct inputs, it would execute without error.
+  3. Given the question, the code solution seems to answer the problem if it was to be used correctly.
+  4. The code solution provides an elegant solution to the problem and doesn't seem overly complicated.
+  '''
+  
+  
+  
+  
+  
+  Question: Write a python function to find the first repeated character in a given string. 
+  <llm-code>
+  def first_repeated_char(str1):
+      for index, c in enumerate(str1):
+          if str1[:index + 1].count(c) > 1:
+              return c
+          return "None"
+  </llm-code>
+  <judge>
+  The code seems to be executable, and solve the question. 
+  Score: \\\\boxed{Yes}.
+  </judge>
+  
+  
+  
+  
+  
+  Question: Write a function to reverse words in a given string.
+  <llm-code>
+  def reverse_words(str):
+      return ' '.join(reversed(s.split()))
+  </llm-code>
+  <judge>
+  There is an error in the function definition. The input argument is `str` whereas the function references `s`. This would not execute, or solve the problem however does take a good approach at solving the problem.
+  Score: \\\\boxed{No}.
+  </judge>
+  
+  
+  
+  
+  
+  Question: Can you write python code to convert degrees to radians.
+  <llm-code>
+  def radian_degree(degree): 
+      '''
+      Function to convert degrees to radians.
+      '''
+      radian = degree*(math.pi/180) 
+      return radian
+  </llm-code>
+  <judge>
+  Seems to answer the problem, is executable (given the math library is imported). 
+  Score: \\\\boxed{Yes}.
+  </judge>
+  
+  
+  
+  
+  
+  Question: {instruction}
+  <llm-code>
+  {output}
+  </llm-code>
+  <judge>
