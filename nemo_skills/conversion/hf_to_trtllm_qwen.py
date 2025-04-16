@@ -35,6 +35,7 @@ def parse_arguments():
     parser.add_argument('--model_dir', type=str, default=None, required=True)
     parser.add_argument('--tp_size', type=int, default=1, help='N-way tensor parallelism size')
     parser.add_argument('--pp_size', type=int, default=1, help='N-way pipeline parallelism size')
+    parser.add_argument('--cp_size', type=int, default=1, help='N-way context parallelism size')
     parser.add_argument(
         '--dtype',
         type=str,
@@ -238,6 +239,7 @@ def convert_and_save_hf(args):
             pp_size=args.pp_size,
             moe_tp_size=args.moe_tp_size,
             moe_ep_size=args.moe_ep_size,
+            cp_size=args.cp_size,
         )
         QWenForCausalLM.quantize(
             args.model_dir,
@@ -262,6 +264,10 @@ def convert_and_save_hf(args):
             qwen = QWenForCausalLM.from_hugging_face(
                 model_dir, args.dtype, mapping=mapping, quant_config=quant_config, **override_fields
             )
+            qwen.config.mapping.cp_size = args.cp_size
+            qwen.config.mapping.attn_tp_size = -1
+            qwen.config.mapping.attn_cp_size = -1
+            qwen.config.mapping.world_size *= args.cp_size
             qwen.save_checkpoint(args.output_dir, save_config=(rank == 0))
             del qwen
 

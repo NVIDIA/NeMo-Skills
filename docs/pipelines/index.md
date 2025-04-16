@@ -33,7 +33,7 @@ This might sound a little complicated, so let's see how it works through an exam
 === "python interface"
 
     ```python
-    from nemo_skills.pipeline import wrap_arguments, generate
+    from nemo_skills.pipeline.cli import wrap_arguments, generate
 
     generate(
         cluster="local",

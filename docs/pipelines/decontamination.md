@@ -27,7 +27,7 @@ you have `/workspace` defined in your [cluster config](../basics/cluster-configs
 you can do it in the following way
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 
 test_sets = ['math', 'amc23', 'aime24']

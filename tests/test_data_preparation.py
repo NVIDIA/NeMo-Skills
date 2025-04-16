@@ -18,7 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from nemo_skills.pipeline import run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
 sys.path.append(str(Path(__file__).absolute().parent / 'gpu-tests'))
 from test_train import docker_run

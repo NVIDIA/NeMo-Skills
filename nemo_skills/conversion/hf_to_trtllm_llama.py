@@ -156,6 +156,7 @@ def parse_arguments():
         '--quant_ckpt_path', type=str, default=None, help='Path of a quantized model checkpoint in .safetensors format'
     )
     parser.add_argument("--use_fp8", action="store_true", default=False, help="Enable FP8 per-tensor quantization")
+    parser.add_argument("--use_nvfp4", action="store_true", default=False, help="Enable NVFP4 quantization")
     parser.add_argument(
         "--use_fp8_rowwise", action="store_true", default=False, help="Enable Fp8 per-token per-channel quantization"
     )
@@ -274,6 +275,8 @@ def args_to_quant_config(args: argparse.Namespace) -> QuantConfig:
         quant_config = precision_to_config(args.weight_only_precision, args.group_size, quant_config)
     elif args.use_fp8:
         quant_config.quant_algo = QuantAlgo.FP8
+    elif args.use_nvfp4:
+        quant_config.quant_algo = QuantAlgo.NVFP4
     elif args.smoothquant:
         quant_config.smoothquant_val = args.smoothquant
         if args.per_channel:
@@ -351,6 +354,8 @@ def convert_and_save_meta(args, rank):
         embedding_sharding_dim=args.embedding_sharding_dim,
     )
     llama.config.mapping.cp_size = args.cp_size
+    llama.config.mapping.attn_tp_size = -1
+    llama.config.mapping.attn_cp_size = -1
     llama.config.mapping.world_size *= args.cp_size
     llama.save_checkpoint(args.output_dir, save_config=(rank == 0))
 
@@ -471,6 +476,8 @@ def convert_and_save_hf(args):
             )
             print(f'Total time of reading and converting: {time.time()-tik:.3f} s')
             llama.config.mapping.cp_size = args.cp_size
+            llama.config.mapping.attn_tp_size = -1
+            llama.config.mapping.attn_cp_size = -1
             llama.config.mapping.world_size *= args.cp_size
             tik = time.time()
             llama.save_checkpoint(args.output_dir, save_config=(rank == 0))

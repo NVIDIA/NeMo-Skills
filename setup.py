@@ -25,7 +25,7 @@ requirements = parse_requirements('requirements/main.txt')
 
 setup(
     name="nemo_skills",
-    version="0.5.0",
+    version="0.6.0",
     description="NeMo Skills - a project to improve skills of LLMs",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

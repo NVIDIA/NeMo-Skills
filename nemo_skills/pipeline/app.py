@@ -27,18 +27,6 @@ from nemo_skills.pipeline.utils import get_mounts_from_config, get_tunnel
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 
 
-def wrap_arguments(arguments: str):
-    """Returns a mock context object to allow using the cli entrypoints as functions."""
-
-    class MockContext:
-        def __init__(self, args):
-            self.args = args
-            self.obj = None
-
-    # first one is the cli name
-    return MockContext(args=arguments.split(" "))
-
-
 def typer_unpacker(f: Callable):
     """from https://github.com/fastapi/typer/issues/279"""
 
