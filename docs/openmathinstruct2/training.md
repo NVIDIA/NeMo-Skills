@@ -46,7 +46,8 @@ python -m nemo_skills.training.prepare_data \
     ++filters.trim_prefix=false \
     ++filters.trim_solutions=false \
     ++filters.drop_incorrect_arithmetic=false \
-    ++filters.split_arithmetic=false
+    ++filters.split_arithmetic=false \
+    ++filters.remove_contaminated=false
 ```
 
 ## Prepare base model
