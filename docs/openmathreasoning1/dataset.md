@@ -164,3 +164,6 @@ python recipes/omr1/pipelines/solution_generation.py --mode full-qwq
 You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode full-qwq` or `--mode full-r1`.
 
 If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
+
+## TIR solution generation pipeline
+TODO

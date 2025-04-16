@@ -35,6 +35,8 @@ solution_sdg:
       ++server.code_execution.sandbox_traceback_verbosity='plain'
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[1, 8]'
+    generate_kwargs:
+      with_sandbox: true
     server_type: trtllm
     server_gpus: 8
     server_nodes: 1

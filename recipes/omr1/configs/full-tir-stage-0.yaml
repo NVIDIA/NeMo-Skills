@@ -33,6 +33,8 @@ solution_sdg:
       ++server.code_execution.max_code_executions=8
       ++max_concurrent_requests=512
       ++server.code_execution.sandbox_traceback_verbosity='plain'
+    generate_kwargs:
+      with_sandbox: true
     server_type: trtllm
     server_gpus: 8
     server_nodes: 1
