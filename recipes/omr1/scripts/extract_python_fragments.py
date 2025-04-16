@@ -1,6 +1,7 @@
-import re
-import json
 import argparse
+import json
+import re
+import os
 from typing import List
 
 
@@ -102,6 +103,8 @@ def main():
     parser.add_argument('--window_size', type=int, default=1500, help='Size of context window before and after code block')
     
     args = parser.parse_args()
+    output_dir = os.path.dirname(args.output_file)
+    os.makedirs(output_dir, exist_ok=True)
     
     process_jsonl_file(args.input_file, args.output_file, args.window_size)
 

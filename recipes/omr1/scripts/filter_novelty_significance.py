@@ -2,6 +2,7 @@ import argparse
 import json
 import glob
 import re
+import os
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
@@ -286,5 +287,8 @@ if __name__ == "__main__":
     parser.add_argument("--output_file", type=str, required=True, 
                         help="Output file for filtered entries")
     args = parser.parse_args()
+
+    output_dir = os.path.dirname(args.output_file)
+    os.makedirs(output_dir, exist_ok=True)
 
     main(args)
