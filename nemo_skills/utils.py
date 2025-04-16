@@ -78,7 +78,7 @@ def nested_dataclass(*args, **kwargs):
 
 
 def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO, use_rich: bool = False):
-    logger = logging.getLogger()
+    logger = logging.getLogger('nemo_skills')
     logger.setLevel(log_level)
 
     if use_rich:
@@ -101,6 +101,8 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
         sys.argv.extend(
             ["hydra.run.dir=.", "hydra.output_subdir=null", "hydra/job_logging=none", "hydra/hydra_logging=none"]
         )
+
+    return logger
 
 
 def get_skills_root_dir():
