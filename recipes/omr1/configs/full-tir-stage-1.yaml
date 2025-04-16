@@ -1,0 +1,49 @@
+cluster: ord
+
+output_dir: /workspace/omr1
+expname: omr1
+
+problem_sdg:
+  # needs to be uploaded on cluster
+  input_file: /workspace/omr1/raw_aops_data.jsonl
+
+  generation:
+    model: /trt_models/qwen2.5-32b-instruct
+    extra_args: "++prompt_template=qwen-instruct"
+    server_type: trtllm
+    server_gpus: 8
+    server_nodes: 1
+    num_chunks: 10  # since data is big, we are parallelizing it 10x
+
+solution_sdg:
+  # this is the output of problem_generation.py
+  input_file: "{output_dir}/all-problems.jsonl"
+  suffix: tir-stage-1  # just used to put files in a separate folder
+
+  generation:
+    # you can take our published model from HF and use it as data generator
+    # https://huggingface.co/nvidia/OMR1-Qwen-32B
+
+                f"++code_execution=true ++server.code_execution.max_code_executions=8 ++max_concurrent_requests=512 ++server.code_execution.sandbox_traceback_verbosity='plain' ++server.code_execution.add_remaining_code_executions=true ++remaining_code_executions='random' "
+    model: /trt_models/omr1-qwen-32b 
+    # TODO: make this look nicer
+    # TODO: implement remaining_code_executions='random'
+    extra_args: "++prompt_config=omr/math-tir ++prompt_template=qwen-instruct ++inference.tokens_to_generate=20000 ++code_execution=true ++server.code_execution.max_code_executions=8 ++max_concurrent_requests=512 ++server.code_execution.sandbox_traceback_verbosity='plain' ++server.code_execution.add_remaining_code_executions=true ++remaining_code_executions='random' "
+    server_type: trtllm
+    server_gpus: 8
+    server_nodes: 1
+    num_random_seeds: 8
+    num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 320 jobs are scheduled)
+    # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
+    # dependent_jobs: N
+
+  judge:
+    model: /trt_models/qwen2.5-32b-instruct
+    extra_args: "++prompt_template=qwen-instruct"
+    server_type: trtllm
+    server_gpus: 8
+    server_nodes: 1
+    num_random_seeds: 8
+  
+  # TODO: modify prepare_sft and add params here
+
