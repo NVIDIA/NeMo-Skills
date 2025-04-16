@@ -22,13 +22,19 @@ solution_sdg:
 
   generation:
     # you can take our published model from HF and use it as data generator
-    # https://huggingface.co/nvidia/OMR1-Qwen-32B
+    # https://huggingface.co/nvidia/<TODO>
 
-                f"++code_execution=true ++server.code_execution.max_code_executions=8 ++max_concurrent_requests=512 ++server.code_execution.sandbox_traceback_verbosity='plain' ++server.code_execution.add_remaining_code_executions=true ++remaining_code_executions='random' "
     model: /trt_models/omr1-qwen-32b 
-    # TODO: make this look nicer
-    # TODO: implement remaining_code_executions='random'
-    extra_args: "++prompt_config=omr/math-tir ++prompt_template=qwen-instruct ++inference.tokens_to_generate=20000 ++code_execution=true ++server.code_execution.max_code_executions=8 ++max_concurrent_requests=512 ++server.code_execution.sandbox_traceback_verbosity='plain' ++server.code_execution.add_remaining_code_executions=true ++remaining_code_executions='random' "
+    extra_args: >
+      ++prompt_config=omr/math-tir
+      ++prompt_template=qwen-instruct
+      ++inference.tokens_to_generate=20000
+      ++code_execution=true
+      ++server.code_execution.max_code_executions=8
+      ++max_concurrent_requests=512
+      ++server.code_execution.sandbox_traceback_verbosity='plain'
+      ++server.code_execution.add_remaining_code_executions=true
+      ++total_code_executions_in_prompt='[1, 8]'
     server_type: trtllm
     server_gpus: 8
     server_nodes: 1
@@ -45,5 +51,8 @@ solution_sdg:
     server_nodes: 1
     num_random_seeds: 8
   
-  # TODO: modify prepare_sft and add params here
-
+  prepare_for_sft:
+    extra_args: >
+      ++remove_no_code=true
+      ++remove_matplotlib=true
+      

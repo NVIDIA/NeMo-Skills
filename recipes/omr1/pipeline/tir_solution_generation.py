@@ -95,7 +95,7 @@ def preprocess_tir_generations(output_dir, suffix, cluster, expname, extra_args=
 
 def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
     run_after = f"{expname}-fill-majority-{suffix}"
-    fragments_file = f"{output_dir}/tir-code-fragments-{suffix}/output_fragments.jsonl"
+    fragments_file = f"{output_dir}/tir-filter-novelty-significance-{suffix}/output_fragments.jsonl"
     novelty_output_dir = f"{output_dir}/tir-filter-novelty-significance-{suffix}/novelty_judges/"
     significance_output_dir = f"{output_dir}/tir-filter-novelty-significance-{suffix}/significance_judges/"
     dependecies = []
@@ -137,11 +137,10 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
         server_type="trtllm",
         server_gpus=8,
         server_nodes=1,
-        num_random_seeds=8,
-        num_chunks=4,
+        num_random_seeds=2,
+        # num_chunks=4,
         expname=expname,
     )
-    run_after = expname
     dependecies.append(expname)
     
     expname = f"{expname}-tir-judge-significance-{suffix}"
@@ -161,11 +160,10 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
         server_type="trtllm",
         server_gpus=8,
         server_nodes=1,
-        num_random_seeds=8,
-        num_chunks=4,
+        num_random_seeds=2,
+        # num_chunks=4,
         expname=expname,
     )
-    run_after = expname
     dependecies.append(expname)
     
     expname = f"{expname}-tir-filter-fragments-{suffix}"
@@ -174,7 +172,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
             f"python /nemo_run/code/recipes/omr1/scripts/filter_novelty_significance.py "
             f"--novelty_files '{novelty_output_dir}/output-rs*.jsonl' "
             f"--significance_files '{significance_output_dir}/output-rs*.jsonl' "
-            f"--output_file {output_dir}/filter-novelty-significance-{suffix}/filtered_output.jsonl "
+            f"--output_file {output_dir}/tir-filter-novelty-significance-{suffix}/filtered_output.jsonl "
         ),
         cluster=cluster,
         partition="cpu",
@@ -186,20 +184,16 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
 
 
 def prepare_for_sft(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
-    # TODO:
-    # implement all filters from my pipeline
-    # filter number of code blocks
-    # filter answers before code block
-    # filter matplotlib
-    run_after = f"{expname}-judge-answers-{suffix}"
+    run_after = f"{expname}-tir-filter-fragments-{suffix}"
 
     cmd = (
         f"python -m nemo_skills.training.prepare_data "
-        f"    ++input_files='{output_dir}/judged-generations-{suffix}/output-rs*.jsonl' "
+        f"    ++input_files='{output_dir}/tir-filter-novelty-significance-{suffix}/filtered_output.jsonl' "
         f"    ++output_path={output_dir}/sft-data-{suffix}.jsonl "
         f"    ++prompt_config=generic/math "  # can remove if not needed
         f"    ++prompt_template=qwen-instruct "  # can remove if not needed
         f"    ++filters.drop_multi_boxed=false "
+        f"    ++filters.remove_matplotlib=true "
         f"    ++filters.remove_len_outlier_problems=false "
         f"    ++filters.remove_len_outlier_solutions=false "
         f"    ++use_judgement=true "
@@ -232,7 +226,7 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['full-tir-stage-0', 'full-tir-stage-1'],  # TODO: add tir mode, remove other parts
+        choices=['full-tir-stage-0'],
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(

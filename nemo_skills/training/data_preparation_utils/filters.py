@@ -99,6 +99,26 @@ class DropIfRegexMatch(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
 
 
+class DropIfRegexNotMatch(BaseFilter):
+    """Drops data if text matches a regex pattern."""
+
+    def __init__(
+        self,
+        regex_patterns: List[str],
+        text_key: str = "text",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.regex_patterns = regex_patterns
+        self.text_key = text_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        for regex_pattern in self.regex_patterns:
+            if not re.search(re.escape(regex_pattern), data_entry[self.text_key]):
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+        return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
+
+
 class DropIfEqual(BaseFilter):
     """Drops data if entry matches provided value."""
 

@@ -60,6 +60,7 @@ filters:
   remove_code_errors: false
   remove_verification_code: false
   remove_matplotlib: false
+  remove_no_code: false
 
 deduplicate: true
 
@@ -122,6 +123,17 @@ processors:
           - {input: {generation: "My solution:\n---import matplotlib---\nSomething else"}, output: null}
           - {input: {generation: "My solution:\nfrom matplotlib import pyplot as plt\nSomething else"}, output: null}
           - {input: {generation: "My solution, no errors"}, output: {generation: "My solution, no errors"}}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexNotMatch
+        should_run: ${filters.remove_no_code}
+        text_key: ${output_key}
+        regex_patterns:
+          - '<tool_call>'
+          - '</tool_call>'
+        test_cases:
+          - {input: {generation: "My solution:\n---<tool_call>---\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\ncode</tool_call>\nSomething else"}, output: null}
+          - {input: {generation: "<tool_call>code</tool_call>"}, output: {generation: "<tool_call>code</tool_call>"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         should_run: ${filters.remove_verification_code}
