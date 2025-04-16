@@ -1,52 +1,72 @@
 import argparse
 import glob
 import json
+import re
 import os
 from collections import Counter
 
-# TODO: 
-# move unnecessary preprocessing to the prepare sft data, add replace code tag
 
 def validate_code_execution(text, code_begin="```python", code_end="```"):
     lines = text.split('\n')
     i = 0
     
     while i < len(lines):
-        # Look for the start of code execution
         if lines[i] == code_begin:
-            # Find the end of code execution
             code_end_idx = -1
             for j in range(i+1, len(lines)):
                 if lines[j] == code_end:
                     code_end_idx = j
                     break
             
-            # If no end marker found, pattern is invalid
             if code_end_idx == -1:
                 return False
             
-            # Check for output marker after code execution
             if code_end_idx + 1 >= len(lines) or lines[code_end_idx + 1] != "```output":
                 return False
             
-            # Find the end of output
             output_end_idx = -1
             for j in range(code_end_idx + 2, len(lines)):
                 if lines[j] == "```":
                     output_end_idx = j
                     break
             
-            # If no end marker for output found, pattern is invalid
             if output_end_idx == -1:
                 return False
             
-            # Move index past this complete code execution + output block
             i = output_end_idx + 1
         else:
-            # Move to next line
             i += 1
     
     return True
+
+
+def cut_final_answer_part(output):
+    final_answer_idx = output.find("**Final Answer**")
+    if final_answer_idx == -1:
+        return None
+
+    boxed_idx = output.find("\\boxed{", final_answer_idx)
+    if boxed_idx == -1:
+        return None
+    
+    balance = 1
+    end_idx = boxed_idx + 7
+    while balance != 0 and end_idx < len(output):
+        if output[end_idx] == "{":
+            balance += 1
+        elif output[end_idx] == "}":
+            balance -= 1
+        end_idx += 1
+    
+    return output[:end_idx]
+
+
+def replace_code_tags(text):
+  pattern = r"```python\n(.*?)\n```\n"
+  replacement = r"<tool_call>\n\1\n</tool_call>\n"
+  processed_text = re.sub(pattern, replacement, text, flags=re.DOTALL)
+
+  return processed_text
 
 
 def filter_code_solution(sample, args):
@@ -58,22 +78,21 @@ def filter_code_solution(sample, args):
     # Make some initial filtering to speed up the next llm judgement stage
     if args.code_begin not in sample["generation"]:
         return "No code blocks found"
-    if not validate_code_execution(sample["generation"], args.code_begin.strip("\n"), args.code_end.strip("\n")):
+    if not validate_code_execution(sample["generation"]):
         return "Incomplete code execution found"
     if "judgement" in sample and "judgement: no" in sample["judgement"].lower():
         return "Incorrect final answer"
-    # if sample["predicted_answer"].lower().startswith("yes") or sample["predicted_answer"].lower().startswith("no"):
-    #     return "Predicted answer: Yes/No"
-    # if sample["generation"].find("\\boxed{") != -1 and sample["generation"].find("\\boxed{") < sample["generation"].find(args.code_begin):
-    #     return "Boxed before code"
-    # if sample["generation"].find(sample["predicted_answer"]) != -1 and sample["generation"].find(sample["predicted_answer"]) < sample["generation"].find(args.code_begin):
-    #     return "Predicted answer before code" # TODO: move this to prepare sft data for transparency
+    if sample["generation"].find("\\boxed{") != -1 and sample["generation"].find("\\boxed{") < sample["generation"].find(args.code_begin):
+        return "Boxed before code"
+    if sample["generation"].find(sample["predicted_answer"]) != -1 and sample["generation"].find(sample["predicted_answer"]) < sample["generation"].find(args.code_begin):
+        return "Predicted answer before code"
     
-    # generation = cut_final_answer_part(sample["generation"])
-    # if generation is None:
-    #     return "Final answer not found"
+    generation = cut_final_answer_part(sample["generation"])
+    if generation is None:
+        return "Final answer not found"
     
-    # sample["generation"] = generation
+    generation = replace_code_tags(generation)
+    sample["generation"] = generation
 
     return "Accepted"
 
@@ -99,8 +118,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocess code judge data")
     parser.add_argument("--input_files", type=str, required=True, help="Input file, could be a pattern like output*.jsonl")
     parser.add_argument("--output_file", type=str, required=True, help="Output file")
-    parser.add_argument("--code_begin", type=str, default="```python", help="Start of code execution block tag")
-    parser.add_argument("--code_end", type=str, default="```", help="End of code execution block tag")
     args = parser.parse_args()
 
     output_dir = os.path.dirname(args.output_file)

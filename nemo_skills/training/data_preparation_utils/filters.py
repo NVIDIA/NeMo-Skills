@@ -147,7 +147,7 @@ class DropIncorrectArithmetic(BaseFilter):
         self.solution_key = solution_key
         self.tolerance = tolerance
 
-    def process_dataset_entry(self, data_entry: str) -> str:
+    def process_dataset_entry(self, data_entry: str) -> List:
         for expression, _ in extract_expressions(data_entry[self.solution_key]):
             parts = expression.split("=")
             if len(parts) < 2:
@@ -294,7 +294,7 @@ class SplitArithmetic(BaseFilter):
         super().__init__(**kwargs)
         self.solution_key = solution_key
 
-    def process_dataset_entry(self, data_entry: str) -> str:
+    def process_dataset_entry(self, data_entry: str) -> List:
         """
         Extends short arithmetic expressions solutions to step-by-step ones
         For example `1 + 2 + 3 + 4 = 10` -> `1 + 2 + 3 + 4 = 3 + 3 + 4 = 6 + 4 = 10`.
