@@ -111,6 +111,55 @@ def get_skills_root_dir():
     return os.path.dirname(os.path.dirname(os.path.abspath(nemo_skills.__file__)))
 
 
+def init_wandb(project, name, exp_dir=None, verbose=False):
+    """
+    Initialize wandb if the API key is set.
+    Returns true if Wandb is initialized, false otherwise.
+
+    Args:
+        project (str): Wandb project name.
+        name (str): Wandb run name.
+        exp_dir (str, optional): Directory for experiment logs. Defaults to None.
+        verbose (bool, optional): If True, prints debug information. Defaults to False.
+
+    Returns:
+        bool: True if wandb is initialized, False otherwise.
+    """
+    try:
+        import wandb
+    except (ImportError, ModuleNotFoundError):
+        if verbose: print("Wandb is not installed. Skipping wandb initialization.")
+        return False
+
+    # Check if the project or name is None, and skip initialization if so
+    if project is None or name is None:
+        if verbose: print("Wandb project or name not provided. Skipping wandb initialization.")
+        return False
+
+    # Determine the log directory based on the provided exp_dir
+    if exp_dir is None:
+        log_dir = os.path.join(os.getcwd(), "experiment_logs", "wandb")
+    else:
+        log_dir = os.path.join(exp_dir, "wandb", project, name)
+    log_dir = os.path.abspath(log_dir)
+
+    # Create the log directory if it does not exist
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # Initialize wandb with the specified parameters
+    try:
+        wandb.init(project=project, name=name, resume='auto', reinit=True, save_code=True, dir=log_dir)
+        if verbose: print("Wandb initialized.")
+        return True
+    except Exception as e:
+        if verbose:
+            print("Wandb initialization failed with the following error.")
+            print(e)
+        return False
+
+
+
 def extract_comments(code: str):
     """Extract a list of comments from the given Python code."""
     comments = []
