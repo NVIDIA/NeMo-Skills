@@ -76,7 +76,7 @@ def judge_answers(output_dir, suffix, cluster, expname, extra_args="", **generat
 
 def preprocess_tir_generations(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
     cmd = (
-        f"python /nemo_run/code/nemo_skills/recipes/omr1/scripts/preprocess_tir_generations.py "
+        f"python /nemo_run/code/recipes/omr1/scripts/preprocess_tir_generations.py "
         f"--input_files '{output_dir}/judged-generations-{suffix}/output-rs*.jsonl' "
         f"--output_file {output_dir}/tir-preprocess-generations-{suffix}/preprocessed_output.jsonl "
         f"--code_begin '```python' "
@@ -102,7 +102,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
 
 
     extraction_cmd = (
-        f"python /nemo_run/code/nemo_skills/recipes/omr1/scripts/extract_python_fragments.py "
+        f"python /nemo_run/code/recipes/omr1/scripts/extract_python_fragments.py "
         f"--input_file={output_dir}/tir-preprocess-generations-{suffix}/preprocessed_output.jsonl "
         f"--output_file={fragments_file} "
         f"--window_size=1500"
@@ -124,7 +124,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
     generate(
         ctx=wrap_arguments(
             f"++prompt_template=qwen-instruct "
-            f"++prompt_config=/nemo_run/code/nemo_skills/recipes/omr1/prompts/classify-tir-novelty.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-tir-novelty.yaml "
             f"++batch_size=512 "
             f"++input_file={fragments_file} "
             f"++generation_key=fragment_novelty "
@@ -148,7 +148,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
     generate(
         ctx=wrap_arguments(
             f"++prompt_template=qwen-instruct "
-            f"++prompt_config=/nemo_run/code/nemo_skills/recipes/omr1/prompts/classify-tir-significance.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-tir-significance.yaml "
             f"++batch_size=512 "
             f"++input_file={fragments_file} "
             f"++generation_key=fragment_significance "
@@ -171,7 +171,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
     expname = f"{expname}-tir-filter-fragments-{suffix}"
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/nemo_skills/recipes/omr1/scripts/filter_novelty_significance.py "
+            f"python /nemo_run/code/recipes/omr1/scripts/filter_novelty_significance.py "
             f"--novelty_files '{novelty_output_dir}/output-rs*.jsonl' "
             f"--significance_files '{significance_output_dir}/output-rs*.jsonl' "
             f"--output_file {output_dir}/filter-novelty-significance-{suffix}/filtered_output.jsonl "
