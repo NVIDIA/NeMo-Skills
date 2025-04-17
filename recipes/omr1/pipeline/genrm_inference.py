@@ -4,9 +4,6 @@ from pathlib import Path
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
-MAX_TOKENS = 40000
-MAX_GEN_TOKENS = 2048
-
 
 def step_1_preprocess_data(
     cluster,
@@ -27,7 +24,6 @@ def step_1_preprocess_data(
     )
 
     preprocess_expname = f"comparison-data-prep-{str(Path(model).name)}-{str(Path(input_dir).name)}"
-    print(preprocess_expname)
     exp = run_cmd(
         ctx=wrap_arguments(preprocess_command),
         cluster=cluster,
@@ -58,10 +54,9 @@ def step_2_score_solns(
                 f"++output_file={output_file} "
                 f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/math-genrm.yaml "
                 f"++prompt_template=qwen-instruct "
-                f"++batch_size=256 "
                 f"++skip_filled=True "
                 f"++generation_key=gen_rm_comparison "
-                f"++inference.tokens_to_generate={MAX_GEN_TOKENS} "
+                f"++inference.tokens_to_generate={2048} "
                 f"++inference.temperature={temperature} "
             ),
             cluster=cluster,
@@ -74,6 +69,7 @@ def step_2_score_solns(
             dependent_jobs=0,
             expname=f"{exp_name}",
             run_after=last_exp_name,
+            rerun_done=True,
         )
 
     return exp_names, output_dir
