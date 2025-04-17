@@ -1,10 +1,10 @@
 import argparse
-import os
-import re
 import json
-import random
-from glob import glob
 import logging
+import os
+import random
+import re
+from glob import glob
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,7 +15,6 @@ def extract_judgment(text, max_idx=None):
 
     try:
         matches = re.findall(r"Judg[e]?ment: (\d+)", text)
-        # print(matches)
 
         if matches:
             number = matches[-1]
@@ -55,13 +54,9 @@ def get_judgment(step_1_output_dir, step_2_output_dir, output_dir):
 
             for line in f:
                 instance = json.loads(line)
-                output_instance = {
-                    "problem": instance['problem'], 
-                    "expected_answer": instance['expected_answer']
-                }
+                output_instance = {"problem": instance['problem'], "expected_answer": instance['expected_answer']}
 
-                judgement = extract_judgment(
-                    instance['gen_rm_comparison'], max_idx=instance["max_idx"])
+                judgement = extract_judgment(instance['gen_rm_comparison'], max_idx=instance["max_idx"])
                 if judgement:
                     output_instance["judgment_idx"] = judgement
                 else:
@@ -70,7 +65,7 @@ def get_judgment(step_1_output_dir, step_2_output_dir, output_dir):
 
                 output_instance["predicted_answer"] = instance[f'predicted_answer_{judgement}']
                 output_instance["is_correct"] = instance[f'is_correct_{judgement}']
-
+                output_instance["subset_for_metrics"] = instance["subset_for_metrics"]
                 fout.write(json.dumps(output_instance) + '\n')
 
 
@@ -84,8 +79,5 @@ def main():
     get_judgment(args.step_1_output_dir, args.step_2_output_dir, args.output_dir)
 
 
-
 if __name__ == "__main__":
     main()
-
-
