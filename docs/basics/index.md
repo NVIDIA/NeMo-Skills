@@ -238,7 +238,7 @@ python -m nemo_skills.dataset.prepare aime24 aime25
 Then run the following Python script
 
 ```python
-from nemo_skills.pipeline import wrap_arguments, convert, eval, run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, convert, eval, run_cmd
 
 expname = "qwq-32b-test"
 cluster = "slurm"
