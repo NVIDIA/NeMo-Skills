@@ -127,9 +127,9 @@ class GenerateSolutionsConfig:
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
         
-        if not isinstance(self.total_code_executions_in_prompt, int | list | tuple):
+        if not isinstance(self.total_code_executions_in_prompt, (int, list, tuple)):
             raise ValueError(
-                "`total_code_executions_in_prompt` must be either int, list or tupe, "
+                "`total_code_executions_in_prompt` must be either int, list or tuple, "
                 f"got {type(self.total_code_executions_in_prompt)}"
             )
 
@@ -334,7 +334,7 @@ class GenerationTask:
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         data_point = deepcopy(data_point)
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
-        if isinstance(total_code_executions_in_prompt, tuple):
+        if isinstance(total_code_executions_in_prompt, (list, tuple)):
             min_val, max_val = total_code_executions_in_prompt
             total_code_executions_in_prompt = random.randint(min_val, max_val)
         data_point['total_code_executions'] = total_code_executions_in_prompt

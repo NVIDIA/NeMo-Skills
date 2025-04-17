@@ -1,19 +1,7 @@
-cluster: oci
+cluster: slurm
 
 output_dir: /workspace/omr1
 expname: omr1
-
-problem_sdg:
-  # needs to be uploaded on cluster
-  input_file: /workspace/omr1/raw_aops_data.jsonl
-
-  generation:
-    model: /trt_models/qwen2.5-32b-instruct
-    extra_args: "++prompt_template=qwen-instruct"
-    server_type: trtllm
-    server_gpus: 8
-    server_nodes: 1
-    num_chunks: 10  # since data is big, we are parallelizing it 10x
 
 solution_sdg:
   # this is the output of problem_generation.py
@@ -26,13 +14,12 @@ solution_sdg:
     # which is similar to LIMO Qwen
     model: /trt_models/LIMO 
     extra_args: >
-      ++prompt_config=generic/math-tir-detailed
+      ++prompt_config=/nemo_run/code/recipes/omr1/prompts/math-tir-detailed.yaml
       ++prompt_template=qwen-instruct
       ++inference.tokens_to_generate=16384
       ++code_execution=true
       ++server.code_execution.max_code_executions=8
       ++max_concurrent_requests=512
-      ++server.code_execution.sandbox_traceback_verbosity='plain'
     generate_kwargs:
       with_sandbox: true
     server_type: trtllm
@@ -50,8 +37,3 @@ solution_sdg:
     server_gpus: 8
     server_nodes: 1
     num_random_seeds: 8
-
-
-
-# judged generations: /exps/code_execution/reproduce-limo/code-labeling/limo-tir-detailed-step300/large_scale/gt-ans-all_pass_rate_lt_1_c7-part06/generation-judged/output-rs*.jsonl
-

@@ -1,4 +1,4 @@
-cluster: ord
+cluster: slurm
 
 output_dir: /workspace/omr1
 expname: omr1
@@ -32,7 +32,6 @@ solution_sdg:
       ++code_execution=true
       ++server.code_execution.max_code_executions=8
       ++max_concurrent_requests=512
-      ++server.code_execution.sandbox_traceback_verbosity='plain'
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[1, 8]'
     generate_kwargs:

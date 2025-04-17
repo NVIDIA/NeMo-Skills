@@ -100,7 +100,7 @@ class DropIfRegexMatch(BaseFilter):
 
 
 class DropIfRegexNotMatch(BaseFilter):
-    """Drops data if text matches a regex pattern."""
+    """Drops data if text doesn't match at least one of the regex patterns."""
 
     def __init__(
         self,
