@@ -1,0 +1,14 @@
+FROM igitman/nemo-skills-nemo:0.6.0
+
+# Setup ssh credentials
+# allow ssh to use the environment variables
+# save the environment variables to ~/.ssh/environment
+RUN apt-get update && \
+    apt-get install -y openssh-server && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p ~/.ssh/ && \
+    mkdir -p /run/sshd && \
+    chmod 0755 /run/sshd && \
+    echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDmI40o3vaRSQABAM06jtMQujhPEGxhRSLblx55Z0IaS sakle@nvidia.com" > ~/.ssh/authorized_keys && \
+    echo "PermitUserEnvironment=yes" > /etc/ssh/sshd_config.d/permit_env.conf && \
+    env > ~/.ssh/environment
