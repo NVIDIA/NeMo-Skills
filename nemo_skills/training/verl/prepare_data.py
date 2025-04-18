@@ -16,6 +16,7 @@ import argparse
 import json
 import pandas as pd
 import uuid
+import os
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert JSONL to Parquet with specific transformations.")
