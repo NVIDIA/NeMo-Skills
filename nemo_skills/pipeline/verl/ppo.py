@@ -178,7 +178,7 @@ class DAPOPPOVerlTask:
     # overlong_buffer_len = 1024
     overlong_penalty_factor = 1.0
 
-    enable_filter_groups = True
+    enable_filter_groups = False
     filter_groups_metric = 'acc'
     max_num_gen_batches = 10
     train_prompt_bsz = 512
