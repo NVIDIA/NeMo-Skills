@@ -25,7 +25,7 @@ def format_entry(entry):
         "problem": entry["question"],
         "expected_answer": entry["answer"],
         "answer_type": entry["answer_type"],
-        "solution": entry["rationale"],
+        "reference_solution": entry["rationale"],
         "raw_subject": entry["raw_subject"],
         "subset_for_metrics": entry["category"],
         "author_name": entry["author_name"],
@@ -36,7 +36,7 @@ def format_entry(entry):
 def write_data_to_file(output_file, data, split):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            if split=='math' and entry["category"] != "Math":
+            if split == 'math' and entry["category"] != "Math":
                 continue
             if entry["image"]:
                 continue
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split",
         default="all",
-        choices=("text", "math"),
+        choices=("all", "text", "math"),
         help="Dataset split to process (math/text).",
     )
     args = parser.parse_args()
