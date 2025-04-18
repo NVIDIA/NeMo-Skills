@@ -13,20 +13,56 @@
 # limitations under the License.
 
 import argparse
-import pandas as pd
 import json
+import pandas as pd
+import uuid
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert JSONL to Parquet with specific transformations.")
+    parser.add_argument('--input_folder', type=str, required=True, help='Path to the the list of jsonl files.')
+    parser.add_argument('--global_step', type=str, required=True, help='Path to save the jsonl file.')
     parser.add_argument('--input_file', type=str, required=True, help='Path to the input JSONL file.')
     parser.add_argument('--output_file', type=str, required=True, help='Path to the output Parquet file.')
     parser.add_argument('--data_source', type=str, default='nemo-skills', help='Data source to be recorded in the output.')
     parser.add_argument('--ability', type=str, default='math', help='Ability to be recorded in the output.')
     return parser.parse_args()
 
-import json
-import pandas as pd
-import uuid
+
+
+def interleave_jsonl_files(folder_path, global_step):
+    # Get a sorted list of all .jsonl files in the folder
+    file_list = sorted([f for f in os.listdir(folder_path) if f.endswith('.jsonl')])
+
+    if not file_list:
+        raise ValueError("No .jsonl files found in the folder")
+
+    all_contents = []
+    # Read all lines from each .jsonl file
+    for filename in file_list:
+        with open(os.path.join(folder_path, filename), 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f if line.strip()]
+            all_contents.append(lines)
+
+    # Ensure all files have the same number of lines
+    num_lines = len(all_contents[0])
+    if not all(len(lines) == num_lines for lines in all_contents):
+        raise ValueError("All .jsonl files must have the same number of lines")
+
+    # Interleave lines: take line 1 from each file, then line 2 from each, etc.
+    merged_lines = []
+    for i in range(num_lines):
+        for lines in all_contents:
+            merged_lines.append(lines[i])
+
+    # Write the interleaved result to the output .jsonl file
+    
+    output_path = os.path.join(folder_path, f"{global_step}.jsonl")
+    with open(output_path, 'w', encoding='utf-8') as f:
+        for line in merged_lines:
+            f.write(line + '\n')
+
+    return output_path
+
 
 def transform_data(input_file, data_source, ability):
     # Read the JSONL file and transform each entry
@@ -47,6 +83,7 @@ def transform_data(input_file, data_source, ability):
                     'ground_truth': json_line['expected_answer'],
                     'style': 'rule-lighteval/MATH_v2'
                 },
+                'response': json_line['response'],
                 # Include extra info such as a unique index
                 'extra_info': {
                     'index': str(uuid.uuid4()),
@@ -69,6 +106,8 @@ def save_to_parquet(df, output_file):
 
 def main():
     args = parse_args()
+    output_path = interleave_jsonl_files(args.input_folder, args.global_step)
+    args.input_file = output_path
     transformed_df = transform_data(args.input_file, args.data_source, args.ability)
     save_to_parquet(transformed_df, args.output_file)
     print(f"Data transformed and saved to {args.output_file}")
