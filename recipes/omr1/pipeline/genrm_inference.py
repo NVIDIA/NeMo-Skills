@@ -183,7 +183,7 @@ def main(args):
             cluster=args.cluster,
             last_exp_name=last_exp_name,
             last_exp_output_dir=step_3_output_dir,
-            expname=expname,
+            expname=os.environ["EVAL_NAME"],
             wandb_group=args.wandb_group,
             wandb_project=args.wandb_project,
         )

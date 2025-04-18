@@ -55,6 +55,7 @@ def read_files(file_paths, single_answer_instances_path):
                             if "judgement" in instance
                             else instance["is_correct"]
                         ),
+                        "subset_for_metrics": instance["subset_for_metrics"],
                     }
                 else:
                     single_answer_instance = {
@@ -62,6 +63,7 @@ def read_files(file_paths, single_answer_instances_path):
                         "predicted_answer": None,
                         "expected_answer": expected_answer,
                         "is_correct": False,
+                        "subset_for_metrics": instance["subset_for_metrics"],
                     }
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
