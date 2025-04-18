@@ -21,7 +21,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Convert JSONL to Parquet with specific transformations.")
     parser.add_argument('--input_folder', type=str, required=True, help='Path to the the list of jsonl files.')
     parser.add_argument('--global_step', type=str, required=True, help='Path to save the jsonl file.')
-    parser.add_argument('--input_file', type=str, required=True, help='Path to the input JSONL file.')
     parser.add_argument('--output_file', type=str, required=True, help='Path to the output Parquet file.')
     parser.add_argument('--data_source', type=str, default='nemo-skills', help='Data source to be recorded in the output.')
     parser.add_argument('--ability', type=str, default='math', help='Ability to be recorded in the output.')
@@ -107,9 +106,8 @@ def save_to_parquet(df, output_file):
 
 def main():
     args = parse_args()
-    output_path = interleave_jsonl_files(args.input_folder, args.global_step)
-    args.input_file = output_path
-    transformed_df = transform_data(args.input_file, args.data_source, args.ability)
+    input_file_path = interleave_jsonl_files(args.input_folder, args.global_step)
+    transformed_df = transform_data(input_file_path, args.data_source, args.ability)
     save_to_parquet(transformed_df, args.output_file)
     print(f"Data transformed and saved to {args.output_file}")
 
