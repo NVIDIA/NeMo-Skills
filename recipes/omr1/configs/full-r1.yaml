@@ -1,4 +1,4 @@
-cluster: ord
+cluster: slurm
 
 output_dir: /workspace/omr1
 expname: omr1

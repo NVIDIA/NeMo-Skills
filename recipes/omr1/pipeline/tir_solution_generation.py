@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from nemo_skills.pipeline import generate, run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
 
 def generate_solutions(input_file, output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
@@ -74,20 +74,125 @@ def judge_answers(output_dir, suffix, cluster, expname, extra_args="", **generat
     )
 
 
+def preprocess_tir_generations(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
+    cmd = (
+        f"python /nemo_run/code/recipes/omr1/scripts/preprocess_tir_generations.py "
+        f"    --input_files '{output_dir}/judged-generations-{suffix}/output-rs*.jsonl' "
+        f"    --output_file {output_dir}/tir-preprocess-generations-{suffix}/preprocessed_output.jsonl "
+        f"    --code_begin '```python' "
+        f"    --code_end '```' "
+    )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        log_dir=f"{output_dir}/tir-preprocess-generations-{suffix}/logs",
+        run_after=f"{expname}-judge-answers-{suffix}",
+        expname=f"{expname}-tir-preprocess-generations-{suffix}",
+    )
+
+
+def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
+    run_after = f"{expname}-fill-majority-{suffix}"
+    fragments_file = f"{output_dir}/tir-filter-novelty-significance-{suffix}/output_fragments.jsonl"
+    novelty_output_dir = f"{output_dir}/tir-filter-novelty-significance-{suffix}/novelty_judges/"
+    significance_output_dir = f"{output_dir}/tir-filter-novelty-significance-{suffix}/significance_judges/"
+    dependencies = []
+
+
+    extraction_cmd = (
+        f"python /nemo_run/code/recipes/omr1/scripts/extract_python_fragments.py "
+        f"    --input_file={output_dir}/tir-preprocess-generations-{suffix}/preprocessed_output.jsonl "
+        f"    --output_file={fragments_file} "
+        f"    --window_size=1500"
+    )
+    
+    expname = f"{expname}-tir-extract-python-fragments-{suffix}"
+    run_cmd(
+        ctx=wrap_arguments(extraction_cmd),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        run_after=run_after,
+        log_dir=f"{output_dir}/tir-filter-novelty-significance-{suffix}/logs",
+        expname=expname,
+    )
+    run_after = expname
+
+    expname = f"{expname}-tir-judge-novelty-{suffix}"
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_template=qwen-instruct "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-tir-novelty.yaml "
+            f"++input_file={fragments_file} "
+            f"++generation_key=fragment_novelty "
+            f"++skip_filled=True "
+        ),
+        cluster=cluster,
+        output_dir=novelty_output_dir,
+        run_after=run_after,
+        model="/trt_models/qwen2.5-32b-instruct",
+        server_type="trtllm",
+        server_gpus=8,
+        server_nodes=1,
+        num_random_seeds=8,
+        num_chunks=4,
+        expname=expname,
+    )
+    dependencies.append(expname)
+    
+    expname = f"{expname}-tir-judge-significance-{suffix}"
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_template=qwen-instruct "
+            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-tir-significance.yaml "
+            f"++input_file={fragments_file} "
+            f"++generation_key=fragment_significance "
+            f"++skip_filled=True "
+        ),
+        cluster=cluster,
+        output_dir=significance_output_dir,
+        run_after=run_after,
+        model="/trt_models/qwen2.5-32b-instruct",
+        server_type="trtllm",
+        server_gpus=8,
+        server_nodes=1,
+        num_random_seeds=8,
+        num_chunks=4,
+        expname=expname,
+    )
+    dependencies.append(expname)
+    
+    expname = f"{expname}-tir-filter-fragments-{suffix}"
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/omr1/scripts/filter_novelty_significance.py "
+            f"    --novelty_files '{novelty_output_dir}/output-rs*.jsonl' "
+            f"    --significance_files '{significance_output_dir}/output-rs*.jsonl' "
+            f"    --output_file {output_dir}/tir-filter-novelty-significance-{suffix}/filtered_output.jsonl "
+        ),
+        cluster=cluster,
+        partition="cpu",  # change that if not available (ignored if running locally)
+        log_dir=f"{output_dir}/tir-filter-novelty-significance-{suffix}/logs",
+        run_after=dependencies, # run after novelty and significance judges
+        expname=expname,
+    )
+
+
 def prepare_for_sft(output_dir, suffix, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-judge-answers-{suffix}"
+    run_after = f"{expname}-tir-filter-fragments-{suffix}"
 
     cmd = (
         f"python -m nemo_skills.training.prepare_data "
-        f"    ++input_files='{output_dir}/judged-generations-{suffix}/output-rs*.jsonl' "
+        f"    ++input_files='{output_dir}/tir-filter-novelty-significance-{suffix}/filtered_output.jsonl' "
         f"    ++output_path={output_dir}/sft-data-{suffix}.jsonl "
         f"    ++prompt_config=generic/math "  # can remove if not needed
         f"    ++prompt_template=qwen-instruct "  # can remove if not needed
         f"    ++filters.drop_multi_boxed=false "
+        f"    ++filters.remove_matplotlib=true "
         f"    ++filters.remove_len_outlier_problems=false "
         f"    ++filters.remove_len_outlier_solutions=false "
         f"    ++use_judgement=true "
-        f"    ++contamination_file={output_dir}/contamination-labeled.jsonl {extra_args}"
+        f"    ++contamination_file={output_dir}/contamination-labeled.jsonl "
     )
     run_cmd(
         ctx=wrap_arguments(cmd),
@@ -103,6 +208,8 @@ stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
     'judge_answers': judge_answers,
+    'preprocess_tir_generations': preprocess_tir_generations,
+    'filter_novelty_significance': filter_novelty_significance,
     # TODO: add summary regeneration step
     'prepare_for_sft': prepare_for_sft,
 }
@@ -114,7 +221,7 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full-qwq', 'full-r1', 'full-tir-stage-1'],
+        choices=['full-tir-stage-0'],
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
@@ -162,7 +269,4 @@ if __name__ == '__main__':
                 expname=config['expname'],
                 **config['solution_sdg']['judge'],
             )
-        if stage == 'prepare_for_sft':
-            stage_args['extra_args'] = config['solution_sdg']['prepare_for_sft']['extra_args']
-
         stages_map[stage](**stage_args)
