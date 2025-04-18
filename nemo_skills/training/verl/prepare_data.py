@@ -55,7 +55,7 @@ def interleave_jsonl_files(folder_path, global_step):
 
     # Write the interleaved result to the output .jsonl file
     
-    output_path = os.path.join(folder_path, f"{global_step}.jsonl")
+    output_path = os.path.join(folder_path, f"global_step_{global_step}.jsonl")
     with open(output_path, 'w', encoding='utf-8') as f:
         for line in merged_lines:
             f.write(line + '\n')
@@ -108,7 +108,7 @@ def main():
     args = parse_args()
     input_file_path = interleave_jsonl_files(args.input_folder, args.global_step)
     transformed_df = transform_data(input_file_path, args.data_source, args.ability)
-    output_file = os.path.join(args.input_folder, f"{args.global_step}.parquet")
+    output_file = os.path.join(args.input_folder, f"global_step_{args.global_step}.parquet")
     save_to_parquet(transformed_df, output_file)
     print(f"Data transformed and saved to {output_file}")
 
