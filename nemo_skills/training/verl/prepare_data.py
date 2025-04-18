@@ -83,7 +83,8 @@ def transform_data(input_file, data_source, ability):
                     'ground_truth': json_line['expected_answer'],
                     'style': 'rule-lighteval/MATH_v2'
                 },
-                'response': json_line['response'],
+                'response': json_line['generation'],
+                'judge': json_line['judgement'],
                 # Include extra info such as a unique index
                 'extra_info': {
                     'index': str(uuid.uuid4()),
