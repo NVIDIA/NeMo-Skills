@@ -125,10 +125,11 @@ def summarize_results(
         else:
             # Assume by default it's Option 2.
             # Verify if it indeed has this structure: {results_dir}/{benchmark}/output*jsonl
-            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0:
-                raise ValueError(
-                    f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
-                )
+            # if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0:
+            #     raise ValueError(
+            #         f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
+            #     )
+            pass
 
         benchmarks_paths = [
             cand_path
