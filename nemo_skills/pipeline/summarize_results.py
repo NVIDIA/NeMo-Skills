@@ -141,15 +141,15 @@ def summarize_results(
         # Filter benchmarks_paths to only include the specified benchmarks
         benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
 
-    if benchmarks_paths:
-        # Ascertain that the benchmarks_paths are valid
-        for benchmark_path in benchmarks_paths:
-            # Valid benchmark_path should contain output*jsonl files
-            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
-                raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
-    else:
-        print(f"No benchmarks found in {results_dir}")
-        return
+    # if benchmarks_paths:
+    #     # Ascertain that the benchmarks_paths are valid
+    #     for benchmark_path in benchmarks_paths:
+    #         # Valid benchmark_path should contain output*jsonl files
+    #         if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
+    #             raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
+    # else:
+    #     print(f"No benchmarks found in {results_dir}")
+    #     return
 
     results = defaultdict(lambda: defaultdict(dict))
     max_metrics_to_print = {}
