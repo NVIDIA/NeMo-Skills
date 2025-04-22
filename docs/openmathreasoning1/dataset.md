@@ -56,7 +56,7 @@ huggingface-cli download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
 Convert the model to TensorRT-LLM with the following (you can skip this and make corresponding changes in the pipeline
 scripts to run with `server_type=vllm` or `server_type=sglang`)
 
-```
+```bash
 ns convert \
    --cluster=slurm \
    --input_model=/hf_models/Qwen2.5-32B-Instruct \
@@ -83,10 +83,32 @@ ns convert \
 ```
 
 At the time of our experiments serving DeepSeek-R1 model with sglang was faster than with TensorRT-LLM, so
-we do not convert that model.
+we do not convert that model, but instead prepare a sharded checkpoint that is much faster to load.
 
-TODO: Add steps for sharding R1 checkpoint
+```python
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
+from nemo_skills.pipeline.utils import get_ray_server_cmd
 
+cmd = get_ray_server_cmd(
+    "python3 nemo_skills/conversion/save_sharded_state.py "
+    "    --model=/hf_models/DeepSeek-R1 "
+    "    --output=/hf_models/DeepSeek-R1-tp16 "
+    "    --tensor-parallel-size=16 "
+    "    --max_model_len=8192 "
+    "    --trust-remote-code "
+    "    --enforce-eager "
+)
+
+run_cmd(
+    ctx=wrap_arguments(cmd),
+    cluster="slurm",
+    num_gpus=8,
+    num_nodes=2,
+    # we are using vllm's script to shard but the model can be served with sglang
+    container="vllm",
+    log_dir="/hf_models/DeepSeek-R1-tp16",
+)
+```
 
 ## Problem generation pipeline
 
