@@ -1,4 +1,4 @@
-# adapted from https://github.com/openai/simple-evals/blob/main/common.py
+# adapted from https://github.com/centerforaisafety/hle/blob/main/hle_eval/run_judge_results.py
 
 system: ""
 
