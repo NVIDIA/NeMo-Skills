@@ -47,7 +47,7 @@ To demonstrate the quality of this dataset, we release a series of OpenMath-Nemo
 * [OpenMath-Nemotron-14B-Kaggle](https://huggingface.co/nvidia/OpenMath-Nemotron-14B-Kaggle) (this is the model used in [AIMO-2 Kaggle competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard))
 * [OpenMath-Nemotron-32B](https://huggingface.co/nvidia/OpenMath-Nemotron-32B)
 
-![Evaluation Results](./results.png)
+![Evaluation Results](./docs/openmath-results.png)
 
 The models achieve state-of-the-art results on popular mathematical benchmarks. We present metrics as pass@1 (maj@64) where pass@1
 is an average accuracy across 64 generations and maj@64 is the result of majority voting.
