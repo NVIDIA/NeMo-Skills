@@ -141,7 +141,7 @@ You can specify a subset of stages using `--stages` argument, e.g. `--stages ext
 If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
 
 
-## Solution generation pipeline
+## CoT solution generation pipeline
 
 [Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/pipelines/solution_generation.py)
 consists of the following stages:
@@ -164,3 +164,11 @@ python recipes/omr1/pipelines/solution_generation.py --mode full-qwq
 You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode full-qwq` or `--mode full-r1`.
 
 If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
+
+## TIR solution generation pipeline
+
+Coming soon!
+
+## GenSelect pipeline
+
+Coming soon!

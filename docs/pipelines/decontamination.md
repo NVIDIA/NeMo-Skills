@@ -31,12 +31,12 @@ from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 
 test_sets = ['math', 'amc23', 'aime24']
-retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
+compare_to = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
 cmd = (
     f"python -m nemo_skills.inference.retrieve_similar "
-    f"    ++retrieve_from=\\\'{retrieve_from}\\\' "
-    f"    ++compare_to='/nemo_run/code/nemo_skills/dataset/math/train_full.jsonl' "
+    f"    ++retrieve_from='/nemo_run/code/nemo_skills/dataset/math/train.jsonl' "
+    f"    ++compare_to=\\\'{compare_to}\\\'"
     f"    ++output_file='/workspace/math-contamination-retrieved.jsonl' "
     f"    ++top_k=1 "
 )
