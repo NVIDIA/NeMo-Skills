@@ -37,15 +37,18 @@ ns convert \
     --convert_to=trtllm \
     --model_type=qwen \
     --num_gpus=1 \
-    --hf_model_name=nvidia/OpenMath-Nemotron-1.5B
+    --hf_model_name=nvidia/OpenMath-Nemotron-1.5B \
+    --max_input_len 50000 \
+    --max_seq_len 50000
 ```
 
+We are converted with longer length since HLE-math benchmark has a few very long prompts.
 You can change the number of GPUs if you have more than 1, but don't use more than 4 for 1.5B and 7B models.
 
 ## Prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare comp-math-24-25 hle-math
+python -m nemo_skills.dataset.prepare comp-math-24-25 hle
 ```
 
 ## Run CoT evaluations
@@ -55,11 +58,26 @@ ns eval \
     --cluster=local \
     --model=/workspace/openmath-nemotron-1.5b-trtllm \
     --server_type=trtllm \
-    --output_dir=/workspace/openmath-nemotron-1.5b-eval \
-    --benchmarks=comp-math-24-25:64,hle-math:64 \
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
+    --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
     --skip_greedy \
+    ++prompt_template=qwen-instruct \
+    ++prompt_config=generic/math \
+    ++inference.tokens_to_generate=32768 \
+    ++inference.temperature=0.6
+
+ns eval \
+    --cluster=local \
+    --model=/workspace/openmath-nemotron-1.5b-trtllm \
+    --server_type=trtllm \
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
+    --benchmarks=hle:64 \
+    --server_gpus=1 \
+    --num_jobs=1 \
+    --skip_greedy \
+    --split=math \
     ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
@@ -74,7 +92,7 @@ in the conversion command.
 For comp-math-24-25 our symbolic checker is good enough, so we can see the results right away by running
 
 ```bash
-ns summarize_results /workspace/openmath-nemotron-1.5b-eval/eval-results/comp-math-24-25 --metric_type math --cluster local
+ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/eval-results/comp-math-24-25 --metric_type math --cluster local
 ```
 
 ```
@@ -118,8 +136,8 @@ ns generate \
     --model=/trt_models/qwen2.5-32b-instruct \
     --server_type=trtllm \
     --server_gpus=4 \
-    --output_dir=/workspace/openmath-nemotron-1.5b-eval/eval-results-judged/hle-math \
-    ++input_dir=/workspace/openmath-nemotron-1.5b-eval/eval-results/hle-math
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
+    ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
 ```
 
 Alternatively, you can use an API model like gpt-4o, but the results might be different.
@@ -132,21 +150,21 @@ ns generate \
     --model=gpt-4o \
     --server_type=openai \
     --server_address=https://api.openai.com/v1 \
-    --output_dir=/workspace/openmath-nemotron-1.5b-eval/eval-results-judged/hle-math \
-    ++input_dir=/workspace/openmath-nemotron-1.5b-eval/eval-results/hle-math
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
+    ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
 done
 ```
 
 To print the metrics run
 
 ```bash
-ns summarize_results /workspace/openmath-nemotron-1.5b-eval/eval-results-judged/hle-math --metric_type math --cluster local
+ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle --metric_type math --cluster local
 ```
 
 This should print the metrics including both symbolic and judge evaluation.
 
 ```
------------------------------------------------- hle-math -----------------------------------------------
+------------------------------------------------ hle -----------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
 majority@64     | 975         | 0.82%            | 5.41%         | 0.72%        | 5.41%       | 0.00%
 pass@64         | 975         | 14.05%           | 38.36%        | 13.85%       | 38.56%      | 0.00%
@@ -155,15 +173,15 @@ pass@1[64]      | 975         | 1.18%            | 5.41%         | 3.06%        
 
 ## Run TIR evaluations
 
-To get TIR evaluation numbers, replace the first generation command with the following.
+To get TIR evaluation numbers, replace the generation commands like this
 
 ```bash
 ns eval \
     --cluster=local \
     --model=/workspace/openmath-nemotron-1.5b-trtllm \
     --server_type=trtllm \
-    --output_dir=/workspace/openmath-nemotron-1.5b-eval \
-    --benchmarks=comp-math-24-25:64,hle-math:64 \
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-tir \
+    --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
     --skip_greedy \
@@ -181,10 +199,10 @@ you should use the following options instead
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath-nemotron-1.5b-trtllm \
+    --model=/workspace/openmath-nemotron-14b-kaggle-trtllm \
     --server_type=trtllm \
-    --output_dir=/workspace/openmath-nemotron-1.5b-eval \
-    --benchmarks=comp-math-24-25:64,hle-math:64 \
+    --output_dir=/workspace/openmath-nemotron-14b-kaggle-eval-tir \
+    --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
     --skip_greedy \
