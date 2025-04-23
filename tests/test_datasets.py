@@ -29,7 +29,7 @@ DATASETS = [
     ('asdiv', ['test']),
     ('gsm-plus', ['test', 'test_rounded']),
     ('gsm8k', ['train', 'test']),
-    ('hle-math', ['test']),
+    ('hle', ['math', 'text']),
     ('human-eval', ['test']),
     ('ifeval', ['test']),
     ('math', ['train', 'test']),
