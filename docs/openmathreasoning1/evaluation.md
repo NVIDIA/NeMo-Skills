@@ -146,7 +146,11 @@ ns summarize_results /workspace/openmath-nemotron-1.5b-eval/eval-results-judged/
 This should print the metrics including both symbolic and judge evaluation.
 
 ```
-
+------------------------------------------------ hle-math -----------------------------------------------
+evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
+majority@64     | 975         | 0.82%            | 5.41%         | 0.72%        | 5.41%       | 0.00%
+pass@64         | 975         | 14.05%           | 38.36%        | 13.85%       | 38.56%      | 0.00%
+pass@1[64]      | 975         | 1.18%            | 5.41%         | 3.06%        | 3.53%       | 0.00%
 ```
 
 ## Run TIR evaluations
