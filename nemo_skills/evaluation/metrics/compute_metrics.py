@@ -58,8 +58,6 @@ class ComputeMetrics:
                 data = read_predictions(predictions, idx, file_handles)
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
-                if 'hmmt' in data_subset:
-                    data_subset = 'hmmt-24-25'
                 if data_subset not in self.calculators:
                     self.calculators[data_subset] = self.get_metrics_calculator(
                         self.benchmark,
