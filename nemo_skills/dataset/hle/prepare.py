@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import json
 from pathlib import Path
 
@@ -25,18 +26,18 @@ def format_entry(entry):
         "problem": entry["question"],
         "expected_answer": entry["answer"],
         "answer_type": entry["answer_type"],
-        "solution": entry["rationale"],
+        "reference_solution": entry["rationale"],
         "raw_subject": entry["raw_subject"],
-        "category": entry["category"],
+        "subset_for_metrics": entry["category"],
         "author_name": entry["author_name"],
         "canary": entry["canary"],
     }
 
 
-def write_data_to_file(output_file, data):
+def write_data_to_file(output_file, data, split):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            if entry["category"] != "Math":
+            if split == 'math' and entry["category"] != "Math":
                 continue
             if entry["image"]:
                 continue
@@ -45,6 +46,14 @@ def write_data_to_file(output_file, data):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--split",
+        default="all",
+        choices=("all", "text", "math"),
+        help="Dataset split to process (math/text).",
+    )
+    args = parser.parse_args()
     dataset = load_dataset("cais/hle", split="test")
     columns_to_keep = [
         'id',
@@ -61,5 +70,10 @@ if __name__ == "__main__":
     dataset = dataset.remove_columns([col for col in dataset.column_names if col not in columns_to_keep])
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"test.jsonl"
-    write_data_to_file(output_file, dataset)
+    if args.split == 'all':
+        for split in ['text', 'math']:
+            output_file = data_dir / f"{split}.jsonl"
+            write_data_to_file(output_file, dataset, split)
+    else:
+        output_file = data_dir / f"{args.split}.jsonl"
+        write_data_to_file(output_file, dataset, args.split)
