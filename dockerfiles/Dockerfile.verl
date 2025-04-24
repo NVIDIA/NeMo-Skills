@@ -4,7 +4,7 @@ FROM verlai/verl:ngc-th2.4.0-cu124-vllm0.6.3-te1.7-v0.0.4
 WORKDIR /opt
 
 # Install verl
-ENV VERL_COMMIT=20a2facf4d19dac5bf2cdaf9edf630367f83ffd0
+ENV VERL_COMMIT=db57bb4331f86769719d3ab2a2e7c1d90d26dc1e
 RUN git clone https://github.com/titu1994/verl.git && \
     cd verl && \
     git checkout $VERL_COMMIT && \
