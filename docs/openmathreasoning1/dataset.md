@@ -1,13 +1,13 @@
 # Dataset construction
 
 OpenMathReasoning-1 dataset consists of mathematical problems collected from [AoPS community forums](https://artofproblemsolving.com/community). Below we describe the pipeline used to create this dataset. All relevant scripts are available in
-[recipes/omr1](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1) folder.
+[recipes/openmathreasoning](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning) folder.
 
 If you don't have a slurm cluster with a large number of GPUs,
 you can still try out all the steps of our pipeline by using [Nvidia NIM models](https://build.nvidia.com/). We include
-a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/configs/example-data.txt) and you can
+a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/example-data.txt) and you can
 switch to that data and NIM models by adding `--mode demo` to all the pipeline commands. We also use different models
-in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/configs/demo.yaml) to pick
+in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/demo.yaml) to pick
 any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
@@ -112,20 +112,20 @@ run_cmd(
 
 ## Problem generation pipeline
 
-[Problem generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/pipelines/problem_generation.py)
+[Problem generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/problem_generation.py)
 consists of the following stages:
 
-1. [Extract all problems](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-problems.yaml)
+1. [Extract all problems](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/extract-problems.yaml)
    from the first forum post (`extract_problems` stage).
 2. Classify whether each problem belongs to one of the following categories:
-   [proof question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-proof.yaml),
-   [binary question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-binary.yaml),
-   [multiple-choice question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-mcq.yaml),
-   [invalid question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/classify-if-invalid.yaml)
+   [proof question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-if-proof.yaml),
+   [binary question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-if-binary.yaml),
+   [multiple-choice question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-if-mcq.yaml),
+   [invalid question](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-if-invalid.yaml)
    (`classify_problems` stage).
-3. [Extract answers](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/extract-answers.yaml)
+3. [Extract answers](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/extract-answers.yaml)
    from the forum discussions (`extract_answers` stage).
-4. [Convert proof questions](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/convert-proofs.yaml)
+4. [Convert proof questions](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/convert-proofs.yaml)
    to answer questions (`convert_proofs` stage).
 5. Remove all binary/multiple-choice/invalid problems and merge remaining problems with converted proofs (`merge_data` stage).
 6. [Decontaminate](../pipelines/decontamination.md) the resulting questions with popular math benchmarks (`decontaminate` stage).
@@ -133,7 +133,7 @@ consists of the following stages:
 You can run the full pipeline with
 
 ```
-python recipes/omr1/pipelines/problem_generation.py
+python recipes/openmathreasoning/pipelines/problem_generation.py
 ```
 
 You can specify a subset of stages using `--stages` argument, e.g. `--stages extract_problems` or `--stages classify_problems,extract_answers`.
@@ -143,7 +143,7 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 
 ## CoT solution generation pipeline
 
-[Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/pipelines/solution_generation.py)
+[Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/solution_generation.py)
 consists of the following stages:
 
 1. [Generate solutions](../pipelines/generation.md) for each of the prepared problems (`generate_solutions` stage).
@@ -158,7 +158,7 @@ consists of the following stages:
 You can run the full pipeline using [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) as solution generation model with
 
 ```
-python recipes/omr1/pipelines/solution_generation.py --mode full-qwq
+python recipes/openmathreasoning/pipelines/solution_generation.py --mode full-qwq
 ```
 
 You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode full-qwq` or `--mode full-r1`.
