@@ -126,7 +126,7 @@ class GenerateSolutionsConfig:
 
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
-        
+
         if not isinstance(self.total_code_executions_in_prompt, (int, list, tuple)):
             raise ValueError(
                 "`total_code_executions_in_prompt` must be either int, list or tuple, "
@@ -293,6 +293,12 @@ class GenerationTask:
             return data
 
         starting_idx = 0
+        if self.cfg.num_chunks:
+            chunk_index = self.cfg.output_file.rfind("_chunk")
+            base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+            if Path(base_output_file).exists():
+                LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                return []
         try:
             with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
@@ -313,6 +319,12 @@ class GenerationTask:
 
         filled_positions = set()
         if self.cfg.skip_filled:
+            if self.cfg.num_chunks:
+                chunk_index = self.cfg.output_file.rfind("_chunk")
+                base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+                if Path(base_output_file).exists():
+                    LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                    return []
             try:
                 with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                     for line in fin:
