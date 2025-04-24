@@ -1,11 +1,11 @@
 cluster: slurm
 
-output_dir: /workspace/omr1
-expname: omr1
+output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
 
 problem_sdg:
   # needs to be uploaded on cluster
-  input_file: /workspace/omr1/raw_aops_data.jsonl
+  input_file: /workspace/openmathreasoning/raw_aops_data.jsonl
 
   generation:
     model: /trt_models/qwen2.5-32b-instruct

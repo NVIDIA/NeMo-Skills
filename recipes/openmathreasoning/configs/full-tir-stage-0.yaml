@@ -1,7 +1,7 @@
 cluster: slurm
 
-output_dir: /workspace/omr1
-expname: omr1
+output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
 
 solution_sdg:
   # this is the output of problem_generation.py
@@ -12,9 +12,9 @@ solution_sdg:
     # you can take and convert the model from https://huggingface.co/GAIR/LIMO
     # in our experiments we re-trained qwen2.5-32b-instruct on LIMO dataset and used the resulting model,
     # which is similar to LIMO Qwen
-    model: /trt_models/LIMO 
+    model: /trt_models/LIMO
     extra_args: >
-      ++prompt_config=/nemo_run/code/recipes/omr1/prompts/math-tir-detailed.yaml
+      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/math-tir-detailed.yaml
       ++prompt_template=qwen-instruct
       ++inference.tokens_to_generate=16384
       ++code_execution=true

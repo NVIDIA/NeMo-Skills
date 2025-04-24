@@ -1,11 +1,11 @@
 cluster: local
 
-output_dir: /workspace/omr1-demo
-expname: omr1-demo
+output_dir: /workspace/openmathreasoning-demo
+expname: openmathreasoning-demo
 
 problem_sdg:
   # this is really .jsonl, but we gitignore it, so changing extension
-  input_file: /nemo_run/code/recipes/omr1/configs/example-data.txt
+  input_file: /nemo_run/code/recipes/openmathreasoning/configs/example-data.txt
 
   generation:
     model: meta/llama-3.3-70b-instruct
