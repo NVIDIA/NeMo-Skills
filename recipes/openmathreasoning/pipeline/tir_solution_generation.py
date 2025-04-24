@@ -99,14 +99,13 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
     significance_output_dir = f"{output_dir}/tir-filter-novelty-significance-{suffix}/significance_judges/"
     dependencies = []
 
-
     extraction_cmd = (
         f"python /nemo_run/code/recipes/omr1/scripts/extract_python_fragments.py "
         f"    --input_file={output_dir}/tir-preprocess-generations-{suffix}/preprocessed_output.jsonl "
         f"    --output_file={fragments_file} "
         f"    --window_size=1500"
     )
-    
+
     expname = f"{expname}-tir-extract-python-fragments-{suffix}"
     run_cmd(
         ctx=wrap_arguments(extraction_cmd),
@@ -139,7 +138,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
         expname=expname,
     )
     dependencies.append(expname)
-    
+
     expname = f"{expname}-tir-judge-significance-{suffix}"
     generate(
         ctx=wrap_arguments(
@@ -161,7 +160,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
         expname=expname,
     )
     dependencies.append(expname)
-    
+
     expname = f"{expname}-tir-filter-fragments-{suffix}"
     run_cmd(
         ctx=wrap_arguments(
@@ -173,7 +172,7 @@ def filter_novelty_significance(output_dir, suffix, cluster, expname, extra_args
         cluster=cluster,
         partition="cpu",  # change that if not available (ignored if running locally)
         log_dir=f"{output_dir}/tir-filter-novelty-significance-{suffix}/logs",
-        run_after=dependencies, # run after novelty and significance judges
+        run_after=dependencies,  # run after novelty and significance judges
         expname=expname,
     )
 
