@@ -23,21 +23,30 @@ dataset["genselect"].to_json("omr-genselect.jsonl")
 
 Convert the data into the SFT format that NeMo-Aligner understands.
 
-```bash
-ns run_cmd --cluster=local \
-python -m nemo_skills.training.prepare_data \
-    ++prompt_template=llama3-instruct \
-    ++prompt_config=generic/math \
-    ++preprocessed_dataset_files=/workspace/omr-genselect.jsonl \
-    ++output_key=generated_solution \
-    ++output_path=/workspace/omr-sft.jsonl \
-    ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
-    ++filters.drop_multi_boxed=false \
-    ++filters.trim_prefix=false \
-    ++filters.trim_solutions=false \
-    ++filters.drop_incorrect_arithmetic=false \
-    ++filters.split_arithmetic=false \
-    ++filters.remove_contaminated=false
+```python
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
+
+cmd = (
+    "python -m nemo_skills.training.prepare_data "
+        "++prompt_template=qwen-instruct "
+        "++preprocessed_dataset_files=/workspace/omr-{inference_mode}.jsonl "
+        "++output_key=generated_solution "
+        "++output_path=/workspace/omr-{inference_mode}-sft.jsonl "
+        "++filters.remove_len_outlier_problems=false "
+        "++filters.drop_multi_boxed=false "
+        "++filters.trim_prefix=false "
+        "++filters.trim_solutions=false "
+        "++filters.drop_incorrect_arithmetic=false "
+        "++filters.split_arithmetic=false "
+        "++filters.remove_contaminated=false "
+        "{extra_args} "
+)
+
+for inference_mode, extra_args in [("genselect", "")]:
+    run_cmd(
+        ctx=wrap_arguments(cmd.format(inference_mode=inference_mode, extra_args=extra_args)),
+        cluster="local",
+    )
 ```
 
 ## Prepare base model

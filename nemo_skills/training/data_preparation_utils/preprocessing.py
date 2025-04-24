@@ -328,7 +328,14 @@ class WriteFinalSftManifest(BaseProcessor):
         if prompt_config and prompt_template:
             self.prompt = get_prompt(prompt_config, prompt_template)
         else:
-            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+            if prompt_template:
+                LOG.warning(
+                    "Prompt template is provided, but prompt config is missing! "
+                    "Assuming 'user: {input_key}' and no special formatting for output."
+                )
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template)
+            else:
+                LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
     def process(self):
         samples_count = 0
