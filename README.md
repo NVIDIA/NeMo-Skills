@@ -35,7 +35,7 @@ We used [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct)
 This dataset was a foundation of our winning submission to the
 [AIMO-2 Kaggle competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard).
 
-See our [paper](https://github.com/NVIDIA/NeMo-Skills/blob/main/recipes/openmathreasoning.pdf) to learn more details!
+See our [paper](https://arxiv.org/abs/2504.16891) to learn more details!
 
 ## OpenMath-Nemotron Models
 
@@ -51,7 +51,7 @@ To demonstrate the quality of this dataset, we release a series of OpenMath-Nemo
 
 The models achieve state-of-the-art results on popular mathematical benchmarks. We present metrics as pass@1 (maj@64) where pass@1
 is an average accuracy across 64 generations and maj@64 is the result of majority voting.
-Please see our [paper](https://github.com/NVIDIA/NeMo-Skills/blob/main/recipes/openmathreasoning.pdf) for more details on the evaluation setup.
+Please see our [paper](https://arxiv.org/abs/2504.16891) for more details on the evaluation setup.
 
 | Model                         | AIME24 |  AIME25     |  HMMT-24-25     | HLE-Math    |
 |-------------------------------|-----------------|-------|-------|-------------|
@@ -93,7 +93,7 @@ If you find our work useful, please consider citing us!
   title   = {AIMO-2 Winning Solution: Building State-of-the-Art Mathematical Reasoning Models with OpenMathReasoning dataset},
   author  = {Ivan Moshkov and Darragh Hanley and Ivan Sorokin and Shubham Toshniwal and Christof Henkel and Benedikt Schifferer and Wei Du and Igor Gitman},
   year    = {2025},
-  journal = {arXiv preprint arXiv:TBD}
+  journal = {arXiv preprint arXiv:2504.16891}
 }
 ```
 
@@ -102,7 +102,7 @@ If you find our work useful, please consider citing us!
   title   = {{OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data}},
   author  = {Shubham Toshniwal and Wei Du and Ivan Moshkov and Branislav Kisacanin and Alexan Ayrapetyan and Igor Gitman},
   year    = {2024},
-  journal = {arXiv preprint arXiv: Arxiv-2410.01560}
+  journal = {arXiv preprint arXiv:2410.01560}
 }
 ```
 
