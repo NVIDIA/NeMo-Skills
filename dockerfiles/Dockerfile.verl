@@ -16,9 +16,6 @@ RUN pip3 install vllm==0.7.3
 RUN MAX_JOBS=4 NINJA_FLAGS="-j4" pip3 install --no-cache-dir --no-build-isolation flash-attn
 RUN pip3 install -U pynvml
 
-# # Install torch 2.5.1
-# RUN pip uninstall -y torch && \
-#     pip install torch==2.5.1
 
 WORKDIR /workspace
 
