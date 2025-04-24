@@ -22,14 +22,14 @@ from nemo_skills.pipeline import check_contamination, generate, run_cmd, wrap_ar
 
 def extract_problems(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
     postprocess_cmd = (
-        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_problem_extraction.py "
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_problem_extraction.py "
         f"    {output_dir}/extract-problems/output.jsonl "
         f"    {output_dir}/extract-problems/extracted-problems.jsonl "
     )
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/extract-problems.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/extract-problems.yaml "
             f"{extra_args} "
         ),
         cluster=cluster,
@@ -46,7 +46,7 @@ def classify_problems(output_dir, cluster, expname, extra_args="", **generate_kw
 
     for mode in ['proof', 'mcq', 'binary', 'invalid']:
         postprocess_cmd = (
-            f"python /nemo_run/code/recipes/omr1/scripts/postprocess_classification.py "
+            f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_classification.py "
             f"    {output_dir}/classify-problems/{mode}/output.jsonl "
             f"    {output_dir}/classify-problems/{mode}/yes.jsonl "
             f"    {output_dir}/classify-problems/{mode}/no.jsonl "
@@ -56,7 +56,7 @@ def classify_problems(output_dir, cluster, expname, extra_args="", **generate_kw
         generate(
             ctx=wrap_arguments(
                 f"++input_file={input_file} "
-                f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/classify-if-{mode}.yaml "
+                f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/classify-if-{mode}.yaml "
                 f"{extra_args} "
             ),
             cluster=cluster,
@@ -77,7 +77,7 @@ def extract_answers(output_dir, cluster, expname, extra_args="", **generate_kwar
     input_file = f"{output_dir}/classify-problems/invalid/no.jsonl"
 
     postprocess_cmd = (
-        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_answer_extraction.py "
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_answer_extraction.py "
         f"    {output_dir}/extract-answers/output.jsonl "
         f"    {output_dir}/extract-answers/extracted-answers.jsonl "
     )
@@ -85,7 +85,7 @@ def extract_answers(output_dir, cluster, expname, extra_args="", **generate_kwar
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/extract-answers.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/extract-answers.yaml "
             f"{extra_args} "
         ),
         cluster=cluster,
@@ -102,7 +102,7 @@ def convert_proofs(output_dir, cluster, expname, extra_args="", **generate_kwarg
     input_file = f"{output_dir}/classify-problems/proof/yes.jsonl"
 
     postprocess_cmd = (
-        f"python /nemo_run/code/recipes/omr1/scripts/postprocess_proof_conversion.py "
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_proof_conversion.py "
         f"    {output_dir}/convert-proofs/output.jsonl "
         f"    {output_dir}/convert-proofs/converted-proofs.jsonl "
     )
@@ -110,7 +110,7 @@ def convert_proofs(output_dir, cluster, expname, extra_args="", **generate_kwarg
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/convert-proofs.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/convert-proofs.yaml "
             f"{extra_args} "
         ),
         cluster=cluster,

@@ -1283,4 +1283,6 @@ def get_exp(expname, cluster_config):
     if cluster_config['executor'] == 'slurm':
         return run.Experiment(expname)
     # hiding all nemo-run logs otherwise as they are not useful locally
+    if cluster_config['executor'] == 'local':
+        return run.Experiment(expname, clean_mode=True)
     return run.Experiment(expname, clean_mode=True, log_level="WARN")

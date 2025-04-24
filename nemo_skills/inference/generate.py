@@ -15,11 +15,13 @@
 import importlib
 import json
 import logging
+import random
 import sys
 import time
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
+from typing import Any
 
 import hydra
 from omegaconf import ListConfig, OmegaConf, open_dict
@@ -102,7 +104,9 @@ class GenerateSolutionsConfig:
     code_execution: bool = False
     # will add to prompt.fill as total_code_executions field (useful for models that support dynamically setting this)
     # if total_code_executions placeholder is not in the prompt, this parameter has no effect
-    total_code_executions_in_prompt: int = 8
+    # if set to tuple, will be randomly sampled from random.randint(min_val, max_val) for each sample in a batch
+    # useful to generate data with variable number of total_code_executions_in_prompt
+    total_code_executions_in_prompt: Any = 8
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
@@ -122,6 +126,12 @@ class GenerateSolutionsConfig:
 
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
+
+        if not isinstance(self.total_code_executions_in_prompt, (int, list, tuple)):
+            raise ValueError(
+                "`total_code_executions_in_prompt` must be either int, list or tuple, "
+                f"got {type(self.total_code_executions_in_prompt)}"
+            )
 
     def _post_init_validate_server(self):
         if self.server["server_type"] == "trtllm" and self.prompt_template is None:
@@ -283,6 +293,12 @@ class GenerationTask:
             return data
 
         starting_idx = 0
+        if self.cfg.num_chunks:
+            chunk_index = self.cfg.output_file.rfind("_chunk")
+            base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+            if Path(base_output_file).exists():
+                LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                return []
         try:
             with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
@@ -303,6 +319,12 @@ class GenerationTask:
 
         filled_positions = set()
         if self.cfg.skip_filled:
+            if self.cfg.num_chunks:
+                chunk_index = self.cfg.output_file.rfind("_chunk")
+                base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+                if Path(base_output_file).exists():
+                    LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                    return []
             try:
                 with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                     for line in fin:
@@ -323,7 +345,11 @@ class GenerationTask:
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         data_point = deepcopy(data_point)
-        data_point['total_code_executions'] = self.cfg.total_code_executions_in_prompt
+        total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
+        if isinstance(total_code_executions_in_prompt, (list, tuple)):
+            min_val, max_val = total_code_executions_in_prompt
+            total_code_executions_in_prompt = random.randint(min_val, max_val)
+        data_point['total_code_executions'] = total_code_executions_in_prompt
         return self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,

@@ -35,17 +35,19 @@ if __name__ == "__main__":
     with open(baseline, "rt", encoding="utf-8") as fin:
         for line in fin:
             data = json.loads(line)
-            assert len(data['choices']) == 1
-            assert len(data['choices'][0]['turns']) == 1
-            baseline_answers[data['question_id']] = data['choices'][0]['turns'][0]['content']
+            messages = data.get('messages', [])
+            answer_text = ""
+            for msg in messages:
+                if msg.get("role") == "assistant":
+                    content = msg.get("content")
+                    answer_text = content.get("answer", "") if isinstance(content, dict) else content
+                    break
+
+            baseline_answers[data['uid']] = answer_text
 
     with open(questions, "rt", encoding="utf-8") as fin, open(output_file, "wt", encoding="utf-8") as fout:
         for line in fin:
             data = json.loads(line)
-            assert len(data['turns']) == 1
-            data['question'] = data.pop('turns')[0]['content']
-            data['baseline_answer'] = baseline_answers[data['question_id']]
-            # original code sets different temperature for different categories
-            # TODO: do we need to do the same or greedy is good enough?
-
+            data['question'] = data.pop('prompt')
+            data['baseline_answer'] = baseline_answers[data['uid']]
             fout.write(json.dumps(data) + "\n")

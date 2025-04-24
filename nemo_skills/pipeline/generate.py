@@ -105,11 +105,25 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         chunk_str = "NONE" if chunk_id is None else str(chunk_id)
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
 
-    command = f"bash -c '{'; '.join(check_commands)}'"
-    if cluster_config['executor'] == 'slurm':
-        output = get_tunnel(cluster_config).run(command).stdout.strip()
+    # If random_seeds has more than N elements, split commands into groups of N
+    request_size = 16
+    if len(random_seeds) > request_size:
+        outputs = []
+        for i in range(0, len(check_commands), request_size):
+            group = check_commands[i : i + request_size]
+            command = f"bash -c '{'; '.join(group)}'"
+            if cluster_config['executor'] == 'slurm':
+                out = get_tunnel(cluster_config).run(command).stdout.strip()
+            else:
+                out = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+            outputs.append(out)
+        output = "\n".join(outputs).strip()
     else:
-        output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+        command = f"bash -c '{'; '.join(check_commands)}'"
+        if cluster_config['executor'] == 'slurm':
+            output = get_tunnel(cluster_config).run(command).stdout.strip()
+        else:
+            output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
 
     # Parse results into a mapping of missing jobs
     missing_jobs = defaultdict(list)
