@@ -24,29 +24,45 @@ def parse_args():
     parser.add_argument('--ability', type=str, default='math', help='Ability to be recorded in the output.')
     return parser.parse_args()
 
+import json
+import pandas as pd
+import uuid
+
 def transform_data(input_file, data_source, ability):
-    # Read the JSONL file
+    # Read the JSONL file and transform each entry
     data = []
     with open(input_file, 'r') as file:
         for line in file:
             json_line = json.loads(line)
             transformed_entry = {
-                'prompt': json_line['input'],
+                # Format the prompt as a list with role and content
+                'prompt': [
+                    {
+                        'content': "Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.\n\n" + json_line['problem'],
+                        'role': 'user'
+                    }
+                ],
+                # Provide the expected answer and reward style
                 'reward_model': {
                     'ground_truth': json_line['expected_answer'],
-                    'style': 'rule'
+                    'style': 'rule-lighteval/MATH_v2'
                 },
+                # Include extra info such as a unique index
                 'extra_info': {
-                    'problem': json_line['problem']
+                    'index': str(uuid.uuid4()),
+                    'problem': json_line['problem'],
+                    'regex': '\\\\boxed\\s*{\\s*(.+?)\\s*}',
                 },
+                # Metadata: source and type of ability tested
                 'data_source': data_source,
                 'ability': ability
             }
             data.append(transformed_entry)
 
-    # Convert list to DataFrame
+    # Convert the list of dictionaries into a DataFrame
     df = pd.DataFrame(data)
     return df
+
 
 def save_to_parquet(df, output_file):
     df.to_parquet(output_file, index=False)
