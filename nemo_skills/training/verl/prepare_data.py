@@ -31,6 +31,7 @@ import uuid
 def transform_data(input_file, data_source, ability):
     # Read the JSONL file and transform each entry
     data = []
+    index = 0
     with open(input_file, 'r') as file:
         for line in file:
             json_line = json.loads(line)
@@ -49,7 +50,7 @@ def transform_data(input_file, data_source, ability):
                 },
                 # Include extra info such as a unique index
                 'extra_info': {
-                    'index': str(uuid.uuid4()),
+                    'index': str(index),
                     'problem': json_line['problem'],
                     'regex': '\\\\boxed\\s*{\\s*(.+?)\\s*}',
                 },
@@ -58,6 +59,7 @@ def transform_data(input_file, data_source, ability):
                 'ability': ability
             }
             data.append(transformed_entry)
+            index += 1
 
     # Convert the list of dictionaries into a DataFrame
     df = pd.DataFrame(data)
