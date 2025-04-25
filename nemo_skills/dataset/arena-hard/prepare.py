@@ -42,7 +42,7 @@ if __name__ == "__main__":
                     content = msg.get("content")
                     answer_text = content.get("answer", "") if isinstance(content, dict) else content
                     break
-        
+
             baseline_answers[data['uid']] = answer_text
 
     with open(questions, "rt", encoding="utf-8") as fin, open(output_file, "wt", encoding="utf-8") as fout:

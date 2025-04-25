@@ -1,11 +1,11 @@
 cluster: slurm
 
-output_dir: /workspace/omr1
-expname: omr1
+output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
 
 problem_sdg:
   # needs to be uploaded on cluster
-  input_file: /workspace/omr1/raw_aops_data.jsonl
+  input_file: /workspace/openmathreasoning/raw_aops_data.jsonl
 
   generation:
     model: /trt_models/qwen2.5-32b-instruct
@@ -51,9 +51,9 @@ solution_sdg:
     server_gpus: 8
     server_nodes: 1
     num_random_seeds: 8
-  
+
   prepare_for_sft:
     extra_args: >
       ++remove_no_code=true
       ++remove_matplotlib=true
-      
+

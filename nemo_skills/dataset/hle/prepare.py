@@ -15,6 +15,7 @@
 import argparse
 import json
 from pathlib import Path
+
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -54,8 +55,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     dataset = load_dataset("cais/hle", split="test")
-    columns_to_keep = ['id', 'question', 'answer', 'answer_type', 'rationale', 
-                      'raw_subject', 'category', 'author_name', 'canary', 'image']
+    columns_to_keep = [
+        'id',
+        'question',
+        'answer',
+        'answer_type',
+        'rationale',
+        'raw_subject',
+        'category',
+        'author_name',
+        'canary',
+        'image',
+    ]
     dataset = dataset.remove_columns([col for col in dataset.column_names if col not in columns_to_keep])
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
