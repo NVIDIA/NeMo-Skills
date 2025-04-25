@@ -166,4 +166,14 @@ You can specify a subset of stages using `--stages` argument and can switch betw
 If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
 
 ## TIR solution generation pipeline
-TODO
+
+TIR solution generation pipeline consists of two stages detailed in the [paper]() TODO.
+
+**Stage-0** leverages [LIMO-Qwen](https://huggingface.co/GAIR/LIMO) model, instructed with [0-shot prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/math-tir-detailed.yaml) to generate long-reasoning TIR solutions.
+
+You can launch it by running
+```
+python recipes/omr1/pipelines/tir_solution_generation.py --mode full-tir-stage-0.yaml 
+```
+
+For the **Stage-1** we suggest to use our [OpenMath-Nemotron-14B](https://huggingface.co/nvidia/OpenMath-Nemotron-14B) as synthetic TIR data generator. It produces high quality solutions and require less strict filtering, resulting in improved sample efficiency.

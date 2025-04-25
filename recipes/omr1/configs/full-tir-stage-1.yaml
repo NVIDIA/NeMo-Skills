@@ -22,9 +22,9 @@ solution_sdg:
 
   generation:
     # you can take our published model from HF and use it as data generator
-    # https://huggingface.co/nvidia/<TODO>
+    # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
 
-    model: /trt_models/omr1-qwen-32b 
+    model: /trt_models/openmath-nemotron-14b 
     extra_args: >
       ++prompt_config=omr/math-tir
       ++prompt_template=qwen-instruct
