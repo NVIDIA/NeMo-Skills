@@ -184,7 +184,7 @@ ns train \
     ++model.data.train_ds.max_seq_length=32768 \
     ++model.data.train_ds.micro_batch_size=1 \
     ++model.data.train_ds.global_batch_size=256 \
-    ++model.tensor_model_parallel_size=4 \
+    ++model.tensor_model_parallel_size=1 \
     ++model.context_parallel_size=2 \
     ++model.data.train_ds.packed_sequence=True \
     ++model.optim.lr=3e-4 \
