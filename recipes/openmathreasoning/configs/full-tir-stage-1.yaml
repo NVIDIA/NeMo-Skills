@@ -26,7 +26,7 @@ solution_sdg:
 
     model: /trt_models/openmathreasoning-qwen-32b
     extra_args: >
-      ++prompt_config=omr/math-tir
+      ++prompt_config=openmath/tir
       ++prompt_template=qwen-instruct
       ++inference.tokens_to_generate=20000
       ++code_execution=true
