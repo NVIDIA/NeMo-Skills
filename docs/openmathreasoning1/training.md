@@ -266,7 +266,7 @@ def filter_func(example, inference_mode):
         return False
     if inference_mode == 'genselect':  # no length-based filtering for genselect
         return True
-    return len(tokenizer.encode(example['output'])) <= 5000
+    return len(tokenizer.encode(example['output'])) >= 5000
 
 dataset = load_dataset("nvidia/OpenMathReasoning")
 
