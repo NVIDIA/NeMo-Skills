@@ -1,8 +1,7 @@
 # Model training
 
-We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
-executing all commands from that folder locally. Change all commands accordingly
-if running on slurm or using different paths.
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and
+that data and models will be downloaded to that folder.
 
 ## Download data and convert to SFT format
 
@@ -291,3 +290,5 @@ dataset["cot"].to_json("omr-cot-round2.jsonl")
 dataset["tir"].to_json("omr-tir-round2.jsonl")
 dataset["genselect"].to_json("omr-genselect-round2.jsonl")
 ```
+
+Since the data is relatively small, you don't need to split it and can pack the full file directly.
