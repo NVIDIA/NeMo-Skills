@@ -195,7 +195,7 @@ class TopAnswerProcessor:
         cfg = self.cfg
         new_answers = []
         all_predictions = []
-        for idx, predictions in enumerate(tqdm(zip_longest(*self.input_file_handles, fillvalue={}))):
+        for idx, predictions in enumerate(tqdm(zip_longest(*self.input_file_handles, fillvalue="{}"))):
             data = read_predictions(predictions, idx, self.input_file_handles)
 
             # Store the metadata about correctness and judgement for each answer
