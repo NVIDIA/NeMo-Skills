@@ -14,177 +14,193 @@
 
 import argparse
 from pathlib import Path
+from omegaconf import OmegaConf
 
-import yaml
-
-from nemo_skills.pipeline import check_contamination, generate, run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import check_contamination, generate, run_cmd, wrap_arguments
 
 
-def extract_problems(input_file, output_dir, cluster, expname, extra_args="", **generate_kwargs):
+def get_stage_expname(base_expname, stage_name, suffix):
+    return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
+
+
+def extract_problems(cluster, expname, run_after, stage_config, **kwargs):
+    """Extracts potential problems from raw text data."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_problem_extraction.py "
-        f"    {output_dir}/extract-problems/output.jsonl "
-        f"    {output_dir}/extract-problems/extracted-problems.jsonl "
+        f"    {output_dir}/output.jsonl "
+        f"    {output_dir}/extracted-problems.jsonl "
     )
+    
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
             f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/extract-problems.yaml "
-            f"{extra_args} "
+            f"{stage_config.get('inline_args', '')} "
         ),
         cluster=cluster,
-        output_dir=f"{output_dir}/extract-problems",
+        output_dir=output_dir,
         postprocess_cmd=postprocess_cmd,
-        expname=f"{expname}-extract-problems",
-        **generate_kwargs,
+        expname=expname,
+        run_after=run_after,
+        **stage_config.get('stage_kwargs', {}),
     )
 
 
-def classify_problems(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-extract-problems"
-    input_file = f"{output_dir}/extract-problems/extracted-problems.jsonl"
-
-    for mode in ['proof', 'mcq', 'binary', 'invalid']:
+def classify_problems(cluster, expname, run_after, stage_config, **kwargs):
+    """Classifies extracted problems into different types (proof, mcq, binary, invalid)."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    
+    modes = stage_config["modes"]
+    current_run_after = run_after
+    current_input_file = input_file
+    
+    for mode in modes:
+        mode_output_dir = f"{output_dir}/{mode}"
+        mode_expname = f"{expname}-{mode}"
+        
         postprocess_cmd = (
             f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_classification.py "
-            f"    {output_dir}/classify-problems/{mode}/output.jsonl "
-            f"    {output_dir}/classify-problems/{mode}/yes.jsonl "
-            f"    {output_dir}/classify-problems/{mode}/no.jsonl "
+            f"    {mode_output_dir}/output.jsonl "
+            f"    {mode_output_dir}/yes.jsonl "
+            f"    {mode_output_dir}/no.jsonl "
             f"    --mode={mode}"
         )
-
+        
         generate(
             ctx=wrap_arguments(
-                f"++input_file={input_file} "
+                f"++input_file={current_input_file} "
                 f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/classify-if-{mode}.yaml "
-                f"{extra_args} "
+                f"{stage_config.get('inline_args', '')} "
             ),
             cluster=cluster,
-            output_dir=f"{output_dir}/classify-problems/{mode}",
+            output_dir=mode_output_dir,
             postprocess_cmd=postprocess_cmd,
-            expname=f"{expname}-classify-{mode}",
-            run_after=run_after,
-            **generate_kwargs,
+            expname=mode_expname,
+            run_after=current_run_after,
+            **stage_config.get('stage_kwargs', {}),
         )
-        run_after = f"{expname}-classify-{mode}"
-        input_file = f"{output_dir}/classify-problems/{mode}/no.jsonl"
-
-    return input_file, run_after
+        current_run_after = mode_expname
+        current_input_file = f"{mode_output_dir}/no.jsonl"
 
 
-def extract_answers(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-classify-invalid"
-    input_file = f"{output_dir}/classify-problems/invalid/no.jsonl"
-
+def extract_answers(cluster, expname, run_after, stage_config, **kwargs):
+    """Extracts answers for problems classified as valid (not invalid)."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_answer_extraction.py "
-        f"    {output_dir}/extract-answers/output.jsonl "
-        f"    {output_dir}/extract-answers/extracted-answers.jsonl "
+        f"    {output_dir}/output.jsonl "
+        f"    {output_dir}/extracted-answers.jsonl "
     )
-
+    
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
             f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/extract-answers.yaml "
-            f"{extra_args} "
+            f"{stage_config.get('inline_args', '')} "
         ),
         cluster=cluster,
-        output_dir=f"{output_dir}/extract-answers",
+        output_dir=output_dir,
         postprocess_cmd=postprocess_cmd,
-        expname=f"{expname}-extract-answers",
+        expname=expname,
         run_after=run_after,
-        **generate_kwargs,
+        **stage_config.get('stage_kwargs', {}),
     )
 
 
-def convert_proofs(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-classify-proof"
-    input_file = f"{output_dir}/classify-problems/proof/yes.jsonl"
-
+def convert_proofs(cluster, expname, run_after, stage_config, **kwargs):
+    """Converts problems classified as proofs into a standard format."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    
     postprocess_cmd = (
         f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_proof_conversion.py "
-        f"    {output_dir}/convert-proofs/output.jsonl "
-        f"    {output_dir}/convert-proofs/converted-proofs.jsonl "
+        f"    {output_dir}/output.jsonl "
+        f"    {output_dir}/converted-proofs.jsonl "
     )
-
+    
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
             f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/convert-proofs.yaml "
-            f"{extra_args} "
+            f"{stage_config.get('inline_args', '')} "
         ),
         cluster=cluster,
-        output_dir=f"{output_dir}/convert-proofs",
+        output_dir=output_dir,
         postprocess_cmd=postprocess_cmd,
-        expname=f"{expname}-convert-proofs",
+        expname=expname,
         run_after=run_after,
-        **generate_kwargs,
+        **stage_config.get('stage_kwargs', {}),
     )
 
 
-def merge_data(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = [f"{expname}-convert-proofs", f"{expname}-extract-answers"]
-
-    cmd = (
-        f"cat {output_dir}/convert-proofs/converted-proofs.jsonl {output_dir}/extract-answers/extracted-answers.jsonl "
-        f"    > {output_dir}/all-problems.jsonl "
-    )
-
+def merge_data(cluster, expname, run_after, stage_config, **kwargs):
+    """Merges the outputs of answer extraction and proof conversion."""
+    output_dir = stage_config["output_dir"]
+    proofs_file = stage_config["proofs_file"]
+    answers_file = stage_config["answers_file"]
+    output_file = f"{output_dir}/all-problems.jsonl"
+    
+    cmd = f"cat {proofs_file} {answers_file} > {output_file}"
+    
     run_cmd(
         ctx=wrap_arguments(cmd),
         cluster=cluster,
-        partition="cpu",  # change that if not available (ignored if running locally)
-        log_dir=f"{output_dir}/merge-data/logs",
-        expname=f"{expname}-merge-data",
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
         run_after=run_after,
+        **stage_config.get('stage_kwargs', {}),
     )
 
 
-def decontaminate(output_dir, cluster, expname, extra_args="", **generate_kwargs):
-    run_after = f"{expname}-merge-data"
-    input_file = f"{output_dir}/all-problems.jsonl"
+def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
+    """Runs decontamination against specified test sets."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    output_file = stage_config.get("output_file", f"{output_dir}/contamination-labeled.jsonl")
+    
+    datasets = stage_config.get('datasets', [])
+    datasets_paths = ",".join([
+        f"/nemo_run/code/nemo_skills/dataset/{d}/test.jsonl" for d in datasets
+    ])
 
-    datasets = [
-        'math',
-        'aime24',
-        'aime25',
-        'amc23',
-        'college_math',
-        'gaokao2023en',
-        'gsm8k',
-        'minerva_math',
-        'olympiadbench',
-        'omni-math',
-    ]
-    datasets = ",".join([f"/nemo_run/code/nemo_skills/dataset/{d}/test.jsonl" for d in datasets])
+    # First step: retrieve similar problems
+    retrieval_expname = f"{expname}-retrieve-similar"
     retrieval_cmd = (
         f"python -m nemo_skills.inference.retrieve_similar "
-        f"   ++retrieve_from=\\\'{datasets}\\\' "
+        f"   ++retrieve_from=\\\'{datasets_paths}\\\' "
         f"   ++compare_to={input_file} "
-        f"   ++output_file={output_dir}/decontamination/retrieved-test.jsonl "
+        f"   ++output_file={output_dir}/retrieved-test.jsonl "
         f"   ++top_k=1 "
     )
+    
     run_cmd(
         ctx=wrap_arguments(retrieval_cmd),
         cluster=cluster,
         num_gpus=1,  # if the data gets really big, might need to run on more gpus
         container="nemo",  # just need pytorch
-        log_dir=f"{output_dir}/decontamination/retrieve-similar/logs",
-        expname=f"{expname}-retrieve-similar",
+        log_dir=f"{output_dir}/logs",
+        expname=retrieval_expname,
         run_after=run_after,
     )
-
-    generate_kwargs.pop('num_chunks', None)  # TODO: remove when supported
-
+    
+    # Second step: check contamination
+    check_contamination_expname = f"{expname}-check-contamination"
+    
     check_contamination(
-        ctx=wrap_arguments(extra_args),
+        ctx=wrap_arguments(stage_config.get('inline_args', '')),
         cluster=cluster,
-        input_file=f"{output_dir}/decontamination/retrieved-test.jsonl",
-        output_file=f"{output_dir}/contamination-labeled.jsonl",
-        log_dir=f"{output_dir}/decontamination/check-contamination/logs",
-        expname=f"{expname}-check-contamination",
-        run_after=f"{expname}-retrieve-similar",
-        **generate_kwargs,
+        input_file=f"{output_dir}/retrieved-test.jsonl",
+        output_file=output_file,
+        log_dir=f"{output_dir}/logs",
+        expname=check_contamination_expname,
+        run_after=retrieval_expname,
+        **stage_config.get('stage_kwargs', {}),
     )
 
 
@@ -198,50 +214,106 @@ stages_map = {
 }
 
 
+def get_available_configs(config_dir):
+    """Get available YAML configuration files from the config directory."""
+    config_dir = Path(config_dir)
+    if not config_dir.exists() or not config_dir.is_dir():
+        return []
+    yaml_files = list(config_dir.glob("*.yaml"))
+    config_names = [file.stem for file in yaml_files if not file.name.startswith('template')]
+    return config_names
+
+
 if __name__ == '__main__':
+    config_dir = Path(__file__).parents[1] / "configs" / "problem_sdg"
+    available_configs = get_available_configs(config_dir)
+    
     parser = argparse.ArgumentParser(description='OpenMathReasoning-1 problem generation pipeline')
     parser.add_argument(
         '--mode',
         type=str,
-        default='full-qwq',
-        choices=['demo', 'full-qwq'],
-        help="Will pick a corresponding config from configs folder "
-        "(full-r1 and full-qwq are the same for problem generation)",
+        required=True,
+        choices=available_configs,
+        help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
-        '--stages',
-        type=str,
-        help='Pipeline stages to run. '
-        'Can specify all, or any subset of stages (comma-separated if want to run multiple)',
-        default='all',
+        '--stages', type=str, default=None,
+        help='Comma-separated list of stages to run. If not specified, runs all stages from the config.',
     )
-
+    
     args = parser.parse_args()
-
-    with open(f'{Path(__file__).parents[1]}/configs/{args.mode}.yaml', 'r') as f:
-        config = yaml.safe_load(f)
-
-    if args.stages == 'all':
-        stages = list(stages_map.keys())
-    elif ',' in args.stages:
-        stages = args.stages.split(',')
+    
+    config_path = config_dir / f"{args.mode}.yaml"
+    config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
+    
+    if 'pipeline_stages' not in config['problem_sdg'] or not config['problem_sdg']['pipeline_stages']:
+        raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
+    full_stage_sequence = config['problem_sdg']['pipeline_stages']
+    
+    if args.stages:
+        # Stages specified via command line
+        stages_to_run = args.stages.split(',')
+        print(f"Running specified stages: {stages_to_run}")
     else:
-        stages = [args.stages]
-
-    for stage in stages:
+        # No command line override, run all stages from config
+        stages_to_run = full_stage_sequence
+        print(f"Running all stages defined in config for mode '{args.mode}': {stages_to_run}")
+    
+    for stage in stages_to_run:
         if stage not in stages_map:
-            raise ValueError(f"Unknown stage: {stage}. Available stages: {list(stages_map.keys())}")
-
-    input_file = config['problem_sdg']['input_file']
-    default_args = dict(
-        output_dir=config['output_dir'],
-        cluster=config['cluster'],
-        expname=config['expname'],
-        **config['problem_sdg']['generation'],
-    )
-
-    for stage in stages:
-        stage_args = default_args.copy()
-        if stage == 'extract_problems':
-            stage_args['input_file'] = input_file
-        stages_map[stage](**stage_args)
+            raise ValueError(f"Unknown stage specified: '{stage}'. Available stages: {list(stages_map.keys())}")
+        if stage not in full_stage_sequence:
+            raise ValueError(
+                f"Stage '{stage}' requested but not part of the defined sequence for mode '{args.mode}' in {config_path}. "
+                f"Specify one of {full_stage_sequence} or select an appropriate mode."
+            )
+    
+    # --- Common parameters ---
+    base_output_dir = config['base_output_dir']
+    suffix = config.get('suffix', args.mode)
+    cluster = config['cluster']
+    expname_base = config['expname']
+    
+    # --- Run selected stages ---
+    for stage in stages_to_run:
+        print(f"\n--- Running stage: {stage} ---")
+        stage_func = stages_map[stage]
+        stage_config = config['problem_sdg'].get('stages', {}).get(stage, {})
+        
+        current_expname = get_stage_expname(expname_base, stage, suffix)
+        
+        # --- Calculate Dependencies based on full_stage_sequence ---
+        run_after_for_this_stage = None
+        current_stage_index = full_stage_sequence.index(stage)
+        
+        if current_stage_index == 0:
+            # First stage has no dependency
+            run_after_for_this_stage = None
+        else:
+            # Standard linear dependency
+            predecessor_stage = full_stage_sequence[current_stage_index - 1]
+            
+            # Special case for merge_data which depends on both extract_answers and convert_proofs
+            if stage == 'merge_data' and 'dependencies' in stage_config:
+                dep_stages = stage_config['dependencies']
+                dependencies = [
+                    get_stage_expname(expname_base, dep_stage, suffix)
+                    for dep_stage in dep_stages
+                ]
+                run_after_for_this_stage = dependencies
+            else:
+                run_after_for_this_stage = get_stage_expname(expname_base, predecessor_stage, suffix)
+        
+        print(f"Dependency for '{stage}': {run_after_for_this_stage}")
+        
+        stage_args = {
+            'cluster': cluster,
+            'expname': current_expname,
+            'run_after': run_after_for_this_stage,
+            'stage_config': stage_config,
+        }
+        
+        # Call the stage function
+        stage_func(**stage_args)
+    
+    print("\n--- Selected pipeline stages finished. ---")

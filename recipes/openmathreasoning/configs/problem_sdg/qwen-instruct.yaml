@@ -1,0 +1,95 @@
+cluster: slurm
+base_output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
+suffix: qwen-instruct  # Suffix for experiment names
+
+
+# Input file for the first stage (extract_problems)
+input_file: ${base_output_dir}/raw_aops_data.jsonl
+
+# Define judge model server parameters
+generate_kwargs:
+  # Model to be used for data processing stages
+  model: /trt_models/qwen2.5-32b-instruct
+  # Server type to launch the model
+  server_type: trtllm
+  # Server parameters
+  server_gpus: 8
+  server_nodes: 1
+  num_chunks: 10  # Parallelize for large datasets
+
+# List of datasets to run problem decontamination with
+decontamination_datasets:
+  - math
+  - aime24
+  - aime25
+  - amc23
+  - college_math
+  - gaokao2023en
+  - gsm8k
+  - minerva_math
+  - olympiadbench
+  - omni-math
+
+pipeline_stages:
+  - extract_problems
+  - classify_problems
+  - extract_answers
+  - convert_proofs
+  - merge_data
+  - decontaminate
+
+directories:
+  step-1-extract-problems: ${base_output_dir}/problem_sdg/step-1-extract-problems
+  step-2-classify-problems: ${base_output_dir}/problem_sdg/step-2-classify-problems
+  step-3-extract-answers: ${base_output_dir}/problem_sdg/step-3-extract-answers
+  step-4-convert-proofs: ${base_output_dir}/problem_sdg/step-4-convert-proofs
+  step-5-merge-data: ${base_output_dir}/problem_sdg/step-5-merge-data
+  step-6-decontaminate: ${base_output_dir}/problem_sdg/step-6-decontamination
+
+# Stage-specific configurations
+stages:
+  extract_problems:
+    output_dir: ${directories.step-1-extract-problems}
+    input_file: ${input_file}
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_kwargs}
+
+  classify_problems:
+    output_dir: ${directories.step-2-classify-problems}
+    input_file: ${directories.step-1-extract-problems}/extracted-problems.jsonl
+    modes: ['proof', 'mcq', 'binary', 'invalid']
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_kwargs}
+
+  extract_answers:
+    output_dir: ${directories.step-3-extract-answers}
+    input_file: ${directories.step-2-classify-problems}/invalid/no.jsonl
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_kwargs}
+
+  convert_proofs:
+    output_dir: ${directories.step-4-convert-proofs}
+    input_file: ${directories.step-2-classify-problems}/proof/yes.jsonl
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_kwargs}
+
+  merge_data:
+    output_dir: ${directories.step-5-merge-data}
+    proofs_file: ${directories.step-4-convert-proofs}/converted-proofs.jsonl
+    answers_file: ${directories.step-3-extract-answers}/extracted-answers.jsonl
+    dependencies: ['extract_answers', 'convert_proofs']
+    stage_kwargs:
+      partition: cpu  # CPU-only task
+
+  decontaminate:
+    output_dir: ${directories.step-6-decontaminate}
+    input_file: ${directories.step-5-merge-data}/all-problems.jsonl
+    output_file: ${directories.step-6-decontaminate}/contamination-labeled.jsonl
+    datasets: ${decontamination_datasets}
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs:
+      model: ${generate_kwargs.model}
+      server_type: ${generate_kwargs.model.server_type}
+      server_gpus: ${generate_kwargs.model.server_gpus}
+      server_nodes: ${generate_kwargs.model.server_nodes}

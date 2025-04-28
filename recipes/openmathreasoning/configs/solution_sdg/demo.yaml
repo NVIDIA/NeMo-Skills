@@ -1,0 +1,77 @@
+cluster: local
+base_output_dir: /workspace/openmathreasoning-demo
+expname: openmathreasoning-demo
+suffix: nim  # Suffix for experiment names
+
+# Input file for the first stage (generate_solutions)
+# This should be the output of the problem_generation.py pipeline
+input_file: ${base_output_dir}/problem_sdg/step-5-merge-data/all-problems.jsonl
+# File with benchmark problems you want decontaminate with
+contamination_file: ${base_output_dir}/problem_sdg/step-6-decontamination/contamination-labeled.jsonl
+# Number of solutions per each problem from the input file to generate
+num_random_seeds_to_generate: 4
+# Can define initial dependency for the `generate_solutions` stage to run after
+initial_dependency: ${expname}-merge-data
+
+# Define judge model server parameters
+generate_kwargs:
+  # Model to be used for answer judgement
+  model: meta/llama-3.3-70b-instruct
+  # Server type to launch the model
+  server_type: openai
+  # NIM API endpoint
+  server_address: https://integrate.api.nvidia.com/v1
+  # Number of generated solutions per problem to judge
+  num_random_seeds: ${num_random_seeds_to_generate}
+
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - generate_solutions          # Generate initial solutions
+  - fill_majority_answer        # Fill missing ground truth answers if any
+  - judge_answers               # Judge correctness based on final answer
+  - prepare_for_sft             # Prepare the final dataset for SFT training
+
+# Directory structure configuration
+directories:
+  step-1-generate-solutions: ${base_output_dir}/solution_sdg/step-1-generate-solutions
+  step-2-fill-majority: ${base_output_dir}/solution_sdg/step-2-fill-majority
+  step-3-judge-answers: ${base_output_dir}/solution_sdg/step-3-judge-answers
+  step-4-prepare-sft: ${base_output_dir}/solution_sdg/step-4-prepare-sft
+
+# Stage-specific configurations
+stages:
+  generate_solutions:
+    output_dir: ${directories.step-1-generate-solutions}
+    input_file: ${input_file}
+    # Arguments passed inside the generate context string (e.g., ++param=value)
+    inline_args: "++inference.tokens_to_generate=8192"
+    # Arguments passed as kwargs to the pipeline function (e.g. generate())
+    stage_kwargs:
+      model: deepseek-ai/deepseek-r1-distill-qwen-32b
+      server_type: openai
+      server_address: https://integrate.api.nvidia.com/v1
+      num_random_seeds: ${num_random_seeds_to_generate}
+
+  fill_majority_answer:
+    output_dir: ${directories.step-2-fill-majority}
+    input_dir: ${directories.step-1-generate-solutions}
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
+
+  judge_answers:
+    output_dir: ${directories.step-3-judge-answers}
+    input_dir: ${directories.step-2-fill-majority}
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_kwargs}
+
+  prepare_for_sft:
+    output_dir: ${directories.step-4-prepare-sft}
+    input_files: ${directories.step-3-judge-answers}/output-rs*.jsonl
+    prompt_config: generic/math
+    prompt_template: qwen-instruct
+    contamination_file: ${contamination_file}
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu

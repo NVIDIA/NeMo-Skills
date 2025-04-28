@@ -1,0 +1,150 @@
+cluster: slurm
+base_output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
+suffix: tir-limo
+
+# Input file for the first stage (generate_solutions)
+# This should be the output of the problem_generation.py pipeline
+input_file: ${base_output_dir}/problem_sdg/step-5-merge-data/all-problems.jsonl
+# File with benchmark problems you want decontaminate with
+contamination_file: ${base_output_dir}/problem_sdg/step-6-decontamination/contamination-labeled.jsonl
+# Number of solutions per each problem from the input file to generate
+num_random_seeds_to_generate: 16
+# Can define initial dependency for the `generate_solutions` stage to run after
+initial_dependency: ${expname}-merge-data
+
+# Define judge model server parameters
+generate_kwargs: &generate_kwargs
+  # Model to be used for answer judgement
+  model: /trt_models/qwen2.5-32b-instruct
+  # Server type to launch the model
+  server_type: trtllm
+  # Server parameters
+  server_gpus: 8
+  server_nodes: 1
+  # Number of generated solutions per problem to judge
+  num_random_seeds: ${num_random_seeds_to_generate}
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - generate_solutions          # Generate initial TIR solutions
+  - fill_majority_answer        # Fill missing ground truth answers if any
+  - judge_answers               # Judge correctness based on final answer
+  - preprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
+  - extract_python_fragments    # Extract python fragments for novelty/significance judgement
+  - judge_novelty               # Judge the novelty of extracted fragments
+  - judge_significance          # Judge the significance of extracted fragments
+  - filter_fragments            # Filter fragments based on novelty/significance scores
+  - prepare_for_sft             # Prepare the final dataset for SFT training
+
+# Directory structure configuration
+directories:
+  step-1-generate-solutions: "${base_output_dir}/step-1-generate-solutions"
+  step-2-fill-majority: "${base_output_dir}/step-2-fill-majority"
+  step-3-judge-answers: "${base_output_dir}/step-3-judge-answers"
+  step-4-preprocess-tir: "${base_output_dir}/step-4-preprocess-tir"
+  step-5-extract-fragments: "${base_output_dir}/step-5-extract-fragments"
+  step-6-judge-novelty: "${base_output_dir}/step-6-judge-novelty"
+  step-7-judge-significance: "${base_output_dir}/step-7-judge-significance"
+  step-8-filter-fragments: "${base_output_dir}/step-8-filter-fragments"
+  step-9-prepare-sft: "${base_output_dir}/step-9-prepare-sft"
+
+# Stage-specific configurations
+stages:
+  generate_solutions:
+    output_dir: ${directories.step-1-generate-solutions}
+    input_file: ${input_file}
+    # Arguments passed inside the generate context string (e.g., ++param=value)
+    inline_args: >-
+      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/math-tir-detailed.yaml
+      ++code_execution=true
+      ++server.code_execution.max_code_executions=8
+      ++prompt_template=qwen-instruct
+      ++inference.tokens_to_generate=16384
+    # Arguments passed as kwargs to the pipeline function (e.g. generate())
+    stage_kwargs:
+      # you can take and convert the model from https://huggingface.co/GAIR/LIMO
+      model: /trt_models/LIMO
+      with_sandbox: true
+      server_type: trtllm
+      server_gpus: 8
+      server_nodes: 1
+      num_random_seeds: ${num_random_seeds_to_generate}
+      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
+      # dependent_jobs: N
+
+  fill_majority_answer:
+    output_dir: ${directories.step-2-fill-majority}
+    input_dir: ${directories.step-1-generate-solutions}
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
+
+  judge_answers:
+    output_dir: ${directories.step-3-judge-answers}
+    input_dir: ${directories.step-2-fill-majority}
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs:
+      <<: *generate_kwargs
+
+  preprocess_tir_generations:
+    output_dir: ${directories.step-4-preprocess-tir}
+    input_dir: ${directories.step-3-judge-answers}
+    code_begin: "```python\n"
+    code_end: "```\n"
+    new_code_begin: "<tool_call>\n"
+    new_code_end: "</tool_call>\n"
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
+
+  extract_python_fragments:
+    output_dir: ${directories.step-5-extract-fragments}
+    input_dir: ${directories.step-4-preprocess-tir}
+    window_size: 1500
+    code_begin: "<tool_call>\n"
+    code_end: "</tool_call>\n"
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
+
+  judge_novelty:
+    output_dir: ${directories.step-6-judge-novelty}
+    input_dir: ${directories.step-5-extract-fragments}
+    prompt_template: qwen-instruct
+    prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml
+    stage_kwargs:
+      <<: *generate_kwargs
+      num_random_seeds: 8 # Use more random seeds for a more "stable" judgement
+      num_chunks: 10 # Increase if need to parallelize more
+
+  judge_significance:
+    output_dir: ${directories.step-7-judge-significance}
+    input_dir: ${directories.step-5-extract-fragments}
+    prompt_template: qwen-instruct
+    prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-significance.yaml
+    stage_kwargs:
+      <<: *generate_kwargs
+      num_random_seeds: 8 # Use more random seeds for a more "stable" judgement
+      num_chunks: 10 # Increase if need to parallelize more
+
+  filter_fragments:
+    output_dir: ${directories.step-8-filter-fragments}
+    novelty_dir: ${directories.step-6-judge-novelty}
+    significance_dir: ${directories.step-7-judge-significance}
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
+
+  prepare_for_sft:
+    output_dir: ${directories.step-9-prepare-sft}
+    input_dir: ${directories.step-8-filter-fragments}
+    prompt_config: generic/math
+    prompt_template: qwen-instruct
+    contamination_file: ${contamination_file}
+    inline_args: >-
+      ++filters.remove_matplotlib=true
+    # You can use CPU partition for this script, if available
+    stage_kwargs:
+      partition: cpu
