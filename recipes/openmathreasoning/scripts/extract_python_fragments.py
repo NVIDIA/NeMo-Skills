@@ -20,7 +20,7 @@ from typing import List
 
 
 def extract_python_blocks_with_context(document: str, args) -> List[str]:
-    pattern = fr'```{args.code_begin}(.*?){args.code_end}\n```output\n(.*?)\n```'
+    pattern = fr'{args.code_begin}(.*?){args.code_end}\n```output\n(.*?)\n```'
 
     matches = list(re.finditer(pattern, document, re.DOTALL))
 
@@ -97,8 +97,8 @@ def main():
     parser = argparse.ArgumentParser(description='Extract Python code blocks with context from JSONL file')
     parser.add_argument('--input_file', type=str, required=True, help='Path to input JSONL file')
     parser.add_argument('--output_file', type=str, required=True, help='Path to output JSONL file')
-    parser.add_argument("--code_begin", type=str, default="```python\n", help="Start of code block tag")
-    parser.add_argument("--code_end", type=str, default="```\n", help="End of code block tag")
+    parser.add_argument("--code_begin", type=str, required=True, help="Start of code block tag")
+    parser.add_argument("--code_end", type=str, required=True, help="End of code block tag")
     parser.add_argument(
         '--window_size', type=int, default=1500, help='Size of context window before and after code block'
     )
