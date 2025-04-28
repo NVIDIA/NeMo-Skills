@@ -20,7 +20,7 @@ from typing import List
 
 
 def extract_python_blocks_with_context(document: str, args) -> List[str]:
-    pattern = fr'{args.code_begin}(.*?){args.code_end}\n```output\n(.*?)\n```'
+    pattern = fr'{args.code_begin}(.*?){args.code_end}```output\n(.*?)\n```'
 
     matches = list(re.finditer(pattern, document, re.DOTALL))
 
