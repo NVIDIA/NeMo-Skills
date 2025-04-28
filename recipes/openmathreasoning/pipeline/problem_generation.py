@@ -246,9 +246,9 @@ if __name__ == '__main__':
     config_path = config_dir / f"{args.mode}.yaml"
     config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
     
-    if 'pipeline_stages' not in config['problem_sdg'] or not config['problem_sdg']['pipeline_stages']:
+    if 'pipeline_stages' not in config or not config['pipeline_stages']:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
-    full_stage_sequence = config['problem_sdg']['pipeline_stages']
+    full_stage_sequence = config['pipeline_stages']
     
     if args.stages:
         # Stages specified via command line
@@ -278,7 +278,7 @@ if __name__ == '__main__':
     for stage in stages_to_run:
         print(f"\n--- Running stage: {stage} ---")
         stage_func = stages_map[stage]
-        stage_config = config['problem_sdg'].get('stages', {}).get(stage, {})
+        stage_config = config.get('stages', {}).get(stage, {})
         
         current_expname = get_stage_expname(expname_base, stage, suffix)
         

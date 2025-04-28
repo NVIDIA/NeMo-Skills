@@ -312,12 +312,10 @@ if __name__ == '__main__':
 
     config_path = config_dir / f"{args.mode}.yaml"
     config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
-    print(config)
-    raise ValueError
     
-    if 'pipeline_stages' not in config['solution_sdg'] or not config['solution_sdg']['pipeline_stages']:
+    if 'pipeline_stages' not in config or not config['pipeline_stages']:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
-    full_stage_sequence = config['solution_sdg']['pipeline_stages']
+    full_stage_sequence = config['pipeline_stages']
 
     if args.stages:
         # Stages specified via command line
@@ -347,7 +345,7 @@ if __name__ == '__main__':
     for stage in stages_to_run:
         print(f"\n--- Running stage: {stage} ---")
         stage_func = stages_map[stage]
-        stage_config = config['solution_sdg'].get('stages', {}).get(stage, {})
+        stage_config = config.get('stages', {}).get(stage, {})
         
         current_expname = get_stage_expname(expname_base, stage, suffix)
 
@@ -369,7 +367,7 @@ if __name__ == '__main__':
             run_after_for_this_stage = dependencies
         elif current_stage_index == 0:
             # First stage in the defined sequence
-            run_after_for_this_stage = config['solution_sdg'].get('initial_dependency', f"{expname_base}-merge-data")
+            run_after_for_this_stage = config.get('initial_dependency', f"{expname_base}-merge-data")
         else:
             # Standard linear dependency
             predecessor_stage = full_stage_sequence[current_stage_index - 1]

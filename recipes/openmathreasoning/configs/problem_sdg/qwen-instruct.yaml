@@ -90,6 +90,6 @@ stages:
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs:
       model: ${generate_kwargs.model}
-      server_type: ${generate_kwargs.model.server_type}
-      server_gpus: ${generate_kwargs.model.server_gpus}
-      server_nodes: ${generate_kwargs.model.server_nodes}
+      server_type: ${generate_kwargs.server_type}
+      server_gpus: ${generate_kwargs.server_gpus}
+      server_nodes: ${generate_kwargs.server_nodes}
