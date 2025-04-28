@@ -197,6 +197,10 @@ class TopAnswerProcessor:
         all_predictions = []
         for idx, predictions in enumerate(tqdm(zip_longest(*self.input_file_handles, fillvalue="{}"))):
             data = read_predictions(predictions, idx, self.input_file_handles)
+            # Removing all empty predictions
+            data = [elem for elem in data if elem]
+            if not data:
+                continue
 
             # Store the metadata about correctness and judgement for each answer
             # Useful when extracting the top answer
