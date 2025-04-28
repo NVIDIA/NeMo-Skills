@@ -125,7 +125,7 @@ def preprocess_code_judge(args):
                     filt_reason = filter_code_solution(sample, args)
                     cnt[filt_reason] += 1
                     cnt["Total"] += 1
-                    if filt_reason is "Accepted":
+                    if filt_reason == "Accepted":
                         sample["original_index"] = idx
                         fout.write(json.dumps(sample) + "\n")
 
