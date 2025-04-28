@@ -75,9 +75,9 @@ def cut_final_answer_part(output):
     return output[:end_idx]
 
 
-def replace_code_tags(text):
-    pattern = r"```python\n(.*?)\n```\n"
-    replacement = r"<tool_call>\n\1\n</tool_call>\n"
+def replace_code_tags(text, args):
+    pattern = fr"{args.code_begin}(.*?)\n{args.code_end}"
+    replacement = fr"{args.new_code_begin}\1\n{args.new_code_end}"
     processed_text = re.sub(pattern, replacement, text, flags=re.DOTALL)
 
     return processed_text
@@ -92,7 +92,7 @@ def filter_code_solution(sample, args):
     # Make some initial filtering to speed up the next llm judgement stage
     if args.code_begin not in sample["generation"]:
         return "No code blocks found"
-    if not validate_code_execution(sample["generation"]):
+    if not validate_code_execution(sample["generation"], args.code_begin.strip(), args.code_end.strip()):
         return "Incomplete code execution found"
     if "judgement" in sample and "judgement: no" in sample["judgement"].lower():
         return "Incorrect final answer"
@@ -109,7 +109,9 @@ def filter_code_solution(sample, args):
     if generation is None:
         return "Final answer not found"
 
-    generation = replace_code_tags(generation)
+    if args.new_code_begin and args.new_code_end:
+        generation = replace_code_tags(generation, args)
+    
     sample["generation"] = generation
 
     return "Accepted"
@@ -140,6 +142,16 @@ if __name__ == "__main__":
         "--input_files", type=str, required=True, help="Input file, could be a pattern like output*.jsonl"
     )
     parser.add_argument("--output_file", type=str, required=True, help="Output file")
+    parser.add_argument("--code_begin", type=str, default="```python\n", help="Start of code block tag")
+    parser.add_argument("--code_end", type=str, default="```\n", help="End of code block tag")
+    parser.add_argument(
+        "--new_code_begin", type=str, default=None,
+        help="New start of code block tag, to replace the original one. If not specified, will not replace"
+    )
+    parser.add_argument(
+        "--new_code_end", type=str, default=None,
+        help="New end of code block tag, to replace the original one. If not specified, will not replace"
+    )
     args = parser.parse_args()
 
     output_dir = os.path.dirname(args.output_file)
