@@ -71,6 +71,20 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
         ++prompt_config=./prompt.yaml
     ```
 
+=== "Azure OpenAI models"
+
+    ```bash
+    export NVIDIA_OPENAI_KEY=<your key>
+    ns generate \
+        --server_type=azureopenai \
+        --model=<your deployment name> \
+        --server_address=<your Azure OpenAI endpoint URL> \
+        --api_version=2024-12-01-preview \
+        --output_dir=./generation \
+        ++input_file=./input.jsonl \
+        ++prompt_config=./prompt.yaml
+    ```
+
 You should be able to see a jsonl file with 3 lines containing the original data and a new `generation` key
 with an LLM output for each prompt.
 

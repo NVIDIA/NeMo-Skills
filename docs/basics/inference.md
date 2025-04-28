@@ -96,6 +96,9 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          To use OpenAI models, use `OPENAI_API_KEY` and set `base_url=https://api.openai.com/v1`.
 
+         To use Azure OpenAI models, use `server_type="azureopenai"` and set `base_url` to your Azure OpenAI endpoint URL.
+         You'll also need to set `api_version` (defaults to "2024-12-01-preview") and provide your Azure OpenAI API key.
+
     2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
          Note that with API models we can't add special tokens, so prompt template is not specified.
 
