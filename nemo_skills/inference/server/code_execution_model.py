@@ -94,7 +94,7 @@ class CodeExecutionWrapper:
                 raise ValueError(
                     "`max_code_executions` set to None in the config, failed to extract the value from the prompt"
                 )
-            max_code_executions = code_executions.group(1)
+            max_code_executions = int(code_executions.group(1))
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
 
