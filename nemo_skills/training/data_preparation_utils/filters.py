@@ -179,7 +179,7 @@ class AddCodeExecutionsCounts(BaseFilter):
             if "You have run out of code executions!" in data_entry[self.solution_key]:
                 counts = 1
         else:
-            counts = int(allowed_ce.group(1))
+            counts = int(allowed_ce.group(1)) + 1
 
         data_entry[self.ce_counter_key] = counts
         return [DataEntry(data=data_entry, metrics=dict(num_modified=1))]
