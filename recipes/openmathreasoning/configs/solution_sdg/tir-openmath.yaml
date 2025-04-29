@@ -5,13 +5,13 @@ suffix: tir-openmath  # Suffix for experiment names
 
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
-input_file: ${base_output_dir}/problem_sdg/step-5-merge-data/all-problems.jsonl
+input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
-contamination_file: ${base_output_dir}/problem_sdg/step-6-decontamination/contamination-labeled.jsonl
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of solutions per each problem from the input file to generate
 num_random_seeds_to_generate: 16
 # Can define initial dependency for the `generate_solutions` stage to run after
-initial_dependency: ${expname}-merge-data
+initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
@@ -35,11 +35,11 @@ pipeline_stages:
 
 # Directory structure configuration
 directories:
-  step-1-generate-solutions: "${base_output_dir}/step-1-generate-solutions"
-  step-2-fill-majority: "${base_output_dir}/step-2-fill-majority"
-  step-3-judge-answers: "${base_output_dir}/step-3-judge-answers"
-  step-4-preprocess-tir: "${base_output_dir}/step-4-preprocess-tir"
-  step-5-prepare-sft: "${base_output_dir}/step-5-prepare-sft"
+  step-1-generate-solutions: "${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions"
+  step-2-fill-majority: "${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority"
+  step-3-judge-answers: "${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers"
+  step-4-preprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-preprocess-tir"
+  step-5-prepare-sft: "${base_output_dir}/solution-sdg-${suffix}/step-5-prepare-sft"
 
 # Stage-specific configurations
 stages:
@@ -52,7 +52,7 @@ stages:
       ++prompt_template=openmath-instruct
       ++inference.tokens_to_generate=16384
       ++code_execution=true
-      ++server.code_execution.max_code_executions=8
+      ++server.code_execution.max_code_executions=null
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[1, 8]'
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
@@ -72,6 +72,8 @@ stages:
   fill_majority_answer:
     output_dir: ${directories.step-2-fill-majority}
     input_dir: ${directories.step-1-generate-solutions}
+    dependencies:
+      - generate_solutions
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -79,6 +81,8 @@ stages:
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
     input_dir: ${directories.step-2-fill-majority}
+    dependencies:
+      - fill_majority_answer
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs:
       <<: *generate_kwargs
@@ -88,6 +92,8 @@ stages:
     input_dir: ${directories.step-3-judge-answers}
     code_begin: "<tool_call>\n"
     code_end: "</tool_call>\n"
+    dependencies:
+      - judge_answers
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -95,11 +101,15 @@ stages:
   prepare_for_sft:
     output_dir: ${directories.step-5-prepare-sft}
     input_file: ${directories.step-4-preprocess-tir}/preprocessed_output.jsonl
-    prompt_config: generic/math
-    prompt_template: qwen-instruct
+    prompt_config: openmath/math-tir
+    prompt_template: openmath-instruct
     contamination_file: ${contamination_file}
+    dependencies:
+      - preprocess_tir_generations
     inline_args: >-
       ++filters.remove_matplotlib=true
+      ++exclude_optional_keys=false
+      ++add_code_execution_counts=true
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu

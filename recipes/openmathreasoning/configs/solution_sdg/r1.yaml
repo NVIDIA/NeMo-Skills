@@ -5,13 +5,13 @@ suffix: r1  # Suffix for experiment names
 
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
-input_file: ${base_output_dir}/problem_sdg/step-5-merge-data/all-problems.jsonl
+input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
-contamination_file: ${base_output_dir}/problem_sdg/step-6-decontamination/contamination-labeled.jsonl
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of solutions per each problem from the input file to generate
 num_random_seeds_to_generate: 16
 # Can define initial dependency for the `generate_solutions` stage to run after
-initial_dependency: ${expname}-merge-data
+initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
 generate_kwargs:
@@ -34,10 +34,10 @@ pipeline_stages:
 
 # Directory structure configuration
 directories:
-  step-1-generate-solutions: ${base_output_dir}/solution_sdg/step-1-generate-solutions
-  step-2-fill-majority: ${base_output_dir}/solution_sdg/step-2-fill-majority
-  step-3-judge-answers: ${base_output_dir}/solution_sdg/step-3-judge-answers
-  step-4-prepare-sft: ${base_output_dir}/solution_sdg/step-4-prepare-sft
+  step-1-generate-solutions: ${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions
+  step-2-fill-majority: ${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority
+  step-3-judge-answers: ${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers
+  step-4-prepare-sft: ${base_output_dir}/solution-sdg-${suffix}/step-4-prepare-sft
 
 # Stage-specific configurations
 stages:
@@ -49,7 +49,7 @@ stages:
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       # assuming the model is in fp8 and running on H100 GPUs
-      model: /hf_models/deepseek-r1-tp16  # checkpoint is pre-sharded to tp16 for faster loading
+      model: /hf_models/DeepSeek-R1-tp16  # checkpoint is pre-sharded to tp16 for faster loading
       server_type: sglang
       server_gpus: 8
       server_nodes: 2
@@ -62,6 +62,8 @@ stages:
   fill_majority_answer:
     output_dir: ${directories.step-2-fill-majority}
     input_dir: ${directories.step-1-generate-solutions}
+    dependencies:
+      - generate_solutions
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -69,15 +71,19 @@ stages:
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
     input_dir: ${directories.step-2-fill-majority}
+    dependencies:
+      - fill_majority_answer
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
   prepare_for_sft:
     output_dir: ${directories.step-4-prepare-sft}
-    input_files: ${directories.step-3-judge-answers}/output-rs*.jsonl
+    input_file: ${directories.step-3-judge-answers}/output-rs*.jsonl
     prompt_config: generic/math
     prompt_template: qwen-instruct
     contamination_file: ${contamination_file}
+    dependencies:
+      - judge_answers
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu

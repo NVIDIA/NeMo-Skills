@@ -158,22 +158,43 @@ consists of the following stages:
 You can run the full pipeline using [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) as solution generation model with
 
 ```
-python recipes/openmathreasoning/pipelines/solution_generation.py --mode full-qwq
+python recipes/openmathreasoning/pipelines/solution_generation.py --mode qwq
 ```
 
-You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode full-qwq` or `--mode full-r1`.
+You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode qwq` or `--mode r1`.
 
 If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on 10 example questions, add `--mode demo`.
 
 ## TIR solution generation pipeline
 
-TIR solution generation pipeline consists of two stages detailed in the [paper]() TODO.
+[Tool-Integrated Reasoning (TIR) solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/solution_generation.py)
+focuses on generating solutions that leverage external tools, more specifically, a Python interpreter. This pipeline also consists of several stages:
 
-**Stage-0** leverages [LIMO-Qwen](https://huggingface.co/GAIR/LIMO) model, instructed with [0-shot prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/omr1/prompts/math-tir-detailed.yaml) to generate long-reasoning TIR solutions.
+1.  [Generate solutions](../pipelines/generation.md) using a TIR-capable model (`generate_solutions` stage). These solutions interleave reasoning steps with executable code blocks.
+2.  [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
+    for problems without ground-truth answers (`fill_majority_answer` stage).
+3.  [Judge answers using an LLM](../pipelines/llm-as-a-judge.md), comparing the final answer to the ground-truth or majority answer (`judge_answers` stage).
+4.  Preprocess generations, including filtering and potentially standardizing code block formats (`preprocess_tir_generations` stage).
 
-You can launch it by running
-```
-python recipes/omr1/pipelines/tir_solution_generation.py --mode full-tir-stage-0.yaml 
-```
+## 
+Optional filtering stages, that we use only for LIMO generations.
 
-For the **Stage-1** we suggest to use our [OpenMath-Nemotron-14B](https://huggingface.co/nvidia/OpenMath-Nemotron-14B) as synthetic TIR data generator. It produces high quality solutions and require less strict filtering, resulting in improved sample efficiency.
+5. Extract Python code fragments from solutions (`extract_python_fragments`).
+6. Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
+7. Filter fragments based on novelty/significance scores (`filter_fragments`).
+## 
+
+8.  Prepare the final dataset for SFT (`prepare_for_sft` stage).
+
+We provide configurations for two TIR variants:
+
+*   **Using LIMO:** This variant ([`tir-limo.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-limo.yaml)) uses the [LIMO model](https://huggingface.co/GAIR/LIMO) and includes strict filtering steps based on code fragment novelty and significance. Run with:
+    ```bash
+    python recipes/openmathreasoning/pipelines/solution_generation.py --mode tir-limo
+    ```
+*   **Using OpenMath-Nemotron:** This variant ([`tir-openmath.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-openmath.yaml)) uses our [OpenMath-Nemotron-14B model](https://huggingface.co/nvidia/OpenMath-Nemotron-14B). It produces solutions with higher-quality Python code, requiring less strict filtering. Run with:
+    ```bash
+    python recipes/openmathreasoning/pipelines/solution_generation.py --mode tir-openmath
+    ```
+
+You can specify a subset of stages using the `--stages` argument for either mode.

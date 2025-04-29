@@ -3,6 +3,7 @@ base_output_dir: /workspace/openmathreasoning-demo
 expname: openmathreasoning-demo
 suffix: nim  # Suffix for experiment names
 
+
 # this is really .jsonl, but we gitignore it, so changing extension
 input_file: /nemo_run/code/recipes/openmathreasoning/configs/problem_sdg/example-data.txt
 
@@ -37,12 +38,12 @@ pipeline_stages:
   - decontaminate
 
 directories:
-  step-1-extract-problems: ${base_output_dir}/problem_sdg/step-1-extract-problems
-  step-2-classify-problems: ${base_output_dir}/problem_sdg/step-2-classify-problems
-  step-3-extract-answers: ${base_output_dir}/problem_sdg/step-3-extract-answers
-  step-4-convert-proofs: ${base_output_dir}/problem_sdg/step-4-convert-proofs
-  step-5-merge-data: ${base_output_dir}/problem_sdg/step-5-merge-data
-  step-6-decontaminate: ${base_output_dir}/problem_sdg/step-6-decontamination
+  step-1-extract-problems: ${base_output_dir}/problem-sdg/step-1-extract-problems
+  step-2-classify-problems: ${base_output_dir}/problem-sdg/step-2-classify-problems
+  step-3-extract-answers: ${base_output_dir}/problem-sdg/step-3-extract-answers
+  step-4-convert-proofs: ${base_output_dir}/problem-sdg/step-4-convert-proofs
+  step-5-merge-data: ${base_output_dir}/problem-sdg/step-5-merge-data
+  step-6-decontaminate: ${base_output_dir}/problem-sdg/step-6-decontamination
 
 # Stage-specific configurations
 stages:

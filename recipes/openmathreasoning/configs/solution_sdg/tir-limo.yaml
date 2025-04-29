@@ -5,13 +5,13 @@ suffix: tir-limo
 
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
-input_file: ${base_output_dir}/problem_sdg/step-5-merge-data/all-problems.jsonl
+input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
-contamination_file: ${base_output_dir}/problem_sdg/step-6-decontamination/contamination-labeled.jsonl
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of solutions per each problem from the input file to generate
 num_random_seeds_to_generate: 16
 # Can define initial dependency for the `generate_solutions` stage to run after
-initial_dependency: ${expname}-merge-data
+initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
@@ -39,15 +39,15 @@ pipeline_stages:
 
 # Directory structure configuration
 directories:
-  step-1-generate-solutions: "${base_output_dir}/step-1-generate-solutions"
-  step-2-fill-majority: "${base_output_dir}/step-2-fill-majority"
-  step-3-judge-answers: "${base_output_dir}/step-3-judge-answers"
-  step-4-preprocess-tir: "${base_output_dir}/step-4-preprocess-tir"
-  step-5-extract-fragments: "${base_output_dir}/step-5-extract-fragments"
-  step-6-judge-novelty: "${base_output_dir}/step-6-judge-novelty"
-  step-7-judge-significance: "${base_output_dir}/step-7-judge-significance"
-  step-8-filter-fragments: "${base_output_dir}/step-8-filter-fragments"
-  step-9-prepare-sft: "${base_output_dir}/step-9-prepare-sft"
+  step-1-generate-solutions: "${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions"
+  step-2-fill-majority: "${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority"
+  step-3-judge-answers: "${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers"
+  step-4-preprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-preprocess-tir"
+  step-5-extract-fragments: "${base_output_dir}/solution-sdg-${suffix}/step-5-extract-fragments"
+  step-6-judge-novelty: "${base_output_dir}/solution-sdg-${suffix}/step-6-judge-novelty"
+  step-7-judge-significance: "${base_output_dir}/solution-sdg-${suffix}/step-7-judge-significance"
+  step-8-filter-fragments: "${base_output_dir}/solution-sdg-${suffix}/step-8-filter-fragments"
+  step-9-prepare-sft: "${base_output_dir}/solution-sdg-${suffix}/step-9-prepare-sft"
 
 # Stage-specific configurations
 stages:
@@ -77,6 +77,8 @@ stages:
   fill_majority_answer:
     output_dir: ${directories.step-2-fill-majority}
     input_dir: ${directories.step-1-generate-solutions}
+    dependencies:
+      - generate_solutions
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -84,6 +86,8 @@ stages:
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
     input_dir: ${directories.step-2-fill-majority}
+    dependencies:
+      - fill_majority_answer
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs:
       <<: *generate_kwargs
@@ -95,6 +99,8 @@ stages:
     code_end: "```\n"
     new_code_begin: "<tool_call>\n"
     new_code_end: "</tool_call>\n"
+    dependencies:
+      - judge_answers
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -105,6 +111,8 @@ stages:
     window_size: 1500
     code_begin: "<tool_call>\n"
     code_end: "</tool_call>\n"
+    dependencies:
+      - preprocess_tir_generations
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
@@ -114,6 +122,8 @@ stages:
     input_dir: ${directories.step-5-extract-fragments}
     prompt_template: qwen-instruct
     prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml
+    dependencies:
+      - extract_python_fragments
     stage_kwargs:
       <<: *generate_kwargs
       num_random_seeds: 8 # Use more random seeds for a more "stable" judgement
@@ -124,6 +134,8 @@ stages:
     input_dir: ${directories.step-5-extract-fragments}
     prompt_template: qwen-instruct
     prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-significance.yaml
+    dependencies:
+      - extract_python_fragments
     stage_kwargs:
       <<: *generate_kwargs
       num_random_seeds: 8 # Use more random seeds for a more "stable" judgement
@@ -133,16 +145,21 @@ stages:
     output_dir: ${directories.step-8-filter-fragments}
     novelty_dir: ${directories.step-6-judge-novelty}
     significance_dir: ${directories.step-7-judge-significance}
+    dependencies:
+      - judge_novelty
+      - judge_significance
     # You can use CPU partition for this script, if available
     stage_kwargs:
       partition: cpu
 
   prepare_for_sft:
     output_dir: ${directories.step-9-prepare-sft}
-    input_dir: ${directories.step-8-filter-fragments}
+    input_file: ${directories.step-8-filter-fragments}/filtered_output.jsonl
     prompt_config: generic/math
     prompt_template: qwen-instruct
     contamination_file: ${contamination_file}
+    dependencies:
+      - filter_fragments
     inline_args: >-
       ++filters.remove_matplotlib=true
     # You can use CPU partition for this script, if available

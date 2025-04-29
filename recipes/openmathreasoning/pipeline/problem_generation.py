@@ -108,7 +108,7 @@ def extract_answers(cluster, expname, run_after, stage_config, **kwargs):
         output_dir=output_dir,
         postprocess_cmd=postprocess_cmd,
         expname=expname,
-        run_after=run_after,
+        run_after=f"{run_after[0]}-invalid",
         **stage_config.get('stage_kwargs', {}),
     )
 
@@ -134,7 +134,7 @@ def convert_proofs(cluster, expname, run_after, stage_config, **kwargs):
         output_dir=output_dir,
         postprocess_cmd=postprocess_cmd,
         expname=expname,
-        run_after=run_after,
+        run_after=f"{run_after[0]}-proof",
         **stage_config.get('stage_kwargs', {}),
     )
 
@@ -282,34 +282,20 @@ if __name__ == '__main__':
         
         current_expname = get_stage_expname(expname_base, stage, suffix)
         
-        # --- Calculate Dependencies based on full_stage_sequence ---
-        run_after_for_this_stage = None
-        current_stage_index = full_stage_sequence.index(stage)
+        dep_stages = stage_config.get('dependencies', None)
+        dependencies = None
+        if dep_stages is not None:
+            dependencies = [
+                get_stage_expname(expname_base, dep_stage, suffix)
+                for dep_stage in dep_stages
+            ]
         
-        if current_stage_index == 0:
-            # First stage has no dependency
-            run_after_for_this_stage = None
-        else:
-            # Standard linear dependency
-            predecessor_stage = full_stage_sequence[current_stage_index - 1]
-            
-            # Special case for merge_data which depends on both extract_answers and convert_proofs
-            if stage == 'merge_data' and 'dependencies' in stage_config:
-                dep_stages = stage_config['dependencies']
-                dependencies = [
-                    get_stage_expname(expname_base, dep_stage, suffix)
-                    for dep_stage in dep_stages
-                ]
-                run_after_for_this_stage = dependencies
-            else:
-                run_after_for_this_stage = get_stage_expname(expname_base, predecessor_stage, suffix)
-        
-        print(f"Dependency for '{stage}': {run_after_for_this_stage}")
+        print(f"Dependency for '{stage}': {dependencies}")
         
         stage_args = {
             'cluster': cluster,
             'expname': current_expname,
-            'run_after': run_after_for_this_stage,
+            'run_after': dependencies,
             'stage_config': stage_config,
         }
         

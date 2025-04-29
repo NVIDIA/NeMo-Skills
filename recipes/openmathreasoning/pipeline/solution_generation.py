@@ -311,7 +311,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config_path = config_dir / f"{args.mode}.yaml"
-    config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
+    config = OmegaConf.to_container(
+        OmegaConf.load(config_path), resolve=True,
+        structured_config_mode="dict"
+    )
     
     if 'pipeline_stages' not in config or not config['pipeline_stages']:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
@@ -349,36 +352,44 @@ if __name__ == '__main__':
         
         current_expname = get_stage_expname(expname_base, stage, suffix)
 
-        # --- Calculate Dependencies based on full_stage_sequence ---
-        run_after_for_this_stage = None
-        current_stage_index = full_stage_sequence.index(stage)
-
-        if stage == 'judge_novelty' or stage == 'judge_significance':
-            # Depend on 'extract_python_fragments'
-            dep_stage = 'extract_python_fragments'
-            run_after_for_this_stage = get_stage_expname(expname_base, dep_stage, suffix)
-        elif stage == 'filter_fragments':
-            # Depend on 'judge_novelty' and 'judge_significance'
-            dep_stages = ['judge_novelty', 'judge_significance']
+        dep_stages = stage_config.get('dependencies')
+        if dep_stages is not None:
             dependencies = [
                 get_stage_expname(expname_base, dep_stage, suffix)
                 for dep_stage in dep_stages
             ]
-            run_after_for_this_stage = dependencies
-        elif current_stage_index == 0:
-            # First stage in the defined sequence
-            run_after_for_this_stage = config.get('initial_dependency', f"{expname_base}-merge-data")
         else:
-            # Standard linear dependency
-            predecessor_stage = full_stage_sequence[current_stage_index - 1]
-            run_after_for_this_stage = get_stage_expname(expname_base, predecessor_stage, suffix)
+            dependencies = config.get('initial_dependency', None)
+        # # --- Calculate Dependencies based on full_stage_sequence ---
+        # run_after_for_this_stage = None
+        # current_stage_index = full_stage_sequence.index(stage)
+
+        # if stage == 'judge_novelty' or stage == 'judge_significance':
+        #     # Depend on 'extract_python_fragments'
+        #     dep_stage = 'extract_python_fragments'
+        #     run_after_for_this_stage = get_stage_expname(expname_base, dep_stage, suffix)
+        # elif stage == 'filter_fragments':
+        #     # Depend on 'judge_novelty' and 'judge_significance'
+        #     dep_stages = ['judge_novelty', 'judge_significance']
+        #     dependencies = [
+        #         get_stage_expname(expname_base, dep_stage, suffix)
+        #         for dep_stage in dep_stages
+        #     ]
+        #     run_after_for_this_stage = dependencies
+        # elif current_stage_index == 0:
+        #     # First stage in the defined sequence
+        #     run_after_for_this_stage = config.get('initial_dependency', f"{expname_base}-merge-data")
+        # else:
+        #     # Standard linear dependency
+        #     predecessor_stage = full_stage_sequence[current_stage_index - 1]
+        #     run_after_for_this_stage = get_stage_expname(expname_base, predecessor_stage, suffix)
         
-        print(f"Dependency for '{stage}': {run_after_for_this_stage}")
+        print(f"Dependency for '{stage}': {dependencies}")
 
         stage_args = {
             'cluster': cluster,
             'expname': current_expname,
-            'run_after': run_after_for_this_stage,
+            'run_after': dependencies,
             'stage_config': stage_config,
         }
 
