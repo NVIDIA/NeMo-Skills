@@ -14,7 +14,6 @@
 
 
 import copy
-import json
 import logging
 import re
 import time
@@ -33,7 +32,7 @@ LOG = logging.getLogger(__name__)
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
-    max_code_executions: int = 8
+    max_code_executions: int | None = 8 # if None, will take this value from the prompt
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
 
@@ -86,6 +85,16 @@ class CodeExecutionWrapper:
 
         if stop_phrases is None:
             stop_phrases = []
+
+        max_code_executions = self.config.max_code_executions
+        if max_code_executions is None:
+            # Assuming that openmath/math-tir prompt is used
+            code_executions = re.search(r"You may perform up to (\d+) Python code calls")
+            if not code_executions:
+                raise ValueError(
+                    "`max_code_executions` set to None in the config, failed to extract the value from the prompt"
+                )
+            max_code_executions = code_executions.group(1)
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
 
@@ -110,7 +119,7 @@ class CodeExecutionWrapper:
         code_execution_time = 0
         stopped_on_repetition = False
         # adding plus one to make sure there is always some completion after the last requested code block
-        for generation_index in range(self.config.max_code_executions + 1):
+        for generation_index in range(max_code_executions + 1):
 
             generation_time_start = time.time()
             if timeout is not None:
@@ -152,7 +161,7 @@ class CodeExecutionWrapper:
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
 
-            if generation_index == self.config.max_code_executions:
+            if generation_index == max_code_executions:
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
@@ -175,7 +184,7 @@ class CodeExecutionWrapper:
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
-                    remaining_code_executions = self.config.max_code_executions - generation_index - 1
+                    remaining_code_executions = max_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
