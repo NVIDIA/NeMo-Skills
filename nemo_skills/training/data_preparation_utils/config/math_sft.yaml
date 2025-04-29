@@ -211,6 +211,10 @@ processors:
         hf_model_name: ${hf_model_name}
         use_chars_for_min_length: ${use_chars_for_min_length}
 
+      - _target_: nemo_skills.training.data_preparation_utils.filters.AddCodeExecutionsCounts
+        should_run: ${add_code_execution_counts}
+        solution_key: ${output_key}
+
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.GroupSamples
     group_key: ${input_key}
 
@@ -218,10 +222,6 @@ processors:
     should_run: ${filters.code_text_filter}
     filter_type: ${filters.code_text_filter}
     prompt_template: ${prompt_template}
-    solution_key: ${output_key}
-
-  - _target_: nemo_skills.training.data_preparation_utils.filters.AddCodeExecutionsCounts
-    should_run: ${add_code_execution_counts}
     solution_key: ${output_key}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
