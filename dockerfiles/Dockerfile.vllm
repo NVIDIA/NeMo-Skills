@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.8.3
+FROM vllm/vllm-openai:v0.8.4
 
 ARG OPENRLHF_COMMIT=9001bc7026517e8f51682978c52cc41eb1d2c563
 RUN cd /opt && git clone https://github.com/Kipok/OpenRLHF && \
