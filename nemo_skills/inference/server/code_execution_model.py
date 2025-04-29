@@ -60,7 +60,7 @@ class CodeExecutionWrapper:
 
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str,
         code_begin: str,
         code_end: str,
         code_output_begin: str,
@@ -89,7 +89,7 @@ class CodeExecutionWrapper:
         max_code_executions = self.config.max_code_executions
         if max_code_executions is None:
             # Assuming that openmath/math-tir prompt is used
-            code_executions = re.search(r"You may perform up to (\d+) Python code calls")
+            code_executions = re.search(r"You may perform up to (\d+) Python code calls", prompt)
             if not code_executions:
                 raise ValueError(
                     "`max_code_executions` set to None in the config, failed to extract the value from the prompt"
