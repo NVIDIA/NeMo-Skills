@@ -13,6 +13,9 @@ skip_first: 0  # useful for skipping validation set from train_full generation (
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
 use_judgement: false  # if True, uses judgement instead of is_correct field
+# if True, adds a new field with max allowed code executions to each sample
+# exclude_optional_keys must be set to false in this case
+add_code_execution_counts: false
 
 downsampling_method: null  # fair, random or null
 random_seed: 42
@@ -215,6 +218,10 @@ processors:
     should_run: ${filters.code_text_filter}
     filter_type: ${filters.code_text_filter}
     prompt_template: ${prompt_template}
+    solution_key: ${output_key}
+
+  - _target_: nemo_skills.training.data_preparation_utils.filters.AddCodeExecutionsCounts
+    should_run: ${add_code_execution_counts}
     solution_key: ${output_key}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
