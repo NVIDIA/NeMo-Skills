@@ -101,7 +101,7 @@ stages:
   prepare_for_sft:
     output_dir: ${directories.step-5-prepare-sft}
     input_file: ${directories.step-4-preprocess-tir}/preprocessed_output.jsonl
-    prompt_config: openmath/math-tir
+    prompt_config: openmath/tir
     prompt_template: openmath-instruct
     contamination_file: ${contamination_file}
     dependencies:
