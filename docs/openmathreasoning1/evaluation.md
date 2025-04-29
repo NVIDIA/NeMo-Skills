@@ -186,7 +186,7 @@ ns eval \
     --num_jobs=1 \
     --skip_greedy \
     ++prompt_template=openmath-instruct \
-    ++prompt_config=openmath/math-tir \
+    ++prompt_config=openmath/tir \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++code_execution=true \
