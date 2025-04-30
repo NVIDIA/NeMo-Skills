@@ -19,8 +19,7 @@ huggingface-cli download nvidia/OpenMath2-Llama3.1-8B --local-dir OpenMath2-Llam
 
 Convert the model to TensorRT-LLM format. This is optional, but highly recommended for more exact
 results and faster inference. If you skip it, replace `--server_type trtllm` with `--server-type vllm`
-in the commands below and change model path to `/workspace/OpenMath2-Llama3.1-8B`. You might also need
-to set smaller batch size for vllm.
+in the commands below and change model path to `/workspace/OpenMath2-Llama3.1-8B`.
 
 ```bash
 ns convert \

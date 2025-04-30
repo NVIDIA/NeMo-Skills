@@ -87,7 +87,7 @@ def prepare_for_sft(output_dir, suffix, cluster, expname, extra_args="", **gener
         f"    ++filters.remove_len_outlier_problems=false "
         f"    ++filters.remove_len_outlier_solutions=false "
         f"    ++use_judgement=true "
-        f"    ++contamination_file={output_dir}/contamination-labeled.jsonl "
+        f"    ++contamination_file={output_dir}/contamination-labeled.jsonl {extra_args}"
     )
     run_cmd(
         ctx=wrap_arguments(cmd),
@@ -114,7 +114,7 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['demo', 'full-qwq', 'full-r1'],  # TODO: add tir mode
+        choices=['demo', 'full-qwq', 'full-r1', 'full-tir-stage-1'],
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
@@ -162,4 +162,7 @@ if __name__ == '__main__':
                 expname=config['expname'],
                 **config['solution_sdg']['judge'],
             )
+        if stage == 'prepare_for_sft':
+            stage_args['extra_args'] = config['solution_sdg']['prepare_for_sft']['extra_args']
+
         stages_map[stage](**stage_args)
