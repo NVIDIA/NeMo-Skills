@@ -35,10 +35,10 @@ pipeline_stages:
 
 # Directory structure configuration
 directories:
-  step-1-generate-solutions: ${base_output_dir}/solution-sdg-${suffx}/step-1-generate-solutions
-  step-2-fill-majority: ${base_output_dir}/solution-sdg-${suffx}/step-2-fill-majority
-  step-3-judge-answers: ${base_output_dir}/solution-sdg-${suffx}/step-3-judge-answers
-  step-4-prepare-sft: ${base_output_dir}/solution-sdg-${suffx}/step-4-prepare-sft
+  step-1-generate-solutions: ${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions
+  step-2-fill-majority: ${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority
+  step-3-judge-answers: ${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers
+  step-4-prepare-sft: ${base_output_dir}/solution-sdg-${suffix}/step-4-prepare-sft
 
 # Stage-specific configurations
 stages:

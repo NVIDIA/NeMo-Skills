@@ -221,7 +221,7 @@ def filter_fragments(cluster, expname, run_after, stage_config, **kwargs):
         log_dir=f"{output_dir}/logs",
         expname=expname,
         run_after=run_after,
-        **stage_config.get("stage_kwargs"),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -261,7 +261,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         log_dir=f"{output_dir}/logs",
         expname=expname,
         run_after=run_after,
-        **stage_config.get("stage_kwargs"),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
