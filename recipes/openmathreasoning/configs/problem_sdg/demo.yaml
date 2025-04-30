@@ -1,6 +1,6 @@
 cluster: local
 base_output_dir: /workspace/openmathreasoning-demo
-expname: openmathreasoning-demo
+expname: omr-demo
 suffix: nim  # Suffix for experiment names
 
 
@@ -50,6 +50,7 @@ stages:
   extract_problems:
     output_dir: ${directories.step-1-extract-problems}
     input_file: ${input_file}
+    dependencies: null
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
@@ -57,18 +58,24 @@ stages:
     output_dir: ${directories.step-2-classify-problems}
     input_file: ${directories.step-1-extract-problems}/extracted-problems.jsonl
     modes: ['proof', 'mcq', 'binary', 'invalid']
+    dependencies:
+      - extract_problems
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
   extract_answers:
     output_dir: ${directories.step-3-extract-answers}
     input_file: ${directories.step-2-classify-problems}/invalid/no.jsonl
+    dependencies:
+      - classify_problems
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
   convert_proofs:
     output_dir: ${directories.step-4-convert-proofs}
     input_file: ${directories.step-2-classify-problems}/proof/yes.jsonl
+    dependencies:
+      - classify_problems
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
@@ -76,12 +83,16 @@ stages:
     output_dir: ${directories.step-5-merge-data}
     proofs_file: ${directories.step-4-convert-proofs}/converted-proofs.jsonl
     answers_file: ${directories.step-3-extract-answers}/extracted-answers.jsonl
-    dependencies: ['extract_answers', 'convert_proofs']
+    dependencies:
+      - extract_answers
+      - convert_proofs
 
   decontaminate:
     output_dir: ${directories.step-6-decontaminate}
     input_file: ${directories.step-5-merge-data}/all-problems.jsonl
     output_file: ${directories.step-6-decontaminate}/contamination-labeled.jsonl
     datasets: ${decontamination_datasets}
+    dependencies:
+      - merge_data
     inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}

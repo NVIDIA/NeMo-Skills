@@ -53,8 +53,8 @@ def classify_problems(cluster, expname, run_after, stage_config, **kwargs):
     """Classifies extracted problems into different types (proof, mcq, binary, invalid)."""
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
-    
     modes = stage_config["modes"]
+    
     current_run_after = run_after
     current_input_file = input_file
     
@@ -146,7 +146,7 @@ def merge_data(cluster, expname, run_after, stage_config, **kwargs):
     answers_file = stage_config["answers_file"]
     output_file = f"{output_dir}/all-problems.jsonl"
     
-    cmd = f"cat {proofs_file} {answers_file} > {output_file}"
+    cmd = f"mkdir -p {output_dir} && cat {proofs_file} {answers_file} > {output_file}"
     
     run_cmd(
         ctx=wrap_arguments(cmd),
@@ -170,7 +170,7 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     ])
 
     # First step: retrieve similar problems
-    retrieval_expname = f"{expname}-retrieve-similar"
+    retrieval_expname = f"{expname}-1"
     retrieval_cmd = (
         f"python -m nemo_skills.inference.retrieve_similar "
         f"   ++retrieve_from=\\\'{datasets_paths}\\\' "
@@ -190,7 +190,7 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     )
     
     # Second step: check contamination
-    check_contamination_expname = f"{expname}-check-contamination"
+    check_contamination_expname = f"{expname}-2"
     
     check_contamination(
         ctx=wrap_arguments(stage_config.get('inline_args', '')),

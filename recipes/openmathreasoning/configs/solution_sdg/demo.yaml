@@ -1,6 +1,6 @@
 cluster: local
 base_output_dir: /workspace/openmathreasoning-demo
-expname: openmathreasoning-demo
+expname: omr-demo
 suffix: nim  # Suffix for experiment names
 
 
