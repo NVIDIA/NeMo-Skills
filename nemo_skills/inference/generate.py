@@ -133,9 +133,10 @@ class GenerateSolutionsConfig:
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
             self.total_code_executions_in_prompt = list(self.total_code_executions_in_prompt)
 
-        if not isinstance(self.total_code_executions_in_prompt, (int, list, tuple)):
+        if (self.total_code_executions_in_prompt is not None and 
+                not isinstance(self.total_code_executions_in_prompt, (int, list, tuple))):
             raise ValueError(
-                "`total_code_executions_in_prompt` must be either int, list or tuple, "
+                "`total_code_executions_in_prompt` must be either int, list, tuple, or None, "
                 f"got {type(self.total_code_executions_in_prompt)}"
             )
 
