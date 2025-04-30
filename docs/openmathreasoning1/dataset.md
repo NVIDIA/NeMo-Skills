@@ -174,7 +174,7 @@ focuses on generating solutions that leverage external tools, more specifically,
 2.  [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
     for problems without ground-truth answers (`fill_majority_answer` stage).
 3.  [Judge answers using an LLM](../pipelines/llm-as-a-judge.md), comparing the final answer to the ground-truth or majority answer (`judge_answers` stage).
-4.  Preprocess generations, including filtering and potentially standardizing code block formats (`preprocess_tir_generations` stage).
+4.  Postprocess generations, including filtering and potentially standardizing code block formats (`postprocess_tir_generations` stage).
 5.  [Optional] Extract Python code fragments from solutions (`extract_python_fragments`).
 6.  [Optional] Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
 7.  [Optional] Filter fragments based on novelty/significance scores (`filter_fragments`).

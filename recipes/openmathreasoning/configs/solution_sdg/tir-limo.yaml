@@ -31,7 +31,7 @@ pipeline_stages:
   - generate_solutions          # Generate initial TIR solutions
   - fill_majority_answer        # Fill missing ground truth answers if any
   - judge_answers               # Judge correctness based on final answer
-  - preprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
+  - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
   - extract_python_fragments    # Extract python fragments for novelty/significance judgement
   - judge_novelty               # Judge the novelty of extracted fragments
   - judge_significance          # Judge the significance of extracted fragments
@@ -43,7 +43,7 @@ directories:
   step-1-generate-solutions: "${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions"
   step-2-fill-majority: "${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority"
   step-3-judge-answers: "${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers"
-  step-4-preprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-preprocess-tir"
+  step-4-postprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-postprocess-tir"
   step-5-extract-fragments: "${base_output_dir}/solution-sdg-${suffix}/step-5-extract-fragments"
   step-6-judge-novelty: "${base_output_dir}/solution-sdg-${suffix}/step-6-judge-novelty"
   step-7-judge-significance: "${base_output_dir}/solution-sdg-${suffix}/step-7-judge-significance"
@@ -93,8 +93,8 @@ stages:
     stage_kwargs:
       <<: *generate_kwargs
 
-  preprocess_tir_generations:
-    output_dir: ${directories.step-4-preprocess-tir}
+  postprocess_tir_generations:
+    output_dir: ${directories.step-4-postprocess-tir}
     input_dir: ${directories.step-3-judge-answers}
     code_begin: "```python\n"
     code_end: "```\n"
@@ -108,12 +108,12 @@ stages:
 
   extract_python_fragments:
     output_dir: ${directories.step-5-extract-fragments}
-    input_dir: ${directories.step-4-preprocess-tir}
+    input_dir: ${directories.step-4-postprocess-tir}
     window_size: 1500
     code_begin: "<tool_call>\n"
     code_end: "</tool_call>\n"
     dependencies:
-      - preprocess_tir_generations
+      - postprocess_tir_generations
     # You can use CPU partition for this script, if available
     # stage_kwargs:
     #   partition: cpu

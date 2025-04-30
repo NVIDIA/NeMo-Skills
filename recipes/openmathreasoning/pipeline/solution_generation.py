@@ -83,10 +83,10 @@ def judge_answers(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
-def preprocess_tir_generations(cluster, expname, run_after, stage_config, **kwargs):
+def postprocess_tir_generations(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
-    output_file = f"{output_dir}/preprocessed_output.jsonl"
+    output_file = f"{output_dir}/postprocessed_output.jsonl"
     
     code_begin = stage_config.get('code_begin')
     code_end = stage_config.get('code_end')
@@ -94,7 +94,7 @@ def preprocess_tir_generations(cluster, expname, run_after, stage_config, **kwar
     new_code_end = stage_config.get('new_code_end')
 
     cmd = (
-        f"python /nemo_run/code/recipes/openmathreasoning/scripts/preprocess_tir_generations.py "
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/postprocess_tir_generations.py "
         f"    --input_files '{input_dir}/output-rs*.jsonl' "
         f"    --output_file {output_file} "
         f"    --code_begin '{code_begin}' "
@@ -116,7 +116,7 @@ def extract_python_fragments(cluster, expname, run_after, stage_config, **kwargs
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
     
-    input_file = f"{input_dir}/preprocessed_output.jsonl"
+    input_file = f"{input_dir}/postprocessed_output.jsonl"
     output_file = f"{output_dir}/output_fragments.jsonl"
     
     code_begin = stage_config.get('code_begin')
@@ -281,7 +281,7 @@ stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
     'judge_answers': judge_answers,
-    'preprocess_tir_generations': preprocess_tir_generations,
+    'postprocess_tir_generations': postprocess_tir_generations,
     'extract_python_fragments': extract_python_fragments,
     'judge_novelty': judge_novelty,
     'judge_significance': judge_significance,
