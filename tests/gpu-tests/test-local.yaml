@@ -16,7 +16,7 @@ executor: local
 
 containers:
   trtllm: igitman/nemo-skills-trtllm:0.6.0
-  vllm: igitman/nemo-skills-vllm:0.6.0
+  vllm: vllm/vllm-openai:v0.8.5
   sglang: igitman/nemo-skills-sglang:0.6.0
   nemo: igitman/nemo-skills-nemo:0.6.0
   sandbox: igitman/nemo-skills-sandbox:0.6.0
