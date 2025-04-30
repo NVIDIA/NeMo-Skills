@@ -168,27 +168,21 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 ## TIR solution generation pipeline
 
 [Tool-Integrated Reasoning (TIR) solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/solution_generation.py)
-focuses on generating solutions that leverage external tools, more specifically, a Python interpreter. This pipeline also consists of several stages:
+focuses on generating solutions that leverage external tools, more specifically, a Python interpreter. This pipeline consists of several stages, some of which are optional:
 
 1.  [Generate solutions](../pipelines/generation.md) using a TIR-capable model (`generate_solutions` stage). These solutions interleave reasoning steps with executable code blocks.
 2.  [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
     for problems without ground-truth answers (`fill_majority_answer` stage).
 3.  [Judge answers using an LLM](../pipelines/llm-as-a-judge.md), comparing the final answer to the ground-truth or majority answer (`judge_answers` stage).
 4.  Preprocess generations, including filtering and potentially standardizing code block formats (`preprocess_tir_generations` stage).
-
-## 
-Optional filtering stages, that we use only for LIMO generations.
-
-5. Extract Python code fragments from solutions (`extract_python_fragments`).
-6. Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
-7. Filter fragments based on novelty/significance scores (`filter_fragments`).
-## 
-
+5.  [Optional] Extract Python code fragments from solutions (`extract_python_fragments`).
+6.  [Optional] Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
+7.  [Optional] Filter fragments based on novelty/significance scores (`filter_fragments`).
 8.  Prepare the final dataset for SFT (`prepare_for_sft` stage).
 
 We provide configurations for two TIR variants:
 
-*   **Using LIMO:** This variant ([`tir-limo.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-limo.yaml)) uses the [LIMO model](https://huggingface.co/GAIR/LIMO) and includes strict filtering steps based on code fragment novelty and significance. Run with:
+*   **Using LIMO:** This variant ([`tir-limo.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-limo.yaml)) uses the [LIMO model](https://huggingface.co/GAIR/LIMO) and includes strict filtering steps based on code fragment novelty and significance. These steps are marked with [Optional] in the list above and should typically be run together or skipped together. Run with:
     ```bash
     python recipes/openmathreasoning/pipelines/solution_generation.py --mode tir-limo
     ```
