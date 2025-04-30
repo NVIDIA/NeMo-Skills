@@ -182,11 +182,11 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     run_cmd(
         ctx=wrap_arguments(retrieval_cmd),
         cluster=cluster,
-        num_gpus=1,  # if the data gets really big, might need to run on more gpus
         container="nemo",  # just need pytorch
         log_dir=f"{output_dir}/logs",
         expname=retrieval_expname,
         run_after=run_after,
+        **stage_config.get('retrieve_similar_kwargs', {})
     )
     
     # Second step: check contamination

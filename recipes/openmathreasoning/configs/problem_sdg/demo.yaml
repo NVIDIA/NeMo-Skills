@@ -90,4 +90,8 @@ stages:
     datasets: ${decontamination_datasets}
     dependencies:
       - merge_data
+    # This script runs embedding model locally,
+    # so if there're GPUs available, you can use them
+    # retrieve_similar_kwargs:
+    #   num_gpus: 1
     stage_kwargs: ${generate_kwargs}
