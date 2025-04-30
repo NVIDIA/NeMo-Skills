@@ -243,7 +243,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         raise ValueError("`contamination_file` is not defined in `prepare_for_sft` stage config")
     
     cmd = (
-        f"python -m nemo_skills.training.prepare_data "
+        f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
         f"    ++input_files='{input_file}' "
         f"    ++output_path={output_file} "
         f"    ++prompt_config={prompt_config} "
