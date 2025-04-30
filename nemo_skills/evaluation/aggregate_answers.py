@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +14,9 @@
 
 import json
 import logging
-import shutil
 import sys
 from collections import Counter, defaultdict
 from enum import Enum
-from itertools import zip_longest
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -195,15 +193,13 @@ class TopAnswerProcessor:
         cfg = self.cfg
         new_answers = []
         all_predictions = []
-        for idx, predictions in enumerate(tqdm(zip_longest(*self.input_file_handles, fillvalue="{}"))):
+        for idx, predictions in enumerate(tqdm(zip(*self.input_file_handles, strict=True))):
             data = read_predictions(predictions, idx, self.input_file_handles)
 
             # Store the metadata about correctness and judgement for each answer
             # Useful when extracting the top answer
             answer_to_metadata = {}
             for elem in data:
-                if not elem:
-                    continue
                 if 'predicted_answer' not in elem:
                     elem['predicted_answer'] = extract_answer(elem['generation'])
                 if elem['predicted_answer'] is not None:
@@ -218,7 +214,7 @@ class TopAnswerProcessor:
                 valid_answers_and_scores = [
                     (elem['predicted_answer'], elem['reward_model_score'])
                     for elem in data
-                    if elem and elem['predicted_answer'] is not None
+                    if elem['predicted_answer'] is not None
                 ]
                 new_answers.append(("no_valid_answer_found", 0, None, None))
                 if len(valid_answers_and_scores) == 0:
@@ -241,7 +237,7 @@ class TopAnswerProcessor:
             else:
                 # Perform majority voting
                 # TODO: currently majority does not take into account equivalent answers written in a different way
-                valid_answers = [elem['predicted_answer'] for elem in data if elem and elem['predicted_answer'] is not None]
+                valid_answers = [elem['predicted_answer'] for elem in data if elem['predicted_answer'] is not None]
                 new_answers.append(("no_valid_answer_found", (0, len(self.input_file_handles)), None, None))
                 if len(valid_answers) == 0:
                     continue
@@ -266,8 +262,6 @@ class TopAnswerProcessor:
         for idx, predictions in enumerate(all_predictions):
             changed = False
             for fidx, handle in enumerate(self.output_file_handles):
-                if not predictions[fidx]:
-                    continue
                 if cfg.ignore_if_not_none and predictions[fidx].get(cfg.fill_key):
                     handle.write(json.dumps(predictions[fidx]) + "\n")
                     continue
