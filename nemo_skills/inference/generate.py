@@ -376,7 +376,7 @@ class GenerationTask:
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 max_code_executions_values = [
-                    dp.get('total_code_executions') for dp in data_points
+                    dp['total_code_executions'] for dp in data_points
                 ]
                 generation_params['max_code_executions'] = max_code_executions_values
 
