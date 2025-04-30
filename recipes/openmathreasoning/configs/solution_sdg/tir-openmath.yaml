@@ -1,0 +1,117 @@
+cluster: slurm
+base_output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
+suffix: tir-openmath  # Suffix for experiment names
+
+
+# Input file for the first stage (generate_solutions)
+# This should be the output of the problem_generation.py pipeline
+input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
+# File with benchmark problems you want decontaminate with
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
+# Number of solutions per each problem from the input file to generate
+num_random_seeds_to_generate: 16
+# Can define initial dependency for the `generate_solutions` stage to run after
+initial_dependency: ${expname}-merge-data-qwen-instruct
+
+# Define judge model server parameters
+generate_kwargs: &generate_kwargs
+  # Model to be used for answer judgement
+  model: /trt_models/qwen2.5-32b-instruct
+  # Server type to launch the model
+  server_type: trtllm
+  # Server parameters
+  server_gpus: 8
+  server_nodes: 1
+  # Number of generated solutions per problem to judge
+  num_random_seeds: ${num_random_seeds_to_generate}
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - generate_solutions          # Generate initial TIR solutions
+  - fill_majority_answer        # Fill missing ground truth answers if any
+  - judge_answers               # Judge correctness based on final answer
+  - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
+  - prepare_for_sft             # Prepare the final dataset for SFT training
+
+# Directory structure configuration
+directories:
+  step-1-generate-solutions: "${base_output_dir}/solution-sdg-${suffix}/step-1-generate-solutions"
+  step-2-fill-majority: "${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority"
+  step-3-judge-answers: "${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers"
+  step-4-postprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-postprocess-tir"
+  step-5-prepare-sft: "${base_output_dir}/solution-sdg-${suffix}/step-5-prepare-sft"
+
+# Stage-specific configurations
+stages:
+  generate_solutions:
+    output_dir: ${directories.step-1-generate-solutions}
+    input_file: ${input_file}
+    # Arguments passed inside the generate context string (e.g., ++param=value)
+    inline_args: >-
+      ++prompt_config=openmath/tir
+      ++prompt_template=openmath-instruct
+      ++inference.tokens_to_generate=16384
+      ++code_execution=true
+      ++server.code_execution.max_code_executions=null
+      ++server.code_execution.add_remaining_code_executions=true
+      ++total_code_executions_in_prompt='[1, 8]'
+      ++override_max_code_executions=true
+    # Arguments passed as kwargs to the pipeline function (e.g. generate())
+    stage_kwargs:
+      # you can take our published model from HF and use it as data generator
+      # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
+      model: /trt_models/openmath-nemotron-14b
+      with_sandbox: true
+      server_type: trtllm
+      server_gpus: 8
+      server_nodes: 1
+      num_random_seeds: ${num_random_seeds_to_generate}
+      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
+      # dependent_jobs: N
+
+  fill_majority_answer:
+    output_dir: ${directories.step-2-fill-majority}
+    input_dir: ${directories.step-1-generate-solutions}
+    dependencies:
+      - generate_solutions
+    # You can use CPU partition for this script, if available
+    # stage_kwargs:
+    #   partition: cpu
+
+  judge_answers:
+    output_dir: ${directories.step-3-judge-answers}
+    input_dir: ${directories.step-2-fill-majority}
+    dependencies:
+      - fill_majority_answer
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs:
+      <<: *generate_kwargs
+
+  postprocess_tir_generations:
+    output_dir: ${directories.step-4-postprocess-tir}
+    input_dir: ${directories.step-3-judge-answers}
+    code_begin: "<tool_call>\n"
+    code_end: "</tool_call>\n"
+    dependencies:
+      - judge_answers
+    # You can use CPU partition for this script, if available
+    # stage_kwargs:
+    #   partition: cpu
+
+  prepare_for_sft:
+    output_dir: ${directories.step-5-prepare-sft}
+    input_file: ${directories.step-4-postprocess-tir}/postprocessed_output.jsonl
+    prompt_config: openmath/tir
+    prompt_template: openmath-instruct
+    contamination_file: ${contamination_file}
+    dependencies:
+      - postprocess_tir_generations
+    inline_args: >-
+      ++filters.remove_matplotlib=true
+      ++exclude_optional_keys=false
+      ++add_code_execution_counts=true
+    # You can use CPU partition for this script, if available
+    # stage_kwargs:
+    #   partition: cpu
