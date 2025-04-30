@@ -65,7 +65,6 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_kwargs}
 
   prepare_for_sft:
