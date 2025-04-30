@@ -3,6 +3,7 @@ base_output_dir: /workspace/openmathreasoning
 expname: openmathreasoning
 suffix: tir-limo
 
+
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
 input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
@@ -80,8 +81,8 @@ stages:
     dependencies:
       - generate_solutions
     # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
+    # stage_kwargs:
+    #   partition: cpu
 
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
@@ -102,8 +103,8 @@ stages:
     dependencies:
       - judge_answers
     # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
+    # stage_kwargs:
+    #   partition: cpu
 
   extract_python_fragments:
     output_dir: ${directories.step-5-extract-fragments}
@@ -114,8 +115,8 @@ stages:
     dependencies:
       - preprocess_tir_generations
     # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
+    # stage_kwargs:
+    #   partition: cpu
 
   judge_novelty:
     output_dir: ${directories.step-6-judge-novelty}
@@ -149,8 +150,8 @@ stages:
       - judge_novelty
       - judge_significance
     # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
+    # stage_kwargs:
+    #   partition: cpu
 
   prepare_for_sft:
     output_dir: ${directories.step-9-prepare-sft}
@@ -163,5 +164,5 @@ stages:
     inline_args: >-
       ++filters.remove_matplotlib=true
     # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
+    # stage_kwargs:
+    #   partition: cpu

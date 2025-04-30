@@ -1,4 +1,4 @@
-cluster: dfw
+cluster: slurm
 base_output_dir: /workspace/openmathreasoning
 expname: openmathreasoning
 suffix: qwen-instruct  # Suffix for experiment names
@@ -16,7 +16,7 @@ generate_kwargs:
   # Server parameters
   server_gpus: 8
   server_nodes: 1
-  num_chunks: 1  # Parallelize for large datasets
+  num_chunks: 10  # Parallelize for large datasets
 
 # List of datasets to run problem decontamination with
 decontamination_datasets:
@@ -83,8 +83,9 @@ stages:
     proofs_file: ${directories.step-4-convert-proofs}/converted-proofs.jsonl
     answers_file: ${directories.step-3-extract-answers}/extracted-answers.jsonl
     dependencies: ['extract_answers', 'convert_proofs']
-    stage_kwargs:
-      partition: cpu  # CPU-only task
+    # You can use CPU partition for this script, if available
+    # stage_kwargs:
+    #   partition: cpu
 
   decontaminate:
     output_dir: ${directories.step-6-decontaminate}

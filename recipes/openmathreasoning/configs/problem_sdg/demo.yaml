@@ -77,8 +77,6 @@ stages:
     proofs_file: ${directories.step-4-convert-proofs}/converted-proofs.jsonl
     answers_file: ${directories.step-3-extract-answers}/extracted-answers.jsonl
     dependencies: ['extract_answers', 'convert_proofs']
-    stage_kwargs:
-      partition: cpu  # CPU-only task
 
   decontaminate:
     output_dir: ${directories.step-6-decontaminate}

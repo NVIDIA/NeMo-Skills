@@ -3,6 +3,7 @@ base_output_dir: /workspace/openmathreasoning-demo
 expname: openmathreasoning-demo
 suffix: nim  # Suffix for experiment names
 
+
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
 input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
@@ -58,9 +59,6 @@ stages:
     input_dir: ${directories.step-1-generate-solutions}
     dependencies:
       - generate_solutions
-    # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu
 
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
@@ -78,6 +76,3 @@ stages:
     contamination_file: ${contamination_file}
     dependencies:
       - judge_answers
-    # You can use CPU partition for this script, if available
-    stage_kwargs:
-      partition: cpu

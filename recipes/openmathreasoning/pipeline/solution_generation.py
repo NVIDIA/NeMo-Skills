@@ -360,30 +360,7 @@ if __name__ == '__main__':
             ]
         else:
             dependencies = config.get('initial_dependency', None)
-        # # --- Calculate Dependencies based on full_stage_sequence ---
-        # run_after_for_this_stage = None
-        # current_stage_index = full_stage_sequence.index(stage)
 
-        # if stage == 'judge_novelty' or stage == 'judge_significance':
-        #     # Depend on 'extract_python_fragments'
-        #     dep_stage = 'extract_python_fragments'
-        #     run_after_for_this_stage = get_stage_expname(expname_base, dep_stage, suffix)
-        # elif stage == 'filter_fragments':
-        #     # Depend on 'judge_novelty' and 'judge_significance'
-        #     dep_stages = ['judge_novelty', 'judge_significance']
-        #     dependencies = [
-        #         get_stage_expname(expname_base, dep_stage, suffix)
-        #         for dep_stage in dep_stages
-        #     ]
-        #     run_after_for_this_stage = dependencies
-        # elif current_stage_index == 0:
-        #     # First stage in the defined sequence
-        #     run_after_for_this_stage = config.get('initial_dependency', f"{expname_base}-merge-data")
-        # else:
-        #     # Standard linear dependency
-        #     predecessor_stage = full_stage_sequence[current_stage_index - 1]
-        #     run_after_for_this_stage = get_stage_expname(expname_base, predecessor_stage, suffix)
-        
         print(f"Dependency for '{stage}': {dependencies}")
 
         stage_args = {
