@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
-    max_code_executions: int | None = 8 # if None, will take this value from the prompt
+    max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
 
@@ -77,6 +77,7 @@ class CodeExecutionWrapper:
         top_logprobs: int | None = None,
         gen_id: str = None,  # used for cancelling requests if supported
         timeout: int | None = None,
+        max_code_executions: int | None = None, # if not None, will override self.config.max_code_executions
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
@@ -86,15 +87,10 @@ class CodeExecutionWrapper:
         if stop_phrases is None:
             stop_phrases = []
 
-        max_code_executions = self.config.max_code_executions
-        if max_code_executions is None:
-            # Assuming that openmath/math-tir prompt is used
-            code_executions = re.search(r"You may perform up to (\d+) Python code calls", prompt)
-            if not code_executions:
-                raise ValueError(
-                    "`max_code_executions` set to None in the config, failed to extract the value from the prompt"
-                )
-            max_code_executions = int(code_executions.group(1))
+        effective_max_code_executions = self.config.max_code_executions
+        if max_code_executions is not None:
+            effective_max_code_executions = max_code_executions
+
         # making a copy of prompts to not corrupt original data
         new_prompt = copy.deepcopy(prompt)
 
@@ -119,7 +115,7 @@ class CodeExecutionWrapper:
         code_execution_time = 0
         stopped_on_repetition = False
         # adding plus one to make sure there is always some completion after the last requested code block
-        for generation_index in range(max_code_executions + 1):
+        for generation_index in range(effective_max_code_executions + 1):
 
             generation_time_start = time.time()
             if timeout is not None:
@@ -161,7 +157,7 @@ class CodeExecutionWrapper:
             request['prompt'] += output
             # if it's the extra iteration, we don't execute the code block and just finish
 
-            if generation_index == max_code_executions:
+            if generation_index == effective_max_code_executions:
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
@@ -184,7 +180,7 @@ class CodeExecutionWrapper:
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
-                    remaining_code_executions = max_code_executions - generation_index - 1
+                    remaining_code_executions = effective_max_code_executions - generation_index - 1
                 # adding code output to the prompt
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
@@ -224,6 +220,7 @@ class CodeExecutionWrapper:
         remove_stop_phrases: bool = True,
         top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
+        max_code_executions: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -249,6 +246,7 @@ class CodeExecutionWrapper:
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
             "timeout": timeout,
+            "max_code_executions": max_code_executions,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -344,6 +342,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         timeout: int | list[int] | None = None,
+        max_code_executions: int | list[int] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -366,6 +365,7 @@ class CodeExecutionWrapper:
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
             timeout=timeout,
+            max_code_executions=max_code_executions,
         )
         all_generations = [None] * len(prompts)
         while True:
