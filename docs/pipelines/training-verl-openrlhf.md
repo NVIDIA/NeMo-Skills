@@ -29,8 +29,6 @@
     The documentation here is incomplete and we advise you to open an issue if you
     plan to try something that is not covered below to get additional support.
 
-    For OpenRLHF, please use the following non-default container `vllm: igitman/nemo-skills-vllm:0.5.3`
-
 ## SFT with OpenRLHF
 
 Here is an example of running SFT job with OpenRLHF.
