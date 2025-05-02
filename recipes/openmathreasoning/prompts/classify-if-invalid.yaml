@@ -1,22 +1,31 @@
 user: |-
-  I will provide a problem statement from a math forum. Your task is to determine whether it is a valid, solvable math problem based on the given text.
+  I will provide a problem statement from a math forum. 
+  Your task is to determine whether it is a valid, solvable math problem based on the given text.
 
   Respond with 'not invalid' if the problem meets all of the following conditions:
 
-  1. It is a well-defined math question, such as solving an equation, finding a minimum, computing an expression, or proving a result.
-  2. It contains enough information to be solved using standard mathematical techniques, even if the solution requires advanced concepts (e.g., limits, logarithms, recursion).
-  3. It is not just a conceptual or definitional question (e.g., "What does the notation  mean?" is not a valid math problem).
+  1. It is a well-defined math question, such as solving an equation, 
+     finding a minimum, computing an expression, or proving a result.
+  2. It contains enough information to be solved using standard mathematical techniques, 
+     even if the solution requires advanced concepts (e.g., limits, logarithms, recursion).
+  3. It is not just a conceptual or definitional question 
+     (e.g., "What does the notation  mean?" is not a valid math problem).
   4. It does not rely on external resources such as images or missing context.
 
-  Otherwise, respond with 'invalid', but only if there is a clear and strong reason why the problem cannot be solved. If you are uncertain, default to 'not invalid'.
+  Otherwise, respond with 'invalid', but only if there is a clear and strong reason why the 
+  problem cannot be solved. If you are uncertain, default to 'not invalid'.
 
   Important Notes:
 
   1. The vast majority (>99%) of problems will be valid math problems.
 
-  2. Only extremely rare cases are invalid, such as: Problems relying on external images or missing definitions. Vague or incomplete statements that cannot be interpreted mathematically. Open-ended conceptual discussions rather than problem-solving.
+  2. Only extremely rare cases are invalid, such as: 
+     Problems relying on external images or missing definitions. 
+     Vague or incomplete statements that cannot be interpreted mathematically. 
+     Open-ended conceptual discussions rather than problem-solving.
 
-  3. A problem is still valid even if solving it requires advanced methods like recursion, limits, or logarithms.
+  3. A problem is still valid even if solving it requires advanced 
+     methods like recursion, limits, or logarithms.
 
   4. Do not evaluate whether the problem has a solution or not.
 
