@@ -9,7 +9,8 @@ user: |-
   Example 1
 
   Problem:
-  Prove that the system \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}} 
+  Prove that the system 
+  \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}} 
   has no solutions in integers $x$ , $y$ , and $z$ .
 
   Output:
