@@ -225,6 +225,53 @@ def filter_fragments(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
+def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    input_dir = stage_config["input_dir"]
+    output_dir = stage_config["output_dir"]
+
+    for random_seed in range(stage_config.get("num_soln_random_seeds", 32)):
+        input_file = f"{input_dir}/output-rs{random_seed}.jsonl"
+        cur_output_dir = f"{output_dir}/output-rs{random_seed}"
+
+        generate(
+            ctx=wrap_arguments(
+                f"++input_file={input_file} "
+                f"{stage_config.get('inline_args', '')} "
+            ),
+            cluster=cluster,
+            output_dir=cur_output_dir,
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+
+
+def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    input_dir = stage_config["input_dir"]
+    output_dir = stage_config["output_dir"]
+
+    for random_seed in range(stage_config.get("num_soln_random_seeds", 32)):
+        cur_input_dir = f"{input_dir}/output-rs{random_seed}"
+        cur_output_dir = f"{output_dir}/output-rs{random_seed}"
+        generate(
+            ctx=wrap_arguments(
+                f"++input_dir={cur_input_dir} "
+                f"{stage_config.get('inline_args', '')} "
+            ),
+            cluster=cluster,
+            generation_type="math_judge",
+            output_dir=cur_output_dir,
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+
+
+
+def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    pass
+
+
 def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
@@ -281,12 +328,16 @@ stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
     'judge_answers': judge_answers,
+    # TIR related steps
     'postprocess_tir_generations': postprocess_tir_generations,
     'extract_python_fragments': extract_python_fragments,
     'judge_novelty': judge_novelty,
     'judge_significance': judge_significance,
-    'filter_fragments': filter_fragments, 
-    # TODO: add summary regeneration step
+    'filter_fragments': filter_fragments,
+    # New summary related steps
+    'generate_new_summaries': generate_new_summaries,
+    'judge_new_summaries': judge_new_summaries,
+    'merge_new_summaries': merge_new_summaries,
     'prepare_for_sft': prepare_for_sft,
 }
 

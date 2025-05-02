@@ -24,7 +24,7 @@ def step_1_summarize_solution(cluster, partition, input_file, output_dir):
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
-            f"++prompt_config=/nemo_run/code/recipes/omr1/prompts/summarize-solution.yaml "
+            f"++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml "
             f"++prompt_template=qwen-instruct "
             f"++batch_size=512 "
             f"++inference.temperature=0.7 "
@@ -66,7 +66,6 @@ def step_1_summarize_solution(cluster, partition, input_file, output_dir):
     )
 
     
-
 def step_2_replace_summary():
     START_TAG = "<think>"
     END_TAG = "</think>"
