@@ -136,11 +136,14 @@ def get_mounted_path(cluster_config: dict, path: str):
     Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
 
     Args:
-        cluster_config:
-        path:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
 
     Returns:
+        str: mounted filepath
 
+    Raises:
+        ValueError: if the filepath is not mounted
     """
     if cluster_config["executor"] == "none":
         # no mounts in local executor
