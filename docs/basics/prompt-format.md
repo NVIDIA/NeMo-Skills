@@ -51,7 +51,7 @@ in the included folder. If you provide a full path, we will take the file you sp
 
     If you're using OpenAI server type (models are hosted elsewhere), you cannot provide the template
     as we cannot add any special tokens and have to send the user/assistant messages following the OpenAI API.
-    For all self-hosted models, the template is required.
+    For self-hosted models with TensorRT-LLM, the template is required, but for other servers it's optional.
 
 ## Prompt config
 
