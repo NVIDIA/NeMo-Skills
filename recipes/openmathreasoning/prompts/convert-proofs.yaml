@@ -28,7 +28,9 @@ user: |-
   distinct points with integer coordinates with area $(2^nm)^2$ .
 
   Output:
-  Consider parabolic triangles whose vertices lie on $y = x^2$ with integer coordinates. Let $f(n)$ be the smallest possible value of $c$, where $(0,0)$, $(b,b^2)$, and $(c,c^2)$ are vertices of such a triangle with area exactly $(2^n)^2$, for some integer b where 0 < b < c.
+  Consider parabolic triangles whose vertices lie on $y = x^2$ with integer coordinates. 
+  Let $f(n)$ be the smallest possible value of $c$, where $(0,0)$, $(b,b^2)$, and $(c,c^2)$ are vertices of such a 
+  triangle with area exactly $(2^n)^2$, for some integer b where 0 < b < c.
   Find $f(4)$.
 
 
