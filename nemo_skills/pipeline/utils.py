@@ -121,7 +121,6 @@ def is_mounted_filepath(cluster_config: dict, path: str):
     return False
 
 
-
 def check_if_mounted(cluster_config, path_to_check):
     """Will check that path_to_check is referenced inside one of the mounts."""
     if cluster_config["executor"] == "none":
@@ -130,6 +129,7 @@ def check_if_mounted(cluster_config, path_to_check):
 
     if not is_mounted_filepath(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
+
 
 def get_mounted_path(cluster_config: dict, path: str):
     """
@@ -220,7 +220,7 @@ def get_unmounted_path(cluster_config: dict, path: str):
     mount_source, mount_dest = mount_path.split(':')
 
     # append the rest of the path to the mount source
-    filepath = mount_dest + path[len(mount_source):]
+    filepath = mount_source + path[len(mount_dest) :]  # replace the mount destination with the mount source
 
     return filepath
 
