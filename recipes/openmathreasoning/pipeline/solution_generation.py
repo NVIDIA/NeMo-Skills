@@ -267,9 +267,34 @@ def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
         )
 
 
-
 def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
-    pass
+    reasoning_dir = stage_config["reasoning_dir"]
+    summary_dir = stage_config["summary_dir"]
+    output_dir = stage_config["output_dir"]
+
+
+    for random_seed in range(stage_config.get("num_soln_random_seeds", 32)):
+        cur_reasoning_file = f"{reasoning_dir}/output-rs{random_seed}.jsonl"
+        cur_summary_dir = f"{summary_dir}/output-rs{random_seed}"
+        cur_output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
+
+        cmd = (
+            f"python /nemo_run/code/recipes/openmathreasoning/scripts/merge_new_summary.py "
+            f"    --reasoning_file {cur_reasoning_file} "
+            f"    --summary_dir {cur_summary_dir} "
+            f"    --output_file {cur_output_file} "
+            f"    --start_tag {stage_config.get('start_tag', '<think>')} "
+            f"    --end_tag {stage_config.get('end_tag', '</think>')} "
+        )
+        run_cmd(
+            ctx=wrap_arguments(cmd),
+            cluster=cluster,
+            log_dir=f"{output_dir}/logs",
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+
 
 
 def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
