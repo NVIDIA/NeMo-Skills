@@ -28,7 +28,13 @@ generate_kwargs: &base_generate_kwargs
 
 # Arguments for generating new summaries
 generate_new_summaries_kwargs:
-  <<: *base_generate_kwargs
+  # <<: *base_generate_kwargs
+  model: /trt_models/qwen2.5-32b-instruct
+  # Server type to launch the model
+  server_type: trtllm
+  # Server parameters
+  server_gpus: 8
+  server_nodes: 1
   # Generate 4 new summaries for each solution
   num_random_seeds: 4   
 
@@ -99,6 +105,7 @@ stages:
       ++prompt_template=qwen-instruct 
       ++inference.temperature=0.7 
       ++inference.tokens_to_generate=2048
+    
     stage_kwargs: ${generate_new_summaries_kwargs}
 
   judge_new_summaries:
