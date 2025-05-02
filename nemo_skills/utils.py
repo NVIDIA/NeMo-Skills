@@ -30,6 +30,7 @@ from rich.logging import RichHandler
 from fire import decorators as fire_decorators
 
 # isort: off
+import nemo_skills
 from nemo_skills.file_utils import (
     jdump,
     jload,
@@ -37,7 +38,7 @@ from nemo_skills.file_utils import (
     count_newlines,
     calculate_chunk_indices,
     unroll_files
-)
+)  # noqa # pylint: disable=unused-import
 # isort: on
 
 
@@ -107,7 +108,6 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
 
 def get_skills_root_dir():
     """Get the root directory of the NeMo Skills package."""
-    import nemo_skills
     return os.path.dirname(os.path.dirname(os.path.abspath(nemo_skills.__file__)))
 
 
