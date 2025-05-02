@@ -202,11 +202,11 @@ def get_unmounted_path(cluster_config: dict, path: str):
     mount_path = None
     for mount in get_mounts_from_config(cluster_config):
         mount_source, mount_dest = mount.split(':')
-        if path.startswith(mount_source):
+        if path.startswith(mount_dest):
             mount_path = mount
             break
 
-        elif path.startswith(mount_dest):
+        elif path.startswith(mount_source):
             # already mounted, return immediately
             return path
 
