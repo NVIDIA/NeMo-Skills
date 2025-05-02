@@ -1,4 +1,5 @@
-# Default prompt that does not contain any extra instructions. Can be used for instruction following evals (e.g. ifeval)
+# default prompt for all python based code benchmark evaluations on system prompt.
+# used by models which are trained with this prompt.
 
 system: |-
   You are given a problem for which you need to generate/complete code.

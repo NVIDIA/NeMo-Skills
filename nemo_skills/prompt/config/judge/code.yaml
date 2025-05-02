@@ -12,7 +12,7 @@ user: |
   
   Only look at the function generated, not any examples/print statements etc. Just the core logic.
   
-  Please first briefly describe your reasoning (in less than 30 words) without writing any code, and then write Decision: \\\\boxed{Yes or No} in your last line.
+  Please first briefly describe your reasoning (in less than 30 words) without writing any code, and then write Decision: \\\\boxed{{Yes or No}} in your last line.
   
   Criteria:
   
@@ -36,7 +36,7 @@ user: |
   </llm-code>
   <judge>
   The code seems to be executable, and solve the question. 
-  Score: \\\\boxed{Yes}.
+  Score: \\\\boxed{{Yes}}.
   </judge>
   
   
@@ -50,7 +50,7 @@ user: |
   </llm-code>
   <judge>
   There is an error in the function definition. The input argument is `str` whereas the function references `s`. This would not execute, or solve the problem however does take a good approach at solving the problem.
-  Score: \\\\boxed{No}.
+  Score: \\\\boxed{{No}}.
   </judge>
   
   
@@ -68,7 +68,7 @@ user: |
   </llm-code>
   <judge>
   Seems to answer the problem, is executable (given the math library is imported). 
-  Score: \\\\boxed{Yes}.
+  Score: \\\\boxed{{Yes}}.
   </judge>
   
   
