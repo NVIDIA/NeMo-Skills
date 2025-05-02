@@ -11,10 +11,10 @@ user: |-
 
     ...
 
-  - For each math problem you identify, make sure to rephrase it such that it's stated clearly and concisely.
+  - For each math problem you identify, rephrase it such that it's stated clearly and concisely.
     Remove any redundant context, personal commentary, anecdotes, or unrelated information.
-    But make sure not to change the meaning of the problem and keep all necessary mathematical or technical details.
-  - If multiple problems that you extract are related, make sure to include all the context in each problem statement
+    But make sure not to change the meaning of the problem and keep all mathematical or technical details.
+  - If multiple problems that you extract are related, include all the context in each problem statement
     as they will be looked at independently.
 
   Here are a few examples.
