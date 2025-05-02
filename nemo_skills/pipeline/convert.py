@@ -27,7 +27,7 @@ LOG = logging.getLogger(__file__)
 
 
 def get_nemo_to_hf_cmd(
-    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
+        input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
 ):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
@@ -44,16 +44,16 @@ def get_nemo_to_hf_cmd(
 
 
 def get_hf_to_trtllm_cmd(
-    input_model,
-    output_model,
-    model_type,
-    hf_model_name,
-    dtype,
-    num_gpus,
-    num_nodes,
-    extra_arguments,
-    trt_prepare_args,
-    trt_reuse_tmp_engine,
+        input_model,
+        output_model,
+        model_type,
+        hf_model_name,
+        dtype,
+        num_gpus,
+        num_nodes,
+        extra_arguments,
+        trt_prepare_args,
+        trt_reuse_tmp_engine,
 ):
     dtype = {
         "bf16": "bfloat16",
@@ -92,7 +92,7 @@ def get_hf_to_trtllm_cmd(
 
     if trt_reuse_tmp_engine:
         cmd = (
-            setup_cmd + f"if [ ! -f {tmp_engine_dir}/config.json ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
+                setup_cmd + f"if [ ! -f {tmp_engine_dir}/config.json ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
         )
     else:
         cmd = setup_cmd + hf_to_trtllm_cmd + " && " + trtllm_build_cmd
@@ -101,7 +101,7 @@ def get_hf_to_trtllm_cmd(
 
 
 def get_hf_to_nemo_cmd(
-    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
+        input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
 ):
     # Check if the model_type is "nemo"
 
@@ -122,6 +122,7 @@ def get_hf_to_nemo_cmd(
 class SupportedTypes(str, Enum):
     llama = "llama"
     qwen = "qwen"
+    qwen3 = "qwen"
     deepseek_v3 = "deepseek_v3"
 
 
@@ -145,52 +146,53 @@ class SupportedDtypes(str, Enum):
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def convert(
-    ctx: typer.Context,
-    cluster: str = typer.Option(
-        None,
-        help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
-        "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
-    ),
-    input_model: str = typer.Option(...),
-    model_type: SupportedTypes = typer.Option(..., help="Type of the model"),
-    output_model: str = typer.Option(..., help="Where to put the final model"),
-    convert_from: SupportedFormatsFrom = typer.Option(..., help="Format of the input model"),
-    convert_to: SupportedFormatsTo = typer.Option(..., help="Format of the output model"),
-    trt_prepare_args: str = typer.Option(
-        "", help="Arguments to pass to the first step of trtllm conversion (that builds tmp engine)"
-    ),
-    trt_reuse_tmp_engine: bool = typer.Option(True, help="Whether to reuse the tmp engine for the final conversion"),
-    hf_model_name: str = typer.Option(None, help="Name of the model on Hugging Face Hub to convert to/from"),
-    dtype: SupportedDtypes = typer.Option("bf16", help="Data type"),
-    expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
-    num_nodes: int = typer.Option(1),
-    num_gpus: int = typer.Option(...),
-    partition: str = typer.Option(
-        None, help="Can specify if need interactive jobs or a specific non-default partition"
-    ),
-    time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    run_after: List[str] = typer.Option(
-        None, help="Can specify a list of expnames that need to be completed before this one starts"
-    ),
-    reuse_code: bool = typer.Option(
-        True,
-        help="If True, will reuse the code from the provided experiment. "
-        "If you use it from Python, by default the code will be re-used from "
-        "the last submitted experiment in the current Python session, so set to False to disable "
-        "(or provide reuse_code_exp to override).",
-    ),
-    reuse_code_exp: str = typer.Option(
-        None,
-        help="If specified, will reuse the code from this experiment. "
-        "Can provide an experiment name or an experiment object if running from code.",
-    ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+        ctx: typer.Context,
+        cluster: str = typer.Option(
+            None,
+            help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
+                 "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
+        ),
+        input_model: str = typer.Option(...),
+        model_type: SupportedTypes = typer.Option(..., help="Type of the model"),
+        output_model: str = typer.Option(..., help="Where to put the final model"),
+        convert_from: SupportedFormatsFrom = typer.Option(..., help="Format of the input model"),
+        convert_to: SupportedFormatsTo = typer.Option(..., help="Format of the output model"),
+        trt_prepare_args: str = typer.Option(
+            "", help="Arguments to pass to the first step of trtllm conversion (that builds tmp engine)"
+        ),
+        trt_reuse_tmp_engine: bool = typer.Option(True,
+                                                  help="Whether to reuse the tmp engine for the final conversion"),
+        hf_model_name: str = typer.Option(None, help="Name of the model on Hugging Face Hub to convert to/from"),
+        dtype: SupportedDtypes = typer.Option("bf16", help="Data type"),
+        expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
+        num_nodes: int = typer.Option(1),
+        num_gpus: int = typer.Option(...),
+        partition: str = typer.Option(
+            None, help="Can specify if need interactive jobs or a specific non-default partition"
+        ),
+        time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+        run_after: List[str] = typer.Option(
+            None, help="Can specify a list of expnames that need to be completed before this one starts"
+        ),
+        reuse_code: bool = typer.Option(
+            True,
+            help="If True, will reuse the code from the provided experiment. "
+                 "If you use it from Python, by default the code will be re-used from "
+                 "the last submitted experiment in the current Python session, so set to False to disable "
+                 "(or provide reuse_code_exp to override).",
+        ),
+        reuse_code_exp: str = typer.Option(
+            None,
+            help="If specified, will reuse the code from this experiment. "
+                 "Can provide an experiment name or an experiment object if running from code.",
+        ),
+        config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+        log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
+        exclusive: bool = typer.Option(
+            True,
+            "--not_exclusive",
+            help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+        ),
 ):
     """Convert a checkpoint from one format to another.
 
