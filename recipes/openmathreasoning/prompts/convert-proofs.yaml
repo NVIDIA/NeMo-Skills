@@ -1,6 +1,7 @@
 user: |-
   I will give you a math problem that asks to prove something.
-  Your task is to create an equivalent problem that instead has some kind of numerical or expression answer that can be used to automatically grade the solution.
+  Your task is to create an equivalent problem that instead has some kind of numerical or expression answer 
+  that can be used to automatically grade the solution.
   Make sure the new problem is at least as difficult as the original proof problem.
 
   Here are a few examples.
@@ -8,10 +9,12 @@ user: |-
   Example 1
 
   Problem:
-  Prove that the system \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}} has no solutions in integers $x$ , $y$ , and $z$ .
+  Prove that the system \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}} 
+  has no solutions in integers $x$ , $y$ , and $z$ .
 
   Output:
-  Let $x$, $y$ and $z$ be a solution to the following system of equations \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}}.
+  Let $x$, $y$ and $z$ be a solution to the following system of equations 
+  \begin{{align*}}x^6 + x^3 + x^3y + y &= 147^{{157}} \\ x^3 + x^3y + y^2 + y + z^9 &= 157^{{147}}\end{{align*}}.
   Calculate the sum of all possible values of $x$.
 
 
