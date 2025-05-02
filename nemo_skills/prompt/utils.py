@@ -339,17 +339,23 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
 
 
 def get_prompt(
-    prompt_config: str,
-    prompt_template: str | None = None,
+    prompt_config: str | dict,
+    prompt_template: str | dict | None = None,
     examples_type: str | None = None,
     config_dir: str | None = None,
     template_dir: str | None = None,
 ) -> Prompt:
     if template_dir is None:
         template_dir = Path(__file__).parent.absolute() / 'template'
-    config = load_config(prompt_config, config_dir)
+    if isinstance(prompt_config, str):
+        config = load_config(prompt_config, config_dir)
+    else:
+        config = prompt_config
     if prompt_template is not None:
-        template = load_config(prompt_template, template_dir)
+        if isinstance(prompt_template, str):
+            template = load_config(prompt_template, template_dir)
+        else:
+            template = prompt_template
         prompt = Prompt(PromptConfig(**config, template=PromptTemplate(**template)))
     else:
         prompt = Prompt(PromptConfig(**config))
