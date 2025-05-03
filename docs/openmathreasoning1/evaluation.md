@@ -190,7 +190,8 @@ ns eval \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++code_execution=true \
-    ++server.code_execution.add_remaining_code_executions=true
+    ++server.code_execution.add_remaining_code_executions=true \
+    ++total_code_executions_in_prompt=8
 ```
 
 The only exception is for [OpenMath-Nemotron-14B-Kaggle](https://huggingface.co/nvidia/OpenMath-Nemotron-14B-Kaggle)

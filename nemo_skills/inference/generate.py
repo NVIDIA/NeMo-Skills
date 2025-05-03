@@ -133,8 +133,9 @@ class GenerateSolutionsConfig:
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
             self.total_code_executions_in_prompt = list(self.total_code_executions_in_prompt)
 
-        if (self.total_code_executions_in_prompt is not None and 
-                not isinstance(self.total_code_executions_in_prompt, (int, list, tuple))):
+        if self.total_code_executions_in_prompt is not None and not isinstance(
+            self.total_code_executions_in_prompt, (int, list, tuple)
+        ):
             raise ValueError(
                 "`total_code_executions_in_prompt` must be either int, list, tuple, or None, "
                 f"got {type(self.total_code_executions_in_prompt)}"
@@ -372,12 +373,10 @@ class GenerationTask:
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
         }
-        
+
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [
-                    dp['total_code_executions'] for dp in data_points
-                ]
+                max_code_executions_values = [dp['total_code_executions'] for dp in data_points]
                 generation_params['max_code_executions'] = max_code_executions_values
 
         generate_method = self.llm.generate_async if is_async else self.llm.generate
