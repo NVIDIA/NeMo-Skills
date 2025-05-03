@@ -10,7 +10,7 @@ input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
 contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of solutions per each problem from the input file to generate
-num_random_seeds_to_generate: 2
+num_random_seeds_to_generate: 32
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ${expname}-merge-data-qwen-instruct
 

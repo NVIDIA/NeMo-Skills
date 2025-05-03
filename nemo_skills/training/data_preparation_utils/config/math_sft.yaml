@@ -84,7 +84,7 @@ processors:
       - "expected_answer"
       - "predicted_answer"
       - "answer_rm_score"
-      - "solutions"   # GenRM keys
+      - "solutions"   # GenSelect keys
       - "num_solutions"
       - "max_idx"
 

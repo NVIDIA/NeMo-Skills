@@ -40,12 +40,33 @@ def prepare_labeling_data(cluster, expname, run_after, stage_config, **kwargs):
         cluster=cluster,
         expname=expname,
         run_after=run_after,
+        log_dir=f"{output_dir}/logs",
         **stage_config.get('stage_kwargs', {}),
     )
     
+def label_data(cluster, expname, run_after, stage_config, **kwargs):
+    """Labels the data for the GenSelect pipeline."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    output_file = f"{output_dir}/output.jsonl"
+    
+    generate(
+        ctx=wrap_arguments(
+            f"++input_file={input_file} "
+            f"{stage_config.get('inline_args', '')} "
+        ),
+        cluster=cluster,
+        output_dir=output_dir,
+        expname=expname,
+        run_after=run_after,
+        log_dir=f"{output_dir}/logs",
+        **stage_config.get('stage_kwargs', {}),
+    )
+
 
 stages_map = {
     'prepare_labeling_data': prepare_labeling_data,
+    'label_data': label_data,
 }
 
 
