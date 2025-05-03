@@ -47,11 +47,11 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag):
     # Find the start and end tags. If either is not found, return None
     start_tag_position = reasoning_generation.find(start_tag)
     if start_tag_position == -1:
-        return None, None
+        return None
 
     end_tag_position = reasoning_generation.find(end_tag)
     if end_tag_position == -1:
-        return None, None
+        return None
 
     reasoning_trace = reasoning_generation[:end_tag_position + len(end_tag)]
 
