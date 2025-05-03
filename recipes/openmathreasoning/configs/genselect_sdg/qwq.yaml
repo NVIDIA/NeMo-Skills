@@ -35,7 +35,7 @@ generate_new_summaries_kwargs:
 pipeline_stages:
   - prepare_labeling_data      # Prepare the labeling data
   - label_data                 # Label the data
-  - extract_judgments          # Extract judgments from the labeled data
+  - extract_judgment           # Extract judgments from the labeled data
   - generate_new_summaries     # Generate new summaries to replace the native summaries of reasoning models
   - merge_new_summaries        # Merge reasoning traces with new summaries
   - prepare_for_sft            # Prepare the final dataset for SFT training
@@ -44,7 +44,7 @@ pipeline_stages:
 directories:
   step-1-prepare-labeling-data: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-1-prepare-labeling-data
   step-2-label-data: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-2-label-data
-  step-3-extract-judgments: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-3-extract-judgments
+  step-3-extract-judgment: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-3-extract-judgment
   step-4-generate-new-summaries: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-4-generate-new-summaries
   step-5-merge-new-summaries: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-5-merge-new-summaries
   step-6-prepare-sft: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-6-prepare-sft
@@ -73,7 +73,28 @@ stages:
       ++inference.temperature=0.6
     
     stage_kwargs: ${generate_kwargs}
-    
+  
+  extract_judgment:
+    output_dir: ${directories.step-3-extract-judgment}
+    input_file: ${directories.step-2-label-data}/output.jsonl
+
+    dependencies:
+      - label_data
+
+  generate_new_summaries:
+    input_dir: ${directories.step-3-extract-judgment}/output.jsonl
+    output_dir: ${directories.step-4-generate-new-summaries}
+
+    dependencies:
+      - extract_judgment
+    inline_args: >- 
+      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-genselect.yaml
+      ++prompt_template=qwen-instruct 
+      ++inference.temperature=0.7 
+      ++inference.tokens_to_generate=2048
+    stage_kwargs: ${generate_new_summaries_kwargs}
+
+
   # fill_majority_answer:
   #   output_dir: ${directories.step-2-fill-majority}
   #   input_dir: ${directories.step-1-generate-solutions}

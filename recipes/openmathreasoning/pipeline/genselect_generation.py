@@ -84,6 +84,26 @@ def extract_judgment(cluster, expname, run_after, stage_config, **kwargs):
         log_dir=f"{output_dir}/logs",
         **stage_config.get('stage_kwargs', {}),
     )
+
+
+def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    """Generates new summaries for the GenSelect pipeline."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+
+    generate(
+        ctx=wrap_arguments(
+            f"++input_file={input_file} "
+            f"{stage_config.get('inline_args', '')} "
+        ),
+        cluster=cluster,
+        output_dir=output_dir,
+        expname=expname,
+        run_after=run_after,
+        log_dir=f"{output_dir}/logs",
+        **stage_config.get('stage_kwargs', {}),
+    )
+
     
 
 stages_map = {
