@@ -25,12 +25,11 @@ def get_stage_expname(base_expname, stage_name, suffix):
 def prepare_labeling_data(cluster, expname, run_after, stage_config, **kwargs):
     """Prepares the labeling data for the GenSelect pipeline."""
     output_dir = stage_config["output_dir"]
-    input_dir = stage_config["input_dir"]
-    input_files = f"{input_dir}/output*.jsonl"
+    input_files = stage_config["input_files"]
 
     cmd = (
         f"python /nemo_run/code/recipes/openmathreasoning/scripts/genselect/prepare_labeling_data.py "
-        f"    --input_files {input_files} "
+        f"    --input_files '{input_files}' "
         f"    --output_dir {output_dir} "
         f"    --max_instances_per_problem {stage_config.get('max_instances_per_problem', 8)} "
         f"    --max_solutions {stage_config.get('max_solutions', 16)} "
@@ -64,7 +63,7 @@ if __name__ == '__main__':
     config_dir = Path(__file__).parents[1] / "configs" / "genselect_sdg"
     available_configs = get_available_configs(config_dir)
     
-    parser = argparse.ArgumentParser(description='OpenMathReasoning-1 problem generation pipeline')
+    parser = argparse.ArgumentParser(description='OpenMathReasoning-1 GenSelect instance generation pipeline')
     parser.add_argument(
         '--mode',
         type=str,

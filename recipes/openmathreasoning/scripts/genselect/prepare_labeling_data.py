@@ -23,19 +23,21 @@ SAFE_SOLNS_LENGTH = 60_000
 # This is based on the Qwen/QwQ-32B model. We can change this if we use a different model.
 # The rough estimate is 20K tokens for solutions + less than 4K tokens for problem + prompt, will allow for 16K tokens for the solution. 
 MAX_TOKEN_LENGTH = 20_000
+MODEL_NAME = "Qwen/QwQ-32B"
+
 
 
 _TOKENIZER = None
 def get_tokenizer():
     global _TOKENIZER
     if _TOKENIZER is None:
-        _TOKENIZER = AutoTokenizer.from_pretrained("Qwen/QwQ-32B")
+        _TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
     return _TOKENIZER
 
 
 def read_data(file_paths):
     problem_to_instances = defaultdict(list)
-    for file_path in unroll_files(file_paths):
+    for file_path in unroll_files(file_paths.split(",")):
         with open(file_path, "r") as f:
             for line in f:
                 instance = json.loads(line)
