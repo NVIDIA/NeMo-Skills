@@ -117,8 +117,6 @@ stages:
     summary_dir: ${directories.step-5-judge-new-summaries}
     output_dir: ${directories.step-6-merge-new-summaries}
     num_soln_random_seeds: ${num_random_seeds_to_generate}
-    start_tag: "<think>"
-    end_tag: "</think>"
     
     dependencies:
       - judge_new_summaries

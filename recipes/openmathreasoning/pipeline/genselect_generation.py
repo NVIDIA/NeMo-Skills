@@ -104,12 +104,73 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
         **stage_config.get('stage_kwargs', {}),
     )
 
+
+def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    """Merges new summaries for the GenSelect pipeline."""
+    output_dir = stage_config["output_dir"]
+    reasoning_file = stage_config["reasoning_file"]
+    summary_dir = stage_config["summary_dir"]
+    output_file = stage_config["output_file"]
+
+    cmd = (
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/genselect/merge_new_summary.py "
+        f"    --reasoning_file {reasoning_file} "
+        f"    --summary_dir {summary_dir} "
+        f"    --output_file {output_file} "
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        expname=expname,
+        run_after=run_after,
+        log_dir=f"{output_dir}/logs",
+        **stage_config.get('stage_kwargs', {}),
+    )
+
+
+
+def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    output_file = f"{output_dir}/sft-data.jsonl"
     
+    prompt_config = stage_config.get("prompt_config")
+    if not prompt_config:
+        raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
+    
+    prompt_template = stage_config.get("prompt_template")
+    if not prompt_template:
+        raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
+        
+    cmd = (
+        f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
+        f"    ++input_files='{input_file}' "
+        f"    ++output_path={output_file} "
+        f"    ++prompt_config={prompt_config} "
+        f"    ++prompt_template={prompt_template} "
+        f"    ++filters.drop_multi_boxed=false "
+        f"    ++filters.remove_len_outlier_problems=false "
+        f"    ++filters.remove_len_outlier_solutions=false "
+        f"    {stage_config.get('inline_args', '')}"
+    )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
+        run_after=run_after,
+        **stage_config.get("stage_kwargs", {}),
+    )
+
+
 
 stages_map = {
     'prepare_labeling_data': prepare_labeling_data,
     'label_data': label_data,
     'extract_judgment': extract_judgment,
+    'generate_new_summaries': generate_new_summaries,
+    'merge_new_summaries': merge_new_summaries,
 }
 
 

@@ -283,8 +283,6 @@ def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             f"  --reasoning_file {cur_reasoning_file} "
             f"  --summary_dir {cur_summary_dir} "
             f"  --output_file {cur_output_file} "
-            # f"  --start_tag {stage_config.get('start_tag', '<think>')} "
-            # f"  --end_tag {stage_config.get('end_tag', '</think>')}"
         )
 
         run_cmd(
