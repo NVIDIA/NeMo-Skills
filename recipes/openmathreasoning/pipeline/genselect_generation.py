@@ -53,6 +53,7 @@ def label_data(cluster, expname, run_after, stage_config, **kwargs):
     generate(
         ctx=wrap_arguments(
             f"++input_file={input_file} "
+            f"++output_file={output_file} "
             f"{stage_config.get('inline_args', '')} "
         ),
         cluster=cluster,
@@ -64,9 +65,31 @@ def label_data(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
+def extract_judgment(cluster, expname, run_after, stage_config, **kwargs):
+    """Extracts the judgment for the GenSelect pipeline."""
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+
+    cmd = (
+        f"python /nemo_run/code/recipes/openmathreasoning/scripts/genselect/extract_judgment.py "
+        f"    --input_file {input_file} "
+        f"    --output_dir {output_dir} "
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        expname=expname,
+        run_after=run_after,
+        log_dir=f"{output_dir}/logs",
+        **stage_config.get('stage_kwargs', {}),
+    )
+    
+
 stages_map = {
     'prepare_labeling_data': prepare_labeling_data,
     'label_data': label_data,
+    'extract_judgment': extract_judgment,
 }
 
 

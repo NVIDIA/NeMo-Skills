@@ -61,7 +61,6 @@ stages:
   label_data:
     output_dir: ${directories.step-2-label-data}
     input_file: ${directories.step-1-prepare-labeling-data}/output.jsonl
-    num_random_seeds: ${num_random_seeds}
 
     dependencies:
       - prepare_labeling_data
