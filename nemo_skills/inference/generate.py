@@ -15,11 +15,13 @@
 import importlib
 import json
 import logging
+import random
 import sys
 import time
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
+from typing import Any
 
 import hydra
 from omegaconf import ListConfig, OmegaConf, open_dict
@@ -100,9 +102,14 @@ class GenerateSolutionsConfig:
 
     # set to True if code execution needs to be supported
     code_execution: bool = False
-    # will add to prompt.fill as total_code_executions field (useful for models that support dynamically setting this)
+    # Controls how many code executions are allowed in prompt (useful for models that support dynamically setting this)
     # if total_code_executions placeholder is not in the prompt, this parameter has no effect
-    total_code_executions_in_prompt: int = 8
+    # Can be int, (min,max) tuple, or None
+    # If (min,max) tuple, will be randomly sampled from random.randint(min_val, max_val) for each sample in a batch
+    # useful to generate data with variable number of total_code_executions_in_prompt
+    total_code_executions_in_prompt: Any = None
+    # When True, total_code_executions_in_prompt override model defaults
+    override_max_code_executions: bool = False
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
@@ -122,6 +129,16 @@ class GenerateSolutionsConfig:
 
         if self.dataset is None and self.prompt_config is None:
             raise ValueError("If `dataset` is not provided, `prompt_config` is required")
+
+        if isinstance(self.total_code_executions_in_prompt, ListConfig):
+            self.total_code_executions_in_prompt = list(self.total_code_executions_in_prompt)
+
+        if (self.total_code_executions_in_prompt is not None and 
+                not isinstance(self.total_code_executions_in_prompt, (int, list, tuple))):
+            raise ValueError(
+                "`total_code_executions_in_prompt` must be either int, list, tuple, or None, "
+                f"got {type(self.total_code_executions_in_prompt)}"
+            )
 
     def _post_init_validate_server(self):
         if self.server["server_type"] == "trtllm" and self.prompt_template is None:
@@ -283,6 +300,12 @@ class GenerationTask:
             return data
 
         starting_idx = 0
+        if self.cfg.num_chunks:
+            chunk_index = self.cfg.output_file.rfind("_chunk")
+            base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+            if Path(base_output_file).exists():
+                LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                return []
         try:
             with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
                 starting_idx = len(fin.readlines())
@@ -303,6 +326,12 @@ class GenerationTask:
 
         filled_positions = set()
         if self.cfg.skip_filled:
+            if self.cfg.num_chunks:
+                chunk_index = self.cfg.output_file.rfind("_chunk")
+                base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
+                if Path(base_output_file).exists():
+                    LOG.warning(f"File `{base_output_file}` exists, skipping generation")
+                    return []
             try:
                 with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
                     for line in fin:
@@ -322,8 +351,13 @@ class GenerationTask:
     # TODO: data will not include any samples skipped after restart
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
+        total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
+        if total_code_executions_in_prompt is not None:
+            if isinstance(total_code_executions_in_prompt, (list, tuple)):
+                min_val, max_val = total_code_executions_in_prompt
+                total_code_executions_in_prompt = random.randint(min_val, max_val)
+            data_point['total_code_executions'] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
-        data_point['total_code_executions'] = self.cfg.total_code_executions_in_prompt
         return self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
@@ -332,13 +366,22 @@ class GenerationTask:
         )
 
     def llm_generate(self, data_points, data, is_async=False):
-        generate_method = self.llm.generate_async if is_async else self.llm.generate
-        return generate_method(
-            prompts=[self.fill_prompt(dp, data) for dp in data_points],
-            stop_phrases=combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
+        generation_params = {
+            "prompts": [self.fill_prompt(dp, data) for dp in data_points],
+            "stop_phrases": combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
-        )
+        }
+        
+        if self.cfg.code_execution:
+            if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
+                max_code_executions_values = [
+                    dp['total_code_executions'] for dp in data_points
+                ]
+                generation_params['max_code_executions'] = max_code_executions_values
+
+        generate_method = self.llm.generate_async if is_async else self.llm.generate
+        return generate_method(**generation_params)
 
     def llm_generate_multi_turn(self, data_points, data):
         # TODO: this will not be efficient if different elements have different number of turns

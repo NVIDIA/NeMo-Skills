@@ -535,6 +535,8 @@ class OpenAIModel(BaseModel):
         model=None,
         base_url=None,
         api_key=None,
+        max_retries: int = 3,
+        initial_retry_delay: float = 2.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -563,6 +565,9 @@ class OpenAIModel(BaseModel):
         self.model = model
         if self.model == "model":  # that's a placeholder, so trying to find real name
             self.model = self.get_model_name_from_server()
+
+        self.max_retries = max_retries
+        self.initial_retry_delay = initial_retry_delay
 
     def batch_generate(
         self,
@@ -665,35 +670,17 @@ class OpenAIModel(BaseModel):
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
         if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
             raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                temperature=temperature,
-                top_p=top_p,
-                max_tokens=tokens_to_generate,
-                presence_penalty=repetition_penalty,
-                seed=random_seed,
-                stop=stop_phrases,
-                messages=prompt,
-                logprobs=top_logprobs is not None,
-                top_logprobs=top_logprobs,
-            )
-        except openai.BadRequestError as e:
-            # this likely only works for Nvidia-hosted models
-            msg = e.body['detail']
-            # expected message:
-            # This model's maximum context length is N tokens.
-            # However, you requested X tokens (Y in the messages, Z in the completion).
-            # Please reduce the length of the messages or completion.
-            if msg.startswith("This model's maximum context length is"):
-                numbers = re.findall(r"\d+", msg)
-                max_tokens = int(numbers[0]) - int(numbers[2])
-                LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
+        
+        retry_count = 0
+        retry_delay = self.initial_retry_delay
+        
+        while True:
+            try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     temperature=temperature,
                     top_p=top_p,
-                    max_tokens=max_tokens,
+                    max_tokens=tokens_to_generate,
                     presence_penalty=repetition_penalty,
                     seed=random_seed,
                     stop=stop_phrases,
@@ -702,12 +689,58 @@ class OpenAIModel(BaseModel):
                     top_logprobs=top_logprobs,
                     timeout=timeout,
                 )
-            else:
+                break  # Success, exit the retry loop
+            except openai.RateLimitError as e:
+                retry_count += 1
+                if retry_count > self.max_retries:
+                    LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
+                    raise
+                
+                # Extract retry-after header if available, otherwise use exponential backoff
+                retry_after = getattr(e, 'retry_after', None)
+                if retry_after is not None and isinstance(retry_after, (int, float)):
+                    wait_time = retry_after
+                else:
+                    wait_time = retry_delay
+                    retry_delay *= 2  # Exponential backoff
+                
+                LOG.warning(
+                    "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
+                    wait_time, retry_count, self.max_retries
+                )
+                time.sleep(wait_time)
+            except openai.BadRequestError as e:
+                # this likely only works for Nvidia-hosted models
+                msg = e.body['detail']
+                # expected message:
+                # This model's maximum context length is N tokens.
+                # However, you requested X tokens (Y in the messages, Z in the completion).
+                # Please reduce the length of the messages or completion.
+                if msg.startswith("This model's maximum context length is"):
+                    numbers = re.findall(r"\d+", msg)
+                    max_tokens = int(numbers[0]) - int(numbers[2])
+                    LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        temperature=temperature,
+                        top_p=top_p,
+                        max_tokens=max_tokens,
+                        presence_penalty=repetition_penalty,
+                        seed=random_seed,
+                        stop=stop_phrases,
+                        messages=prompt,
+                        logprobs=top_logprobs is not None,
+                        top_logprobs=top_logprobs,
+                        timeout=timeout,
+                    )
+                else:
+                    raise
+            except AttributeError:
+                LOG.error("Unexpected response from OpenAI API: %s", response)
                 raise
-        except AttributeError:
-            # sometimes response is a string?
-            LOG.error("Unexpected response from OpenAI API: %s", response)
-            raise
+            except Exception as e:
+                LOG.error("Unexpected error during API call: %s", str(e))
+                raise
 
         choice = response.choices[0]
         output = choice.message.content

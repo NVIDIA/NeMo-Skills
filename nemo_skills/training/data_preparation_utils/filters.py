@@ -99,6 +99,26 @@ class DropIfRegexMatch(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
 
 
+class DropIfRegexNotMatch(BaseFilter):
+    """Drops data if text doesn't match at least one of the regex patterns."""
+
+    def __init__(
+        self,
+        regex_patterns: List[str],
+        text_key: str = "text",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.regex_patterns = regex_patterns
+        self.text_key = text_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        for regex_pattern in self.regex_patterns:
+            if not re.search(re.escape(regex_pattern), data_entry[self.text_key]):
+                return [DataEntry(data=None, metrics=dict(num_removed=1))]
+        return [DataEntry(data=data_entry, metrics=dict(num_reomoved=0))]
+
+
 class DropIfEqual(BaseFilter):
     """Drops data if entry matches provided value."""
 
@@ -141,13 +161,37 @@ class DropIncorrectCodeBlocks(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
+class AddCodeExecutionsCounts(BaseFilter):
+    def __init__(
+            self, solution_key: str = "generation",
+            ce_counter_key: str = "total_code_executions",
+            **kwargs
+        ):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+        self.ce_counter_key = ce_counter_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        pattern = r"Remaining code executions: (\d+)."
+        allowed_ce = re.search(pattern, data_entry[self.solution_key])
+        counts = 0
+        if not allowed_ce:
+            if "You have run out of code executions!" in data_entry[self.solution_key]:
+                counts = 1
+        else:
+            counts = int(allowed_ce.group(1)) + 1
+
+        data_entry[self.ce_counter_key] = counts
+        return [DataEntry(data=data_entry, metrics=dict(num_modified=1))]
+
+
 class DropIncorrectArithmetic(BaseFilter):
     def __init__(self, solution_key: str = "generation", tolerance=1e-4, **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
         self.tolerance = tolerance
 
-    def process_dataset_entry(self, data_entry: str) -> str:
+    def process_dataset_entry(self, data_entry: str) -> List:
         for expression, _ in extract_expressions(data_entry[self.solution_key]):
             parts = expression.split("=")
             if len(parts) < 2:
@@ -294,7 +338,7 @@ class SplitArithmetic(BaseFilter):
         super().__init__(**kwargs)
         self.solution_key = solution_key
 
-    def process_dataset_entry(self, data_entry: str) -> str:
+    def process_dataset_entry(self, data_entry: str) -> List:
         """
         Extends short arithmetic expressions solutions to step-by-step ones
         For example `1 + 2 + 3 + 4 = 10` -> `1 + 2 + 3 + 4 = 3 + 3 + 4 = 6 + 4 = 10`.
