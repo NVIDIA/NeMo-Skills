@@ -97,7 +97,7 @@ stages:
   merge_new_summaries:
     reasoning_file: ${directories.step-3-extract-judgment}/output.jsonl
     summary_dir: ${directories.step-4-generate-new-summaries}
-    output_file: ${directories.step-5-merge-new-summaries}/output.jsonl
+    output_dir: ${directories.step-5-merge-new-summaries}
     
     dependencies:
       - generate_new_summaries
@@ -107,6 +107,6 @@ stages:
     output_dir: ${directories.step-6-prepare-sft}
     prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/summarize-genselect.yaml
     prompt_template: qwen-instruct
-    
+
     dependencies:
       - merge_new_summaries

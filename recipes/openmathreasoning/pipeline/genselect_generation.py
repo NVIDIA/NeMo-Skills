@@ -107,10 +107,10 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
 
 def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
     """Merges new summaries for the GenSelect pipeline."""
-    output_dir = stage_config["output_dir"]
     reasoning_file = stage_config["reasoning_file"]
     summary_dir = stage_config["summary_dir"]
-    output_file = stage_config["output_file"]
+    output_dir = stage_config["output_dir"]
+    output_file = f"{output_dir}/output.jsonl"
 
     cmd = (
         f"python /nemo_run/code/recipes/openmathreasoning/scripts/genselect/merge_new_summary.py "
@@ -171,6 +171,7 @@ stages_map = {
     'extract_judgment': extract_judgment,
     'generate_new_summaries': generate_new_summaries,
     'merge_new_summaries': merge_new_summaries,
+    'prepare_for_sft': prepare_for_sft,
 }
 
 
