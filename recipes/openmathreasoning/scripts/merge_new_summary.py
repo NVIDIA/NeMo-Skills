@@ -134,8 +134,8 @@ def main():
     parser.add_argument("--reasoning_file", type=str, required=True, help="Path to the reasoning file")
     parser.add_argument("--summary_dir", type=str, required=True, help="Path to the summary directory")
     parser.add_argument("--output_file", type=str, required=True, help="Path to the output file")
-    parser.add_argument("--start_tag", type=str, required=True, help="Start tag")
-    parser.add_argument("--end_tag", type=str, required=True, help="End tag")
+    parser.add_argument("--start_tag", type=str, default="<think>", help="Start tag")
+    parser.add_argument("--end_tag", type=str, default="</think>", help="End tag")
     args = parser.parse_args()
 
     formatted_instances = format_reasoning_trace_with_summary(args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag)

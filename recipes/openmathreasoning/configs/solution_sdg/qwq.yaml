@@ -10,12 +10,12 @@ input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
 contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of solutions per each problem from the input file to generate
-num_random_seeds_to_generate: 32
+num_random_seeds_to_generate: 1
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
-generate_kwargs: &base_generate_kwargs
+generate_kwargs: &generate_kwargs
   # Model to be used for answer judgement
   model: /trt_models/qwen2.5-32b-instruct
   # Server type to launch the model
@@ -28,13 +28,7 @@ generate_kwargs: &base_generate_kwargs
 
 # Arguments for generating new summaries
 generate_new_summaries_kwargs:
-  # <<: *base_generate_kwargs
-  model: /trt_models/qwen2.5-32b-instruct
-  # Server type to launch the model
-  server_type: trtllm
-  # Server parameters
-  server_gpus: 8
-  server_nodes: 1
+  <<: *generate_kwargs
   # Generate 4 new summaries for each solution
   num_random_seeds: 4   
 
@@ -100,14 +94,13 @@ stages:
 
     dependencies:
       - judge_answers
-    inline_args: > 
+    inline_args: >- 
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml
       ++prompt_template=qwen-instruct 
       ++inference.temperature=0.7 
       ++inference.tokens_to_generate=2048
-    
     stage_kwargs: ${generate_new_summaries_kwargs}
-
+      
   judge_new_summaries:
     input_dir: ${directories.step-4-generate-new-summaries}
     output_dir: ${directories.step-5-judge-new-summaries}
@@ -116,12 +109,16 @@ stages:
     dependencies:
       - generate_new_summaries
     inline_args: "++prompt_template=qwen-instruct"
-    stage_kwargs: ${generate_kwargs}
+    stage_kwargs: ${generate_new_summaries_kwargs}
 
 
   merge_new_summaries:
-    input_dir: ${directories.step-5-judge-new-summaries}
+    reasoning_dir: ${directories.step-3-judge-answers}
+    summary_dir: ${directories.step-5-judge-new-summaries}
     output_dir: ${directories.step-6-merge-new-summaries}
+    num_soln_random_seeds: ${num_random_seeds_to_generate}
+    start_tag: "<think>"
+    end_tag: "</think>"
     
     dependencies:
       - judge_new_summaries
