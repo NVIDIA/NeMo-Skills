@@ -7,6 +7,8 @@ sdg_pipeline: genselect_sdg
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
 input_files: ${base_output_dir}/solution-sdg-${suffix}/step-6-merge-new-summaries/output-rs*.jsonl
+# File with benchmark problems you want decontaminate with
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
 # Number of GenSelect instances per problem
 max_instances_per_problem: 8
 # Number of maximum solutions which form the GenSelect input
@@ -105,8 +107,9 @@ stages:
   prepare_for_sft:
     input_file: ${directories.step-5-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-6-prepare-sft}
-    prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/summarize-genselect.yaml
+    prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/genselect.yaml
     prompt_template: qwen-instruct
+    contamination_file: ${contamination_file}
 
     dependencies:
       - merge_new_summaries

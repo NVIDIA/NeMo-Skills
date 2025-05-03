@@ -142,16 +142,21 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     prompt_template = stage_config.get("prompt_template")
     if not prompt_template:
         raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
-        
+    
+    contamination_file = stage_config.get('contamination_file')
+    if not contamination_file:
+        raise ValueError("`contamination_file` is not defined in `prepare_for_sft` stage config")
+
     cmd = (
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
-        f"    ++input_files='{input_file}' "
+        f"    ++preprocessed_dataset_files='{input_file}' "
         f"    ++output_path={output_file} "
         f"    ++prompt_config={prompt_config} "
         f"    ++prompt_template={prompt_template} "
         f"    ++filters.drop_multi_boxed=false "
         f"    ++filters.remove_len_outlier_problems=false "
         f"    ++filters.remove_len_outlier_solutions=false "
+        f"    ++contamination_file={contamination_file} "
         f"    {stage_config.get('inline_args', '')}"
     )
     run_cmd(
