@@ -68,7 +68,7 @@ def format_reasoning_trace_with_summary(reasoning_file, summary_dir):
     invalid_summary_count = 0
 
     all_summaries = list(zip(*list_of_summary_instances))
-    for idx, (reasoning_instance, summaries_for_reasoning_instance) in enumerate(zip(reasoning_instances, all_summaries)):
+    for _, (reasoning_instance, summaries_for_reasoning_instance) in enumerate(zip(reasoning_instances, all_summaries)):
         reasoning_judgment = reasoning_instance["judgment"]
         assert (reasoning_instance["problem"] == summaries_for_reasoning_instance[0]["problem"])
         valid_summaries = [summary for summary in summaries_for_reasoning_instance if is_valid_summary(reasoning_judgment, summary["generation"])]

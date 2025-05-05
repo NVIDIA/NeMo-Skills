@@ -59,7 +59,7 @@ def select_best_summary(valid_summaries):
     return max(valid_summaries, key=lambda x: len(x["generation"]))
 
 
-def trim_reasoning_generation(reasoning_generation, start_tag, end_tag):    
+def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_end_tag=False):    
     """Trim the thinking part of the original reasoning generation till the step with the rightmost boxed entry"""
     
     # Find the start and end tags. If either is not found, return None
@@ -69,9 +69,13 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag):
 
     end_tag_position = reasoning_generation.find(end_tag)
     if end_tag_position == -1:
-        return None
-
-    reasoning_trace = reasoning_generation[:end_tag_position + len(end_tag)]
+        if strict_end_tag:
+            return None
+        else:
+            reasoning_generation = reasoning_generation + end_tag
+            reasoning_trace = reasoning_generation
+    else:
+        reasoning_trace = reasoning_generation[:end_tag_position + len(end_tag)]
 
     # Extract the answer from the reasoning trace by searching for boxed entries
     answer_from_reasoning_trace = extract_answer(reasoning_trace)
@@ -97,7 +101,7 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag):
     return reasoning_trace
 
 
-def format_reasoning_trace_with_summary(reasoning_file, summary_dir, start_tag, end_tag):
+def format_reasoning_trace_with_summary(reasoning_file, summary_dir, start_tag, end_tag,  strict_end_tag=False):
     """Format the reasoning trace with the best summary from the summary directory"""
     # Read the reasoning instances
     reasoning_instances = read_jsonl_file(reasoning_file)
@@ -122,7 +126,7 @@ def format_reasoning_trace_with_summary(reasoning_file, summary_dir, start_tag, 
     all_summaries = list(zip(*list_of_summary_instances))
     for (reasoning_instance, summaries_for_reasoning_instance) in zip(reasoning_instances, all_summaries):
         # Step 1 - Trim the reasoning generation
-        trimmed_reasoning_trace = trim_reasoning_generation(reasoning_instance["generation"], start_tag, end_tag)
+        trimmed_reasoning_trace = trim_reasoning_generation(reasoning_instance["generation"], start_tag, end_tag, strict_end_tag=strict_end_tag)
 
         # If the reasoning generation is not trimmed, skip this instance
         if trimmed_reasoning_trace is None:
@@ -154,9 +158,11 @@ def main():
     parser.add_argument("--output_file", type=str, required=True, help="Path to the output file")
     parser.add_argument("--start_tag", type=str, default="<think>", help="Start tag")
     parser.add_argument("--end_tag", type=str, default="</think>", help="End tag")
+    parser.add_argument("--strict_end_tag", type=bool, default=False, help="Strict end tag")
     args = parser.parse_args()
 
-    formatted_instances = format_reasoning_trace_with_summary(args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag)
+    formatted_instances = format_reasoning_trace_with_summary(
+        args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag, args.strict_end_tag)
 
     with open(args.output_file, "w") as f:
         for instance in formatted_instances:

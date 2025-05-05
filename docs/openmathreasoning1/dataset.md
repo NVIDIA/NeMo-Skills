@@ -151,7 +151,7 @@ consists of the following stages:
    for all problems where ground-truth answer is not known (`fill_majority_answer` stage).
 3. [Judge answers using an LLM](../pipelines/llm-as-a-judge.md). Only the final answer is compared to the ground-truth (or majority)
    answer, not the full solution (`judge_answers` stage).
-4. TODO: generate a new summary
+4. Generate new summaries for reasoning solutions, and replace the original solution summaries with valid new summaries (`generate_new_summaries`, `judge_new_summaries`, and `merge_new_summaries`).   
 5. Filter out all incorrect solutions and prepare the data for SFT (`prepare_for_sft` stage).
 
 
