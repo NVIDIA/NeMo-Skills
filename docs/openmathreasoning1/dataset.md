@@ -196,3 +196,19 @@ We provide configurations for two TIR variants:
     ```
 
 You can specify a subset of stages using the `--stages` argument for either mode.
+
+
+
+## GenSelect Generation Pipeline
+
+[GenSelect generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/genselect_generation.py) creates the GenSelect input and output instances. The pipeline relies on the following stages:
+
+1. Prepare instances comparing different solutions (summaries of these solutions) for a given problem (`prepare_labeling_data` stage).
+2. Generating solutions for the comparison instances where we use a reasoning model to output the judgment of what solution is the top-ranking one according to the model (`label_data` stage).
+3. Extract judgments from the reasoning trace and filter out judgments that pick the wrong solutions (`extract_judgment` stage).
+4. Generate new summaries for these judgment reasoning traces (we generate 4 summary per reasoning trace). These summaries can replace the costly reasoning traces as GenSelect targets (`generate_new_summaries` stage). 
+5. Select the best *valid* summary (where the judgment matches the reasoning trace's judgment) as target for GenSelect.
+6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/genselect.yaml).    
+
+
+We provide a configuration `qwq` ([`qwq.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/genselect_sdg/qwq.yaml)) which uses the [Qwen/QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model for labeling the comparison instances. 
