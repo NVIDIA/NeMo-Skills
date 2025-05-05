@@ -208,7 +208,7 @@ You can specify a subset of stages using the `--stages` argument for either mode
 3. Extract judgments from the reasoning trace and filter out judgments that pick the wrong solutions (`extract_judgment` stage).
 4. Generate new summaries for these judgment reasoning traces (we generate 4 summary per reasoning trace). These summaries can replace the costly reasoning traces as GenSelect targets (`generate_new_summaries` stage). 
 5. Select the best *valid* summary (where the judgment matches the reasoning trace's judgment) as target for GenSelect.
-6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/genselect.yaml).    
+6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/openmath/genselect.yaml).    
 
 
 We provide a configuration `qwq` ([`qwq.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/genselect_sdg/qwq.yaml)) which uses the [Qwen/QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model for labeling the comparison instances. 

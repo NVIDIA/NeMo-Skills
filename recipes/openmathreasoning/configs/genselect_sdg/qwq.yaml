@@ -68,7 +68,7 @@ stages:
       - prepare_labeling_data
 
     inline_args: >- 
-      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/genselect.yaml
+      ++prompt_config=openmath/genselect
       ++prompt_template=qwen-instruct
       ++generation_key=gen_rm_comparison
       ++inference.tokens_to_generate=16_384
@@ -107,7 +107,7 @@ stages:
   prepare_for_sft:
     input_file: ${directories.step-5-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-6-prepare-sft}
-    prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/genselect.yaml
+    prompt_config: openmath/genselect
     prompt_template: qwen-instruct
     contamination_file: ${contamination_file}
 
