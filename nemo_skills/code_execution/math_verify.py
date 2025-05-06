@@ -35,13 +35,6 @@ from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
 LOG = logging.getLogger(__file__)
 
 
-class DummyFuture:
-    def __init__(self, return_value):
-        self.return_value = return_value
-
-    def result(self):
-        return self.return_value
-
 def unroll_files(input_files):
     for manifest_pattern in input_files:
         for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
@@ -73,7 +66,7 @@ def dump_data(input_files, data, map_to_future):
                 continue
             line_dict["is_correct"] = map_to_future[
                 (line_dict["predicted_answer"], line_dict["expected_answer"])
-            ].result()
+            ]
             file_handle.write(json.dumps(line_dict) + "\n")
 
     for file_handle in tmp_file_handles:
@@ -225,7 +218,7 @@ def batch_evaluate_results(
                     timeout_seconds=timeout,
                 )
             else:
-                map_to_future[(predicted_answer, gt_answer)] = DummyFuture(line_dict["is_correct"])
+                map_to_future[(predicted_answer, gt_answer)] = line_dict["is_correct"]
 
         for file_handle in file_handles:
             file_handle.close()
