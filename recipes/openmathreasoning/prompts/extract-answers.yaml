@@ -45,6 +45,8 @@ user: |-
     array([-0.93580304,  2.03210427])
     ```
     ```system
-    You have run out of code executions! You can no longer write or execute code. Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.
+    You have run out of code executions! 
+    You can no longer write or execute code. 
+    Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.
     ```
     Hmm, it seems I've reached the limit of code executions. Let me check the solution provided by the code.
