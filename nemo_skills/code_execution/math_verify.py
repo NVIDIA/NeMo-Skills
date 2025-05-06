@@ -159,7 +159,7 @@ def batch_evaluate_results(
     num_parallel_requests=100,
     in_memory_lines=1500,
     numeric_precision=15,
-    timeout=10.0,
+    timeout=10,
     take_modulo=None,
     ignore_cache: bool = False,
     use_predicted_answer_key: bool = False,
