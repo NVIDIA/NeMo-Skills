@@ -159,7 +159,7 @@ class GenSelectTask(GenerationTask):
 
                 judgment = self._extract_judgment(instance['gen_rm_comparison'], max_idx=instance["max_idx"])
                 if judgment:
-                    output_instance["judgment_idx"] = judgement
+                    output_instance["judgment_idx"] = judgment
                 else:
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
