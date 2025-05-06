@@ -220,10 +220,10 @@ def batch_evaluate_results(
             else:
                 map_to_future[(predicted_answer, gt_answer)] = line_dict["is_correct"]
 
-        for file_handle in file_handles:
-            file_handle.close()
+    if len(data) > 0:
+        dump_data(input_files, data, map_to_future)
 
-        if len(data) > 0:
-            dump_data(input_files, data, map_to_future)
+    for file_handle in file_handles:
+        file_handle.close()
 
     write_tmp_files_back(input_files)
