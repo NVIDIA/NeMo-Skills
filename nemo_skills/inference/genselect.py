@@ -104,8 +104,8 @@ class GenSelectConfig:
     def __post_init__(self):
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
-        self.input_file = Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl"
-        self.output_file = Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl"
+        self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
+        self.output_file = str(Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl")
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
 
