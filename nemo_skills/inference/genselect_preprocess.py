@@ -134,16 +134,13 @@ def sample_instances(clustered_instances, max_soln_samples=8, sampling_strategy=
 
 def create_comparison_instance(clustered_instances, problem, max_soln_samples=8, sampling_strategy="linear"):
     # Create a consolidated instance
-    comparison_instance = {
-        "problem": problem,
-    }
-    
     sampled_instances = sample_instances(clustered_instances, max_soln_samples=max_soln_samples, sampling_strategy=sampling_strategy)
     sampled_solutions = [extract_summary(instance["generation"]) for instance in sampled_instances]
     consolidated_solutions = ""
     for idx, solution in enumerate(sampled_solutions):
         consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
 
+    comparison_instance = deepcopy(sampled_instances[0])
     comparison_instance["solutions"] = consolidated_solutions
     comparison_instance["max_idx"] = len(sampled_solutions) - 1
     comparison_instance["num_solutions"] = len(sampled_instances)
