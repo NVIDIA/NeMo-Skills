@@ -90,7 +90,7 @@ If you find our work useful, please consider citing us!
 
 ```bibtex
 @article{moshkov2025aimo2,
-  title   = {AIMO-2 Winning Solution: Building State-of-the-Art Mathematical Reasoning Models with OpenMathReasoning dataset},
+  title   = {{AIMO-2 Winning Solution: Building State-of-the-Art Mathematical Reasoning Models with OpenMathReasoning dataset}},
   author  = {Ivan Moshkov and Darragh Hanley and Ivan Sorokin and Shubham Toshniwal and Christof Henkel and Benedikt Schifferer and Wei Du and Igor Gitman},
   year    = {2025},
   journal = {arXiv preprint arXiv:2504.16891}
@@ -98,11 +98,11 @@ If you find our work useful, please consider citing us!
 ```
 
 ```bibtex
-@article{toshniwal2024openmathinstruct2,
+@inproceedings{toshniwal2024openmathinstruct2,
   title   = {{OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data}},
   author  = {Shubham Toshniwal and Wei Du and Ivan Moshkov and Branislav Kisacanin and Alexan Ayrapetyan and Igor Gitman},
-  year    = {2024},
-  journal = {arXiv preprint arXiv:2410.01560}
+  year    = {2025},
+  booktitle = {ICLR},
 }
 ```
 
@@ -111,7 +111,7 @@ If you find our work useful, please consider citing us!
   title   = {{OpenMathInstruct-1: A 1.8 Million Math Instruction Tuning Dataset}},
   author  = {Shubham Toshniwal and Ivan Moshkov and Sean Narenthiran and Daria Gitman and Fei Jia and Igor Gitman},
   year    = {2024},
-  booktitle = {Advances in Neural Information Processing Systems},
+  booktitle = {NeurIPS},
 }
 ```
 
