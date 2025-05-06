@@ -88,6 +88,7 @@ class GenSelectConfig:
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
 
+    examples_type: str | None = None  # to be able to customize few-shot examples
     sandbox: dict = field(default_factory=dict)
     code_execution: bool = False
     # Controls how many code executions are allowed in prompt (useful for models that support dynamically setting this)
