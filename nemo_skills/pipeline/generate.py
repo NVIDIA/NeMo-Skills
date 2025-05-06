@@ -331,7 +331,11 @@ def get_genselect_cmd(
         f"    ++skip_filled=True "
         f"    ++input_dir={output_dir}/comparison_instances "
         f"    ++output_dir={output_dir} "
-        f"    ++random_seed={random_seed} "
+        f"    ++inference.random_seed={random_seed} "
+        f"    ++inference.temperature=0.7 "
+        f"    ++inference.tokens_to_generate=2048 "
+        f"    ++inference.top_k=0 "
+        f"    ++inference.top_p=0.95 "
     )
     cmd += f" {extra_arguments} "
     return cmd, postprocess_cmd
