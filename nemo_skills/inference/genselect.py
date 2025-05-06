@@ -154,11 +154,11 @@ class GenSelectTask(GenerationTask):
     
 
     def postprocess(self):
-        single_answer_instances_file = path.join(self.input_dir, "single_answer_instances.jsonl")
+        single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")
         single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
-        input_file = self.output_file
-        output_file = Path(self.output_dir) / f"output-rs{self.inference.random_seed}.jsonl"
+        input_file = self.cfg.output_file
+        output_file = Path(self.cfg.output_dir) / f"output-rs{self.cfg.inference.random_seed}.jsonl"
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
             for single_answer_instance in single_answer_instances:
