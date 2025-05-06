@@ -179,55 +179,53 @@ def batch_evaluate_results(
     cleanup_tmp_files(input_files)
 
     data = []
-    with ThreadPoolExecutor(max_workers=num_parallel_requests) as executor:
-        for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
-            if line_idx % in_memory_lines == 0:
-                if line_idx > 0:  # dumping into tmp files
-                    dump_data(input_files, data, map_to_future)
-                # new in-memory buffer
-                data = []
-                map_to_future = {}
+    for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
+        if line_idx % in_memory_lines == 0:
+            if line_idx > 0:  # dumping into tmp files
+                dump_data(input_files, data, map_to_future)
+            # new in-memory buffer
+            data = []
+            map_to_future = {}
 
-            data.append([])
-            for file_line in lines:
-                data[-1].append(file_line)
-                if file_line is None:  # if different files have different number of lines
-                    continue
-                line_dict = json.loads(file_line)
-                if not line_dict:  # can be empty for incomplete generations
-                    continue
-                gt_answer = line_dict["expected_answer"]
+        data.append([])
+        for file_line in lines:
+            data[-1].append(file_line)
+            if file_line is None:  # if different files have different number of lines
+                continue
+            line_dict = json.loads(file_line)
+            if not line_dict:  # can be empty for incomplete generations
+                continue
+            gt_answer = line_dict["expected_answer"]
 
-                if not use_predicted_answer_key:
-                    line_dict["predicted_answer"] = extract_answer(
-                        line_dict["generation"],
-                        extract_from_boxed=extract_from_boxed,
-                        extract_regex=extract_regex,
+            if not use_predicted_answer_key:
+                line_dict["predicted_answer"] = extract_answer(
+                    line_dict["generation"],
+                    extract_from_boxed=extract_from_boxed,
+                    extract_regex=extract_regex,
+                )
+            else:
+                if "predicted_answer" not in line_dict:
+                    raise ValueError(
+                        "predicted_answer key not found in the line_dict. "
+                        "Set use_predicted_answer_key=False to re-extract"
                     )
-                else:
-                    if "predicted_answer" not in line_dict:
-                        raise ValueError(
-                            "predicted_answer key not found in the line_dict. "
-                            "Set use_predicted_answer_key=False to re-extract"
-                        )
 
-                data[-1][-1] = json.dumps(line_dict)
-                predicted_answer = line_dict["predicted_answer"]
+            data[-1][-1] = json.dumps(line_dict)
+            predicted_answer = line_dict["predicted_answer"]
 
-                if (predicted_answer, gt_answer) in map_to_future:
-                    continue
+            if (predicted_answer, gt_answer) in map_to_future:
+                continue
 
-                if ignore_cache or line_dict.get("is_correct") is None:
-                    map_to_future[(predicted_answer, gt_answer)] = executor.submit(
-                        verify_answer,
-                        gt_answer,
-                        predicted_answer,
-                        take_modulo=take_modulo,
-                        numeric_precision=numeric_precision,
-                        timeout_seconds=timeout,
-                    )
-                else:
-                    map_to_future[(predicted_answer, gt_answer)] = DummyFuture(line_dict["is_correct"])
+            if ignore_cache or line_dict.get("is_correct") is None:
+                map_to_future[(predicted_answer, gt_answer)] = verify_answer(
+                    gt_answer,
+                    predicted_answer,
+                    take_modulo=take_modulo,
+                    numeric_precision=numeric_precision,
+                    timeout_seconds=timeout,
+                )
+            else:
+                map_to_future[(predicted_answer, gt_answer)] = DummyFuture(line_dict["is_correct"])
 
         for file_handle in file_handles:
             file_handle.close()
