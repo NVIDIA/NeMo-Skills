@@ -161,6 +161,30 @@ class DropIncorrectCodeBlocks(BaseFilter):
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
 
 
+class AddCodeExecutionsCounts(BaseFilter):
+    def __init__(
+            self, solution_key: str = "generation",
+            ce_counter_key: str = "total_code_executions",
+            **kwargs
+        ):
+        super().__init__(**kwargs)
+        self.solution_key = solution_key
+        self.ce_counter_key = ce_counter_key
+
+    def process_dataset_entry(self, data_entry) -> List:
+        pattern = r"Remaining code executions: (\d+)."
+        allowed_ce = re.search(pattern, data_entry[self.solution_key])
+        counts = 0
+        if not allowed_ce:
+            if "You have run out of code executions!" in data_entry[self.solution_key]:
+                counts = 1
+        else:
+            counts = int(allowed_ce.group(1)) + 1
+
+        data_entry[self.ce_counter_key] = counts
+        return [DataEntry(data=data_entry, metrics=dict(num_modified=1))]
+
+
 class DropIncorrectArithmetic(BaseFilter):
     def __init__(self, solution_key: str = "generation", tolerance=1e-4, **kwargs):
         super().__init__(**kwargs)
