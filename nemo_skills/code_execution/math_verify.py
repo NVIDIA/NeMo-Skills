@@ -220,8 +220,8 @@ def batch_evaluate_results(
                 if ignore_cache or line_dict.get("is_correct") is None:
                     map_to_future[(predicted_answer, gt_answer)] = executor.submit(
                         verify_answer,
-                        predicted_answer,
                         gt_answer,
+                        predicted_answer,
                         take_modulo=take_modulo,
                         numeric_precision=numeric_precision,
                         timeout_seconds=timeout,
