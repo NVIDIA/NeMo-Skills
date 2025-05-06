@@ -14,15 +14,18 @@
 
 import json
 import logging
+import re
 import sys
 from dataclasses import field
 from enum import Enum
 from pathlib import Path
+from copy import deepcopy
+import random
 
 import hydra
 import typer
 from tqdm import tqdm
-
+from os import path, makedirs
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.generate import InferenceConfig, GenerationTask
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
@@ -109,8 +112,62 @@ class GenSelectTask(GenerationTask):
     def get_generation_module(self):
         return "nemo_skills.inference.genselect"
 
+    def _extract_judgment(self, generation, max_idx=None):
+        """Extract the judgment from the generation."""
+        judgment = None
+
+        try:
+            matches = re.findall(r"Judg[e]?ment: (\d+)", generation)
+            # print(matches)
+
+            if matches:
+                number = matches[-1]
+                judgment = int(number)
+                if max_idx is not None and judgment > max_idx:
+                    judgment = None
+            else:
+                judgment = None
+
+        except:
+            judgment = None
+
+        if judgment is not None and max_idx is not None:
+            if judgment > max_idx:
+                judgment = None
+
+        return judgment
+    
+
     def postprocess(self):
-        pass
+        single_answer_instances_file = path.join(self.input_dir, "single_answer_instances.jsonl")
+        single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
+
+        input_file = self.output_file
+        output_file = Path(self.output_dir) / f"output-rs{self.inference.random_seed}.jsonl"
+
+        with open(input_file, 'r') as f, open(output_file, 'w') as fout:
+            for single_answer_instance in single_answer_instances:
+                fout.write(json.dumps(single_answer_instance) + '\n')
+
+            for line in f:
+                instance = json.loads(line)
+                output_instance = deepcopy(instance)
+                output_instance = {
+                    "problem": instance['problem'], 
+                    "expected_answer": instance['expected_answer']
+                }
+
+                judgment = self._extract_judgment(instance['gen_rm_comparison'], max_idx=instance["max_idx"])
+                if judgment:
+                    output_instance["judgment_idx"] = judgement
+                else:
+                    output_instance["judgment_idx"] = None
+                    judgment = random.randint(0, instance["max_idx"])
+
+                output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
+                output_instance["is_correct"] = instance[f'is_correct_{judgment}']
+
+                fout.write(json.dumps(output_instance) + '\n')
 
 
 # Update the hydra main to use the class method
