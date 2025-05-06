@@ -12,23 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-bs4
-datasets
-evalplus @ git+https://github.com/evalplus/evalplus@c91370f
-httpx
-huggingface_hub
-hydra-core
-nemo_run @ git+https://github.com/NVIDIA/NeMo-Run.git
-numpy
-openai
-pyyaml
-rank_bm25
-requests
-scikit-learn
-sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor@29b9b1ec0ceaf3ffa441c1d01297371b3f8e11d2
-sympy
-tqdm
-transformers
-typer >= 0.13
-fire
-wandb
+
+MAJOR = 0
+MINOR = 6
+PATCH = 0
+
+# Use the following formatting: (major, minor, patch, pre-release)
+VERSION = (MAJOR, MINOR, PATCH)
+
+__shortversion__ = '.'.join(map(str, VERSION[:3]))
+__version__ = '.'.join(map(str, VERSION[:3]))

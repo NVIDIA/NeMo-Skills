@@ -225,14 +225,15 @@ through a convenient Python API.
     commands below without changes.
 
 In our paper we also did a second round SFT for all models except 32B. All the commands stay the same
-except the following changes to initial data preparation as well as a change to train for 2000 steps
+except the following changes to initial data preparation as well as a change to train for 3000 steps
 instead of 30000 used in the first-round SFT.
 
 ```bash
     --nemo_model=/workspace/openmathreasoning-sft/checkpoints/model-averaged-nemo \
-    --average_steps=500,1000,1500,2000 \
-    ++model.optim.sched.warmup_steps=200 \
-    ++trainer.sft.max_steps=2000 \
+    --training_data=<path to the new packed data> \
+    --average_steps=750,1500,2250,3000 \
+    ++model.optim.sched.warmup_steps=300 \
+    ++trainer.sft.max_steps=3000
 ```
 
 Here is the code that can be used to prepare the second-round SFT data

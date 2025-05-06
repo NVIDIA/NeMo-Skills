@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '0.6.0'
+from nemo_skills.version import __version__
 
 # only used in ns setup command to initialize with defaults
 _containers = {

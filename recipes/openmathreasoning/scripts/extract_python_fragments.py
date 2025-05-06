@@ -19,24 +19,15 @@ import re
 from typing import List
 
 
-def extract_python_blocks_with_context(document: str, window_size: int = 500) -> List[str]:
-    """
-    Extract Python code blocks with surrounding context from a document.
-
-    Args:
-        document (str): The input document text
-        window_size (int): Number of characters to include before and after the code block
-
-    Returns:
-        list: List of extracted fragments, each containing one Python block with context
-    """
-    pattern = r'```python\n(.*?)\n```\n```output\n(.*?)\n```'
+def extract_python_blocks_with_context(document: str, args) -> List[str]:
+    pattern = fr'{args.code_begin}(.*?){args.code_end}```output\n(.*?)\n```'
 
     matches = list(re.finditer(pattern, document, re.DOTALL))
 
     if not matches:
         return []
 
+    window_size = args.window_size
     fragments = []
 
     for i, match in enumerate(matches):
@@ -67,16 +58,8 @@ def extract_python_blocks_with_context(document: str, window_size: int = 500) ->
     return fragments
 
 
-def process_jsonl_file(input_file: str, output_file: str, window_size: int = 500) -> None:
-    """
-    Process a JSONL file, extracting Python blocks from each entry's 'generation' field.
-
-    Args:
-        input_file (str): Path to the input JSONL file
-        output_file (str): Path to the output JSONL file
-        window_size (int): Number of characters for context window
-    """
-    with open(input_file, 'r', encoding='utf-8') as f_in, open(output_file, 'w', encoding='utf-8') as f_out:
+def process_jsonl_file(args) -> None:
+    with open(args.input_file, 'r', encoding='utf-8') as f_in, open(args.output_file, 'w', encoding='utf-8') as f_out:
         for idx, line in enumerate(f_in):
             try:
                 entry = json.loads(line.strip())
@@ -86,7 +69,7 @@ def process_jsonl_file(input_file: str, output_file: str, window_size: int = 500
                     continue
 
                 generation = entry['generation']
-                fragments = extract_python_blocks_with_context(generation, window_size)
+                fragments = extract_python_blocks_with_context(generation, args)
 
                 for fragment_idx, fragment in enumerate(fragments):
                     output_entry = {
@@ -107,13 +90,15 @@ def process_jsonl_file(input_file: str, output_file: str, window_size: int = 500
             except Exception as e:
                 print(f"Error processing line {idx}: {str(e)}")
 
-    print(f"Processing complete. Results written to {output_file}")
+    print(f"Processing complete. Results written to {args.output_file}")
 
 
 def main():
     parser = argparse.ArgumentParser(description='Extract Python code blocks with context from JSONL file')
     parser.add_argument('--input_file', type=str, required=True, help='Path to input JSONL file')
     parser.add_argument('--output_file', type=str, required=True, help='Path to output JSONL file')
+    parser.add_argument("--code_begin", type=str, required=True, help="Start of code block tag")
+    parser.add_argument("--code_end", type=str, required=True, help="End of code block tag")
     parser.add_argument(
         '--window_size', type=int, default=1500, help='Size of context window before and after code block'
     )
@@ -122,7 +107,7 @@ def main():
     output_dir = os.path.dirname(args.output_file)
     os.makedirs(output_dir, exist_ok=True)
 
-    process_jsonl_file(args.input_file, args.output_file, args.window_size)
+    process_jsonl_file(args)
 
 
 if __name__ == "__main__":

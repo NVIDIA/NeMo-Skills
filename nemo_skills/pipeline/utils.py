@@ -38,6 +38,8 @@ from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
+
+
 LOG = logging.getLogger(__file__)
 
 
@@ -99,29 +101,282 @@ def get_registered_external_repo(name: str) -> Optional[RepoMetadata]:
     return EXTERNAL_REPOS[name]
 
 
+def is_mounted_filepath(cluster_config: dict, path: str):
+    """
+    Check if the filepath is mounted using the cluster config. Does not raise an error if the filepath is not mounted.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        bool: Whether the filepath is mounted.
+    """
+    # Find which mount path matches the filepaths prefix
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_dest):
+            return True
+
+    return False
+
+
 def check_if_mounted(cluster_config, path_to_check):
     """Will check that path_to_check is referenced inside one of the mounts."""
     if cluster_config["executor"] == "none":
         # no mounts in local executor
         return
 
-    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
-        if path_to_check.startswith(mount.split(":")[1]):
-            return
-    raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
+    if not is_mounted_filepath(cluster_config, path_to_check):
+        raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
-def get_unmounted_path(cluster_config, path):
-    """Will return the path on the filesystem before it's mounted."""
+def get_mounted_path(cluster_config: dict, path: str):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        str: mounted filepath
+
+    Raises:
+        ValueError: if the filepath is not mounted
+    """
     if cluster_config["executor"] == "none":
         # no mounts in local executor
         return path
     if path is None:
         return None
+
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
+    for mount in cluster_config['mounts']:
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_source):
+            mount_path = mount
+            break
+
+        elif path.startswith(mount_dest):
+            # already mounted, return immediately
+            return path
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+    # append the rest of the path to the mount destination
+    filepath = mount_dest + path[len(mount_source) :]
+
+    return filepath
+
+
+def get_unmounted_path(cluster_config: dict, path: str):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
+    If the filepath is already mounted, it will return the filepath as is.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        str: mounted filepath
+
+    Raises:
+        ValueError: if the filepath is not mounted
+    """
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return path
+    if path is None:
+        return None
+
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
     for mount in get_mounts_from_config(cluster_config):
-        if path.startswith(mount.split(":")[1]):
-            return mount.split(":")[0] + path[len(mount.split(":")[1]) :]
-    raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_dest):
+            mount_path = mount
+            break
+
+        elif path.startswith(mount_source):
+            # already mounted, return immediately
+            return path
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+
+    # append the rest of the path to the mount source
+    filepath = mount_source + path[len(mount_dest) :]  # replace the mount destination with the mount source
+
+    return filepath
+
+
+def add_mount_path(mount_source: str, mount_dest: str, cluster_config):
+    """Add a mount path to the cluster configuration."""
+
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+
+    if 'mounts' in cluster_config:
+        original_mounts = get_mounts_from_config(cluster_config)
+        added_mount = False
+        for mount_path in original_mounts:
+            source, destination = mount_path.split(':')
+
+            if source == mount_source and destination == mount_dest:
+                return
+
+        if not added_mount:
+            cluster_config['mounts'].append(f"{mount_source}:{mount_dest}")
+            logging.info(f"Added mount path: `{mount_source}:{mount_dest}`")
+
+    else:
+        raise ValueError("No mounts found in cluster config, can only add to existing mount list.")
+
+
+def create_remote_directory(directory: str | list, cluster_config: dict):
+    """Create a remote directory on the cluster."""
+
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+
+    if isinstance(directory, str):
+        directory = [directory]
+
+    if cluster_config.get('executor') != 'slurm':
+        tunnel = run.LocalTunnel(job_dir=directory[0])
+        for dir_path in directory:
+            tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
+            logging.info(f"Created directory: {dir_path} in local filesystem.")
+        tunnel.cleanup()
+
+    elif cluster_config.get('executor') == 'slurm':
+        ssh_tunnel_config = cluster_config.get('ssh_tunnel', None)
+        if ssh_tunnel_config is None:
+            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
+
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = directory[0]
+
+        tunnel = get_tunnel(cluster_config)
+        for dir_path in directory:
+            tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
+            logging.info(f"Created directory: {dir_path} on remote cluster.")
+        tunnel.cleanup()
+
+    else:
+        raise ValueError(f"Unsupported executor: {cluster_config.get('executor')}")
+
+
+def resolve_mount_paths(cluster_config: dict, mount_paths: str | list | dict, create_remote_dir: bool = True):
+    """
+    Resolve the mount paths using the cluster config to merge the mount destination path to the filepath.
+    Args:
+        cluster_config: The cluster configuration dictionary to update.
+        mount_paths: The mount paths to resolve - can be a string (comma separated), dict or a list of strings.
+            Each mount path should be in the format `src:dest`.
+        create_remote_dir: Whether to create the remote directories for the mount paths.
+    """
+    if mount_paths is not None:
+        if isinstance(mount_paths, str):
+            mount_paths_list = mount_paths.split(",")
+        elif isinstance(mount_paths, dict):
+            mount_paths_list = [f"{src}:{dest}" for src, dest in mount_paths.items()]
+        else:
+            mount_paths_list = mount_paths
+
+        # remove empty strings from the list and strip whitespace
+        mount_paths_list = [path.strip() for path in mount_paths_list]
+        mount_paths_list = [path for path in mount_paths_list if path != ""]
+
+        for idx, path in enumerate(mount_paths_list):
+            assert ":" in path, f"Invalid mount path: {path}. Each path must be in the format `src:dest`"
+            src, dest = path.split(":")
+            src = src.strip().strip("\n")
+            dest = dest.strip().strip("\n")
+
+            LOG.info(f"Adding mount path:- {src}:{dest}")
+            mount_paths_list[idx] = (src, dest)
+            add_mount_path(src, dest, cluster_config)
+
+        if create_remote_dir:
+            LOG.info(f"Creating remote directories for mount paths:")
+            all_src_dir = [src for src, _ in mount_paths_list]
+            # Check if it is a file or a directory and only create the directory
+            for idx in range(len(all_src_dir)):
+                if os.path.splitext(all_src_dir[idx])[1] != "":
+                    all_src_dir[idx] = os.path.dirname(all_src_dir[idx])
+                LOG.info(f"Attempting to create remote directory: {all_src_dir[idx]}")
+
+            create_remote_directory(all_src_dir, cluster_config)
+
+    return cluster_config
+
+
+def check_remote_mount_directories(directories: list, cluster_config: dict, exit_on_failure: bool = True):
+    """Create a remote directory on the cluster."""
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+    if isinstance(directories, str):
+        directories = [directories]
+    if cluster_config.get('executor') != 'slurm':
+        tunnel = run.LocalTunnel(job_dir=None)
+        all_dirs_exist = True
+        missing_source_locations = []
+        for directory in directories:
+            result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
+            if "Directory Exists" not in result.stdout:
+                missing_source_locations.append(directory)
+        tunnel.cleanup()
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
+    elif cluster_config.get('executor') == 'slurm':
+        ssh_tunnel_config = cluster_config.get('ssh_tunnel', None)
+        if ssh_tunnel_config is None:
+            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = os.getcwd()
+        tunnel = get_tunnel(cluster_config)
+        missing_source_locations = []
+        for directory in directories:
+            result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
+            if "Directory Exists" not in result.stdout:
+                missing_source_locations.append(directory)
+        tunnel.cleanup()
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
+    else:
+        raise ValueError(f"Unsupported executor: {cluster_config.get('executor')}")
 
 
 # caching the status assuming it doesn't change while experiment is being scheduled
@@ -512,6 +767,23 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
+    # If the str provided is an env variable, resolve it
+    if "$" in job_dir:
+        job_dir = os.path.expandvars(job_dir)
+        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
+
+    if "$" in host:
+        host = os.path.expandvars(host)
+        LOG.info(f"Resolved `host` from env var to `{host}`")
+
+    if "$" in user:
+        user = os.path.expandvars(user)
+        LOG.info(f"Resolved `user` from env var to `{user}`")
+
+    if "$" in identity:
+        identity = os.path.expandvars(identity)
+        LOG.info(f"Resolved `identity` from env var to `{identity}`")
+
     return run.SSHTunnel(
         host=host,
         user=user,
