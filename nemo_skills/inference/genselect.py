@@ -158,7 +158,8 @@ class GenSelectTask(GenerationTask):
         single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        output_file = Path(self.cfg.output_dir) / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        output_file = Path(self.cfg.output_dir) / "math" / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
             for single_answer_instance in single_answer_instances:
