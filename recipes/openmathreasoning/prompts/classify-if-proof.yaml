@@ -13,7 +13,8 @@ user: |-
   Example 1
 
   Problem:
-  Prove the identity $a^\frac{{1}}{{2}}-\frac{{a-a^{{-2}}{{a^\frac{{1}}{{2}}-a^{{-\frac{{1}}{{2}} +\frac{{1-a^{{-2}}{{a^\frac{{1}}{{2}}+a^{{-\frac{{1}}{{2}}+\frac{{2}}{{a^\frac{{3}}{{2}}=0$
+  Prove the identity $a^\frac{{1}}{{2}}-\frac{{a-a^{{-2}}{{a^\frac{{1}}{{2}}-a^{{-\frac{{1}}{{2}} +
+                      \frac{{1-a^{{-2}}{{a^\frac{{1}}{{2}}+a^{{-\frac{{1}}{{2}}+\frac{{2}}{{a^\frac{{3}}{{2}}=0$
 
   Output: proof
 
@@ -22,7 +23,8 @@ user: |-
   Example 2
 
   Problem:
-  Write first several terms of a geometric progression in which the difference between the third and first terms is equal to 9, and that between the fifth and third terms equal 36.
+  Write first several terms of a geometric progression in which the difference between the third and first 
+  terms is equal to 9, and that between the fifth and third terms equal 36.
 
   Output: not proof
 
@@ -31,7 +33,8 @@ user: |-
   Example 3
 
   Problem:
-  Solve the following equations: $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
+  Solve the following equations: 
+  $\frac{{\sin(60^\circ+x)+\sin(60^\circ-x)}}{{2}} =\frac{{\tan x}}{{(1+\tan^2 x)^2}}+\frac{{\cot x}}{{(1+\cot^2 x)^2}}$
 
   Output: not proof
 
