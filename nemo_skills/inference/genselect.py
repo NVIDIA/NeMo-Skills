@@ -24,6 +24,7 @@ import random
 
 import hydra
 import typer
+from typing import Any
 from tqdm import tqdm
 from os import path, makedirs
 from nemo_skills.inference.server.code_execution_model import server_params
@@ -86,6 +87,17 @@ class GenSelectConfig:
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
+
+    sandbox: dict = field(default_factory=dict)
+    code_execution: bool = False
+    # Controls how many code executions are allowed in prompt (useful for models that support dynamically setting this)
+    # if total_code_executions placeholder is not in the prompt, this parameter has no effect
+    # Can be int, (min,max) tuple, or None
+    # If (min,max) tuple, will be randomly sampled from random.randint(min_val, max_val) for each sample in a batch
+    # useful to generate data with variable number of total_code_executions_in_prompt
+    total_code_executions_in_prompt: Any = None
+    # When True, total_code_executions_in_prompt override model defaults
+    override_max_code_executions: bool = False
 
 
     def __post_init__(self):
