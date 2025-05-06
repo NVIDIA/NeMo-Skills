@@ -48,28 +48,21 @@ def read_files(file_paths, single_answer_instances_path):
         problem_to_clustered_instances = {}
         for problem, instance_list in problem_to_instances.items():
             answer_clusters = defaultdict(list)
-            expected_answer = None
             for instance in instance_list:
                 answer = instance["predicted_answer"]
-                expected_answer = instance["expected_answer"]
-                if answer is None:
-                    continue
                 answer_clusters[answer].append(instance)
             
-            if len(answer_clusters) < 2:
+            if len(answer_clusters) == 1:
                 # Single answer or no answer
-                if len(answer_clusters) == 1:
-                    _, single_answer_instance_list = list(answer_clusters.items())[0]
-                    instance = single_answer_instance_list[0]
-                    single_answer_instance = deepcopy(instance)
-                    single_answer_instance["is_correct"] = (is_correct_judgement(instance["judgement"]) if "judgement" in instance else instance["is_correct"])
+                _, single_answer_instance_list = list(answer_clusters.items())[0]
+                instance = single_answer_instance_list[0]
+                single_answer_instance = deepcopy(instance)
+                if single_answer_instance["predicted_answer"] is None:
+                    # The only predicted answer across seeds is None
+                    single_answer_instance["is_correct"] = False
                 else:
-                    single_answer_instance = {
-                        "problem": problem, 
-                        "predicted_answer": None, 
-                        "expected_answer": expected_answer, 
-                        "is_correct": False
-                    }
+                    single_answer_instance["is_correct"] = (is_correct_judgement(instance["judgement"]) if "judgement" in instance else instance["is_correct"])
+                
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
                 problem_to_clustered_instances[problem] = [(answer, instances) for answer, instances in answer_clusters.items()]

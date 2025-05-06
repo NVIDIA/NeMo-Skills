@@ -585,16 +585,16 @@ def generate(
             genselect_args = genselect_args + f" ++num_random_seeds={len(random_seeds)}" + f" ++output_dir={output_dir}"
             preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
 
-            # preprocess_task = add_task(
-            #     exp,
-            #     cmd=preprocess_cmd,
-            #     task_name="preprocess_genselect",
-            #     log_dir=f"{output_dir}/preprocess-logs",
-            #     container=cluster_config["containers"]["nemo-skills"],
-            #     cluster_config=cluster_config,
-            # )
-            # initial_tasks = [preprocess_task]
-            initial_tasks = None
+            preprocess_task = add_task(
+                exp,
+                cmd=preprocess_cmd,
+                task_name="preprocess_genselect",
+                log_dir=f"{output_dir}/preprocess-logs",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+            )
+            initial_tasks = [preprocess_task]
+            # initial_tasks = None
 
         else:
             initial_tasks = None
