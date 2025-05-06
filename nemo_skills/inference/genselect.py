@@ -114,7 +114,7 @@ class GenSelectTask(GenerationTask):
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_generation_config')
+@hydra.main(version_base=None, config_name='base_genselect_config')
 def generate(cfg: GenSelectConfig):
     cfg = GenSelectConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)

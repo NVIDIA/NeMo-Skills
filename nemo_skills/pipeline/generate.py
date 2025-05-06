@@ -622,6 +622,13 @@ def generate(
                 )
                 prev_tasks = initial_tasks
                 for _ in range(dependent_jobs + 1):
+                    print(wrap_cmd(
+                            get_generation_command(server_address=server_address, generation_commands=cmd),
+                            preprocess_cmd,
+                            full_postprocess_cmd,
+                            random_seed=seed,
+                        )
+                    )
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
