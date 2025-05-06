@@ -24,7 +24,7 @@ import tqdm
 from latex2sympy2_extended.math_normalization import extract_boxed_content
 from latex2sympy2_extended import NormalizationConfig, normalize_latex
 from math_verify import parse, verify, StringExtractionConfig, LatexExtractionConfig
-from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
+from nemo_skills.utils import unroll_files
 
 LOG = logging.getLogger(__file__)
 
