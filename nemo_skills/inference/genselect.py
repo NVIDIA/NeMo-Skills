@@ -38,16 +38,13 @@ LOG = logging.getLogger(__file__)
 class GenSelectConfig:
     """Genselect parameters."""
 
-    input_dir: str  # Where to save the generations
-    output_dir: str  # Where to save the generations
+    input_dir: str  # Directory where the original predictions are saved
+    output_dir: str  # Where to save the intermediate outputs and final predictions
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
     prompt_template: str | None = None  # not required for OpenAI server
-    prompt_config: str = "openmath/genselect"  # we will fetch it from dataset dir if not provided
-    prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
-    # if True, model will be prompted to continue "generation" without closing assistant tag
-    continue_prefix_generation: bool = False
+    prompt_config: str = "openmath/genselect"  # GenSelect template
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
@@ -65,14 +62,6 @@ class GenSelectConfig:
     chunk_id: int | None = None  # if specified, will index the specified chunk only
 
     generation_key: str = "gen_rm_comparison"
-    # if specified, we will have a loop over that key in the data file and
-    # treat each element as a new turn of conversation
-    # E.g. if multi_turn_key="turns" and a line in your data file has
-    # turns: ['Hey how are you?', 'And where do you live?']
-    # the generations will also be a list with the first entry corresponding to prompt
-    # with the first question, second entry to both first question, first answer and second question
-    # and so on
-    multi_turn_key: str | None = None
 
     # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
     # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
@@ -84,17 +73,18 @@ class GenSelectConfig:
     # useful to double check that your data can be loaded and prompt has what you expect
     dry_run: bool = False
 
-    # extra stop phrases for llms
+    # Added some of these extra parameters eventhough they are not used in the GenSelect pipeline
+    # This is because we use the GenerationTask class and it expects these parameters
     extra_stop_phrases: list[str] = field(default_factory=list)
+    multi_turn_key: str | None = None
+
+    prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
+    # if True, model will be prompted to continue "generation" without closing assistant tag
+    continue_prefix_generation: bool = False
 
     examples_type: str | None = None  # to be able to customize few-shot examples
     sandbox: dict = field(default_factory=dict)
     code_execution: bool = False
-    # Controls how many code executions are allowed in prompt (useful for models that support dynamically setting this)
-    # if total_code_executions placeholder is not in the prompt, this parameter has no effect
-    # Can be int, (min,max) tuple, or None
-    # If (min,max) tuple, will be randomly sampled from random.randint(min_val, max_val) for each sample in a batch
-    # useful to generate data with variable number of total_code_executions_in_prompt
     total_code_executions_in_prompt: Any = None
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
