@@ -219,4 +219,18 @@ All other commands are the same as in the [CoT part](#run-cot-evaluations).
 
 ## Run GenSelect evaluations
 
-Coming soon!
+Here is a sample command to run GenSelect evaluation:
+
+```bash
+ns generate \
+    --generation_type=genselect \
+    --genselect_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
+    --model=/trt_models/openmath-nemotron-1.5b \
+    ++prompt_template=qwen-instruct \
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect/hle \
+    --cluster=slurm \
+    --server_type=trtllm \
+    --server_gpus=1 \
+    --num_random_seeds=8
+done
+```
