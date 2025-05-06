@@ -24,9 +24,8 @@ from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.code_execution.math_grader import extract_answer, batch_evaluate_results
 from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.code_execution.math_verify import batch_evaluate_results
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
@@ -48,7 +47,6 @@ def eval_mcq(cfg):
 
 @nested_dataclass(kw_only=True)
 class MathEvaluatorConfig:
-    num_parallel_requests: int = 100
     in_memory_lines: int = 1500
     numeric_precision: int = 15
     timeout: int = 10
