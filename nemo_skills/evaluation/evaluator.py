@@ -47,10 +47,8 @@ def eval_mcq(cfg):
 
 @nested_dataclass(kw_only=True)
 class MathEvaluatorConfig:
-    in_memory_lines: int = 1500
     numeric_precision: int = 15
     timeout: int = 10
-    ignore_cache: bool = False
     # if True will not attempt to re-extract based on \boxed or regex
     use_predicted_answer_key: bool = False
 

@@ -35,53 +35,6 @@ def unroll_files(input_files):
             yield manifest
 
 
-def cleanup_tmp_files(input_files):
-    # removing any potentially present tmp files
-    for manifest in unroll_files(input_files):
-        try:
-            os.remove(manifest + "-tmp")
-        except OSError:
-            pass
-
-
-def dump_data(input_files, data, map_to_future):
-    LOG.info("Waiting for current results and dumping to tmp files")
-    tmp_file_handles = [
-        open(manifest + f"-tmp", "at", encoding="utf-8", buffering=1) for manifest in unroll_files(input_files)
-    ]
-
-    for line_data in data:
-        for file_data, file_handle in zip(line_data, tmp_file_handles):
-            if file_data is None:
-                continue
-            line_dict = json.loads(file_data)
-            if not line_dict:
-                file_handle.write("\n")
-                continue
-            line_dict["is_correct"] = map_to_future[
-                (line_dict["predicted_answer"], line_dict["expected_answer"])
-            ]
-            file_handle.write(json.dumps(line_dict) + "\n")
-
-    for file_handle in tmp_file_handles:
-        file_handle.close()
-
-
-def write_tmp_files_back(input_files):
-    """Will gracefully handle early exits on errors by properly merging files"""
-    LOG.info("Writing temporary files back into original files")
-    for manifest in unroll_files(input_files):
-        # copying the rest of the results unchanged if any to tmp file
-        with open(manifest + "-tmp", "rt") as fin:
-            processed_lines = sum(1 for _ in fin)
-        with open(manifest, "rt", encoding="utf-8") as fin, open(manifest + "-tmp", "at", encoding="utf-8") as fout:
-            for line_idx, line in enumerate(fin):
-                if line_idx >= processed_lines:
-                    fout.write(line)
-        # then replacing original file with tmp file
-        os.replace(manifest + "-tmp", manifest)
-
-
 def _additional_normalization(expr):
     # Remove % and \\% from the number
     percentage_pattern = r"^(\d+\.?\d*)(?:\\%|%)$"
@@ -150,76 +103,53 @@ def verify_answer(gt_answer, predicted_answer, take_modulo: int | None = None, *
 
 def batch_evaluate_results(
     input_files: list[str],
-    in_memory_lines=1500,
     numeric_precision=15,
     timeout=10,
     take_modulo=None,
-    ignore_cache: bool = False,
     use_predicted_answer_key: bool = False,
     extract_from_boxed: bool = True,
     extract_regex: str = r"The final answer is (.+)$",
 ):
-    """Will write if the results are correct back into the original files."""
+    for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
+        # assume that input_file is small enough to entirely fit in the memory
+        input_data = []
+        with open(input_file, "rt", encoding="utf-8") as f:
+            num_lines = sum(1 for _ in f)
+        
+        with open(input_file, "rt", encoding="utf-8") as fin:
+            for file_line in tqdm.tqdm(fin, total=num_lines, desc=f"Evaluating {os.path.basename(input_file)}"):
+                line_dict = json.loads(file_line)
+                if not line_dict:  # can be empty for incomplete generations
+                    input_data.append({})
+                    continue
 
-    file_handles = [open(manifest, "rt", encoding="utf-8") for manifest in unroll_files(input_files)]
-    cleanup_tmp_files(input_files)
-
-    data = []
-    for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
-        if line_idx % in_memory_lines == 0:
-            if line_idx > 0:  # dumping into tmp files
-                dump_data(input_files, data, map_to_future)
-            # new in-memory buffer
-            data = []
-            map_to_future = {}
-
-        data.append([])
-        for file_line in lines:
-            data[-1].append(file_line)
-            if file_line is None:  # if different files have different number of lines
-                continue
-            line_dict = json.loads(file_line)
-            if not line_dict:  # can be empty for incomplete generations
-                continue
-            gt_answer = line_dict["expected_answer"]
-
-            if not use_predicted_answer_key:
-                line_dict["predicted_answer"] = extract_answer(
-                    line_dict["generation"],
-                    extract_from_boxed=extract_from_boxed,
-                    extract_regex=extract_regex,
-                )
-            else:
-                if "predicted_answer" not in line_dict:
-                    raise ValueError(
-                        "predicted_answer key not found in the line_dict. "
-                        "Set use_predicted_answer_key=False to re-extract"
+                if not use_predicted_answer_key:
+                    line_dict["predicted_answer"] = extract_answer(
+                        line_dict["generation"],
+                        extract_from_boxed=extract_from_boxed,
+                        extract_regex=extract_regex,
                     )
+                else:
+                    if "predicted_answer" not in line_dict:
+                        raise ValueError(
+                            "predicted_answer key not found in the line_dict. "
+                            "Set use_predicted_answer_key=False to re-extract"
+                        )
 
-            data[-1][-1] = json.dumps(line_dict)
-            predicted_answer = line_dict["predicted_answer"]
+                gt_answer = line_dict["expected_answer"]
+                predicted_answer = line_dict["predicted_answer"]
 
-            if (predicted_answer, gt_answer) in map_to_future:
-                continue
-
-            if ignore_cache or line_dict.get("is_correct") is None:
-                map_to_future[(predicted_answer, gt_answer)] = verify_answer(
+                line_dict["is_correct"] = verify_answer(
                     gt_answer,
                     predicted_answer,
                     take_modulo=take_modulo,
                     numeric_precision=numeric_precision,
                     timeout_seconds=timeout,
                 )
-            else:
-                map_to_future[(predicted_answer, gt_answer)] = line_dict["is_correct"]
-
-    if len(data) > 0:
-        dump_data(input_files, data, map_to_future)
-
-    for file_handle in file_handles:
-        file_handle.close()
-
-    write_tmp_files_back(input_files)
+                input_data.append(line_dict)
+        with open(input_file, "wt", encoding="utf-8", buffering=1) as fout:
+            for line_dict in input_data:
+                fout.write(json.dumps(line_dict) + "\n")
 
 
 def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
