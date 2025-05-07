@@ -5,10 +5,7 @@ suffix: qwen-instruct  # Suffix for experiment names
 
 
 # Input file for the first stage (extract_problems)
-# input_file: ${base_output_dir}/raw_aops_data.jsonl
-# this is really .jsonl, but we gitignore it, so changing extension
-input_file: /nemo_run/code/recipes/openmathreasoning/configs/problem_sdg/example-data.txt
-
+input_file: ${base_output_dir}/raw_aops_data.jsonl
 
 # Define judge model server parameters
 generate_kwargs:

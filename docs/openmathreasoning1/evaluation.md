@@ -152,7 +152,6 @@ ns generate \
     --server_address=https://api.openai.com/v1 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
     ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
-done
 ```
 
 To print the metrics run
@@ -233,5 +232,15 @@ ns generate \
     --server_type=trtllm \
     --server_gpus=1 \
     --num_random_seeds=8
-done
+```
+
+The output folder will have three folders (apart from log folders):
+1. `comparison_instances`: This is the folder where input instances for genselect are kept.
+2. `comparison_judgment`: Output of GenSelect judgments. 
+3. `hle` / `math`: Folder with outputs based on GenSelect's judgments. If `dataset` is not specified in the command, we create a folder with the name `math`  
+
+To print the metrics run:
+
+```bash
+ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle/hle --metric_type math --cluster local
 ```
