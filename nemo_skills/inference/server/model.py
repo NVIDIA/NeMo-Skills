@@ -536,9 +536,9 @@ class OpenAIModel(BaseModel):
         base_url=None,
         api_key=None,
         api_version=None,
-        server_type: str = "openai",
         max_retries: int = 3,
         initial_retry_delay: float = 2.0,
+        endpoint_type: str = "openai",
         **kwargs,
     ):
         BaseModel.__init__(self, **kwargs)
@@ -553,17 +553,22 @@ class OpenAIModel(BaseModel):
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
-            if base_url is not None and 'api.nvidia.com' in base_url:
-                api_key = os.getenv("NVIDIA_API_KEY", api_key)
-                if not api_key:
-                    raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
+            if base_url is not None and 'nvidia.com' in base_url:
+                if endpoint_type == "azureopenai":
+                    api_key = os.getenv("AZURE_OPENAI_API_KEY", api_key)
+                    if not api_key:
+                        raise ValueError("AZURE_OPENAI_API_KEY is required for Azure OpenAI models.")
+                elif endpoint_type == "openai":
+                    api_key = os.getenv("NVIDIA_API_KEY", api_key)
+                    if not api_key:
+                        raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
             elif base_url is not None and 'api.openai.com' in base_url:
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
 
-        # Initialize appropriate client based on server_type
-        if server_type == "azureopenai":
+        # Initialize appropriate client based on endpoint_type
+        if endpoint_type == "azureopenai":
             self.client = openai.AzureOpenAI(api_key=api_key, api_version=api_version or "2024-12-01-preview", azure_endpoint=base_url)
             self.model_type = "Azure OpenAI"
         else:
@@ -681,7 +686,6 @@ class OpenAIModel(BaseModel):
         
         retry_count = 0
         retry_delay = self.initial_retry_delay
-
         while True:
             try:
                 if self.model_type == "Azure OpenAI":
@@ -714,7 +718,6 @@ class OpenAIModel(BaseModel):
                 if retry_count > self.max_retries:
                     LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
                     raise
-
                 # Extract retry-after header if available, otherwise use exponential backoff
                 retry_after = getattr(e, 'retry_after', None)
                 if retry_after is not None and isinstance(retry_after, (int, float)):
@@ -722,7 +725,6 @@ class OpenAIModel(BaseModel):
                 else:
                     wait_time = retry_delay
                     retry_delay *= 2  # Exponential backoff
-
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
                     wait_time, retry_count, self.max_retries
@@ -757,8 +759,6 @@ class OpenAIModel(BaseModel):
             except AttributeError:
                 LOG.error("Unexpected response from OpenAI API: %s", response)
                 raise
-            except openai.RateLimitError:
-                raise openai.RateLimitError(e.message + "\n Try to reduce the batch_size")
             except Exception as e:
                 LOG.error("Unexpected error during API call: %s", str(e))
                 raise
@@ -908,7 +908,6 @@ models = {
     'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'openai': OpenAIModel,
-    'azureopenai': OpenAIModel,  # Use OpenAIModel with server_type="azureopenai"
     'vllm': VLLMModel,
     'sglang': VLLMModel,  # interface is the same
 }

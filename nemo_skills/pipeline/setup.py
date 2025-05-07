@@ -76,7 +76,7 @@ def setup():
         env_vars = typer.prompt(
             "\nYou can also specify any environment variables that you want to be accessible in containers.\n"
             "Can either define just the name (we take value from the current environment), or name=value to use a fixed value.\n"
-            "By default we will always pass WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, HF_TOKEN, so you don't need to list those.\n"
+            "By default we will always pass WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, HF_TOKEN, so you don't need to list those.\n"
             "What other environment variables would you like to define? (comma separated)",
             default="",
         )

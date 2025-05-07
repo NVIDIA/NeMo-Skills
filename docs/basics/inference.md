@@ -96,13 +96,14 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          To use OpenAI models, use `OPENAI_API_KEY` and set `base_url=https://api.openai.com/v1`.
 
-         To use Azure OpenAI models, use `server_type="azureopenai"` and set `base_url` to your Azure OpenAI endpoint URL.
+         To use Azure OpenAI models, use `endpoint_type="azureopenai"` and set `base_url` to your Azure OpenAI endpoint URL.
          You'll also need to set `api_version` (defaults to "2024-12-01-preview") and provide your Azure OpenAI API key.
 
          Example for Azure OpenAI:
          ```python
          llm = get_model(
-             server_type="azureopenai",
+             server_type="openai",  # Use OpenAIModel class
+             endpoint_type="azureopenai",  # Configure for Azure endpoints
              base_url="<your Azure OpenAI endpoint URL>",
              model="<your deployment name>",
              api_version="2024-12-01-preview"
