@@ -46,7 +46,7 @@ def _additional_normalization(expr):
     return expr
 
 
-def verify_answer(gt_answer, predicted_answer, take_modulo: int | None = None, **kwargs):
+def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kwargs):
     if predicted_answer is None:
         return False
     
@@ -139,7 +139,7 @@ def batch_evaluate_results(
                 gt_answer = line_dict["expected_answer"]
                 predicted_answer = line_dict["predicted_answer"]
 
-                line_dict["is_correct"] = verify_answer(
+                line_dict["is_correct"] = math_equal(
                     gt_answer,
                     predicted_answer,
                     take_modulo=take_modulo,

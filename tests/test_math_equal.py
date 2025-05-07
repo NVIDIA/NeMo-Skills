@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import pytest
-from test_code_execution import _get_sandbox
+from nemo_skills.evaluation.math_grader import verify_answer
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
     "output_pair",
     [
@@ -48,16 +47,13 @@ from test_code_execution import _get_sandbox
     ],
     ids=str,
 )
-def test_correct_examples(sandbox_type, output_pair):
-    sandbox = _get_sandbox(sandbox_type)
-
-    output = sandbox.is_output_correct(output_pair[0], output_pair[1])
+def test_correct_examples(output_pair):
+    output = verify_answer(output_pair[0], output_pair[1])
     assert output is True
-    output = sandbox.is_output_correct(output_pair[1], output_pair[0])
+    output = verify_answer(output_pair[1], output_pair[0])
     assert output is True
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
     "output_pair",
     [
@@ -71,9 +67,7 @@ def test_correct_examples(sandbox_type, output_pair):
     ids=str,
 )
 def test_incorrect_examples(sandbox_type, output_pair):
-    sandbox = _get_sandbox(sandbox_type)
-
-    output = sandbox.is_output_correct(output_pair[0], output_pair[1])
+    output = verify_answer(output_pair[0], output_pair[1])
     assert output is False
-    output = sandbox.is_output_correct(output_pair[1], output_pair[0])
+    output = verify_answer(output_pair[1], output_pair[0])
     assert output is False

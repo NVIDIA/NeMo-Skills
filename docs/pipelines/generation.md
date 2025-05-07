@@ -300,7 +300,7 @@ After the jobs are finished, you will see `/workspace/synthetic-math-solutions/g
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
 key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
-[symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/code_execution/math_grader.py).
+[symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py).
 
 To get a more robust assessment of whether the solutions are correct you can follow up with an
 [LLM-as-a-judge evaluation](../pipelines/llm-as-a-judge.md) and then

@@ -185,6 +185,7 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --skip_greedy \
+    --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=openmath/tir \
     ++inference.tokens_to_generate=32768 \
@@ -207,6 +208,7 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --skip_greedy \
+    --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
