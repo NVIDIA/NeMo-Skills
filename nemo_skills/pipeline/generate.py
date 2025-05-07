@@ -594,7 +594,6 @@ def generate(
                 cluster_config=cluster_config,
             )
             initial_tasks = [preprocess_task]
-            # initial_tasks = None
 
         else:
             initial_tasks = None
