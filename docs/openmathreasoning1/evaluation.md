@@ -228,7 +228,7 @@ ns generate \
     ++prompt_template=qwen-instruct \
     ++dataset=hle \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \
-    --cluster=slurm \
+    --cluster=local \
     --server_type=trtllm \
     --server_gpus=1 \
     --num_random_seeds=8
