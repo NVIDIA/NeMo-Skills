@@ -64,7 +64,7 @@ def test_correct_examples(output_pair):
     ],
     ids=str,
 )
-def test_incorrect_examples(sandbox_type, output_pair):
+def test_incorrect_examples(output_pair):
     output = math_equal(output_pair[0], output_pair[1])
     assert output is False
     output = math_equal(output_pair[1], output_pair[0])
