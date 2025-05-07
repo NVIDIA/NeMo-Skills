@@ -34,7 +34,7 @@ jobs:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-        docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.6.0 &
+        docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.6.1 &
         sleep 120
         export NEMO_SKILLS_SANDBOX_HOST=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' local-sandbox`
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail

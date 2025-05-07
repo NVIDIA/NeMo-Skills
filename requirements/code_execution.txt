@@ -14,10 +14,9 @@
 
 # needed for persistent sessions
 ipython
+
 # this are requirements for code execution - put all packages that LLM should have access to in here
 numpy
 pandas
 scipy
-
-# needed for comparison of results
 sympy
