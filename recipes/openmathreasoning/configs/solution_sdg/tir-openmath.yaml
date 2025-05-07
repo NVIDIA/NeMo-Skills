@@ -26,12 +26,20 @@ generate_kwargs: &generate_kwargs
   # Number of generated solutions per problem to judge
   num_random_seeds: ${num_random_seeds_to_generate}
 
+generate_new_summaries_kwargs:
+  <<: *generate_kwargs
+  # Generate 4 new summaries for each solution
+  num_random_seeds: 4   
+
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - generate_solutions          # Generate initial TIR solutions
   - fill_majority_answer        # Fill missing ground truth answers if any
   - judge_answers               # Judge correctness based on final answer
   - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
+  - generate_new_summaries       # Generate new summaries for reasoning solutions
+  - judge_new_summaries          # Judge new summaries for reasoning solutions
+  - merge_new_summaries          # Merge new summaries for reasoning solutions
   - prepare_for_sft             # Prepare the final dataset for SFT training
 
 # Directory structure configuration
@@ -40,7 +48,10 @@ directories:
   step-2-fill-majority: "${base_output_dir}/solution-sdg-${suffix}/step-2-fill-majority"
   step-3-judge-answers: "${base_output_dir}/solution-sdg-${suffix}/step-3-judge-answers"
   step-4-postprocess-tir: "${base_output_dir}/solution-sdg-${suffix}/step-4-postprocess-tir"
-  step-5-prepare-sft: "${base_output_dir}/solution-sdg-${suffix}/step-5-prepare-sft"
+  step-5-generate-new-summaries: "${base_output_dir}/solution-sdg-${suffix}/step-5-generate-new-summaries"
+  step-6-judge-new-summaries: "${base_output_dir}/solution-sdg-${suffix}/step-6-judge-new-summaries"
+  step-7-merge-new-summaries: "${base_output_dir}/solution-sdg-${suffix}/step-7-merge-new-summaries"
+  step-8-prepare-sft: "${base_output_dir}/solution-sdg-${suffix}/step-8-prepare-sft"
 
 # Stage-specific configurations
 stages:
@@ -100,14 +111,44 @@ stages:
     # stage_kwargs:
     #   partition: cpu
 
-  prepare_for_sft:
-    output_dir: ${directories.step-5-prepare-sft}
+  generate_new_summaries:
     input_file: ${directories.step-4-postprocess-tir}/postprocessed_output.jsonl
+    output_dir: ${directories.step-5-generate-new-summaries}
+    
+    dependencies:
+      - judge_answers
+    inline_args: >- 
+      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml
+      ++prompt_template=qwen-instruct 
+      ++inference.temperature=0.7 
+      ++inference.tokens_to_generate=2048
+    stage_kwargs: ${generate_new_summaries_kwargs}
+      
+  judge_new_summaries:
+    input_dir: ${directories.step-5-generate-new-summaries}
+    output_dir: ${directories.step-6-judge-new-summaries}
+
+    dependencies:
+      - generate_new_summaries
+    inline_args: "++prompt_template=qwen-instruct"
+    stage_kwargs: ${generate_new_summaries_kwargs}
+
+  merge_new_summaries:
+    reasoning_file: ${directories.step-4-postprocess-tir}/postprocessed_output.jsonl
+    summary_dir: ${directories.step-6-judge-new-summaries}
+    output_dir: ${directories.step-7-merge-new-summaries}
+    
+    dependencies:
+      - judge_new_summaries
+
+  prepare_for_sft:
+    input_file: ${directories.step-7-merge-new-summaries}/output.jsonl
+    output_dir: ${directories.step-8-prepare-sft}
     prompt_config: openmath/tir
     prompt_template: openmath-instruct
     contamination_file: ${contamination_file}
     dependencies:
-      - postprocess_tir_generations
+      - merge_new_summaries
     inline_args: >-
       ++filters.remove_matplotlib=true
       ++exclude_optional_keys=false

@@ -84,6 +84,9 @@ processors:
       - "expected_answer"
       - "predicted_answer"
       - "answer_rm_score"
+      - "solutions"   # GenSelect keys
+      - "num_solutions"
+      - "max_idx"
 
   # this will optimize processors inside to avoid serializing data to disk
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
