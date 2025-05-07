@@ -42,7 +42,7 @@ def _additional_normalization(expr):
     if match_gt:
         expr = match_gt.group(1)
     # Remove . corresponding to the end of sentence
-    expr = expr.rstrip(".")
+    expr = expr.rstrip(".\\")
     return expr
 
 
@@ -50,6 +50,9 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
     if predicted_answer is None:
         return False
     
+    gt_answer = str(gt_answer)
+    predicted_answer = str(predicted_answer)
+
     # if we are sure that gt is always integer
     if take_modulo is not None:
         gt_answer = int(gt_answer) % take_modulo
@@ -65,9 +68,9 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
     norm_gt_mcq = gt_answer.strip()
 
     is_mcq = re.fullmatch("|".join(mcq_options), norm_gt_mcq)
-    if is_mcq:
-        parsed_gt = parse(gt_answer, [StringExtractionConfig(strings=tuple(mcq_options))])
-        parsed_pred = parse(predicted_answer, [StringExtractionConfig(strings=tuple(mcq_options))])
+    parsed_gt = parse(gt_answer, [StringExtractionConfig(strings=tuple(mcq_options))])
+    parsed_pred = parse(predicted_answer, [StringExtractionConfig(strings=tuple(mcq_options))])
+    if is_mcq and verify(parsed_gt, parsed_pred):
         return verify(parsed_gt, parsed_pred)
     
     # Additional normalization step
@@ -80,9 +83,10 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
     normalized_pred = normalize_latex(predicted_answer, NormalizationConfig)
     is_literal = (re.fullmatch(literal_pattern, normalized_gt) and
                   re.fullmatch(literal_pattern, normalized_pred))
+    is_normalized_equal = (normalized_gt.replace(" ", "") == normalized_pred.replace(" ", ""))
 
-    if is_literal:
-        return normalized_gt.replace(" ", "") == normalized_pred.replace(" ", "")
+    if is_literal or is_normalized_equal:
+        return is_normalized_equal
 
     # Fallback to symbolic comparison
     current_gt_answer = gt_answer

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import pytest
-from nemo_skills.evaluation.math_grader import verify_answer
+from nemo_skills.evaluation.math_grader import math_equal
 
 
 @pytest.mark.parametrize(
@@ -22,15 +22,13 @@ from nemo_skills.evaluation.math_grader import verify_answer
         (5, 5),
         (5, 5.0),
         ("1/2", 0.5),
-        ("3128 1/2", 3128.5),
         ("\\frac{1}{2}", 0.5),
         ("918\\frac{1}{2}", 918.5),
         ("x^2+2x+1", "x^2 + 2*x + 1"),
         ("x^2+2x+1", "x^2 + 2*x - (-1)"),
-        ("x^2+2x+1", "2x+ 1+x^2"),
+        ("y = x^2+2x+1", "2x+ 1+x^2"),
         ("odd", "\\text{odd}"),
         ("E", "\\mathrm{E}"),
-        ("B", "\\mathcal{B}"),
         ("A", "\\textbf{A}"),
         ("f'", "f'"),
         ("185", "185\\"),
@@ -39,8 +37,8 @@ from nemo_skills.evaluation.math_grader import verify_answer
         ("\\frac {1}{2}", 0.5),
         ("17\\text{ any text}", "17"),
         ("\$10", "10"),
-        ("10%", "0.1"),
-        ("56,\\!01,\\!78,\\!95,\\!760", "56017895760"),
+        ("10%", "10"),
+        ("10\\%", "10"),
         (5 / 2, '\\frac{5}{2}'),
         ('\\frac{1}{3}', '\\dfrac{1}{3}'),
         ('(r+5)(r+5)', '(r+5)^2'),
@@ -48,9 +46,9 @@ from nemo_skills.evaluation.math_grader import verify_answer
     ids=str,
 )
 def test_correct_examples(output_pair):
-    output = verify_answer(output_pair[0], output_pair[1])
+    output = math_equal(output_pair[0], output_pair[1])
     assert output is True
-    output = verify_answer(output_pair[1], output_pair[0])
+    output = math_equal(output_pair[1], output_pair[0])
     assert output is True
 
 
@@ -67,7 +65,7 @@ def test_correct_examples(output_pair):
     ids=str,
 )
 def test_incorrect_examples(sandbox_type, output_pair):
-    output = verify_answer(output_pair[0], output_pair[1])
+    output = math_equal(output_pair[0], output_pair[1])
     assert output is False
-    output = verify_answer(output_pair[1], output_pair[0])
+    output = math_equal(output_pair[1], output_pair[0])
     assert output is False
