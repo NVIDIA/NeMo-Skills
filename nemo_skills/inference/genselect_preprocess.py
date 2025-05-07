@@ -85,7 +85,6 @@ def extract_summary(solution, max_length=5000):
         summary = solution.rsplit("</think>", 1)[1]
     
     summary = summary.replace("<think>", "")
-    summary = summary.strip().rstrip("<|im_end|>")
 
     if len(summary) > max_length:
         summary = summary[-max_length:]
