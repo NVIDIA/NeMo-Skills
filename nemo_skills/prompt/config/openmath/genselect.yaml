@@ -1,4 +1,4 @@
-# Prompt used for GenSelect inference
+# Prompt used for GenSelect inference - https://arxiv.org/abs/2504.16891
 
 system: ""
 

@@ -78,7 +78,7 @@ stages:
       server_gpus: 8
       server_nodes: 1
       num_random_seeds: ${num_random_seeds_to_generate}
-      # num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
       # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
       # dependent_jobs: N
 

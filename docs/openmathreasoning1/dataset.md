@@ -112,7 +112,7 @@ run_cmd(
 
 ## Problem generation pipeline
 
-[Problem generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/problem_generation.py)
+[Problem generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipeline/problem_generation.py)
 consists of the following stages:
 
 1. [Extract all problems](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/extract-problems.yaml)
@@ -133,7 +133,7 @@ consists of the following stages:
 You can run the full pipeline with
 
 ```
-python recipes/openmathreasoning/pipelines/problem_generation.py
+python recipes/openmathreasoning/pipeline/problem_generation.py
 ```
 
 You can specify a subset of stages using `--stages` argument, e.g. `--stages extract_problems` or `--stages classify_problems,extract_answers`.
@@ -143,7 +143,7 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 
 ## CoT solution generation pipeline
 
-[Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/solution_generation.py)
+[Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipeline/solution_generation.py)
 consists of the following stages:
 
 1. [Generate solutions](../pipelines/generation.md) for each of the prepared problems (`generate_solutions` stage).
@@ -159,7 +159,7 @@ consists of the following stages:
 You can run the full pipeline using [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) as solution generation model with
 
 ```
-python recipes/openmathreasoning/pipelines/solution_generation.py --mode qwq
+python recipes/openmathreasoning/pipeline/solution_generation.py --mode qwq
 ```
 
 You can specify a subset of stages using `--stages` argument and can switch between QwQ and R1 models using `--mode qwq` or `--mode r1`.
@@ -168,7 +168,7 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 
 ## TIR solution generation pipeline
 
-[Tool-Integrated Reasoning (TIR) solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/solution_generation.py)
+[Tool-Integrated Reasoning (TIR) solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipeline/solution_generation.py)
 focuses on generating solutions that leverage external tools, more specifically, a Python interpreter. This pipeline consists of several stages, some of which are optional:
 
 1. [Generate solutions](../pipelines/generation.md) using a TIR-capable model (`generate_solutions` stage). These solutions interleave reasoning steps with executable code blocks.
@@ -188,11 +188,11 @@ We provide configurations for two TIR variants:
 
 *   **Using LIMO:** This variant ([`tir-limo.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-limo.yaml)) uses the [LIMO model](https://huggingface.co/GAIR/LIMO) and includes strict filtering steps based on code fragment novelty and significance. These steps are marked with [Optional] in the list above and should typically be run together or skipped together. Run with:
     ```bash
-    python recipes/openmathreasoning/pipelines/solution_generation.py --mode tir-limo
+    python recipes/openmathreasoning/pipeline/solution_generation.py --mode tir-limo
     ```
 *   **Using OpenMath-Nemotron:** This variant ([`tir-openmath.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/solution_sdg/tir-openmath.yaml)) uses our [OpenMath-Nemotron-14B model](https://huggingface.co/nvidia/OpenMath-Nemotron-14B). It produces solutions with higher-quality Python code, requiring less strict filtering. Run with:
     ```bash
-    python recipes/openmathreasoning/pipelines/solution_generation.py --mode tir-openmath
+    python recipes/openmathreasoning/pipeline/solution_generation.py --mode tir-openmath
     ```
 
 You can specify a subset of stages using the `--stages` argument for either mode.
@@ -201,14 +201,20 @@ You can specify a subset of stages using the `--stages` argument for either mode
 
 ## GenSelect Generation Pipeline
 
-[GenSelect generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/genselect_generation.py) creates the GenSelect input and output instances. The pipeline relies on the following stages:
+[GenSelect generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipelines/genselect_generation.py) creates the GenSelect input-output instances. The pipeline relies on the following stages:
 
 1. Prepare instances comparing different solutions (summaries of these solutions) for a given problem (`prepare_labeling_data` stage).
 2. Generating solutions for the comparison instances where we use a reasoning model to output the judgment of what solution is the top-ranking one according to the model (`label_data` stage).
 3. Extract judgments from the reasoning trace and filter out judgments that pick the wrong solutions (`extract_judgment` stage).
 4. Generate new summaries for these judgment reasoning traces (we generate 4 summary per reasoning trace). These summaries can replace the costly reasoning traces as GenSelect targets (`generate_new_summaries` stage). 
-5. Select the best *valid* summary (where the judgment matches the reasoning trace's judgment) as target for GenSelect.
-6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/openmath/genselect.yaml).    
+5. Select the best *valid* summary (where the judgment matches the reasoning trace's judgment) as target for GenSelect (`merge_new_summaries` stage).
+6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/openmath/genselect.yaml) (`prepare_for_sft` stage).    
 
 
-We provide a configuration `qwq` ([`qwq.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/genselect_sdg/qwq.yaml)) which uses the [Qwen/QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model for labeling the comparison instances. 
+We provide a configuration `qwq` ([`qwq.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/genselect_sdg/qwq.yaml)) which uses the [Qwen/QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model for labeling the comparison instances. You can run this configuration as:
+   ```bash
+   python recipes/openmathreasoning/pipeline/genselect_generation.py --mode qwq
+   ```
+You can specify a subset of stages using the `--stages` argument.
+
+
