@@ -33,8 +33,8 @@ def assign_rm_values(input_file, output_dir):
             comp_instance = json.loads(line)
             if comp_instance is None:
                 continue
-            if "gen_rm_comparison" in comp_instance:
-                rm_judgment = comp_instance["gen_rm_comparison"]
+            if "genselect_comparison" in comp_instance:
+                rm_judgment = comp_instance["genselect_comparison"]
             else:
                 raise ValueError("No judgment found")
 

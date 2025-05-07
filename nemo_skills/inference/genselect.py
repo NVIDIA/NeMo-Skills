@@ -162,7 +162,7 @@ class GenSelectTask(GenerationTask):
                 instance = json.loads(line)
                 output_instance = deepcopy(instance)
 
-                judgment = self._extract_judgment(instance['gen_rm_comparison'], max_idx=instance["max_idx"])
+                judgment = self._extract_judgment(instance['genselect_comparison'], max_idx=instance["max_idx"])
                 if judgment:
                     output_instance["judgment_idx"] = judgment
                 else:

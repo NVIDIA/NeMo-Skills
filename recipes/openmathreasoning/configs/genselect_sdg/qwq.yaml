@@ -70,7 +70,7 @@ stages:
     inline_args: >- 
       ++prompt_config=openmath/genselect
       ++prompt_template=qwen-instruct
-      ++generation_key=gen_rm_comparison
+      ++generation_key=genselect_comparison
       ++inference.tokens_to_generate=16_384
       ++inference.temperature=0.6
     
