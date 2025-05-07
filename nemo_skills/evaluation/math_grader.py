@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-from itertools import zip_longest
 
 import tqdm
 

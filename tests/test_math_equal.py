@@ -42,6 +42,12 @@ from nemo_skills.evaluation.math_grader import math_equal
         (5 / 2, '\\frac{5}{2}'),
         ('\\frac{1}{3}', '\\dfrac{1}{3}'),
         ('(r+5)(r+5)', '(r+5)^2'),
+        ("\\frac{\\sqrt{3}}{3}", "\\frac{\\sqrt{3}}{3} \\approx 0.577"),
+        ("C", "C. x = 42"),
+        (
+            "\\begin{pmatrix}0&0&0\\\\0&1&0\\\\0&0&1\\end{pmatrix}",
+            "\\begin{bmatrix} 0 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 0 & 0 & 1 \\end{bmatrix}"
+        ),
     ],
     ids=str,
 )
@@ -60,7 +66,7 @@ def test_correct_examples(output_pair):
         ("x^2+2x+1", "x^3+2x+1"),
         ("odd", "\\text{oddd}"),
         ("E", "\\mathrm{E}*2"),
-        ("E", "E'"),
+        ("\\sqrt{67},-\\sqrt{85}", "\\sqrt{67}"),
     ],
     ids=str,
 )

@@ -23,7 +23,7 @@ from typing import Any, List, Tuple
 import hydra
 from tqdm import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.evaluation.metrics import read_predictions
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
