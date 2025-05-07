@@ -58,4 +58,4 @@ def test_error_on_extra_params():
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        assert "got an unexpected keyword argument 'sandbox_host'" in e.stderr.decode()
+        assert "got an unexpected keyword argument 'sandbox'" in e.stderr.decode()

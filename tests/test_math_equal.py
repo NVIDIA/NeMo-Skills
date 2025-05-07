@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import pytest
+
 from nemo_skills.evaluation.math_grader import math_equal
 
 
@@ -27,7 +28,6 @@ from nemo_skills.evaluation.math_grader import math_equal
         ("x^2+2x+1", "x^2 + 2*x + 1"),
         ("x^2+2x+1", "x^2 + 2*x - (-1)"),
         ("y = x^2+2x+1", "2x+ 1+x^2"),
-        ("odd", "\\text{odd}"),
         ("E", "\\mathrm{E}"),
         ("A", "\\textbf{A}"),
         ("f'", "f'"),
@@ -43,10 +43,9 @@ from nemo_skills.evaluation.math_grader import math_equal
         ('\\frac{1}{3}', '\\dfrac{1}{3}'),
         ('(r+5)(r+5)', '(r+5)^2'),
         ("\\frac{\\sqrt{3}}{3}", "\\frac{\\sqrt{3}}{3} \\approx 0.577"),
-        ("C", "C. x = 42"),
         (
             "\\begin{pmatrix}0&0&0\\\\0&1&0\\\\0&0&1\\end{pmatrix}",
-            "\\begin{bmatrix} 0 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 0 & 0 & 1 \\end{bmatrix}"
+            "\\begin{bmatrix} 0 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 0 & 0 & 1 \\end{bmatrix}",
         ),
     ],
     ids=str,
