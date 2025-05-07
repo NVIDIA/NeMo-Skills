@@ -16,7 +16,7 @@ generate_kwargs:
   # Server parameters
   server_gpus: 8
   server_nodes: 1
-  # num_chunks: 10  # Parallelize for large datasets
+  num_chunks: 10  # Parallelize for large datasets
 
 # List of datasets to run problem decontamination with
 decontamination_datasets:
