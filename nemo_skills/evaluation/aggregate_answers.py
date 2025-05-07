@@ -23,7 +23,7 @@ from typing import Any, List, Tuple
 import hydra
 from tqdm import tqdm
 
-from nemo_skills.evaluation.math_grader import extract_answer, math_equal
+from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.evaluation.metrics import read_predictions
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
@@ -65,9 +65,6 @@ class ProcessTopAnswerConfig:
 
     # if True, will use the RM score for weighted majority voting
     use_majority_rm_score: bool = False
-
-    # if True, will use math_equal for determining equivalent answers in majority voting
-    use_math_equal_majority: bool = False
 
     # if provided, will fail if can't find this many files. Useful in scheduled
     # pipelines to ensure this step doesn't run if some of the expected files are missing
@@ -167,10 +164,6 @@ class TopAnswerProcessor:
             self.fill_mode = "majority_rm"
         elif self.cfg.use_highest_rm_score:
             self.fill_mode = "highest_rm"
-        
-        # Add math_equal suffix if using math equality for majority voting
-        if self.cfg.use_math_equal_majority and "majority" in self.fill_mode:
-            self.fill_mode += "_math_equal"
 
         # Setting up the fill_key in case it's not provided
         if cfg.fill_key is None:
@@ -243,37 +236,12 @@ class TopAnswerProcessor:
                 new_answers[-1] = [rm_answer, rm_score] + answer_to_metadata[rm_answer]
             else:
                 # Perform majority voting
+                # TODO: currently majority does not take into account equivalent answers written in a different way
                 valid_answers = [elem['predicted_answer'] for elem in data if elem['predicted_answer'] is not None]
                 new_answers.append(("no_valid_answer_found", (0, len(self.input_file_handles)), None, None))
                 if len(valid_answers) == 0:
                     continue
-                
-                if cfg.use_math_equal_majority:
-                    # Use math_equal to cluster equivalent answers
-                    answer_clusters = []
-                    cluster_sizes = []
-                    
-                    for answer in valid_answers:
-                        # Check if this answer belongs to an existing cluster
-                        for i, representative in enumerate(answer_clusters):
-                            if math_equal(representative, answer):
-                                cluster_sizes[i] += 1
-                        else:  # If not found, create a new cluster
-                            answer_clusters.append(answer)
-                            cluster_sizes.append(1)
-                    
-                    # Find the largest cluster
-                    if answer_clusters:
-                        max_idx = cluster_sizes.index(max(cluster_sizes))
-                        majority_answer = answer_clusters[max_idx]
-                        num_votes = cluster_sizes[max_idx]
-                    else:
-                        majority_answer = valid_answers[0]
-                        num_votes = 1
-                else:
-                    # Standard majority voting with exact string match
-                    majority_answer, num_votes = Counter(valid_answers).most_common(1)[0]
-                
+                majority_answer, num_votes = Counter(valid_answers).most_common(1)[0]
                 new_answers[-1] = [majority_answer, (num_votes, len(self.input_file_handles))] + answer_to_metadata[
                     majority_answer
                 ]
