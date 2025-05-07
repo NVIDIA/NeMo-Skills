@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer, batch_evaluate_results
+from nemo_skills.evaluation.math_grader import extract_answer, batch_evaluate_results
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.inference.server.model import get_model
