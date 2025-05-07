@@ -61,7 +61,7 @@ class GenSelectConfig:
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
 
-    generation_key: str = "gen_rm_comparison"
+    generation_key: str = "genselect_comparison"
 
     # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
     # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
