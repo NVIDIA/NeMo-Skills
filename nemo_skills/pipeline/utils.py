@@ -1184,7 +1184,8 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
-            num_gpus=gpus_per_node,
+            # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
+            num_gpus='all',
             network="host",
             env_vars=env_vars,
             additional_kwargs={"entrypoint": ""},
