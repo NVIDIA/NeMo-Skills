@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer, batch_evaluate_results
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.inference.server.model import get_model
@@ -47,14 +47,8 @@ def eval_mcq(cfg):
 
 @nested_dataclass(kw_only=True)
 class MathEvaluatorConfig:
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
-    num_parallel_requests: int = 100
-    in_memory_lines: int = 1500
-    include_percentage: bool = True
-    tolerance: float = 1e-4
-    timeout: float = 10.0
-    ignore_cache: bool = False
+    numeric_precision: int = 15
+    timeout: int = 10
     # if True will not attempt to re-extract based on \boxed or regex
     use_predicted_answer_key: bool = False
 
@@ -67,10 +61,8 @@ class MathEvaluatorConfig:
 def eval_math(cfg):
     eval_config = MathEvaluatorConfig(**cfg.eval_config)
 
-    sandbox = get_sandbox(**eval_config.sandbox)
     eval_config = asdict(eval_config)
-    eval_config.pop('sandbox')
-    sandbox.batch_evaluate_results(
+    batch_evaluate_results(
         input_files=cfg.input_files,
         **eval_config,
     )
