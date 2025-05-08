@@ -14,7 +14,6 @@
 
 import json
 import logging
-import re
 import shutil
 import subprocess
 from argparse import Namespace
@@ -25,6 +24,7 @@ from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
+from nemo_skills.evaluation.math_grader import extract_answer, batch_evaluate_results
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.inference.server.model import get_model
@@ -35,41 +35,20 @@ LOG = logging.getLogger(__file__)
 
 
 def eval_mcq(cfg):
-    # Adapted from https://github.com/TIGER-AI-Lab/MMLU-Pro/blob/8b6741a3011d8caa405fdd629f54b6931cb6e042/evaluate_from_api.py#L189
-    # Original three functions are merged into one
-    def tigerlab_parse(sample):
-        attempt_one = re.search(r"answer is \(([A-J])\)", sample['generation'])
-        if attempt_one:
-            return attempt_one.group(1)
-        attempt_two = re.search(r'.*[aA]nswer:\s*([A-J])', sample['generation'])
-        if attempt_two:
-            return attempt_two.group(1)
-        attempt_three = re.search(r"\b[A-J]\b(?!.*\b[A-J]\b)", sample['generation'], re.DOTALL)
-        if attempt_three:
-            return attempt_three.group(0)
-        return None
-
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
         with open(file, 'wt', encoding='utf-8') as fout:
             for sample in tqdm(data):
-                parse_result = tigerlab_parse(sample)
-                sample['is_correct'] = parse_result == sample['expected_answer']
-                sample['predicted_answer'] = parse_result
+                sample['predicted_answer'] = extract_answer(sample["generation"])
+                sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
                 fout.write(json.dumps(sample) + "\n")
-                        
+
 
 @nested_dataclass(kw_only=True)
 class MathEvaluatorConfig:
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
-    num_parallel_requests: int = 100
-    in_memory_lines: int = 1500
-    include_percentage: bool = True
-    tolerance: float = 1e-4
-    timeout: float = 10.0
-    ignore_cache: bool = False
+    numeric_precision: int = 15
+    timeout: int = 10
     # if True will not attempt to re-extract based on \boxed or regex
     use_predicted_answer_key: bool = False
 
@@ -82,10 +61,8 @@ class MathEvaluatorConfig:
 def eval_math(cfg):
     eval_config = MathEvaluatorConfig(**cfg.eval_config)
 
-    sandbox = get_sandbox(**eval_config.sandbox)
     eval_config = asdict(eval_config)
-    eval_config.pop('sandbox')
-    sandbox.batch_evaluate_results(
+    batch_evaluate_results(
         input_files=cfg.input_files,
         **eval_config,
     )
@@ -411,7 +388,7 @@ class LeanEvaluatorConfig:
     ignore_cache: bool = False
 
 
-def eval_lean4(cfg):
+def eval_lean4_proof(cfg):
     eval_config = LeanEvaluatorConfig(**cfg.eval_config)
 
     sandbox = get_sandbox(**eval_config.sandbox)
@@ -419,7 +396,20 @@ def eval_lean4(cfg):
     eval_config_dict.pop('sandbox')
     sandbox.batch_evaluate_results(
         input_files=cfg.input_files,
-        answer_format='lean',
+        answer_format='lean4-proof',
+        **eval_config_dict,
+    )
+
+
+def eval_lean4_statement(cfg):
+    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
+
+    sandbox = get_sandbox(**eval_config.sandbox)
+    eval_config_dict = asdict(eval_config)
+    eval_config_dict.pop('sandbox')
+    sandbox.batch_evaluate_results(
+        input_files=cfg.input_files,
+        answer_format='lean4-statement',
         **eval_config_dict,
     )
 
@@ -431,7 +421,8 @@ EVALUATOR_MAP = {
     'arena': eval_arena,
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
-    'lean4': eval_lean4,
+    'lean4-proof': eval_lean4_proof,
+    'lean4-statement': eval_lean4_statement,
     'multichoice': eval_mcq,
 }
 

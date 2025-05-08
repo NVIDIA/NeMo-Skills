@@ -13,6 +13,9 @@ skip_first: 0  # useful for skipping validation set from train_full generation (
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
 use_judgement: false  # if True, uses judgement instead of is_correct field
+# if True, adds a new field with max allowed code executions to each sample
+# exclude_optional_keys must be set to false in this case
+add_code_execution_counts: false
 
 downsampling_method: null  # fair, random or null
 random_seed: 42
@@ -59,6 +62,8 @@ filters:
   code_text_filter: null
   remove_code_errors: false
   remove_verification_code: false
+  remove_matplotlib: false
+  remove_no_code: false
 
 deduplicate: true
 
@@ -79,6 +84,9 @@ processors:
       - "expected_answer"
       - "predicted_answer"
       - "answer_rm_score"
+      - "solutions"   # GenSelect keys
+      - "num_solutions"
+      - "max_idx"
 
   # this will optimize processors inside to avoid serializing data to disk
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
@@ -103,11 +111,35 @@ processors:
           - 'Traceback (most recent call last)'
           - '<output cut>'
           - 'Timed out'
+          - 'SyntaxError'
         test_cases:
           - {input: {generation: "My solution:\n---Traceback (most recent call last)---\nSomething else"}, output: null}
           - {input: {generation: "My solution:\nSome long output<output cut>\nSomething else"}, output: null}
           - {input: {generation: "My solution:\nTimed out\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\n[0;31mSyntaxError\u001b\nSomething else"}, output: null}
           - {input: {generation: "My solution, no errors"}, output: {generation: "My solution, no errors"}}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
+        should_run: ${filters.remove_matplotlib}
+        text_key: ${output_key}
+        regex_patterns:
+          - 'from matplotlib'
+          - 'import matplotlib'
+        test_cases:
+          - {input: {generation: "My solution:\n---import matplotlib---\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\nfrom matplotlib import pyplot as plt\nSomething else"}, output: null}
+          - {input: {generation: "My solution, no errors"}, output: {generation: "My solution, no errors"}}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexNotMatch
+        should_run: ${filters.remove_no_code}
+        text_key: ${output_key}
+        regex_patterns:
+          - '<tool_call>'
+          - '</tool_call>'
+        test_cases:
+          - {input: {generation: "My solution:\n---<tool_call>---\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\ncode</tool_call>\nSomething else"}, output: null}
+          - {input: {generation: "<tool_call>code</tool_call>"}, output: {generation: "<tool_call>code</tool_call>"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         should_run: ${filters.remove_verification_code}
@@ -181,6 +213,10 @@ processors:
         max_length: ${max_solution_length}
         hf_model_name: ${hf_model_name}
         use_chars_for_min_length: ${use_chars_for_min_length}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.AddCodeExecutionsCounts
+        should_run: ${add_code_execution_counts}
+        solution_key: ${output_key}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.GroupSamples
     group_key: ${input_key}

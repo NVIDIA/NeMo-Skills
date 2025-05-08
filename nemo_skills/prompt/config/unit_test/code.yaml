@@ -1,0 +1,110 @@
+system: ""
+
+# Defines the unit test generation prompt for code tasks
+# If you want different number of unit tests, please write a new config
+user: |
+  You are an expert at writing assertion test cases and below is a question and code solution. 
+  You must generate {num_tests_to_generate} assert statements that will be used to evaluate the code solution's correctness. 
+  Here are some examples that you should use as a reference:
+  
+  
+  Question: Write a python function to find the first repeated character in a given string. 
+  Solution:
+  <llm-code>
+  def first_repeated_char(str1):
+      for index, c in enumerate(str1):
+          if str1[:index + 1].count(c) > 1:
+              return c
+          return "None"
+  </llm-code>
+  Test Cases:
+  <assertion>
+  assert first_repeated_char("abbac") == "a"
+  </assertion>
+  <assertion>
+  assert first_repeated_char("xvvdf") == "v"
+  </assertion>
+  <assertion>
+  assert first_repeated_char("egeagea") == "e"
+  </assertion>
+  <assertion>
+  assert first_repeated_char("rrrrea") == "r"
+  </assertion>
+  <assertion>
+  assert first_repeated_char("fa") == "None"
+  </assertion>
+  
+  
+  Question: Write a function to reverse words in a given string.
+  Solution:
+  <llm-code>
+  def reverse_words(str):
+      return ' '.join(reversed(s.split()))
+  </llm-code>
+  Test Cases:
+  <assertion>
+  assert reverse_words("hi this is bob.") == "bob. is this hi"
+  </assertion>
+  <assertion>
+  assert reverse_words("no way, really?") == "really? way, no"
+  </assertion>
+  <assertion>
+  assert reverse_words("one two three four") == "four three two one"
+  </assertion>
+  <assertion>
+  assert reverse_words("fire away, questions please!!") == "please!! questions away, fire"
+  </assertion>
+  <assertion>
+  assert reverse_words("live, laughter and life.") == "life. and laughter live,"
+  </assertion>
+  
+  
+  Question: Given an array of integers nums and an integer target, return the indices of the two numbers such that they add up to the target. You may assume that each input would have exactly one solution, and you may not use the same element twice.
+  Solution:
+  <llm-code>
+  def two_sum(nums, target):
+      # Create a dictionary to store the difference and index
+      hashmap = dict()
+    
+      # Loop through the list of numbers
+      for i, num in enumerate(nums):
+          difference = target - num
+          if difference in hashmap:
+              return [hashmap[difference], i]
+          # Store the number and its index in the hashmap
+          hashmap[num] = i
+  </llm-code>
+  Test Cases:
+  <assertion>
+  assert two_sum([2, 7, 11, 15], 9) == [0, 1]
+  </assertion>
+  <assertion>
+  assert two_sum([-3, 4, 3, 90], 0) == [0, 2]
+  </assertion>
+  <assertion>
+  assert two_sum([3, 3], 6) == [0, 1]
+  </assertion>
+  <assertion>
+  assert two_sum([1, 2, 3, 4, 5, 6, 7, 8], 15) == [6, 7]
+  </assertion>
+  <assertion>
+  assert two_sum([230, 863, 916, 585, 981], 1844) == [1, 4]
+  </assertion>
+  
+  
+  Here are guidelines for writing the assertion test cases:
+  1. You must wrap each assertion test case with tags <assertion> and </assertion>.
+  2. Do not start the assert with any indents or spaces.
+  3. You must not import any unit testing libraries for the assertions such as "unittest" or "pytest".
+  4. Each assertion must be complete and immediately executable. Assume the code solution is provided, do not repeat it.
+  5. Avoid unnecessary string literals, incorrect escaping, wrapping in "```python" or other redundancies.
+  6. Remember, it is your responsibility to carefully read the question and evaluate the correctness of the code based on the assertions you create. 
+  
+  Here is the question and code solution you must provide assertion test cases for:
+  
+  
+  Question: {instruction}
+  Solution:
+  <llm-code>
+  {output}
+  </llm-code>

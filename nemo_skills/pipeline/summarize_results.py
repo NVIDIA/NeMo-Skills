@@ -25,7 +25,8 @@ from typing import Optional
 import typer
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline import (
+from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import (
     check_if_mounted,
     cluster_download,
     cluster_upload,
@@ -33,7 +34,6 @@ from nemo_skills.pipeline import (
     get_tunnel,
     get_unmounted_path,
 )
-from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import setup_logging
 
 
@@ -284,7 +284,7 @@ def summarize_results(
                         k_metrics[metric_key][base_name]["k"].append(k)
                         k_metrics[metric_key][base_name]["value"].append(metric_value)
 
-                    run.summary.update({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
+                    run.log({f"{benchmark}/{eval_mode}/{metric_key}": metric_value})
 
             # Create combined plot per metric key (line series)
             for metric_key, eval_modes in k_metrics.items():

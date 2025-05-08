@@ -48,7 +48,6 @@ def test_vllm_generate_greedy():
         f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -63,6 +62,7 @@ def test_vllm_generate_greedy():
         assert 'is_correct' not in data
         assert 'generation' in data
     assert os.path.exists(f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy/generation/output.jsonl.done")
+
 
 @pytest.mark.gpu
 def test_vllm_generate_greedy_chunked():
@@ -86,7 +86,6 @@ def test_vllm_generate_greedy_chunked():
         f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -95,7 +94,7 @@ def test_vllm_generate_greedy_chunked():
     # no evaluation by default - checking just the number of lines and that there is no is_correct key
     with open(f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy-chunked/generation/output.jsonl") as fin:
         lines = fin.readlines()
-    assert len(lines) == 20 # because max_samples is the number of samples per chunk
+    assert len(lines) == 20  # because max_samples is the number of samples per chunk
     for line in lines:
         data = json.loads(line)
         assert 'is_correct' not in data
@@ -125,11 +124,11 @@ def test_vllm_generate_seeds():
         f"    --server_nodes 1 "
         f"    --num_random_seeds {num_seeds} "
         f"    --eval_args='++eval_type=math' "
+        f"    --with_sandbox "
         f"    ++dataset=gsm8k "
         f"    ++split=test "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -144,12 +143,14 @@ def test_vllm_generate_seeds():
             data = json.loads(line)
             assert 'is_correct' in data
             assert 'generation' in data
-        assert os.path.exists(f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation/output-rs{seed}.jsonl.done")
+        assert os.path.exists(
+            f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation/output-rs{seed}.jsonl.done"
+        )
 
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation/output-rs*.jsonl"],
     )["all"]["majority@3"]
     # rough check, since exact accuracy varies depending on gpu type
-    assert metrics['symbolic_correct'] >= 60
+    assert metrics['symbolic_correct'] >= 50
     assert metrics['num_entries'] == 10

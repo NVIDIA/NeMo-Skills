@@ -82,6 +82,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     prompt_template: ${prompt_template}
+    task_name: math
     input_key: ${input_key}
     metadata: ${metadata}
     exclude_optional_keys: ${exclude_optional_keys}

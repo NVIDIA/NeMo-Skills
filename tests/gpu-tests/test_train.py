@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
 import json
 import os
 import sys
@@ -24,8 +23,7 @@ import yaml
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import eval, generate, train
+from nemo_skills.pipeline.cli import eval, generate, train, wrap_arguments
 
 
 def docker_run(image_name, volume_paths, command):

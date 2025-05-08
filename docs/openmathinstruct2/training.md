@@ -1,6 +1,6 @@
 # Model training
 
-We assume you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs) and are
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
@@ -46,7 +46,8 @@ python -m nemo_skills.training.prepare_data \
     ++filters.trim_prefix=false \
     ++filters.trim_solutions=false \
     ++filters.drop_incorrect_arithmetic=false \
-    ++filters.split_arithmetic=false
+    ++filters.split_arithmetic=false \
+    ++filters.remove_contaminated=false
 ```
 
 ## Prepare base model

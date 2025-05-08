@@ -18,6 +18,7 @@ pytest tests/gpu-tests/test_convert.py -k test_nemo_hf_conversion -s -x
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/nemo-to-hf/model
 
 # generation/evaluation tests
+pytest tests/gpu-tests/test_logprobs.py -s -x
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
@@ -27,7 +28,7 @@ docker run --rm \
     -e HF_TOKEN=$HF_TOKEN \
     -v /tmp:/tmp \
     -v `pwd`:/nemo_run/code \
-    igitman/nemo-skills-nemo:0.5.0 \
+    igitman/nemo-skills-nemo:0.6.0 \
     python /nemo_run/code/tests/gpu-tests/make_tiny_llm.py --model_type $NEMO_SKILLS_TEST_MODEL_TYPE
 
 # converting the model through test

@@ -14,7 +14,6 @@
 
 import asyncio
 import copy
-import json
 import logging
 import re
 import sys
@@ -22,7 +21,6 @@ import time
 import uuid
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import tensorrt_llm
@@ -61,7 +59,7 @@ def parse_input(input_texts: str, tokenizer):
     return batch_input_ids, input_lengths
 
 
-def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -> tuple[str, int]:
+def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -> tuple[str, list[str], int]:
     """Returns detokenized text and the number of tokens."""
     output_begin = input_length
     output_end = input_length + max_output_len
@@ -70,7 +68,7 @@ def get_output(output_ids, input_length, max_output_len, tokenizer, eos_token) -
     if len(eos_ids) > 0:
         outputs = outputs[: eos_ids[0]]
     outputs = outputs.tolist()
-    return tokenizer.decode(outputs), len(outputs)
+    return tokenizer.decode(outputs), tokenizer.convert_ids_to_tokens(outputs), len(outputs)
 
 
 def load_tokenizer(tokenizer_dir: str):
@@ -370,6 +368,8 @@ def _stream(
     sampling_config=None,
     timeout=None,
     is_draft_target_model: bool = False,
+    repetition_check_chars: Optional[int] = None,
+    repetition_limit: Optional[int] = None,
 ):
     if stop_words_list is None:
         stop_words_list = []
@@ -379,13 +379,19 @@ def _stream(
         [copy.deepcopy(batch_input_ids_list[batch_idx]) for _ in range(num_sequences)]
         for batch_idx in range(len(request_ids))
     ]
-    # checking the last 20 tokens for stop words
+    # checking this often for stop phrases / repetitions
     num_tokens_to_check = 20
+    repetition_check_tokens = 200
+
+    stop_on_repetitions = repetition_check_chars is not None and repetition_limit is not None
 
     start_time = time.time()
 
-    idx = 0
     finished_reqs = 0
+    last_seq_length_stop = 0
+    last_seq_length_rep = 0
+    stopped_on_repetition = False
+
     while finished_reqs < len(request_ids):
         multi_responses = runner.session.await_responses(request_ids)
         responses = [response for responses in multi_responses for response in responses]
@@ -410,24 +416,7 @@ def _stream(
             sampling_config=sampling_config,
             is_draft_target_model=is_draft_target_model,
         )
-
-        matching_stop_word = None
-        # checking every half of the required tokens to have overlapping checks
-        if idx < num_tokens_to_check - 1 or idx % (num_tokens_to_check // 2) != 0:
-            idx += 1
-            continue
-
-        seq_length = output['sequence_lengths']
-        generation_suffix = output['output_ids'][0, 0, seq_length[0] - num_tokens_to_check : seq_length[0]]
-        out_string = get_output(generation_suffix, 0, num_tokens_to_check, tokenizer, end_id)[0]
-        for stop_word in stop_words_list:
-            if stop_word in out_string:
-                matching_stop_word = stop_word
-                break
-
-        if matching_stop_word is not None:
-            runner.session.cancel_request(request_ids[0])
-            break
+        seq_length = output['sequence_lengths'][0].item()
 
         if timeout:
             current_time = time.time() - start_time
@@ -435,13 +424,49 @@ def _stream(
                 runner.session.cancel_request(request_ids[0])
                 break
 
-        idx += 1
+        if seq_length - last_seq_length_stop >= num_tokens_to_check:
+            # we are checking in overlapping pieces to ensure nothing is missed
+            look_back = max(last_seq_length_stop - num_tokens_to_check // 2, input_lengths[0])
+            generation_suffix = output['output_ids'][0, 0, look_back:seq_length]
+            suffix_length = seq_length - look_back
+            out_string = get_output(generation_suffix, 0, suffix_length, tokenizer, end_id)[0]
+            last_seq_length_stop = seq_length
 
-    out_string, num_generated_tokens = get_output(
+            matching_stop_word = None
+            for stop_word in stop_words_list:
+                if stop_word in out_string:
+                    matching_stop_word = stop_word
+                    break
+
+            if matching_stop_word is not None:
+                runner.session.cancel_request(request_ids[0])
+                break
+
+        if stop_on_repetitions and seq_length - last_seq_length_rep >= repetition_check_tokens:
+            last_seq_length_rep = seq_length
+            # detokenizing everything so far to make sure generation
+            # is not corrupted by stitching partial detokenizations
+            full_gen_so_far = get_output(
+                output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
+            )[0]
+            # checking for repetition
+            if len(full_gen_so_far) < repetition_check_chars:
+                continue
+
+            suffix = full_gen_so_far[-repetition_check_chars:]
+            cnt = full_gen_so_far[:-repetition_check_chars].count(suffix)
+            if cnt >= repetition_limit:
+                stopped_on_repetition = True
+                runner.session.cancel_request(request_ids[0])
+                break
+
+    out_string, out_tokens, num_generated_tokens = get_output(
         output['output_ids'][0, 0], input_lengths[0], output['sequence_lengths'][0], tokenizer, end_id
     )
+
     # TODO: the number of tokens is not exact, because we might trim the output a bit,
     #       but close enough for practical purposes
+    matching_stop_word = None
     for stop_word in stop_words_list:
         if stop_word in out_string:
             matching_stop_word = stop_word
@@ -455,14 +480,20 @@ def _stream(
         # this is a hack to add it back, but we are going to include it even when
         # it was not generated by the model e.g. if we stopped due to max tokens
         out_string += tokenizer.decode(end_id)
-
     generation_time = int(round(time.time() - start_time))
 
-    return {
+    result = {
         'generation': out_string,
         'num_generated_tokens': num_generated_tokens,
         'generation_time': generation_time,
+        'stopped_on_repetition': stopped_on_repetition,
     }
+
+    if output_log_probs:
+        result['tokens'] = out_tokens
+        result['logprobs'] = output['log_probs'][0][0].tolist()
+
+    return result
 
 
 class TensorRTLLM:
@@ -473,9 +504,10 @@ class TensorRTLLM:
         max_input_len: Optional[int] = None,
         max_output_len: Optional[int] = None,
         max_beam_width: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
+        repetition_check_chars: Optional[int] = None,
+        repetition_limit: Optional[int] = None,
     ):
         self.tokenizer, self.pad_id, self.end_id = load_tokenizer(tokenizer_dir=model_path)
 
@@ -492,7 +524,8 @@ class TensorRTLLM:
         )
 
         self.runner = ModelRunnerCpp.from_dir(**runner_kwargs)
-        self.timeout = timeout_seconds
+        self.repetition_check_chars = repetition_check_chars
+        self.repetition_limit = repetition_limit
 
         self.active_generations = {}
         self.active_requests = {}
@@ -511,6 +544,8 @@ class TensorRTLLM:
         repetition_penalty,
         random_seed,
         stop_words_list,
+        top_logprobs,
+        timeout,
     ):
         try:
             request_id, stream_kwargs = generate(
@@ -525,6 +560,7 @@ class TensorRTLLM:
                 top_p_min=top_p_min,
                 repetition_penalty=repetition_penalty,
                 random_seed=random_seed,
+                output_log_probs=bool(top_logprobs is not None),
                 # stop words in trtllm are supported on the token-level only and this representation is not unique
                 # so instead of passing in all tokenizations (is that even possible?) of each phrase, we will
                 # instead stream outputs and detokenize them to check for stop words - this is done inside
@@ -535,15 +571,24 @@ class TensorRTLLM:
                 return_dict=True,
                 output_sequence_lengths=True,
                 streaming=True,
-                timeout=self.timeout,
+                timeout=timeout,
             )
+            # Forward repetition parameters:
+            stream_kwargs['repetition_check_chars'] = self.repetition_check_chars
+            stream_kwargs['repetition_limit'] = self.repetition_limit
+
             self.active_requests[generation_id] = request_id
             output = _stream(**stream_kwargs)
 
         except RuntimeError as e:
             logging.error("RuntimeError: %s", e)
             # TODO: return dictionary with a proper error reporting
-            output = {"generation": f"RuntimeError: {e}", "num_generated_tokens": 10, "generation_time": 0}
+            output = {
+                "generation": f"RuntimeError: {e}",
+                "num_generated_tokens": 10,
+                "generation_time": 0,
+                "stopped_on_repetition": False,
+            }
 
         return output
 
@@ -565,6 +610,8 @@ class TensorRTLLM:
             data["repetition_penalty"],
             data["random_seed"],
             data["stop_words_list"],
+            data["top_logprobs"],
+            data["timeout"],
         )
 
         self.active_generations[generation_id] = future
@@ -590,13 +637,12 @@ class TensorRTLLM:
 
     def cancel_generation(self, generation_id: str) -> Dict[str, Any]:
         if generation_id not in self.active_generations:
-            raise HTTPException(status_code=404, detail="Generation not found")
+            return {"status": "not found"}
 
         future = self.active_generations[generation_id]
         request_id = self.active_requests[generation_id]
         self.cancel_request(request_id)
         future.cancel()
-
         # Clean up canceled generation
         del self.active_generations[generation_id]
 
@@ -613,12 +659,17 @@ class GenerationRequest(BaseModel):
     repetition_penalty: float = 1.2
     random_seed: int = 0
     stop_words_list: Optional[List[str]] = None
+    top_logprobs: Optional[int] = None
+    timeout: Optional[int] = None
 
 
 class GenerationResponse(BaseModel):
     generation: Optional[str] = None
     num_generated_tokens: Optional[int] = None
     generation_time: Optional[int] = None
+    tokens: Optional[list[str]] = None
+    logprobs: Optional[list[float]] = None
+    stopped_on_repetition: Optional[bool] = None
 
 
 class GenerationResponseAsync(BaseModel):
@@ -641,9 +692,10 @@ class MPIWrapper:
         max_input_len: Optional[int] = None,
         max_output_len: Optional[int] = None,
         max_beam_width: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
         kv_cache_free_gpu_memory_fraction: Optional[float] = None,
         disable_chunked_context: bool = False,
+        repetition_check_chars: Optional[int] = None,
+        repetition_limit: Optional[int] = None,
     ):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
@@ -654,8 +706,9 @@ class MPIWrapper:
             max_output_len=max_output_len,
             max_beam_width=max_beam_width,
             kv_cache_free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
-            timeout_seconds=timeout_seconds,
             disable_chunked_context=disable_chunked_context,
+            repetition_check_chars=repetition_check_chars,
+            repetition_limit=repetition_limit,
         )
         self.app = None
         if self.rank == 0:
@@ -676,6 +729,8 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
+                "top_logprobs": request.top_logprobs,
+                "timeout": request.timeout,
             }
 
             self.comm.Barrier()
@@ -687,7 +742,7 @@ class MPIWrapper:
                 output = self.model.get_generation(generation_id)
                 if output is not None:
                     return output
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.5)
 
         @app.put("/generate_async", response_model=GenerationResponseAsync)
         async def generate_async(request: GenerationRequest):
@@ -701,6 +756,8 @@ class MPIWrapper:
                 "repetition_penalty": request.repetition_penalty,
                 "random_seed": request.random_seed,
                 "stop_words_list": request.stop_words_list,
+                "top_logprobs": request.top_logprobs,
+                "timeout": request.timeout,
             }
 
             self.comm.Barrier()
@@ -754,12 +811,15 @@ def main():
     parser.add_argument("--max_output_len", type=int, default=None, help="Maximum output length")
     parser.add_argument("--max_beam_width", type=int, default=None, help="Maximum beam width")
     parser.add_argument(
-        "--timeout_seconds", type=int, default=None, help="No session should take longer than the timeout"
-    )
-    parser.add_argument(
         "--kv_cache_free_gpu_memory_fraction", type=float, default=None, help="Free GPU memory fraction for cache"
     )
     parser.add_argument("--disable_chunked_context", action="store_true", help="Disable chunked context")
+    parser.add_argument(
+        "--repetition_check_chars", type=int, default=None, help="Number of characters to check for repetition"
+    )
+    parser.add_argument(
+        "--repetition_limit", type=int, default=None, help="Repetition limit: stops generation if exceeded"
+    )
     args = parser.parse_args()
 
     wrapper = MPIWrapper(
@@ -768,9 +828,10 @@ def main():
         max_input_len=args.max_input_len,
         max_output_len=args.max_output_len,
         max_beam_width=args.max_beam_width,
-        timeout_seconds=args.timeout_seconds,
         kv_cache_free_gpu_memory_fraction=args.kv_cache_free_gpu_memory_fraction,
         disable_chunked_context=args.disable_chunked_context,
+        repetition_check_chars=args.repetition_check_chars,
+        repetition_limit=args.repetition_limit,
     )
     wrapper.run(host=args.host, port=args.port)
 

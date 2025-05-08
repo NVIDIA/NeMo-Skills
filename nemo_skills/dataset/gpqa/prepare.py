@@ -14,11 +14,14 @@
 
 import argparse
 import json
-from pathlib import Path
-from datasets import load_dataset
-from tqdm import tqdm
 import random
 import re
+from pathlib import Path
+
+from datasets import load_dataset
+from tqdm import tqdm
+
+from nemo_skills.dataset.utils import get_mcq_fields
 
 """
 Preprocessing adapted from https://github.com/EleutherAI/lm-evaluation-harness/blob/main/lm_eval/tasks/gpqa/generative/utils.py
@@ -46,20 +49,15 @@ def format_entry(entry, random_seed):
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
     return {
-        "A": choices[0],
-        "B": choices[1],
-        "C": choices[2],
-        "D": choices[3],
-        "options": [choices[0], choices[1], choices[2], choices[3]],
         "expected_answer": f"{chr(65 + correct_answer_index)}",
         "explanation": preprocess(entry["Explanation"]),
-        "question": entry["Question"],
         "subset_for_metrics": entry["Subdomain"],
         "difficulty": (
             re.split(r'\s*\(', entry["Writer's Difficulty Estimate"])[0]
             if entry["Writer's Difficulty Estimate"] is not None
             else None
         ),
+        **get_mcq_fields(entry["Question"], choices),
     }
 
 

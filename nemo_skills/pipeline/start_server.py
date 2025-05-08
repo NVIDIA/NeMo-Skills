@@ -13,12 +13,10 @@
 # limitations under the License.
 from enum import Enum
 
-import nemo_run as run
 import typer
 
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_free_port
 from nemo_skills.utils import setup_logging
 
 
@@ -38,7 +36,7 @@ def start_server(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     model: str = typer.Option(..., help="Path to the model"),
-    server_type: SupportedServers = typer.Option('trtllm', help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(..., help="Number of GPUs to use for hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
@@ -61,7 +59,7 @@ def start_server(
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
 
     cluster_config = get_cluster_config(cluster, config_dir)
 
@@ -82,7 +80,7 @@ def start_server(
         "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
 
-    with run.Experiment("server") as exp:
+    with get_exp("server", cluster_config) as exp:
         add_task(
             exp,
             cmd="",  # not running anything except the server

@@ -108,13 +108,7 @@ def test_execution_error(sandbox_type):
 
     output, session_id = sandbox.execute_code(code)
     # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
-    error = (
-        '\x1b[0;31m---------------------------------------------------------------------------\x1b[0m\n\x1b[0;31m'
-        'ZeroDivisionError\x1b[0m                         Traceback (most recent call last)\nFile \x1b[0;32m'
-        '<ipython-input-1-bc757c3fda29>:1\x1b[0m\n\x1b[0;32m----> 1\x1b[0m \x1b[38;5;241;43m1\x1b[39;49m\x1b[43m '
-        '\x1b[49m\x1b[38;5;241;43m/\x1b[39;49m\x1b[43m \x1b[49m\x1b[38;5;241;43m0\x1b[39;49m\n\n\x1b[0;31m'
-        'ZeroDivisionError\x1b[0m: division by zero\n'
-    )
+    error = 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n'
     assert output == {
         'process_status': 'completed',
         'stderr': '',
@@ -130,10 +124,7 @@ def test_syntax_error(sandbox_type):
     code = """a = 2\n b = 3"""
 
     output, session_id = sandbox.execute_code(code)
-    error = (
-        '\x1b[0;36m  File \x1b[0;32m<ipython-input-1-ff73a4eb1351>:2\x1b[0;36m\x1b[0m\n\x1b[0;31m    '
-        'b = 3\x1b[0m\n\x1b[0m    ^\x1b[0m\n\x1b[0;31mIndentationError\x1b[0m\x1b[0;31m:\x1b[0m unexpected indent\n'
-    )
+    error = '    b = 3\n    ^\nIndentationError: unexpected indent\n'
     assert output == {
         'process_status': 'completed',
         'stderr': '',
@@ -171,16 +162,9 @@ x = (600 - height_in_inches) / 30
 x
 """
     error = (
-        "\x1b[0;31m---------------------------------------------------------------------------\x1b[0m\n\x1b[0;31m"
-        "NameError\x1b[0m                                 Traceback (most recent call last)\nFile \x1b[0;32m"
-        "<ipython-input-1-2d264478936f>:4\x1b[0m\n\x1b[1;32m      2\x1b[0m height_in_inches \x1b[38;5;241m=\x1b"
-        "[39m \x1b[38;5;241m20\x1b[39m \x1b[38;5;241m*\x1b[39m \x1b[38;5;241m12\x1b[39m\n\x1b[1;32m      3\x1b[0m"
-        " \x1b[38;5;66;03m# height of bamboo in inches after x days\x1b[39;00m\n\x1b[0;32m----> 4\x1b[0m "
-        "height_after_x_days \x1b[38;5;241m=\x1b[39m height_in_inches \x1b[38;5;241m+\x1b[39m \x1b[38;5;241m30"
-        "\x1b[39m \x1b[38;5;241m*\x1b[39m \x1b[43mx\x1b[49m\n\x1b[1;32m      5\x1b[0m \x1b[38;5;66;03m"
-        "# solve for x\x1b[39;00m\n\x1b[1;32m      6\x1b[0m x \x1b[38;5;241m=\x1b[39m (\x1b[38;5;241m600\x1b[39m "
-        "\x1b[38;5;241m-\x1b[39m height_in_inches) \x1b[38;5;241m/\x1b[39m \x1b[38;5;241m30\x1b[39m\n\n\x1b[0;31m"
-        "NameError\x1b[0m: name 'x' is not defined\n"
+        "Traceback (most recent call last):\n    "
+        "height_after_x_days = height_in_inches + 30 * x\n"
+        "NameError: name 'x' is not defined\n"
     )
     output, session_id = sandbox.execute_code(code)
     assert output == {
@@ -329,10 +313,10 @@ def test_lean4_code_execution_failure(sandbox_type):
 
 
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_lean4_few_shots(sandbox_type):
+def test_minif2f_deepseek_fewshots(sandbox_type):
     sandbox = _get_sandbox(sandbox_type)
 
-    from nemo_skills.prompt.few_shot_examples.minif2f import minif2f_deepseek_fewshot
+    from nemo_skills.prompt.few_shot_examples.lean4 import minif2f_deepseek_fewshot
 
     # Test case for Lean4 code with syntax error
     session_id_list = []
@@ -364,6 +348,47 @@ def test_lean4_few_shots(sandbox_type):
     assert (
         not stdout_list
     ), f"Expected the stdout to match the expected output for all test cases, but mismatches were found at indices {stdout_list}."
+    assert (
+        not stderr_list
+    ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."
+
+
+@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
+def test_math_to_lean4_fewshots(sandbox_type):
+    sandbox = _get_sandbox(sandbox_type)
+
+    from nemo_skills.prompt.few_shot_examples.lean4 import math_to_lean4_fewshot
+
+    # Test case for Lean4 code with syntax error
+    session_id_list = []
+    process_status_list = []
+    stdout_list = []
+    stderr_list = []
+
+    for i, entry in enumerate(math_to_lean4_fewshot):
+        code = entry["header"] + entry["formal_statement"] + entry["formal_proof"]
+
+        output, session_id = sandbox.execute_code(code, language="lean4")
+
+        if session_id is not None:
+            session_id_list.append(i)
+        if output["process_status"] != 'completed':
+            process_status_list.append(i)
+        if "warning: declaration uses 'sorry'" not in output["stdout"]:
+            stdout_list.append(i)
+        if output["stderr"] != "":
+            stderr_list.append(i)
+
+    # Assertions for the correct code
+    assert (
+        not session_id_list
+    ), f"Expected session_id to be None for all test cases, but got session_ids for few shots at indices {session_id_list}."
+    assert (
+        not process_status_list
+    ), f"Expected process_status to be 'completed' for all test cases, but these few shots did not complete successfully: indices {process_status_list}."
+    assert (
+        not stdout_list
+    ), f"Expected the stdout to include the warning 'declaration uses 'sorry'' for incomplete proofs in all test cases, but mismatches or missing warnings were found at indices {stdout_list}."
     assert (
         not stderr_list
     ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."

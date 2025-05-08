@@ -18,8 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import run_cmd
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
 sys.path.append(str(Path(__file__).absolute().parent / 'gpu-tests'))
 from test_train import docker_run
@@ -172,7 +171,6 @@ def test_openmathinstruct2():
     assert (
         expected_md5 == output_md5
     ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
-
 
 
 def test_aggregate_answers_fill():

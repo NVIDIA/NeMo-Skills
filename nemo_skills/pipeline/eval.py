@@ -15,15 +15,22 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Tuple
 
-import nemo_run as run
 import typer
 
 from nemo_skills.dataset.utils import get_dataset_module
-from nemo_skills.pipeline import add_task, check_if_mounted, get_cluster_config, get_generation_command, run_exp
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import get_free_port, get_server_command
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    get_generation_command,
+    get_server_command,
+    run_exp,
+)
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -169,13 +176,14 @@ def eval(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
 ):
     """Evaluate a model on specified benchmarks.
 
     Run `python -m nemo_skills.inference.generate --help` for other supported arguments
     (need to be prefixed with ++, since we use Hydra for that script).
     """
-    setup_logging(disable_hydra_logs=False)
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting evaluation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
@@ -229,9 +237,21 @@ def eval(
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
+    # Check which benchmarks require sandbox
+    benchmark_requires_sandbox = {}
+    for benchmark in benchmarks.keys():
+        benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
+        requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        if requires_sandbox and not with_sandbox:
+            LOG.warning(
+                "Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark
+            )
+
+    # Create evaluation commands as before
     eval_cmds = (
         [
-            cmd
+            (cmd, benchmark)
             for benchmark in benchmarks.keys()
             for cmd in get_greedy_cmd(
                 benchmark,
@@ -248,7 +268,7 @@ def eval(
         else []
     )
     eval_cmds += [
-        cmd
+        (cmd, benchmark)
         for benchmark, rs_num in benchmarks.items()
         for rs in range(starting_seed, starting_seed + rs_num)
         for cmd in get_sampling_cmd(
@@ -269,15 +289,25 @@ def eval(
         # TODO: should we keep num_jobs as the total max?
         num_jobs *= num_runs
 
-    # splitting eval cmds equally across num_jobs nodes
-    eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
+    # Create job batches with benchmark info
+    job_batches = []
+    for i in range(num_jobs):
+        cmds = []
+        benchmarks_in_job = set()
+        for cmd, benchmark in eval_cmds[i::num_jobs]:
+            cmds.append(cmd)
+            benchmarks_in_job.add(benchmark)
+        job_batches.append((cmds, benchmarks_in_job))
 
-    with run.Experiment(expname) as exp:
-        for idx, eval_cmd in enumerate(eval_cmds):
-            LOG.info("Launching task with command %s", eval_cmd)
+    with get_exp(expname, cluster_config) as exp:
+        for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
+            # Check if any benchmark in this job requires sandbox
+            job_needs_sandbox = with_sandbox or any(benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job)
+            
+            LOG.info("Launching task with command %s", " && ".join(cmds))
             add_task(
                 exp,
-                cmd=get_generation_command(server_address=server_address, generation_commands=eval_cmd),
+                cmd=get_generation_command(server_address=server_address, generation_commands=" && ".join(cmds)),
                 task_name=f'{expname}-{idx}',
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
@@ -285,7 +315,7 @@ def eval(
                 partition=partition,
                 time_min=time_min,
                 server_config=server_config,
-                with_sandbox=True,
+                with_sandbox=job_needs_sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,

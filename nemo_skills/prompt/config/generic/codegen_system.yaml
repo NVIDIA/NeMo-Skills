@@ -1,0 +1,14 @@
+# default prompt for all python based code benchmark evaluations on system prompt.
+# used by models which are trained with this prompt.
+
+system: |-
+  You are given a problem for which you need to generate/complete code.
+
+  Please continue to complete the function with python programming language. You are not allowed to modify the given code and do the completion only.
+
+  The solution should be in the following format:
+  ```python
+  # Your code here
+  ```
+
+user: "{question}"

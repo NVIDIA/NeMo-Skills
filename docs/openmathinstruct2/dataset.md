@@ -1,7 +1,7 @@
 # Dataset construction
 
 Here are the commands you can run to re-create [OpenMathInstruct-2 dataset](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2).
-We assume you have `/workspace` defined in your [cluster config](../basics/prerequisites.md#cluster-configs) and are running
+We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are running
 all commands on a slurm cluster. Change the commands accordingly if running locally
 (but it's going to take a lot of time).
 We also assume you have the [Llama3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct)
@@ -108,8 +108,7 @@ We use the Python API in commands below.
 MATH dataset.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import generate
+from nemo_skills.pipeline.cli import wrap_arguments, generate
 
 # we generated 80 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 80 new data files
@@ -134,8 +133,7 @@ for i in range(80):
 GSM8K dataset.
 
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import generate
+from nemo_skills.pipeline.cli import wrap_arguments, generate
 
 # we generated 10 new problems from each original seed problem, so we have a loop
 # to now generate 32 solutions for each of those 10 new data files
@@ -164,8 +162,7 @@ You also need to specify the full path to where `/workspace` is mounted
 Python/cmdline API as for other scripts).
 
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 # for MATH
 input_folder = "/workspace/new-problems-solution-augmentation/math"
@@ -214,8 +211,7 @@ We test against GSM8K, MATH, AMC 2023, and AIME 2024.
 
 Retrieve top-5 similar items from the test sets
 ```python
-from nemo_skills.pipeline import wrap_arguments
-from nemo_skills.pipeline.cli import run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 
 test_sets = ['gsm8k', 'math', 'amc23', 'aime24']

@@ -98,6 +98,8 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float],
         random_seed: int | list[int],
         stop_phrases: list[str] | list[list[str]] | None,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -125,6 +127,8 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
@@ -137,6 +141,8 @@ class BaseModel(abc.ABC):
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -204,6 +210,8 @@ class BaseModel(abc.ABC):
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
@@ -220,6 +228,7 @@ class BaseModel(abc.ABC):
             repetition_penalty=repetition_penalty,
             random_seed=random_seed,
             stop_phrases=stop_phrases,
+            top_logprobs=top_logprobs,
             remove_stop_phrases=remove_stop_phrases,
         )
         all_generations = [None] * len(prompts)
@@ -235,6 +244,10 @@ class BaseModel(abc.ABC):
                 if gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
+                    # trtllm always return these fields so we need to remove them if not requested
+                    if top_logprobs is None:
+                        gen_dict.pop('tokens', None)
+                        gen_dict.pop('logprobs', None)
 
             time.sleep(1)
 
@@ -259,12 +272,15 @@ class TRTLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
-
+        if top_logprobs is not None and top_logprobs > 1:
+            raise NotImplementedError("This code does not support `top_logprobs` > 1.")
         if generate_endpoint not in ["generate", "generate_async"]:
             raise ValueError(f"Invalid generate endpoint: {generate_endpoint}")
 
@@ -281,6 +297,8 @@ class TRTLLMModel(BaseModel):
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "stop_words_list": stop_phrases,
+            "top_logprobs": top_logprobs,
+            "timeout": timeout,
         }
         output_dict = self.requests_lib.put(
             url="http://{}:{}/{}".format(self.server_host, self.server_port, generate_endpoint),
@@ -311,6 +329,8 @@ class TRTLLMModel(BaseModel):
         min_p: float | list[float] = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
@@ -327,6 +347,8 @@ class TRTLLMModel(BaseModel):
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
             'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -339,13 +361,14 @@ class TRTLLMModel(BaseModel):
             if not is_list:
                 kwargs[key] = [value for _ in range(len(prompts))]
 
+        # futures are not really necessary here unless the number of prompts is huge
+        # as we get http reply right away with generation id from the trtllm server
         futures = []
-        with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
-            for request_idx in range(len(prompts)):
-                request = {key: value[request_idx] for key, value in kwargs.items()}
-                request['prompt'] = prompts[request_idx]
-                self.preprocess_request(request)
-                futures.append(executor.submit(self._generate_single_async, **request))
+        for request_idx in range(len(prompts)):
+            request = {key: value[request_idx] for key, value in kwargs.items()}
+            request['prompt'] = prompts[request_idx]
+            self.preprocess_request(request)
+            futures.append(self.executor.submit(self._generate_single_async, **request))
         outputs = [future.result() for future in futures]
 
         new_gen_id_to_params = {
@@ -404,6 +427,8 @@ class NemoModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float | list[float] = 1.0,
         random_seed: int | list[int] = 0,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -412,6 +437,10 @@ class NemoModel(BaseModel):
         """
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
+        if top_logprobs is not None:
+            raise NotImplementedError("Nemo server does not support top_logprobs parameter.")
+        if timeout is not None:
+            raise NotImplementedError("Nemo server does not support timeout parameter.")
         if isinstance(prompt, dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
@@ -452,10 +481,16 @@ class NemoModel(BaseModel):
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
         remove_stop_phrases: bool = True,
     ) -> list[dict]:
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
+        if top_logprobs is not None:
+            raise NotImplementedError("Nemo server does not support top_logprobs parameter.")
+        if timeout is not None:
+            raise NotImplementedError("Nemo server does not support timeout parameter.")
 
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
@@ -504,6 +539,8 @@ class OpenAIModel(BaseModel):
         model=None,
         base_url=None,
         api_key=None,
+        max_retries: int = 3,
+        initial_retry_delay: float = 2.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -527,11 +564,16 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
+            # assuming it's not used and setting a dummy value
+            api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
         if self.model == "model":  # that's a placeholder, so trying to find real name
             self.model = self.get_model_name_from_server()
+
+        self.max_retries = max_retries
+        self.initial_retry_delay = initial_retry_delay
 
     def batch_generate(
         self,
@@ -542,6 +584,7 @@ class OpenAIModel(BaseModel):
         top_k: int = 0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> list[dict]:
         # only supported by the OpenAI endpoint!
@@ -568,6 +611,8 @@ class OpenAIModel(BaseModel):
                                 "presence_penalty": repetition_penalty,
                                 "seed": random_seed,
                                 "stop": stop_phrases,
+                                "logprobs": top_logprobs is not None,
+                                "top_logprobs": top_logprobs,
                             },
                         }
                     )
@@ -622,54 +667,103 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
+        timeout: int | None = None,
+        top_logprobs: int | None = None,
     ) -> str:
         if top_k != 0:
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if min_p > 0:
-            ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
+            raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
+        if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
+            raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                temperature=temperature,
-                top_p=top_p,
-                max_tokens=tokens_to_generate,
-                presence_penalty=repetition_penalty,
-                seed=random_seed,
-                stop=stop_phrases,
-                messages=prompt,
-            )
-            response = response.choices[0]
-        except openai.BadRequestError as e:
-            # this likely only works for Nvidia-hosted models
-            msg = e.body['detail']
-            # expected message:
-            # This model's maximum context length is N tokens.
-            # However, you requested X tokens (Y in the messages, Z in the completion).
-            # Please reduce the length of the messages or completion.
-            if msg.startswith("This model's maximum context length is"):
-                numbers = re.findall(r"\d+", msg)
-                max_tokens = int(numbers[0]) - int(numbers[2])
-                LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
+        retry_count = 0
+        retry_delay = self.initial_retry_delay
+
+        while True:
+            try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     temperature=temperature,
                     top_p=top_p,
-                    max_tokens=max_tokens,
+                    max_tokens=tokens_to_generate,
                     presence_penalty=repetition_penalty,
                     seed=random_seed,
                     stop=stop_phrases,
                     messages=prompt,
-                ).choices[0]
-            else:
-                raise
-        except AttributeError:
-            # sometimes response is a string?
-            LOG.error("Unexpected response from OpenAI API: %s", response)
-            raise
+                    logprobs=top_logprobs is not None,
+                    top_logprobs=top_logprobs,
+                    timeout=timeout,
+                )
+                break  # Success, exit the retry loop
+            except openai.RateLimitError as e:
+                retry_count += 1
+                if retry_count > self.max_retries:
+                    LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
+                    raise
 
-        output = response.message.content
-        return {'generation': output}
+                # Extract retry-after header if available, otherwise use exponential backoff
+                retry_after = getattr(e, 'retry_after', None)
+                if retry_after is not None and isinstance(retry_after, (int, float)):
+                    wait_time = retry_after
+                else:
+                    wait_time = retry_delay
+                    retry_delay *= 2  # Exponential backoff
+
+                LOG.warning(
+                    "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
+                    wait_time,
+                    retry_count,
+                    self.max_retries,
+                )
+                time.sleep(wait_time)
+            except openai.BadRequestError as e:
+                # this likely only works for Nvidia-hosted models
+                msg = e.body['detail']
+                # expected message:
+                # This model's maximum context length is N tokens.
+                # However, you requested X tokens (Y in the messages, Z in the completion).
+                # Please reduce the length of the messages or completion.
+                if msg.startswith("This model's maximum context length is"):
+                    numbers = re.findall(r"\d+", msg)
+                    max_tokens = int(numbers[0]) - int(numbers[2])
+                    LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        temperature=temperature,
+                        top_p=top_p,
+                        max_tokens=max_tokens,
+                        presence_penalty=repetition_penalty,
+                        seed=random_seed,
+                        stop=stop_phrases,
+                        messages=prompt,
+                        logprobs=top_logprobs is not None,
+                        top_logprobs=top_logprobs,
+                        timeout=timeout,
+                    )
+                else:
+                    raise
+            except AttributeError:
+                LOG.error("Unexpected response from OpenAI API: %s", response)
+                raise
+            except Exception as e:
+                LOG.error("Unexpected error during API call: %s", str(e))
+                raise
+
+        choice = response.choices[0]
+        output = choice.message.content
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
+            result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+
+        return result
 
     def get_model_name_from_server(self):
         model_list = self.client.models.list()
@@ -735,6 +829,8 @@ class VLLMModel(BaseModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
         stop_phrases: list[str] | None = None,
     ) -> dict:
         if isinstance(prompt, dict):
@@ -755,7 +851,7 @@ class VLLMModel(BaseModel):
             echo=False,
             frequency_penalty=0.0,
             presence_penalty=0.0,
-            logprobs=None,
+            logprobs=top_logprobs,
             logit_bias=None,
             n=1,
             extra_body={
@@ -764,13 +860,13 @@ class VLLMModel(BaseModel):
                 "repetition_penalty": repetition_penalty,
                 "spaces_between_special_tokens": False,
             },
+            timeout=timeout,
         )
 
-        output, num_generated_tokens = self.parse_openai_response(response)
-        return {'generation': output, 'num_generated_tokens': num_generated_tokens}
+        return self.parse_openai_response(response)
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> tuple[str, int]:
+    def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
         assert not isinstance(response, list)
         assert len(response.choices) == 1
         choice = response.choices[0]
@@ -782,8 +878,12 @@ class VLLMModel(BaseModel):
             # sglang has a little different api here
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
-        num_generated_tokens = response.usage.completion_tokens
-        return output, num_generated_tokens
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = choice.logprobs.token_logprobs
+            result['tokens'] = choice.logprobs.tokens
+            result['top_logprobs'] = choice.logprobs.top_logprobs
+        return result
 
     def get_model_name_from_server(self):
         model_list = self.oai_client.models.list()

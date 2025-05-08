@@ -18,6 +18,7 @@ import shlex
 import subprocess
 import sys
 import tarfile
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,8 +30,10 @@ import nemo_run as run
 import yaml
 from huggingface_hub import get_token
 from invoke import StreamWatcher
+from nemo_run.config import set_nemorun_home
 from nemo_run.core.execution.docker import DockerExecutor
-from nemo_run.core.execution.slurm import SlurmJobDetails
+from nemo_run.core.execution.local import LocalExecutor
+from nemo_run.core.execution.slurm import SlurmJobDetails, get_packaging_job_key
 from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
@@ -60,10 +63,14 @@ class RepoMetadata:
         if not self.path.exists():
             raise ValueError(f"Repository path `{self.path}` does not exist.")
 
+
 # Registry of external repos that should be packaged with the code in the experiment
 EXTERNAL_REPOS = {
-    'nemo_skills': RepoMetadata(name='nemo_skills', path=Path(__file__).absolute().parents[1]),  # path to nemo_skills repo
+    'nemo_skills': RepoMetadata(
+        name='nemo_skills', path=Path(__file__).absolute().parents[1]
+    ),  # path to nemo_skills repo
 }
+
 
 def register_external_repo(metadata: RepoMetadata):
     """Register an external repo to be packaged with the code in the experiment.
@@ -92,22 +99,282 @@ def get_registered_external_repo(name: str) -> Optional[RepoMetadata]:
     return EXTERNAL_REPOS[name]
 
 
+def is_mounted_filepath(cluster_config: dict, path: str):
+    """
+    Check if the filepath is mounted using the cluster config. Does not raise an error if the filepath is not mounted.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        bool: Whether the filepath is mounted.
+    """
+    # Find which mount path matches the filepaths prefix
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_dest):
+            return True
+
+    return False
+
+
 def check_if_mounted(cluster_config, path_to_check):
     """Will check that path_to_check is referenced inside one of the mounts."""
-    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
-        if path_to_check.startswith(mount.split(":")[1]):
-            return
-    raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return
+
+    if not is_mounted_filepath(cluster_config, path_to_check):
+        raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
-def get_unmounted_path(cluster_config, path):
-    """Will return the path on the filesystem before it's mounted."""
+def get_mounted_path(cluster_config: dict, path: str):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        str: mounted filepath
+
+    Raises:
+        ValueError: if the filepath is not mounted
+    """
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return path
     if path is None:
         return None
+
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
+    for mount in cluster_config['mounts']:
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_source):
+            mount_path = mount
+            break
+
+        elif path.startswith(mount_dest):
+            # already mounted, return immediately
+            return path
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+    # append the rest of the path to the mount destination
+    filepath = mount_dest + path[len(mount_source) :]
+
+    return filepath
+
+
+def get_unmounted_path(cluster_config: dict, path: str):
+    """
+    Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
+    If the filepath is already mounted, it will return the filepath as is.
+
+    Args:
+        cluster_config: cluster config dictionary
+        path: path to the file to be mounted
+
+    Returns:
+        str: mounted filepath
+
+    Raises:
+        ValueError: if the filepath is not mounted
+    """
+    if cluster_config["executor"] == "none":
+        # no mounts in local executor
+        return path
+    if path is None:
+        return None
+
+    # Find which mount path matches the filepaths prefix
+    mount_path = None
     for mount in get_mounts_from_config(cluster_config):
-        if path.startswith(mount.split(":")[1]):
-            return mount.split(":")[0] + path[len(mount.split(":")[1]) :]
-    raise ValueError(f"The path '{path}' is not mounted. Check cluster config.")
+        mount_source, mount_dest = mount.split(':')
+        if path.startswith(mount_dest):
+            mount_path = mount
+            break
+
+        elif path.startswith(mount_source):
+            # already mounted, return immediately
+            return path
+
+    if mount_path is None:
+        raise ValueError(
+            f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
+            f"{cluster_config['mounts']}"
+        )
+
+    # replace the mount destination inside the filepath with the mount source
+    mount_source, mount_dest = mount_path.split(':')
+
+    # append the rest of the path to the mount source
+    filepath = mount_source + path[len(mount_dest) :]  # replace the mount destination with the mount source
+
+    return filepath
+
+
+def add_mount_path(mount_source: str, mount_dest: str, cluster_config):
+    """Add a mount path to the cluster configuration."""
+
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+
+    if 'mounts' in cluster_config:
+        original_mounts = get_mounts_from_config(cluster_config)
+        added_mount = False
+        for mount_path in original_mounts:
+            source, destination = mount_path.split(':')
+
+            if source == mount_source and destination == mount_dest:
+                return
+
+        if not added_mount:
+            cluster_config['mounts'].append(f"{mount_source}:{mount_dest}")
+            logging.info(f"Added mount path: `{mount_source}:{mount_dest}`")
+
+    else:
+        raise ValueError("No mounts found in cluster config, can only add to existing mount list.")
+
+
+def create_remote_directory(directory: str | list, cluster_config: dict):
+    """Create a remote directory on the cluster."""
+
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+
+    if isinstance(directory, str):
+        directory = [directory]
+
+    if cluster_config.get('executor') != 'slurm':
+        tunnel = run.LocalTunnel(job_dir=directory[0])
+        for dir_path in directory:
+            tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
+            logging.info(f"Created directory: {dir_path} in local filesystem.")
+        tunnel.cleanup()
+
+    elif cluster_config.get('executor') == 'slurm':
+        ssh_tunnel_config = cluster_config.get('ssh_tunnel', None)
+        if ssh_tunnel_config is None:
+            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
+
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = directory[0]
+
+        tunnel = get_tunnel(cluster_config)
+        for dir_path in directory:
+            tunnel.run(f'mkdir -p {dir_path}', hide=False, warn=True)
+            logging.info(f"Created directory: {dir_path} on remote cluster.")
+        tunnel.cleanup()
+
+    else:
+        raise ValueError(f"Unsupported executor: {cluster_config.get('executor')}")
+
+
+def resolve_mount_paths(cluster_config: dict, mount_paths: str | list | dict, create_remote_dir: bool = True):
+    """
+    Resolve the mount paths using the cluster config to merge the mount destination path to the filepath.
+    Args:
+        cluster_config: The cluster configuration dictionary to update.
+        mount_paths: The mount paths to resolve - can be a string (comma separated), dict or a list of strings.
+            Each mount path should be in the format `src:dest`.
+        create_remote_dir: Whether to create the remote directories for the mount paths.
+    """
+    if mount_paths is not None:
+        if isinstance(mount_paths, str):
+            mount_paths_list = mount_paths.split(",")
+        elif isinstance(mount_paths, dict):
+            mount_paths_list = [f"{src}:{dest}" for src, dest in mount_paths.items()]
+        else:
+            mount_paths_list = mount_paths
+
+        # remove empty strings from the list and strip whitespace
+        mount_paths_list = [path.strip() for path in mount_paths_list]
+        mount_paths_list = [path for path in mount_paths_list if path != ""]
+
+        for idx, path in enumerate(mount_paths_list):
+            assert ":" in path, f"Invalid mount path: {path}. Each path must be in the format `src:dest`"
+            src, dest = path.split(":")
+            src = src.strip().strip("\n")
+            dest = dest.strip().strip("\n")
+
+            LOG.info(f"Adding mount path:- {src}:{dest}")
+            mount_paths_list[idx] = (src, dest)
+            add_mount_path(src, dest, cluster_config)
+
+        if create_remote_dir:
+            LOG.info(f"Creating remote directories for mount paths:")
+            all_src_dir = [src for src, _ in mount_paths_list]
+            # Check if it is a file or a directory and only create the directory
+            for idx in range(len(all_src_dir)):
+                if os.path.splitext(all_src_dir[idx])[1] != "":
+                    all_src_dir[idx] = os.path.dirname(all_src_dir[idx])
+                LOG.info(f"Attempting to create remote directory: {all_src_dir[idx]}")
+
+            create_remote_directory(all_src_dir, cluster_config)
+
+    return cluster_config
+
+
+def check_remote_mount_directories(directories: list, cluster_config: dict, exit_on_failure: bool = True):
+    """Create a remote directory on the cluster."""
+    if cluster_config is None:
+        raise ValueError("Cluster config is not provided.")
+    if isinstance(directories, str):
+        directories = [directories]
+    if cluster_config.get('executor') != 'slurm':
+        tunnel = run.LocalTunnel(job_dir=None)
+        all_dirs_exist = True
+        missing_source_locations = []
+        for directory in directories:
+            result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
+            if "Directory Exists" not in result.stdout:
+                missing_source_locations.append(directory)
+        tunnel.cleanup()
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
+    elif cluster_config.get('executor') == 'slurm':
+        ssh_tunnel_config = cluster_config.get('ssh_tunnel', None)
+        if ssh_tunnel_config is None:
+            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
+        # Check for pre-existing job_dir in the ssh_tunnel_config
+        if 'job_dir' not in ssh_tunnel_config:
+            ssh_tunnel_config['job_dir'] = os.getcwd()
+        tunnel = get_tunnel(cluster_config)
+        missing_source_locations = []
+        for directory in directories:
+            result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
+            if "Directory Exists" not in result.stdout:
+                missing_source_locations.append(directory)
+        tunnel.cleanup()
+        if len(missing_source_locations) > 0 and exit_on_failure:
+            missing_source_locations = [
+                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
+            ]
+            missing_source_locations = "\n".join(missing_source_locations)
+            raise FileNotFoundError(
+                f"Some files or directories do not exist at the source location for mounting !!\n\n"
+                f"{missing_source_locations}"
+            )
+    else:
+        raise ValueError(f"Unsupported executor: {cluster_config.get('executor')}")
 
 
 # caching the status assuming it doesn't change while experiment is being scheduled
@@ -134,6 +401,10 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                 handles.append(job.handle)
                 continue
         return handles
+
+    # if we are given an experiment object, we can directly get the handles
+    if isinstance(expname, run.Experiment):
+        return _get_handles(expname)
 
     try:
         with run.Experiment.from_title(expname) as exp:
@@ -240,7 +511,7 @@ def get_reward_server_command(
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
-        if cluster_config["executor"] == "local":
+        if cluster_config["executor"] != "slurm":
             num_tasks = 1
 
     elif server_type == "vllm":
@@ -334,7 +605,7 @@ def get_server_command(
         )
 
         # somehow on slurm nemo needs multiple tasks, but locally only 1
-        if cluster_config["executor"] == "local":
+        if cluster_config["executor"] != "slurm":
             num_tasks = 1
     elif server_type == 'vllm':
         start_vllm_cmd = (
@@ -380,7 +651,9 @@ def get_server_command(
     return server_cmd, num_tasks
 
 
-def get_sandox_command():
+def get_sandox_command(cluster_config):
+    if cluster_config['executor'] == 'none':
+        return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
 
 
@@ -462,12 +735,27 @@ def get_cluster_config(cluster=None, config_dir=None):
 
     config_file = os.environ.get("NEMO_SKILLS_CONFIG")
     if not config_file:
-        raise ValueError("Either cluster or NEMO_SKILLS_CONFIG must be provided.")
+        LOG.warning(
+            "Cluster config is not specified. Running locally without containers. "
+            "Only a subset of features is supported and you're responsible "
+            "for installing any required dependencies. "
+            "It's recommended to run `ns setup` to define appropriate configs!"
+        )
+        # just returning empty string for any container on access
+        cluster_config = {'executor': 'none', 'containers': defaultdict(str)}
+        return cluster_config
 
     if not Path(config_file).exists():
         raise ValueError(f"Cluster config {config_file} not found.")
 
-    return read_config(config_file)
+    cluster_config = read_config(config_file)
+
+    if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
+        if "job_dir" not in cluster_config:
+            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        set_nemorun_home(cluster_config["job_dir"])
+
+    return cluster_config
 
 
 @lru_cache
@@ -479,6 +767,23 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
+    # If the str provided is an env variable, resolve it
+    if "$" in job_dir:
+        job_dir = os.path.expandvars(job_dir)
+        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
+
+    if "$" in host:
+        host = os.path.expandvars(host)
+        LOG.info(f"Resolved `host` from env var to `{host}`")
+
+    if "$" in user:
+        user = os.path.expandvars(user)
+        LOG.info(f"Resolved `user` from env var to `{user}`")
+
+    if "$" in identity:
+        identity = os.path.expandvars(identity)
+        LOG.info(f"Resolved `identity` from env var to `{identity}`")
+
     return run.SSHTunnel(
         host=host,
         user=user,
@@ -494,6 +799,10 @@ def tunnel_hash(tunnel):
 
 
 def get_tunnel(cluster_config):
+    if "ssh_tunnel" not in cluster_config:
+        if cluster_config["executor"] != "slurm":
+            LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
+        return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
 
 
@@ -639,6 +948,7 @@ def get_git_repo_path(path: str | Path = None):
     finally:
         os.chdir(original_path)
 
+
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
     nemo_skills_dir = get_registered_external_repo('nemo_skills').path
@@ -658,7 +968,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
         if not (Path(repo_path) / 'nemo_skills').is_dir():
-            logging.warning(
+            logging.info(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
                 str(nemo_skills_dir / '*'),
@@ -675,14 +985,14 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             check_uncommitted_changes=check_uncommited_changes,
         )
     else:
-        logging.warning(
+        logging.info(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
             str(nemo_skills_dir / '*'),
         )
         include_patterns.append(str(nemo_skills_dir / '*'))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
-        root_package =  run.PatternPackager(
+        root_package = run.PatternPackager(
             include_pattern=include_patterns,
             relative_path=include_pattern_relative_paths,
         )
@@ -699,21 +1009,16 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             repo_path = repo_meta.path
             if get_git_repo_path(repo_path):
                 # Extra repos is a git repos, so we need to package only committed files
-                extra_repos[repo_name] = (
-                    run.GitArchivePackager(
-                        basepath=str(repo_path),
-                        check_uncommitted_changes=check_uncommited_changes
-                    )
+                extra_repos[repo_name] = run.GitArchivePackager(
+                    basepath=str(repo_path), check_uncommitted_changes=check_uncommited_changes
                 )
             else:
                 # Extra repos is not a git repo, so we need to package all files in the directory
                 repo_include_pattern = [str(Path(repo_path) / '*')]
                 repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
-                extra_repos[repo_name] = (
-                    run.PatternPackager(
-                        include_pattern=repo_include_pattern,
-                        relative_path=repo_include_pattern_relative_path,
-                    )
+                extra_repos[repo_name] = run.PatternPackager(
+                    include_pattern=repo_include_pattern,
+                    relative_path=repo_include_pattern_relative_path,
                 )
 
         # Return hybrid packager
@@ -863,10 +1168,15 @@ def get_executor(
     if extra_package_dirs is not None:
         extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
-    if cluster_config["executor"] == "local":
+
+    if cluster_config["executor"] != "slurm":
         if num_nodes > 1:
             raise ValueError("Local executor does not support multi-node execution")
 
+    if cluster_config["executor"] == "none":
+        return LocalExecutor()
+
+    if cluster_config["executor"] == "local":
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
         return DockerExecutor(
             container_image=container,
@@ -910,7 +1220,7 @@ def get_executor(
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
-        f"--ntasks={tasks_per_node * num_nodes}",
+        f"--ntasks-per-node={tasks_per_node}",
         f"--nodes={num_nodes}",
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
@@ -962,13 +1272,18 @@ def temporary_env_update(cluster_config, updates):
         cluster_config["env_vars"] = original_env_vars
 
 
+# TODO: this function has become too cumbersome to use with all recently added support
+#       we should make it simpler by perhaps removing separate logic for server/sandbox
+#       and supporting them through a list of cmds directly
+#       should also make heterogenous logic very clear and more robust
+#       and all parameters that can be list should be list for consistency
 def add_task(
     exp,
-    cmd,
+    cmd: str | list[str],
     task_name,
     cluster_config,
-    container,
-    num_tasks=1,
+    container: str | list[str],
+    num_tasks: int | list[int] = 1,
     num_gpus=None,
     num_nodes=1,
     log_dir=None,
@@ -996,7 +1311,7 @@ def add_task(
 
     Example of how to set task_dependencies:
 
-    with run.Experiment(expname) as exp:
+    with get_exp(expname, cluster_config) as exp:
         task1 = add_task(exp, ...)
         task2 = add_task(exp, ..., task_dependencies=[task1])
 
@@ -1008,7 +1323,7 @@ def add_task(
     If you want to avoid this, set `reuse_code=False`.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
-        if isinstance(run_after, str):
+        if isinstance(run_after, (str, run.Experiment)):
             run_after = [run_after]
         dependencies = []
         for dep_expname in run_after:
@@ -1031,6 +1346,7 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     het_group = 0
+    het_group_indices = []
     total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
     commands = []
@@ -1058,38 +1374,49 @@ def add_task(
             het_group=het_group,
             total_het_groups=total_het_groups,
         )
-        if cluster_config["executor"] == "local" and num_server_tasks > 1:
+        if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
         commands.append(server_cmd)
         executors.append(server_executor)
+        het_group_indices.append(het_group)
         het_group += 1
 
-    # then goes the main task unless it's empty
+    # then goes the main task(s) unless it's empty
     if cmd:
-        if cluster_config["executor"] == "local" and num_tasks > 1:
-            cmd = f"mpirun --allow-run-as-root -np {num_tasks} bash -c {shlex.quote(cmd)}"
-        with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
-            commands.append(cmd)
-            executors.append(
-                get_executor(
-                    cluster_config=cluster_config,
-                    container=container,
-                    num_nodes=num_nodes,
-                    tasks_per_node=num_tasks,
-                    gpus_per_node=num_gpus,
-                    partition=partition,
-                    time_min=time_min,
-                    dependencies=dependencies,
-                    job_name=task_name,
-                    log_dir=log_dir,
-                    log_prefix="main",
-                    extra_package_dirs=extra_package_dirs,
-                    slurm_kwargs=slurm_kwargs,
-                    heterogeneous=heterogeneous,
-                    het_group=het_group,
-                    total_het_groups=total_het_groups,
+        if isinstance(cmd, str):
+            cmd = [cmd]
+        if isinstance(container, str):
+            container = [container]
+        if isinstance(num_tasks, int):
+            num_tasks = [num_tasks]
+        if len(cmd) != len(container) or len(cmd) != len(num_tasks):
+            raise ValueError("Number of commands, containers and num_tasks must match.")
+        for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
+            if cluster_config["executor"] != "slurm" and cur_tasks > 1:
+                cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
+            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+                commands.append(cur_cmd)
+                executors.append(
+                    get_executor(
+                        cluster_config=cluster_config,
+                        container=cur_container,
+                        num_nodes=num_nodes,
+                        tasks_per_node=cur_tasks,
+                        gpus_per_node=num_gpus,
+                        partition=partition,
+                        time_min=time_min,
+                        dependencies=dependencies,
+                        job_name=task_name,
+                        log_dir=log_dir,
+                        log_prefix="main" if len(cmd) == 1 else f"main_{cur_idx}",
+                        extra_package_dirs=extra_package_dirs,
+                        slurm_kwargs=slurm_kwargs,
+                        heterogeneous=heterogeneous,
+                        het_group=het_group,
+                        total_het_groups=total_het_groups,
+                    )
                 )
-            )
+                het_group_indices.append(het_group)
         het_group += 1
 
     # finally a sandbox if needed
@@ -1103,7 +1430,7 @@ def add_task(
                 sandbox_env_updates["PYTHONPATH"] = override + ":/app"
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
-            commands.append(get_sandox_command())
+            commands.append(get_sandox_command(cluster_config))
             sandbox_executor = get_executor(
                 cluster_config=cluster_config,
                 container=cluster_config["containers"]["sandbox"],
@@ -1124,24 +1451,39 @@ def add_task(
                 total_het_groups=total_het_groups,
             )
             executors.append(sandbox_executor)
+            het_group_indices.append(het_group)
         het_group += 1
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
-        if reuse_code:
+        if isinstance(tunnel, run.SSHTunnel) and reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
-                if isinstance(reuse_code_exp, run.Experiment):
-                    LOG.info("Reusing code from experiment %s", reuse_code_exp._title)
-                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
+                if isinstance(reuse_code_exp, str):
+                    try:
+                        reuse_code_exp = run.Experiment.from_id(reuse_code_exp)
+                    except Exception:
+                        LOG.debug(f"Failed to create experiment from id {reuse_code_exp}, trying to find it by title")
+                        reuse_code_exp = run.Experiment.from_title(reuse_code_exp)
+
+                LOG.info("Trying to reuse code from experiment %s", reuse_code_exp._title)
+                reuse_key = get_packaging_job_key(reuse_code_exp._id, "nemo-run")
+                if reuse_key in reuse_code_exp.tunnels[tunnel.key].packaging_jobs:
+                    reuse_dir = reuse_code_exp.tunnels[tunnel.key].packaging_jobs[reuse_key].dst_path
+
+                    for executor in executors:
+                        executor.packager.symlink_from_remote_dir = reuse_dir
+                    LOG.info(f"Successfully reused code from {reuse_key}")
                 else:
-                    with run.Experiment.from_title(reuse_code_exp) as reuse_exp:
-                        LOG.info("Reusing code from experiment %s", reuse_code_exp)
-                        reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs['nemo-run'].dst_path
-                for executor in executors:
-                    executor.packager.symlink_from_remote_dir = reuse_dir
-        else:  # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+                    LOG.warning("Relevant packaging job not found for experiment %s", reuse_code_exp._title)
+        # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
+        elif isinstance(tunnel, run.SSHTunnel):
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
+
+    # no mounting here, so assuming /nemo_run/code can be replaced with the current dir
+    if cluster_config["executor"] == "none":
+        for idx in range(len(commands)):
+            commands[idx] = commands[idx].replace('/nemo_run/code', './')
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
@@ -1152,6 +1494,8 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
+        if heterogeneous:
+            executors[0].het_group_indices = het_group_indices
         return exp.add(
             [run.Script(inline=command) for command in commands],
             executor=executors,
@@ -1165,12 +1509,23 @@ def run_exp(exp, cluster_config, sequential=None):
 
     If it is specified, it will be used as is.
     """
-    if cluster_config['executor'] == 'local':
+    if cluster_config['executor'] != 'slurm':
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
         exp.run(detach=True, sequential=False if sequential is None else sequential)
 
         # caching the experiment code for reuse
-        ssh_hash = tunnel_hash(get_tunnel(cluster_config))
-        if ssh_hash not in REUSE_CODE_EXP:
-            REUSE_CODE_EXP[ssh_hash] = exp
+        tunnel = get_tunnel(cluster_config)
+        if isinstance(tunnel, run.SSHTunnel):
+            ssh_hash = tunnel_hash(tunnel)
+            if ssh_hash not in REUSE_CODE_EXP:
+                REUSE_CODE_EXP[ssh_hash] = exp
+
+
+def get_exp(expname, cluster_config):
+    if cluster_config['executor'] == 'slurm':
+        return run.Experiment(expname)
+    # hiding all nemo-run logs otherwise as they are not useful locally
+    if cluster_config['executor'] == 'local':
+        return run.Experiment(expname, clean_mode=True)
+    return run.Experiment(expname, clean_mode=True, log_level="WARN")

@@ -21,8 +21,25 @@ import re
 import sys
 import tokenize
 import typing
+import fire
 from dataclasses import MISSING, dataclass, fields, is_dataclass
 from typing import Any, List, Optional
+from pathlib import Path
+
+from rich.logging import RichHandler
+from fire import decorators as fire_decorators
+
+# isort: off
+import nemo_skills
+from nemo_skills.file_utils import (
+    jdump,
+    jload,
+    jload_chunk,
+    count_newlines,
+    calculate_chunk_indices,
+    unroll_files
+)  # noqa # pylint: disable=unused-import
+# isort: on
 
 
 def nested_dataclass(*args, **kwargs):
@@ -61,26 +78,22 @@ def nested_dataclass(*args, **kwargs):
     return wrapper(args[0]) if args else wrapper
 
 
-def unroll_files(input_files, parent_dir: str | None = None):
-    if len(input_files) == 0:
-        raise ValueError("No files found with the given pattern.")
-    total_files = 0
-    for file_pattern in input_files:
-        if parent_dir is not None:
-            file_pattern = os.path.join(parent_dir, file_pattern)
-        for file in sorted(glob.glob(file_pattern, recursive=True)):
-            total_files += 1
-            yield file
-    if total_files == 0:
-        raise ValueError("No files found with the given pattern.")
-
-
-def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO):
-    logger = logging.getLogger()
+def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO, use_rich: bool = False):
+    logger = logging.getLogger('nemo_skills')
     logger.setLevel(log_level)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s %(levelname)s  %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
+
+    if use_rich:
+        handler = RichHandler(
+            rich_tracebacks=True,
+            show_path=False,
+            show_time=False,
+        )
+        for hdlr in logger.handlers[:]:
+            logger.removeHandler(hdlr)
+    else:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s %(levelname)s  %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        handler.setFormatter(formatter)
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -89,6 +102,62 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
         sys.argv.extend(
             ["hydra.run.dir=.", "hydra.output_subdir=null", "hydra/job_logging=none", "hydra/hydra_logging=none"]
         )
+
+    return logger
+
+
+def get_skills_root_dir():
+    """Get the root directory of the NeMo Skills package."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(nemo_skills.__file__)))
+
+
+def init_wandb(project, name, exp_dir=None, verbose=False):
+    """
+    Initialize wandb if the API key is set.
+    Returns true if Wandb is initialized, false otherwise.
+
+    Args:
+        project (str): Wandb project name.
+        name (str): Wandb run name.
+        exp_dir (str, optional): Directory for experiment logs. Defaults to None.
+        verbose (bool, optional): If True, prints debug information. Defaults to False.
+
+    Returns:
+        bool: True if wandb is initialized, False otherwise.
+    """
+    try:
+        import wandb
+    except (ImportError, ModuleNotFoundError):
+        if verbose: print("Wandb is not installed. Skipping wandb initialization.")
+        return False
+
+    # Check if the project or name is None, and skip initialization if so
+    if project is None or name is None:
+        if verbose: print("Wandb project or name not provided. Skipping wandb initialization.")
+        return False
+
+    # Determine the log directory based on the provided exp_dir
+    if exp_dir is None:
+        log_dir = os.path.join(os.getcwd(), "experiment_logs", "wandb")
+    else:
+        log_dir = os.path.join(exp_dir, "wandb", project, name)
+    log_dir = os.path.abspath(log_dir)
+
+    # Create the log directory if it does not exist
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # Initialize wandb with the specified parameters
+    try:
+        wandb.init(project=project, name=name, resume='auto', reinit=True, save_code=True, dir=log_dir)
+        if verbose: print("Wandb initialized.")
+        return True
+    except Exception as e:
+        if verbose:
+            print("Wandb initialization failed with the following error.")
+            print(e)
+        return False
+
 
 
 def extract_comments(code: str):
@@ -272,17 +341,7 @@ def chunk_data(data: List[Any], output_filename: str, chunk_id: Optional[int], n
                 f"chunk_id should be in the range [0, num_chunks)."
             )
 
-        remainder = len(data) % num_chunks
-        base_size = len(data) // num_chunks
-
-        extra = 1 if chunk_id < remainder else 0
-
-        if chunk_id < remainder:
-            start_idx = chunk_id * (base_size + 1)
-        else:
-            start_idx = remainder * (base_size + 1) + (chunk_id - remainder) * base_size
-
-        end_idx = start_idx + base_size + extra
+        start_idx, end_idx = calculate_chunk_indices(len(data), num_chunks, chunk_id)
         data = data[start_idx:end_idx]
 
         if len(data) > 0:
@@ -363,3 +422,81 @@ def prefill_judgement(data_point: dict) -> str | None:
         return "Reasoning: The two answers are identical.\nJudgement: Yes"
 
     return None
+
+def check_no_extra_args_fire():
+    """
+    Check if there are any extra arguments passed to the function.
+
+    This function inspects the command-line arguments and verifies that all
+    arguments passed to the function are expected by the function's signature.
+    If any extra arguments are found, it raises a ValueError.
+
+    Raises:
+        RuntimeError: If the function name is not found in the calling context.
+        ValueError: If extra arguments are found that are not accepted by the function.
+    """
+    args = sys.argv[1:]
+    # Extract the function name and its arguments from the command-line arguments
+    function_name = args[0]
+    function_args = args[1:]
+
+    # Determine the calling context by inspecting the call stack
+    context = {}
+    caller = inspect.stack()[1]
+    caller_frame = caller[0]
+    caller_globals = caller_frame.f_globals
+    caller_locals = caller_frame.f_locals
+    context.update(caller_globals)
+    context.update(caller_locals)
+
+    # Check if the help flag is present
+    if any(arg.startswith("--help") for arg in function_args) or '--help' in function_name:
+        return None  # Skip the check if the help flag is present
+
+    # Check if the function name exists in the calling context
+    if function_name not in context:
+        raise RuntimeError(
+            f"Function {function_name} not found in the calling context when checking for unused arguments."
+        )
+
+    component = context[function_name]
+
+    # Determine if the component is a class or a routine
+    is_class = inspect.isclass(component)
+    treatment = ('class' if is_class else 'routine',)
+
+    # Get the metadata and parse function arguments
+    metadata = fire_decorators.GetMetadata(component)
+    fn = component.__call__ if treatment == 'callable' else component
+    parse = fire.core._MakeParseFn(fn, metadata)
+    (varargs, kwargs), consumed_args, remaining_args, capacity = parse(function_args)
+
+    # Check for extra arguments that are not accepted by the function
+    if remaining_args:
+        raise ValueError(
+            f"Extra arguments found that are not accepted by function `{function_name}`:\n"
+            f"Additional arguments: {' '.join(remaining_args)}"
+        )
+
+
+def resolve_python_module_from_file(py_filepath: str, root_module: str = 'nemo_skills'):
+    """
+    Get the python module path from a python file path.
+    Ex: /.../NeMo-Skills/nemo_skills/dataset/abc.py -> nemo_skills.dataset.abc
+
+    Args:
+        py_filepath: Python file path. Provided as __file__ from the calling module.
+
+    Returns:
+        str: Python module path.
+    """
+    module_path = Path(py_filepath).absolute()
+    parts = Path(module_path).parts
+
+    if root_module not in parts:
+        raise ValueError("The provided file path is not within the nemo_codegen module.")
+
+    stripped_module_path = Path(*parts[parts.index(root_module) :])
+    striped_module = str(stripped_module_path).replace("/", ".")
+    striped_module = os.path.splitext(striped_module)[0]
+    return striped_module

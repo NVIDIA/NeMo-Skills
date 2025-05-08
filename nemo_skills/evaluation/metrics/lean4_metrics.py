@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
-
+from collections import defaultdict
 
 class Lean4Metrics(BaseMetrics):
     def __init__(self):
@@ -27,29 +27,35 @@ class Lean4Metrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         self.total += 1
+        if len(predictions) == 1: # greedy
+            self.agg_mode_dict["greedy"]["correct_proof"] += int(predictions[0]['proof_status'] == "completed")
+            self.agg_mode_dict["greedy"]["timeout_error"] += int(predictions[0]['proof_status'] == "timeout")
 
-        if len(predictions) > 1:
+
+        elif len(predictions) > 1: # pass@k
             # Multiple predictions, select the pass@k
-            self.agg_mode = f"pass@{len(predictions)}"
+            # getting metrics for all k up to len(predictions). Starting from last to make sure it's printed
+            for k in range(len(predictions), 0, -1):
+                self.agg_mode_dict[f"pass@{k}"]["correct_proof"] += int(any(elem['proof_status'] == "completed"
+                                                              for elem in predictions[:k]))
+                self.agg_mode_dict[f"pass@{k}"]["timeout_error"] += int(all(elem['proof_status'] == "timeout"
+                                                            for elem in predictions[:k]))
 
-            self.correct_proof += any([elem['proof_status'] == "completed" for elem in predictions])
-            if all([elem['proof_status'] == "timeout" for elem in predictions]):
-                self.timeout_error += 1
-        else:
-            self.agg_mode = "greedy"
-
-            self.correct_proof += predictions[0]['proof_status'] == "completed"
-            self.timeout_error += predictions[0]['proof_status'] == "timeout"
 
     def get_metrics(self):
-        metrics = {"num_entries": self.total}
-        metrics["lean4_correct"] = self.correct_proof / self.total * 100.0
-        metrics["timeout_error"] = self.timeout_error / self.total * 100.0
-        return {self.agg_mode: metrics}
+        metrics_dict = {}
+        for agg_mode, metric_values in self.agg_mode_dict.items():
+            metrics = {"num_entries": self.total}
+            metrics["lean4_correct"] = (metric_values["correct_proof"] / self.total) * 100.0
+            metrics["timeout_error"] = (metric_values["timeout_error"] / self.total) * 100.0
+            metrics_dict[agg_mode] = metrics
+        return metrics_dict
+
 
     def reset(self):
-        self.correct_proof = 0
-        self.timeout_error = 0
         self.total = 0
-        # Aggregation mode is automatically set
-        self.agg_mode = "greedy"
+        self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
+
+    def max_aggregations_to_print(self):
+    # Return 1 to print only the largest k (or "greedy" and the largest pass@k)
+        return 1

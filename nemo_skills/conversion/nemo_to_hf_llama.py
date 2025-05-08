@@ -22,12 +22,11 @@ from collections import OrderedDict
 from pathlib import Path
 
 import torch
-import yaml
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
 from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy
 from nemo.utils import logging
 from omegaconf import OmegaConf
-from pytorch_lightning import Trainer
+from pytorch_lightning.trainer.trainer import Trainer
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 

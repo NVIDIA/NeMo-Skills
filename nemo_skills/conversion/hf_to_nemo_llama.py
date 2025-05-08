@@ -56,6 +56,7 @@ def get_args():
         help="Name of HF model we are converting to (e.g. mistralai/Mistral-7B-v0.1)",
     )
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
+    parser.add_argument("--nemo-format", choices=["zarr", "torch_dist"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
     return args
 
@@ -110,7 +111,7 @@ def load_config(llama_config):
     while llama_config['vocab_size'] % base != 0:
         base //= 2
     nemo_config.make_vocab_size_divisible_by = base
-    nemo_config.dist_ckpt_format = 'zarr'
+    nemo_config.dist_ckpt_format = args.nemo_format
     return nemo_config
 
 

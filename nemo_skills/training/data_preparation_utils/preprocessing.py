@@ -328,7 +328,14 @@ class WriteFinalSftManifest(BaseProcessor):
         if prompt_config and prompt_template:
             self.prompt = get_prompt(prompt_config, prompt_template)
         else:
-            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+            if prompt_template:
+                LOG.warning(
+                    "Prompt template is provided, but prompt config is missing! "
+                    "Assuming 'user: {input_key}' and no special formatting for output."
+                )
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template)
+            else:
+                LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
     def process(self):
         samples_count = 0
@@ -403,6 +410,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self,
         prompt_config: str,
         prompt_template: str,
+        task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
         exclude_optional_keys: bool = True,
@@ -427,6 +435,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle
         self.num_output_samples = num_output_samples
+        self.task_name = task_name
 
     def process(self):
         samples_count = 0
@@ -452,6 +461,9 @@ class WriteFinalRLManifest(BaseProcessor):
                     output_sample["input"] = self.prompt.fill(input_dict=elem)
                 else:
                     output_sample["input"] = elem[self.input_key]
+
+                if self.task_name:
+                    output_sample["task_name"] = self.task_name
 
                 output_sample.update(self.metadata)
                 all_data.append(output_sample)

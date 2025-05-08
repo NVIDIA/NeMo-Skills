@@ -1,0 +1,19 @@
+user: |-
+  I will give you a critique's response which compares multiple solutions of a math problem. This response will explore different approaches, making mistakes along the way, correcting them, switching around and so on. But eventually the critique converges on its ranking of the different solutions and ends with a string "Judgment: " followed by a number corresponding to the index of the best solution. Your task is to write a clean version of the final critique without all the exploration and make sure to put the final judgment at the end. Please make sure to include the details related to arriving at the final judgment but not the tangential details.
+
+  Problem:
+  {problem}
+
+
+  Solutions:
+  {solutions}
+
+
+  Critique:
+  {generation}
+
+  
+  Now write a clean version of the final critique without all the exploration. Make sure to put in:
+  - The details related to arriving at the final judgment.
+  - Clearly writing the final judgment at the end via "Judgment: " followed by the index of the best solution. 
+  
