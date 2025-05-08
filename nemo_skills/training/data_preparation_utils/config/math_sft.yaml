@@ -57,7 +57,7 @@ filters:
   trim_solutions: true
   drop_incorrect_arithmetic: false
   split_arithmetic: false
-  remove_len_outlier_problems: true
+  remove_len_outlier_problems: false
   remove_len_outlier_solutions: false
   code_text_filter: null
   remove_code_errors: false
