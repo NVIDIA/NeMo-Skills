@@ -651,7 +651,9 @@ def get_server_command(
     return server_cmd, num_tasks
 
 
-def get_sandox_command():
+def get_sandox_command(cluster_config):
+    if cluster_config['executor'] == 'none':
+        return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
 
 
@@ -1428,7 +1430,7 @@ def add_task(
                 sandbox_env_updates["PYTHONPATH"] = override + ":/app"
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
-            commands.append(get_sandox_command())
+            commands.append(get_sandox_command(cluster_config))
             sandbox_executor = get_executor(
                 cluster_config=cluster_config,
                 container=cluster_config["containers"]["sandbox"],

@@ -88,7 +88,7 @@ If you pay attention to the log of above commands, you will notice that it print
 WARNING  Cluster config is not specified. Running locally without containers. Only a subset of features is supported and you're responsible for installing any required dependencies. It's recommended to run `ns setup` to define appropriate configs!
 ```
 
-Indeed, for anything more complicated than calling an API model, you'd need to do a little bit more setup. Since there
+Indeed, for anything more complicated than calling an API model, it's recommended that you do a little bit more setup. Since there
 are many heterogeneous jobs that we support, it's much simpler to run things in prebuilt containers than to try to
 install all packages in your current environment. To tell nemo-skills which containers to use and how to mount your
 local filesystem, we'd need to define a [cluster config](./cluster-configs.md). Here is an example of how a "local" cluster
@@ -124,6 +124,12 @@ and another mount[^1] for `/hf_models`, e.g.
 [^1]: Of course you can use a single mount if you'd like or define more than 2 mounts
 
 Also add `HUGGINGFACE_HUB_CACHE=/hf_models` when asked to add environment variables.
+
+!!! note
+
+    While we recommend running everything in containers by defining a cluster config, it's not a requirement.
+    Any of our jobs can be run without specifying the config, but you would need to make sure your environment
+    has all necessary packages installed.
 
 Now that we have our first config created, we can run inference
 with a local model (assuming you have at least one GPU on the machine you're using).
