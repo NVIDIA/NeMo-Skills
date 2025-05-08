@@ -17,17 +17,14 @@ import glob
 import json
 import logging
 import os
-import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import requests
 import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.utils import clean_formal_generation
 from nemo_skills.dataset.utils import get_lean4_header
 from nemo_skills.utils import python_doc_to_cmd_help, unroll_files
@@ -58,7 +55,7 @@ def cleanup_tmp_files(input_files):
             pass
 
 
-def dump_data(input_files, data, map_to_future, update_fn, answer_format="natural_language"):
+def dump_data(input_files, data, map_to_future):
     LOG.info("Waiting for current results and dumping to tmp files")
     tmp_file_handles = [
         open(manifest + f"-tmp", "at", encoding="utf-8", buffering=1) for manifest in unroll_files(input_files)
@@ -72,7 +69,7 @@ def dump_data(input_files, data, map_to_future, update_fn, answer_format="natura
             if not line_dict:
                 file_handle.write("\n")
                 continue
-            update_fn(map_to_future, line_dict, answer_format)
+            line_dict["proof_status"] = map_to_future[(line_dict["predicted_proof"])].result()
             file_handle.write(json.dumps(line_dict) + "\n")
 
     for file_handle in tmp_file_handles:
@@ -267,100 +264,6 @@ print(json.dumps(to_return))
                 self.sessions[session_id] = self.sessions[session_id][:-1]
         return output, session_id
 
-    def is_output_correct(
-        self,
-        pred_output,
-        gt_output,
-        take_modulo: int | None = None,
-        include_percentage=True,
-        tolerance=1e-4,
-        timeout=10.0,
-    ):
-        # embedding the full math grader code here to send to server for execution
-        with open(Path(__file__).absolute().parent / "math_grader.py", "rt") as fin:
-            math_grader_code = fin.read()
-
-        # corner cases
-        if isinstance(pred_output, str):
-            pred_output = pred_output.replace("'''", r'\'\'\'')
-            while pred_output.endswith('\\'):
-                pred_output = pred_output[:-1]
-
-        if isinstance(gt_output, str):
-            gt_output = gt_output.replace("'''", r'\'\'\'')
-            while gt_output.endswith('\\'):
-                gt_output = gt_output[:-1]
-
-        if take_modulo is not None:
-            gt_output = int(gt_output) % take_modulo
-            try:
-                pred_output = int(pred_output) % take_modulo
-            except:
-                pred_output = None
-            # no need to simpy call in this case
-            return pred_output == gt_output
-
-        math_equal_call = f"""
-    output = math_equal(
-        {repr(str(pred_output))},
-        {repr(str(gt_output))},
-        {include_percentage},
-        {tolerance},
-        {timeout},
-    )
-"""
-
-        TO_EXECUTE = f"""
-import os
-import sys
-import json
-from io import StringIO
-os.environ['OPENBLAS_NUM_THREADS'] = '16'
-
-{math_grader_code}
-
-stdout = sys.stdout
-# removing all output to not capture that
-sys.stdout = sys.stderr = StringIO()
-try:
-    {math_equal_call}
-    error_message = ""
-except Exception as e:
-    output = False
-    error_message = str(e)
-# restoring the output to get the print
-sys.stdout = stdout
-print(json.dumps({{"result": output, "error_message": error_message}}))
-"""
-
-        request = self._prepare_request(TO_EXECUTE, timeout)
-        try:
-            output = self._send_request(request, timeout)
-        except requests.exceptions.Timeout:
-            output = {'result': False, 'error_message': 'timeout'}
-
-        if output.get('error_message', 'internal error!'):
-            # logging the error
-            LOG.error(
-                "Error during correctness check:\noutput dict: %s\npred_output: %s\ngt_output: %s\nmath_equal_call: %s",
-                output,
-                pred_output,
-                gt_output,
-                math_equal_call,
-            )
-
-        if 'result' not in output:
-            LOG.error(
-                "Unexpected output:\noutput dict: %s\npred_output: %s\ngt_output: %s\nmath_equal_call: %s",
-                output,
-                pred_output,
-                gt_output,
-                math_equal_call,
-            )
-            return False
-
-        return output['result']
-
     def is_proof_correct(self, pred_output, timeout=30.0):
         TO_EXECUTE = pred_output
 
@@ -374,38 +277,24 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
     def batch_evaluate_results(
         self,
         input_files: List[str],
-        num_parallel_requests=100,
-        in_memory_lines=1500,
-        include_percentage=True,
-        tolerance=1e-4,
-        timeout=10.0,
-        take_modulo=None,
-        answer_format="natural_language",
+        num_parallel_requests=10,
+        in_memory_lines=500,
+        timeout=30.0,
+        answer_format="lean4-proof",
         ignore_cache: bool = False,
-        use_predicted_answer_key: bool = False,
         use_predicted_proof_key: bool = False,
-        extract_from_boxed: bool = True,
-        extract_regex: str = r"The final answer is (.+)$",
     ):
         """Will write if the results are correct back into the original files."""
 
         file_handles = [open(manifest, "rt", encoding="utf-8") for manifest in unroll_files(input_files)]
         cleanup_tmp_files(input_files)
 
-        def update_fn(map_to_future, line_dict, answer_format="natural_language"):
-            if answer_format == "natural_language":
-                line_dict["is_correct"] = map_to_future[
-                    (line_dict["predicted_answer"], line_dict["expected_answer"])
-                ].result()
-            elif "lean4-" in answer_format:
-                line_dict["proof_status"] = map_to_future[(line_dict["predicted_proof"])].result()
-
         data = []
         with ThreadPoolExecutor(max_workers=num_parallel_requests) as executor:
             for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
                 if line_idx % in_memory_lines == 0:
                     if line_idx > 0:  # dumping into tmp files
-                        dump_data(input_files, data, map_to_future, update_fn, answer_format)
+                        dump_data(input_files, data, map_to_future)
                     # new in-memory buffer
                     data = []
                     map_to_future = {}
@@ -418,23 +307,8 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                     line_dict = json.loads(file_line)
                     if not line_dict:  # can be empty for incomplete generations
                         continue
-                    if answer_format == "natural_language":
-                        gt_answer = line_dict["expected_answer"]
 
-                    if answer_format == "natural_language":
-                        if not use_predicted_answer_key:
-                            line_dict["predicted_answer"] = extract_answer(
-                                line_dict["generation"],
-                                extract_from_boxed=extract_from_boxed,
-                                extract_regex=extract_regex,
-                            )
-                        else:
-                            if "predicted_answer" not in line_dict:
-                                raise ValueError(
-                                    "predicted_answer key not found in the line_dict. "
-                                    "Set use_predicted_answer_key=False to re-extract"
-                                )
-                    elif answer_format == "lean4-proof":
+                    if answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
                             generation = clean_formal_generation(line_dict["generation"])
                             line_dict["predicted_proof"] = (
@@ -457,51 +331,30 @@ print(json.dumps({{"result": output, "error_message": error_message}}))
                                     "predicted_proof key not found in the line_dict. "
                                     "Set use_predicted_proof_key=False to re-combine"
                                 )
+                    else:
+                        raise ValueError(f'Unknown answer_format: {answer_format}')
 
                     data[-1][-1] = json.dumps(line_dict)
 
-                    if answer_format == "natural_language":
-                        predicted_answer = line_dict["predicted_answer"]
-                    elif "lean4-" in answer_format:
-                        predicted_proof = line_dict["predicted_proof"]
+                    predicted_proof = line_dict["predicted_proof"]
 
-                    if answer_format == "natural_language" and (predicted_answer, gt_answer) in map_to_future:
-                        continue
-                    elif ("lean4-" in answer_format) and predicted_proof in map_to_future:
+                    if predicted_proof in map_to_future:
                         continue
 
-                    if (
-                        ignore_cache
-                        or (line_dict.get("is_correct") is None and answer_format == "natural_language")
-                        or (line_dict.get("proof_status") is None and ("lean4-" in answer_format))
-                    ):
-                        if answer_format == "natural_language":
-                            map_to_future[(predicted_answer, gt_answer)] = executor.submit(
-                                self.is_output_correct,
-                                predicted_answer,
-                                gt_answer,
-                                include_percentage=include_percentage,
-                                tolerance=tolerance,
-                                timeout=timeout,
-                                take_modulo=take_modulo,
-                            )
-                        elif "lean4-" in answer_format:
-                            map_to_future[predicted_proof] = executor.submit(
-                                self.is_proof_correct,
-                                predicted_proof,
-                                timeout=timeout,
-                            )
+                    if ignore_cache or line_dict.get("proof_status") is None:
+                        map_to_future[predicted_proof] = executor.submit(
+                            self.is_proof_correct,
+                            predicted_proof,
+                            timeout=timeout,
+                        )
                     else:
-                        if answer_format == "natural_language":
-                            map_to_future[(predicted_answer, gt_answer)] = DummyFuture(line_dict["is_correct"])
-                        elif "lean4-" in answer_format:
-                            map_to_future[predicted_proof] = DummyFuture(line_dict["proof_status"])
+                        map_to_future[predicted_proof] = DummyFuture(line_dict["proof_status"])
 
             for file_handle in file_handles:
                 file_handle.close()
 
             if len(data) > 0:
-                dump_data(input_files, data, map_to_future, update_fn, answer_format)
+                dump_data(input_files, data, map_to_future)
 
         write_tmp_files_back(input_files)
 

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Dict
 from urllib.error import URLError
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer
 
 
 @contextlib.contextmanager
