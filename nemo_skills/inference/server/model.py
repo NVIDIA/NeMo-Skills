@@ -535,12 +535,13 @@ class OpenAIModel(BaseModel):
         model=None,
         base_url=None,
         api_key=None,
+        api_version=None,
         max_retries: int = 3,
         initial_retry_delay: float = 2.0,
+        endpoint_type: str = "openai",
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        from openai import OpenAI
+        BaseModel.__init__(self, **kwargs)
 
         if model is None:
             model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
@@ -552,16 +553,28 @@ class OpenAIModel(BaseModel):
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
-            if base_url is not None and 'api.nvidia.com' in base_url:
-                api_key = os.getenv("NVIDIA_API_KEY", api_key)
-                if not api_key:
-                    raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
+            if base_url is not None and 'nvidia.com' in base_url:
+                if endpoint_type == "azureopenai":
+                    api_key = os.getenv("AZURE_OPENAI_API_KEY", api_key)
+                    if not api_key:
+                        raise ValueError("AZURE_OPENAI_API_KEY is required for Azure OpenAI models.")
+                elif endpoint_type == "openai":
+                    api_key = os.getenv("NVIDIA_API_KEY", api_key)
+                    if not api_key:
+                        raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
             elif base_url is not None and 'api.openai.com' in base_url:
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
 
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        # Initialize appropriate client based on endpoint_type
+        if endpoint_type == "azureopenai":
+            self.client = openai.AzureOpenAI(api_key=api_key, api_version=api_version or "2024-12-01-preview", azure_endpoint=base_url)
+            self.model_type = "Azure OpenAI"
+        else:
+            self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
+            self.model_type = "OpenAI"
+
         self.model = model
         if self.model == "model":  # that's a placeholder, so trying to find real name
             self.model = self.get_model_name_from_server()
@@ -673,29 +686,38 @@ class OpenAIModel(BaseModel):
         
         retry_count = 0
         retry_delay = self.initial_retry_delay
-        
         while True:
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    temperature=temperature,
-                    top_p=top_p,
-                    max_tokens=tokens_to_generate,
-                    presence_penalty=repetition_penalty,
-                    seed=random_seed,
-                    stop=stop_phrases,
-                    messages=prompt,
-                    logprobs=top_logprobs is not None,
-                    top_logprobs=top_logprobs,
-                    timeout=timeout,
-                )
-                break  # Success, exit the retry loop
+                if self.model_type == "Azure OpenAI":
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        temperature=1,
+                        max_completion_tokens=tokens_to_generate,
+                        seed=random_seed,
+                        messages=prompt,
+                        logprobs=top_logprobs is not None,
+                        top_logprobs=top_logprobs,
+                    )
+                else:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        temperature=temperature,
+                        top_p=top_p,
+                        max_tokens=tokens_to_generate,
+                        presence_penalty=repetition_penalty,
+                        seed=random_seed,
+                        stop=stop_phrases,
+                        messages=prompt,
+                        logprobs=top_logprobs is not None,
+                        top_logprobs=top_logprobs,
+                        timeout=timeout,
+                    )
+                break
             except openai.RateLimitError as e:
                 retry_count += 1
                 if retry_count > self.max_retries:
                     LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
                     raise
-                
                 # Extract retry-after header if available, otherwise use exponential backoff
                 retry_after = getattr(e, 'retry_after', None)
                 if retry_after is not None and isinstance(retry_after, (int, float)):
@@ -703,7 +725,6 @@ class OpenAIModel(BaseModel):
                 else:
                     wait_time = retry_delay
                     retry_delay *= 2  # Exponential backoff
-                
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
                     wait_time, retry_count, self.max_retries

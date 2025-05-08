@@ -1035,7 +1035,7 @@ def get_env_variables(cluster_config):
     - `required_env_vars` - list of required environment variables
     - `env_vars` - list of optional environment variables
 
-    WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
+    WANDB_API_KEY, NVIDIA_API_KEY, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, and HF_TOKEN are always added if they exist.
 
     Args:
         cluster_config: cluster config dictionary
@@ -1063,7 +1063,7 @@ def get_env_variables(cluster_config):
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
     # value, assuming it has not been updated externally between these two calls
-    always_optional_env_vars = ["WANDB_API_KEY", "NVIDIA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"]
+    always_optional_env_vars = ["WANDB_API_KEY", "NVIDIA_API_KEY", "OPENAI_API_KEY", "AZURE_OPENAI_API_KEY", "HF_TOKEN"]
     default_factories = {
         "HF_TOKEN": lambda: str(get_token()),
     }
