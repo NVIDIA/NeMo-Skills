@@ -235,6 +235,7 @@ ns generate \
 ```
 
 The output folder will have three folders (apart from log folders):
+
 1. `comparison_instances`: This is the folder where input instances for genselect are kept.
 
 2. `comparison_judgment`: Output of GenSelect judgments. 
