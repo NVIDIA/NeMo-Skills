@@ -36,7 +36,7 @@ def start_server(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     model: str = typer.Option(..., help="Path to the model"),
-    server_type: SupportedServers = typer.Option('trtllm', help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(..., help="Number of GPUs to use for hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
