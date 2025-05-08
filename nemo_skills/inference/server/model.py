@@ -560,6 +560,8 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
+            # assuming it's not used and setting a dummy value
+            api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
@@ -670,10 +672,10 @@ class OpenAIModel(BaseModel):
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
         if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
             raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
-        
+
         retry_count = 0
         retry_delay = self.initial_retry_delay
-        
+
         while True:
             try:
                 response = self.client.chat.completions.create(
@@ -695,7 +697,7 @@ class OpenAIModel(BaseModel):
                 if retry_count > self.max_retries:
                     LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
                     raise
-                
+
                 # Extract retry-after header if available, otherwise use exponential backoff
                 retry_after = getattr(e, 'retry_after', None)
                 if retry_after is not None and isinstance(retry_after, (int, float)):
@@ -703,10 +705,12 @@ class OpenAIModel(BaseModel):
                 else:
                     wait_time = retry_delay
                     retry_delay *= 2  # Exponential backoff
-                
+
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
-                    wait_time, retry_count, self.max_retries
+                    wait_time,
+                    retry_count,
+                    self.max_retries,
                 )
                 time.sleep(wait_time)
             except openai.BadRequestError as e:

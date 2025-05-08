@@ -38,8 +38,6 @@ from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
-
-
 LOG = logging.getLogger(__file__)
 
 
@@ -653,7 +651,9 @@ def get_server_command(
     return server_cmd, num_tasks
 
 
-def get_sandox_command():
+def get_sandox_command(cluster_config):
+    if cluster_config['executor'] == 'none':
+        return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
 
 
@@ -1430,7 +1430,7 @@ def add_task(
                 sandbox_env_updates["PYTHONPATH"] = override + ":/app"
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
-            commands.append(get_sandox_command())
+            commands.append(get_sandox_command(cluster_config))
             sandbox_executor = get_executor(
                 cluster_config=cluster_config,
                 container=cluster_config["containers"]["sandbox"],
@@ -1494,26 +1494,14 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
-        try:
-            if heterogeneous:
-                executors[0].het_group_indices = het_group_indices
-            return exp.add(
-                [run.Script(inline=command) for command in commands],
-                executor=executors,
-                name="nemo-run",
-                dependencies=task_dependencies,
-            )
-        except AssertionError as e:
-            # AssertionError: Unsupported executor type.
-            if "Unsupported executor type" in str(e):
-                raise ValueError(
-                    "Running this command without --cluster parameter is not supported "
-                    "(even for running locally you need to pick a 'local' cluster). "
-                    "Please specify --cluster. You can run `ns setup` to define your "
-                    "cluster config if you don't have it yet."
-                ) from e
-            else:
-                raise e
+        if heterogeneous:
+            executors[0].het_group_indices = het_group_indices
+        return exp.add(
+            [run.Script(inline=command) for command in commands],
+            executor=executors,
+            name="nemo-run",
+            dependencies=task_dependencies,
+        )
 
 
 def run_exp(exp, cluster_config, sequential=None):
