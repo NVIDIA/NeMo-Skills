@@ -245,5 +245,8 @@ The output folder will have three folders (apart from log folders):
 To print the metrics run:
 
 ```bash
-ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle/hle --metric_type math --cluster local
+ns summarize_results \
+  /workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle/hle \
+  --metric_type math \
+  --cluster local
 ```
