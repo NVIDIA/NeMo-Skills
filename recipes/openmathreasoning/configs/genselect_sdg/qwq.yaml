@@ -1,0 +1,115 @@
+cluster: slurm
+base_output_dir: /workspace/openmathreasoning
+expname: openmathreasoning
+suffix: qwq  # Suffix for experiment names
+sdg_pipeline: genselect_sdg
+
+# Input file for the first stage (generate_solutions)
+# This should be the output of the problem_generation.py pipeline
+input_files: ${base_output_dir}/solution-sdg-${suffix}/step-6-merge-new-summaries/output-rs*.jsonl
+# File with benchmark problems you want decontaminate with
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
+# Number of GenSelect instances per problem
+max_instances_per_problem: 8
+# Number of maximum solutions which form the GenSelect input
+max_solutions: 16 
+
+
+# Define judge model server parameters
+generate_kwargs: &generate_kwargs
+  # Model to be used for GenSelect output generation
+  model: /trt_models/qwq-32b-24k-input
+  # Server type to launch the model
+  server_type: trtllm
+  # Server parameters
+  server_gpus: 8
+  server_nodes: 1
+
+# Arguments for generating new summaries
+generate_new_summaries_kwargs:
+  <<: *generate_kwargs
+  # Summarization model
+  model: /trt_models/qwen2.5-32b-instruct
+  # Generate 4 new summaries for each solution
+  num_random_seeds: 4   
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - prepare_labeling_data      # Prepare the labeling data
+  - label_data                 # Label the data
+  - extract_judgment           # Extract judgments from the labeled data
+  - generate_new_summaries     # Generate new summaries to replace the native summaries of reasoning models
+  - merge_new_summaries        # Merge reasoning traces with new summaries
+  - prepare_for_sft            # Prepare the final dataset for SFT training
+
+# Directory structure configuration
+directories:
+  step-1-prepare-labeling-data: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-1-prepare-labeling-data
+  step-2-label-data: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-2-label-data
+  step-3-extract-judgment: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-3-extract-judgment
+  step-4-generate-new-summaries: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-4-generate-new-summaries
+  step-5-merge-new-summaries: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-5-merge-new-summaries
+  step-6-prepare-sft: ${base_output_dir}/${sdg_pipeline}-${suffix}/step-6-prepare-sft
+
+# Stage-specific configurations
+stages:
+  prepare_labeling_data:
+    input_files: ${input_files}
+    output_dir: ${directories.step-1-prepare-labeling-data}
+    max_instances_per_problem: ${max_instances_per_problem}
+    max_solutions: ${max_solutions}
+
+
+  label_data:
+    input_file: ${directories.step-1-prepare-labeling-data}/output.jsonl
+    output_dir: ${directories.step-2-label-data}
+
+    dependencies:
+      - prepare_labeling_data
+
+    inline_args: >- 
+      ++prompt_config=openmath/genselect
+      ++prompt_template=qwen-instruct
+      ++generation_key=genselect_comparison
+      ++inference.tokens_to_generate=16_384
+      ++inference.temperature=0.6
+    
+    stage_kwargs: ${generate_kwargs}
+  
+  extract_judgment:
+    input_file: ${directories.step-2-label-data}/output.jsonl
+    output_dir: ${directories.step-3-extract-judgment}
+
+    dependencies:
+      - label_data
+
+  generate_new_summaries:
+    input_file: ${directories.step-3-extract-judgment}/output.jsonl
+    output_dir: ${directories.step-4-generate-new-summaries}
+
+    dependencies:
+      - extract_judgment
+    inline_args: >- 
+      ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-genselect.yaml
+      ++prompt_template=qwen-instruct 
+      ++inference.temperature=0.7 
+      ++inference.tokens_to_generate=2048
+    stage_kwargs: ${generate_new_summaries_kwargs}
+
+  merge_new_summaries:
+    reasoning_file: ${directories.step-3-extract-judgment}/output.jsonl
+    summary_dir: ${directories.step-4-generate-new-summaries}
+    output_dir: ${directories.step-5-merge-new-summaries}
+    
+    dependencies:
+      - generate_new_summaries
+
+  prepare_for_sft:
+    input_file: ${directories.step-5-merge-new-summaries}/output.jsonl
+    output_dir: ${directories.step-6-prepare-sft}
+    prompt_config: openmath/genselect
+    prompt_template: qwen-instruct
+    contamination_file: ${contamination_file}
+
+    dependencies:
+      - merge_new_summaries

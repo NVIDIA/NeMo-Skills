@@ -313,6 +313,34 @@ def get_math_judge_cmd(
     return cmd, postprocess_cmd
 
 
+def get_genselect_cmd(
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+    eval_args=None,
+    chunk_id=None,
+    num_chunks=None,
+    postprocess_cmd=None,
+    script: str = 'nemo_skills.inference.genselect',
+    output_prefix: str = "output",
+):
+    if eval_args is not None:
+        raise ValueError("Cannot specify eval_args for math judge")
+    cmd = (
+        f"python -m {script} "
+        f"    ++skip_filled=True "
+        f"    ++input_dir={output_dir}/comparison_instances "
+        f"    ++output_dir={output_dir} "
+        f"    ++inference.random_seed={random_seed} "
+        f"    ++inference.temperature=0.7 "
+        f"    ++inference.tokens_to_generate=2048 "
+        f"    ++inference.top_k=0 "
+        f"    ++inference.top_p=0.95 "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd, postprocess_cmd
+
+
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
     if preprocess_cmd:
         if random_seed is not None:
@@ -329,24 +357,28 @@ class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
     math_judge = "math_judge"
+    genselect = "genselect"
 
 
 server_command_factories = {
     GenerationType.generate: get_server_command,
     GenerationType.reward: get_reward_server_command,
     GenerationType.math_judge: get_server_command,
+    GenerationType.genselect: get_server_command,
 }
 
 client_command_factories = {
     GenerationType.generate: get_cmd,
     GenerationType.reward: get_rm_cmd,
     GenerationType.math_judge: get_math_judge_cmd,
+    GenerationType.genselect: get_genselect_cmd,
 }
 
 client_command_scripts = {
     GenerationType.generate: 'nemo_skills.inference.generate',
     GenerationType.reward: 'nemo_skills.inference.reward_model',
     GenerationType.math_judge: 'nemo_skills.inference.llm_math_judge',
+    GenerationType.genselect: 'nemo_skills.inference.genselect',
 }
 
 
@@ -435,6 +467,9 @@ def generate(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
+    ),
+    genselect_args: str = typer.Option(
+        None, help="Can specify extra arguments to prepare the data for genselect"
     ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -545,6 +580,24 @@ def generate(
     has_tasks = False
 
     with get_exp(expname, cluster_config) as exp:
+        if generation_type == GenerationType.genselect:
+            # Add the preprocessing command for genselect
+            genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + genselect_args
+            preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+
+            preprocess_task = add_task(
+                exp,
+                cmd=preprocess_cmd,
+                task_name="preprocess_genselect",
+                log_dir=f"{output_dir}/preprocess-logs",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+            )
+            initial_tasks = [preprocess_task]
+
+        else:
+            initial_tasks = None
+
         for seed, chunk_ids in remaining_jobs.items():
             for chunk_id in chunk_ids:
                 has_tasks = True
@@ -571,7 +624,7 @@ def generate(
                     postprocess_cmd=postprocess_cmd,
                     script=cmd_script,
                 )
-                prev_tasks = None
+                prev_tasks = initial_tasks
                 for _ in range(dependent_jobs + 1):
                     new_task = add_task(
                         exp,
