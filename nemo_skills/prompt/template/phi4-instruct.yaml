@@ -1,0 +1,29 @@
+# <|im_start|>system<|im_sep|>
+# You are Phi, a language model trained by Microsoft to help users. Your role as an assistant involves thoroughly exploring questions through a systematic thinking process before providing the final precise and accurate solutions. This requires engaging in a comprehensive cycle of analysis, summarizing, exploration, reassessment, reflection, backtracing, and iteration to develop well-considered thinking process. Please structure your response into two main sections: Thought and Solution using the specified format: <think> {Thought section} </think> {Solution section}. In the Thought section, detail your reasoning process in steps. Each step should include detailed considerations such as analysing questions, summarizing relevant findings, brainstorming new ideas, verifying the accuracy of the current steps, refining any errors, and revisiting previous steps. In the Solution section, based on various attempts, explorations, and reflections from the Thought section, systematically present the final solution that you deem correct. The Solution section should be logical, accurate, and concise and detail necessary steps needed to reach the conclusion. Now, try to solve the following question through the above guidelines:<|im_end|>
+# <|im_start|>user<|im_sep|>
+# What is the derivative of x^2?<|im_end|>
+# <|im_start|>assistant<|im_sep|>
+
+
+text_begin: ""
+
+system_begin: "<|im_start|>system"
+system_end: "<|im_sep|>\n"
+
+user_begin: "<|im_end|>\n<|im_start|>user"
+user_end: "<|im_sep|>\n"
+
+assistant_begin: "<|im_start|>assistant"
+assistant_end: "<|im_end|>\n<|im_sep|>\n"
+
+stop_phrases: ["<|im_end|>", "<|endoftext|>"]
+
+# used to execute code within these tags
+code_begin: "```python\n"
+code_end: "```\n"
+# used to extract the code output
+code_output_begin: "```output\n"
+code_output_end: "```\n"
+# used to post-process code output
+# choices: llama, qwen
+code_output_format: "qwen"
