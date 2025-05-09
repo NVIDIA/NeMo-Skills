@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from enum import Enum
 from typing import List
 
@@ -27,6 +28,12 @@ from nemo_skills.pipeline.utils import (
     get_free_port,
     get_generation_command,
     run_exp,
+    add_mount_path,
+    is_mounted_filepath,
+    get_mounted_path,
+    create_remote_directory,
+    resolve_mount_paths,
+    check_remote_mount_directories,
 )
 from nemo_skills.utils import setup_logging
 
@@ -74,6 +81,7 @@ def check_contamination(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -103,6 +111,7 @@ def check_contamination(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False,                                           help="Check if mounted paths are available on the remote machine"),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -121,10 +130,32 @@ def check_contamination(
     get_random_port = server_gpus != 8 and not exclusive
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, input_file)
-    check_if_mounted(cluster_config, output_file)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if check_mounted_paths:
+        if not is_mounted_filepath(cluster_config, input_file):
+            input_dir, input_filename = os.path.split(input_file)
+            add_mount_path(input_dir, "/mounted_data/input", cluster_config)
+
+        if not is_mounted_filepath(cluster_config, output_file):
+            output_dir, output_filename = os.path.split(output_file)
+            add_mount_path(output_dir, "/mounted_data/output", cluster_config)
+
+    input_file = get_mounted_path(cluster_config, input_file)
+    output_file = get_mounted_path(cluster_config, output_file)
+
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
+        log_dir = get_mounted_path(cluster_config, log_dir)
+
+    if model and check_mounted_paths:
+        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
+    if model: model = get_mounted_path(cluster_config, model)
+
+    if check_mounted_paths:
+        # Final check for existance of mounted paths
+        checked_files = [model, input_file, output_file, log_dir]
+        check_remote_mount_directories(checked_files, cluster_config)
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
