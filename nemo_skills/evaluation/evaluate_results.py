@@ -42,6 +42,9 @@ class EvaluateResultsConfig:
     # the escape phrase prior to a lean4 block to extract
     final_answer_key:  str = field(default="### Final Answer")
 
+    # whether to restate the formal statement when constructing the final output proof
+    restate_formal_statement: bool = True
+
     def __post_init__(self):
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")

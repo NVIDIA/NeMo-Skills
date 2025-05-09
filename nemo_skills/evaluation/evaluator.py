@@ -387,6 +387,7 @@ class LeanEvaluatorConfig:
     timeout: float = 30.0
     ignore_cache: bool = False
     final_answer_key: str = "**FINAL ANSWER**"
+    restate_formal_statement: bool = True
 
 
 def eval_lean4_proof(cfg):
