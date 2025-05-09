@@ -563,7 +563,7 @@ def get_ray_server_cmd(start_cmd):
         "        --head "
         "        --port=6379 "
         f"       {ports} && "
-        f"   {start_cmd} ;"
+        f"   {start_cmd} ; "
         "else "
         "    echo 'Starting worker node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
