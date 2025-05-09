@@ -55,6 +55,7 @@ filters:
   remove_contaminated: true
   majority_filter: false
   trim_solutions: true
+  trim_prefix: false
   drop_incorrect_arithmetic: false
   split_arithmetic: false
   remove_len_outlier_problems: false
@@ -178,6 +179,12 @@ processors:
         should_run: ${filters.majority_filter}
         min_majority_votes: ${majority_filter.min_majority_votes}
         min_majority_percentage: ${majority_filter.min_majority_percentage}
+
+      - _target_: nemo_skills.training.data_preparation_utils.filters.TrimPrefix
+        should_run: ${filters.trim_prefix}
+        solution_key: ${output_key}
+        test_cases:
+          - {input: {generation: "My solution:\nSubtract 3 from 5"}, output: {generation: "Subtract 3 from 5"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.TrimSolutions
         should_run: ${filters.trim_solutions}
