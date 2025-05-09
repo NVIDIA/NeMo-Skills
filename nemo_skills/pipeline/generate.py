@@ -35,6 +35,7 @@ from nemo_skills.pipeline.utils import (
     get_server_command,
     get_tunnel,
     get_unmounted_path,
+    wrap_cmd,
     run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
@@ -339,18 +340,6 @@ def get_genselect_cmd(
     )
     cmd += f" {extra_arguments} "
     return cmd, postprocess_cmd
-
-
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
-    if preprocess_cmd:
-        if random_seed is not None:
-            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {preprocess_cmd} && {cmd} "
-    if postprocess_cmd:
-        if random_seed is not None:
-            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {cmd} && {postprocess_cmd} "
-    return cmd
 
 
 class GenerationType(str, Enum):

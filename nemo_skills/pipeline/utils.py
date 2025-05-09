@@ -255,6 +255,9 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
     if isinstance(directory, str):
         directory = [directory]
 
+    # Get unmounted path of all directories
+    directory = [get_unmounted_path(cluster_config, dir_path) for dir_path in directory]
+
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
         for dir_path in directory:
@@ -657,6 +660,67 @@ def get_sandox_command(cluster_config):
     return "/entrypoint.sh && /start.sh"
 
 
+def configure_client(
+    *,  # Force keyword arguments
+    model: str,
+    server_type: str,
+    server_gpus: int,
+    server_nodes: int,
+    server_address: str,
+    server_port: int,
+    server_args: str,
+    extra_arguments: str,
+    get_random_port: bool
+):
+    """
+    Utility function to configure a client for the model inference server.
+
+    Args:
+        model: Mounted Path to the model to evaluate.
+        server_type: String name of the server type.
+        server_address: URL of the server hosting the model.
+        server_gpus: Number of GPUs to use for the server.
+        server_nodes: Number of nodes to use for the server.
+        server_port: Port number for the server.
+        server_args: Additional arguments for the server.
+        extra_arguments: Extra arguments to pass to the command.
+        get_random_port: Whether to get a random port for the server.
+
+    Returns:
+        A tuple containing:
+            - server_config: Configuration for the server.
+            - extra_arguments: Updated extra arguments for the command.
+            - server_address: Address of the server.
+            - server_port: Port number for the server.
+    """
+    if server_address is None:  # we need to host the model
+        if server_port is None:  # if not specified, we will use a random port or 5000 depending get_random_port
+            server_port = get_free_port(strategy="random") if not get_random_port else 5000
+        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        server_address = f"localhost:{server_port}"
+
+        server_config = {
+            "model_path": model,
+            "server_type": server_type,
+            "num_gpus": server_gpus,
+            "num_nodes": server_nodes,
+            "server_args": server_args,
+            "server_port": server_port,
+        }
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.host=localhost ++server.port={server_port} "
+        )
+    else:  # model is hosted elsewhere
+        server_config = None
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.base_url={server_address} ++server.model={model} "
+        )
+        server_port = None
+    return server_config, extra_arguments, server_address, server_port
+
+
 @dataclass(kw_only=True)
 class CustomJobDetails(SlurmJobDetails):
     # we have 1 srun per sub-task (e.g. server/sandbox/main), but only a single sbatch
@@ -750,10 +814,60 @@ def get_cluster_config(cluster=None, config_dir=None):
 
     cluster_config = read_config(config_file)
 
+    # resolve ssh tunnel config
+    if "ssh_tunnel" in cluster_config:
+        cluster_config = update_ssh_tunnel_config(cluster_config)
+
     if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
         set_nemorun_home(cluster_config["job_dir"])
+
+    return cluster_config
+
+
+def update_ssh_tunnel_config(cluster_config: dict):
+    """
+    Update the ssh tunnel configuration in the cluster config to resolve job dir and username.
+    uses the `user` information to populate `job_dir` if in config.
+
+    Args:
+        cluster_config: dict: The cluster configuration dictionary
+
+    Returns:
+        dict: The updated cluster configuration dictionary
+    """
+    if 'ssh_tunnel' not in cluster_config:
+        return cluster_config
+
+    if 'user' in cluster_config['ssh_tunnel']:
+        # Resolve `user` from env if not provided
+        if cluster_config['ssh_tunnel']['user'] is None:
+            cluster_config['ssh_tunnel']['user'] = os.environ['USER']
+            LOG.info(f"Resolved `user` to `{cluster_config['ssh_tunnel']['user']}`")
+
+        elif isinstance(cluster_config['ssh_tunnel']['user'], str) and '$' in cluster_config['ssh_tunnel']['user']:
+            cluster_config['ssh_tunnel']['user'] = os.path.expandvars(cluster_config['ssh_tunnel']['user'])
+            LOG.info(f"Resolved `user` to `{cluster_config['ssh_tunnel']['user']}`")
+
+    if 'job_dir' in cluster_config['ssh_tunnel']:
+        # Resolve `job_dir` from env if not provided
+        cluster_config['ssh_tunnel']['job_dir'] = os.path.expandvars(cluster_config['ssh_tunnel']['job_dir'])
+        LOG.info(f"Resolved `job_dir` to `{cluster_config['ssh_tunnel']['job_dir']}`")
+
+    if 'identity' in cluster_config['ssh_tunnel']:
+        # Resolve `identity` from env if not provided
+        cluster_config['ssh_tunnel']['identity'] = os.path.expandvars(cluster_config['ssh_tunnel']['identity'])
+        LOG.info(f"Resolved `identity` to `{cluster_config['ssh_tunnel']['identity']}`")
+
+        if "$" in cluster_config['ssh_tunnel']['identity']:
+            raise ValueError(
+                f"Identity file path could not be loaded from env variable `{cluster_config['ssh_tunnel']['identity']}`"
+            )
+
+    # Add mount container list if not present
+    if 'mounts' not in cluster_config:
+        cluster_config['mounts'] = []
 
     return cluster_config
 
@@ -767,23 +881,6 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
-    # If the str provided is an env variable, resolve it
-    if "$" in job_dir:
-        job_dir = os.path.expandvars(job_dir)
-        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
-
-    if "$" in host:
-        host = os.path.expandvars(host)
-        LOG.info(f"Resolved `host` from env var to `{host}`")
-
-    if "$" in user:
-        user = os.path.expandvars(user)
-        LOG.info(f"Resolved `user` from env var to `{user}`")
-
-    if "$" in identity:
-        identity = os.path.expandvars(identity)
-        LOG.info(f"Resolved `identity` from env var to `{identity}`")
-
     return run.SSHTunnel(
         host=host,
         user=user,
@@ -1087,6 +1184,18 @@ def get_env_variables(cluster_config):
             logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
 
     return env_vars
+
+
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
+    if preprocess_cmd:
+        if random_seed is not None:
+            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {preprocess_cmd} && {cmd} "
+    if postprocess_cmd:
+        if random_seed is not None:
+            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {cmd} && {postprocess_cmd} "
+    return cmd
 
 
 def get_mounts_from_config(cluster_config: dict):
