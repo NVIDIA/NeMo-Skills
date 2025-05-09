@@ -40,6 +40,16 @@ from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
+def wrap_arguments(arguments: str):
+    """Returns a mock context object to allow using the cli entrypoints as functions."""
+
+    class MockContext:
+        def __init__(self, args):
+            self.args = args
+            self.obj = None
+
+    # first one is the cli name
+    return MockContext(args=arguments.split(" "))
 
 # TODO: this file is way too big - we need to split it into pieces
 
@@ -335,6 +345,10 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         raise ValueError("Cluster config is not provided.")
     if isinstance(directories, str):
         directories = [directories]
+
+    # Get unmounted path of all directories
+    directories = [get_unmounted_path(cluster_config, dir_path) for dir_path in directories]
+
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)
         all_dirs_exist = True
