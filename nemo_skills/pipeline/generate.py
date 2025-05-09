@@ -554,7 +554,7 @@ def generate(
 
     if check_mounted_paths:
         # Perform final check that all mounted filepaths exist on the cluster
-        checked_paths = [model, output_dir, log_dir]
+        checked_paths = [model, output_dir]
         check_remote_mount_directories(checked_paths, cluster_config)
 
     get_server_command = server_command_factories[generation_type]

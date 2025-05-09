@@ -33,6 +33,11 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_tunnel,
     get_unmounted_path,
+    is_mounted_filepath,
+    get_mounted_path,
+    create_remote_directory,
+    resolve_mount_paths,
+    check_remote_mount_directories,
 )
 from nemo_skills.utils import setup_logging
 
@@ -59,6 +64,7 @@ def summarize_results(
     ),
     remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     max_samples: int = typer.Option(-1, help="Limit metric computation only to first `max_samples`"),
     extra_datasets: str = typer.Option(
         None,
@@ -86,6 +92,7 @@ def summarize_results(
     upload_path = None
     if cluster is not None:
         cluster_config = get_cluster_config(cluster, config_dir)
+        cluster_config = resolve_mount_paths(cluster_config, mount_paths)
         check_if_mounted(cluster_config, results_dir)
     if cluster == "local":
         results_dir = get_unmounted_path(cluster_config, results_dir)

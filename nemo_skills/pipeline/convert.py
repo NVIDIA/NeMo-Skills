@@ -252,7 +252,7 @@ def convert(
 
     if check_mounted_paths:
         # Check existance of mounted filepaths
-        checked_paths = [input_model, output_model, log_dir]
+        checked_paths = [input_model, output_model]
         check_remote_mount_directories(checked_paths, cluster_config)
 
     conversion_cmd_map = {

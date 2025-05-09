@@ -16,7 +16,19 @@ from enum import Enum
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_free_port
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    add_mount_path,
+    is_mounted_filepath,
+    get_mounted_path,
+    create_remote_directory,
+    resolve_mount_paths,
+    check_remote_mount_directories,
+)
 from nemo_skills.utils import setup_logging
 
 
@@ -42,6 +54,7 @@ def start_server(
     server_args: str = typer.Option("", help="Additional arguments for the server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
@@ -56,20 +69,32 @@ def start_server(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
     cluster_config = get_cluster_config(cluster, config_dir)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
     try:
         server_type = server_type.value
     except AttributeError:
         pass
 
+    if model and check_mounted_paths:
+        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
+    model = get_mounted_path(cluster_config, model)
+
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
+        log_dir = get_mounted_path(cluster_config, log_dir)
+
+    if check_mounted_paths:
+        # final check for all mounted paths
+        checked_paths = [model] + [log_dir] if log_dir else []
+        check_remote_mount_directories(checked_paths, cluster_config)
 
     server_config = {
         "model_path": model,

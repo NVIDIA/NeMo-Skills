@@ -266,7 +266,9 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
         directory = [directory]
 
     # Get unmounted path of all directories
-    directory = [get_unmounted_path(cluster_config, dir_path) for dir_path in directory]
+    directory = [get_unmounted_path(cluster_config, dir_path)
+                 if is_mounted_filepath(cluster_config, dir_path) else dir_path
+                 for dir_path in directory]
 
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
@@ -347,7 +349,9 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         directories = [directories]
 
     # Get unmounted path of all directories
-    directories = [get_unmounted_path(cluster_config, dir_path) for dir_path in directories]
+    directories = [get_unmounted_path(cluster_config, dir_path)
+                   if is_mounted_filepath(cluster_config, dir_path) else dir_path
+                   for dir_path in directories]
 
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)

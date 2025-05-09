@@ -111,7 +111,7 @@ def check_contamination(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
-    check_mounted_paths: bool = typer.Option(False,                                           help="Check if mounted paths are available on the remote machine"),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -154,7 +154,7 @@ def check_contamination(
 
     if check_mounted_paths:
         # Final check for existance of mounted paths
-        checked_files = [model, input_file, output_file, log_dir]
+        checked_files = [model, input_file, output_file] + [log_dir] if log_dir else []
         check_remote_mount_directories(checked_files, cluster_config)
 
     if server_address is None:  # we need to host the model
