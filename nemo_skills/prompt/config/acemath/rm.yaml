@@ -1,0 +1,5 @@
+# Prompt used by AceMath reward models for math benchmarks
+
+system: Please reason step by step, and check your final answer within \boxed{{}}.
+
+user: "{problem}"
