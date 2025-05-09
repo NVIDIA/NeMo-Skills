@@ -20,7 +20,7 @@ user: |-
   Complete the following Lean 4 code:
 
   ```lean4
-  {header}{informal_prefix}{formal_statement}
+  {header}{formal_statement}
     sorry
   ```
 
