@@ -315,7 +315,7 @@ print(json.dumps(to_return))
                             generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
                             line_dict["predicted_proof"] = (
                                 line_dict["header"] +
-                                line_dict["formal_statement"] if restate_formal_statement else '' +
+                                (line_dict["formal_statement"] if restate_formal_statement else '') +
                                 generation
                             )
                         else:
