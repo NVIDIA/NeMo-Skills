@@ -20,7 +20,19 @@ from typing import List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    run_exp,
+    add_mount_path,
+    is_mounted_filepath,
+    get_mounted_path,
+    create_remote_directory,
+    resolve_mount_paths,
+    check_remote_mount_directories,
+)
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -169,6 +181,7 @@ def convert(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -191,6 +204,7 @@ def convert(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -219,13 +233,27 @@ def convert(
     if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
         raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
 
+    # Prepare cluster config and mount paths
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, input_model)
-    check_if_mounted(cluster_config, output_model)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if check_mounted_paths:
+        if not is_mounted_filepath(cluster_config, input_model): add_mount_path(input_model, "/input_model", cluster_config)
+        if not is_mounted_filepath(cluster_config, output_model): add_mount_path(output_model, "/output_model", cluster_config)
+
+    input_model = get_mounted_path(cluster_config, input_model)
+    output_model = get_mounted_path(cluster_config, output_model)
+
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
+        log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = str(Path(output_model) / "conversion-logs")
+
+    if check_mounted_paths:
+        # Check existance of mounted filepaths
+        checked_paths = [input_model, output_model, log_dir]
+        check_remote_mount_directories(checked_paths, cluster_config)
 
     conversion_cmd_map = {
         ("nemo", "hf"): get_nemo_to_hf_cmd,
