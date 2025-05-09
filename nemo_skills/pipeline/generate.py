@@ -38,8 +38,10 @@ from nemo_skills.pipeline.utils import (
     get_mounted_path,
     get_unmounted_path,
     check_remote_mount_directories,
+    resolve_mount_paths,
+    create_remote_directory,
     wrap_cmd,
-    run_exp, resolve_mount_paths, create_remote_directory,
+    run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
@@ -544,7 +546,6 @@ def generate(
         log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/generation-logs"
-        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
 
     # Check and mount model path
     if model and check_mounted_paths:
