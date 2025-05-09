@@ -40,6 +40,7 @@ class ReadData(BaseProcessor):
         skip_first: int = 0,
         add_correct: bool = True,
         add_incorrect: bool = False,
+        add_unlabeled: bool = False,
         use_judgement: bool = False,
         keys_to_keep: list[str] | None = None,
         deduplicate: bool = True,
@@ -53,6 +54,7 @@ class ReadData(BaseProcessor):
         self.skip_first = skip_first
         self.add_correct = add_correct
         self.add_incorrect = add_incorrect
+        self.add_unlabeled = add_unlabeled
         self.use_judgement = use_judgement
         self.keys_to_keep = keys_to_keep
         self.deduplicate = deduplicate
@@ -117,7 +119,7 @@ class ReadData(BaseProcessor):
             if not line_dict:
                 continue
 
-            if self.output_key is not None:
+            if self.output_key is not None and not self.add_unlabeled:
                 if not self.use_judgement:
                     if "is_correct" not in line_dict:
                         LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")

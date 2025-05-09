@@ -12,6 +12,7 @@ metadata: null  # can provide additional metadata to store (e.g. dataset or gene
 skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
+add_unlabeled: false  # if True, saves unlabeled solutions (no is_correct field)
 use_judgement: false  # if True, uses judgement instead of is_correct field
 # if True, adds a new field with max allowed code executions to each sample
 # exclude_optional_keys must be set to false in this case
@@ -50,20 +51,21 @@ majority_filter:
   min_majority_percentage: 0.0
 
 filters:
-  drop_multi_boxed: true
+  drop_multi_boxed: false
   remove_contaminated: true
   majority_filter: false
-  trim_prefix: true
   trim_solutions: true
+  trim_prefix: false
   drop_incorrect_arithmetic: false
   split_arithmetic: false
-  remove_len_outlier_problems: true
+  remove_len_outlier_problems: false
   remove_len_outlier_solutions: false
   code_text_filter: null
   remove_code_errors: false
   remove_verification_code: false
   remove_matplotlib: false
   remove_no_code: false
+  remove_no_think_tags: false
 
 deduplicate: true
 
@@ -76,6 +78,7 @@ processors:
     skip_first: ${skip_first}
     add_correct: ${add_correct}
     add_incorrect: ${add_incorrect}
+    add_unlabeled: ${add_unlabeled}
     use_judgement: ${use_judgement}
     deduplicate: ${deduplicate}
     keys_to_keep:  # input/output/is_correct/judgement are automatically added
@@ -141,6 +144,17 @@ processors:
           - {input: {generation: "My solution:\ncode</tool_call>\nSomething else"}, output: null}
           - {input: {generation: "<tool_call>code</tool_call>"}, output: {generation: "<tool_call>code</tool_call>"}}
 
+      - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexNotMatch
+        should_run: ${filters.remove_no_think_tags}
+        text_key: ${output_key}
+        regex_patterns:
+          - '<think>'
+          - '</think>'
+        test_cases:
+          - {input: {generation: "My solution:\n---<think>---\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\n</think>\nSomething else"}, output: null}
+          - {input: {generation: "<think>thinking</think>summary"}, output: {generation: "<think>thinking</think>summary"}}
+
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
         should_run: ${filters.remove_verification_code}
         text_key: ${output_key}
@@ -167,7 +181,7 @@ processors:
         min_majority_percentage: ${majority_filter.min_majority_percentage}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.TrimPrefix
-        should_run: ${filters.trim_solutions}
+        should_run: ${filters.trim_prefix}
         solution_key: ${output_key}
         test_cases:
           - {input: {generation: "My solution:\nSubtract 3 from 5"}, output: {generation: "Subtract 3 from 5"}}
