@@ -39,6 +39,9 @@ class EvaluateResultsConfig:
     # check graders.py for the supported eval types and their parameters
     eval_config: dict = field(default_factory=dict)
 
+    # the escape phrase prior to a lean4 block to extract
+    final_answer_key:  str = field(default="### Final Answer")
+
     def __post_init__(self):
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")
