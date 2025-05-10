@@ -250,24 +250,21 @@ def eval(
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
     # Create evaluation commands as before
-    eval_cmds = (
-        [
-            (cmd, benchmark)
-            for benchmark in benchmarks.keys()
-            for cmd in get_greedy_cmd(
-                benchmark,
-                split,
-                output_dir,
-                extra_eval_args=extra_eval_args,
-                extra_arguments=extra_arguments,
-                extra_datasets=extra_datasets,
-                num_chunks=num_chunks,
-                chunk_ids=chunk_ids,
-            )
-        ]
-        if add_greedy
-        else []
-    )
+    eval_cmds = [
+        (cmd, benchmark)
+        for benchmark, rs_num in benchmarks.items()
+        for cmd in get_greedy_cmd(
+            benchmark,
+            split,
+            output_dir,
+            extra_eval_args=extra_eval_args,
+            extra_arguments=extra_arguments,
+            extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
+        )
+        if add_greedy or rs_num == 0
+    ]
     eval_cmds += [
         (cmd, benchmark)
         for benchmark, rs_num in benchmarks.items()

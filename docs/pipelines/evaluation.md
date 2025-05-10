@@ -92,7 +92,7 @@ will fetch the results from cluster automatically if you ran the job there.
 ## Using multiple samples
 
 The `:0` part after benchmark name means that we only want to run
-greedy decoding, but if you set `:4` it will run greedy + 4 samples with high temperature
+greedy decoding, but if you set `:4` it will run 4 samples with high temperature
 that can be used for majority voting or estimating pass@k. E.g. if we run with
 
 ```bash
@@ -110,16 +110,16 @@ you will see the following output after summarizing results
 ```
 -------------------------- gsm8k ---------------------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 1319        | 82.34            | 0.91
 majority@4      | 1319        | 87.95            | 0.00
 pass@4          | 1319        | 93.78            | 0.00
 
 
 ------------------------------ human-eval -----------------------------
 evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
-greedy          | 164         | 67.68              | 62.20
 pass@4          | 164         | 78.66              | 72.56
 ```
+
+If you want to get both multiple samples and greedy results, use `--add_greedy` parameter.
 
 ## How the benchmarks are defined
 
