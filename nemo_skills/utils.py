@@ -23,7 +23,7 @@ import tokenize
 import typing
 import fire
 from dataclasses import MISSING, dataclass, fields, is_dataclass
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional, Union
 from pathlib import Path
 
 from rich.logging import RichHandler
@@ -500,3 +500,44 @@ def resolve_python_module_from_file(py_filepath: str, root_module: str = 'nemo_s
     striped_module = str(stripped_module_path).replace("/", ".")
     striped_module = os.path.splitext(striped_module)[0]
     return striped_module
+
+
+def maybe_get_env(value: Union[int, List[int]], env_name, default=None, cast: Callable[[Any], Any] = None):
+    """
+    Retrieve the value of an environment variable, iff the value is originally None.
+
+    If the provided value is None, this function attempts to retrieve the value
+    from the environment variables specified by `env_name`. If none of the
+    environment variables are set, it returns the provided default value.
+
+    Args:
+        value: The initial value to check or a list of values to check.
+        env_name (str or list of str): The name(s) of the environment variable(s) to check.
+        default: The default value to return if the environment variable is not set.
+        cast: A function to cast the environment variable to a specific type. If None, no casting is performed.
+
+    Returns:
+        The value of the environment variable if set, otherwise the default value.
+    """
+    if value is None:
+        # Convert env_name to a list if it's a string
+        if isinstance(env_name, str):
+            env_name = [env_name]
+
+        found_value = False
+        # Iterate over the list of environment variable names
+        for env in env_name:
+            # Try to get the value from the environment
+            value = os.environ.get(env, None)
+            if value is not None:
+                # Cast the value if a casting function is provided
+                if cast is not None:
+                    value = cast(value)
+
+                found_value = True
+                break
+
+        # If no environment variable is found, use the default value
+        if not found_value:
+            value = default
+    return value
