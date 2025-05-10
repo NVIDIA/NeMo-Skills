@@ -547,14 +547,9 @@ def generate(
     else:
         log_dir = f"{output_dir}/generation-logs"
 
-    # Check and mount model path
-    if model and check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
-    model = get_mounted_path(cluster_config, model)
-
     if check_mounted_paths:
         # Perform final check that all mounted filepaths exist on the cluster
-        checked_paths = [model, output_dir]
+        checked_paths = [output_dir]
         check_remote_mount_directories(checked_paths, cluster_config)
 
     get_server_command = server_command_factories[generation_type]

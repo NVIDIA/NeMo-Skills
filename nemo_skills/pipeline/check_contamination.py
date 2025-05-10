@@ -148,13 +148,9 @@ def check_contamination(
         if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
         log_dir = get_mounted_path(cluster_config, log_dir)
 
-    if model and check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
-    if model: model = get_mounted_path(cluster_config, model)
-
     if check_mounted_paths:
         # Final check for existance of mounted paths
-        checked_files = [model, input_file, output_file] + [log_dir] if log_dir else []
+        checked_files = [input_file, output_file] + [log_dir] if log_dir else []
         check_remote_mount_directories(checked_files, cluster_config)
 
     if server_address is None:  # we need to host the model

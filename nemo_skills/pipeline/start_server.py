@@ -83,18 +83,9 @@ def start_server(
     except AttributeError:
         pass
 
-    if model and check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
-    model = get_mounted_path(cluster_config, model)
-
     if log_dir:
         if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
         log_dir = get_mounted_path(cluster_config, log_dir)
-
-    if check_mounted_paths:
-        # final check for all mounted paths
-        checked_paths = [model] + [log_dir] if log_dir else []
-        check_remote_mount_directories(checked_paths, cluster_config)
 
     server_config = {
         "model_path": model,

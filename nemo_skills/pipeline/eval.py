@@ -220,13 +220,9 @@ def eval(
     else:
         log_dir = f"{output_dir}/eval-logs"
 
-    if model and check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, model): add_mount_path(model, "/model", cluster_config)
-    model = get_mounted_path(cluster_config, model)
-
     if check_mounted_paths:
         # Final check for existance of mounted paths
-        checked_files = [model, output_dir, log_dir]
+        checked_files = [output_dir, log_dir]
         check_remote_mount_directories(checked_files, cluster_config)
 
     if num_chunks:
