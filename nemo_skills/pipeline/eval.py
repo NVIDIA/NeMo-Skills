@@ -15,7 +15,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
 import typer
 
@@ -148,7 +148,10 @@ def eval(
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
-    skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
+    add_greedy: bool = typer.Option(
+        False,
+        help="Whether to add greedy evaluation. Only applicable if num_samples > 0, otherwise greedy is default.",
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -244,9 +247,7 @@ def eval(
         requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
         benchmark_requires_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
-            LOG.warning(
-                "Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark
-            )
+            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
     # Create evaluation commands as before
     eval_cmds = (
@@ -264,7 +265,7 @@ def eval(
                 chunk_ids=chunk_ids,
             )
         ]
-        if not skip_greedy
+        if add_greedy
         else []
     )
     eval_cmds += [
@@ -302,8 +303,10 @@ def eval(
     with get_exp(expname, cluster_config) as exp:
         for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
             # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job)
-            
+            job_needs_sandbox = with_sandbox or any(
+                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
+            )
+
             LOG.info("Launching task with command %s", " && ".join(cmds))
             add_task(
                 exp,
