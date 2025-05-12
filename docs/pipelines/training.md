@@ -21,7 +21,7 @@ python -m nemo_skills.training.prepare_data \
 
 !!! tip
 
-    Many scripts access `++input_files` argument. You can use any glob patterns there and also
+    Many scripts accept `++input_files` argument. You can use any glob patterns there and also
     reference multiple files/patterns separated by space or comma.
 
 If you want to run that command inside container or on cluster, add `ns run_cmd --cluster=...` in the beginning.
