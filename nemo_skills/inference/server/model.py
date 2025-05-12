@@ -576,6 +576,8 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
+            # assuming it's not used and setting a dummy value
+            api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
@@ -691,7 +693,7 @@ class OpenAIModel(BaseModel):
             raise ValueError("`top_logprobs` is not supported with stream=True")
         retry_count = 0
         retry_delay = self.initial_retry_delay
-        
+
         while True:
             try:
                 response = self.client.chat.completions.create(
@@ -714,7 +716,7 @@ class OpenAIModel(BaseModel):
                 if retry_count > self.max_retries:
                     LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
                     raise
-                
+
                 # Extract retry-after header if available, otherwise use exponential backoff
                 retry_after = getattr(e, 'retry_after', None)
                 if retry_after is not None and isinstance(retry_after, (int, float)):
@@ -722,7 +724,7 @@ class OpenAIModel(BaseModel):
                 else:
                     wait_time = retry_delay
                     retry_delay *= 2  # Exponential backoff
-                
+
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
                     wait_time, retry_count, self.max_retries
@@ -761,9 +763,9 @@ class OpenAIModel(BaseModel):
             except Exception as e:
                 LOG.error("Unexpected error during API call: %s", str(e))
                 raise
-        
+
         if stream:
-            return self._stream_chunks(response)         
+            return self._stream_chunks(response)
 
         choice = response.choices[0]
         output = choice.message.content
@@ -794,11 +796,11 @@ class OpenAIModel(BaseModel):
         prev_delta, cur_delta, stop_suffix = "", "", None
         for chunk in response:
             prev_delta, cur_delta = cur_delta, chunk.choices[0].text
-            
+
             # Handle stop phrases
             if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
                 stop_suffix = chunk.choices[0].stop_reason
-            
+
             if prev_delta:
                 yield {"generation": prev_delta}
             if stop_suffix:
@@ -926,26 +928,26 @@ class VLLMModel(BaseModel):
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
-    
+
     def _stream_chunks(self, response):
         """
         Helper generator that yields incremental chunks.
         """
         prev_delta, cur_delta, stop_suffix = "", "", None
-        is_sglnag_stop_phrase = False
+        is_sglang_stop_phrase = False
         for chunk in response:
             prev_delta, cur_delta = cur_delta, chunk.choices[0].text
-            
+
             # Handle stop phrases
             ## sglang variant
             if hasattr(chunk.choices[0], "matched_stop") and isinstance(chunk.choices[0].matched_stop, str):
                 stop_suffix = chunk.choices[0].matched_stop
-                is_sglnag_stop_phrase = True
+                is_sglang_stop_phrase = True
             ## vllm variant
             if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
                 stop_suffix = chunk.choices[0].stop_reason
-            
-            if prev_delta and not is_sglnag_stop_phrase:
+
+            if prev_delta and not is_sglang_stop_phrase:
                 yield {"generation": prev_delta}
             if stop_suffix:
                 yield {'generation': stop_suffix}
