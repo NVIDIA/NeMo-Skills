@@ -283,6 +283,8 @@ print(json.dumps(to_return))
         answer_format="lean4-proof",
         ignore_cache: bool = False,
         use_predicted_proof_key: bool = False,
+        final_answer_key: str = "**FINAL ANSWER**",
+        restate_formal_statement: bool = True,
     ):
         """Will write if the results are correct back into the original files."""
 
@@ -310,9 +312,11 @@ print(json.dumps(to_return))
 
                     if answer_format == "lean4-proof":
                         if not use_predicted_proof_key:
-                            generation = clean_formal_generation(line_dict["generation"])
+                            generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
                             line_dict["predicted_proof"] = (
-                                line_dict["header"] + line_dict["formal_statement"] + generation
+                                line_dict["header"] +
+                                (line_dict["formal_statement"] if restate_formal_statement else '') +
+                                generation
                             )
                         else:
                             if "predicted_proof" not in line_dict:

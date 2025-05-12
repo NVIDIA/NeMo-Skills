@@ -25,23 +25,23 @@ import typer
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
+    check_remote_mount_directories,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
+    get_mounted_path,
     get_reward_server_command,
     get_server_command,
     get_tunnel,
-    add_mount_path,
-    is_mounted_filepath,
-    get_mounted_path,
     get_unmounted_path,
-    check_remote_mount_directories,
+    is_mounted_filepath,
     resolve_mount_paths,
-    create_remote_directory,
-    wrap_cmd,
     run_exp,
+    wrap_cmd,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
 
@@ -463,9 +463,7 @@ def generate(
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
     ),
-    genselect_args: str = typer.Option(
-        None, help="Can specify extra arguments to prepare the data for genselect"
-    ),
+    genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -496,6 +494,21 @@ def generate(
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    log_samples: bool = typer.Option(
+        False,
+        help="If True, will log random samples from the output files to wandb. "
+        "Requires WANDB_API_KEY to be set in the environment. "
+        "Use expname/wandb_group/wandb_project to specify where to log.",
+    ),
+    wandb_name: str = typer.Option(
+        None,
+        help="Name of the wandb group to sync samples to. If not specified, but log_samples=True, will use expname.",
+    ),
+    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
+    wandb_project: str = typer.Option(
+        'nemo-skills',
+        help="Name of the wandb project to sync samples to.",
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -519,6 +532,15 @@ def generate(
     except AttributeError:
         pass
 
+    if log_samples:
+        wandb_parameters = {
+            'name': wandb_name or expname,
+            'project': wandb_project,
+            'group': wandb_group,
+        }
+    else:
+        wandb_parameters = None
+
     get_random_port = server_gpus != 8 and not exclusive
 
     if random_seeds and num_random_seeds:
@@ -538,11 +560,13 @@ def generate(
     cluster_config = resolve_mount_paths(cluster_config, mount_paths, create_remote_dir=check_mounted_paths)
 
     # Check and mount output and log dirs
-    if check_mounted_paths: create_remote_directory(output_dir, cluster_config)
+    if check_mounted_paths:
+        create_remote_directory(output_dir, cluster_config)
     output_dir = get_mounted_path(cluster_config, output_dir)
 
     if log_dir:
-        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
+        if check_mounted_paths:
+            create_remote_directory(log_dir, cluster_config)
         log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/generation-logs"
@@ -607,7 +631,15 @@ def generate(
         else:
             initial_tasks = None
 
-        for seed, chunk_ids in remaining_jobs.items():
+        for job_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+            if wandb_parameters:
+                # no need for chunks as it will run after merging
+                wandb_parameters['samples_file'] = get_chunked_rs_filename(
+                    output_dir,
+                    random_seed=seed,
+                    chunk_id=None,
+                    output_prefix=output_prefix,
+                )
             for chunk_id in chunk_ids:
                 has_tasks = True
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -642,6 +674,8 @@ def generate(
                             preprocess_cmd,
                             full_postprocess_cmd,
                             random_seed=seed,
+                            # only logging for the first job
+                            wandb_parameters=wandb_parameters if job_idx == 0 else None,
                         ),
                         task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
                         log_dir=log_dir,

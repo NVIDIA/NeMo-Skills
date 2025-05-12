@@ -40,6 +40,7 @@ from torchx.specs.api import AppState
 
 LOG = logging.getLogger(__file__)
 
+
 def wrap_arguments(arguments: str):
     """Returns a mock context object to allow using the cli entrypoints as functions."""
 
@@ -50,6 +51,7 @@ def wrap_arguments(arguments: str):
 
     # first one is the cli name
     return MockContext(args=arguments.split(" "))
+
 
 # TODO: this file is way too big - we need to split it into pieces
 
@@ -266,9 +268,10 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
         directory = [directory]
 
     # Get unmounted path of all directories
-    directory = [get_unmounted_path(cluster_config, dir_path)
-                 if is_mounted_filepath(cluster_config, dir_path) else dir_path
-                 for dir_path in directory]
+    directory = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directory
+    ]
 
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
@@ -349,9 +352,10 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         directories = [directories]
 
     # Get unmounted path of all directories
-    directories = [get_unmounted_path(cluster_config, dir_path)
-                   if is_mounted_filepath(cluster_config, dir_path) else dir_path
-                   for dir_path in directories]
+    directories = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directories
+    ]
 
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)
@@ -688,7 +692,7 @@ def configure_client(
     server_port: int,
     server_args: str,
     extra_arguments: str,
-    get_random_port: bool
+    get_random_port: bool,
 ):
     """
     Utility function to configure a client for the model inference server.
@@ -1204,7 +1208,7 @@ def get_env_variables(cluster_config):
     return env_vars
 
 
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
     if preprocess_cmd:
         if random_seed is not None:
             preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
@@ -1213,6 +1217,16 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
         if random_seed is not None:
             postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
         cmd = f" {cmd} && {postprocess_cmd} "
+    if wandb_parameters:
+        log_wandb_cmd = (
+            f"python -m nemo_skills.inference.log_samples_wandb "
+            f"    {wandb_parameters['samples_file']} "
+            f"    --name={wandb_parameters['name']} "
+            f"    --project={wandb_parameters['project']} "
+        )
+        if wandb_parameters['group'] is not None:
+            log_wandb_cmd += f" --group={wandb_parameters['group']} "
+        cmd = f"{cmd} && {log_wandb_cmd} "
     return cmd
 
 
@@ -1311,7 +1325,8 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
-            num_gpus=gpus_per_node,
+            # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
+            num_gpus=-1 if gpus_per_node is not None else None,
             network="host",
             env_vars=env_vars,
             additional_kwargs={"entrypoint": ""},

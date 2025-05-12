@@ -15,27 +15,27 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
 import typer
 
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_remote_mount_directories,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
-    get_server_command,
-    run_exp,
-    add_mount_path,
-    is_mounted_filepath,
     get_mounted_path,
-    create_remote_directory,
+    get_server_command,
+    is_mounted_filepath,
     resolve_mount_paths,
-    check_remote_mount_directories,
+    run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
@@ -160,7 +160,10 @@ def eval(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
-    skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
+    add_greedy: bool = typer.Option(
+        False,
+        help="Whether to add greedy evaluation. Only applicable if num_samples > 0, otherwise greedy is default.",
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -211,11 +214,13 @@ def eval(
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
     if check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, output_dir): create_remote_directory(output_dir, cluster_config)
+        if not is_mounted_filepath(cluster_config, output_dir):
+            create_remote_directory(output_dir, cluster_config)
     output_dir = get_mounted_path(cluster_config, output_dir)
 
     if log_dir:
-        if not is_mounted_filepath(cluster_config, log_dir): create_remote_directory(log_dir, cluster_config)
+        if not is_mounted_filepath(cluster_config, log_dir):
+            create_remote_directory(log_dir, cluster_config)
         log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/eval-logs"
@@ -274,29 +279,24 @@ def eval(
         requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
         benchmark_requires_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
-            LOG.warning(
-                "Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark
-            )
+            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
     # Create evaluation commands as before
-    eval_cmds = (
-        [
-            (cmd, benchmark)
-            for benchmark in benchmarks.keys()
-            for cmd in get_greedy_cmd(
-                benchmark,
-                split,
-                output_dir,
-                extra_eval_args=extra_eval_args,
-                extra_arguments=extra_arguments,
-                extra_datasets=extra_datasets,
-                num_chunks=num_chunks,
-                chunk_ids=chunk_ids,
-            )
-        ]
-        if not skip_greedy
-        else []
-    )
+    eval_cmds = [
+        (cmd, benchmark)
+        for benchmark, rs_num in benchmarks.items()
+        for cmd in get_greedy_cmd(
+            benchmark,
+            split,
+            output_dir,
+            extra_eval_args=extra_eval_args,
+            extra_arguments=extra_arguments,
+            extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
+        )
+        if add_greedy or rs_num == 0
+    ]
     eval_cmds += [
         (cmd, benchmark)
         for benchmark, rs_num in benchmarks.items()
@@ -332,8 +332,10 @@ def eval(
     with get_exp(expname, cluster_config) as exp:
         for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
             # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job)
-            
+            job_needs_sandbox = with_sandbox or any(
+                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
+            )
+
             LOG.info("Launching task with command %s", " && ".join(cmds))
             add_task(
                 exp,
