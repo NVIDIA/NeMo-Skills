@@ -71,9 +71,10 @@ class AnswerJudgementMetrics(BaseMetrics):
             self.update_perf_dict(self.agg_mode_dict[f"majority@{len(predictions)}"], *majority_metrics)
 
             # Pass@k
-            pass_judgement = self.get_judgement_by_type(predictions, "pass", gt_judgement)
-            pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
-            self.update_perf_dict(self.agg_mode_dict[f"pass@{len(predictions)}"], *pass_metrics)
+            for k in range(1, len(predictions) + 1):
+                pass_judgement = self.get_judgement_by_type(predictions[:k], "pass", gt_judgement)
+                pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
+                self.update_perf_dict(self.agg_mode_dict[f"pass@{k}"], *pass_metrics)
         
         # greedy for single sample, pass@1[k] for multiple samples
         single_sample_metric_name = "greedy" if len(predictions) == 1 else f"pass@1[{len(predictions)}]"
