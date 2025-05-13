@@ -155,7 +155,7 @@ def check_contamination(
         log_dir = get_mounted_path(cluster_config, log_dir)
 
     if check_mounted_paths:
-        # Final check for existance of mounted paths
+        # Final check for existence of mounted paths
         checked_files = [input_file, output_file] + [log_dir] if log_dir else []
         check_remote_mount_directories(checked_files, cluster_config)
 
