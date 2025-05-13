@@ -21,7 +21,16 @@ from typing import Callable, List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
+from nemo_skills.pipeline.utils import (
+    add_task,
+    get_free_port,
+    get_cluster_config,
+    get_exp,
+    get_timeout,
+    run_exp,
+    get_mounted_path,
+    resolve_mount_paths,
+)
 from nemo_skills.utils import setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -274,6 +283,7 @@ def train(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -316,24 +326,27 @@ def train(
         pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    check_if_mounted(cluster_config, nemo_model)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    output_dir = get_mounted_path(cluster_config, output_dir)
+    nemo_model = get_mounted_path(cluster_config, nemo_model)
+
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = output_dir
 
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
-        check_if_mounted(cluster_config, training_data)
+        training_data = get_mounted_path(cluster_config, training_data)
 
     if not final_nemo_path:
         final_nemo_path = f"{output_dir}/model-averaged-nemo"
-    check_if_mounted(cluster_config, final_nemo_path)
+    final_nemo_path = get_mounted_path(cluster_config, final_nemo_path)
 
     if validation_data:
-        check_if_mounted(cluster_config, validation_data)
+        validation_data = get_mounted_path(cluster_config, validation_data)
 
     if " " in str(average_steps):
         raise ValueError("average steps should be separated with commas")

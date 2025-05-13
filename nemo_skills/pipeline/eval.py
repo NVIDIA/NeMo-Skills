@@ -22,18 +22,29 @@ import typer
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_remote_mount_directories,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
+    get_mounted_path,
     get_server_command,
+    is_mounted_filepath,
+    resolve_mount_paths,
     run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
 LOG = logging.getLogger(__file__)
+
+
+class ExtraDatasetType(str, Enum):
+    copy = "copy"
+    mount = "mount"
 
 
 def get_greedy_cmd(
@@ -147,6 +158,7 @@ def eval(
     ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     add_greedy: bool = typer.Option(
         False,
@@ -174,12 +186,14 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
+    # extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -197,11 +211,28 @@ def eval(
         pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if check_mounted_paths:
+        if not is_mounted_filepath(cluster_config, output_dir):
+            create_remote_directory(output_dir, cluster_config)
+    else:
+        check_if_mounted(cluster_config, output_dir)
+    output_dir = get_mounted_path(cluster_config, output_dir)
+
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        if not is_mounted_filepath(cluster_config, log_dir):
+            create_remote_directory(log_dir, cluster_config)
+        else:
+            check_if_mounted(cluster_config, log_dir)
+        log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/eval-logs"
+
+    if check_mounted_paths:
+        # Final check for existance of mounted paths
+        checked_files = [output_dir, log_dir]
+        check_remote_mount_directories(checked_files, cluster_config)
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
@@ -239,6 +270,11 @@ def eval(
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
+    # TODO(@titu1994): add support for extra_datasets_type in future pr
+    # try:
+    #     extra_datasets_type = extra_datasets_type.value
+    # except AttributeError:
+    #     pass
 
     # Check which benchmarks require sandbox
     benchmark_requires_sandbox = {}

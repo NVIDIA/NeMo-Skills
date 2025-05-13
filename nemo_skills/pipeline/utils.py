@@ -41,6 +41,18 @@ from torchx.specs.api import AppState
 LOG = logging.getLogger(__file__)
 
 
+def wrap_arguments(arguments: str):
+    """Returns a mock context object to allow using the cli entrypoints as functions."""
+
+    class MockContext:
+        def __init__(self, args):
+            self.args = args
+            self.obj = None
+
+    # first one is the cli name
+    return MockContext(args=arguments.split(" "))
+
+
 # TODO: this file is way too big - we need to split it into pieces
 
 # keeping a global variable for first submitted experiment (per cluster) and reusing it by default
@@ -255,6 +267,12 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
     if isinstance(directory, str):
         directory = [directory]
 
+    # Get unmounted path of all directories
+    directory = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directory
+    ]
+
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
         for dir_path in directory:
@@ -332,6 +350,13 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         raise ValueError("Cluster config is not provided.")
     if isinstance(directories, str):
         directories = [directories]
+
+    # Get unmounted path of all directories
+    directories = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directories
+    ]
+
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)
         all_dirs_exist = True
@@ -657,6 +682,67 @@ def get_sandox_command(cluster_config):
     return "/entrypoint.sh && /start.sh"
 
 
+def configure_client(
+    *,  # Force keyword arguments
+    model: str,
+    server_type: str,
+    server_gpus: int,
+    server_nodes: int,
+    server_address: str,
+    server_port: Optional[int],
+    server_args: str,
+    extra_arguments: str,
+    get_random_port: bool,
+):
+    """
+    Utility function to configure a client for the model inference server.
+
+    Args:
+        model: Mounted Path to the model to evaluate.
+        server_type: String name of the server type.
+        server_address: URL of the server hosting the model.
+        server_gpus: Number of GPUs to use for the server.
+        server_nodes: Number of nodes to use for the server.
+        server_port: Port number for the server.
+        server_args: Additional arguments for the server.
+        extra_arguments: Extra arguments to pass to the command.
+        get_random_port: Whether to get a random port for the server.
+
+    Returns:
+        A tuple containing:
+            - server_config: Configuration for the server.
+            - extra_arguments: Updated extra arguments for the command.
+            - server_address: Address of the server.
+            - server_port: Port number for the server.
+    """
+    if server_address is None:  # we need to host the model
+        if server_port is None:  # if not specified, we will use a random port or 5000 depending get_random_port
+            server_port = get_free_port(strategy="random") if not get_random_port else 5000
+        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        server_address = f"localhost:{server_port}"
+
+        server_config = {
+            "model_path": model,
+            "server_type": server_type,
+            "num_gpus": server_gpus,
+            "num_nodes": server_nodes,
+            "server_args": server_args,
+            "server_port": server_port,
+        }
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.host=localhost ++server.port={server_port} "
+        )
+    else:  # model is hosted elsewhere
+        server_config = None
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.base_url={server_address} ++server.model={model} "
+        )
+        server_port = None
+    return server_config, extra_arguments, server_address, server_port
+
+
 @dataclass(kw_only=True)
 class CustomJobDetails(SlurmJobDetails):
     # we have 1 srun per sub-task (e.g. server/sandbox/main), but only a single sbatch
@@ -750,10 +836,57 @@ def get_cluster_config(cluster=None, config_dir=None):
 
     cluster_config = read_config(config_file)
 
+    # resolve ssh tunnel config
+    if "ssh_tunnel" in cluster_config:
+        cluster_config = update_ssh_tunnel_config(cluster_config)
+
     if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
         set_nemorun_home(cluster_config["job_dir"])
+
+    return cluster_config
+
+
+def update_ssh_tunnel_config(cluster_config: dict):
+    """
+    Update the ssh tunnel configuration in the cluster config to resolve job dir and username.
+    uses the `user` information to populate `job_dir` if in config.
+
+    Args:
+        cluster_config: dict: The cluster configuration dictionary
+
+    Returns:
+        dict: The updated cluster configuration dictionary
+    """
+    if 'ssh_tunnel' not in cluster_config:
+        return cluster_config
+
+    resolve_map = [
+        dict(key='user', default_env_key='USER'),
+        dict(key='job_dir', default_env_key=None),
+        dict(key='identity', default_env_key=None),
+    ]
+
+    for item in resolve_map:
+        key = item['key']
+        default_env_key = item['default_env_key']
+
+        if key in cluster_config['ssh_tunnel']:
+            # Resolve `user` from env if not provided
+            if cluster_config['ssh_tunnel'][key] is None and default_env_key is not None:
+                cluster_config['ssh_tunnel'][key] = os.environ[default_env_key]
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
+
+            elif isinstance(cluster_config['ssh_tunnel'][key], str) and '$' in cluster_config['ssh_tunnel'][key]:
+                cluster_config['ssh_tunnel'][key] = os.path.expandvars(cluster_config['ssh_tunnel'][key])
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
+
+    if "$" in cluster_config['ssh_tunnel']['identity']:
+        raise ValueError(
+            "SSH identity cannot be resolved from environment variables. "
+            "Please provide a valid path to the identity file."
+        )
 
     return cluster_config
 
@@ -767,23 +900,6 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
-    # If the str provided is an env variable, resolve it
-    if "$" in job_dir:
-        job_dir = os.path.expandvars(job_dir)
-        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
-
-    if "$" in host:
-        host = os.path.expandvars(host)
-        LOG.info(f"Resolved `host` from env var to `{host}`")
-
-    if "$" in user:
-        user = os.path.expandvars(user)
-        LOG.info(f"Resolved `user` from env var to `{user}`")
-
-    if "$" in identity:
-        identity = os.path.expandvars(identity)
-        LOG.info(f"Resolved `identity` from env var to `{identity}`")
-
     return run.SSHTunnel(
         host=host,
         user=user,
@@ -1087,6 +1203,28 @@ def get_env_variables(cluster_config):
             logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
 
     return env_vars
+
+
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
+    if preprocess_cmd:
+        if random_seed is not None:
+            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {preprocess_cmd} && {cmd} "
+    if postprocess_cmd:
+        if random_seed is not None:
+            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {cmd} && {postprocess_cmd} "
+    if wandb_parameters:
+        log_wandb_cmd = (
+            f"python -m nemo_skills.inference.log_samples_wandb "
+            f"    {wandb_parameters['samples_file']} "
+            f"    --name={wandb_parameters['name']} "
+            f"    --project={wandb_parameters['project']} "
+        )
+        if wandb_parameters['group'] is not None:
+            log_wandb_cmd += f" --group={wandb_parameters['group']} "
+        cmd = f"{cmd} && {log_wandb_cmd} "
+    return cmd
 
 
 def get_mounts_from_config(cluster_config: dict):
