@@ -47,9 +47,9 @@ class AnswerJudgementMetrics(BaseMetrics):
         is_invalid = pred_judgement is None
         is_correct = pred_judgement == gt_judgement
         if not is_correct:
-            if pred_judgement:
+            if pred_judgement == True:
                 is_fp = True
-            else: # Keeping logic for false negatives for now
+            elif pred_judgement == False:
                 is_fn = True
         return is_correct, is_fp, is_fn, is_invalid
         
