@@ -689,7 +689,7 @@ def configure_client(
     server_gpus: int,
     server_nodes: int,
     server_address: str,
-    server_port: int,
+    server_port: Optional[int],
     server_args: str,
     extra_arguments: str,
     get_random_port: bool,
@@ -862,34 +862,31 @@ def update_ssh_tunnel_config(cluster_config: dict):
     if 'ssh_tunnel' not in cluster_config:
         return cluster_config
 
-    if 'user' in cluster_config['ssh_tunnel']:
-        # Resolve `user` from env if not provided
-        if cluster_config['ssh_tunnel']['user'] is None:
-            cluster_config['ssh_tunnel']['user'] = os.environ['USER']
-            LOG.info(f"Resolved `user` to `{cluster_config['ssh_tunnel']['user']}`")
+    resolve_map = [
+        dict(key='user', default_env_key='USER'),
+        dict(key='job_dir', default_env_key=None),
+        dict(key='identity', default_env_key=None),
+    ]
 
-        elif isinstance(cluster_config['ssh_tunnel']['user'], str) and '$' in cluster_config['ssh_tunnel']['user']:
-            cluster_config['ssh_tunnel']['user'] = os.path.expandvars(cluster_config['ssh_tunnel']['user'])
-            LOG.info(f"Resolved `user` to `{cluster_config['ssh_tunnel']['user']}`")
+    for item in resolve_map:
+        key = item['key']
+        default_env_key = item['default_env_key']
 
-    if 'job_dir' in cluster_config['ssh_tunnel']:
-        # Resolve `job_dir` from env if not provided
-        cluster_config['ssh_tunnel']['job_dir'] = os.path.expandvars(cluster_config['ssh_tunnel']['job_dir'])
-        LOG.info(f"Resolved `job_dir` to `{cluster_config['ssh_tunnel']['job_dir']}`")
+        if key in cluster_config['ssh_tunnel']:
+            # Resolve `user` from env if not provided
+            if cluster_config['ssh_tunnel'][key] is None and default_env_key is not None:
+                cluster_config['ssh_tunnel'][key] = os.environ[default_env_key]
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-    if 'identity' in cluster_config['ssh_tunnel']:
-        # Resolve `identity` from env if not provided
-        cluster_config['ssh_tunnel']['identity'] = os.path.expandvars(cluster_config['ssh_tunnel']['identity'])
-        LOG.info(f"Resolved `identity` to `{cluster_config['ssh_tunnel']['identity']}`")
+            elif isinstance(cluster_config['ssh_tunnel'][key], str) and '$' in cluster_config['ssh_tunnel'][key]:
+                cluster_config['ssh_tunnel'][key] = os.path.expandvars(cluster_config['ssh_tunnel'][key])
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-        if "$" in cluster_config['ssh_tunnel']['identity']:
-            raise ValueError(
-                f"Identity file path could not be loaded from env variable `{cluster_config['ssh_tunnel']['identity']}`"
-            )
-
-    # Add mount container list if not present
-    if 'mounts' not in cluster_config:
-        cluster_config['mounts'] = []
+    if "$" in cluster_config['ssh_tunnel']['identity']:
+        raise ValueError(
+            "SSH identity cannot be resolved from environment variables. "
+            "Please provide a valid path to the identity file."
+        )
 
     return cluster_config
 

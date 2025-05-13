@@ -216,11 +216,15 @@ def eval(
     if check_mounted_paths:
         if not is_mounted_filepath(cluster_config, output_dir):
             create_remote_directory(output_dir, cluster_config)
+    else:
+        check_if_mounted(cluster_config, output_dir)
     output_dir = get_mounted_path(cluster_config, output_dir)
 
     if log_dir:
         if not is_mounted_filepath(cluster_config, log_dir):
             create_remote_directory(log_dir, cluster_config)
+        else:
+            check_if_mounted(cluster_config, log_dir)
         log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/eval-logs"

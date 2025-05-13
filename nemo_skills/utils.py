@@ -21,13 +21,13 @@ import re
 import sys
 import tokenize
 import typing
-import fire
 from dataclasses import MISSING, dataclass, fields, is_dataclass
-from typing import Any, Callable, List, Optional, Union
 from pathlib import Path
+from typing import Any, Callable, List, Optional, Union
 
-from rich.logging import RichHandler
+import fire
 from fire import decorators as fire_decorators
+from rich.logging import RichHandler
 
 # isort: off
 import nemo_skills
@@ -37,8 +37,9 @@ from nemo_skills.file_utils import (
     jload_chunk,
     count_newlines,
     calculate_chunk_indices,
-    unroll_files
+    unroll_files,
 )  # noqa # pylint: disable=unused-import
+
 # isort: on
 
 
@@ -128,12 +129,14 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
     try:
         import wandb
     except (ImportError, ModuleNotFoundError):
-        if verbose: print("Wandb is not installed. Skipping wandb initialization.")
+        if verbose:
+            print("Wandb is not installed. Skipping wandb initialization.")
         return False
 
     # Check if the project or name is None, and skip initialization if so
     if project is None or name is None:
-        if verbose: print("Wandb project or name not provided. Skipping wandb initialization.")
+        if verbose:
+            print("Wandb project or name not provided. Skipping wandb initialization.")
         return False
 
     # Determine the log directory based on the provided exp_dir
@@ -150,14 +153,14 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
     # Initialize wandb with the specified parameters
     try:
         wandb.init(project=project, name=name, resume='auto', reinit=True, save_code=True, dir=log_dir)
-        if verbose: print("Wandb initialized.")
+        if verbose:
+            print("Wandb initialized.")
         return True
     except Exception as e:
         if verbose:
             print("Wandb initialization failed with the following error.")
             print(e)
         return False
-
 
 
 def extract_comments(code: str):
@@ -423,6 +426,7 @@ def prefill_judgement(data_point: dict) -> str | None:
 
     return None
 
+
 def check_no_extra_args_fire():
     """
     Check if there are any extra arguments passed to the function.
@@ -502,7 +506,7 @@ def resolve_python_module_from_file(py_filepath: str, root_module: str = 'nemo_s
     return striped_module
 
 
-def maybe_get_env(value: Union[int, List[int]], env_name, default=None, cast: Callable[[Any], Any] = None):
+def maybe_get_env(value: Union[Any, List[Any]], env_name, default=None, cast: Callable[[Any], Any] = None):
     """
     Retrieve the value of an environment variable, iff the value is originally None.
 

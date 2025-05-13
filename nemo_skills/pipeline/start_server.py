@@ -17,17 +17,17 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_remote_mount_directories,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
-    add_mount_path,
-    is_mounted_filepath,
     get_mounted_path,
-    create_remote_directory,
+    is_mounted_filepath,
     resolve_mount_paths,
-    check_remote_mount_directories,
 )
 from nemo_skills.utils import setup_logging
 
@@ -84,7 +84,10 @@ def start_server(
         pass
 
     if log_dir:
-        if check_mounted_paths: create_remote_directory(log_dir, cluster_config)
+        if check_mounted_paths:
+            create_remote_directory(log_dir, cluster_config)
+        else:
+            check_if_mounted(cluster_config, log_dir)
         log_dir = get_mounted_path(cluster_config, log_dir)
 
     server_config = {

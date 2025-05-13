@@ -27,6 +27,7 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
+    check_if_mounted,
     check_remote_mount_directories,
     create_remote_directory,
     get_cluster_config,
@@ -38,7 +39,6 @@ from nemo_skills.pipeline.utils import (
     get_server_command,
     get_tunnel,
     get_unmounted_path,
-    is_mounted_filepath,
     resolve_mount_paths,
     run_exp,
     wrap_cmd,
@@ -562,11 +562,15 @@ def generate(
     # Check and mount output and log dirs
     if check_mounted_paths:
         create_remote_directory(output_dir, cluster_config)
+    else:
+        check_if_mounted(cluster_config, output_dir)
     output_dir = get_mounted_path(cluster_config, output_dir)
 
     if log_dir:
         if check_mounted_paths:
             create_remote_directory(log_dir, cluster_config)
+        else:
+            check_if_mounted(cluster_config, log_dir)
         log_dir = get_mounted_path(cluster_config, log_dir)
     else:
         log_dir = f"{output_dir}/generation-logs"
