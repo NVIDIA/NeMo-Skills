@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--server_type",
-        default="sglang",
+        default="vllm",
         choices=["vllm", "sglang", "trtllm"],
         help="Type of the model server to use.",
     )
