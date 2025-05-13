@@ -41,7 +41,7 @@ class AnswerJudgementMetrics(BaseMetrics):
             is_correct, is_fp, is_fn = False, False, False
 
             answers = [is_correct_judgement(elem['judgement']) for elem in predictions]
-            majority_judgement = Counter(answers).most_common(1)[0]
+            majority_judgement = Counter(answers).most_common(1)[0][0]
             is_correct = majority_judgement == is_correct_judgement(predictions[0]['expected_judgement'])
 
             if not is_correct:
@@ -69,6 +69,7 @@ class AnswerJudgementMetrics(BaseMetrics):
 
             self.update_perf_dict(self.agg_mode_dict[f"pass@{len(predictions)}"], is_correct, is_fp, is_fn)
         else:
+            is_fp, is_fn = False, False
             is_correct = is_correct_judgement(predictions[0]['judgement']) == is_correct_judgement(
                 predictions[0]['expected_judgement']
             )
