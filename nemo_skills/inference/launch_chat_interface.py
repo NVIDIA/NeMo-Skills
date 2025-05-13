@@ -1,5 +1,8 @@
 import argparse
+import time
 from typing import Callable
+from requests.exceptions import ConnectionError
+from openai import APIConnectionError
 
 import gradio as gr
 
@@ -95,20 +98,35 @@ def _build_chat_fn(llm, prompt: Prompt, max_code_executions: int) -> Callable:
     return chat_fn
 
 
+def _get_llm_with_retry(args: argparse.Namespace, wait=30):
+    """Attempt to obtain a code-execution model, retrying until the server is reachable."""
+
+    while True:
+        try:
+            sandbox = get_sandbox(host=args.host)
+            
+            return get_code_execution_model(
+                server_type=args.server_type,
+                host=args.host,
+                sandbox=sandbox,
+                code_execution={
+                    "max_code_executions": args.max_code_executions,
+                    "add_remaining_code_executions": args.add_remaining_code_executions,
+                },
+            )
+        except (ConnectionError, APIConnectionError):
+            print(
+                "[launch_chat_interface] Could not connect to servers. "
+                f"Retrying in {wait} seconds…",
+                flush=True,
+            )
+            time.sleep(wait)
+
+
 def create_demo(args: argparse.Namespace) -> gr.Blocks:
     """Instantiate sandbox, model, prompt, and wire everything into a Gradio app."""
 
-    sandbox = get_sandbox(host=args.host)
-
-    llm = get_code_execution_model(
-        server_type=args.server_type,
-        host=args.host,
-        sandbox=sandbox,
-        code_execution={
-            "max_code_executions": args.max_code_executions,
-            "add_remaining_code_executions": args.add_remaining_code_executions,
-        },
-    )
+    llm = _get_llm_with_retry(args)
 
     prompt = get_prompt(
         args.prompt_config,
