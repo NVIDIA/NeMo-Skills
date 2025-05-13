@@ -64,23 +64,26 @@ class AnswerJudgementMetrics(BaseMetrics):
         self.total += 1
         gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
         if len(predictions) > 1:
-            # Majority@k
-            # Reinitialize local vars
-            # Pass@k
-            for k in range(1, len(predictions) + 1):
-                majority_judgement = self.get_judgement_by_type(predictions[:k], "majority", gt_judgement)
+            # Majority@k, Pass@k, Pass@1[k]
+            for k in range(len(predictions), 0, -1):
+                pred_subset = predictions[:k]
+                majority_judgement = self.get_judgement_by_type(pred_subset, "majority", gt_judgement)
                 majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
                 self.update_perf_dict(self.agg_mode_dict[f"majority@{k}"], *majority_metrics)
 
-                pass_judgement = self.get_judgement_by_type(predictions[:k], "pass", gt_judgement)
+                pass_judgement = self.get_judgement_by_type(pred_subset, "pass", gt_judgement)
                 pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
                 self.update_perf_dict(self.agg_mode_dict[f"pass@{k}"], *pass_metrics)
-        
-        # greedy for single sample, pass@1[k] for multiple samples
-        single_sample_metric_name = "greedy" if len(predictions) == 1 else f"pass@1[{len(predictions)}]"
-        per_sample_metrics = [self.get_judgement_metrics(is_correct_judgement(prediction['judgement']), gt_judgement) for prediction in predictions]
-        avg_per_sample_metrics = [sum(metrics) / len(metrics) for metrics in zip(*per_sample_metrics)]
-        self.update_perf_dict(self.agg_mode_dict[single_sample_metric_name], *avg_per_sample_metrics)
+
+                pass1_k_metrics = [self.get_judgement_metrics(is_correct_judgement(prediction['judgement']), gt_judgement) for prediction in pred_subset]
+                avg_pass1_k_metrics = [sum(metrics) / len(metrics) for metrics in zip(*pass1_k_metrics)]
+                self.update_perf_dict(self.agg_mode_dict[f"pass@1[{k}]"], *avg_pass1_k_metrics)
+
+        # Greedy
+        if len(predictions) == 1:
+            per_sample_metrics = self.get_judgement_metrics(is_correct_judgement(predictions[0]['judgement']), gt_judgement)
+            self.update_perf_dict(self.agg_mode_dict["greedy"], *per_sample_metrics)
+            return
 
 
     def get_metrics(self):
@@ -98,3 +101,7 @@ class AnswerJudgementMetrics(BaseMetrics):
     def reset(self):
         self.total = 0
         self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
+
+    def max_aggregations_to_print(self):
+        # majority + pass + pass@1[k]
+        return 1 + 1 + 1
