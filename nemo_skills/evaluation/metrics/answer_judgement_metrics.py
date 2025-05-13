@@ -66,12 +66,12 @@ class AnswerJudgementMetrics(BaseMetrics):
         if len(predictions) > 1:
             # Majority@k
             # Reinitialize local vars
-            majority_judgement = self.get_judgement_by_type(predictions, "majority", gt_judgement)
-            majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
-            self.update_perf_dict(self.agg_mode_dict[f"majority@{len(predictions)}"], *majority_metrics)
-
             # Pass@k
             for k in range(1, len(predictions) + 1):
+                majority_judgement = self.get_judgement_by_type(predictions[:k], "majority", gt_judgement)
+                majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
+                self.update_perf_dict(self.agg_mode_dict[f"majority@{k}"], *majority_metrics)
+
                 pass_judgement = self.get_judgement_by_type(predictions[:k], "pass", gt_judgement)
                 pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
                 self.update_perf_dict(self.agg_mode_dict[f"pass@{k}"], *pass_metrics)
