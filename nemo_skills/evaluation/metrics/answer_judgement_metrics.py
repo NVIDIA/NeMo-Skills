@@ -28,14 +28,17 @@ class AnswerJudgementMetrics(BaseMetrics):
         perf_dict["fn_count"] += float(is_fn)
         perf_dict["invalid_count"] += float(invalid_count)
     
-    def get_judgement_by_type(self, predictions, judgement_type: str) -> Union[bool, None]:
+    def get_judgement_by_type(self, predictions, judgement_type: str, gt_judgement: bool) -> Union[bool, None]:
         answers = [c for elem in predictions if (c:=is_correct_judgement(elem['judgement'])) is not None]
         if len(answers) == 0:
             return None
         if judgement_type == "majority":
             return Counter(answers).most_common(1)[0][0]
         elif judgement_type == "pass":
-            return any(answers)
+            for answer in answers:
+                if answer == gt_judgement:
+                    return answer
+            return answers[0]
         else:
             raise ValueError(f"Invalid judgement type: {judgement_type}")
     
@@ -63,15 +66,16 @@ class AnswerJudgementMetrics(BaseMetrics):
         if len(predictions) > 1:
             # Majority@k
             # Reinitialize local vars
-            majority_judgement = self.get_judgement_by_type(predictions, "majority")
+            majority_judgement = self.get_judgement_by_type(predictions, "majority", gt_judgement)
             majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
             self.update_perf_dict(self.agg_mode_dict[f"majority@{len(predictions)}"], *majority_metrics)
 
             # Pass@k
-            pass_judgement = self.get_judgement_by_type(predictions, "pass")
+            pass_judgement = self.get_judgement_by_type(predictions, "pass", gt_judgement)
             pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
             self.update_perf_dict(self.agg_mode_dict[f"pass@{len(predictions)}"], *pass_metrics)
         
+        # greedy for single sample, pass@1[k] for multiple samples
         single_sample_metric_name = "greedy" if len(predictions) == 1 else f"pass@1[{len(predictions)}]"
         per_sample_metrics = [self.get_judgement_metrics(is_correct_judgement(prediction['judgement']), gt_judgement) for prediction in predictions]
         avg_per_sample_metrics = [sum(metrics) / len(metrics) for metrics in zip(*per_sample_metrics)]
