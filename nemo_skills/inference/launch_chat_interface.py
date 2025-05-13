@@ -6,6 +6,7 @@ from openai import APIConnectionError
 
 import gradio as gr
 
+from nemo_skills.inference.server.model import get_model
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.prompt.utils import get_prompt, Prompt
@@ -26,6 +27,11 @@ def parse_args() -> argparse.Namespace:
         default="vllm",
         choices=["vllm", "sglang", "trtllm"],
         help="Type of the model server to use.",
+    )
+    parser.add_argument(
+        "--with_code_execution",
+        action="store_true",
+        help="Whether to use a model with code execution capabilities.",
     )
     parser.add_argument(
         "--max_code_executions",
@@ -60,10 +66,12 @@ def _format_tool_calls(text: str) -> str:
     return text.replace("<tool_call>", "```python").replace("</tool_call>", "```")
 
 
-def _build_chat_fn(llm, prompt: Prompt, max_code_executions: int) -> Callable:
+def _build_chat_fn(llm, prompt: Prompt, max_code_executions: int | None = None) -> Callable:
     """Return a Gradio-compatible callback that streams model output."""
 
-    extra_params = prompt.get_code_execution_args()
+    extra_params = {}
+    if max_code_executions is not None:
+        extra_params = prompt.get_code_execution_args()
 
     def chat_fn(user_input: str, tokens_to_generate: int):
         """Single-turn chat callback streaming tokens one by one."""
@@ -72,9 +80,11 @@ def _build_chat_fn(llm, prompt: Prompt, max_code_executions: int) -> Callable:
         chat_history = []
 
         # Build the final prompt string
-        prompt_filled = prompt.fill(
-            {"problem": user_input, "total_code_executions": max_code_executions}
-        )
+        prompt_kwargs = {"problem": user_input}
+        if max_code_executions is not None:
+            prompt_kwargs["total_code_executions"] = max_code_executions
+            
+        prompt_filled = prompt.fill(prompt_kwargs)
 
         chat_history.append((user_input, ""))  # show the user message instantly
         yield chat_history
@@ -99,21 +109,26 @@ def _build_chat_fn(llm, prompt: Prompt, max_code_executions: int) -> Callable:
 
 
 def _get_llm_with_retry(args: argparse.Namespace, wait=30):
-    """Attempt to obtain a code-execution model, retrying until the server is reachable."""
+    """Attempt to obtain a model, retrying until the server is reachable."""
 
     while True:
         try:
-            sandbox = get_sandbox(host=args.host)
-            
-            return get_code_execution_model(
-                server_type=args.server_type,
-                host=args.host,
-                sandbox=sandbox,
-                code_execution={
-                    "max_code_executions": args.max_code_executions,
-                    "add_remaining_code_executions": args.add_remaining_code_executions,
-                },
-            )
+            if args.with_code_execution:
+                sandbox = get_sandbox(host=args.host)
+                return get_code_execution_model(
+                    server_type=args.server_type,
+                    host=args.host,
+                    sandbox=sandbox,
+                    code_execution={
+                        "max_code_executions": args.max_code_executions,
+                        "add_remaining_code_executions": args.add_remaining_code_executions,
+                    },
+                )
+            else:
+                return get_model(
+                    server_type=args.server_type,
+                    host=args.host,
+                )
         except (ConnectionError, APIConnectionError):
             print(
                 "[launch_chat_interface] Could not connect to servers. "
@@ -124,7 +139,7 @@ def _get_llm_with_retry(args: argparse.Namespace, wait=30):
 
 
 def create_demo(args: argparse.Namespace) -> gr.Blocks:
-    """Instantiate sandbox, model, prompt, and wire everything into a Gradio app."""
+    """Instantiate model, prompt, and wire everything into a Gradio app."""
 
     llm = _get_llm_with_retry(args)
 
@@ -133,14 +148,15 @@ def create_demo(args: argparse.Namespace) -> gr.Blocks:
         args.prompt_template,
     )
 
-    chat_fn = _build_chat_fn(llm, prompt, args.max_code_executions)
+    max_code_executions = args.max_code_executions if args.with_code_execution else None
+    chat_fn = _build_chat_fn(llm, prompt, max_code_executions)
 
+    ui_title = "AI Chat"
     # ----------------------- UI definition ----------------------------------
-    with gr.Blocks(theme=gr.themes.Soft(), title="Math Reasoning Chat") as demo:
-        gr.Markdown("# Math Reasoning Chat with Code Execution")
-        gr.Markdown(
-            "Ask a math question. The model can use a Python interpreter to find the solution."
-        )
+    with gr.Blocks(theme=gr.themes.Soft(), title=ui_title) as demo:
+        ui_subtitle = "Ask a question. " + ("The model can use a Python interpreter." if args.with_code_execution else "")
+        gr.Markdown(f"# {ui_title}")
+        gr.Markdown(ui_subtitle)
 
         chatbot = gr.Chatbot(label="Conversation", height=500)
 
@@ -164,11 +180,19 @@ def create_demo(args: argparse.Namespace) -> gr.Blocks:
             )
             clear_btn = gr.Button("Clear Chat", variant="secondary", scale=1)
 
-        gr.Examples(
-            examples=[
-                "What is the sum of the first 5000 prime numbers?",
+        examples = [
+            "What is the sum of the first 5000 prime numbers?",
+            "Solve the equation x^13 - 5x^2 + 6 = 0.",
+        ]
+        
+        if not args.with_code_execution:
+            examples = [
+                "Find ",
                 "Solve the equation x^3 - 5x^2 + 6x = 0.",
-            ],
+            ]
+            
+        gr.Examples(
+            examples=examples,
             inputs=msg,
             label="Example problems",
         )
