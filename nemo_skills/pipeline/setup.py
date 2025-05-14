@@ -13,6 +13,10 @@
 # limitations under the License.
 
 import os
+
+# Add Docker client import
+import subprocess
+import sys
 from pathlib import Path
 
 import typer
@@ -20,6 +24,26 @@ import yaml
 
 from nemo_skills import _containers
 from nemo_skills.pipeline.app import app
+
+
+# Helper function to check if Docker is available
+def is_docker_available():
+    try:
+        subprocess.run(["docker", "--version"], check=True, capture_output=True)
+        return True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+# Helper function to pull Docker containers
+def pull_docker_containers(containers):
+    for container_name, container_image in containers.items():
+        typer.echo(f"Pulling {container_name}: {container_image}...")
+        try:
+            subprocess.run(["docker", "pull", container_image], check=True)
+            typer.echo(f"Successfully pulled {container_image}")
+        except subprocess.SubprocessError:
+            typer.echo(f"Failed to pull {container_image}. Please pull it manually.")
 
 
 @app.command()
@@ -148,6 +172,24 @@ def setup():
             f"You can find more information on what containers we use in "
             f"https://github.com/NVIDIA/NeMo-Skills/tree/main/dockerfiles"
         )
+
+        if config_type == 'local':
+            pull_containers = typer.confirm(
+                "\nWould you like to pull all the necessary Docker containers now? "
+                "This might take some time but ensures everything is ready to use.\n"
+                "You can skip this step and we will pull the containers automatically when you run the first job.",
+                default=True,
+            )
+
+            if pull_containers:
+                if is_docker_available():
+                    typer.echo("\nPulling Docker containers...")
+                    pull_docker_containers(config['containers'])
+                    typer.echo("All containers have been pulled!")
+                else:
+                    typer.echo(
+                        "\nDocker does not seem to be available on your system. Please ensure Docker is installed."
+                    )
 
         # Ask if the user wants to create another config
         create_another = typer.confirm("\nWould you like to create another cluster config?", default=False)
