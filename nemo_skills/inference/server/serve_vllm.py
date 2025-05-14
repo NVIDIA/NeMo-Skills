@@ -48,6 +48,8 @@ def main():
         f'    {extra_arguments} ' + (' | grep -v "200 OK"' if not args.verbose else "")
     )
 
+    print(cmd)
+
     subprocess.run(cmd, shell=True, check=True)
 
 

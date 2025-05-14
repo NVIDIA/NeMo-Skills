@@ -116,7 +116,7 @@ class VLLMRewardModel(BaseModel):
         per_token_scores = None
         inference_error = ""
         try:
-            response = requests.post(self.request_url, prompt={"input": prompt, "model": self.model})
+            response = requests.post(self.request_url, json={"input": prompt, "model": self.model})
             output = response.json()
             per_token_scores = output['data'][0]['data']
         except requests.exceptions.HTTPError as err:
