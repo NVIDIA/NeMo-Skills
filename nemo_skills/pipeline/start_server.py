@@ -21,10 +21,11 @@ from nemo_skills.utils import setup_logging
 
 
 def get_gradio_chat_cmd(server_type, with_sandbox, extra_args):
+    if with_sandbox:
+        extra_args = " --with_sandbox " + extra_args
     cmd = (
         "python -m nemo_skills.inference.launch_chat_interface "
         f"   --server_type {server_type} "
-        f"   --with_sandbox {with_sandbox} "
         f"   {extra_args} "
     )
     return cmd
@@ -96,10 +97,13 @@ def start_server(
 
     with get_exp("server", cluster_config) as exp:
         if launch_chat_interface:
+            if server_type in ["trtllm", "nemo"]:
+                raise ValueError(f"Currently chat interface for {server_type} is not supported.")
             add_task(
                 exp,
                 cmd=get_gradio_chat_cmd(server_type, with_sandbox, extra_chat_args),
                 task_name='gradio_chat',
+                container="",
                 cluster_config=get_cluster_config(), # launch app locally
             )
         add_task(
