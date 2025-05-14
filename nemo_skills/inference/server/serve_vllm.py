@@ -24,6 +24,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Print verbose logs")
     args, unknown = parser.parse_known_args()
 
+    print(unknown)
     extra_arguments = f'{" ".join(unknown)}'
 
     print(f"Deploying model {args.model}")

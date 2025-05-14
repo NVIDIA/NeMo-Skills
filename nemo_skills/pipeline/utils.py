@@ -518,7 +518,6 @@ def get_reward_server_command(
         if num_nodes > 1:
             raise ValueError("VLLM server does not support multi-node execution")
 
-        print(server_args)
         server_start_cmd = (
             f"python3 -m nemo_skills.inference.server.serve_vllm "
             f"    --model {model_path} "
@@ -526,7 +525,6 @@ def get_reward_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        print(server_start_cmd)
         num_tasks = 1
     else:
         raise ValueError(f"Server type '{server_type}' not supported for reward model.")
