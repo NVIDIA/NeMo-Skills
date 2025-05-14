@@ -93,6 +93,7 @@ def setup():
             "You don't need to mount nemo-skills or your local git repo, it's always accessible with /nemo_run/code\n"
             "It's usually a good idea to define some mounts for your general workspace (to keep data/output results)\n"
             "as well as for your models (e.g. /trt_models, /hf_models).\n"
+            "If you're setting up a Slurm config, make sure to use the cluster paths here.\n"
             "What mounts would you like to add? (comma separated)",
             default=f"/home/{os.getlogin()}:/workspace" if config_type == 'local' else None,
         )
