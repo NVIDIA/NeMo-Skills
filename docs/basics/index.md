@@ -135,7 +135,7 @@ Now that we have our first config created, we can run inference
 with a local model (assuming you have at least one GPU on the machine you're using).
 You would also need to have
 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-set up on your machine.
+set up on your machine and define [HF_TOKEN environment variable](https://huggingface.co/docs/hub/en/security-tokens).
 
 ```bash
 ns generate \

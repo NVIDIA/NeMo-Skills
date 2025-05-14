@@ -62,7 +62,6 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
@@ -76,7 +75,6 @@ ns eval \
     --benchmarks=hle:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     --split=math \
     ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
@@ -183,7 +181,6 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=openmath/tir \
@@ -206,7 +203,6 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=generic/math \
@@ -240,9 +236,9 @@ The output folder will have three folders (apart from log folders):
 
 1. `comparison_instances`: This is the folder where input instances for genselect are kept.
 
-2. `comparison_judgment`: Output of GenSelect judgments. 
+2. `comparison_judgment`: Output of GenSelect judgments.
 
-3. `hle` / `math`: Folder with outputs based on GenSelect's judgments. If `dataset` is not specified in the command, we create a folder with the name `math`  
+3. `hle` / `math`: Folder with outputs based on GenSelect's judgments. If `dataset` is not specified in the command, we create a folder with the name `math`
 
 To print the metrics run:
 
