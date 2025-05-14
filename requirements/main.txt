@@ -20,6 +20,7 @@ fire
 
 # needed local code execution server for persistent sessions
 flask
+gradio
 httpx
 huggingface_hub
 hydra-core
