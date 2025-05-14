@@ -523,7 +523,9 @@ def get_reward_server_command(
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
+            f"    --task reward "
             f"    {server_args} "
+
         )
         num_tasks = 1
     else:
