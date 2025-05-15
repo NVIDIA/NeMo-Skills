@@ -72,7 +72,7 @@ def get_hf_to_trtllm_cmd(
         hf_to_trtllm_cmd = (
             f"python -m nemo_skills.conversion.hf_to_trtllm_quantize "
             f"    --model_dir {input_model} "
-            f"    --dtype float16 "
+            f"    --dtype auto "
             f"    --qformat {dtype} "
             f"    --output_dir {tmp_engine_dir} "
             f"    --calib_size {calib_size} "
