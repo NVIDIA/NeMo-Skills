@@ -249,10 +249,6 @@ def convert(
         pass
 
     # Validate dtype-related requirements
-    if dtype == "fp8" and not calib_dataset:
-        raise ValueError("--calib_dataset is required when dtype is 'fp8'")
-
-    # Validate dtype-related requirements
     if dtype == "fp8":
         if not calib_dataset:
             raise ValueError("--calib_dataset is required when dtype is 'fp8'")
