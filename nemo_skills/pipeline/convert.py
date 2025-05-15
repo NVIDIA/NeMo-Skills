@@ -251,6 +251,13 @@ def convert(
     # Validate dtype-related requirements
     if dtype == "fp8" and not calib_dataset:
         raise ValueError("--calib_dataset is required when dtype is 'fp8'")
+
+    # Validate dtype-related requirements
+    if dtype == "fp8":
+        if not calib_dataset:
+            raise ValueError("--calib_dataset is required when dtype is 'fp8'")
+        if convert_to != "trtllm":
+            raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
         
     # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
     if convert_from == "nemo" and convert_to == "trtllm":
