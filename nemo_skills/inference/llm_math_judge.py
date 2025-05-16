@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import sys
-from dataclasses import asdict, field
-from pathlib import Path
-from typing import Any
+from dataclasses import field
 from os import path
 import hydra
-from tqdm import tqdm
 
 from nemo_skills.evaluation.math_grader import extract_answer
-from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
+from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import InferenceConfig, GenerationTask, GenerateSolutionsConfig
-from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, nested_dataclass, prefill_judgement, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -49,6 +44,13 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     # Used to identify the input file if `input_dir` is provided. If `random_seed` is not provided,
     # the input will be assumed to be from 'greedy' generation
     random_seed: str | None = None
+    # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
+    inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Inference server configuration {server_params}
+    server: dict = field(default_factory=dict)
+    # Sandbox configuration {sandbox_params}
+    sandbox: dict = field(default_factory=dict)
+
     # Override the default Generation config here
     prompt_config: str = "judge/math"
     generation_key: str = "judgement"
@@ -102,6 +104,7 @@ class LLMMathJudgeTask(GenerationTask):
 def generate(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
+    print(cfg)
 
     task = LLMMathJudgeTask(cfg)
     task.generate()

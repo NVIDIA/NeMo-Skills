@@ -426,7 +426,7 @@ class GenerationTask:
             output.update(original_data_point)
             fout.write(json.dumps(output) + "\n")
 
-    def prefill_generation(self, data_point) -> dict | None:
+    def _prefill_generation(self, data_point) -> dict | None:
         """Prefill generation in case LLM is not required."""
         # Override this method to customize the prefilling behavior.
         return None
@@ -435,7 +435,7 @@ class GenerationTask:
         with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
             data_points_batch = []
             for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
-                prefill_output = self.prefill_generation(data_point)
+                prefill_output = self._prefill_generation(data_point)
                 if prefill_output is not None:
                     # We can bypass the LLM and directly dump the prefilled output
                     self.dump_outputs([prefill_output], [data_point], fout)
@@ -468,7 +468,7 @@ class GenerationTask:
         remaining_data_points = []
 
         for idx, data_point in enumerate(data):
-            prefill_output = self.prefill_generation(data_point)
+            prefill_output = self._prefill_generation(data_point)
             if prefill_output is not None:
                 prefilled_outputs.append(prefill_output)
                 prefilled_data_points.append(data_point)
