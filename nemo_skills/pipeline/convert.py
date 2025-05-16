@@ -51,6 +51,8 @@ def get_hf_to_trtllm_cmd(
     dtype,
     num_gpus,
     num_nodes,
+    calib_dataset,
+    calib_size,
     extra_arguments,
     trt_prepare_args,
     trt_reuse_tmp_engine,
@@ -59,36 +61,64 @@ def get_hf_to_trtllm_cmd(
         "bf16": "bfloat16",
         "fp16": "float16",
         "fp32": "float32",
+        "fp8": "fp8",
     }[dtype]
 
     tmp_engine_dir = f"{output_model}-tmp"
 
     setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 
-    hf_to_trtllm_cmd = (
-        f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
-        f"    --model_dir {input_model} "
-        f"    --output_dir {tmp_engine_dir} "
-        f"    --dtype {dtype} "
-        f"    --tp_size {num_gpus} "
-        f"    --pp_size {num_nodes} "
-        f"    --workers 16 "
-        f"    {trt_prepare_args} "
-    )
-
-    trtllm_build_cmd = (
-        f"trtllm-build "
-        f"    --checkpoint_dir {tmp_engine_dir} "
-        f"    --output_dir {output_model} "
-        f"    --gpt_attention_plugin {dtype} "
-        f"    --use_paged_context_fmha enable "
-        f"    --max_batch_size 512 "
-        f"    --max_input_len 4096 "
-        f"    --max_seq_len 8192 "
-        f"    --max_num_tokens 8192 "
-        f"    {extra_arguments} && "
-        f"cp {input_model}/tokenizer* {output_model} "
-    )
+    if dtype == "fp8":
+        hf_to_trtllm_cmd = (
+            f"python -m nemo_skills.conversion.hf_to_trtllm_quantize "
+            f"    --model_dir {input_model} "
+            f"    --dtype auto "
+            f"    --qformat {dtype} "
+            f"    --output_dir {tmp_engine_dir} "
+            f"    --calib_size {calib_size} "
+            f"    --calib_dataset {calib_dataset} "
+            f"    --batch_size 4 "
+            f"    --tp_size {num_gpus} "
+            f"    --pp_size {num_nodes} "
+            f"    {trt_prepare_args} "
+        )
+        trtllm_build_cmd = (
+            f"trtllm-build "
+            f"    --checkpoint_dir {tmp_engine_dir} "
+            f"    --output_dir {output_model} "
+            f"    --gemm_plugin auto "
+            f"    --use_paged_context_fmha enable "
+            f"    --max_batch_size 512 "
+            f"    --max_input_len 4096 "
+            f"    --max_seq_len 8192 "
+            f"    --max_num_tokens 8192 "
+            f"    {extra_arguments} && "
+            f"cp {input_model}/tokenizer* {output_model} "
+        )
+    else:    
+        hf_to_trtllm_cmd = (
+            f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
+            f"    --model_dir {input_model} "
+            f"    --output_dir {tmp_engine_dir} "
+            f"    --dtype {dtype} "
+            f"    --tp_size {num_gpus} "
+            f"    --pp_size {num_nodes} "
+            f"    --workers 16 "
+            f"    {trt_prepare_args} "
+        )
+        trtllm_build_cmd = (
+            f"trtllm-build "
+            f"    --checkpoint_dir {tmp_engine_dir} "
+            f"    --output_dir {output_model} "
+            f"    --gpt_attention_plugin {dtype} "
+            f"    --use_paged_context_fmha enable "
+            f"    --max_batch_size 512 "
+            f"    --max_input_len 4096 "
+            f"    --max_seq_len 8192 "
+            f"    --max_num_tokens 8192 "
+            f"    {extra_arguments} && "
+            f"cp {input_model}/tokenizer* {output_model} "
+        )
 
     if trt_reuse_tmp_engine:
         cmd = (
@@ -140,6 +170,7 @@ class SupportedDtypes(str, Enum):
     bf16 = "bf16"
     fp16 = "fp16"
     fp32 = "fp32"
+    fp8 = "fp8"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -162,6 +193,14 @@ def convert(
     trt_reuse_tmp_engine: bool = typer.Option(True, help="Whether to reuse the tmp engine for the final conversion"),
     hf_model_name: str = typer.Option(None, help="Name of the model on Hugging Face Hub to convert to/from"),
     dtype: SupportedDtypes = typer.Option("bf16", help="Data type"),
+    calib_dataset: str = typer.Option(
+        None,
+        help="(Required for dtype=fp8) HuggingFace dataset to use for FP8 calibration",
+    ),
+    calib_size: int = typer.Option(
+        4096,
+        help="Optional number of samples to use from the calibration dataset (if dtype=fp8)",
+    ),
     expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
     num_nodes: int = typer.Option(1),
     num_gpus: int = typer.Option(...),
@@ -209,6 +248,13 @@ def convert(
     except AttributeError:
         pass
 
+    # Validate dtype-related requirements
+    if dtype == "fp8":
+        if not calib_dataset:
+            raise ValueError("--calib_dataset is required when dtype is 'fp8'")
+        if convert_to != "trtllm":
+            raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
+        
     # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
     if convert_from == "nemo" and convert_to == "trtllm":
         raise ValueError("Conversion from NeMo to TensorRT LLM is not supported directly. Convert to HF first.")
@@ -249,6 +295,8 @@ def convert(
         dtype=dtype,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
+        calib_dataset=calib_dataset,
+        calib_size=calib_size,
         extra_arguments=extra_arguments,
     )
     with get_exp(expname, cluster_config) as exp:
@@ -279,3 +327,4 @@ if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341
     typer.main.get_command_name = lambda name: name
     app()
+
