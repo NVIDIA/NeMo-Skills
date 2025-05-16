@@ -62,7 +62,6 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
@@ -76,7 +75,6 @@ ns eval \
     --benchmarks=hle:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     --split=math \
     ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
@@ -152,7 +150,6 @@ ns generate \
     --server_address=https://api.openai.com/v1 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
     ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
-done
 ```
 
 To print the metrics run
@@ -184,13 +181,14 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
+    --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=openmath/tir \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++code_execution=true \
-    ++server.code_execution.add_remaining_code_executions=true
+    ++server.code_execution.add_remaining_code_executions=true \
+    ++total_code_executions_in_prompt=8
 ```
 
 The only exception is for [OpenMath-Nemotron-14B-Kaggle](https://huggingface.co/nvidia/OpenMath-Nemotron-14B-Kaggle)
@@ -205,7 +203,7 @@ ns eval \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
+    --with_sandbox \
     ++prompt_template=openmath-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
@@ -218,4 +216,35 @@ All other commands are the same as in the [CoT part](#run-cot-evaluations).
 
 ## Run GenSelect evaluations
 
-Coming soon!
+Here is a sample command to run GenSelect evaluation:
+
+```bash
+ns generate \
+    --generation_type=genselect \
+    --genselect_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
+    --model=/trt_models/openmath-nemotron-1.5b \
+    ++prompt_template=qwen-instruct \
+    ++dataset=hle \
+    --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \
+    --cluster=local \
+    --server_type=trtllm \
+    --server_gpus=1 \
+    --num_random_seeds=64
+```
+
+The output folder will have three folders (apart from log folders):
+
+1. `comparison_instances`: This is the folder where input instances for genselect are kept.
+
+2. `comparison_judgment`: Output of GenSelect judgments.
+
+3. `hle` / `math`: Folder with outputs based on GenSelect's judgments. If `dataset` is not specified in the command, we create a folder with the name `math`
+
+To print the metrics run:
+
+```bash
+ns summarize_results \
+  /workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle/hle \
+  --metric_type math \
+  --cluster local
+```

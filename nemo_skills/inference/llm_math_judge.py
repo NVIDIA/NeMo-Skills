@@ -22,7 +22,7 @@ from typing import Any
 import hydra
 from tqdm import tqdm
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.generate import InferenceConfig
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params

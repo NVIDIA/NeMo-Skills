@@ -8,9 +8,10 @@ RUN mkdir /opt/benchmarks
 RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1
 
 RUN mkdir -p /opt/NeMo-Skills/requirements
-COPY nemo_skills setup.py README.md /opt/NeMo-Skills/
-COPY requirements/main.txt /opt/NeMo-Skills/requirements/
-RUN cd /opt/NeMo-Skills && pip install -e .
+COPY setup.py README.md /opt/NeMo-Skills/
+COPY nemo_skills /opt/NeMo-Skills/nemo_skills/
+COPY requirements /opt/NeMo-Skills/requirements/
+RUN cd /opt/NeMo-Skills && pip install -e .[all]
 
 RUN pip install langdetect absl-py immutabledict nltk ipython && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"

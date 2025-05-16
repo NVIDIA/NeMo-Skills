@@ -21,14 +21,14 @@ python -m nemo_skills.training.prepare_data \
 
 !!! tip
 
-    Many scripts access `++input_files` argument. You can use any glob patterns there and also
+    Many scripts accept `++input_files` argument. You can use any glob patterns there and also
     reference multiple files/patterns separated by space or comma.
 
 If you want to run that command inside container or on cluster, add `ns run_cmd --cluster=...` in the beginning.
 
 You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
 that data preparation script supports which you can see
-[here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/math_sft.yaml).
+[here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/config/math_sft.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
 a good idea to check their documentation to understand how this config is structured.
 

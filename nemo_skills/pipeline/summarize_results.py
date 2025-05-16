@@ -71,8 +71,11 @@ def summarize_results(
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
-    wandb_group: Optional[str] = typer.Option(None, help="Name of the wandb group to sync these results to"),
-    wandb_project: Optional[str] = typer.Option('nemo-skills', help="Name of the wandb project"),
+    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync results to."),
+    wandb_project: str = typer.Option(
+        'nemo-skills',
+        help="Name of the wandb project to sync results to.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)

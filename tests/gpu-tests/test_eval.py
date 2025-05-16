@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
 import os
 import subprocess
 import sys
@@ -81,6 +80,7 @@ def test_trtllm_code_execution_eval():
         f"    --benchmarks gsm8k:0 "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
+        f"    --with_sandbox "
         f"    ++prompt_template={prompt_template} "
         f"    ++examples_type=gsm8k_text_with_code "
         f"    ++split=test "

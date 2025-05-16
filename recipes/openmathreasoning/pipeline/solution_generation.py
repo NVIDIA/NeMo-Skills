@@ -225,6 +225,124 @@ def filter_fragments(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
+def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    output_dir = stage_config["output_dir"]
+    input_dir = stage_config.get("input_dir")
+
+    if input_dir:
+        for random_seed in range(stage_config.get("num_soln_random_seeds", 32)):
+            input_file = f"{input_dir}/output-rs{random_seed}.jsonl"
+            cur_output_dir = f"{output_dir}/output-rs{random_seed}"
+
+            generate(
+                ctx=wrap_arguments(
+                    f"++input_file={input_file} "
+                    f"{stage_config.get('inline_args', '')} "
+                ),
+                cluster=cluster,
+                output_dir=cur_output_dir,
+                expname=expname,
+                run_after=run_after,
+                **stage_config.get('stage_kwargs', {}),
+            )
+    else:
+        input_file = stage_config["input_file"]
+        generate(
+            ctx=wrap_arguments(
+                f"++input_file={input_file} "
+                f"{stage_config.get('inline_args', '')} "
+            ),
+            cluster=cluster,
+            output_dir=output_dir,
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+        
+
+
+def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    """Judge new summaries. Required to make sure the summaries are consistent with original solutions."""
+    input_dir = stage_config["input_dir"]
+    output_dir = stage_config["output_dir"]
+
+    if stage_config.get("num_soln_random_seeds"):
+        num_random_seeds = stage_config.get("num_soln_random_seeds")
+        for random_seed in range(num_random_seeds):
+            cur_input_dir = f"{input_dir}/output-rs{random_seed}"
+            cur_output_dir = f"{output_dir}/output-rs{random_seed}"
+            generate(
+                ctx=wrap_arguments(
+                    f"++input_dir={cur_input_dir} "
+                    f"{stage_config.get('inline_args', '')} "
+                ),
+                cluster=cluster,
+                generation_type="math_judge",
+                output_dir=cur_output_dir,
+                expname=expname,
+                run_after=run_after,
+                **stage_config.get('stage_kwargs', {}),
+            )
+    else:
+        generate(
+            ctx=wrap_arguments(
+                f"++input_dir={input_dir} "
+                f"{stage_config.get('inline_args', '')} "
+            ),
+            cluster=cluster,
+            generation_type="math_judge",
+            output_dir=output_dir,
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+
+
+def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
+    summary_dir = stage_config["summary_dir"]
+    output_dir = stage_config["output_dir"]
+    reasoning_dir = stage_config.get("reasoning_dir")
+
+    if reasoning_dir:
+        for random_seed in range(stage_config.get("num_soln_random_seeds", 32)):
+            cur_reasoning_file = f"{reasoning_dir}/output-rs{random_seed}.jsonl"
+            cur_summary_dir = f"{summary_dir}/output-rs{random_seed}"
+            cur_output_file = f"{output_dir}/output-rs{random_seed}.jsonl"
+
+            cmd = (
+                f"python /nemo_run/code/recipes/openmathreasoning/scripts/merge_new_summary.py "
+                f"  --reasoning_file {cur_reasoning_file} "
+                f"  --summary_dir {cur_summary_dir} "
+                f"  --output_file {cur_output_file} "
+            )
+
+            run_cmd(
+                ctx=wrap_arguments(cmd),
+                cluster=cluster,
+                log_dir=f"{output_dir}/logs",
+                expname=expname,
+                run_after=run_after,
+                **stage_config.get('stage_kwargs', {}),
+            )
+    else:
+        reasoning_file = stage_config["reasoning_file"]
+        cmd = (
+            f"python /nemo_run/code/recipes/openmathreasoning/scripts/merge_new_summary.py "
+            f"  --reasoning_file {reasoning_file} "
+            f"  --summary_dir {summary_dir} "
+            f"  --output_file {output_dir}/output.jsonl "
+        )
+
+        run_cmd(
+            ctx=wrap_arguments(cmd),
+            cluster=cluster,
+            log_dir=f"{output_dir}/logs",
+            expname=expname,
+            run_after=run_after,
+            **stage_config.get('stage_kwargs', {}),
+        )
+
+
 def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
@@ -281,12 +399,16 @@ stages_map = {
     'generate_solutions': generate_solutions,
     'fill_majority_answer': fill_majority_answer,
     'judge_answers': judge_answers,
+    # TIR related steps
     'postprocess_tir_generations': postprocess_tir_generations,
     'extract_python_fragments': extract_python_fragments,
     'judge_novelty': judge_novelty,
     'judge_significance': judge_significance,
-    'filter_fragments': filter_fragments, 
-    # TODO: add summary regeneration step
+    'filter_fragments': filter_fragments,
+    # New summary related steps
+    'generate_new_summaries': generate_new_summaries,
+    'judge_new_summaries': judge_new_summaries,
+    'merge_new_summaries': merge_new_summaries,
     'prepare_for_sft': prepare_for_sft,
 }
 

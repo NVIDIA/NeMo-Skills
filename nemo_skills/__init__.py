@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '0.6.0'
+from nemo_skills.version import __version__
 
 # only used in ns setup command to initialize with defaults
 _containers = {
@@ -20,7 +20,7 @@ _containers = {
     'vllm': 'igitman/nemo-skills-vllm:0.6.0',
     'sglang': 'igitman/nemo-skills-sglang:0.6.0',
     'nemo': 'igitman/nemo-skills-nemo:0.6.0',
-    'sandbox': 'igitman/nemo-skills-sandbox:0.6.0',
+    'sandbox': 'igitman/nemo-skills-sandbox:0.6.1',
     'nemo-skills': 'igitman/nemo-skills:0.6.0',
     'verl': 'igitman/nemo-skills-verl:0.6.0',
 }

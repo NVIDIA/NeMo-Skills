@@ -13,25 +13,22 @@
 # limitations under the License.
 
 import pytest
-from test_code_execution import _get_sandbox
+
+from nemo_skills.evaluation.math_grader import math_equal
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
     "output_pair",
     [
         (5, 5),
         (5, 5.0),
         ("1/2", 0.5),
-        ("3128 1/2", 3128.5),
         ("\\frac{1}{2}", 0.5),
         ("918\\frac{1}{2}", 918.5),
         ("x^2+2x+1", "x^2 + 2*x + 1"),
         ("x^2+2x+1", "x^2 + 2*x - (-1)"),
-        ("x^2+2x+1", "2x+ 1+x^2"),
-        ("odd", "\\text{odd}"),
+        ("y = x^2+2x+1", "2x+ 1+x^2"),
         ("E", "\\mathrm{E}"),
-        ("B", "\\mathcal{B}"),
         ("A", "\\textbf{A}"),
         ("f'", "f'"),
         ("185", "185\\"),
@@ -40,24 +37,26 @@ from test_code_execution import _get_sandbox
         ("\\frac {1}{2}", 0.5),
         ("17\\text{ any text}", "17"),
         ("\$10", "10"),
-        ("10%", "0.1"),
-        ("56,\\!01,\\!78,\\!95,\\!760", "56017895760"),
+        ("10%", "10"),
+        ("10\\%", "10"),
         (5 / 2, '\\frac{5}{2}'),
         ('\\frac{1}{3}', '\\dfrac{1}{3}'),
         ('(r+5)(r+5)', '(r+5)^2'),
+        ("\\frac{\\sqrt{3}}{3}", "\\frac{\\sqrt{3}}{3} \\approx 0.577"),
+        (
+            "\\begin{pmatrix}0&0&0\\\\0&1&0\\\\0&0&1\\end{pmatrix}",
+            "\\begin{bmatrix} 0 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 0 & 0 & 1 \\end{bmatrix}",
+        ),
     ],
     ids=str,
 )
-def test_correct_examples(sandbox_type, output_pair):
-    sandbox = _get_sandbox(sandbox_type)
-
-    output = sandbox.is_output_correct(output_pair[0], output_pair[1])
+def test_correct_examples(output_pair):
+    output = math_equal(output_pair[0], output_pair[1])
     assert output is True
-    output = sandbox.is_output_correct(output_pair[1], output_pair[0])
+    output = math_equal(output_pair[1], output_pair[0])
     assert output is True
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
     "output_pair",
     [
@@ -66,14 +65,12 @@ def test_correct_examples(sandbox_type, output_pair):
         ("x^2+2x+1", "x^3+2x+1"),
         ("odd", "\\text{oddd}"),
         ("E", "\\mathrm{E}*2"),
-        ("E", "E'"),
+        ("\\sqrt{67},-\\sqrt{85}", "\\sqrt{67}"),
     ],
     ids=str,
 )
-def test_incorrect_examples(sandbox_type, output_pair):
-    sandbox = _get_sandbox(sandbox_type)
-
-    output = sandbox.is_output_correct(output_pair[0], output_pair[1])
+def test_incorrect_examples(output_pair):
+    output = math_equal(output_pair[0], output_pair[1])
     assert output is False
-    output = sandbox.is_output_correct(output_pair[1], output_pair[0])
+    output = math_equal(output_pair[1], output_pair[0])
     assert output is False

@@ -14,6 +14,7 @@
 
 
 import abc
+from collections.abc import Generator
 import json
 import logging
 import os
@@ -25,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient
+from openai import DefaultHttpxClient, Stream
 
 LOG = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ class BaseModel(abc.ABC):
         stop_phrases: list[str] | list[list[str]] | None,
         top_logprobs: int | None = None,
         timeout: int | None = None,
+        stream: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -130,6 +132,7 @@ class BaseModel(abc.ABC):
         top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
+        stream: bool = False,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -143,6 +146,7 @@ class BaseModel(abc.ABC):
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
             'timeout': timeout,
+            'stream': stream,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -188,7 +192,7 @@ class BaseModel(abc.ABC):
                 del self.gen_id_to_params[generation_id]
 
             if remove_stop_phrases:
-                if output['generation'] is not None:
+                if isinstance(output, dict) and output['generation'] is not None:
                     output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
             generations.append(output)
@@ -209,6 +213,7 @@ class BaseModel(abc.ABC):
         top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
+        stream: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -226,6 +231,7 @@ class BaseModel(abc.ABC):
             stop_phrases=stop_phrases,
             top_logprobs=top_logprobs,
             remove_stop_phrases=remove_stop_phrases,
+            stream=stream,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -237,11 +243,11 @@ class BaseModel(abc.ABC):
             ]
             generations = self.get_generations(remaining_ids)
             for gen_pos, gen_dict in zip(remaining_positions, generations):
-                if gen_dict['generation'] is not None:  # will be None until done
+                if isinstance(gen_dict, Generator) or gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
                     # trtllm always return these fields so we need to remove them if not requested
-                    if top_logprobs is None:
+                    if isinstance(gen_dict, dict) and top_logprobs is None:
                         gen_dict.pop('tokens', None)
                         gen_dict.pop('logprobs', None)
 
@@ -272,11 +278,14 @@ class TRTLLMModel(BaseModel):
         timeout: int | None = None,
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
+        stream: bool = False,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
         if top_logprobs is not None and top_logprobs > 1:
             raise NotImplementedError("This code does not support `top_logprobs` > 1.")
+        if stream:
+            raise NotImplementedError("trtllm server does not support streaming.")
         if generate_endpoint not in ["generate", "generate_async"]:
             raise ValueError(f"Invalid generate endpoint: {generate_endpoint}")
 
@@ -329,6 +338,7 @@ class TRTLLMModel(BaseModel):
         timeout: int | list[int] | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        stream: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -345,6 +355,7 @@ class TRTLLMModel(BaseModel):
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
             'timeout': timeout,
+            'stream': stream
         }
         for key, value in kwargs.items():
             is_list = False
@@ -426,6 +437,7 @@ class NemoModel(BaseModel):
         top_logprobs: int | None = None,
         timeout: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
+        stream: bool = False,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -439,6 +451,8 @@ class NemoModel(BaseModel):
             raise NotImplementedError("Nemo server does not support timeout parameter.")
         if isinstance(prompt, dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
+        if stream:
+            raise NotImplementedError("NeMo server does not support streaming.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
@@ -480,6 +494,7 @@ class NemoModel(BaseModel):
         top_logprobs: int | None = None,
         timeout: int | None = None,
         remove_stop_phrases: bool = True,
+        stream: bool = False,
     ) -> list[dict]:
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
@@ -502,6 +517,7 @@ class NemoModel(BaseModel):
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
+            "stream": stream,
         }
         self.preprocess_request(request)
         generations = self.requests_lib.put(
@@ -560,6 +576,8 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
+            # assuming it's not used and setting a dummy value
+            api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
@@ -663,17 +681,19 @@ class OpenAIModel(BaseModel):
         stop_phrases: list[str],
         timeout: int | None = None,
         top_logprobs: int | None = None,
-    ) -> str:
+        stream: bool = False,
+    ) -> dict | Stream:
         if top_k != 0:
             raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
         if min_p > 0:
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0`.")
         if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
             raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
-        
+        if stream and top_logprobs is not None:
+            raise ValueError("`top_logprobs` is not supported with stream=True")
         retry_count = 0
         retry_delay = self.initial_retry_delay
-        
+
         while True:
             try:
                 response = self.client.chat.completions.create(
@@ -688,6 +708,7 @@ class OpenAIModel(BaseModel):
                     logprobs=top_logprobs is not None,
                     top_logprobs=top_logprobs,
                     timeout=timeout,
+                    stream=stream,
                 )
                 break  # Success, exit the retry loop
             except openai.RateLimitError as e:
@@ -695,7 +716,7 @@ class OpenAIModel(BaseModel):
                 if retry_count > self.max_retries:
                     LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
                     raise
-                
+
                 # Extract retry-after header if available, otherwise use exponential backoff
                 retry_after = getattr(e, 'retry_after', None)
                 if retry_after is not None and isinstance(retry_after, (int, float)):
@@ -703,7 +724,7 @@ class OpenAIModel(BaseModel):
                 else:
                     wait_time = retry_delay
                     retry_delay *= 2  # Exponential backoff
-                
+
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
                     wait_time, retry_count, self.max_retries
@@ -732,6 +753,7 @@ class OpenAIModel(BaseModel):
                         logprobs=top_logprobs is not None,
                         top_logprobs=top_logprobs,
                         timeout=timeout,
+                        stream=stream,
                     )
                 else:
                     raise
@@ -741,6 +763,9 @@ class OpenAIModel(BaseModel):
             except Exception as e:
                 LOG.error("Unexpected error during API call: %s", str(e))
                 raise
+
+        if stream:
+            return self._stream_chunks(response)
 
         choice = response.choices[0]
         output = choice.message.content
@@ -763,6 +788,23 @@ class OpenAIModel(BaseModel):
         assert len(model_list.data) == 1, "Unexpected number of models returned by OpenAI API."
         model_name = model_list.data[0].id
         return model_name
+
+    def _stream_chunks(self, response):
+        """
+        Helper generator that yields incremental chunks.
+        """
+        prev_delta, cur_delta, stop_suffix = "", "", None
+        for chunk in response:
+            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+
+            # Handle stop phrases
+            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
+                stop_suffix = chunk.choices[0].stop_reason
+
+            if prev_delta:
+                yield {"generation": prev_delta}
+            if stop_suffix:
+                yield {'generation': stop_suffix}
 
 
 class VLLMModel(BaseModel):
@@ -824,7 +866,8 @@ class VLLMModel(BaseModel):
         top_logprobs: int | None = None,
         timeout: int | None = None,
         stop_phrases: list[str] | None = None,
-    ) -> dict:
+        stream: bool = False,
+    ) -> dict | Stream:
         if isinstance(prompt, dict):
             raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         stop_phrases = stop_phrases or []
@@ -845,6 +888,7 @@ class VLLMModel(BaseModel):
             presence_penalty=0.0,
             logprobs=top_logprobs,
             logit_bias=None,
+            stream=stream,
             n=1,
             extra_body={
                 "top_k": top_k,
@@ -854,6 +898,9 @@ class VLLMModel(BaseModel):
             },
             timeout=timeout,
         )
+
+        if stream:
+            return self._stream_chunks(response)
 
         return self.parse_openai_response(response)
 
@@ -881,6 +928,29 @@ class VLLMModel(BaseModel):
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
+
+    def _stream_chunks(self, response):
+        """
+        Helper generator that yields incremental chunks.
+        """
+        prev_delta, cur_delta, stop_suffix = "", "", None
+        is_sglang_stop_phrase = False
+        for chunk in response:
+            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+
+            # Handle stop phrases
+            ## sglang variant
+            if hasattr(chunk.choices[0], "matched_stop") and isinstance(chunk.choices[0].matched_stop, str):
+                stop_suffix = chunk.choices[0].matched_stop
+                is_sglang_stop_phrase = True
+            ## vllm variant
+            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
+                stop_suffix = chunk.choices[0].stop_reason
+
+            if prev_delta and not is_sglang_stop_phrase:
+                yield {"generation": prev_delta}
+            if stop_suffix:
+                yield {'generation': stop_suffix}
 
 
 models = {

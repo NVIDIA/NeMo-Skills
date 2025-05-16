@@ -23,6 +23,7 @@ import pytest
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 
+
 def _test_individual_generations(output: dict, server_type: str):
     """
     Tests that the output of a model generation has the expected keys, types, and lengths.
@@ -34,7 +35,10 @@ def _test_individual_generations(output: dict, server_type: str):
     assert isinstance(logprobs, list), f"{server_type}: 'logprobs' is not a list"
     assert isinstance(tokens, list), f"{server_type}: 'tokens' is not a list"
     assert len(logprobs) == len(tokens), f"{server_type}: Length of 'logprobs' and 'tokens' do not match"
-    assert len(tokens) == output["num_generated_tokens"], f"{server_type}: Length of tokens does not match num_generated_tokens"
+    assert (
+        len(tokens) == output["num_generated_tokens"]
+    ), f"{server_type}: Length of tokens does not match num_generated_tokens"
+
 
 @pytest.mark.gpu
 def test_cross_model_logprobs_consistency():
@@ -56,7 +60,7 @@ def test_cross_model_logprobs_consistency():
     for server_type, model_path in model_info:
         if not model_path:
             continue
-        
+
         output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
         cmd = (
             f"ns eval "
@@ -67,7 +71,6 @@ def test_cross_model_logprobs_consistency():
             f"--benchmarks gsm8k:1 "
             f"--server_gpus 1 "
             f"--server_nodes 1 "
-            f"--skip_greedy "
             f"++prompt_template={prompt_template} "
             f"++split=test "
             f"++batch_size=8 "
@@ -77,14 +80,14 @@ def test_cross_model_logprobs_consistency():
             f"++inference.temperature=0.7 "
         )
         subprocess.run(cmd, shell=True, check=True)
-        time.sleep(120) # Wait for the server to finish generating
+        time.sleep(120)  # Wait for the server to finish generating
         jsonl_file = Path(output_dir) / "eval-results" / "gsm8k" / "output-rs0.jsonl"
 
         with open(jsonl_file, "r") as f:
             outputs = [json.loads(line) for line in f.readlines()]
         for output in outputs:
             _test_individual_generations(output, server_type)
-        
+
         output = outputs[0]
         logprobs = output["logprobs"]
         tokens = output["tokens"]
@@ -97,9 +100,17 @@ def test_cross_model_logprobs_consistency():
     server_type = "vllm"
     other_server_type = "trtllm"
 
-    assert len(outputs_map[server_type]) == len(outputs_map[other_server_type]), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
+    assert len(outputs_map[server_type]) == len(
+        outputs_map[other_server_type]
+    ), f"Length of outputs do not match between {server_type} and {other_server_type}: {len(outputs_map[server_type])} vs {len(outputs_map[other_server_type])}"
     if model_type == "llama":
         pytest.skip("Skipping logprobs comparison for LLAMA model as they do not match between TRTLLM and VLLM")
-    for (token, logprob), (other_token, other_logprob) in zip(outputs_map[server_type], outputs_map[other_server_type]):
-        assert token.replace("Ġ", " ") == other_token.replace("Ġ", " "), f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
-        assert abs(logprob - other_logprob) < tolerance, f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"
+    for (token, logprob), (other_token, other_logprob) in zip(
+        outputs_map[server_type], outputs_map[other_server_type]
+    ):
+        assert token.replace("Ġ", " ") == other_token.replace(
+            "Ġ", " "
+        ), f"Tokens for {server_type} and {other_server_type} do not match: '{token}' vs '{other_token}'"
+        assert (
+            abs(logprob - other_logprob) < tolerance
+        ), f"Logprobs for {server_type} and {other_server_type} do not match for token '{token}': {logprob} vs {other_logprob}"

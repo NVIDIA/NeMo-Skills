@@ -1,4 +1,4 @@
-# default prompt for all code generation benchmarks (e.g. human-eval, mmlu)
+# default prompt for all python based code benchmark evaluations
 
 system: ""
 

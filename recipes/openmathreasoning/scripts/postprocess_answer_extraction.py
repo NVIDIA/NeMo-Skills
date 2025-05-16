@@ -15,7 +15,7 @@
 import argparse
 import json
 
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

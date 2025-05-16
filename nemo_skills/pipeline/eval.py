@@ -15,7 +15,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Tuple
 
 import typer
 
@@ -148,7 +148,10 @@ def eval(
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
-    skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
+    add_greedy: bool = typer.Option(
+        False,
+        help="Whether to add greedy evaluation. Only applicable if num_samples > 0, otherwise greedy is default.",
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -176,6 +179,7 @@ def eval(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -236,26 +240,33 @@ def eval(
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
-    eval_cmds = (
-        [
-            cmd
-            for benchmark in benchmarks.keys()
-            for cmd in get_greedy_cmd(
-                benchmark,
-                split,
-                output_dir,
-                extra_eval_args=extra_eval_args,
-                extra_arguments=extra_arguments,
-                extra_datasets=extra_datasets,
-                num_chunks=num_chunks,
-                chunk_ids=chunk_ids,
-            )
-        ]
-        if not skip_greedy
-        else []
-    )
+    # Check which benchmarks require sandbox
+    benchmark_requires_sandbox = {}
+    for benchmark in benchmarks.keys():
+        benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
+        requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        if requires_sandbox and not with_sandbox:
+            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
+
+    # Create evaluation commands as before
+    eval_cmds = [
+        (cmd, benchmark)
+        for benchmark, rs_num in benchmarks.items()
+        for cmd in get_greedy_cmd(
+            benchmark,
+            split,
+            output_dir,
+            extra_eval_args=extra_eval_args,
+            extra_arguments=extra_arguments,
+            extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
+        )
+        if add_greedy or rs_num == 0
+    ]
     eval_cmds += [
-        cmd
+        (cmd, benchmark)
         for benchmark, rs_num in benchmarks.items()
         for rs in range(starting_seed, starting_seed + rs_num)
         for cmd in get_sampling_cmd(
@@ -276,15 +287,27 @@ def eval(
         # TODO: should we keep num_jobs as the total max?
         num_jobs *= num_runs
 
-    # splitting eval cmds equally across num_jobs nodes
-    eval_cmds = [" && ".join(eval_cmds[i::num_jobs]) for i in range(num_jobs)]
+    # Create job batches with benchmark info
+    job_batches = []
+    for i in range(num_jobs):
+        cmds = []
+        benchmarks_in_job = set()
+        for cmd, benchmark in eval_cmds[i::num_jobs]:
+            cmds.append(cmd)
+            benchmarks_in_job.add(benchmark)
+        job_batches.append((cmds, benchmarks_in_job))
 
     with get_exp(expname, cluster_config) as exp:
-        for idx, eval_cmd in enumerate(eval_cmds):
-            LOG.info("Launching task with command %s", eval_cmd)
+        for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
+            # Check if any benchmark in this job requires sandbox
+            job_needs_sandbox = with_sandbox or any(
+                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
+            )
+
+            LOG.info("Launching task with command %s", " && ".join(cmds))
             add_task(
                 exp,
-                cmd=get_generation_command(server_address=server_address, generation_commands=eval_cmd),
+                cmd=get_generation_command(server_address=server_address, generation_commands=" && ".join(cmds)),
                 task_name=f'{expname}-{idx}',
                 log_dir=log_dir,
                 container=cluster_config["containers"]["nemo-skills"],
@@ -292,7 +315,7 @@ def eval(
                 partition=partition,
                 time_min=time_min,
                 server_config=server_config,
-                with_sandbox=True,
+                with_sandbox=job_needs_sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
