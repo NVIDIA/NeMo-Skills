@@ -44,8 +44,8 @@ def eval_mcq(cfg):
             if len(match) > 0:
                 parsed = match[-1].strip()
 
-        if parsed is None:
-            paren_pattern = r"[\(\s*]\w+[\).:*]?"
+        if parsed is not None:
+            return parsed
 
         def format_func(s):
             return (
@@ -59,6 +59,7 @@ def eval_mcq(cfg):
                 .strip()
             )
 
+        paren_pattern = r"[\(\s*]\w+[\).:*]?"
         paren_matches = [format_func(p) for p in re.findall(paren_pattern, text)]
         paren_matches = [p for p in paren_matches if p in "ABCDEFGHIJ"]
         return paren_matches[-1] if paren_matches else None
