@@ -214,6 +214,7 @@ class GenerationTask:
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
+
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
         self.use_async_loop = (
@@ -425,10 +426,21 @@ class GenerationTask:
             output.update(original_data_point)
             fout.write(json.dumps(output) + "\n")
 
+    def prefill_generation(self, data_point) -> dict | None:
+        """Prefill generation in case LLM is not required."""
+        # Override this method to customize the prefilling behavior.
+        return None
+
     def sync_loop(self, data):
         with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
             data_points_batch = []
             for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
+                prefill_output = self.prefill_generation(data_point)
+                if prefill_output is not None:
+                    # We can bypass the LLM and directly dump the prefilled output
+                    self.dump_outputs([prefill_output], [data_point], fout)
+                    continue
+
                 data_points_batch.append(data_point)
                 if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
                     if self.cfg.multi_turn_key is None:
@@ -437,21 +449,48 @@ class GenerationTask:
                         outputs = self.llm_generate_multi_turn(data_points_batch, data)
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
+            
+            # Process remaining data points. 
+            if len(data_points_batch) > 0:
+                if self.cfg.multi_turn_key is None:
+                    outputs = self.llm_generate(data_points_batch, data)
+                else:
+                    outputs = self.llm_generate_multi_turn(data_points_batch, data)
+                self.dump_outputs(outputs, data_points_batch, fout)
+
+
 
     def async_loop(self, data):
-        pbar = tqdm(total=len(data), desc="Remaining generations")
+        """Async loop to generate generations."""
 
+        # We first segregate the data into prefilled and non-prefilled data points
+        prefilled_data_points, prefilled_outputs = [], []
+        remaining_data_points = []
+
+        for idx, data_point in enumerate(data):
+            prefill_output = self.prefill_generation(data_point)
+            if prefill_output is not None:
+                prefilled_outputs.append(prefill_output)
+                prefilled_data_points.append(data_point)
+            else:
+                remaining_data_points.append(data_point)
+
+        pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
         last_submitted_idx = 0
         requests_in_progress = {}  # generation_id -> original data_point
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
-            while last_submitted_idx < len(data) or len(requests_in_progress) > 0:
+            # Dump prefilled data first
+            if len(prefilled_data_points) > 0:
+                self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
+
+            while last_submitted_idx < len(remaining_data_points) or len(requests_in_progress) > 0:
                 num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
-                if last_submitted_idx < len(data) and num_to_submit > 0:
+                if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
+                    # The full data is passed to the llm_generate function since few-shot examples can come from the entire dataset
                     generation_ids = self.llm_generate(
-                        data[last_submitted_idx : last_submitted_idx + num_to_submit], data, is_async=True
-                    )
+                        remaining_data_points[last_submitted_idx:last_submitted_idx + num_to_submit], data, is_async=True)
                     for idx, gen_id in enumerate(generation_ids):
-                        requests_in_progress[gen_id] = data[last_submitted_idx + idx]
+                        requests_in_progress[gen_id] = remaining_data_points[last_submitted_idx + idx]
 
                     last_submitted_idx += num_to_submit
 
