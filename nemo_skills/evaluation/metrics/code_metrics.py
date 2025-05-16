@@ -21,6 +21,12 @@ class CodeMetrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
+    def get_prediction_results(self, prediction):
+        return {
+            "total_correct": prediction['is_correct'],
+            "total_correct_plus": prediction['is_correct-plus'],
+        }
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 
@@ -29,31 +35,24 @@ class CodeMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         self.total += 1
-
-        if len(predictions) > 1:
-            self.agg_mode = f"pass@{len(predictions)}"
-
-            self.total_correct += any([elem['is_correct'] for elem in predictions])
-            self.total_correct_plus += any([elem['is_correct-plus'] for elem in predictions])
-        else:
-            # If single prediction, set it to greedy aggregation mode
-            self.agg_mode = "greedy"
-
-            self.total_correct += predictions[0]['is_correct']
-            self.total_correct_plus += predictions[0]['is_correct-plus']
+        self.get_pass_at_k(self.agg_mode_dict, predictions=predictions)
 
     def get_metrics(self):
-        metrics_dict = {
-            "num_entries": self.total,
-            "passing_base_tests": self.total_correct / self.total * 100.0,
-            "passing_plus_tests": self.total_correct_plus / self.total * 100.0,
-        }
+        metrics_dict = {}
+        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
+            metrics_dict[agg_mode] = {
+                "num_entries": self.total,
+                "passing_base_tests": agg_metric_dict["total_correct"] / self.total * 100.0,
+                "passing_plus_tests": agg_metric_dict["total_correct_plus"] / self.total * 100.0,
+            }
 
-        return {self.agg_mode: metrics_dict}
+        return metrics_dict
 
     def reset(self):
         self.total = 0
-        self.total_correct = 0
-        self.total_correct_plus = 0
-        # Aggregation mode is automatically set
-        self.agg_mode = "greedy"
+        self.agg_mode_dict = defaultdict(lambda: defaultdict(float))
+
+    def max_aggregations_to_print(self):
+        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
+        # pass + pass@1[k]
+        return 1 + 1
