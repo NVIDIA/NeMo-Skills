@@ -97,10 +97,8 @@ class RewardModelTask(GenerationTask):
         super().__init__(cfg)
 
     def setup_llm(self):
+        """LLM is a reward model"""
         return get_reward_model(model_type=self.cfg.reward_model_type, **self.cfg.server)
-
-    def setup_prompt(self):
-        return get_prompt(self.cfg.prompt_template)
     
     def llm_generate(self, data_points, data):
         """Rather than generating, we are scoring the data points"""
