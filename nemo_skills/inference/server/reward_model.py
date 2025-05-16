@@ -135,7 +135,6 @@ class VLLMRewardModel(BaseModel):
             # Return a trivial reward model score
             return {"reward_model_score": 0.0, "inference_error": inference_error}
 
-        print(per_token_scores)
         last_token_score = per_token_scores[-1]
         score = None
         if self.model_type == "orm":
