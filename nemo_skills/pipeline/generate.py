@@ -150,11 +150,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
-    if done_jobs_str:
-        LOG.info(
-            "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
-            done_jobs_str,
-        )
     missing_jobs_str = ", ".join(
         [
             (
@@ -166,11 +161,20 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
+
     if missing_jobs_str:
-        LOG.info(
-            "The following jobs are incomplete and will be launched: seeds %s",
-            missing_jobs_str,
-        )
+        # only printing this if there are some missing and some done
+        if done_jobs_str:
+            LOG.warning(
+                "The following jobs are incomplete and will be launched: seeds %s",
+                missing_jobs_str,
+            )
+            LOG.warning(
+                "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
+                done_jobs_str,
+            )
+    else:
+        LOG.warning("All jobs are completed. No jobs will be launched (to override set --rerun_done).")
 
     return missing_jobs
 
