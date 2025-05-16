@@ -24,7 +24,7 @@ from tqdm import tqdm
 
 from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.generate import InferenceConfig
+from nemo_skills.inference.generate import InferenceConfig, GenerationTask
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, nested_dataclass, prefill_judgement, setup_logging
@@ -97,111 +97,126 @@ cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
 
 
-@hydra.main(version_base=None, config_name='base_llm_math_judge_config', config_path='.')
-def llm_math_judge(cfg: LlmMathJudgeConfig):
+# @hydra.main(version_base=None, config_name='base_llm_math_judge_config', config_path='.')
+# def llm_math_judge(cfg: LlmMathJudgeConfig):
+#     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
+
+#     LOG.info("Config used: %s", cfg)
+#     if cfg.code_execution:
+#         sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
+#         llm = get_code_execution_model(**cfg.server, sandbox=sandbox)
+#     else:
+#         llm = get_model(**cfg.server)
+
+#     # if using code execution, we need some extra parameters for generate call
+#     if cfg.code_execution:
+#         extra_generate_params = prompt.get_code_execution_args()
+#     else:
+#         extra_generate_params = {}
+
+#     # making sure output dir exists
+#     Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
+
+#     # we currently assume the dataset is small enough to be loaded into memory
+#     data = []
+#     with open(cfg.input_file, "rt", encoding="utf-8") as fin:
+#         for line in fin:
+#             data.append(json.loads(line))
+
+#     starting_idx = 0
+#     if cfg.skip_filled:
+#         try:
+#             with open(cfg.output_file, "rt", encoding="utf-8") as fin:
+#                 starting_idx = len(fin.readlines())
+#         except FileNotFoundError:
+#             LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
+#     # additionally, skipping whatever is pre-filled, assuming offset didn't change
+#     data = data[starting_idx:]
+
+#     # need to account for anything that's prefilled
+#     if 0 <= cfg.max_samples <= starting_idx:
+#         cfg.max_samples = 0
+
+#     if starting_idx < cfg.max_samples:
+#         cfg.max_samples -= starting_idx
+
+#     if cfg.max_samples < 0 or cfg.max_samples > len(data):
+#         cfg.max_samples = len(data)
+
+#     if len(data) == 0:  # we might not have any examples if skip_filled=True
+#         return
+
+#     prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
+#     if "predicted_answer" not in data[0]:
+#         data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
+
+#     LOG.info("Prompt used: %s", prompt)
+#     LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
+
+#     data_points = []
+#     judgements = []
+#     prefilled_indices = []
+
+#     with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
+#         for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
+#             if idx >= cfg.max_samples:
+#                 break
+#             if "predicted_answer" not in data_point:
+#                 data_point["predicted_answer"] = extract_answer(data_point["generation"])
+#             if data_point["expected_answer"] is None:
+#                 raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
+#             judgement = prefill_judgement(data_point)
+#             if judgement is None:
+#                 data_points.append(data_point)
+#             else:
+#                 judgements.append({cfg.generation_key: judgement, **data_point})
+#                 prefilled_indices.append(idx)
+
+#             if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
+#                 prompts = [prompt.fill(dp) for dp in data_points]
+#                 stop_phrases = prompt.stop_phrases
+
+#                 if len(prompts) > 0:
+#                     outputs = llm.generate(
+#                         prompts=prompts,
+#                         stop_phrases=stop_phrases,
+#                         **asdict(cfg.inference),
+#                         **extra_generate_params,
+#                     )
+
+#                 prefilled_idx = 0
+#                 generated_idx = 0
+#                 for cur_idx in range(idx - len(data_points) - len(judgements) + 1, idx + 1):
+#                     if cur_idx in prefilled_indices:
+#                         fout.write(json.dumps(judgements[prefilled_idx]) + "\n")
+#                         prefilled_idx += 1
+#                     else:
+#                         output = outputs[generated_idx]
+#                         output[cfg.generation_key] = output.pop("generation")
+#                         for key in output:
+#                             data_points[generated_idx].pop(key, None)
+#                         output.update(data_points[generated_idx])
+#                         fout.write(json.dumps(output) + "\n")
+#                         generated_idx += 1
+
+#                 data_points.clear()
+#                 judgements.clear()
+#                 prefilled_indices.clear()
+
+
+class LLMMathJudgeTask(GenerationTask):
+    def __init__(self, cfg: LlmMathJudgeConfig):
+        super().__init__(cfg)
+
+
+# Update the hydra main to use the class method
+@hydra.main(version_base=None, config_name='base_llm_math_judge_config')
+def generate(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
-
     LOG.info("Config used: %s", cfg)
-    if cfg.code_execution:
-        sandbox = get_sandbox(**cfg.sandbox) if cfg.sandbox is not None else None
-        llm = get_code_execution_model(**cfg.server, sandbox=sandbox)
-    else:
-        llm = get_model(**cfg.server)
 
-    # if using code execution, we need some extra parameters for generate call
-    if cfg.code_execution:
-        extra_generate_params = prompt.get_code_execution_args()
-    else:
-        extra_generate_params = {}
-
-    # making sure output dir exists
-    Path(cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
-
-    # we currently assume the dataset is small enough to be loaded into memory
-    data = []
-    with open(cfg.input_file, "rt", encoding="utf-8") as fin:
-        for line in fin:
-            data.append(json.loads(line))
-
-    starting_idx = 0
-    if cfg.skip_filled:
-        try:
-            with open(cfg.output_file, "rt", encoding="utf-8") as fin:
-                starting_idx = len(fin.readlines())
-        except FileNotFoundError:
-            LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
-    # additionally, skipping whatever is pre-filled, assuming offset didn't change
-    data = data[starting_idx:]
-
-    # need to account for anything that's prefilled
-    if 0 <= cfg.max_samples <= starting_idx:
-        cfg.max_samples = 0
-
-    if starting_idx < cfg.max_samples:
-        cfg.max_samples -= starting_idx
-
-    if cfg.max_samples < 0 or cfg.max_samples > len(data):
-        cfg.max_samples = len(data)
-
-    if len(data) == 0:  # we might not have any examples if skip_filled=True
-        return
-
-    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
-    if "predicted_answer" not in data[0]:
-        data[0]["predicted_answer"] = extract_answer(data[0]["generation"])
-
-    LOG.info("Prompt used: %s", prompt)
-    LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data[0], prompt.fill(data[0]))
-
-    data_points = []
-    judgements = []
-    prefilled_indices = []
-
-    with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
-        for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
-            if idx >= cfg.max_samples:
-                break
-            if "predicted_answer" not in data_point:
-                data_point["predicted_answer"] = extract_answer(data_point["generation"])
-            if data_point["expected_answer"] is None:
-                raise ValueError(f"Expected answer is required for judgement, found None at line {idx}")
-            judgement = prefill_judgement(data_point)
-            if judgement is None:
-                data_points.append(data_point)
-            else:
-                judgements.append({cfg.generation_key: judgement, **data_point})
-                prefilled_indices.append(idx)
-
-            if len(data_points) == cfg.batch_size or idx == cfg.max_samples - 1:
-                prompts = [prompt.fill(dp) for dp in data_points]
-                stop_phrases = prompt.stop_phrases
-
-                if len(prompts) > 0:
-                    outputs = llm.generate(
-                        prompts=prompts,
-                        stop_phrases=stop_phrases,
-                        **asdict(cfg.inference),
-                        **extra_generate_params,
-                    )
-
-                prefilled_idx = 0
-                generated_idx = 0
-                for cur_idx in range(idx - len(data_points) - len(judgements) + 1, idx + 1):
-                    if cur_idx in prefilled_indices:
-                        fout.write(json.dumps(judgements[prefilled_idx]) + "\n")
-                        prefilled_idx += 1
-                    else:
-                        output = outputs[generated_idx]
-                        output[cfg.generation_key] = output.pop("generation")
-                        for key in output:
-                            data_points[generated_idx].pop(key, None)
-                        output.update(data_points[generated_idx])
-                        fout.write(json.dumps(output) + "\n")
-                        generated_idx += 1
-
-                data_points.clear()
-                judgements.clear()
-                prefilled_indices.clear()
+    task = LLMMathJudgeTask(cfg)
+    task.generate()
 
 
 HELP_MESSAGE = get_help_message(
@@ -216,4 +231,5 @@ if __name__ == "__main__":
         print(HELP_MESSAGE)
     else:
         setup_logging()
-        llm_math_judge()
+        generate()
+
