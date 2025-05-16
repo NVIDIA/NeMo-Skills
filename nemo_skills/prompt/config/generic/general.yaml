@@ -1,0 +1,7 @@
+system: ""
+
+user: |-
+  Solve the following problem. Make sure to conclude with "Answer: [the_answer_letter]", where the [the_answer_letter] is one of A, B, C or D.
+
+  {examples}{problem}
+
