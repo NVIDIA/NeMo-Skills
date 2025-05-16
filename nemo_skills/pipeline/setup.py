@@ -13,10 +13,7 @@
 # limitations under the License.
 
 import os
-
-# Add Docker client import
 import subprocess
-import sys
 from pathlib import Path
 
 import typer
@@ -26,12 +23,11 @@ from nemo_skills import _containers
 from nemo_skills.pipeline.app import app
 
 
-# Helper function to check if Docker is available
 def is_docker_available():
     try:
         subprocess.run(["docker", "--version"], check=True, capture_output=True)
         return True
-    except (subprocess.SubprocessError, FileNotFoundError):
+    except subprocess.SubprocessError:
         return False
 
 
@@ -42,8 +38,8 @@ def pull_docker_containers(containers):
         try:
             subprocess.run(["docker", "pull", container_image], check=True)
             typer.echo(f"Successfully pulled {container_image}")
-        except subprocess.SubprocessError:
-            typer.echo(f"Failed to pull {container_image}. Please pull it manually.")
+        except subprocess.SubprocessError as e:
+            typer.echo(f"Failed to pull {container_image}: {e}")
 
 
 @app.command()
