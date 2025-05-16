@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict
 
 from tqdm import tqdm
+import re
 
 from nemo_skills.code_execution.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import get_sandbox
@@ -35,12 +36,24 @@ LOG = logging.getLogger(__file__)
 
 
 def eval_mcq(cfg):
+    def find_last_letter(text):
+        paren_pattern = r"[\(\s*]\w+[\).:*]?"
+        format_func = lambda s: s.replace("(", "").replace(")", "").replace(".", "").replace(":", "").replace("*", "").strip()
+        paren_matches = [format_func(p) for p in re.findall(paren_pattern, text)]
+        alphabet = "ABCDEFGHIJ"
+        paren_matches = [p for p in paren_matches if p in alphabet]
+        return paren_matches[-1] if paren_matches and len(paren_matches) > 0 else None
+
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
         with open(file, 'wt', encoding='utf-8') as fout:
             for sample in tqdm(data):
-                sample['predicted_answer'] = extract_answer(sample["generation"])
+                extracted_answer = extract_answer(sample["generation"])
+                if extracted_answer is None:
+                    extracted_answer = find_last_letter(sample["generation"])
+
+                sample['predicted_answer'] = extracted_answer
                 sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
                 fout.write(json.dumps(sample) + "\n")
 
