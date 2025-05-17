@@ -86,7 +86,7 @@ class NemoRewardModel(BaseModel):
 
         scores = response.json()
 
-        outputs = [{"reward_model_score": score} for score in scores["rewards"]]
+        outputs = [{"generation": score} for score in scores["rewards"]]
         return outputs
 
 
@@ -133,7 +133,7 @@ class VLLMRewardModel(BaseModel):
 
         if per_token_scores is None:
             # Return a trivial reward model score
-            return {"reward_model_score": 0.0, "inference_error": inference_error}
+            return {"generation": 0.0, "inference_error": inference_error}
 
         last_token_score = per_token_scores[-1]
         score = None
@@ -149,7 +149,7 @@ class VLLMRewardModel(BaseModel):
             # Last token's score, a 2-entry array where the second entry is the probability of being correct
             score = last_token_score[1]
 
-        return {"reward_model_score": score}
+        return {"generation": score}
 
     def score(self, prompts: list[str]) -> list[float]:
         outputs = [None] * len(prompts)  # Pre-allocate a list to store results in correct order
@@ -169,7 +169,7 @@ class VLLMRewardModel(BaseModel):
                     error_code = error_details.get("code", "No code found")
                     if error_code == 400 and 'maximum context length' in error_message:
                         outputs[idx] = {
-                            "reward_model_score": 0
+                            "generation": 0
                         }  # Default value set as 0 if we have request over maximum context length
                         LOG.warning("Maximum context length exceeded, setting reward score as 0")
                     else:
