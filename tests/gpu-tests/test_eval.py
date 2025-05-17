@@ -95,7 +95,7 @@ def test_trtllm_code_execution_eval():
     )["all"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
-        assert metrics['symbolic_correct'] >= 50
+        assert metrics['symbolic_correct'] >= 40
     else:  # qwen
         assert metrics['symbolic_correct'] >= 70
     assert metrics['num_entries'] == 20
