@@ -106,6 +106,17 @@ class RewardModelTask(GenerationTask):
         return outputs
     
 
+# Update the hydra main to use the class method
+@hydra.main(version_base=None, config_name='base_reward_model_config')
+def generate(cfg: RewardModelConfig):
+    cfg = RewardModelConfig(_init_nested=True, **cfg)
+    LOG.info("Config used: %s", cfg)
+    print(cfg)
+
+    task = RewardModelTask(cfg)
+    task.generate()
+
+
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
     server_params=server_params(),
