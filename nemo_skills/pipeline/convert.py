@@ -278,6 +278,8 @@ def convert(
         ("hf", "nemo"): get_hf_to_nemo_cmd,
         ("hf", "trtllm"): partial(
             get_hf_to_trtllm_cmd,
+            calib_dataset=calib_dataset,
+            calib_size=calib_size,
             trt_prepare_args=trt_prepare_args,
             trt_reuse_tmp_engine=trt_reuse_tmp_engine,
         ),
@@ -295,8 +297,6 @@ def convert(
         dtype=dtype,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
-        calib_dataset=calib_dataset,
-        calib_size=calib_size,
         extra_arguments=extra_arguments,
     )
     with get_exp(expname, cluster_config) as exp:
