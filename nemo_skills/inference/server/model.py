@@ -496,6 +496,7 @@ class NemoModel(BaseModel):
         remove_stop_phrases: bool = True,
         stream: bool = False,
     ) -> list[dict]:
+        # we are overriding generate directly, since nemo doesn't support inflight batching
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
         if top_logprobs is not None:
@@ -503,7 +504,6 @@ class NemoModel(BaseModel):
         if timeout is not None:
             raise NotImplementedError("Nemo server does not support timeout parameter.")
 
-        # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
@@ -1015,7 +1015,7 @@ class MegatronModel(BaseModel):
         stream: bool = False,
     ) -> dict | Stream:
         if isinstance(prompt, dict):
-            raise NotImplementedError("Not supported for Megatron models")
+            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
         if stream is True:
             raise NotImplementedError("Megatron server does not support streaming.")
         stop_phrases = stop_phrases or []
@@ -1028,28 +1028,85 @@ class MegatronModel(BaseModel):
             prompt=[prompt],
             max_tokens=tokens_to_generate,
             temperature=temperature,
-            # top_p=top_p,
-            # seed=random_seed,
-            # stop=stop_phrases,
-            # echo=False,
-            # frequency_penalty=0.0,
-            # presence_penalty=0.0,
-            # logprobs=top_logprobs,
-            # logit_bias=None,
-            # stream=stream,
-            # n=1,
-            # extra_body={
-            #     "top_k": top_k,
-            #     "min_p": min_p,
-            #     "repetition_penalty": repetition_penalty,
-            #     "spaces_between_special_tokens": False,
-            # },
-            # timeout=timeout,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=top_logprobs,
+            logit_bias=None,
+            stream=stream,
+            n=1,
+            extra_body={
+                "top_k": top_k,
+                "min_p": min_p,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            },
+            timeout=timeout,
         )
 
-        if stream:
-            return self._stream_chunks(response)
+        return self.parse_openai_response(response)
 
+    def generate(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
+        remove_stop_phrases: bool = True,
+        stream: bool = False,
+    ) -> dict | Stream:
+        # overriding generate to provide batched support as there is on inflight-batching
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
+        if stream is True:
+            raise NotImplementedError("Megatron server does not support streaming.")
+        stop_phrases = stop_phrases or []
+
+        # TODO: reuse from preprocess_request ideally
+        if temperature == 0:
+            temperature = 1.0
+            top_k = 1
+            top_p = 1.0
+
+        if top_k == 0:
+            top_k = -1
+
+        response = self.oai_client.completions.create(
+            model="model",
+            prompt=prompts,
+            max_tokens=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=top_logprobs,
+            logit_bias=None,
+            stream=stream,
+            n=1,
+            extra_body={
+                "top_k": top_k,
+                "min_p": min_p,
+                "repetition_penalty": repetition_penalty,
+                "spaces_between_special_tokens": False,
+            },
+            timeout=timeout,
+        )
+        print(response)
+        1 / 0
+        outputs = []
         return self.parse_openai_response(response)
 
     @classmethod
@@ -1065,7 +1122,7 @@ class MegatronModel(BaseModel):
             # sglang has a little different api here
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        result = {'generation': output, 'num_generated_tokens': -1}  # response.usage.completion_tokens}
         if choice.logprobs:
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
@@ -1076,9 +1133,9 @@ class MegatronModel(BaseModel):
 models = {
     'trtllm': TRTLLMModel,
     'nemo': NemoModel,
+    'megatron': MegatronModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
-    'megatron': MegatronModel,
     'sglang': VLLMModel,  # interface is the same
 }
 
