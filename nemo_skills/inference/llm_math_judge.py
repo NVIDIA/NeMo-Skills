@@ -104,7 +104,6 @@ class LLMMathJudgeTask(GenerationTask):
 def generate(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
-    print(cfg)
 
     task = LLMMathJudgeTask(cfg)
     task.generate()
