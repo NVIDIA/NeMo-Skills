@@ -1083,7 +1083,7 @@ class MegatronModel(BaseModel):
 
         if top_logprobs is None:
             top_logprobs = 0
-        print(prompts)
+
         response = self.oai_client.completions.create(
             model="model",
             prompt=prompts,
@@ -1101,7 +1101,7 @@ class MegatronModel(BaseModel):
             n=1,
             timeout=timeout,
         )
-        print(response)
+
         outputs = self.parse_openai_response(response, batch=True)
 
         if remove_stop_phrases:
