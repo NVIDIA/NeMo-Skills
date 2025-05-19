@@ -21,7 +21,7 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import sandbox_params
-from nemo_skills.inference.generate import InferenceConfig
+from nemo_skills.inference.generate import InferenceConfig, GenerateSolutionsConfig, GenerationTask
 from nemo_skills.inference.server.code_execution_model import get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
@@ -30,139 +30,126 @@ LOG = logging.getLogger(__file__)
 
 
 @nested_dataclass(kw_only=True)
-class CheckContaminationConfig:
+class CheckContaminationConfig(GenerateSolutionsConfig):
     """Top-level parameters for the script"""
 
     input_file: str  # an output of the retrieve_similar.py script
     output_file: str  # where to save the generations
+
+    # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
+    inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Prompt configuration - path to yaml files
-    prompt_template: str | None = None  # not required for OpenAI server
-    prompt_config: str = "judge/check-contamination"
-    examples_type: str | None = None  # to be able to customize few-shot examples
-    inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Sandbox configuration {sandbox_params}
+    sandbox: dict = field(default_factory=dict)
 
-    batch_size: int = 128
+    # Override the default Generation config here
+    # Async generation requires non-trivial work to support. We will not support it for now.
+    # Since contamination is a fast operation, we can afford to do it synchronously
+    use_async_loop: bool = False
+    code_execution: bool = False
+    prompt_config: str = "judge/check-contamination"    
     generation_key: str = "contaminated"
+
+    # Contamination-specific parameters
     retrieve_key: str = "problem"  # will be used to fill in prompt with retrieve_key1 and retrieve_key2
-
-    skip_filled: bool = False  # skip already filled generations
-
     # ask both with retrieve_key1 / retrieve_key2 and retrieve_key2 / retrieve_key1 and fill True if any is True
     check_both_ways: bool = False
+    # Number of similar items to check. If not provided, will use the number of similar items in the first data point.
+    top_k: int | None = None 
 
-    # can add this flag to just print the first prompt instead of running generation
-    # useful to double check that your data can be loaded and prompt has what you expect
-    dry_run: bool = False
 
     def __post_init__(self):
-        if self.server.server_type != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
+        self._post_init_validate_server()
 
-        if self.server.server_type == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
-
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values"""
+        if self.use_async_loop:
+            raise ValueError("Async generation is not supported for checking contamination")
+        if self.code_execution:
+            raise ValueError("Code execution is not supported for checking contamination")
+        
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_check_contamination_config", node=CheckContaminationConfig)
 
 
-# TODO: try to unify common parts in 3 similar generation scripts
-@hydra.main(version_base=None, config_name='base_check_contamination_config', config_path='.')
+class CheckContaminationTask(GenerationTask):
+    def __init__(self, cfg: CheckContaminationConfig):
+        super().__init__(cfg)
+
+    def load_data(self):
+        # Load the data as done in the base class
+        data = super().load_data()
+
+        # Adjust the batch size to account for the number of similar items
+        if self.cfg.top_k is None:
+            self.cfg.top_k = len(data[0]['similar_items'])
+        self.cfg.batch_size = max(1, self.cfg.batch_size // self.cfg.top_k // (2 if self.cfg.check_both_ways else 1))
+
+        return data
+    
+
+    def sync_loop(self, data):
+        """Override the sync loop to check contamination."""
+        num_contaminated, total = 0, 0
+        with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
+            data_points_batch = []
+            for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
+                data_points_batch.append(data_point)
+                if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
+                    query_data = []
+                    for original_data_point in data_points_batch:
+                        for similar_item in original_data_point['similar_items']:
+                            query_data.append(
+                                {
+                                    f'{self.cfg.retrieve_key}1': original_data_point[self.cfg.retrieve_key],
+                                    f'{self.cfg.retrieve_key}2': similar_item,
+                                }
+                            )
+
+                            if self.cfg.check_both_ways:
+                                query_data.append(
+                                    {
+                                        f'{self.cfg.retrieve_key}2': original_data_point[self.cfg.retrieve_key],
+                                        f'{self.cfg.retrieve_key}1': similar_item,
+                                    }
+                                )
+                    
+                    outputs = self.llm_generate(query_data, data)
+                    output_idx = 0
+                    for original_data_point in data_points_batch:
+                        all_generations = []
+                        elem = {}
+                        contaminated = False
+                        for output in outputs[output_idx : output_idx + self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)]:
+                            all_generations.append(output['generation'])
+                            if output['generation'].strip() == "True":
+                                contaminated = True
+                            output_idx += 1
+                        elem[self.cfg.generation_key] = contaminated
+                        if contaminated:
+                            num_contaminated += 1
+                        total += 1
+                        elem["all_generations"] = all_generations
+                        for key in elem:
+                            original_data_point.pop(key, None)
+                        elem.update(original_data_point)
+                        fout.write(json.dumps(elem) + '\n')
+
+
+        if total > 0:
+            LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)
+
+
+# Update the hydra main to use the class method
+@hydra.main(version_base=None, config_name='base_generation_config')
 def check_contamination(cfg: CheckContaminationConfig):
     cfg = CheckContaminationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    llm = get_model(**cfg.server)
-    prompt = get_prompt(cfg.prompt_config, cfg.prompt_template, examples_type=cfg.examples_type)
-    LOG.info("Prompt used: %s", prompt)
-
-    # assuming everything fits in memory for simplicity
-    with open(cfg.input_file, 'rt', encoding='utf-8') as fin:
-        data = [json.loads(line) for line in fin]
-
-    first_element = {
-        f'{cfg.retrieve_key}1': data[0][cfg.retrieve_key],
-        f'{cfg.retrieve_key}2': data[0]['similar_items'][0],
-    }
-    LOG.info(
-        "Example prompt:\nData dictionary: %s\nPrompt: %s",
-        first_element,
-        prompt.fill(first_element),
-    )
-
-    if cfg.dry_run:
-        return
-
-    data_points = []
-
-    # we need to make top_k (* 2 if cfg.check_both_ways) generations for each data point
-    # correcting to not exceed the requesting batch size
-    top_k = len(data[0]['similar_items'])
-    cfg.batch_size = max(1, cfg.batch_size // top_k // (2 if cfg.check_both_ways else 1))
-
-    starting_idx = 0
-    if cfg.skip_filled:
-        try:
-            with open(cfg.output_file, "rt", encoding="utf-8") as fin:
-                starting_idx = len(fin.readlines())
-        except FileNotFoundError:
-            LOG.warning(f"File `{cfg.output_file}` not found, starting from scratch")
-    data = data[starting_idx:]
-    total = 0
-    num_contaminated = 0
-
-    with open(cfg.output_file, "at" if cfg.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
-        for idx, data_point in enumerate(tqdm(data, initial=starting_idx, total=len(data) + starting_idx)):
-            data_points.append(data_point)
-
-            if len(data_points) == cfg.batch_size or idx == len(data) - 1:
-                # constructing the data for llm calls
-                all_data = []
-                for original_data_point in data_points:
-                    for similar_item in original_data_point['similar_items']:
-                        all_data.append(
-                            {
-                                f'{cfg.retrieve_key}1': original_data_point[cfg.retrieve_key],
-                                f'{cfg.retrieve_key}2': similar_item,
-                            }
-                        )
-
-                        if cfg.check_both_ways:
-                            all_data.append(
-                                {
-                                    f'{cfg.retrieve_key}2': original_data_point[cfg.retrieve_key],
-                                    f'{cfg.retrieve_key}1': similar_item,
-                                }
-                            )
-
-                prompts = [prompt.fill(dp) for dp in all_data]
-                stop_phrases = prompt.stop_phrases
-
-                outputs = llm.generate(prompts=prompts, stop_phrases=stop_phrases, **asdict(cfg.inference))
-                output_idx = 0
-                for original_data_point in data_points:
-                    all_generations = []
-                    elem = {}
-                    contaminated = False
-                    for output in outputs[output_idx : output_idx + top_k * (2 if cfg.check_both_ways else 1)]:
-                        all_generations.append(output['generation'])
-                        if output['generation'].strip() == "True":
-                            contaminated = True
-                        output_idx += 1
-                    elem[cfg.generation_key] = contaminated
-                    if contaminated:
-                        num_contaminated += 1
-                    total += 1
-                    elem["all_generations"] = all_generations
-                    for key in elem:
-                        original_data_point.pop(key, None)
-                    elem.update(original_data_point)
-                    fout.write(json.dumps(elem) + '\n')
-                data_points = []
-    if total > 0:
-        LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)
+    task = GenerationTask(cfg)
+    task.generate()
 
 
 HELP_MESSAGE = get_help_message(

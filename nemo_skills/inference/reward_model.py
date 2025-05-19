@@ -57,6 +57,8 @@ class RewardModelConfig(GenerateSolutionsConfig):
     # Async loop is currently not supported for reward model
     # Currently reward models are quite fast, so we don't need to use async loop
     use_async_loop: bool = False
+    # Code execution is not supported for reward model
+    code_execution: bool = False
 
     # Generation is used to construct the prompt for the reward model
     prefix_generation_to_response: bool = True
@@ -79,14 +81,19 @@ class RewardModelConfig(GenerateSolutionsConfig):
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
-        if self.server["server_type"] != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
+        # Validate the server parameters - inherited from the generate config
+        self._post_init_validate_server()
 
-        if self.server["server_type"] == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
-
+        # Validate that certain parameters should only have certain values
+        self._post_init_validate_params()
+        
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values"""
         if self.use_async_loop:
             raise ValueError("Async generation is not supported for reward model")
+        if self.code_execution:
+            raise ValueError("Code execution is not supported for reward model")
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_reward_model_config", node=RewardModelConfig)

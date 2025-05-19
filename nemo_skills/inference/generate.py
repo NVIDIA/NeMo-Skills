@@ -154,6 +154,10 @@ class GenerateSolutionsConfig:
 
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
+        
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values""" 
+        pass
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
