@@ -439,9 +439,9 @@ class GenerationTask:
                 if prefill_output is not None:
                     # We can bypass the LLM and directly dump the prefilled output
                     self.dump_outputs([prefill_output], [data_point], fout)
-                    continue
-
-                data_points_batch.append(data_point)
+                else:
+                    data_points_batch.append(data_point)
+                
                 if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
                     if self.cfg.multi_turn_key is None:
                         outputs = self.llm_generate(data_points_batch, data)
@@ -450,15 +450,6 @@ class GenerationTask:
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
             
-            # Process remaining data points. 
-            if len(data_points_batch) > 0:
-                if self.cfg.multi_turn_key is None:
-                    outputs = self.llm_generate(data_points_batch, data)
-                else:
-                    outputs = self.llm_generate_multi_turn(data_points_batch, data)
-                self.dump_outputs(outputs, data_points_batch, fout)
-
-
 
     def async_loop(self, data):
         """Async loop to generate generations."""
