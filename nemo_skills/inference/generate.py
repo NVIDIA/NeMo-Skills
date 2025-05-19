@@ -146,9 +146,10 @@ class GenerateSolutionsConfig:
             # TODO: fix that
             raise ValueError("Prompt template is required for trtllm servers")
 
-        if self.server["server_type"] == "nemo" and self.prompt_template is None:
+        if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
             LOG.warning(
-                "NeMo implementation of openai chat completions api doesn't support batching and thus is very slow. "
+                "NeMo/Megatron implementation of openai chat completions api "
+                "doesn't support batching and thus is very slow. "
                 "Until this is fixed, we highly recommend that you provide prompt template explicitly."
             )
 

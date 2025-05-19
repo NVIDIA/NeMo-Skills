@@ -14,13 +14,13 @@
 
 
 import abc
-from collections.abc import Generator
 import json
 import logging
 import os
 import re
 import time
 import uuid
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -355,7 +355,7 @@ class TRTLLMModel(BaseModel):
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
             'timeout': timeout,
-            'stream': stream
+            'stream': stream,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -727,7 +727,9 @@ class OpenAIModel(BaseModel):
 
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
-                    wait_time, retry_count, self.max_retries
+                    wait_time,
+                    retry_count,
+                    self.max_retries,
                 )
                 time.sleep(wait_time)
             except openai.BadRequestError as e:
@@ -958,6 +960,7 @@ models = {
     'nemo': NemoModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
+    'megatron': VLLMModel,
     'sglang': VLLMModel,  # interface is the same
 }
 

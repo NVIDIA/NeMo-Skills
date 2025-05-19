@@ -18,4 +18,4 @@ RUN pip install transformers accelerate
 RUN rm /etc/pip/constraint.txt && touch /etc/pip/constraint.txt
 RUN pip install -U "nvidia-modelopt[all]>=0.27"
 
-ENV PYTHON_PATH=/opt/Megatron-LM
+ENV PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM

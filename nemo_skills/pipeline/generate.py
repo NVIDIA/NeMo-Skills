@@ -48,6 +48,7 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 def get_chunked_rs_filename(

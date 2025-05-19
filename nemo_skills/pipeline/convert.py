@@ -153,6 +153,8 @@ def get_hf_to_megatron_cmd(
     # megatron-lm uses hacky import logic, so would need to copy a lot of files to move conversion on our side
     # for now just assuming it's available in /opt/Megatron-LM in whatever container is used
     cmd = (
+        f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
+        f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
         f"cd /opt/Megatron-LM && "
         f"python tools/checkpoint/convert.py "
         f"    --model-type GPT "

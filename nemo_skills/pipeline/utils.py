@@ -607,6 +607,27 @@ def get_server_command(
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if cluster_config["executor"] != "slurm":
             num_tasks = 1
+    elif server_type == 'megatron':
+        if cluster_config["executor"] != "slurm":
+            num_tasks = 1
+            prefix = f"torchrun --nproc_per_node {num_gpus}"
+        else:
+            prefix = "python "
+        # similar to conversion, we don't hold scripts for megatron on our side
+        # and expect it to be in /opt/Megatron-LM in the container
+        server_start_cmd = (
+            f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
+            f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+            f"cd /opt/Megatron-LM && "
+            f"{prefix} tools/run_text_generation_server.py "
+            f"    --load {model_path} "
+            f"    --tensor-model-parallel-size {num_gpus} "
+            f"    --pipeline-model-parallel-size {num_nodes} "
+            f"    --use-checkpoint-args "
+            f"    --max-tokens-to-oom 12000000 "
+            f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
+            f"    {server_args} "
+        )
     elif server_type == 'vllm':
         start_vllm_cmd = (
             f"python3 -m nemo_skills.inference.server.serve_vllm "
