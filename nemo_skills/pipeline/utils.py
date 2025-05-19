@@ -1522,12 +1522,13 @@ def add_task(
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
-            run.Script(inline=commands[0], metadata={"use_cluster_with_ray": with_ray}),
+            run.Script(inline=commands[0], metadata={"use_with_ray_cluster": with_ray}),
             executor=executors[0],
             name="nemo-run",
             dependencies=task_dependencies,
         )
     else:
+<<<<<<< HEAD
         if heterogeneous:
             executors[0].het_group_indices = het_group_indices
         return exp.add(
@@ -1536,6 +1537,29 @@ def add_task(
             name="nemo-run",
             dependencies=task_dependencies,
         )
+=======
+        try:
+            if heterogeneous:
+                executors[0].het_group_indices = het_group_indices
+            return exp.add(
+                [run.Script(inline=command, metadata={"use_with_ray_cluster": with_ray})
+                for command in commands],
+                executor=executors,
+                name="nemo-run",
+                dependencies=task_dependencies,
+            )
+        except AssertionError as e:
+            # AssertionError: Unsupported executor type.
+            if "Unsupported executor type" in str(e):
+                raise ValueError(
+                    "Running this command without --cluster parameter is not supported "
+                    "(even for running locally you need to pick a 'local' cluster). "
+                    "Please specify --cluster. You can run `ns setup` to define your "
+                    "cluster config if you don't have it yet."
+                ) from e
+            else:
+                raise e
+>>>>>>> WIP fix ray key
 
 
 def run_exp(exp, cluster_config, sequential=None):
