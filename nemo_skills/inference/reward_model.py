@@ -111,7 +111,6 @@ class RewardModelTask(GenerationTask):
 def generate(cfg: RewardModelConfig):
     cfg = RewardModelConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
-    print(cfg)
 
     task = RewardModelTask(cfg)
     task.generate()
