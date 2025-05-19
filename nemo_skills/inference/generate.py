@@ -218,7 +218,9 @@ class GenerationTask:
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
         self.use_async_loop = (
-            self.cfg.use_async_loop and self.cfg.server["server_type"] != "nemo" and self.cfg.multi_turn_key is None
+            self.cfg.use_async_loop
+            and self.cfg.server["server_type"] not in ["nemo", "megatron"]
+            and self.cfg.multi_turn_key is None
         )
         if self.use_async_loop:
             LOG.warning(
