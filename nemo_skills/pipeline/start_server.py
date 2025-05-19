@@ -20,13 +20,14 @@ from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_c
 from nemo_skills.utils import setup_logging
 
 
-def get_gradio_chat_cmd(server_type, with_sandbox, extra_args):
-    if with_sandbox:
-        extra_args = " --with_sandbox " + extra_args
+def get_gradio_chat_cmd(executor, server_type):
+    # if cluster is local, we want to automatically launch an app
+    # otherwise, we launch configuration page that asks for server address
+    mode = 'direct' if executor == "local" else 'manual'
     cmd = (
-        "python -m nemo_skills.inference.launch_chat_interface "
+        "python -m nemo_skills.inference.chat_interface.launch "
+        f"   --mode {mode} "
         f"   --server_type {server_type} "
-        f"   {extra_args} "
     )
     return cmd
 
@@ -59,7 +60,6 @@ def start_server(
     launch_chat_interface: bool = typer.Option(
         False, help="If True, will launch a gradio app that provides chat with the model"
     ),
-    extra_chat_args: str = typer.Option("", help="Additional arguments for the chat app"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
@@ -101,7 +101,7 @@ def start_server(
                 raise ValueError(f"Currently chat interface for {server_type} is not supported.")
             add_task(
                 exp,
-                cmd=get_gradio_chat_cmd(server_type, with_sandbox, extra_chat_args),
+                cmd=get_gradio_chat_cmd(cluster_config["executor"], server_type),
                 task_name='gradio_chat',
                 container="",
                 cluster_config=get_cluster_config(), # launch app locally
