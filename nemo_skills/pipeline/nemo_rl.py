@@ -116,9 +116,9 @@ class NemoRLTask:
         )
 
         ray_job_cmd = self.get_job_cmd()
-        ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
+        # ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
 
-        cmd = f"{cmd} {ray_server_cmd} "
+        cmd = f"{cmd} {ray_job_cmd} "
         return cmd
 
 
@@ -332,6 +332,7 @@ def nemo_rl(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
+                with_ray=True,
             )
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
