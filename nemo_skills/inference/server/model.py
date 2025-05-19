@@ -1081,6 +1081,9 @@ class MegatronModel(BaseModel):
         if top_k == 0:
             top_k = -1
 
+        if top_logprobs is None:
+            top_logprobs = 0
+
         response = self.oai_client.completions.create(
             model="model",
             prompt=prompts,
@@ -1107,6 +1110,11 @@ class MegatronModel(BaseModel):
         print(response)
         1 / 0
         outputs = []
+
+        if remove_stop_phrases:
+            for output in outputs:
+                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
         return self.parse_openai_response(response)
 
     @classmethod
