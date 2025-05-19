@@ -1333,6 +1333,7 @@ def add_task(
     extra_package_dirs: list[str] | None = None,
     slurm_kwargs: dict | None = None,
     heterogeneous: bool = False,
+    with_ray: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -1521,7 +1522,7 @@ def add_task(
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
-            run.Script(inline=commands[0]),
+            run.Script(inline=commands[0], metadata={"use_cluster_with_ray": with_ray}),
             executor=executors[0],
             name="nemo-run",
             dependencies=task_dependencies,
