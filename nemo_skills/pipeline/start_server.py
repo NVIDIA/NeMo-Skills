@@ -25,6 +25,7 @@ class SupportedServers(str, Enum):
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 @app.command()
