@@ -31,10 +31,11 @@ Preprocessing adapted from https://github.com/EleutherAI/lm-evaluation-harness/b
 def preprocess(text):
     if text is None:
         return " "
-    text = text.strip()
-    text = text.replace(" [title]", ". ")
-    text = re.sub("\\[.*?\\]", "", text)
-    text = text.replace("  ", " ")
+    return text.strip()
+    # text = text.strip()
+    # text = text.replace(" [title]", ". ")
+    # text = re.sub("\\[.*?\\]", "", text)
+    # text = text.replace("  ", " ")
     return text
 
 
@@ -72,7 +73,7 @@ def save_data(split, random_seed):
     dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{split}")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"{split}.jsonl"
+    output_file = data_dir / f"{split}_new.jsonl"
     write_data_to_file(output_file, dataset, random_seed)
 
 
