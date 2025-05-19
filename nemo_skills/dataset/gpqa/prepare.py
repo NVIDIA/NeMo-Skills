@@ -73,7 +73,7 @@ def save_data(split, random_seed):
     dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{split}")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"{split}_new.jsonl"
+    output_file = data_dir / f"{split}_new2.jsonl"
     write_data_to_file(output_file, dataset, random_seed)
 
 
