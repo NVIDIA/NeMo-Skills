@@ -1018,10 +1018,14 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
         if stream is True:
             raise NotImplementedError("Megatron server does not support streaming.")
-        stop_phrases = stop_phrases or []
+        if min_p > 0:
+            raise NotImplementedError("Megatron server does not support min_p parameter.")
+        if repetition_penalty != 1.0:
+            raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
+        if top_k != 0:
+            raise NotImplementedError("Megatron server does not support top_k parameter.")
 
-        if top_k == 0:
-            top_k = -1
+        stop_phrases = stop_phrases or []
 
         response = self.oai_client.completions.create(
             model="model",
@@ -1038,12 +1042,6 @@ class MegatronModel(BaseModel):
             logit_bias=None,
             stream=stream,
             n=1,
-            extra_body={
-                "top_k": top_k,
-                "min_p": min_p,
-                "repetition_penalty": repetition_penalty,
-                "spaces_between_special_tokens": False,
-            },
             timeout=timeout,
         )
 
@@ -1070,20 +1068,22 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
         if stream is True:
             raise NotImplementedError("Megatron server does not support streaming.")
+        if min_p > 0:
+            raise NotImplementedError("Megatron server does not support min_p parameter.")
+        if repetition_penalty != 1.0:
+            raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
+        if top_k != 0:
+            raise NotImplementedError("Megatron server does not support top_k parameter.")
         stop_phrases = stop_phrases or []
 
         # TODO: reuse from preprocess_request ideally
         if temperature == 0:
             temperature = 1.0
-            top_k = 1
             top_p = 1.0
-
-        if top_k == 0:
-            top_k = -1
 
         if top_logprobs is None:
             top_logprobs = 0
-
+        print(prompts)
         response = self.oai_client.completions.create(
             model="model",
             prompt=prompts,
@@ -1099,43 +1099,57 @@ class MegatronModel(BaseModel):
             logit_bias=None,
             stream=stream,
             n=1,
-            extra_body={
-                "top_k": top_k,
-                "min_p": min_p,
-                "repetition_penalty": repetition_penalty,
-                "spaces_between_special_tokens": False,
-            },
             timeout=timeout,
         )
         print(response)
-        1 / 0
-        outputs = []
+        outputs = self.parse_openai_response(response, batch=True)
 
         if remove_stop_phrases:
             for output in outputs:
                 output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
-        return self.parse_openai_response(response)
+        return outputs
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
-        assert not isinstance(response, list)
-        assert len(response.choices) == 1
-        choice = response.choices[0]
-        output = choice.text
-        # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop":
-            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
-                output += choice.stop_reason
-            # sglang has a little different api here
-            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
-                output += choice.matched_stop
-        result = {'generation': output, 'num_generated_tokens': -1}  # response.usage.completion_tokens}
-        if choice.logprobs:
-            result['logprobs'] = choice.logprobs.token_logprobs
-            result['tokens'] = choice.logprobs.tokens
-            result['top_logprobs'] = choice.logprobs.top_logprobs
-        return result
+    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False) -> dict | list[dict]:
+        """Parse OpenAI response to extract the generated text and other metadata.
+
+        Args:
+            response: The response from OpenAI API
+            batch: Whether the response contains multiple generations (batch mode)
+
+        Returns:
+            A single dict with generation info or a list of dicts for batch mode
+        """
+
+        def process_choice(choice):
+            output = choice.text
+            # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+            if choice.finish_reason == "stop":
+                if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                    output += choice.stop_reason
+                # sglang has a little different api here
+                if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                    output += choice.matched_stop
+
+            # For a single response we can get completion tokens from response.usage
+            # For batch we don't have this information per choice
+            num_tokens = getattr(response, 'usage', None)
+            num_generated_tokens = num_tokens.completion_tokens if num_tokens else -1
+
+            result = {'generation': output, 'num_generated_tokens': num_generated_tokens}
+            if choice.logprobs:
+                result['logprobs'] = choice.logprobs.token_logprobs
+                result['tokens'] = choice.logprobs.tokens
+                result['top_logprobs'] = choice.logprobs.top_logprobs
+            return result
+
+        if batch:
+            return [process_choice(choice) for choice in response.choices]
+        else:
+            assert not isinstance(response, list)
+            assert len(response.choices) == 1
+            return process_choice(response.choices[0])
 
 
 models = {
