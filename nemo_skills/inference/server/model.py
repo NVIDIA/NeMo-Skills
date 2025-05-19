@@ -848,8 +848,8 @@ class VLLMModel(BaseModel):
             http_client=http_client,
         )
 
-        self.model_name_server = self.get_model_name_from_server()
-        self.model = self.model_name_server
+        # self.model_name_server = self.get_model_name_from_server()
+        # self.model = self.model_name_server
 
     def __del__(self):
         if self._tunnel:
@@ -878,7 +878,7 @@ class VLLMModel(BaseModel):
             top_k = -1
 
         response = self.oai_client.completions.create(
-            model=self.model,
+            model="model",  # self.model,
             prompt=[prompt],
             max_tokens=tokens_to_generate,
             temperature=temperature,
