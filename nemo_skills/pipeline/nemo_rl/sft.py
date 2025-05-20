@@ -64,12 +64,12 @@ class NemoRLTask:
     def format_data_args(self):
         cmd = (
             f"data.dataset_name=prompt_response_dataset "
-            f"data.train_data_path={self.prompt_data} "
-            f"data.val_data_path={self.eval_data} "
+            f"+data.train_data_path={self.prompt_data} "
+            f"+data.val_data_path={self.eval_data} "
             f"data.add_bos=false "
             f"data.add_eos=false "
-            f"data.input_key=input "
-            f"data.output_key=output "
+            f"+data.input_key=input "
+            f"+data.output_key=output "
         )
         return cmd
 
@@ -159,14 +159,6 @@ def get_training_cmd(
         task.extra_arguments = extra_arguments
 
     return task.get_cmd()
-
-
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    openai = "openai"
-    sglang = "sglang"
 
 
 @app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
