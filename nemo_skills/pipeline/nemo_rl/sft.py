@@ -173,7 +173,7 @@ def sft_nemo_rl(
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
-    prompt_data: str = typer.Option(None, help="Path to the prompt data"),
+    train_data: str = typer.Option(None, help="Path to the prompt data"),
     eval_data: str = typer.Option(None, help="Path to the eval data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
@@ -226,10 +226,14 @@ def sft_nemo_rl(
         log_dir = output_dir
 
     if num_training_jobs > 0:
-        if prompt_data is None:
+        if train_data is None:
             raise ValueError("prompt_data is required when num_training_jobs > 0")
-        if prompt_data.startswith("/"):  # could ask to download from HF
-            check_if_mounted(cluster_config, prompt_data)
+        if train_data.startswith("/"):  # could ask to download from HF
+            check_if_mounted(cluster_config, train_data)
+        if eval_data is None:
+            eval_data = train_data
+        else:
+            check_if_mounted(cluster_config, eval_data)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
@@ -237,7 +241,7 @@ def sft_nemo_rl(
         partition=partition,
         hf_model=hf_model,
         output_dir=output_dir,
-        prompt_data=prompt_data,
+        prompt_data=train_data,
         eval_data=eval_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
