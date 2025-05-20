@@ -33,8 +33,9 @@ from nemo_skills.training.data_preparation_utils.arithmetic_utils import (
     merge_solution_steps,
     solve_expression,
 )
+from nemo_skills.utils import get_logger_name
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 PREFIX_SOLN = "My solution:\n"
 PATTERN_ANS = re.compile(r"\\boxed\{([^}]*)\}")

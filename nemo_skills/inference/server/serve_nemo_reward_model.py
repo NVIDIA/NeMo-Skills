@@ -27,11 +27,13 @@ from dataclasses import dataclass
 
 import hydra
 import numpy as np
-from flask import Flask, abort, jsonify, request
+from flask import Flask, jsonify, request
 from mpi4py import MPI
 from pytriton.client import ModelClient
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @dataclass

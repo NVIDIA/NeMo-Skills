@@ -24,9 +24,9 @@ from copy import deepcopy
 import hydra
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.utils import nested_dataclass, setup_logging
+from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def read_file(file_path):

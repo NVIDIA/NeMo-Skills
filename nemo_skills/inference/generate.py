@@ -30,13 +30,9 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import chunk_data, get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import chunk_data, get_help_message, get_logger_name, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__name__)
-print("******************************************")
-print(__name__)
-print(__file__)
-print("******************************************")
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)

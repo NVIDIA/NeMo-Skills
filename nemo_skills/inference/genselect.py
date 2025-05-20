@@ -30,9 +30,9 @@ from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)

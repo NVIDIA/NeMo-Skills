@@ -28,7 +28,9 @@ import openai
 import requests
 from openai import DefaultHttpxClient, Stream
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:

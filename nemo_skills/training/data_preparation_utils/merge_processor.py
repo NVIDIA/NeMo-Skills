@@ -18,8 +18,9 @@ import hydra
 from sdp.processors.base_processor import DataEntry
 
 from nemo_skills.training.data_preparation_utils.filters import BaseFilter
+from nemo_skills.utils import get_logger_name
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class MergeProcessor(BaseFilter):

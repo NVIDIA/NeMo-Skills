@@ -29,9 +29,9 @@ from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_answer
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import nested_dataclass, unroll_files
+from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def eval_mcq(cfg):

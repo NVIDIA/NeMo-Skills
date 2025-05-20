@@ -33,9 +33,9 @@ from nemo_skills.pipeline.utils import (
     get_timeout,
     run_exp,
 )
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @dataclass

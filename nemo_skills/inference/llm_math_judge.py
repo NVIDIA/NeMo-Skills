@@ -23,9 +23,9 @@ from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
-from nemo_skills.utils import get_help_message, nested_dataclass, prefill_judgement, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, prefill_judgement, setup_logging
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: should we move slightly confusing input/output dir and rs to the pipeline wrapper?
 

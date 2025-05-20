@@ -17,13 +17,14 @@ import logging
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from enum import Enum
 
 import openai
 import requests
-from openai import BadRequestError, OpenAI
+from openai import BadRequestError
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class BaseModel(abc.ABC):
