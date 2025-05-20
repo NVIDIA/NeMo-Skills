@@ -1078,11 +1078,6 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support top_k parameter.")
         stop_phrases = stop_phrases or []
 
-        # TODO: reuse from preprocess_request ideally
-        if temperature == 0:
-            temperature = 1.0
-            top_p = 1.0
-
         if top_logprobs is None:
             top_logprobs = 0
 

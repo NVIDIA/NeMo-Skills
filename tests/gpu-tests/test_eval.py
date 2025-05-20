@@ -241,6 +241,7 @@ def test_megatron_eval():
         f"    ++prompt_template={prompt_template} "
         f"    ++split=test "
         f"    ++max_samples=20 "
+        f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
