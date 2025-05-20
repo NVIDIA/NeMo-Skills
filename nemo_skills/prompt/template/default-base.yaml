@@ -20,7 +20,7 @@ assistant_begin: ""
 assistant_end: ""
 
 # by default we separate few shot examples with 6 newlines, so using it to stop
-stop_phrases: ["\n\n\n\n\n\n", "</s>"]
+stop_phrases: ["\n\n\n\n\n\n"]
 
 # used to execute code within these tags
 code_begin: '<llm-code>\n'
