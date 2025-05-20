@@ -80,11 +80,14 @@ class AppContext:
 
         self.chat = ChatService(self.loader, self.prompts)
 
-        # Initial load of generic model to validate connectivity (skip in manual launch mode)
+        # In direct-launch mode block until the generic model is ready so the
+        # chat UI is only shown once the backend is usable.
         if self.cfg.launch_mode == "direct":
-            ok, err = self.loader.load_generic()
-            if not ok:
-                logger.warning("Generic LLM unavailable at startup: %s", err)
+            # Block until generic model is reachable.
+            self.loader.load_generic_with_retry()
+            # Try to bring up code-exec stack once; proceed even if it fails so
+            # the UI can reflect availability via the checkbox banner.
+            self.loader.load_code_and_sandbox()
 
     def ensure_code_ready(self) -> None:
         ok, err = self.loader.load_code_and_sandbox()

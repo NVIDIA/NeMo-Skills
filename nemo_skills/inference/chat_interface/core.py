@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import requests
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -141,6 +142,21 @@ class ModelLoader:
         except Exception as e:  # noqa: BLE001
             logger.exception("Unexpected error loading generic model")
             return False, str(e)
+
+    def load_generic_with_retry(self, wait: int = 30) -> Tuple[bool, str]:
+        """Keep retrying ``load_generic`` until the model server responds."""
+
+        while True:
+            ok, err = self.load_generic()
+            if ok:
+                return ok, err  # success — propagate upstream
+
+            logger.warning(
+                "Generic LLM not reachable yet (error: %s). Retrying in %d s…",
+                err,
+                wait,
+            )
+            time.sleep(wait)
 
     def load_code_and_sandbox(self) -> Tuple[bool, str]:
         """Attempt to load code-exec model and sandbox."""

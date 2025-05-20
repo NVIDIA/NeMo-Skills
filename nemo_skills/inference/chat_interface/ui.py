@@ -79,7 +79,7 @@ class ChatUI:
             self.server_status = gr.Markdown("")
 
             self.connect_btn.click(
-                self.on_connect,
+                fn=self.on_connect,
                 inputs=[self.host_tb, self.server_dd, self.ssh_server_tb, self.ssh_key_tb],
                 outputs=[
                     self.server_status,
@@ -87,6 +87,7 @@ class ChatUI:
                     self.chat_group,
                     self.code_exec_checkbox,
                 ],
+                api_name="connect",
             )
 
     def _build_chat_panel(self):
@@ -137,13 +138,30 @@ class ChatUI:
         self.ctx.loader = ModelLoader(self.ctx.cfg)
         self.ctx.chat = ChatService(self.ctx.loader, self.ctx.prompts)
 
-        ok, err_generic = self.ctx.loader.load_generic()
+        # Show a notification that we're trying to connect.
+        yield (
+            "<div style='padding-top:10px;font-size: 16px;font-weight: 500;'><span style='color:#6CA0FF'>Connecting to the model server...</span></div>",
+            gr.update(visible=True),  # keep server page visible
+            gr.update(visible=False),  # hide chat page
+            gr.update(interactive=False),
+        )
+
+        # Retry until the generic model endpoint becomes available so that
+        # the user cannot reach the chat screen prematurely.
+        ok, err_generic = self.ctx.loader.load_generic_with_retry()
         if not ok:
-            return f"<span style='color:red'>Generic model error: {err_generic}</span>"
+            yield (
+                f"<span style='color:red'>Generic model error: {err_generic}</span>",
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(interactive=False),
+            )
+            return
+
         code_ok, code_err = self.ctx.loader.load_code_and_sandbox()
         status_lines = ["Generic model ✔" if ok else f"Generic model ❌ ({err_generic})"]
         status_lines.append("Code model ✔" if code_ok else f"Code model ⚠ ({code_err})")
-        return (
+        yield (
             "<br/>".join(status_lines),
             gr.update(visible=False),  # hide server page
             gr.update(visible=True),   # show chat page
@@ -178,8 +196,6 @@ class ChatUI:
         # If user just toggled, refresh code_status.
         self.latest_code_status = self.ctx.loader.get_code_execution_status(self.code_exec_checkbox.value)
         if self.latest_code_status == CodeExecStatus.ENABLED and not self.ctx.loader.code_llm:
-            # Lazy-load code model if needed
-            self.ctx.ensure_code_ready()
             self.latest_code_status = self.ctx.loader.get_code_execution_status(True)
 
         history: List = []
