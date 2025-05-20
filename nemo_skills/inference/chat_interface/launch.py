@@ -14,25 +14,30 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
+
+import hydra
+from hydra.core.config_store import ConfigStore
+from omegaconf import OmegaConf
 
 from nemo_skills.inference.chat_interface.core import AppConfig
 from nemo_skills.inference.chat_interface.chat_service import AppContext
 from nemo_skills.inference.chat_interface.ui import ChatUI
+from nemo_skills.utils import setup_logging
 
 
-def launch():
-    parser = argparse.ArgumentParser(description="NeMo Skills Chat Interface (refactored)")
-    parser.add_argument("--mode", choices=["manual", "direct"], default="manual")
-    parser.add_argument("--host", default="localhost")
-    parser.add_argument("--server_type", default="vllm")
-    args = parser.parse_args()
+cs = ConfigStore.instance()
+cs.store(name="base_chat_interface_config", node=AppConfig)
 
-    logging.basicConfig(format="%(asctime)s | %(levelname)s | %(name)s | %(message)s", level=logging.INFO)
 
-    cfg = AppConfig(host=args.host, server_type=args.server_type, launch_mode=args.mode)
-    ctx = AppContext(cfg)
+@hydra.main(version_base=None, config_name="base_chat_interface_config")
+def launch(cfg: AppConfig):
+    setup_logging(disable_hydra_logs=True)
+    logging.info("Effective configuration:\n%s", OmegaConf.to_yaml(cfg))
+
+    cfg_obj = AppConfig(**cfg)
+
+    ctx = AppContext(cfg_obj)
     ui = ChatUI(ctx)
 
     app = ui.launch()
@@ -40,4 +45,4 @@ def launch():
 
 
 if __name__ == "__main__":
-    launch() 
+    launch()

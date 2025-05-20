@@ -58,6 +58,9 @@ class AppConfig:
     # UI behaviour
     launch_mode: str = "manual"  # or "direct"
 
+    # Model capabilities: "cot", "tir", "both" (toggleable)
+    supported_modes: str = "both"
+
 class CodeExecStatus(Enum):
     """High-level availability of the Python code-execution toolchain."""
 
@@ -218,3 +221,22 @@ class ModelLoader:
         except requests.RequestException as e:  # noqa: BLE001
             logger.warning("Sandbox health check failed: %s", e)
             return False
+
+    def supports_code_toggle(self) -> bool:
+        """Return True if the backend advertises support for both execution modes."""
+        return self._cfg.supported_modes == "both"
+
+    def load_code_and_sandbox_with_retry(self, wait: int = 30) -> Tuple[bool, str]:
+        """Keep retrying ``load_code_and_sandbox`` until the code-exec stack responds."""
+
+        while True:
+            ok, err = self.load_code_and_sandbox()
+            if ok:
+                return ok, err  # success — propagate upstream
+
+            logger.warning(
+                "Code-execution stack not reachable yet (error: %s). Retrying in %d s…",
+                err,
+                wait,
+            )
+            time.sleep(wait)

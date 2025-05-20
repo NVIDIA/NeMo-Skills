@@ -62,7 +62,19 @@ class ChatUI:
         if ctx.cfg.launch_mode == "direct":
             self.server_group.visible = False
             self.chat_group.visible = True
-            self.code_exec_checkbox.interactive = bool(ctx.loader.code_llm)
+            # Toggle is available only when the backend supports *both* modes.  For single-
+            # mode models ("cot" or "tir") we force the checkbox to the correct state and
+            # disable user interaction.
+            mode_cap = ctx.cfg.supported_modes
+            can_toggle = mode_cap == "both"
+            self.code_exec_checkbox.interactive = can_toggle
+            if not can_toggle:
+                # Force checkbox value based on capabilities.
+                self.code_exec_checkbox.value = (mode_cap == "tir")
+                note = (
+                    "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
+                )
+                self.subtitle_md.value = f"Status: {note}"
 
     # ------------------------------------------------------------------
     # UI builders
@@ -146,29 +158,69 @@ class ChatUI:
             gr.update(interactive=False),
         )
 
-        # Retry until the generic model endpoint becomes available so that
-        # the user cannot reach the chat screen prematurely.
-        ok, err_generic = self.ctx.loader.load_generic_with_retry()
-        if not ok:
-            yield (
-                f"<span style='color:red'>Generic model error: {err_generic}</span>",
-                gr.update(visible=True),
-                gr.update(visible=False),
-                gr.update(interactive=False),
-            )
-            return
+        mode_cap = self.ctx.cfg.supported_modes
 
-        code_ok, code_err = self.ctx.loader.load_code_and_sandbox()
-        status_lines = ["Generic model ✔" if ok else f"Generic model ❌ ({err_generic})"]
-        status_lines.append("Code model ✔" if code_ok else f"Code model ⚠ ({code_err})")
+        # --- Generic model --------------------------------------------------
+        if mode_cap in ("cot", "both"):
+            ok_generic, err_generic = self.ctx.loader.load_generic_with_retry()
+            if not ok_generic:
+                yield (
+                    f"<span style='color:red'>Generic model error: {err_generic}</span>",
+                    gr.update(visible=True),
+                    gr.update(visible=False),
+                    gr.update(interactive=False),
+                )
+                return
+        else:
+            ok_generic, err_generic = False, "not requested"
+
+        # --- Code model -----------------------------------------------------
+        if mode_cap == "tir":
+            code_ok, code_err = self.ctx.loader.load_code_and_sandbox_with_retry()
+        elif mode_cap == "both":
+            code_ok, code_err = self.ctx.loader.load_code_and_sandbox()
+        else:
+            code_ok, code_err = False, "not requested"
+
+        status_lines = []
+        if mode_cap in ("cot", "both"):
+            status_lines.append("Generic model ✔" if ok_generic else f"Generic model ❌ ({err_generic})")
+        if mode_cap in ("tir", "both"):
+            status_lines.append("Code model ✔" if code_ok else f"Code model ⚠ ({code_err})")
+
+        # Determine checkbox interactivity based on declared model capabilities.
+        can_toggle = mode_cap == "both"
+        forced_val = (mode_cap == "tir")
+        checkbox_update = (
+            gr.update(interactive=True)
+            if can_toggle
+            else gr.update(interactive=False, value=forced_val)
+        )
+
         yield (
             "<br/>".join(status_lines),
             gr.update(visible=False),  # hide server page
             gr.update(visible=True),   # show chat page
-            gr.update(interactive=code_ok),
+            checkbox_update,
         )
 
     def on_toggle_code_exec(self, checkbox_val: bool):
+        # Respect declared capabilities – disallow switching if model is single-mode.
+        mode_cap = self.ctx.cfg.supported_modes
+        if mode_cap != "both":
+            # Revert to the allowed state and show explanatory message.
+            allowed_val = (mode_cap == "tir")
+            msg = (
+                "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
+            )
+            self.latest_code_status = self.ctx.loader.get_code_execution_status(allowed_val)
+            return (
+                f"{msg}",
+                gr.update(value=allowed_val),
+                self._banner_from_code_status(self.latest_code_status),
+            )
+
+        # If we reach here, the toggle is allowed.
         self.latest_code_status = self.ctx.loader.get_code_execution_status(checkbox_val)
         status_txt = {
             CodeExecStatus.ENABLED: "Python interpreter ENABLED.",

@@ -80,16 +80,18 @@ class AppContext:
 
         self.chat = ChatService(self.loader, self.prompts)
 
-        # In direct-launch mode block until the generic model is ready so the
-        # chat UI is only shown once the backend is usable.
+        # In direct-launch mode we prepare whatever model(s) are needed before
+        # the UI appears so that the chat screen is immediately usable.
         if self.cfg.launch_mode == "direct":
-            # Block until generic model is reachable.
-            self.loader.load_generic_with_retry()
-            # Try to bring up code-exec stack once; proceed even if it fails so
-            # the UI can reflect availability via the checkbox banner.
-            self.loader.load_code_and_sandbox()
+            # Load only the models required by the declared capabilities.
+            if self.cfg.supported_modes in ("cot", "both"):
+                # Block until the generic model is reachable so that plain-text
+                # chatting works.
+                self.loader.load_generic_with_retry()
 
-    def ensure_code_ready(self) -> None:
-        ok, err = self.loader.load_code_and_sandbox()
-        if not ok:
-            logger.warning("Failed to ready code-exec model: %s", err)
+            if self.cfg.supported_modes == "tir":
+                # Block until code model is reachable.
+                self.loader.load_code_and_sandbox_with_retry()
+            elif self.cfg.supported_modes == "both":
+                # Attempt once; UI will surface failures.
+                self.loader.load_code_and_sandbox()

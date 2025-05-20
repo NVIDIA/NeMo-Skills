@@ -26,8 +26,8 @@ def get_gradio_chat_cmd(executor, server_type):
     mode = 'direct' if executor == "local" else 'manual'
     cmd = (
         "python -m nemo_skills.inference.chat_interface.launch "
-        f"   --mode {mode} "
-        f"   --server_type {server_type} "
+        f"launch_mode={mode} "
+        f"server_type={server_type} "
     )
     return cmd
 
