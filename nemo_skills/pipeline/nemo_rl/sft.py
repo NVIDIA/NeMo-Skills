@@ -62,7 +62,7 @@ class NemoRLTask:
 
     def format_data_args(self):
         cmd = (
-            "data.prompt_file=/opt/nemo-rl/examples/prompts/cot.txt "
+            # "data.prompt_file=/opt/nemo-rl/examples/prompts/cot.txt "
         )
         return cmd
 
