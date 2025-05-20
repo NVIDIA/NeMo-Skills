@@ -86,7 +86,7 @@ class NemoRLTask:
             f"echo 'Starting training' && "
             f"uv run --active python {self.get_script_module()} "
             f"  {self.format_train_args()} "
-            f"  {self.format_data_args()} "
+            # f"  {self.format_data_args()} "
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
