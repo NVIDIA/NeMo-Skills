@@ -3,7 +3,7 @@ FROM nvcr.io/nvidia/pytorch:25.04-py3
 # Set working directory
 WORKDIR /opt
 
-# Install verl
+# Install megatron-lm
 ENV MEGATRON_COMMIT=dfc0a3d004391a82d8d8a5a6d991b65eaed0190c
 RUN git clone https://github.com/NVIDIA/Megatron-LM && \
     cd Megatron-LM && \
@@ -18,4 +18,4 @@ RUN pip install transformers accelerate
 RUN rm /etc/pip/constraint.txt && touch /etc/pip/constraint.txt
 RUN pip install -U "nvidia-modelopt[all]>=0.27"
 
-ENV PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM
+ENV PYTHONPATH=/opt/Megatron-LM
