@@ -1539,10 +1539,12 @@ def add_task(
         )
 =======
         try:
+            if with_ray:
+                raise  ValueError("Ray cluster is not supported yet for multiple tasks")
             if heterogeneous:
                 executors[0].het_group_indices = het_group_indices
             return exp.add(
-                [run.Script(inline=command, metadata={"use_with_ray_cluster": with_ray})
+                [run.Script(inline=command)
                 for command in commands],
                 executor=executors,
                 name="nemo-run",
