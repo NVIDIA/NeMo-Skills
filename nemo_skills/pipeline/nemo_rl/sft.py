@@ -79,11 +79,12 @@ class NemoRLTask:
         return cmd
 
     def get_script_module(self):
-        return "/nemo_run/code/NeMo-Skills/nemo_skills/training/nemo_rl/start_sft_nemo_rl.py "
+        return "/nemo_run/code/nemo_skills/training/nemo_rl/start_sft_nemo_rl.py "
 
     def get_job_cmd(self):
         ray_job_cmd = (
             f"echo 'Starting training' && "
+            # f"ls /nemo_run/code && "
             f"uv run --active python {self.get_script_module()} "
             f"  {self.format_train_args()} "
             # f"  {self.format_data_args()} "
