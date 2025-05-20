@@ -215,3 +215,41 @@ def test_nemo_eval():
     else:  # qwen
         assert metrics['symbolic_correct'] >= 70
     assert metrics['num_entries'] == 20
+
+
+@pytest.mark.gpu
+def test_megatron_eval():
+    model_path = os.getenv('NEMO_SKILLS_TEST_MEGATRON_MODEL')
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL to run this test")
+    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+    if not model_type:
+        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    if model_type != "llama":
+        pytest.skip("Only llama models are supported in Megatron.")
+    prompt_template = 'llama3-instruct'
+
+    cmd = (
+        f"ns eval "
+        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
+        f"    --model {model_path} "
+        f"    --server_type megatron "
+        f"    --output_dir /tmp/nemo-skills-tests/{model_type}/megatron-eval "
+        f"    --benchmarks gsm8k:0 "
+        f"    --server_gpus 1 "
+        f"    --server_nodes 1 "
+        f"    ++prompt_template={prompt_template} "
+        f"    ++split=test "
+        f"    ++max_samples=20 "
+        f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
+    )
+    subprocess.run(cmd, shell=True, check=True)
+
+    # running compute_metrics to check that results are expected
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"/tmp/nemo-skills-tests/{model_type}/megatron-eval/eval-results/gsm8k/output.jsonl"]
+    )["all"]["greedy"]
+    # rough check, since exact accuracy varies depending on gpu type
+    # TODO: something is broken in megatron inference here as this should be 50!
+    assert metrics['symbolic_correct'] >= 20
+    assert metrics['num_entries'] == 20

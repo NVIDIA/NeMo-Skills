@@ -21,9 +21,9 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_nemo_to_hf_cmd(
@@ -95,7 +95,7 @@ def get_hf_to_trtllm_cmd(
             f"    {extra_arguments} && "
             f"cp {input_model}/tokenizer* {output_model} "
         )
-    else:    
+    else:
         hf_to_trtllm_cmd = (
             f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
             f"    --model_dir {input_model} "
@@ -133,8 +133,6 @@ def get_hf_to_trtllm_cmd(
 def get_hf_to_nemo_cmd(
     input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
 ):
-    # Check if the model_type is "nemo"
-
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
@@ -143,6 +141,33 @@ def get_hf_to_nemo_cmd(
         f"    --out-path {output_model} "
         f"    --hf-model-name {hf_model_name} "
         f"    --precision {dtype} "
+        f"    {extra_arguments} "
+    )
+
+    return cmd
+
+
+def get_hf_to_megatron_cmd(
+    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
+):
+    # megatron-lm uses hacky import logic, so would need to copy a lot of files to move conversion on our side
+    # for now just assuming it's available in /opt/Megatron-LM in whatever container is used
+    cmd = (
+        f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
+        f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+        f"cd /opt/Megatron-LM && "
+        f"python tools/checkpoint/convert.py "
+        f"    --model-type GPT "
+        f"    --loader llama_mistral "
+        f"    --model-size llama3 "
+        f"    --load-dir {input_model} "
+        f"    --saver core "
+        f"    --save-dir {output_model} "
+        f"    --checkpoint-type hf "
+        f"    --tokenizer-model {hf_model_name} "
+        f"    --bf16 "
+        f"    --target-tensor-parallel-size {num_gpus} "  # TODO: is there a way to not specify this?
+        f"    --target-pipeline-parallel-size {num_nodes} "
         f"    {extra_arguments} "
     )
 
@@ -159,6 +184,7 @@ class SupportedFormatsTo(str, Enum):
     nemo = "nemo"
     hf = "hf"
     trtllm = "trtllm"
+    megatron = "megatron"
 
 
 class SupportedFormatsFrom(str, Enum):
@@ -254,7 +280,7 @@ def convert(
             raise ValueError("--calib_dataset is required when dtype is 'fp8'")
         if convert_to != "trtllm":
             raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
-        
+
     # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
     if convert_from == "nemo" and convert_to == "trtllm":
         raise ValueError("Conversion from NeMo to TensorRT LLM is not supported directly. Convert to HF first.")
@@ -264,6 +290,15 @@ def convert(
 
     if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
         raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
+
+    if convert_to == "megatron":
+        if convert_from != "hf":
+            raise ValueError("Conversion to Megatron is only supported from HF models")
+        if model_type != "llama":
+            raise ValueError("Conversion to Megatron is only supported for Llama models")
+        if dtype != "bf16":
+            # TODO: that's probably not true, but need to figure out how it's passed
+            raise ValueError("Conversion to Megatron is only supported for bf16 models")
 
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, input_model)
@@ -275,6 +310,7 @@ def convert(
 
     conversion_cmd_map = {
         ("nemo", "hf"): get_nemo_to_hf_cmd,
+        ("hf", "megatron"): get_hf_to_megatron_cmd,
         ("hf", "nemo"): get_hf_to_nemo_cmd,
         ("hf", "trtllm"): partial(
             get_hf_to_trtllm_cmd,
@@ -286,6 +322,7 @@ def convert(
     }
     container_map = {
         ("nemo", "hf"): cluster_config["containers"]["nemo"],
+        ("hf", "megatron"): cluster_config["containers"]["megatron"],
         ("hf", "nemo"): cluster_config["containers"]["nemo"],
         ("hf", "trtllm"): cluster_config["containers"]["trtllm"],
     }
@@ -327,4 +364,3 @@ if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341
     typer.main.get_command_name = lambda name: name
     app()
-

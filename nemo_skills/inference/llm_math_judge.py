@@ -16,15 +16,16 @@ import logging
 import sys
 from dataclasses import field
 from os import path
+
 import hydra
 
-from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.code_execution.sandbox import sandbox_params
-from nemo_skills.inference.generate import InferenceConfig, GenerationTask, GenerateSolutionsConfig
+from nemo_skills.evaluation.math_grader import extract_answer
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
-from nemo_skills.utils import get_help_message, nested_dataclass, prefill_judgement, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, prefill_judgement, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: should we move slightly confusing input/output dir and rs to the pipeline wrapper?
 
@@ -61,7 +62,7 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
         if self.input_file is None and self.input_dir is not None:
             seed = f'-rs{self.random_seed}' if self.random_seed is not None else ''
             self.input_file = path.join(self.input_dir, f"output{seed}.jsonl")
-            self.output_file = path.join(self.output_dir,  f"output{seed}.jsonl")
+            self.output_file = path.join(self.output_dir, f"output{seed}.jsonl")
         elif self.input_file is not None and self.input_dir is None:
             if self.output_file is None:
                 raise ValueError("Output file should be provided if providing `input_file`")
@@ -82,7 +83,7 @@ cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
 class LLMMathJudgeTask(GenerationTask):
     def __init__(self, cfg: LlmMathJudgeConfig):
         super().__init__(cfg)
-    
+
     def preprocess_data(self, data):
         """Extract the predicted answer from the generation."""
         for data_point in data:
@@ -90,7 +91,7 @@ class LLMMathJudgeTask(GenerationTask):
                 data_point["predicted_answer"] = extract_answer(data_point["generation"])
 
         return data
-    
+
     def prefill_generation(self, data_point):
         """Prefill judgement"""
         judgement = prefill_judgement(data_point)
@@ -98,6 +99,7 @@ class LLMMathJudgeTask(GenerationTask):
             return None
         else:
             return {"generation": judgement}
+
 
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_llm_math_judge_config')
@@ -122,4 +124,3 @@ if __name__ == "__main__":
     else:
         setup_logging()
         generate()
-
