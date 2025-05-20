@@ -53,6 +53,7 @@ class NemoRLTask:
 
     def format_train_args(self):
         cmd = (
+            f"policy.model_name={self.model} "
             f"cluster.gpus_per_node={self.num_gpus} "
             f"cluster.num_nodes={self.num_nodes} "
             f"logger.log_dir={self.log_dir} "
@@ -62,7 +63,13 @@ class NemoRLTask:
 
     def format_data_args(self):
         cmd = (
-            # "data.prompt_file=/opt/nemo-rl/examples/prompts/cot.txt "
+            f"data.dataset_name=prompt_response_dataset "
+            f"data.train_data_path={self.prompt_data} "
+            f"data.val_data_path={self.eval_data} "
+            f"data.add_bos=false "
+            f"data.add_eos=false "
+            f"data.input_key=input "
+            f"data.output_key=output "
         )
         return cmd
 
@@ -84,10 +91,9 @@ class NemoRLTask:
     def get_job_cmd(self):
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            # f"ls /nemo_run/code && "
             f"uv run --active python {self.get_script_module()} "
             f"  {self.format_train_args()} "
-            # f"  {self.format_data_args()} "
+            f"  {self.format_data_args()} "
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
