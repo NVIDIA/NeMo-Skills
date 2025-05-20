@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import sys
 from dataclasses import field
 from pathlib import Path
 
 import hydra
-from tqdm import tqdm
 
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.server.reward_model import get_reward_model
 from nemo_skills.code_execution.sandbox import sandbox_params
-from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 from nemo_skills.inference.generate import InferenceConfig, GenerationTask, GenerateSolutionsConfig
 
@@ -115,7 +112,7 @@ class RewardModelTask(GenerationTask):
 
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_reward_model_config')
-def generate(cfg: RewardModelConfig):
+def score(cfg: RewardModelConfig):
     cfg = RewardModelConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
@@ -125,7 +122,7 @@ def generate(cfg: RewardModelConfig):
 
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
-    server_params=server_params(),
+    params=server_params(),
     sandbox_params=sandbox_params(),
 )
 
@@ -135,4 +132,4 @@ if __name__ == "__main__":
         print(HELP_MESSAGE)
     else:
         setup_logging()
-        generate()
+        score()

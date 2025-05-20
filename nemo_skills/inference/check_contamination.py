@@ -15,15 +15,14 @@
 import json
 import logging
 import sys
-from dataclasses import asdict, field
+from dataclasses import field
 
 import hydra
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import InferenceConfig, GenerateSolutionsConfig, GenerationTask
-from nemo_skills.inference.server.code_execution_model import get_model, server_params
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__file__)
@@ -33,8 +32,8 @@ LOG = logging.getLogger(__file__)
 class CheckContaminationConfig(GenerateSolutionsConfig):
     """Top-level parameters for the script"""
 
-    input_file: str  # an output of the retrieve_similar.py script
-    output_file: str  # where to save the generations
+    input_file: str | None = None  # an output of the retrieve_similar.py script
+    output_file: str | None = None  # where to save the generations
 
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -60,7 +59,13 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
 
 
     def __post_init__(self):
+        if self.input_file is None:
+            raise ValueError("Input file is required for checking contamination")
+        if self.output_file is None:
+            raise ValueError("Output file is required for checking contamination")
+
         self._post_init_validate_server()
+        self._post_init_validate_params()
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
@@ -89,6 +94,20 @@ class CheckContaminationTask(GenerationTask):
 
         return data
     
+    def log_example_prompt(self, data):
+        data_point = data[0]
+        query_item = data_point[self.cfg.retrieve_key]
+        similar_item = data_point['similar_items'][0]
+        first_element = {
+            f'{self.cfg.retrieve_key}1': query_item,
+            f'{self.cfg.retrieve_key}2': similar_item,
+        }
+        LOG.info(
+            "Example prompt:\nData dictionary: %s\nPrompt: %s",
+            first_element,
+            self.prompt.fill(first_element),
+        )
+        
 
     def sync_loop(self, data):
         """Override the sync loop to check contamination."""
@@ -143,12 +162,12 @@ class CheckContaminationTask(GenerationTask):
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_generation_config')
+@hydra.main(version_base=None, config_name='base_check_contamination_config')
 def check_contamination(cfg: CheckContaminationConfig):
     cfg = CheckContaminationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    task = GenerationTask(cfg)
+    task = CheckContaminationTask(cfg)
     task.generate()
 
 
