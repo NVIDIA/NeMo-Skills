@@ -13,6 +13,8 @@ pytest tests/gpu-tests/test_convert.py -k test_hf_trtllm_conversion -s -x
 export NEMO_SKILLS_TEST_TRTLLM_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-trtllm/model
 pytest tests/gpu-tests/test_convert.py -k test_hf_nemo_conversion -s -x
 export NEMO_SKILLS_TEST_NEMO_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-nemo/model
+pytest tests/gpu-tests/test_convert.py -k test_hf_megatron_conversion -s -x
+export NEMO_SKILLS_TEST_MEGATRON_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-megatron/model
 pytest tests/gpu-tests/test_convert.py -k test_nemo_hf_conversion -s -x
 # using the back-converted model to check that it's reasonable
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/nemo-to-hf/model
