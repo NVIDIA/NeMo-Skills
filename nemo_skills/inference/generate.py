@@ -33,6 +33,10 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import chunk_data, get_help_message, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__name__)
+print("******************************************")
+print(__name__)
+print(__file__)
+print("******************************************")
 
 
 @nested_dataclass(kw_only=True)
