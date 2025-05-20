@@ -34,7 +34,7 @@ from nemo_skills.training.data_preparation_utils.arithmetic_utils import (
     solve_expression,
 )
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 PREFIX_SOLN = "My solution:\n"
 PATTERN_ANS = re.compile(r"\\boxed\{([^}]*)\}")
@@ -162,11 +162,7 @@ class DropIncorrectCodeBlocks(BaseFilter):
 
 
 class AddCodeExecutionsCounts(BaseFilter):
-    def __init__(
-            self, solution_key: str = "generation",
-            ce_counter_key: str = "total_code_executions",
-            **kwargs
-        ):
+    def __init__(self, solution_key: str = "generation", ce_counter_key: str = "total_code_executions", **kwargs):
         super().__init__(**kwargs)
         self.solution_key = solution_key
         self.ce_counter_key = ce_counter_key
@@ -322,7 +318,7 @@ class TrimSolutions(BaseFilter):
     def process_dataset_entry(self, data_entry) -> List:
         # extracting full boxed answer first
         predicted_answer = extract_answer(data_entry[self.solution_key])
-        
+
         original_solution = data_entry[self.solution_key]
         if predicted_answer is not None:
             predicted_answer = "\\boxed{" + predicted_answer + "}"

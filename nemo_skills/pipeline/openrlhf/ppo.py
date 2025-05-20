@@ -35,7 +35,7 @@ from nemo_skills.pipeline.utils import (
 )
 from nemo_skills.utils import setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @dataclass

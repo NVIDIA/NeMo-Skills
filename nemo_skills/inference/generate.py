@@ -32,7 +32,7 @@ from nemo_skills.inference.server.code_execution_model import get_code_execution
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import chunk_data, get_help_message, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @nested_dataclass(kw_only=True)
@@ -155,9 +155,9 @@ class GenerateSolutionsConfig:
 
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
-        
+
     def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values""" 
+        """Validate that certain parameters are restricted to certain values"""
         pass
 
 
@@ -448,7 +448,7 @@ class GenerationTask:
                     self.dump_outputs([prefill_output], [data_point], fout)
                 else:
                     data_points_batch.append(data_point)
-                
+
                 if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
                     if self.cfg.multi_turn_key is None:
                         outputs = self.llm_generate(data_points_batch, data)
@@ -456,7 +456,6 @@ class GenerationTask:
                         outputs = self.llm_generate_multi_turn(data_points_batch, data)
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
-            
 
     def async_loop(self, data):
         """Async loop to generate generations."""
@@ -486,7 +485,10 @@ class GenerationTask:
                 if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
                     # The full data is passed to the llm_generate function since few-shot examples can come from the entire dataset
                     generation_ids = self.llm_generate(
-                        remaining_data_points[last_submitted_idx:last_submitted_idx + num_to_submit], data, is_async=True)
+                        remaining_data_points[last_submitted_idx : last_submitted_idx + num_to_submit],
+                        data,
+                        is_async=True,
+                    )
                     for idx, gen_id in enumerate(generation_ids):
                         requests_in_progress[gen_id] = remaining_data_points[last_submitted_idx + idx]
 

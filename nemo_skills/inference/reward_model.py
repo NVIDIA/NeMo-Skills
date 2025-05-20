@@ -19,14 +19,13 @@ from pathlib import Path
 
 import hydra
 
+from nemo_skills.code_execution.sandbox import sandbox_params
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.server.reward_model import get_reward_model
-from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
-from nemo_skills.inference.generate import InferenceConfig, GenerationTask, GenerateSolutionsConfig
 
-
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @nested_dataclass(kw_only=True)
@@ -83,7 +82,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
 
         # Validate that certain parameters should only have certain values
         self._post_init_validate_params()
-        
+
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
         if self.use_async_loop:
@@ -103,12 +102,12 @@ class RewardModelTask(GenerationTask):
     def setup_llm(self):
         """LLM is a reward model"""
         return get_reward_model(model_type=self.cfg.reward_model_type, **self.cfg.server)
-    
+
     def llm_generate(self, data_points, data):
         """Rather than generating, we are scoring the data points"""
         outputs = self.llm.score(prompts=[self.prompt.fill(dp, data) for dp in data_points])
         return outputs
-    
+
 
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_reward_model_config')

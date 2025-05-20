@@ -19,7 +19,7 @@ from sdp.processors.base_processor import DataEntry
 
 from nemo_skills.training.data_preparation_utils.filters import BaseFilter
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 class MergeProcessor(BaseFilter):

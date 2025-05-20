@@ -38,7 +38,7 @@ from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 # TODO: this file is way too big - we need to split it into pieces

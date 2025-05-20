@@ -22,7 +22,7 @@ from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
 from nemo_skills.utils import setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 def get_cmd(extra_arguments):

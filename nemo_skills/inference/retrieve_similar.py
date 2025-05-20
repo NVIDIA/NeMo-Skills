@@ -27,7 +27,7 @@ from sentence_transformers import SentenceTransformer, util
 
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 def top_k_similarity(from_emb, to_emb, top_k, chunk_size):

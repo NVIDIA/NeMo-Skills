@@ -33,7 +33,7 @@ from nemo_skills.pipeline.utils import (
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 def get_greedy_cmd(

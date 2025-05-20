@@ -21,11 +21,11 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import sandbox_params
-from nemo_skills.inference.generate import InferenceConfig, GenerateSolutionsConfig, GenerationTask
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @nested_dataclass(kw_only=True)
@@ -47,7 +47,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
     # Since contamination is a fast operation, we can afford to do it synchronously
     use_async_loop: bool = False
     code_execution: bool = False
-    prompt_config: str = "judge/check-contamination"    
+    prompt_config: str = "judge/check-contamination"
     generation_key: str = "contaminated"
 
     # Contamination-specific parameters
@@ -55,8 +55,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
     # ask both with retrieve_key1 / retrieve_key2 and retrieve_key2 / retrieve_key1 and fill True if any is True
     check_both_ways: bool = False
     # Number of similar items to check. If not provided, will use the number of similar items in the first data point.
-    top_k: int | None = None 
-
+    top_k: int | None = None
 
     def __post_init__(self):
         if self.input_file is None:
@@ -73,7 +72,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
             raise ValueError("Async generation is not supported for checking contamination")
         if self.code_execution:
             raise ValueError("Code execution is not supported for checking contamination")
-        
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_check_contamination_config", node=CheckContaminationConfig)
@@ -93,7 +92,7 @@ class CheckContaminationTask(GenerationTask):
         self.cfg.batch_size = max(1, self.cfg.batch_size // self.cfg.top_k // (2 if self.cfg.check_both_ways else 1))
 
         return data
-    
+
     def log_example_prompt(self, data):
         data_point = data[0]
         query_item = data_point[self.cfg.retrieve_key]
@@ -107,7 +106,6 @@ class CheckContaminationTask(GenerationTask):
             first_element,
             self.prompt.fill(first_element),
         )
-        
 
     def sync_loop(self, data):
         """Override the sync loop to check contamination."""
@@ -134,14 +132,16 @@ class CheckContaminationTask(GenerationTask):
                                         f'{self.cfg.retrieve_key}1': similar_item,
                                     }
                                 )
-                    
+
                     outputs = self.llm_generate(query_data, data)
                     output_idx = 0
                     for original_data_point in data_points_batch:
                         all_generations = []
                         elem = {}
                         contaminated = False
-                        for output in outputs[output_idx : output_idx + self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)]:
+                        for output in outputs[
+                            output_idx : output_idx + self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
+                        ]:
                             all_generations.append(output['generation'])
                             if output['generation'].strip() == "True":
                                 contaminated = True
@@ -155,7 +155,6 @@ class CheckContaminationTask(GenerationTask):
                             original_data_point.pop(key, None)
                         elem.update(original_data_point)
                         fout.write(json.dumps(elem) + '\n')
-
 
         if total > 0:
             LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)

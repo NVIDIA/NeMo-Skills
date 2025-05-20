@@ -27,7 +27,7 @@ from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.evaluation.metrics import read_predictions
 from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @nested_dataclass(kw_only=True)

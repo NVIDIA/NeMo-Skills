@@ -23,7 +23,7 @@ import openai
 import requests
 from openai import BadRequestError, OpenAI
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 class BaseModel(abc.ABC):

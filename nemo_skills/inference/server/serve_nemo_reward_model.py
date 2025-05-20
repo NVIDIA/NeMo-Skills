@@ -27,11 +27,11 @@ from dataclasses import dataclass
 
 import hydra
 import numpy as np
-from flask import Flask, jsonify, request, abort
+from flask import Flask, abort, jsonify, request
 from mpi4py import MPI
 from pytriton.client import ModelClient
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,7 +53,6 @@ def proxy_rm(cfg: RewardModelGenerationConfig) -> None:
         app = Flask(__name__)
 
         client = ModelClient(cfg.triton_server_address, "reward_model")
-
 
         @app.route('/score', methods=['POST'])
         def infer():

@@ -15,7 +15,7 @@ import json
 import logging
 from typing import Union
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 def read_predictions(predictions, line_idx, file_handles):

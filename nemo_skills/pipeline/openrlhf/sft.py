@@ -24,7 +24,7 @@ from nemo_skills.pipeline.openrlhf import openrlhf_app
 from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
 from nemo_skills.utils import setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 
 
 @dataclass
