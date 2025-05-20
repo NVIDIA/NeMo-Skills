@@ -20,7 +20,7 @@ from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_c
 from nemo_skills.utils import setup_logging
 
 
-def get_gradio_chat_cmd(executor, server_type):
+def get_gradio_chat_cmd(executor, server_type, extra_args):
     # if cluster is local, we want to automatically launch an app
     # otherwise, we launch configuration page that asks for server address
     mode = 'direct' if executor == "local" else 'manual'
@@ -28,6 +28,7 @@ def get_gradio_chat_cmd(executor, server_type):
         "python -m nemo_skills.inference.chat_interface.launch "
         f"launch_mode={mode} "
         f"server_type={server_type} "
+        f" {extra_args} "
     )
     return cmd
 
@@ -60,6 +61,7 @@ def start_server(
     launch_chat_interface: bool = typer.Option(
         False, help="If True, will launch a gradio app that provides chat with the model"
     ),
+    extra_chat_args: str = typer.Option("", help="Extra hydra arguments to be passed to the chat app"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
