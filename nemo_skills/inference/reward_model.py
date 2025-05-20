@@ -121,7 +121,7 @@ def score(cfg: RewardModelConfig):
 
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
-    params=server_params(),
+    server_params=server_params(),
     sandbox_params=sandbox_params(),
 )
 
