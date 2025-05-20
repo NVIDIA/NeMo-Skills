@@ -406,6 +406,7 @@ def configure_client(
     server_nodes,
     model,
     server_args,
+    server_entrypoint,
     extra_arguments,
 ):
     if server_address is None:  # we need to host the model
@@ -419,6 +420,7 @@ def configure_client(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
         extra_arguments = (
@@ -455,6 +457,11 @@ def generate(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
@@ -656,6 +663,7 @@ def generate(
                     server_nodes=server_nodes,
                     model=model,
                     server_args=server_args,
+                    server_entrypoint=server_entrypoint,
                     extra_arguments=extra_arguments_original,
                 )
                 cmd, full_postprocess_cmd = get_cmd(

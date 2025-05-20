@@ -476,6 +476,7 @@ def get_reward_server_command(
     cluster_config: dict,
     server_port: int,
     server_args: str = "",
+    server_entrypoint: str | None = None,
 ):
     num_tasks = num_gpus
 
@@ -489,11 +490,12 @@ def get_reward_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_nemo_aligner_reward_model"
         nemo_aligner_reward_model_port = get_free_port(strategy="random", exclude=[server_port])
         server_start_cmd = (
             # Note: The order of the two commands is important as the reward model server
             # needs to be the first command so it can get the HF_TOKEN from the environment
-            f"python -m nemo_skills.inference.server.serve_nemo_aligner_reward_model "
+            f"python -m {server_entrypoint} "
             f"    ++rm_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
@@ -518,8 +520,9 @@ def get_reward_server_command(
         if num_nodes > 1:
             raise ValueError("VLLM server does not support multi-node execution")
 
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_vllm"
         server_start_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -580,6 +583,7 @@ def get_server_command(
     cluster_config: dict,
     server_port: int,
     server_args: str = "",
+    server_entrypoint: str | None = None,
 ):
     num_tasks = num_gpus
 
@@ -593,8 +597,9 @@ def get_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_nemo"
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_nemo "
+            f"python -m {server_entrypoint} "
             f"    gpt_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
@@ -613,13 +618,14 @@ def get_server_command(
             prefix = f"torchrun --nproc_per_node {num_gpus}"
         else:
             prefix = "python "
+        server_entrypoint = server_entrypoint or "tools/run_text_generation_server.py"
         # similar to conversion, we don't hold scripts for megatron on our side
         # and expect it to be in /opt/Megatron-LM in the container
         server_start_cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
             f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
             f"cd /opt/Megatron-LM && "
-            f"{prefix} tools/run_text_generation_server.py "
+            f"{prefix} {server_entrypoint} "
             f"    --load {model_path} "
             f"    --tensor-model-parallel-size {num_gpus} "
             f"    --pipeline-model-parallel-size {num_nodes} "
@@ -629,8 +635,9 @@ def get_server_command(
             f"    {server_args} "
         )
     elif server_type == 'vllm':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -643,8 +650,9 @@ def get_server_command(
             multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_sglang"
         server_start_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --num_nodes {num_nodes} "
@@ -654,9 +662,10 @@ def get_server_command(
         )
         num_tasks = 1
     else:
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
-            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
+            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
             f"    --model_path {model_path} "
             f"    --port {server_port} "
             f"    {server_args} "

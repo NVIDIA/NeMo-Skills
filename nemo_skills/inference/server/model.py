@@ -1132,8 +1132,12 @@ class MegatronModel(BaseModel):
                 if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                     output += choice.matched_stop
 
-            result = {'generation': output, 'num_generated_tokens': len(choice.tokens)}
-            # TODO: logprobs if we need those
+            result = {'generation': output, 'num_generated_tokens': -1}
+            if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
+                result['logprobs'] = choice.logprobs.token_logprobs
+                result['tokens'] = choice.logprobs.tokens
+                result['top_logprobs'] = choice.logprobs.top_logprobs
+                result['num_generated_tokens'] = len(choice.logprobs.tokens)
             return result
 
         if batch:

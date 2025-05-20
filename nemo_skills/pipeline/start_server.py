@@ -41,6 +41,11 @@ def start_server(
     server_gpus: int = typer.Option(..., help="Number of GPUs to use for hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     with_sandbox: bool = typer.Option(
@@ -78,6 +83,7 @@ def start_server(
         "num_gpus": server_gpus,
         "num_nodes": server_nodes,
         "server_args": server_args,
+        "server_entrypoint": server_entrypoint,
         "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
 
