@@ -33,19 +33,18 @@ def preprocess(text):
         return " "
     text = text.strip()
     text = text.replace(" [title]", ". ")
-    text = re.sub("\\[.*?\\]", "", text)
     text = text.replace("  ", " ")
     return text
 
 
-def format_entry(entry, random_seed):
+def format_entry(entry):
     choices = [
         preprocess(entry["Incorrect Answer 1"]),
         preprocess(entry["Incorrect Answer 2"]),
         preprocess(entry["Incorrect Answer 3"]),
         preprocess(entry["Correct Answer"]),
     ]
-    random.seed(random_seed)
+    
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
     return {
@@ -61,19 +60,20 @@ def format_entry(entry, random_seed):
     }
 
 
-def write_data_to_file(output_file, data, random_seed):
+def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            json.dump(format_entry(entry, random_seed), fout)
+            json.dump(format_entry(entry), fout)
             fout.write("\n")
 
 
 def save_data(split, random_seed):
+    random.seed(random_seed)
     dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{split}")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
     output_file = data_dir / f"{split}.jsonl"
-    write_data_to_file(output_file, dataset, random_seed)
+    write_data_to_file(output_file, dataset)
 
 
 if __name__ == "__main__":
