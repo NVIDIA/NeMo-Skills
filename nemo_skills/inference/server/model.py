@@ -1132,16 +1132,8 @@ class MegatronModel(BaseModel):
                 if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                     output += choice.matched_stop
 
-            # For a single response we can get completion tokens from response.usage
-            # For batch we don't have this information per choice
-            num_tokens = getattr(response, 'usage', None)
-            num_generated_tokens = num_tokens.completion_tokens if num_tokens else -1
-
-            result = {'generation': output, 'num_generated_tokens': num_generated_tokens}
-            if choice.logprobs:
-                result['logprobs'] = choice.logprobs.token_logprobs
-                result['tokens'] = choice.logprobs.tokens
-                result['top_logprobs'] = choice.logprobs.top_logprobs
+            result = {'generation': output, 'num_generated_tokens': len(choice.tokens)}
+            # TODO: logprobs if we need those
             return result
 
         if batch:
