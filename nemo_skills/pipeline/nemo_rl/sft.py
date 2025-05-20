@@ -82,10 +82,9 @@ class NemoRLTask:
         return "/nemo_run/code/NeMo-Skills/nemo_skills/training/nemo_rl/start_sft_nemo_rl.py "
 
     def get_job_cmd(self):
-        ray_job_cmd = self.get_ray_launch_cmd()
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"{ray_job_cmd} uv run --active python {self.get_script_module()} "
+            f"uv run --active python {self.get_script_module()} "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
             f"  {self.logging_params} "
