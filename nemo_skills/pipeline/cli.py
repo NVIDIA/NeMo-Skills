@@ -22,7 +22,8 @@ from nemo_skills.pipeline.check_contamination import check_contamination
 from nemo_skills.pipeline.convert import convert
 from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.generate import generate
-from nemo_skills.pipeline.nemo_rl import nemo_rl
+from nemo_skills.pipeline.nemo_rl.sft import sft_nemo_rl
+from nemo_skills.pipeline.nemo_rl.grpo import grpo_nemo_rl
 from nemo_skills.pipeline.openrlhf.ppo import ppo_openrlhf
 from nemo_skills.pipeline.openrlhf.sft import sft_openrlhf
 from nemo_skills.pipeline.run_cmd import run_cmd

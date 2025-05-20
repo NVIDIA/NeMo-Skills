@@ -172,9 +172,9 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
 
 
-@app.command(name='nemo-rl', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@app.command(name='grpo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def nemo_rl(
+def grpo_nemo_rl(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
