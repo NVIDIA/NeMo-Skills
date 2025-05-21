@@ -15,7 +15,9 @@ import json
 import logging
 from typing import Union
 
-LOG = logging.getLogger(__file__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def read_predictions(predictions, line_idx, file_handles):

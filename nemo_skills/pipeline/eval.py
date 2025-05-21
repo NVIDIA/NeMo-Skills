@@ -31,9 +31,9 @@ from nemo_skills.pipeline.utils import (
     get_server_command,
     run_exp,
 )
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_greedy_cmd(
@@ -108,6 +108,7 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -133,6 +134,11 @@ def eval(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option('test', help="Data split to use for evaluation"),
     num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
@@ -224,6 +230,7 @@ def eval(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
         # += is okay here because the args have already been copied in this context
