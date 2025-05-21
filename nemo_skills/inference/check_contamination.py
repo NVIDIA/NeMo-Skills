@@ -73,18 +73,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
         return [
             ("code_execution", False),
         ]
-
-<<<<<<< HEAD
         
-=======
-    def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values"""
-        if self.use_async_loop:
-            raise ValueError("Async generation is not supported for checking contamination")
-        if self.code_execution:
-            raise ValueError("Code execution is not supported for checking contamination")
-
->>>>>>> main
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_check_contamination_config", node=CheckContaminationConfig)
@@ -118,7 +107,6 @@ class CheckContaminationTask(GenerationTask):
             first_element,
             self.prompt.fill(first_element),
         )
-<<<<<<< HEAD
         
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
@@ -147,8 +135,6 @@ class CheckContaminationTask(GenerationTask):
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
                 return {self.cfg.generation_key: True}
         return None
-=======
->>>>>>> main
 
     def sync_loop(self, data):
         """Override the sync loop to check contamination."""
@@ -163,7 +149,6 @@ class CheckContaminationTask(GenerationTask):
                 else:
                     data_points_batch.append(data_point)
 
-<<<<<<< HEAD
                 if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
                     # Create paraphrase queries for each data point
                     query_data = [
@@ -171,16 +156,6 @@ class CheckContaminationTask(GenerationTask):
                         for query_point in self._create_query_data(data_point)
                     ]
                     # Get LLMs judgement on paraphrase queries for each data point
-=======
-                            if self.cfg.check_both_ways:
-                                query_data.append(
-                                    {
-                                        f'{self.cfg.retrieve_key}2': original_data_point[self.cfg.retrieve_key],
-                                        f'{self.cfg.retrieve_key}1': similar_item,
-                                    }
-                                )
-
->>>>>>> main
                     outputs = self.llm_generate(query_data, data)
                     output_idx = 0
 
@@ -188,14 +163,8 @@ class CheckContaminationTask(GenerationTask):
                         all_generations = []
                         elem = {}
                         contaminated = False
-<<<<<<< HEAD
                         query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
                         for output in outputs[output_idx : output_idx + query_per_data_point]:
-=======
-                        for output in outputs[
-                            output_idx : output_idx + self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
-                        ]:
->>>>>>> main
                             all_generations.append(output['generation'])
                             # If any of the generations is True, then the data point is considered contaminated
                             if output['generation'].strip() == "True":
@@ -289,7 +258,7 @@ class CheckContaminationTask(GenerationTask):
                         for generation in elem['all_generations']:
                             if generation.strip() == "True":
                                 elem[self.cfg.generation_key] = True
-                                break
+                       1         break
 
                         elem.update(remaining_data_points[data_point_idx])
                         fout.write(json.dumps(elem) + '\n')
