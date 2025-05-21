@@ -48,7 +48,6 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     server: dict = field(default_factory=dict)
-    sandbox: dict = field(default_factory=dict)
 
     # Override the default Generation config here
     prompt_config: str = "judge/math"
@@ -76,6 +75,7 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("code_execution", False),
+            ("sandbox", {}),
         ]
         
 
@@ -116,6 +116,7 @@ def generate(cfg: LlmMathJudgeConfig):
 
 HELP_MESSAGE = get_help_message(
     LlmMathJudgeConfig,
+    server_params=server_params(),
 )
 
 

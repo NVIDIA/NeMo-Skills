@@ -68,6 +68,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("code_execution", False),
+            ("sandbox", {}),
         ]
         
 

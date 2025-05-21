@@ -83,6 +83,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
         return [
             ("use_async_loop", False),
             ("code_execution", False),
+            ("sandbox", {}),
         ]
 
 
