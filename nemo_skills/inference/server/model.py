@@ -793,18 +793,16 @@ class OpenAIModel(BaseModel):
         """
         Helper generator that yields incremental chunks.
         """
-        prev_delta, cur_delta, stop_suffix = "", "", None
+
         for chunk in response:
-            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+            cur_delta = chunk.choices[0].text
 
-            # Handle stop phrases
-            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
-                stop_suffix = chunk.choices[0].stop_reason
+            if cur_delta:
+                yield {"generation": cur_delta}
 
-            if prev_delta:
-                yield {"generation": prev_delta}
+            stop_suffix = getattr(chunk.choices[0], "stop_reason", None)
             if stop_suffix:
-                yield {'generation': stop_suffix}
+                yield {"generation": stop_suffix}
 
 
 class VLLMModel(BaseModel):
@@ -933,24 +931,40 @@ class VLLMModel(BaseModel):
         """
         Helper generator that yields incremental chunks.
         """
-        prev_delta, cur_delta, stop_suffix = "", "", None
-        is_sglang_stop_phrase = False
+
+        emitted_so_far = []
+
         for chunk in response:
-            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+            cur_delta = chunk.choices[0].text
+            print(chunk.choices[0])
+            emitted_so_far += [cur_delta]
 
-            # Handle stop phrases
-            ## sglang variant
-            if hasattr(chunk.choices[0], "matched_stop") and isinstance(chunk.choices[0].matched_stop, str):
-                stop_suffix = chunk.choices[0].matched_stop
-                is_sglang_stop_phrase = True
-            ## vllm variant
-            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
-                stop_suffix = chunk.choices[0].stop_reason
+            if cur_delta:
+                yield {"generation": cur_delta}
 
-            if prev_delta and not is_sglang_stop_phrase:
-                yield {"generation": prev_delta}
-            if stop_suffix:
-                yield {'generation': stop_suffix}
+            # vllm variant
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            # sglang variant
+            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+
+            # vllm variant - emit stop_reason as is and finish
+            if stop_reason:
+                yield {"generation": stop_reason}
+
+            # sglang variant - emit only not-yet-sent part of matched_stop
+            if matched_stop:
+                remaining = matched_stop
+                # find the longest prefix of matched_stop that is already at
+                # the end of what we've emitted.
+                emitted_str = "".join(emitted_so_far)
+                max_len = min(len(emitted_str), len(matched_stop))
+                for i in range(max_len, 0, -1):
+                    if emitted_str.endswith(matched_stop[:i]):
+                        remaining = matched_stop[i:]
+                        break
+
+                if remaining:
+                    yield {"generation": remaining}
 
 
 models = {
