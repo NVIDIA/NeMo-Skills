@@ -258,7 +258,7 @@ class CheckContaminationTask(GenerationTask):
                         for generation in elem['all_generations']:
                             if generation.strip() == "True":
                                 elem[self.cfg.generation_key] = True
-                       1         break
+                                break
 
                         elem.update(remaining_data_points[data_point_idx])
                         fout.write(json.dumps(elem) + '\n')
