@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from typing import List, Optional
 
 import typer
@@ -26,7 +24,6 @@ from nemo_skills.pipeline.utils import (
     check_if_mounted,
     get_cluster_config,
     get_exp,
-    get_free_port,
     get_timeout,
     run_exp,
 )
@@ -49,7 +46,7 @@ class NemoRLTask:
     timeout: str
     log_dir: str
     extra_arguments: str = ""
-    tmpdir: str = "/tmp"
+    tmpdir: str = "/nemo_run/tmp"
 
     def format_train_args(self):
         cmd = (
@@ -106,10 +103,9 @@ class NemoRLTask:
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
-            f"export NEMO_RL_VENV_DIR=/opt/nemo_rl_venv && "
+            f"export NEMO_RL_VENV_DIR={self.tmpdir}/nemo_rl_venv && "
             f"export UV_CACHE_DIR={self.tmpdir}/uv && "
-            # f"cd /nemo_run/code && "
-            f"cd /opt/nemo-rl && "
+            f"cd /nemo_run/code && "
             f"{preamble_cmd} && "
         )
 
