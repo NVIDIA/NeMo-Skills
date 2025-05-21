@@ -201,7 +201,7 @@ class CheckContaminationTask(GenerationTask):
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
         last_submitted_idx = 0
         requests_in_progress = {}  # generation_id -> original data_point
-        data_point_idx_to_gen_ids = defaultdict(set)  # original data_point_idx -> [generation_ids]
+        data_point_idx_to_gen_ids = defaultdict(set)  # original data_point_idx -> set(generation_ids)
         data_point_idx_to_all_generations = defaultdict(list)  # original data_point_idx -> [all generations]
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
