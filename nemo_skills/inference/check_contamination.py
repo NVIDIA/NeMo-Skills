@@ -232,8 +232,6 @@ class CheckContaminationTask(GenerationTask):
 
                 generations = self.llm.get_generations(list(requests_in_progress.keys()))
 
-                outputs_to_dump = []
-                data_points_to_dump = []
                 for (gen_id, data_point_idx), gen_dict in zip(requests_in_progress.copy().items(), generations):
                     if gen_dict['generation'] is None:  # not done yet
                         continue
