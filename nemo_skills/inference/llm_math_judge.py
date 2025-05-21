@@ -56,6 +56,11 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     generation_key: str = "judgement"
 
     def __post_init__(self):
+        self._post_init_validate_data()
+        self._post_init_validate_server()
+        self._post_init_validate_params()
+
+    def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
         if self.input_file is None and self.input_dir is not None:
@@ -67,12 +72,6 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
                 raise ValueError("Output file should be provided if providing `input_file`")
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
-
-        if self.server.server_type != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
-
-        if self.server.server_type == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -98,6 +97,7 @@ class LLMMathJudgeTask(GenerationTask):
             return None
         else:
             return {"generation": judgement}
+
 
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_llm_math_judge_config')

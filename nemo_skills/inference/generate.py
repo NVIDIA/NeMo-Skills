@@ -117,6 +117,7 @@ class GenerateSolutionsConfig:
     def __post_init__(self):
         self._post_init_validate_data()
         self._post_init_validate_server()
+        self._post_init_validate_params()
 
     def _post_init_validate_data(self):
         if self.input_file is not None:
@@ -157,7 +158,13 @@ class GenerateSolutionsConfig:
         
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values""" 
-        pass
+        for (param, default_value) in self._get_disallowed_params():
+            if getattr(self, param) != default_value:
+                raise ValueError(f"{param} must be {default_value}")
+    
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return []
 
 
 cs = hydra.core.config_store.ConfigStore.instance()

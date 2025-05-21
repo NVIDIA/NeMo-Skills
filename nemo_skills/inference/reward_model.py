@@ -66,6 +66,11 @@ class RewardModelConfig(GenerateSolutionsConfig):
     reward_model_type: str = "orm"
 
     def __post_init__(self):
+        self._post_init_validate_data()
+        self._post_init_validate_server()
+        self._post_init_validate_params()
+
+    def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
         if self.input_file is None and self.input_dir is not None:
@@ -78,18 +83,12 @@ class RewardModelConfig(GenerateSolutionsConfig):
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
-        # Validate the server parameters - inherited from the generate config
-        self._post_init_validate_server()
-
-        # Validate that certain parameters should only have certain values
-        self._post_init_validate_params()
-        
-    def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values"""
-        if self.use_async_loop:
-            raise ValueError("Async generation is not supported for reward model")
-        if self.code_execution:
-            raise ValueError("Code execution is not supported for reward model")
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("use_async_loop", False),
+            ("code_execution", False),
+        ]
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
