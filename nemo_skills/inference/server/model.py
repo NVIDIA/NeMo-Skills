@@ -800,9 +800,9 @@ class OpenAIModel(BaseModel):
             if cur_delta:
                 yield {"generation": cur_delta}
 
-            stop_suffix = getattr(chunk.choices[0], "stop_reason", None)
-            if stop_suffix:
-                yield {"generation": stop_suffix}
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
 
 
 class VLLMModel(BaseModel):
@@ -936,7 +936,6 @@ class VLLMModel(BaseModel):
 
         for chunk in response:
             cur_delta = chunk.choices[0].text
-            print(chunk.choices[0])
             emitted_so_far += [cur_delta]
 
             if cur_delta:
@@ -948,11 +947,11 @@ class VLLMModel(BaseModel):
             matched_stop = getattr(chunk.choices[0], "matched_stop", None)
 
             # vllm variant - emit stop_reason as is and finish
-            if stop_reason:
+            if stop_reason and isinstance(stop_reason, str):
                 yield {"generation": stop_reason}
 
             # sglang variant - emit only not-yet-sent part of matched_stop
-            if matched_stop:
+            if matched_stop and isinstance(matched_stop, str):
                 remaining = matched_stop
                 # find the longest prefix of matched_stop that is already at
                 # the end of what we've emitted.
