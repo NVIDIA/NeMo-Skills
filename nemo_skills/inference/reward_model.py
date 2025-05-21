@@ -116,10 +116,7 @@ def score(cfg: RewardModelConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(
-    RewardModelConfig,
-    params=server_params(),
-)
+HELP_MESSAGE = get_help_message(RewardModelConfig)
 
 
 if __name__ == "__main__":
