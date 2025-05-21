@@ -46,8 +46,7 @@ class NemoRLTask:
     timeout: str
     log_dir: str
     extra_arguments: str = ""
-    # tmpdir: str = "/nemo_run/tmp"
-    tmpdir: str = "/tmp"
+    tmpdir: str = "/nemo_run/tmp"
 
     def format_train_args(self):
         cmd = (
