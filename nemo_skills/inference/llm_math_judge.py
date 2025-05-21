@@ -74,6 +74,12 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("code_execution", False),
+        ]
+        
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
@@ -112,8 +118,6 @@ def generate(cfg: LlmMathJudgeConfig):
 
 HELP_MESSAGE = get_help_message(
     LlmMathJudgeConfig,
-    server_params=server_params(),
-    sandbox_params=sandbox_params(),
 )
 
 

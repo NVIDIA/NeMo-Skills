@@ -19,9 +19,7 @@ from pathlib import Path
 
 import hydra
 
-from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.server.reward_model import get_reward_model
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -120,8 +118,6 @@ def score(cfg: RewardModelConfig):
 
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
-    params=server_params(),
-    sandbox_params=sandbox_params(),
 )
 
 

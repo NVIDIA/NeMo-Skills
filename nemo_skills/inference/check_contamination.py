@@ -284,8 +284,6 @@ def check_contamination(cfg: CheckContaminationConfig):
 
 HELP_MESSAGE = get_help_message(
     CheckContaminationConfig,
-    server_params=server_params(),
-    sandbox_params=sandbox_params(),
 )
 
 
