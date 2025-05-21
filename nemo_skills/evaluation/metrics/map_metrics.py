@@ -18,6 +18,7 @@ from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
 from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
 from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
 from nemo_skills.evaluation.metrics.mtbench_metrics import MtBenchMetrics
+from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
@@ -29,6 +30,7 @@ METRICS_MAP = {
     "if": IFMetrics,
     "mt-bench": MtBenchMetrics,
     "multichoice": MathMetrics,
+    "ruler": RulerMetrics,
 }
 
 def get_metrics(metric_type: str):
