@@ -45,10 +45,6 @@ class RewardModelConfig(GenerateSolutionsConfig):
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     server: dict = field(default_factory=dict)
-<<<<<<< HEAD
-=======
-    sandbox: dict = field(default_factory=dict)
->>>>>>> main
 
     # Async loop is currently not supported for reward model
     # Currently reward models are quite fast, so we don't need to use async loop
@@ -120,11 +116,7 @@ def score(cfg: RewardModelConfig):
 
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
-<<<<<<< HEAD
     server_params=server_params(),
-=======
-    params=server_params(),
->>>>>>> main
 )
 
 
