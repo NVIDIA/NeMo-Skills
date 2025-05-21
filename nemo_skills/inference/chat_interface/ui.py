@@ -112,7 +112,7 @@ class ChatUI:
                 self.max_tokens = gr.Slider(50, 20000, value=4000, step=50, label="Max new tokens")
                 self.temperature = gr.Slider(0.0, 1.2, value=0.0, step=0.05, label="Temperature")
             self.code_exec_checkbox = gr.Checkbox(label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state)
-            self.chatbot = gr.Chatbot(height=450, bubble_full_width=False)
+            self.chatbot = gr.Chatbot(height=450, show_label=False, bubble_full_width=False)
             with gr.Row():
                 self.msg_tb = gr.Textbox(label="Your question", lines=3, scale=4)
                 self.submit_btn = gr.Button("Send", variant="primary")
