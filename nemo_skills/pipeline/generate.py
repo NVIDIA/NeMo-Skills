@@ -292,6 +292,7 @@ def get_rm_cmd(
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
+    print(cmd)
     return cmd, postprocess_cmd
 
 
