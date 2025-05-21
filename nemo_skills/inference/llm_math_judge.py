@@ -47,9 +47,7 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     random_seed: str | None = None
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
-    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
 
     # Override the default Generation config here

@@ -19,7 +19,6 @@ from pathlib import Path
 
 import hydra
 
-from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.server.reward_model import get_reward_model
@@ -45,9 +44,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
     random_seed: str | None = None
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
-    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
 
     # Async loop is currently not supported for reward model
@@ -119,11 +116,7 @@ def score(cfg: RewardModelConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(
-    RewardModelConfig,
-    server_params=server_params(),
-    sandbox_params=sandbox_params(),
-)
+HELP_MESSAGE = get_help_message(RewardModelConfig)
 
 
 if __name__ == "__main__":

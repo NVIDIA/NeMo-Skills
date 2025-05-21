@@ -20,7 +20,6 @@ from dataclasses import field
 import hydra
 from tqdm import tqdm
 
-from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -37,15 +36,12 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
 
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
-    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
 
     # Override the default Generation config here
     # Async generation requires non-trivial work to support. We will not support it for now.
     # Since contamination is a fast operation, we can afford to do it synchronously
-    use_async_loop: bool = False
     code_execution: bool = False
     prompt_config: str = "judge/check-contamination"
     generation_key: str = "contaminated"
@@ -68,8 +64,6 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
-        if self.use_async_loop:
-            raise ValueError("Async generation is not supported for checking contamination")
         if self.code_execution:
             raise ValueError("Code execution is not supported for checking contamination")
 
@@ -173,7 +167,6 @@ def check_contamination(cfg: CheckContaminationConfig):
 HELP_MESSAGE = get_help_message(
     CheckContaminationConfig,
     server_params=server_params(),
-    sandbox_params=sandbox_params(),
 )
 
 
