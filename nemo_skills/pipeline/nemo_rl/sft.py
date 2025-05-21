@@ -103,7 +103,7 @@ class NemoRLTask:
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
-            f"export NEMO_RL_VENV_DIR={self.tmpdir}/nemo_rl_venv && "
+            f"export NEMO_RL_VENV_DIR=/opt/nemo_rl_venv && " # comes from dockerfile
             f"export UV_CACHE_DIR={self.tmpdir}/uv && "
             f"cd /nemo_run/code && "
             f"{preamble_cmd} && "
