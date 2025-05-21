@@ -103,7 +103,7 @@ def start_server(
                 raise ValueError(f"Currently chat interface for {server_type} is not supported.")
             add_task(
                 exp,
-                cmd=get_gradio_chat_cmd(cluster_config["executor"], server_type),
+                cmd=get_gradio_chat_cmd(cluster_config["executor"], server_type, extra_chat_args),
                 task_name='gradio_chat',
                 container="",
                 cluster_config=get_cluster_config(), # launch app locally
