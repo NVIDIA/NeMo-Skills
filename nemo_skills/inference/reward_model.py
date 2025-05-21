@@ -47,8 +47,6 @@ class RewardModelConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=dict)
 
     # Async loop is currently not supported for reward model
     # Currently reward models are quite fast, so we don't need to use async loop
@@ -121,6 +119,7 @@ def score(cfg: RewardModelConfig):
 HELP_MESSAGE = get_help_message(
     RewardModelConfig,
     server_params=server_params(),
+    sandbox_params=sandbox_params(),
 )
 
 

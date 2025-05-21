@@ -280,24 +280,12 @@ This script uses Hydra (https://hydra.cc/) for dynamic configuration management.
 You can apply Hydra's command-line syntax for overriding configuration values directly.
 Below are the available configuration options and their default values:
     """.strip()
-    
-    docstring = get_fields_docstring(dataclass_obj)
-    print("***" * 100)
-    print("First")
-    print(docstring)
-    print("***" * 100)
 
+    docstring = get_fields_docstring(dataclass_obj)
     # to handle {} in docstring.
     docstring = docstring.replace('{}', '{{}}')
     # to handle any dictionaries as defaults (replacing {...} with {{...}} if there is a space inside)
     docstring = re.sub(r'{([^}]+(?=\s)[^}]*)}', r'{{\1}}', docstring)
-
-    print("---" * 100)
-    print("Second")
-    print(docstring)
-    print("---" * 100)
-
-    print(kwargs)
     # Might need to add some other edge-case handling
     # here, so that formatting does not complain
     docstring = docstring.format(**kwargs)

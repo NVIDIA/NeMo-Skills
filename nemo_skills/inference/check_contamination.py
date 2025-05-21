@@ -22,7 +22,6 @@ from collections import defaultdict
 import hydra
 from tqdm import tqdm
 
-from nemo_skills.code_execution.sandbox import sandbox_params
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -41,8 +40,6 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=dict)
 
     # Override the default Generation config here
     code_execution: bool = False
@@ -284,6 +281,7 @@ def check_contamination(cfg: CheckContaminationConfig):
 
 HELP_MESSAGE = get_help_message(
     CheckContaminationConfig,
+    server_params=server_params(),
 )
 
 
