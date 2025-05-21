@@ -15,7 +15,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
 import typer
 
@@ -31,9 +31,9 @@ from nemo_skills.pipeline.utils import (
     get_server_command,
     run_exp,
 )
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_greedy_cmd(
@@ -108,6 +108,7 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -133,6 +134,11 @@ def eval(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option('test', help="Data split to use for evaluation"),
     num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
@@ -148,7 +154,10 @@ def eval(
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
-    skip_greedy: bool = typer.Option(False, help="Whether to skip greedy evaluation"),
+    add_greedy: bool = typer.Option(
+        False,
+        help="Whether to add greedy evaluation. Only applicable if num_samples > 0, otherwise greedy is default.",
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -221,6 +230,7 @@ def eval(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
         # += is okay here because the args have already been copied in this context
@@ -244,29 +254,24 @@ def eval(
         requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
         benchmark_requires_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
-            LOG.warning(
-                "Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark
-            )
+            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
     # Create evaluation commands as before
-    eval_cmds = (
-        [
-            (cmd, benchmark)
-            for benchmark in benchmarks.keys()
-            for cmd in get_greedy_cmd(
-                benchmark,
-                split,
-                output_dir,
-                extra_eval_args=extra_eval_args,
-                extra_arguments=extra_arguments,
-                extra_datasets=extra_datasets,
-                num_chunks=num_chunks,
-                chunk_ids=chunk_ids,
-            )
-        ]
-        if not skip_greedy
-        else []
-    )
+    eval_cmds = [
+        (cmd, benchmark)
+        for benchmark, rs_num in benchmarks.items()
+        for cmd in get_greedy_cmd(
+            benchmark,
+            split,
+            output_dir,
+            extra_eval_args=extra_eval_args,
+            extra_arguments=extra_arguments,
+            extra_datasets=extra_datasets,
+            num_chunks=num_chunks,
+            chunk_ids=chunk_ids,
+        )
+        if add_greedy or rs_num == 0
+    ]
     eval_cmds += [
         (cmd, benchmark)
         for benchmark, rs_num in benchmarks.items()
@@ -302,8 +307,10 @@ def eval(
     with get_exp(expname, cluster_config) as exp:
         for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
             # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job)
-            
+            job_needs_sandbox = with_sandbox or any(
+                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
+            )
+
             LOG.info("Launching task with command %s", " && ".join(cmds))
             add_task(
                 exp,

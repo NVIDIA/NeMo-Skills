@@ -37,9 +37,9 @@ from nemo_skills.pipeline.utils import (
     get_unmounted_path,
     run_exp,
 )
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging, str_ids_to_list
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class SupportedServers(str, Enum):
@@ -48,6 +48,7 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 def get_chunked_rs_filename(
@@ -150,11 +151,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
-    if done_jobs_str:
-        LOG.info(
-            "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
-            done_jobs_str,
-        )
     missing_jobs_str = ", ".join(
         [
             (
@@ -166,11 +162,20 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
+
     if missing_jobs_str:
-        LOG.info(
-            "The following jobs are incomplete and will be launched: seeds %s",
-            missing_jobs_str,
-        )
+        # only printing this if there are some missing and some done
+        if done_jobs_str:
+            LOG.warning(
+                "The following jobs are incomplete and will be launched: seeds %s",
+                missing_jobs_str,
+            )
+            LOG.warning(
+                "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
+                done_jobs_str,
+            )
+    else:
+        LOG.warning("All jobs are completed. No jobs will be launched (to override set --rerun_done).")
 
     return missing_jobs
 
@@ -287,6 +292,7 @@ def get_rm_cmd(
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
+    print(cmd)
     return cmd, postprocess_cmd
 
 
@@ -341,7 +347,7 @@ def get_genselect_cmd(
     return cmd, postprocess_cmd
 
 
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
     if preprocess_cmd:
         if random_seed is not None:
             preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
@@ -350,6 +356,16 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None):
         if random_seed is not None:
             postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
         cmd = f" {cmd} && {postprocess_cmd} "
+    if wandb_parameters:
+        log_wandb_cmd = (
+            f"python -m nemo_skills.inference.log_samples_wandb "
+            f"    {wandb_parameters['samples_file']} "
+            f"    --name={wandb_parameters['name']} "
+            f"    --project={wandb_parameters['project']} "
+        )
+        if wandb_parameters['group'] is not None:
+            log_wandb_cmd += f" --group={wandb_parameters['group']} "
+        cmd = f"{cmd} && {log_wandb_cmd} "
     return cmd
 
 
@@ -391,6 +407,7 @@ def configure_client(
     server_nodes,
     model,
     server_args,
+    server_entrypoint,
     extra_arguments,
 ):
     if server_address is None:  # we need to host the model
@@ -404,6 +421,7 @@ def configure_client(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
         extra_arguments = (
@@ -440,6 +458,11 @@ def generate(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
@@ -468,9 +491,7 @@ def generate(
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
     ),
-    genselect_args: str = typer.Option(
-        None, help="Can specify extra arguments to prepare the data for genselect"
-    ),
+    genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -500,6 +521,21 @@ def generate(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    log_samples: bool = typer.Option(
+        False,
+        help="If True, will log random samples from the output files to wandb. "
+        "Requires WANDB_API_KEY to be set in the environment. "
+        "Use expname/wandb_group/wandb_project to specify where to log.",
+    ),
+    wandb_name: str = typer.Option(
+        None,
+        help="Name of the wandb group to sync samples to. If not specified, but log_samples=True, will use expname.",
+    ),
+    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
+    wandb_project: str = typer.Option(
+        'nemo-skills',
+        help="Name of the wandb project to sync samples to.",
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -522,6 +558,15 @@ def generate(
         server_type = server_type.value
     except AttributeError:
         pass
+
+    if log_samples:
+        wandb_parameters = {
+            'name': wandb_name or expname,
+            'project': wandb_project,
+            'group': wandb_group,
+        }
+    else:
+        wandb_parameters = None
 
     get_random_port = server_gpus != 8 and not exclusive
 
@@ -598,7 +643,15 @@ def generate(
         else:
             initial_tasks = None
 
-        for seed, chunk_ids in remaining_jobs.items():
+        for job_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+            if wandb_parameters:
+                # no need for chunks as it will run after merging
+                wandb_parameters['samples_file'] = get_chunked_rs_filename(
+                    output_dir,
+                    random_seed=seed,
+                    chunk_id=None,
+                    output_prefix=output_prefix,
+                )
             for chunk_id in chunk_ids:
                 has_tasks = True
                 server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -611,6 +664,7 @@ def generate(
                     server_nodes=server_nodes,
                     model=model,
                     server_args=server_args,
+                    server_entrypoint=server_entrypoint,
                     extra_arguments=extra_arguments_original,
                 )
                 cmd, full_postprocess_cmd = get_cmd(
@@ -633,6 +687,8 @@ def generate(
                             preprocess_cmd,
                             full_postprocess_cmd,
                             random_seed=seed,
+                            # only logging for the first job
+                            wandb_parameters=wandb_parameters if job_idx == 0 else None,
                         ),
                         task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
                         log_dir=log_dir,

@@ -14,24 +14,25 @@
 
 import json
 import logging
+import random
 import re
 import sys
+from copy import deepcopy
 from dataclasses import field
 from enum import Enum
+from os import makedirs, path
 from pathlib import Path
-from copy import deepcopy
-import random
+from typing import Any
 
 import hydra
 import typer
-from typing import Any
 from tqdm import tqdm
-from os import path, makedirs
-from nemo_skills.inference.server.code_execution_model import server_params
-from nemo_skills.inference.generate import InferenceConfig, GenerationTask
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__file__)
+from nemo_skills.inference.generate import GenerationTask, InferenceConfig
+from nemo_skills.inference.server.code_execution_model import server_params
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
@@ -89,12 +90,13 @@ class GenSelectConfig:
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
 
-
     def __post_init__(self):
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
         self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
-        self.output_file = str(Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl")
+        self.output_file = str(
+            Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl"
+        )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
 
@@ -140,7 +142,6 @@ class GenSelectTask(GenerationTask):
                 judgment = None
 
         return judgment
-    
 
     def postprocess(self):
         single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")

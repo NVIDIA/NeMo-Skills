@@ -21,9 +21,9 @@ from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.inference.server.model import get_model
-from nemo_skills.utils import unroll_files
+from nemo_skills.utils import get_logger_name, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class MathMetrics(BaseMetrics):
@@ -70,7 +70,6 @@ class MathMetrics(BaseMetrics):
         if self.has_sympy and self.has_judge:
             perf_dict["both_correct"] += current_correct_sympy and current_correct_judge
             perf_dict["any_correct"] += current_correct_sympy or current_correct_judge
-
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -287,7 +286,9 @@ class MathMetrics(BaseMetrics):
                 if self.has_sympy:
                     current_correct_sympy = sum([elem['is_correct'] for elem in predictions[:k]]) / k
                 if self.has_judge:
-                    current_correct_judge = sum([is_correct_judgement(elem['judgement']) for elem in predictions[:k]]) / k
+                    current_correct_judge = (
+                        sum([is_correct_judgement(elem['judgement']) for elem in predictions[:k]]) / k
+                    )
                 if all([elem['predicted_answer'] is None for elem in predictions[:k]]):
                     no_answer = True
 

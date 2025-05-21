@@ -14,9 +14,11 @@
 
 import logging
 import re
-from typing import Dict, Tuple
+from typing import Tuple
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def format_code_output(
@@ -97,10 +99,10 @@ def extract_code_block(text: str, languages=None) -> str:
     return ""
 
 
-def clean_formal_generation(generation: str) -> str:
+def clean_formal_generation(generation: str, final_answer_key: str = "**FINAL ANSWER**") -> str:
     # Extract part after **FINAL ANSWER** if present
-    if "**FINAL ANSWER**" in generation:
-        generation = generation.split("**FINAL ANSWER**", 1)[1].strip()
+    if final_answer_key in generation:
+        generation = generation.split(final_answer_key, 1)[1].strip()
 
     languages = ["lean4", "lean3", "lean", ""]
     extracted_code = extract_code_block(generation, languages)

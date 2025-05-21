@@ -24,14 +24,14 @@ from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
-from nemo_skills.evaluation.math_grader import extract_answer, batch_evaluate_results
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.constants import JUDGE_MODEL
+from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_answer
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import nested_dataclass, unroll_files
+from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def eval_mcq(cfg):
@@ -386,6 +386,8 @@ class LeanEvaluatorConfig:
     in_memory_lines: int = 500
     timeout: float = 30.0
     ignore_cache: bool = False
+    final_answer_key: str = "**FINAL ANSWER**"
+    restate_formal_statement: bool = True
 
 
 def eval_lean4_proof(cfg):

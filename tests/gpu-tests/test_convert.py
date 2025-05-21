@@ -77,6 +77,34 @@ def test_hf_nemo_conversion():
 
 
 @pytest.mark.gpu
+def test_hf_megatron_conversion():
+    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+    if not model_type:
+        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    if model_type != "llama":
+        pytest.skip("Only llama models are supported in Megatron.")
+    hf_model_name = 'meta-llama/Meta-Llama-3.1-8B-Instruct'
+
+    cmd = (
+        f"ns convert "
+        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
+        f"    --input_model {model_path} "
+        f"    --output_model /tmp/nemo-skills-tests/{model_type}/conversion/hf-to-megatron/model "
+        f"    --convert_from hf "
+        f"    --convert_to megatron "
+        f"    --model_type {model_type} "
+        f"    --num_gpus 1 "
+        f"    --hf_model_name {hf_model_name} "
+    )
+
+    subprocess.run(cmd, shell=True, check=True)
+    assert Path(f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-megatron/model").exists()
+
+
+@pytest.mark.gpu
 def test_nemo_hf_conversion():
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:

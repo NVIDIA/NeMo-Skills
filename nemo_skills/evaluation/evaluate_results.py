@@ -20,9 +20,9 @@ from typing import Any
 import hydra
 
 from nemo_skills.evaluation.evaluator import evaluate
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
@@ -38,6 +38,12 @@ class EvaluateResultsConfig:
     # the supported parameters are different depending on the eval configuration
     # check graders.py for the supported eval types and their parameters
     eval_config: dict = field(default_factory=dict)
+
+    # the escape phrase prior to a lean4 block to extract
+    final_answer_key: str = field(default="### Final Answer")
+
+    # whether to restate the formal statement when constructing the final output proof
+    restate_formal_statement: bool = True
 
     def __post_init__(self):
         if isinstance(self.input_files, str):

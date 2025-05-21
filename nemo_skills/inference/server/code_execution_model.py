@@ -18,14 +18,15 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.server.model import BaseModel, TRTLLMModel, get_model, models, trim_after_stop_phrases
-from nemo_skills.utils import nested_dataclass, python_doc_to_cmd_help
+from nemo_skills.inference.server.model import BaseModel, get_model, models, trim_after_stop_phrases
+from nemo_skills.utils import get_logger_name, nested_dataclass, python_doc_to_cmd_help
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
@@ -77,12 +78,33 @@ class CodeExecutionWrapper:
         top_logprobs: int | None = None,
         gen_id: str = None,  # used for cancelling requests if supported
         timeout: int | None = None,
-        max_code_executions: int | None = None, # if not None, will override self.config.max_code_executions
+        max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
+        stream: bool = False,
     ):
         if not isinstance(prompt, str):
             raise NotImplementedError("OpenAI API is not supported yet.")
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
+
+        if stream:
+            return self._stream_single(
+                prompt=prompt,
+                code_begin=code_begin,
+                code_end=code_end,
+                code_output_begin=code_output_begin,
+                code_output_end=code_output_end,
+                code_output_format=code_output_format,
+                tokens_to_generate=tokens_to_generate,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                min_p=min_p,
+                repetition_penalty=repetition_penalty,
+                random_seed=random_seed,
+                stop_phrases=stop_phrases,
+                timeout=timeout,
+                max_code_executions=max_code_executions,
+            )
 
         if stop_phrases is None:
             stop_phrases = []
@@ -221,6 +243,7 @@ class CodeExecutionWrapper:
         top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
+        stream: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -247,6 +270,7 @@ class CodeExecutionWrapper:
             'stop_phrases': stop_phrases,
             "timeout": timeout,
             "max_code_executions": max_code_executions,
+            "stream": stream,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -317,7 +341,7 @@ class CodeExecutionWrapper:
                 del self.gen_id_to_params[generation_id]
 
             if remove_stop_phrases:
-                if output['generation'] is not None:
+                if isinstance(output, dict) and output['generation'] is not None:
                     output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
             generations.append(output)
@@ -343,6 +367,7 @@ class CodeExecutionWrapper:
         remove_stop_phrases: bool = True,
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
+        stream: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -366,6 +391,7 @@ class CodeExecutionWrapper:
             remove_stop_phrases=remove_stop_phrases,
             timeout=timeout,
             max_code_executions=max_code_executions,
+            stream=stream,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -377,13 +403,102 @@ class CodeExecutionWrapper:
             ]
             generations = self.get_generations(remaining_ids)
             for gen_pos, gen_dict in zip(remaining_positions, generations):
-                if gen_dict['generation'] is not None:  # will be None until done
+                if isinstance(gen_dict, Generator) or gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None
                     all_generations[gen_pos] = gen_dict
 
             time.sleep(1)
 
         return all_generations
+
+    def _stream_single(
+        self,
+        prompt: str,
+        code_begin: str,
+        code_end: str,
+        code_output_begin: str,
+        code_output_end: str,
+        code_output_format: str,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+        timeout: int | None = None,
+        max_code_executions: int | None = None,
+    ):
+        """
+        Helper method, that implements streaming generation.
+        """
+        effective_max_code_executions = self.config.max_code_executions
+        if max_code_executions is not None:
+            effective_max_code_executions = max_code_executions
+
+        stop_phrases = stop_phrases or []
+
+        request = {
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases + [code_end],
+            'timeout': timeout,
+            'tokens_to_generate': tokens_to_generate,
+            'stream': True,
+        }
+
+        current_full_prompt = prompt
+        session_id = None  # For sandbox state continuity
+        for generation_index in range(effective_max_code_executions + 1):
+            model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
+
+            current_output_segment = ""
+            num_generated_tokens = 0
+            for chunk in model_token_iterator:
+                yield chunk
+                current_output_segment += chunk['generation']
+                num_generated_tokens += 1
+
+            request['tokens_to_generate'] -= num_generated_tokens
+            if request['tokens_to_generate'] <= 0:
+                break
+            if not current_output_segment:
+                break
+
+            current_full_prompt += current_output_segment
+
+            if generation_index == effective_max_code_executions:
+                # This was the last iteration, intended for final text generation after all code executions.
+                break
+
+            if current_output_segment.endswith(code_end) and current_output_segment.rfind(
+                code_begin
+            ) > current_output_segment.rfind(code_end, 0, -1):
+                execution_dict, session_id = self.sandbox.execute_code(
+                    generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
+                    timeout=self.config.code_execution_timeout,
+                    max_output_characters=self.config.max_code_output_characters,
+                    session_id=session_id,
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
+                )
+
+                remaining_code_executions = None
+                if self.config.add_remaining_code_executions:
+                    remaining_code_executions = effective_max_code_executions - generation_index - 1
+
+                formatted_code_output = format_code_output(
+                    execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
+                )
+
+                yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
+                current_full_prompt += formatted_code_output  # Append executed code's output to the prompt
+            else:
+                break
 
 
 def server_params():

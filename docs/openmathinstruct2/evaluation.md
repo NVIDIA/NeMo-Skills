@@ -124,7 +124,6 @@ ns eval \
     --benchmarks=aime24:256,amc23:256,math:256,gsm8k:256,omni-math:256 \
     --server_gpus=1 \
     --num_jobs=1 \
-    --skip_greedy \
     ++prompt_template=llama3-instruct \
     ++inference.tokens_to_generate=4096
 ```
