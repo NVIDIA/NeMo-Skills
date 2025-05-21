@@ -26,18 +26,13 @@ from nemo_skills.utils import setup_logging
 LOG = logging.getLogger(__file__)
 
 
-def get_cmd(command, preprocess_cmd=None, postprocess_cmd=None):
-
-    cmd = f"export HYDRA_FULL_ERROR=1 && " f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code " f"&& cd /nemo_run/code && "
-
-    if preprocess_cmd is not None:
-        cmd += f"{preprocess_cmd.strip()} && "
-
-    cmd += f"{command.strip()} "
-
-    if postprocess_cmd is not None:
-        cmd += f"&& {postprocess_cmd.strip()} "
-
+def get_cmd(command):
+    cmd = (
+        f"export HYDRA_FULL_ERROR=1 && "
+        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"cd /nemo_run/code && "
+        f"{command.strip()} "
+    )
     return cmd
 
 
@@ -82,8 +77,6 @@ def run_cmd(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
-    preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
-    postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="Whether to use the sandboxing feature to host the model"),
     log_dir: str = typer.Option(
@@ -111,11 +104,13 @@ def run_cmd(
     command = command or extra_arguments  # From here on, `command` will be used as the command to run
     extra_arguments = ""  # Reset extra_arguments to avoid confusion
 
+    # Setup cluster config
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
     cluster_config = pipeline_utils.resolve_mount_paths(
         cluster_config, mount_paths, create_remote_dir=check_mounted_paths
     )
 
+    # Setup log dir
     if log_dir:
         if check_mounted_paths:
             pipeline_utils.create_remote_directory(log_dir, cluster_config)
@@ -124,9 +119,10 @@ def run_cmd(
         log_dir = pipeline_utils.get_mounted_path(cluster_config, log_dir)
 
     # Resolve if we need to use the inference server
-    get_random_port = server_gpus != 8 and not exclusive
+    get_random_port = server_gpus is not None and server_gpus != 8 and not exclusive
 
     with get_exp(expname, cluster_config) as exp:
+        # Setup server config if model is provided
         server_port = None if get_random_port else 5000
         if model is not None:
             server_config, extra_arguments, server_address, server_port = pipeline_utils.configure_client(
@@ -143,18 +139,19 @@ def run_cmd(
         else:
             server_config = None
 
-        cmd = get_cmd(
-            command=command,
-            preprocess_cmd=preprocess_cmd,
-            postprocess_cmd=postprocess_cmd,
-        )
+        # Prepare command
+        cmd = get_cmd(command=command)
+
+        # Wrap command with generation command if model is provided
+        if model is not None and server_config is not None:
+            cmd = pipeline_utils.get_generation_command(server_address, cmd)
 
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
             # Add the task to the experiment
             new_task = add_task(
                 exp,
-                cmd=pipeline_utils.get_generation_command(server_address, cmd),
+                cmd=cmd,
                 task_name=expname,
                 log_dir=log_dir,
                 container=cluster_config["containers"][container],
