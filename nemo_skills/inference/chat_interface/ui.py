@@ -26,6 +26,24 @@ from nemo_skills.inference.chat_interface.chat_service import ChatService, AppCo
 
 logger = logging.getLogger(__name__)
 
+# ------------------------------------------------------------------
+# Styling helpers
+# ------------------------------------------------------------------
+_CUSTOM_CSS = """
+#input-row {align-items: center;}
+#send-btn, #cancel-btn {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  padding: 0 !important;
+  font-size: 24px !important;
+  line-height: 24px !important;
+}
+#msg-box textarea {
+  resize: vertical;
+}
+"""
+
 
 def _format_output(text: str) -> str:
     """Format special tool_call blocks as code for nicer display."""
@@ -52,8 +70,10 @@ class ChatUI:
     def __init__(self, ctx: AppContext):
         self.ctx = ctx
         self.latest_code_status = CodeExecStatus.NOT_REQUESTED
+        # Flag toggled by the "Cancel generation" button to interrupt streaming.
+        self.cancel_requested: bool = False
 
-        with gr.Blocks(title="AI Chat Interface", theme=gr.themes.Soft()) as self.demo:
+        with gr.Blocks(title="AI Chat Interface", theme=gr.themes.Soft(), css=_CUSTOM_CSS) as self.demo:
             # chat panel needs to exist before server panel (server panel references it in outputs list)
             self._build_chat_panel()
             self._build_server_config_panel()
@@ -113,9 +133,12 @@ class ChatUI:
                 self.temperature = gr.Slider(0.0, 1.2, value=0.0, step=0.05, label="Temperature")
             self.code_exec_checkbox = gr.Checkbox(label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state)
             self.chatbot = gr.Chatbot(height=450, show_label=False, bubble_full_width=False)
-            with gr.Row():
-                self.msg_tb = gr.Textbox(label="Your question", lines=3, scale=4)
-                self.submit_btn = gr.Button("Send", variant="primary")
+            with gr.Row(elem_id="input-row", equal_height=True):
+                self.msg_tb = gr.Textbox(show_label=False, placeholder="Type your message...", lines=3, scale=8, elem_id="msg-box")
+                # Send (arrow) and Cancel (square) buttons mimic a typical chat UI.
+                self.send_btn = gr.Button("➤", variant="primary", elem_id="send-btn", scale=0)
+                # Square stop icon (■). Hidden until a generation is in progress.
+                self.cancel_btn = gr.Button("■", variant="secondary", visible=False, interactive=False, elem_id="cancel-btn", scale=0)
             self.clear_btn = gr.Button("Clear chat")
 
             # Bind events
@@ -124,17 +147,19 @@ class ChatUI:
                 inputs=[self.code_exec_checkbox],
                 outputs=[self.subtitle_md, self.code_exec_checkbox, self.banner_html],
             )
-            self.submit_btn.click(
+            self.send_btn.click(
                 self.handle_chat_submit,
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
-                outputs=[self.chatbot, self.banner_html],
+                outputs=[self.chatbot, self.banner_html, self.send_btn, self.cancel_btn],
             ).then(lambda: gr.update(value=""), None, [self.msg_tb])
             self.msg_tb.submit(
                 self.handle_chat_submit,
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
-                outputs=[self.chatbot, self.banner_html],
+                outputs=[self.chatbot, self.banner_html, self.send_btn, self.cancel_btn],
             ).then(lambda: gr.update(value=""), None, [self.msg_tb])
             self.clear_btn.click(lambda: (None, ""), None, [self.chatbot, self.msg_tb])
+            # Bind cancel event – returns updates for both send and cancel buttons.
+            self.cancel_btn.click(self.on_cancel, None, [self.send_btn, self.cancel_btn])
 
     # ------------------------------------------------------------------
     # Event callbacks
@@ -240,9 +265,28 @@ class ChatUI:
             self._banner_from_code_status(self.latest_code_status),
         )
 
+    def on_cancel(self):
+        """Callback for the *Cancel generation* button.
+
+        Sets an instance flag that the streaming loop checks to stop early and
+        immediately disables the button in the UI.
+        """
+        # Request cancellation – the running generator will notice soon.
+        self.cancel_requested = True
+        # Immediately swap buttons in UI.
+        return (
+            gr.update(visible=True, interactive=True),   # send button visible again
+            gr.update(visible=False, interactive=False),  # cancel button hidden
+        )
+
     def handle_chat_submit(self, user_msg: str, max_tokens: int, temperature: float):
         if not user_msg.strip():
-            yield ([(user_msg, "Please enter a question.")], gr.update(value="", visible=False))
+            yield (
+                [(user_msg, "Please enter a question.")],
+                gr.update(value="", visible=False),
+                gr.update(visible=True, interactive=True),
+                gr.update(visible=False, interactive=False),
+            )
             return
 
         # If user just toggled, refresh code_status.
@@ -250,21 +294,49 @@ class ChatUI:
         if self.latest_code_status == CodeExecStatus.ENABLED and not self.ctx.loader.code_llm:
             self.latest_code_status = self.ctx.loader.get_code_execution_status(True)
 
+        # Reset cancellation flag and enable the button for this generation.
+        self.cancel_requested = False
+
         history: List = []
         bot_response_so_far = ""
-        yield (history, gr.update(value="", visible=False))
+        yield (
+            history,
+            gr.update(value="", visible=False),
+            gr.update(visible=False, interactive=False),  # hide send
+            gr.update(visible=True, interactive=True),    # show cancel
+        )
 
         try:
             stream = self.ctx.chat.stream_chat(
                 user_msg, tokens_to_generate=max_tokens, temperature=temperature, status=self.latest_code_status
             )
             for chunk in stream:
+                if self.cancel_requested:
+                    break
                 bot_response_so_far += chunk
                 history = [(user_msg, _format_output(bot_response_so_far))]
-                yield history, gr.update(value=self.banner_html.value, visible=self.banner_html.visible)
+                yield (
+                    history,
+                    gr.update(value=self.banner_html.value, visible=self.banner_html.visible),
+                    gr.update(visible=False),
+                    gr.update(),
+                )
+
+            # Stream finished naturally or due to cancellation; disable the button.
+            yield (
+                history,
+                gr.update(value=self.banner_html.value, visible=self.banner_html.visible),
+                gr.update(visible=True, interactive=True),   # show send again
+                gr.update(visible=False, interactive=False), # hide cancel
+            )
         except Exception as e:
             logger.exception("Chat failed")
-            yield [(user_msg, f"Error: {e}")], self._banner_from_code_status(CodeExecStatus.DISABLED)
+            yield (
+                [(user_msg, f"Error: {e}")],
+                self._banner_from_code_status(CodeExecStatus.DISABLED),
+                gr.update(visible=True, interactive=True),
+                gr.update(visible=False, interactive=False),
+            )
 
     def launch(self):
         return self.demo 
