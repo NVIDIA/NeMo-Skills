@@ -113,26 +113,21 @@ class CheckContaminationTask(GenerationTask):
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
         query_data = []
-        query_idx = 0
         for similar_item in data_point['similar_items'][:self.cfg.top_k]:
             query_data.append(
                 {
                     f'{self.cfg.retrieve_key}1': data_point[self.cfg.retrieve_key],
                     f'{self.cfg.retrieve_key}2': similar_item,
-                    "query_idx": query_idx,
                 }
             )
-            query_idx += 1
 
             if self.cfg.check_both_ways:
                 query_data.append(
                     {
                         f'{self.cfg.retrieve_key}2': data_point[self.cfg.retrieve_key],
                         f'{self.cfg.retrieve_key}1': similar_item,
-                        "query_idx": query_idx,
                     }
                 )
-                query_idx += 1
 
         return query_data
 
