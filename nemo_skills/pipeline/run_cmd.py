@@ -99,6 +99,7 @@ def run_cmd(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
@@ -121,9 +122,6 @@ def run_cmd(
     )
 
     log_dir = check_remote_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
-
-    # Resolve if we need to use the inference server
-    get_random_port = server_gpus is not None and server_gpus != 8 and not exclusive
 
     with get_exp(expname, cluster_config) as exp:
         # Setup server config if model is provided
