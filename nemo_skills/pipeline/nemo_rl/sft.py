@@ -134,7 +134,6 @@ def get_training_cmd(
     log_dir,
     cache_dir,
 ):
-    # TODO: use those
     timeout = get_timeout(cluster_config, partition)
 
     if task is None:
