@@ -216,7 +216,9 @@ def check_mounts(
         # Check that the file or dir exists at the remote location
         check_remote_mount_directories(list(mount_map.keys()) + [log_dir], cluster_config)
 
-    return *new_paths, log_dir
+    if new_paths:
+        return *new_paths, log_dir
+    return log_dir
 
 
 def get_mounted_path(cluster_config: dict, path: str):
