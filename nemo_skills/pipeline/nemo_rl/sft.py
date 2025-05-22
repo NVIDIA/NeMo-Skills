@@ -70,11 +70,12 @@ class NemoRLTask:
         )
         return cmd
 
-    def format_wandb_args(self, disable_wandb, wandb_project, expname):
+    def format_wandb_args(self):
         cmd = (
-            "logger.wandb_enabled=true " if not disable_wandb else ""
-            f"logger.wandb.project={wandb_project} "
-            f"logger.wandb.name={expname} "
+            f"logger.wandb_enabled={not self.disable_wandb} "
+            f"logger.wandb.project={self.wandb_project} "
+            f"logger.wandb.name={self.expname} "
+            f"++logger.wandb.id={self.expname} "
         )
         return cmd
 
@@ -98,7 +99,7 @@ class NemoRLTask:
 
     def get_cmd(self):
 
-        self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
+        self.logging_params = self.format_wandb_args()
         preamble_cmd = self.get_preamble_cmd()
 
         cmd = (
