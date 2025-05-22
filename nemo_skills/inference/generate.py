@@ -464,6 +464,17 @@ class GenerationTask:
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
 
+
+    def get_llm_generations(self, requests_in_progress, generations):
+        """Get the LLM generations from the output file. 
+        To allow for stateful generation, we also pass in the generations dictionary."""
+
+        original_dp_idx_to_gen_id = {value: key for key, value in requests_in_progress.items()}
+        for original_dp_idx, gen_id in original_dp_idx_to_gen_id.items():
+            generations[original_dp_idx] = self.llm.get_generations([gen_id])[0]
+
+        return (requests_in_progress, generations)
+    
     def async_loop(self, data):
         """Async loop to generate generations."""
 
@@ -481,7 +492,8 @@ class GenerationTask:
 
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
         last_submitted_idx = 0
-        requests_in_progress = {}  # generation_id -> original data_point
+        requests_in_progress = {}  # original data_point_idx -> generation_id
+        generations = []  # original data_point_idx -> generation_dict
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
@@ -496,23 +508,25 @@ class GenerationTask:
                         data,
                         is_async=True,
                     )
+
                     for idx, gen_id in enumerate(generation_ids):
-                        requests_in_progress[gen_id] = remaining_data_points[last_submitted_idx + idx]
+                        requests_in_progress[last_submitted_idx + idx] = gen_id
+                        generations.append({"generation": None})
 
                     last_submitted_idx += num_to_submit
 
-                generations = self.llm.get_generations(list(requests_in_progress.keys()))
+                requests_in_progress, generations = self.get_llm_generations(requests_in_progress, generations)
 
                 outputs_to_dump = []
                 data_points_to_dump = []
-                for (gen_id, original_dp), gen_dict in zip(requests_in_progress.copy().items(), generations):
-                    if gen_dict['generation'] is None:  # not done yet
+                for original_dp_idx in requests_in_progress.copy().keys():
+                    if generations[original_dp_idx]['generation'] is None:  # not done yet
                         continue
                     # remove the completed task from in_progress
-                    requests_in_progress.pop(gen_id)
-
-                    outputs_to_dump.append(gen_dict)
-                    data_points_to_dump.append(original_dp)
+                    requests_in_progress.pop(original_dp_idx)
+                    output_dict = generations[original_dp_idx]
+                    outputs_to_dump.append(output_dict)
+                    data_points_to_dump.append(remaining_data_points[original_dp_idx])
 
                     pbar.update(1)
 

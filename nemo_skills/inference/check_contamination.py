@@ -133,139 +133,93 @@ class CheckContaminationTask(GenerationTask):
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
                 return {"generation": True}
         return None
+    
+    def llm_generate(self, data_points, data, is_async=False):
+        """Override the base class method to create a 1:N mapping between data points and contamination queries."""
+        # Create the query instances per data point
+        query_data_batch = [
+            query_point 
+            for data_point in data_points 
+            for query_point in self._create_query_data(data_point)
+        ]
+        
+        # Get the LLM judgement on the queries
+        outputs = super().llm_generate(query_data_batch, data, is_async)
+        
+        # Postprocessing of outputs to create a N:1 mapping between contamination results and data points
+        query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
+        
+        if not is_async:
+            output_idx = 0
+            proc_outputs = []
+            for _ in data_points:
+                proc_output = {"all_generations": [], "generation": False}
+                for output in outputs[output_idx : output_idx + query_per_data_point]:
+                    proc_output["all_generations"].append(output['generation'])
+                    # If any of the generations is True, then the data point is considered contaminated
+                    if output['generation'].strip() == "True":
+                        proc_output["generation"] = True
+                        
+                proc_outputs.append(proc_output)
+                output_idx += query_per_data_point
 
-    def sync_loop(self, data):
-        """Override the sync loop to check contamination."""
-        num_contaminated, total = 0, 0
-        with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
-            data_points_batch = []
-            for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
-                prefill_output = self._prefill_generation(data_point)
-                if prefill_output is not None:
-                    # We can bypass the LLM and directly dump the prefilled output
-                    self.dump_outputs([prefill_output], [data_point], fout)
+            return proc_outputs
+        else:
+            # Club the generation IDs into tuples for each data point
+            generation_ids = []
+            for idx in range(0, len(outputs), query_per_data_point):
+                # We mark each generation ID as "Unfinished" to indicate that it is not done yet
+                generation_ids.append(outputs[idx: idx + query_per_data_point])
+
+            return generation_ids
+
+    def get_llm_generations(self, requests_in_progress, generations):
+        """Override the base class method to synchronize the N:1 mapping between contamination results and original data points. This is done by getting the LLM generations for all the queries for each data point and then processing the "generation" key.
+        
+        requests_in_progress: A dictionary of the form {original_data_point_idx: gen_id_list}
+        generations: A dictionary of the form {original_data_point_idx: gen_dict}
+        """
+        for original_dp_idx, gen_id_list in requests_in_progress.items():
+            # Get the LLM generations for all the queries remaining for this data point
+            gen_dict_list = self.llm.get_generations(gen_id_list)
+            # If all generations have finished, we can process the "generation" key, otherwise keep it as None
+            rem_gen_id_list = []
+            for gen_id, gen_dict in zip(gen_id_list, gen_dict_list):
+                if gen_dict['generation'] is None:
+                    # If any of the generations is not done, we cannot process the data point
+                    rem_gen_id_list.append(gen_id)
                 else:
-                    data_points_batch.append(data_point)
+                    if "all_generations" not in generations[original_dp_idx]:
+                        generations[original_dp_idx]['all_generations'] = []
 
-                if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
-                    # Create paraphrase queries for each data point
-                    query_data = [
-                        query_point for data_point in data_points_batch 
-                        for query_point in self._create_query_data(data_point)
-                    ]
-                    # Get LLMs judgement on paraphrase queries for each data point
-                    outputs = self.llm_generate(query_data, data)
-                    output_idx = 0
+                    generations[original_dp_idx]['all_generations'].append(gen_dict['generation'])
+                    
+            # Update the requests in progress to include the remaining generation IDs
+            requests_in_progress[original_dp_idx] = rem_gen_id_list
 
-                    for original_data_point in data_points_batch:
-                        all_generations = []
-                        elem = {}
-                        contaminated = False
-                        query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
-                        for output in outputs[output_idx : output_idx + query_per_data_point]:
-                            all_generations.append(output['generation'])
-                            # If any of the generations is True, then the data point is considered contaminated
-                            if output['generation'].strip() == "True":
-                                contaminated = True
-                                break
-                        
-                        output_idx += query_per_data_point
-                        elem[self.cfg.generation_key] = contaminated
-                        
-                        if contaminated:
-                            num_contaminated += 1
-                        total += 1
-                        elem["all_generations"] = all_generations
-                        for key in elem:
-                            original_data_point.pop(key, None)
-                        elem.update(original_data_point)
-                        fout.write(json.dumps(elem) + '\n')
+            if rem_gen_id_list:
+                # There are still generations to be processed
+                generations[original_dp_idx]["generation"] = None
+            else:
+                # All generations have finished
+                # If any of the generations is True, then the data point is considered contaminated
+                contaminated_count = len([generation for generation in generations[original_dp_idx]['all_generations'] if generation.strip() == "True"])
+                generations[original_dp_idx]['generation'] = (contaminated_count > 0)
+
+        return (requests_in_progress, generations)
+
+    def _postprocess(self):
+        """Postprocess the output file to calculate the contamination portion."""
+        num_contaminated, total = 0, 0
+        with open(self.cfg.output_file, "r", encoding="utf-8", buffering=1) as fin:
+            for line in fin:
+                total += 1
+                data_point = json.loads(line)
+                if data_point[self.cfg.generation_key]:
+                    num_contaminated += 1
 
         if total > 0:
             LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)
-
-
-    def async_loop(self, data):
-        """Async loop to generate generations."""
-
-        # We first segregate the data into prefilled and non-prefilled data points
-        prefilled_data_points, prefilled_outputs = [], []
-        remaining_data_points = []
-
-        for idx, data_point in enumerate(data):
-            prefill_output = self._prefill_generation(data_point)
-            if prefill_output is not None:
-                prefilled_outputs.append(prefill_output)
-                prefilled_data_points.append(data_point)
-            else:
-                remaining_data_points.append(data_point)
-
-        pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
-        last_submitted_idx = 0
-        requests_in_progress = {}  # generation_id -> original data_point
-        data_point_idx_to_gen_ids = defaultdict(set)  # original data_point_idx -> set(generation_ids)
-        data_point_idx_to_all_generations = defaultdict(list)  # original data_point_idx -> [all generations]
-        with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
-            # Dump prefilled data first
-            if len(prefilled_data_points) > 0:
-                self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
-
-            while last_submitted_idx < len(remaining_data_points) or len(requests_in_progress) > 0:
-                num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
-                data_points_batch = remaining_data_points[last_submitted_idx:last_submitted_idx + num_to_submit]
-                if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
-                    # Create paraphrase queries for each data point
-                    query_data = [
-                        query_point for data_point in data_points_batch
-                        for query_point in self._create_query_data(data_point)
-                    ]
-                    # Assert that the number of queries is correct
-                    query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
-                    assert (len(query_data) == len(data_points_batch) * query_per_data_point, "Query data length mismatch")
-
-                    generation_ids = self.llm_generate(query_data, data, is_async=True)
-                    for idx, gen_id in enumerate(generation_ids):
-                        orig_data_point_idx = last_submitted_idx + idx // query_per_data_point
-                        requests_in_progress[gen_id] = orig_data_point_idx
-                        data_point_idx_to_gen_ids[orig_data_point_idx].add(gen_id)
-
-
-                    last_submitted_idx += num_to_submit
-
-                generations = self.llm.get_generations(list(requests_in_progress.keys()))
-
-                for (gen_id, data_point_idx), gen_dict in zip(requests_in_progress.copy().items(), generations):
-                    if gen_dict['generation'] is None:  # not done yet
-                        continue
-                    # remove the completed task from in_progress
-                    requests_in_progress.pop(gen_id)
-                    # Add the generation to the list of all generations for this data point
-                    data_point_idx_to_all_generations[data_point_idx].append(gen_dict['generation'])
-                    # Remove the generation from the set of generation ids for this data point
-                    data_point_idx_to_gen_ids[data_point_idx].remove(gen_id)
-
-                    # If all generations corresponding to this data point are done, we can dump the result
-                    if len(data_point_idx_to_gen_ids[data_point_idx]) == 0:
-                        # All generations for this data point are done, so we can dump the result
-                        data_point_idx_to_gen_ids.pop(data_point_idx)
-                        elem = {}
-                        elem['all_generations'] = data_point_idx_to_all_generations[data_point_idx]
-                        elem[self.cfg.generation_key] = False
-                        for generation in elem['all_generations']:
-                            if generation.strip() == "True":
-                                elem[self.cfg.generation_key] = True
-                                break
-
-                        elem.update(remaining_data_points[data_point_idx])
-                        fout.write(json.dumps(elem) + '\n')
-                        
-                        pbar.update(1)
-
-                time.sleep(1)  # Prevent excessive API overload
-
-            pbar.close()
-
-        self.restore_async_order()
 
 
 # Update the hydra main to use the class method
