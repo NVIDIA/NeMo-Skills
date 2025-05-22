@@ -113,7 +113,6 @@ class NemoRLTask:
 
 def get_training_cmd(
     cluster_config,
-    task: Optional[NemoRLTask],
     partition,
     hf_model,
     output_dir,
@@ -130,26 +129,21 @@ def get_training_cmd(
 ):
     timeout = get_timeout(cluster_config, partition)
 
-    if task is None:
-        task = NemoRLTask(
-            model=hf_model,
-            output_dir=output_dir,
-            prompt_data=prompt_data,
-            eval_data=eval_data,
-            num_gpus=num_gpus,
-            num_nodes=num_nodes,
-            expname=expname,
-            disable_wandb=disable_wandb,
-            wandb_project=wandb_project,
-            timeout=timeout,
-            extra_arguments=extra_arguments,
-            log_dir=log_dir,
-            cache_dir=cache_dir,
-        )
-
-    else:
-        task.timeout = timeout
-        task.extra_arguments = extra_arguments
+    task = NemoRLTask(
+        model=hf_model,
+        output_dir=output_dir,
+        prompt_data=prompt_data,
+        eval_data=eval_data,
+        num_gpus=num_gpus,
+        num_nodes=num_nodes,
+        expname=expname,
+        disable_wandb=disable_wandb,
+        wandb_project=wandb_project,
+        timeout=timeout,
+        extra_arguments=extra_arguments,
+        log_dir=log_dir,
+        cache_dir=cache_dir,
+    )
 
     return task.get_cmd()
 
@@ -236,7 +230,6 @@ def sft_nemo_rl(
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
-        task=None,
         partition=partition,
         hf_model=hf_model,
         output_dir=output_dir,
