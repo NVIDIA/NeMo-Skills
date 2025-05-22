@@ -16,17 +16,18 @@ from enum import Enum
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_free_port
+from nemo_skills.pipeline.utils import (
+    add_task, check_if_mounted,
+    get_cluster_config, get_exp,
+    get_generation_command,
+    get_free_port
+)
 from nemo_skills.utils import setup_logging
 
 
-def get_gradio_chat_cmd(executor, server_type, extra_args):
-    # if cluster is local, we want to automatically launch an app
-    # otherwise, we launch configuration page that asks for server address
-    mode = 'direct' if executor == "local" else 'manual'
+def get_gradio_chat_cmd(server_type, extra_args):
     cmd = (
         "python -m nemo_skills.inference.chat_interface.launch "
-        f"launch_mode={mode} "
         f"server_type={server_type} "
         f" {extra_args} "
     )
@@ -98,19 +99,13 @@ def start_server(
     }
 
     with get_exp("server", cluster_config) as exp:
+        cmd = ""
         if launch_chat_interface:
-            if server_type in ["trtllm", "nemo"]:
-                raise ValueError(f"Currently chat interface for {server_type} is not supported.")
-            add_task(
-                exp,
-                cmd=get_gradio_chat_cmd(cluster_config["executor"], server_type, extra_chat_args),
-                task_name='gradio_chat',
-                container="",
-                cluster_config=get_cluster_config(), # launch app locally
-            )
+            server_address = f"localhost:{server_config['server_port']}"
+            cmd = get_generation_command(server_address, get_gradio_chat_cmd(server_type, extra_chat_args))
         add_task(
             exp,
-            cmd="",  # not running anything except the server
+            cmd=cmd,
             task_name='server',
             log_dir=log_dir,
             container=cluster_config["containers"]["nemo-skills"],
