@@ -28,9 +28,9 @@ from nemo_skills.pipeline.utils import (
     get_timeout,
     run_exp,
 )
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import setup_logging, get_logger_name
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @dataclass
@@ -99,13 +99,12 @@ class NemoRLTask:
         return ray_job_cmd
 
     def get_cmd(self):
-
         self.logging_params = self.format_wandb_args()
         preamble_cmd = self.get_preamble_cmd()
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
-            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && " # comes from dockerfile
+            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && "
             f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/nemo-rl && "
             f"cd /opt/nemo-rl && "
@@ -207,7 +206,7 @@ def sft_nemo_rl(
     ),
     cache_dir: str = typer.Option(
         ...,
-        help="Path to the directory where the cache will be stored. This should be a mounted "
+        help="Path to the directory where the NeMo-RL uv cache will be stored. This should be a mounted "
         "path so the cache can be reused between jobs.",
     ),
     exclusive: bool = typer.Option(

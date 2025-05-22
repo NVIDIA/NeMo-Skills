@@ -16,6 +16,6 @@ from typer import Typer
 
 from nemo_skills.pipeline.app import app
 
-nemo_rl_app = Typer(help="nemo-rl training pipelines (run 'ns nemo-rl --help' for more information)")
+nemo_rl_app = Typer(help="nemo_rl training pipelines (run 'ns nemo_rl --help' for more information)")
 
-app.add_typer(nemo_rl_app, name="nemo-rl")
+app.add_typer(nemo_rl_app, name="nemo_rl")
