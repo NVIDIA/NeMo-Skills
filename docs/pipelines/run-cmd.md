@@ -49,7 +49,10 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-Then we can run the server and the inference code in a single command:
+Then we can run the server and the inference code in a single command as below. We will also show how to start the code 
+execution server that can be used to run arbitrary code in a sandboxed environment. This can be useful to safely 
+execute untrusted code or to run code that requires a specific environment in a container without affecting the host 
+system.
 
 ```bash
 ns run_cmd \
@@ -60,3 +63,5 @@ ns run_cmd \
     --with_sandbox \
     cd /nemo_run/code/ && python inference.py
 ```
+
+This will launch the LLM inference server, the
