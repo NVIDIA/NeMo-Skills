@@ -203,7 +203,7 @@ class CheckContaminationTask(GenerationTask):
             else:
                 # All generations have finished
                 # If any of the generations is True, then the data point is considered contaminated
-                contaminated_count = len([generation for generation in generations[original_dp_idx]['all_generations'] if generation.strip() == "True"])
+                contaminated = any([generation.strip() == "True" for generation in generations[original_dp_idx]['all_generations']])
                 generations[original_dp_idx]['generation'] = (contaminated_count > 0)
 
         return (requests_in_progress, generations)
