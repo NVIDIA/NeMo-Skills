@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# copied from https://github.com/NVIDIA/NeMo-RL/blob/main/examples/run_sft.py
+
 import argparse
 import os
 import pprint
