@@ -20,10 +20,11 @@ import typer
 from nemo_skills import utils
 from nemo_skills.pipeline import utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_exp, run_exp
-from nemo_skills.utils import setup_logging
+from nemo_skills.pipeline.generate import wrap_cmd
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_cmd(command):
@@ -77,6 +78,8 @@ def run_cmd(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
+    preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
+    postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="Whether to use the sandboxing feature to host the model"),
     log_dir: str = typer.Option(
@@ -141,6 +144,7 @@ def run_cmd(
 
         # Prepare command
         cmd = get_cmd(command=command)
+        cmd = wrap_cmd(cmd, preprocess_cmd, postprocess_cmd)
 
         # Wrap command with generation command if model is provided
         if model is not None and server_config is not None:

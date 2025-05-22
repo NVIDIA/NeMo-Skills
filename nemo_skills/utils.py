@@ -107,6 +107,10 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     return logger
 
 
+def get_logger_name(file):
+    return 'nemo_skills' + file.split('nemo_skills')[1].replace('/', '.').replace('.py', '')
+
+
 def get_skills_root_dir():
     """Get the root directory of the NeMo Skills package."""
     return os.path.dirname(os.path.dirname(os.path.abspath(nemo_skills.__file__)))

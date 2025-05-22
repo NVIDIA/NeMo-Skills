@@ -16,21 +16,23 @@
 """Script to prepare labeling data for GenSelect"""
 
 
-import os 
-import json
-from collections import defaultdict
-from utils import create_comparison_instance, segregate_instances
-import logging
-import random
 import argparse
-from transformers import AutoTokenizer
+import json
+import logging
 import multiprocessing as mp
-from functools import partial
+import os
+import random
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from nemo_skills.utils import unroll_files
+from functools import partial
+
+from transformers import AutoTokenizer
+from utils import create_comparison_instance, segregate_instances
+
+from nemo_skills.utils import get_logger_name, unroll_files
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(get_logger_name(__file__))
 import hashlib
 
 # Skip if the solutions are too long
@@ -39,13 +41,14 @@ SKIP_LENGTH = 100_000
 SAFE_SOLNS_LENGTH = 60_000
 # Maximum number of tokens in the solutions
 # This is based on the Qwen/QwQ-32B model. We can change this if we use a different model.
-# The rough estimate is 20K tokens for solutions + less than 4K tokens for problem + prompt, will allow for 16K tokens for the solution. 
+# The rough estimate is 20K tokens for solutions + less than 4K tokens for problem + prompt, will allow for 16K tokens for the solution.
 MAX_TOKEN_LENGTH = 20_000
 MODEL_NAME = "Qwen/QwQ-32B"
 
 
-
 _TOKENIZER = None
+
+
 def get_tokenizer():
     global _TOKENIZER
     if _TOKENIZER is None:
@@ -61,9 +64,11 @@ def read_data(file_paths):
                 instance = json.loads(line)
                 problem = instance["problem"]
                 problem_to_instances[problem].append(instance)
-            
+
     logger.warning(f"Number of problems: {len(problem_to_instances)}")
-    average_num_instances = sum([len(instances) for instances in problem_to_instances.values()]) / len(problem_to_instances)
+    average_num_instances = sum([len(instances) for instances in problem_to_instances.values()]) / len(
+        problem_to_instances
+    )
     logger.warning(f"Average number of instances: {average_num_instances}")
     return problem_to_instances
 
@@ -81,7 +86,7 @@ def process_problem_batch(problem_batch, max_instances_per_problem, max_solution
     tokenizer = get_tokenizer()
 
     processed_results = []
-    for (_, problem_instances) in problem_batch:
+    for _, problem_instances in problem_batch:
         # Segregate solutions into correct and incorrect
         correct_solutions, incorrect_solutions = segregate_instances(problem_instances)
         # Skip if no correct or no incorrect
@@ -106,10 +111,7 @@ def process_problem_batch(problem_batch, max_instances_per_problem, max_solution
                 # skip
                 continue
 
-            signature = hash_signature(
-                comparison_instance["problem"],
-                comparison_instance["solutions"]
-            )
+            signature = hash_signature(comparison_instance["problem"], comparison_instance["solutions"])
             if signature in unique_comparison_instances:
                 continue
 
@@ -131,8 +133,8 @@ def process_problem_batch(problem_batch, max_instances_per_problem, max_solution
 
 
 def prepare_data(
-        input_files, max_instances_per_problem=4, max_solutions=16, seed=10, 
-        num_workers=None, chunk_size=1000):
+    input_files, max_instances_per_problem=4, max_solutions=16, seed=10, num_workers=None, chunk_size=1000
+):
     if num_workers is None:
         num_workers = mp.cpu_count()
     random.seed(seed)
@@ -142,19 +144,19 @@ def prepare_data(
     problems = list(problem_to_instances.items())
 
     # chunk the problems
-    problem_chunks = [
-        problems[i:i+chunk_size] for i in range(0, len(problems), chunk_size)
-    ]
-    
+    problem_chunks = [problems[i : i + chunk_size] for i in range(0, len(problems), chunk_size)]
+
     all_unique_instances = []
     with ProcessPoolExecutor(max_workers=min(num_workers, len(problem_chunks))) as executor:
         # map over chunks
         results_iter = executor.map(
-            partial(process_problem_batch, 
-                    max_instances_per_problem=max_instances_per_problem,
-                    max_solutions=max_solutions, 
-                    seed=seed),
-            problem_chunks
+            partial(
+                process_problem_batch,
+                max_instances_per_problem=max_instances_per_problem,
+                max_solutions=max_solutions,
+                seed=seed,
+            ),
+            problem_chunks,
         )
         for chunk_idx, chunk_result in enumerate(results_iter, start=1):
             all_unique_instances.extend(chunk_result)
@@ -178,15 +180,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_files", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
-    
-    parser.add_argument("--max_instances_per_problem", type=int, default=8, 
-                        help="Maximum number of GenSelect instances per problem")
-    parser.add_argument("--max_solutions", type=int, default=16, 
-                        help="Maximum number of solutions that form the GenSelect input")
-    
+
+    parser.add_argument(
+        "--max_instances_per_problem", type=int, default=8, help="Maximum number of GenSelect instances per problem"
+    )
+    parser.add_argument(
+        "--max_solutions", type=int, default=16, help="Maximum number of solutions that form the GenSelect input"
+    )
+
     parser.add_argument("--seed", type=int, default=10)
     args = parser.parse_args()
 
-    unique_instances = prepare_data(
-        args.input_files, args.max_instances_per_problem, args.max_solutions, args.seed)
+    unique_instances = prepare_data(args.input_files, args.max_instances_per_problem, args.max_solutions, args.seed)
     save_data(unique_instances, args.output_dir)

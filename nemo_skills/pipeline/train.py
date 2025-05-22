@@ -23,17 +23,18 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_task,
-    get_free_port,
+    check_if_mounted,
     get_cluster_config,
     get_exp,
-    get_timeout,
-    run_exp,
+    get_free_port,
     get_mounted_path,
+    get_timeout,
     resolve_mount_paths,
+    run_exp,
 )
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 GRPO_VLLM_PORT = 4321
 

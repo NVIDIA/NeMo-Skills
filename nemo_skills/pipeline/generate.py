@@ -43,9 +43,9 @@ from nemo_skills.pipeline.utils import (
     run_exp,
     wrap_cmd,
 )
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, setup_logging, str_ids_to_list
+from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging, str_ids_to_list
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class SupportedServers(str, Enum):
@@ -54,6 +54,7 @@ class SupportedServers(str, Enum):
     nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
+    megatron = "megatron"
 
 
 def get_chunked_rs_filename(
@@ -156,11 +157,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
-    if done_jobs_str:
-        LOG.info(
-            "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
-            done_jobs_str,
-        )
     missing_jobs_str = ", ".join(
         [
             (
@@ -172,11 +168,20 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             if chunks
         ]
     )
+
     if missing_jobs_str:
-        LOG.info(
-            "The following jobs are incomplete and will be launched: seeds %s",
-            missing_jobs_str,
-        )
+        # only printing this if there are some missing and some done
+        if done_jobs_str:
+            LOG.warning(
+                "The following jobs are incomplete and will be launched: seeds %s",
+                missing_jobs_str,
+            )
+            LOG.warning(
+                "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
+                done_jobs_str,
+            )
+    else:
+        LOG.warning("All jobs are completed. No jobs will be launched (to override set --rerun_done).")
 
     return missing_jobs
 
@@ -293,6 +298,7 @@ def get_rm_cmd(
         f"    ++random_seed={random_seed} "
     )
     cmd += f" {extra_arguments} "
+    print(cmd)
     return cmd, postprocess_cmd
 
 
@@ -385,6 +391,7 @@ def configure_client(
     server_nodes,
     model,
     server_args,
+    server_entrypoint,
     extra_arguments,
 ):
     if server_address is None:  # we need to host the model
@@ -398,6 +405,7 @@ def configure_client(
             "num_gpus": server_gpus,
             "num_nodes": server_nodes,
             "server_args": server_args,
+            "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
         extra_arguments = (
@@ -434,6 +442,11 @@ def generate(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     num_random_seeds: int = typer.Option(
@@ -656,6 +669,7 @@ def generate(
                     server_nodes=server_nodes,
                     model=model,
                     server_args=server_args,
+                    server_entrypoint=server_entrypoint,
                     extra_arguments=extra_arguments_original,
                 )
                 cmd, full_postprocess_cmd = get_cmd(

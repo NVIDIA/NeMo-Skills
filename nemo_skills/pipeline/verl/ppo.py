@@ -32,9 +32,9 @@ from nemo_skills.pipeline.utils import (
     run_exp,
 )
 from nemo_skills.pipeline.verl import verl_app
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @dataclass
