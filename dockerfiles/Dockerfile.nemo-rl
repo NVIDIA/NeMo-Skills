@@ -26,7 +26,7 @@ ENV RAY_USAGE_STATS_ENABLED=0
 FROM base AS hermetic
 
 ARG NEMO_RL_COMMIT
-ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-cec9a60ff798554279ca494a0ef40ce5f283e0d8}
+ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-8e155f9427d9403086505f55c106339957fcba04}
 
 RUN git clone https://github.com/NVIDIA/NeMo-RL.git /opt/nemo-rl && cd /opt/nemo-rl && git checkout ${NEMO_RL_COMMIT}
 
