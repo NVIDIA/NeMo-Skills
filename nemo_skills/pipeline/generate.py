@@ -28,7 +28,7 @@ from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
     check_if_mounted,
-    check_remote_mount_directories,
+    check_remote_mounts,
     create_remote_directory,
     get_cluster_config,
     get_exp,
@@ -572,26 +572,15 @@ def generate(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths, create_remote_dir=check_mounted_paths)
 
-    # Check and mount output and log dirs
-    if check_mounted_paths:
-        create_remote_directory(output_dir, cluster_config)
-    else:
-        check_if_mounted(cluster_config, output_dir)
-    output_dir = get_mounted_path(cluster_config, output_dir)
-
-    if log_dir:
-        if check_mounted_paths:
-            create_remote_directory(log_dir, cluster_config)
-        else:
-            check_if_mounted(cluster_config, log_dir)
-        log_dir = get_mounted_path(cluster_config, log_dir)
-    else:
+    if not log_dir:
         log_dir = f"{output_dir}/generation-logs"
 
-    if check_mounted_paths:
-        # Perform final check that all mounted filepaths exist on the cluster
-        checked_paths = [output_dir]
-        check_remote_mount_directories(checked_paths, cluster_config)
+    output_dir, log_dir = check_remote_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]

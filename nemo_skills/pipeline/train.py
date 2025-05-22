@@ -24,6 +24,7 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
+    check_remote_mounts,
     get_cluster_config,
     get_exp,
     get_free_port,
@@ -307,6 +308,7 @@ def train(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -329,13 +331,12 @@ def train(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    output_dir = get_mounted_path(cluster_config, output_dir)
-    nemo_model = get_mounted_path(cluster_config, nemo_model)
-
-    if log_dir:
-        log_dir = get_mounted_path(cluster_config, log_dir)
-    else:
-        log_dir = output_dir
+    nemo_model, output_dir, log_dir = check_remote_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={nemo_model: None, output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if num_training_jobs > 0:
         if training_data is None:

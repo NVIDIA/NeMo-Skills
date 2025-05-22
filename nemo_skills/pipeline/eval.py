@@ -25,7 +25,7 @@ from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
     check_if_mounted,
-    check_remote_mount_directories,
+    check_remote_mounts,
     create_remote_directory,
     get_cluster_config,
     get_exp,
@@ -219,26 +219,12 @@ def eval(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    if check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, output_dir):
-            create_remote_directory(output_dir, cluster_config)
-    else:
-        check_if_mounted(cluster_config, output_dir)
-    output_dir = get_mounted_path(cluster_config, output_dir)
-
-    if log_dir:
-        if not is_mounted_filepath(cluster_config, log_dir):
-            create_remote_directory(log_dir, cluster_config)
-        else:
-            check_if_mounted(cluster_config, log_dir)
-        log_dir = get_mounted_path(cluster_config, log_dir)
-    else:
-        log_dir = f"{output_dir}/eval-logs"
-
-    if check_mounted_paths:
-        # Final check for existance of mounted paths
-        checked_files = [output_dir, log_dir]
-        check_remote_mount_directories(checked_files, cluster_config)
+    output_dir, log_dir = check_remote_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)

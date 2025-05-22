@@ -21,7 +21,14 @@ from nemo_skills import utils
 from nemo_skills.pipeline import utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    check_remote_mounts,
+    get_cluster_config,
+    get_exp,
+    run_exp,
+)
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -113,13 +120,7 @@ def run_cmd(
         cluster_config, mount_paths, create_remote_dir=check_mounted_paths
     )
 
-    # Setup log dir
-    if log_dir:
-        if check_mounted_paths:
-            pipeline_utils.create_remote_directory(log_dir, cluster_config)
-        else:
-            check_if_mounted(cluster_config, log_dir)
-        log_dir = pipeline_utils.get_mounted_path(cluster_config, log_dir)
+    log_dir = check_remote_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
     # Resolve if we need to use the inference server
     get_random_port = server_gpus is not None and server_gpus != 8 and not exclusive

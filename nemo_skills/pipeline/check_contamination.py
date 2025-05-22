@@ -24,7 +24,7 @@ from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
     check_if_mounted,
-    check_remote_mount_directories,
+    check_remote_mounts,
     create_remote_directory,
     get_cluster_config,
     get_exp,
@@ -137,32 +137,12 @@ def check_contamination(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    if check_mounted_paths:
-        if not is_mounted_filepath(cluster_config, input_file):
-            input_dir, input_filename = os.path.split(input_file)
-            add_mount_path(input_dir, "/mounted_data/input", cluster_config)
-
-        if not is_mounted_filepath(cluster_config, output_file):
-            output_dir, output_filename = os.path.split(output_file)
-            add_mount_path(output_dir, "/mounted_data/output", cluster_config)
-    else:
-        check_if_mounted(cluster_config, input_file)
-        check_if_mounted(cluster_config, output_file)
-
-    input_file = get_mounted_path(cluster_config, input_file)
-    output_file = get_mounted_path(cluster_config, output_file)
-
-    if log_dir:
-        if check_mounted_paths:
-            create_remote_directory(log_dir, cluster_config)
-        else:
-            check_if_mounted(cluster_config, log_dir)
-        log_dir = get_mounted_path(cluster_config, log_dir)
-
-    if check_mounted_paths:
-        # Final check for existence of mounted paths
-        checked_files = [input_file, output_file] + [log_dir] if log_dir else []
-        check_remote_mount_directories(checked_files, cluster_config)
+    input_file, output_file, log_dir = check_remote_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={input_file: "/mounted_data/input", output_file: "/mounted_data/output"},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"

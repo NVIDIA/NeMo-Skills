@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import nemo_run as run
 import yaml
@@ -141,6 +141,82 @@ def check_if_mounted(cluster_config, path_to_check):
 
     if not is_mounted_filepath(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
+
+
+def check_remote_mounts(
+    cluster_config, log_dir: str, mount_map: Dict[str, Optional[str]] = None, check_mounted_paths: bool = False
+):
+    """
+    Utility method to check if the paths are mounted, whether the remote directories exist, create them if they dont exist
+    and finally resolve their mounted paths.
+
+    Args:
+        cluster_config: cluster config dictionary
+        log_dir: optional str representing the log directory
+        mount_map: a dictionary mapping the paths to their default mount locations.
+            Keys must be the mount source, and values must be the mount destination.
+            If the mount destination is None, the path will not be mounted but still checked and remote directory will still be created.
+            Mount destinations must be absolute paths and begin with '/'.
+        check_mounted_paths: if True, will perform remote calls to dynamically mount the provided paths, and create
+            remote directories if required. Finally, will assert that all remote paths are valid files or directories.
+
+    Returns:
+        tuple: a tuple of the mounted paths for the provided paths in mount_map, and the log_dir
+    """
+    # Check if mount map is provided
+    mount_map = mount_map or {}
+
+    # Compute directory of all files
+    remote_dir_list = []
+
+    # Check paths and add to mount list if not mounted
+    if check_mounted_paths:
+        for idx, (path, default_mount) in enumerate(mount_map.items()):
+            if not is_mounted_filepath(cluster_config, path):
+                # check if the path is a file or a directory
+                # so that the directory can be created
+                is_file = os.path.splitext(path) != ""
+                if is_file:
+                    path_dir, _ = os.path.split(path)
+                else:
+                    path_dir = path
+                remote_dir_list.append(path_dir)
+
+                if default_mount is not None:
+                    # Check that path is not empty and is an absolute path
+                    assert (
+                        default_mount[0] == '/'
+                    ), f"Default mount path should be absolute path, given {default_mount}"
+
+                    # Add mount path to the cluster config
+                    add_mount_path(path_dir, default_mount, cluster_config)
+
+    else:
+        # Just check if the paths are mounted
+        for path in mount_map.keys():
+            check_if_mounted(cluster_config, path)
+
+    # check if the paths are mounted, get them if they arent but have mount sources
+    # will error out if there are no corresponding mount sources
+    new_paths = [get_mounted_path(cluster_config, path) for path in mount_map.keys()]
+
+    if log_dir:
+        if check_mounted_paths:
+            # Create log dir in some location that will be mounted
+            remote_dir_list.append(log_dir)
+        else:
+            check_if_mounted(cluster_config, log_dir)
+        log_dir = get_mounted_path(cluster_config, log_dir)
+
+    if check_mounted_paths:
+        # Create missing remote directories
+        if remote_dir_list:
+            create_remote_directory(remote_dir_list, cluster_config)
+
+        # Check that the file or dir exists at the remote location
+        check_remote_mount_directories(list(mount_map.keys()) + [log_dir], cluster_config)
+
+    return *new_paths, log_dir
 
 
 def get_mounted_path(cluster_config: dict, path: str):
