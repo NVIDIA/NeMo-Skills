@@ -208,7 +208,7 @@ class CheckContaminationTask(GenerationTask):
 
         return (requests_in_progress, generations)
 
-    def _postprocess(self):
+    def postprocess(self):
         """Postprocess the output file to calculate the contamination portion."""
         num_contaminated, total = 0, 0
         with open(self.cfg.output_file, "r", encoding="utf-8", buffering=1) as fin:
