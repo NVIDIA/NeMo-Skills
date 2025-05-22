@@ -14,13 +14,13 @@
 
 
 import abc
-from collections.abc import Generator
 import json
 import logging
 import os
 import re
 import time
 import uuid
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -28,7 +28,9 @@ import openai
 import requests
 from openai import DefaultHttpxClient, Stream
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
@@ -355,7 +357,7 @@ class TRTLLMModel(BaseModel):
             'stop_phrases': stop_phrases,
             'top_logprobs': top_logprobs,
             'timeout': timeout,
-            'stream': stream
+            'stream': stream,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -496,6 +498,7 @@ class NemoModel(BaseModel):
         remove_stop_phrases: bool = True,
         stream: bool = False,
     ) -> list[dict]:
+        # we are overriding generate directly, since nemo doesn't support inflight batching
         if min_p > 0:
             raise NotImplementedError("Nemo server does not support min_p parameter.")
         if top_logprobs is not None:
@@ -503,7 +506,6 @@ class NemoModel(BaseModel):
         if timeout is not None:
             raise NotImplementedError("Nemo server does not support timeout parameter.")
 
-        # we are overriding generate directly, since nemo doesn't support inflight batching
         if isinstance(prompts[0], dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
@@ -727,7 +729,9 @@ class OpenAIModel(BaseModel):
 
                 LOG.warning(
                     "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
-                    wait_time, retry_count, self.max_retries
+                    wait_time,
+                    retry_count,
+                    self.max_retries,
                 )
                 time.sleep(wait_time)
             except openai.BadRequestError as e:
@@ -966,9 +970,198 @@ class VLLMModel(BaseModel):
                     yield {"generation": remaining}
 
 
+class MegatronModel(BaseModel):
+    # it's partially openai-compatible but not fully, so can't easily reuse the other class..
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # TODO: duplication with vllm class, need to address this
+        self._tunnel = None
+        if self.ssh_server and self.ssh_key_path:
+            import sshtunnel
+
+            if '@' in self.ssh_server:
+                ssh_username, ssh_server = self.ssh_server.split('@')
+            else:
+                ssh_server = self.ssh_server
+                ssh_username = None
+
+            self._tunnel = sshtunnel.SSHTunnelForwarder(
+                (ssh_server, 22),
+                ssh_username=ssh_username,
+                ssh_pkey=self.ssh_key_path,
+                remote_bind_address=(self.server_host, int(self.server_port)),
+            )
+            self._tunnel.start()
+            # Use localhost with tunneled port for OpenAI client
+            # This way all traffic to server_host:server_port goes through SSH tunnel
+            self.server_host = '127.0.0.1'
+            self.server_port = str(self._tunnel.local_bind_port)
+
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
+        self.oai_client = openai.OpenAI(
+            api_key="EMPTY",
+            base_url=f"http://{self.server_host}:{self.server_port}",  # note there is no /v1 here
+            timeout=None,
+            http_client=http_client,
+        )
+
+    def __del__(self):
+        if self._tunnel:
+            self._tunnel.stop()
+
+    def _generate_single(
+        self,
+        prompt: str | dict,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
+        stop_phrases: list[str] | None = None,
+        stream: bool = False,
+    ) -> dict | Stream:
+        if isinstance(prompt, dict):
+            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
+        if stream is True:
+            raise NotImplementedError("Megatron server does not support streaming.")
+        if min_p > 0:
+            raise NotImplementedError("Megatron server does not support min_p parameter.")
+        if repetition_penalty != 1.0:
+            raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
+        if top_k != 0:
+            raise NotImplementedError("Megatron server does not support top_k parameter.")
+
+        stop_phrases = stop_phrases or []
+
+        response = self.oai_client.completions.create(
+            model="model",
+            prompt=[prompt],
+            max_tokens=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=top_logprobs,
+            logit_bias=None,
+            stream=stream,
+            n=1,
+            timeout=timeout,
+        )
+
+        return self.parse_openai_response(response)
+
+    def generate(
+        self,
+        prompts: list[str | dict],
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
+        remove_stop_phrases: bool = True,
+        stream: bool = False,
+    ) -> dict | Stream:
+        # overriding generate to provide batched support as there is on inflight-batching
+        if isinstance(prompts[0], dict):
+            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
+        if stream is True:
+            raise NotImplementedError("Megatron server does not support streaming.")
+        if min_p > 0:
+            raise NotImplementedError("Megatron server does not support min_p parameter.")
+        if repetition_penalty != 1.0:
+            raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
+        if top_k != 0:
+            raise NotImplementedError("Megatron server does not support top_k parameter.")
+        stop_phrases = stop_phrases or []
+
+        if top_logprobs is None:
+            top_logprobs = 0
+
+        response = self.oai_client.completions.create(
+            model="model",
+            prompt=prompts,
+            max_tokens=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            echo=False,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=top_logprobs,
+            logit_bias=None,
+            stream=stream,
+            n=1,
+            timeout=timeout,
+        )
+
+        outputs = self.parse_openai_response(response, batch=True)
+
+        if remove_stop_phrases:
+            for output in outputs:
+                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+
+        return outputs
+
+    @classmethod
+    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False) -> dict | list[dict]:
+        """Parse OpenAI response to extract the generated text and other metadata.
+
+        Args:
+            response: The response from OpenAI API
+            batch: Whether the response contains multiple generations (batch mode)
+
+        Returns:
+            A single dict with generation info or a list of dicts for batch mode
+        """
+
+        def process_choice(choice):
+            output = choice.text
+            # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+            if choice.finish_reason == "stop":
+                if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                    output += choice.stop_reason
+                # sglang has a little different api here
+                if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                    output += choice.matched_stop
+
+            result = {'generation': output, 'num_generated_tokens': -1}
+            if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
+                result['logprobs'] = choice.logprobs.token_logprobs
+                result['tokens'] = choice.logprobs.tokens
+                result['top_logprobs'] = choice.logprobs.top_logprobs
+                result['num_generated_tokens'] = len(choice.logprobs.tokens)
+            return result
+
+        if batch:
+            return [process_choice(choice) for choice in response.choices]
+        else:
+            assert not isinstance(response, list)
+            assert len(response.choices) == 1
+            return process_choice(response.choices[0])
+
+
 models = {
     'trtllm': TRTLLMModel,
     'nemo': NemoModel,
+    'megatron': MegatronModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,  # interface is the same
