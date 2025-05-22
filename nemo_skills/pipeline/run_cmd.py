@@ -88,7 +88,7 @@ def run_cmd(
     preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    with_sandbox: bool = typer.Option(False, help="Whether to use the sandboxing feature to host the model"),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
