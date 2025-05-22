@@ -241,7 +241,7 @@ def get_mounted_path(cluster_config: dict, path: str):
 
     # Find which mount path matches the filepaths prefix
     mount_path = None
-    for mount in cluster_config['mounts']:
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         mount_source, mount_dest = mount.split(':')
         if path.startswith(mount_source):
             mount_path = mount
@@ -288,7 +288,7 @@ def get_unmounted_path(cluster_config: dict, path: str):
 
     # Find which mount path matches the filepaths prefix
     mount_path = None
-    for mount in get_mounts_from_config(cluster_config):
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         mount_source, mount_dest = mount.split(':')
         if path.startswith(mount_dest):
             mount_path = mount
@@ -301,7 +301,7 @@ def get_unmounted_path(cluster_config: dict, path: str):
     if mount_path is None:
         raise ValueError(
             f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
-            f"{cluster_config['mounts']}"
+            f"{cluster_config['mounts'] + ['/nemo_run/code:/nemo_run/code']}"
         )
 
     # replace the mount destination inside the filepath with the mount source
@@ -320,7 +320,7 @@ def add_mount_path(mount_source: str, mount_dest: str, cluster_config):
         raise ValueError("Cluster config is not provided.")
 
     if 'mounts' in cluster_config:
-        original_mounts = get_mounts_from_config(cluster_config)
+        original_mounts = get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']
         added_mount = False
         for mount_path in original_mounts:
             source, destination = mount_path.split(':')
