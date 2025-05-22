@@ -93,22 +93,22 @@ def summarize_results(
         cluster_config = get_cluster_config(cluster, config_dir)
         cluster_config = resolve_mount_paths(cluster_config, mount_paths)
         check_if_mounted(cluster_config, results_dir)
-    if cluster == "local":
-        results_dir = get_unmounted_path(cluster_config, results_dir)
-    elif cluster is not None:
-        upload_path = results_dir
-        tunnel = get_tunnel(cluster_config)
-        temp_dir = tempfile.mkdtemp()
-        print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
-        os.makedirs(temp_dir, exist_ok=True)
-        cluster_download(
-            tunnel,
-            get_unmounted_path(cluster_config, results_dir),
-            temp_dir,
-            remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
-            verbose=verbose,
-        )
-        results_dir = Path(temp_dir) / Path(results_dir).name
+        if cluster_config.get("executor", "") == "local":
+            results_dir = get_unmounted_path(cluster_config, results_dir)
+        else:
+            upload_path = results_dir
+            tunnel = get_tunnel(cluster_config)
+            temp_dir = tempfile.mkdtemp()
+            print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
+            os.makedirs(temp_dir, exist_ok=True)
+            cluster_download(
+                tunnel,
+                get_unmounted_path(cluster_config, results_dir),
+                temp_dir,
+                remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
+                verbose=verbose,
+            )
+            results_dir = Path(temp_dir) / Path(results_dir).name
 
     # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
 
