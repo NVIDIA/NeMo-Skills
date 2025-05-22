@@ -24,7 +24,7 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
-    check_remote_mounts,
+    check_mounts,
     get_cluster_config,
     get_exp,
     get_free_port,
@@ -331,7 +331,7 @@ def train(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    nemo_model, output_dir, log_dir = check_remote_mounts(
+    nemo_model, output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
         mount_map={nemo_model: None, output_dir: None},

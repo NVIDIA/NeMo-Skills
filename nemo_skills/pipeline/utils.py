@@ -143,7 +143,7 @@ def check_if_mounted(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
-def check_remote_mounts(
+def check_mounts(
     cluster_config, log_dir: str, mount_map: Dict[str, Optional[str]] = None, check_mounted_paths: bool = False
 ):
     """
@@ -790,6 +790,7 @@ def get_sandox_command(cluster_config):
     return "/entrypoint.sh && /start.sh"
 
 
+# TODO: Unify the signature of generate.py to use this
 def configure_client(
     *,  # Force keyword arguments
     model: str,

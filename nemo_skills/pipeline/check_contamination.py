@@ -24,7 +24,7 @@ from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
     check_if_mounted,
-    check_remote_mounts,
+    check_mounts,
     create_remote_directory,
     get_cluster_config,
     get_exp,
@@ -137,7 +137,7 @@ def check_contamination(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    input_file, output_file, log_dir = check_remote_mounts(
+    input_file, output_file, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
         mount_map={input_file: "/mounted_data/input", output_file: "/mounted_data/output"},

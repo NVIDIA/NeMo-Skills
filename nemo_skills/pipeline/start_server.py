@@ -20,7 +20,7 @@ from nemo_skills.pipeline.utils import (
     add_mount_path,
     add_task,
     check_if_mounted,
-    check_remote_mounts,
+    check_mounts,
     create_remote_directory,
     get_cluster_config,
     get_exp,
@@ -89,14 +89,7 @@ def start_server(
     except AttributeError:
         pass
 
-    log_dir = check_remote_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
-
-    if log_dir:
-        if check_mounted_paths:
-            create_remote_directory(log_dir, cluster_config)
-        else:
-            check_if_mounted(cluster_config, log_dir)
-        log_dir = get_mounted_path(cluster_config, log_dir)
+    log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
     server_config = {
         "model_path": model,

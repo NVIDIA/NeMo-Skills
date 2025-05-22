@@ -21,14 +21,7 @@ from nemo_skills import utils
 from nemo_skills.pipeline import utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
-from nemo_skills.pipeline.utils import (
-    add_task,
-    check_if_mounted,
-    check_remote_mounts,
-    get_cluster_config,
-    get_exp,
-    run_exp,
-)
+from nemo_skills.pipeline.utils import add_task, check_if_mounted, check_mounts, get_cluster_config, get_exp, run_exp
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -53,7 +46,9 @@ def run_cmd(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    command: str = typer.Option(None, help="Command to run in the container. Can also be specified as extra arguments."),
+    command: str = typer.Option(
+        None, help="Command to run in the container. Can also be specified as extra arguments."
+    ),
     container: str = typer.Option("nemo-skills", help="Container to use for the run"),
     expname: str = typer.Option("script", help="Nemo run experiment name"),
     partition: str = typer.Option(
@@ -121,7 +116,7 @@ def run_cmd(
         cluster_config, mount_paths, create_remote_dir=check_mounted_paths
     )
 
-    log_dir = check_remote_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
+    log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
     with get_exp(expname, cluster_config) as exp:
         # Setup server config if model is provided
