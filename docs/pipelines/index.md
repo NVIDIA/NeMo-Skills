@@ -93,13 +93,13 @@ All scripts inside pipeline folder have the following parameters.
   `--mount_paths /my/remote/workspace:/workspace` to mount `/workspace` folder from the host
   machine to the slurm job.
 - **--check_mounted_paths**: This flag offers a few different capabilities for convenience:
-  - Check if the paths specified in the script are mounted correctly. This is useful if you want to make 
+    - Check if the paths specified in the script are mounted correctly. This is useful if you want to make 
     sure that the paths that are mounted are available  on remote machine before running the job. 
     E.g. use `--check_mounted_paths` to check if `/my/remote/workspace` folder from the host machine 
     is a folder that exists and can be mounted.
-  - In many cases, if the directory does not exist, we will create it for you. This is useful for 
+    - In many cases, if the directory does not exist, we will create it for you. This is useful for 
     output and log directories.
-  - If paths are provided but not mounted, often times we will dynamically mount them for you.
+    - If paths are provided but not mounted, often times we will dynamically mount them for you.
 - **--partition**: Can be used to run in a specific slurm partition (e.g. commonly used
   to launch interactive jobs).
 - **--not_exclusive**: Can be used if you want to request a part o the slurm node. By default
