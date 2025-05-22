@@ -53,7 +53,7 @@ def run_cmd(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
-    command: str = typer.Option(None, help="Command to run in the container"),
+    command: str = typer.Option(None, help="Command to run in the container. Can also be specified as extra arguments."),
     container: str = typer.Option("nemo-skills", help="Container to use for the run"),
     expname: str = typer.Option("script", help="Nemo run experiment name"),
     partition: str = typer.Option(
@@ -88,7 +88,7 @@ def run_cmd(
     preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    with_sandbox: bool = typer.Option(False, help="Whether to use the sandboxing feature to host the model"),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
