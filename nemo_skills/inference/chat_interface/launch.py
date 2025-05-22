@@ -41,7 +41,7 @@ def launch(cfg: AppConfig):
     ui = ChatUI(ctx)
 
     app = ui.launch()
-    app.queue().launch()
+    app.queue().launch(server_port=7885)
 
 
 if __name__ == "__main__":

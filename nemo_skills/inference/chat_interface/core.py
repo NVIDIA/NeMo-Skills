@@ -56,7 +56,7 @@ class AppConfig:
     add_remaining_code_executions: bool = True
 
     # UI behaviour
-    launch_mode: str = "manual"  # or "direct"
+    launch_mode: str = "direct"  # or "manual"
 
     # Model capabilities: "cot", "tir", "both" (toggleable)
     supported_modes: str = "both"
