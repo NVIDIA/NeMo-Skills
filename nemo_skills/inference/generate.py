@@ -467,11 +467,15 @@ class GenerationTask:
 
     def get_llm_generations(self, requests_in_progress, generations):
         """Get the LLM generations from the output file. 
-        To allow for stateful generation, we also pass in the generations dictionary."""
+        To allow for stateful generation, we also pass in the generations dictionary.
+        In most cases, stateful generation is not needed.
+        """
 
-        original_dp_idx_to_gen_id = {value: key for key, value in requests_in_progress.items()}
-        for original_dp_idx, gen_id in original_dp_idx_to_gen_id.items():
-            generations[original_dp_idx] = self.llm.get_generations([gen_id])[0]
+        gen_ids = list(requests_in_progress.values())
+        outputs = self.llm.get_generations(gen_ids)
+
+        for dp_idx, output in zip(requests_in_progress.keys(), outputs):
+            generations[dp_idx] = output
 
         return (requests_in_progress, generations)
     
