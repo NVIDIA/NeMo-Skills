@@ -19,6 +19,7 @@ from typing import List, Optional
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.nemo_rl import nemo_rl_app
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
@@ -160,7 +161,7 @@ def get_training_cmd(
     return task.get_cmd()
 
 
-@app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@nemo_rl_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def sft_nemo_rl(
     ctx: typer.Context,
@@ -215,7 +216,7 @@ def sft_nemo_rl(
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
 ):
-    """Runs Verl PPO training (verl.trainer.main_ppo)"""
+    """Runs NeMo-RL SFT training """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
