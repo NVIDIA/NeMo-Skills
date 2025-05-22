@@ -29,7 +29,9 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class RewardModelConfig(GenerateSolutionsConfig):
-    """LLM reward model parameters."""
+    """LLM reward model parameters. 
+For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """
 
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
     output_file: str | None = None  # Where to save the generations if `input_file` is provided
@@ -44,6 +46,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
     random_seed: str | None = None
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
     # Async loop is currently not supported for reward model
@@ -61,9 +64,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
     reward_model_type: str = "orm"
 
     def __post_init__(self):
-        self._post_init_validate_data()
-        self._post_init_validate_server()
-        self._post_init_validate_params()
+        super().__post_init__()
 
     def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
@@ -115,9 +116,12 @@ def score(cfg: RewardModelConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(
-    RewardModelConfig,
-    server_params=server_params(),
+HELP_MESSAGE = (
+    RewardModelConfig.__doc__ + "\n\n" + 
+    get_help_message(
+        RewardModelConfig,
+        server_params=server_params(), 
+    )
 )
 
 

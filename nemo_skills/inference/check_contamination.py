@@ -31,13 +31,16 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class CheckContaminationConfig(GenerateSolutionsConfig):
-    """Top-level parameters for the script"""
+    """LLM-based check contamination parameters. 
+For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """
 
     input_file: str | None = None  # an output of the retrieve_similar.py script
     output_file: str | None = None  # where to save the generations
 
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
     # Override the default Generation config here
@@ -53,9 +56,7 @@ class CheckContaminationConfig(GenerateSolutionsConfig):
     top_k: int | None = None
 
     def __post_init__(self):
-        self._post_init_validate_data()
-        self._post_init_validate_server()
-        self._post_init_validate_params()
+        super().__post_init__()
 
     def _post_init_validate_data(self):
         """Validate that the data parameters adhere to the expected values"""
@@ -277,11 +278,13 @@ def check_contamination(cfg: CheckContaminationConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(
-    CheckContaminationConfig,
-    server_params=server_params(),
+HELP_MESSAGE = (
+    CheckContaminationConfig.__doc__ + "\n\n" + 
+    get_help_message(
+        CheckContaminationConfig,
+        server_params=server_params(), 
+    )
 )
-
 
 if __name__ == "__main__":
     if '--help' in sys.argv or '-h' in sys.argv:
