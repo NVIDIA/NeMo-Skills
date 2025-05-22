@@ -28,7 +28,7 @@ from nemo_skills.utils import setup_logging
 def get_gradio_chat_cmd(model, server_type, extra_args):
     cmd = (
         "python -m nemo_skills.inference.chat_interface.launch "
-        f"model_config_path={model}/config.json"
+        f"model_config_path={model}/config.json "
         f"server_type={server_type} "
         f" {extra_args} "
     )
