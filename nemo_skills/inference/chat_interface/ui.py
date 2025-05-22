@@ -77,7 +77,6 @@ class ChatUI:
             # chat panel needs to exist before server panel (server panel references it in outputs list)
             self._build_chat_panel()
 
-        self.server_group.visible = False
         self.chat_group.visible = True
         # Toggle is available only when the backend supports *both* modes.  For single-
         # mode models ("cot" or "tir") we force the checkbox to the correct state and
