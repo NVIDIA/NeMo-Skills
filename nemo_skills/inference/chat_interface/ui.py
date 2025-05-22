@@ -73,6 +73,8 @@ class ChatUI:
         # Flag toggled by the "Cancel generation" button to interrupt streaming.
         self.cancel_requested: bool = False
         self.turns_for_prompt: list[dict] = []
+        # Track the current prompt config override (None means use default)
+        self.prompt_config_override: str | None = None
 
         with gr.Blocks(title="AI Chat Interface", theme=gr.themes.Soft(), css=_CUSTOM_CSS) as self.demo:
             # chat panel needs to exist before server panel (server panel references it in outputs list)
@@ -87,11 +89,25 @@ class ChatUI:
         self.code_exec_checkbox.interactive = can_toggle
         if not can_toggle:
             # Force checkbox value based on capabilities.
-            self.code_exec_checkbox.value = (mode_cap == "tir")
+            forced_code_exec = (mode_cap == "tir")
+            self.code_exec_checkbox.value = forced_code_exec
+            # Also update the prompt config to match the forced mode
+            correct_prompt = self._get_default_prompt_config(forced_code_exec)
+            self.prompt_config_tb.value = correct_prompt
             note = (
                 "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
             )
             self.subtitle_md.value = f"Status: {note}"
+
+    def _get_default_prompt_config(self, use_code: bool) -> str:
+        """Get the default prompt config based on code execution state."""
+        return self.ctx.cfg.code_prompt_config if use_code else self.ctx.cfg.base_prompt_config
+
+    def _get_current_prompt_config(self, use_code: bool) -> str:
+        """Get the current prompt config, either override or default."""
+        if self.prompt_config_override:
+            return self.prompt_config_override
+        return self._get_default_prompt_config(use_code)
 
     # ------------------------------------------------------------------
     # UI builders
@@ -100,12 +116,24 @@ class ChatUI:
         with gr.Column(visible=False) as self.chat_group:
             gr.Markdown("## Chat")
             self.subtitle_md = gr.Markdown("")
+            
+            # Parameters panel
+            with gr.Accordion("Parameters", open=False) as self.params_accordion:
+                with gr.Row():
+                    self.max_tokens = gr.Slider(50, 20000, value=4000, step=50, label="Max new tokens")
+                    self.temperature = gr.Slider(0.0, 1.2, value=0.0, step=0.05, label="Temperature")
+                self.code_exec_checkbox = gr.Checkbox(label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state)
+                # Set initial prompt config based on initial code execution state
+                initial_prompt = self._get_default_prompt_config(self.ctx.cfg.initial_code_execution_state)
+                self.prompt_config_tb = gr.Textbox(
+                    value=initial_prompt,
+                    label="Prompt Config", 
+                    placeholder="e.g., generic/math or openmath/tir",
+                    info="Override prompt config for this chat session (clears on chat reset)"
+                )
+            
             # Sandbox banner (hidden by default)
             self.banner_html = gr.HTML(value="", visible=False)
-            with gr.Row():
-                self.max_tokens = gr.Slider(50, 20000, value=4000, step=50, label="Max new tokens")
-                self.temperature = gr.Slider(0.0, 1.2, value=0.0, step=0.05, label="Temperature")
-            self.code_exec_checkbox = gr.Checkbox(label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state)
             self.chatbot = gr.Chatbot(height=450, show_label=False, bubble_full_width=False)
             with gr.Row(elem_id="input-row", equal_height=True):
                 self.msg_tb = gr.Textbox(show_label=False, placeholder="Type your message...", lines=3, scale=8, elem_id="msg-box")
@@ -119,7 +147,12 @@ class ChatUI:
             self.code_exec_checkbox.change(
                 self.on_toggle_code_exec,
                 inputs=[self.code_exec_checkbox],
-                outputs=[self.subtitle_md, self.code_exec_checkbox, self.banner_html],
+                outputs=[self.subtitle_md, self.code_exec_checkbox, self.banner_html, self.prompt_config_tb],
+            )
+            self.prompt_config_tb.change(
+                self.on_prompt_config_change,
+                inputs=[self.prompt_config_tb],
+                outputs=[],
             )
             self.send_btn.click(
                 self.handle_chat_submit,
@@ -131,13 +164,28 @@ class ChatUI:
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
                 outputs=[self.chatbot, self.banner_html, self.send_btn, self.cancel_btn],
             ).then(lambda: gr.update(value=""), None, [self.msg_tb])
-            self.clear_btn.click(self.on_clear_chat, None, [self.chatbot, self.msg_tb])
+            self.clear_btn.click(self.on_clear_chat, None, [self.chatbot, self.msg_tb, self.prompt_config_tb])
             # Bind cancel event – returns updates for both send and cancel buttons.
             self.cancel_btn.click(self.on_cancel, None, [self.send_btn, self.cancel_btn])
 
     # ------------------------------------------------------------------
     # Event callbacks
     # ------------------------------------------------------------------
+    def on_prompt_config_change(self, prompt_config_value: str):
+        """Handle prompt config override changes."""
+        if prompt_config_value.strip():
+            # Only set override if it's different from the current default
+            default_config = self._get_default_prompt_config(self.code_exec_checkbox.value)
+            if prompt_config_value.strip() != default_config:
+                self.prompt_config_override = prompt_config_value.strip()
+                logger.info("Set prompt config override: %s", self.prompt_config_override)
+            else:
+                self.prompt_config_override = None
+                logger.info("Cleared prompt config override (matches default)")
+        else:
+            self.prompt_config_override = None
+            logger.info("Cleared prompt config override (empty field)")
+
     def on_toggle_code_exec(self, checkbox_val: bool):
         # Respect declared capabilities – disallow switching if model is single-mode.
         mode_cap = self.ctx.cfg.supported_modes
@@ -148,10 +196,13 @@ class ChatUI:
                 "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
             )
             self.latest_code_status = self.ctx.loader.get_code_execution_status(allowed_val)
+            # Keep current prompt config override unchanged
+            current_prompt = self.prompt_config_tb.value
             return (
                 f"{msg}",
                 gr.update(value=allowed_val),
                 self._banner_from_code_status(self.latest_code_status),
+                gr.update(value=current_prompt),
             )
 
         # If we reach here, the toggle is allowed.
@@ -168,10 +219,16 @@ class ChatUI:
             else gr.update()
         )
 
+        # Update prompt config to default for the new mode if no override is set
+        new_prompt_config = self.prompt_config_tb.value
+        if not self.prompt_config_override:
+            new_prompt_config = self._get_default_prompt_config(checkbox_val)
+
         return (
             f"Status: {status_txt}",
             checkbox_update,
             self._banner_from_code_status(self.latest_code_status),
+            gr.update(value=new_prompt_config),
         )
 
     def on_cancel(self):
@@ -189,9 +246,17 @@ class ChatUI:
         )
     
     def on_clear_chat(self):
-        """Clear chat history both in UI and internal state."""
+        """Clear chat history both in UI and internal state, and reset prompt config override."""
         self.turns_for_prompt = []
-        return None, ""
+        # Reset prompt config to default based on current code execution state
+        default_prompt = self._get_default_prompt_config(self.code_exec_checkbox.value)
+        
+        # Clear the override AFTER getting the default to ensure consistency
+        self.prompt_config_override = None
+        
+        logger.info("Clear chat: resetting prompt config to %s", default_prompt)
+        # Explicitly update the field value using gr.update
+        return None, "", gr.update(value=default_prompt)
 
     def handle_chat_submit(self, user_msg: str, max_tokens: int, temperature: float):
         if not user_msg.strip():
@@ -242,6 +307,7 @@ class ChatUI:
                 max_tokens,
                 temperature,
                 self.latest_code_status,
+                prompt_config_override=self._get_current_prompt_config(self.latest_code_status == CodeExecStatus.ENABLED),
             )
             for chunk in stream:
                 if self.cancel_requested:

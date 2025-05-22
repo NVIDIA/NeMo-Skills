@@ -130,8 +130,14 @@ class PromptManager:
         self._cfg = cfg
         self._cache: Dict[str, Prompt] = {}
 
-    def get(self, use_code: bool) -> Prompt:
+    def get(self, use_code: bool, prompt_config_override: str | None = None) -> Prompt:
         """Initialize and cache the requested prompt object."""
+        if prompt_config_override:
+            # When using override, always load fresh (don't cache overrides)
+            logger.debug("Loading prompt config override: %s", prompt_config_override)
+            prompt = get_prompt(prompt_config=prompt_config_override, prompt_template=self._cfg.prompt_template)
+            return prompt
+        
         path = self._cfg.code_prompt_config if use_code else self._cfg.base_prompt_config
         if path in self._cache:
             return self._cache[path]

@@ -35,6 +35,7 @@ class ChatService:
         tokens_to_generate: int,
         temperature: float,
         status: CodeExecStatus,
+        prompt_config_override: str | None = None,
     ) -> Iterator[str]:
         """Yield the bot response incrementally as plain text chunks."""
 
@@ -43,7 +44,7 @@ class ChatService:
         if llm is None:
             raise RuntimeError("No active LLM available.")
 
-        prompt_obj = self._prompts.get(use_code)
+        prompt_obj = self._prompts.get(use_code, prompt_config_override)
         prompt_kwargs = {
             "turns": turns,
         }
