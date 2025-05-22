@@ -166,8 +166,8 @@ def sft_nemo_rl(
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
-    train_data: str = typer.Option(None, help="Path to the prompt data"),
-    eval_data: str = typer.Option(None, help="Path to the eval data"),
+    training_data: str = typer.Option(None, help="Path to the training data"),
+    validation_data: str = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -224,14 +224,14 @@ def sft_nemo_rl(
         log_dir = output_dir
 
     if num_training_jobs > 0:
-        if train_data is None:
-            raise ValueError("prompt_data is required when num_training_jobs > 0")
-        if train_data.startswith("/"):  # could ask to download from HF
-            check_if_mounted(cluster_config, train_data)
-        if eval_data is None:
-            eval_data = train_data
+        if training_data is None:
+            raise ValueError("training_data is required when num_training_jobs > 0")
+        if training_data.startswith("/"):  # could ask to download from HF
+            check_if_mounted(cluster_config, training_data)
+        if validation_data is None:
+            validation_data = training_data
         else:
-            check_if_mounted(cluster_config, eval_data)
+            check_if_mounted(cluster_config, validation_data)
         check_if_mounted(cluster_config, cache_dir)
 
     train_cmd = get_training_cmd(
@@ -240,8 +240,8 @@ def sft_nemo_rl(
         partition=partition,
         hf_model=hf_model,
         output_dir=output_dir,
-        prompt_data=train_data,
-        eval_data=eval_data,
+        prompt_data=training_data,
+        eval_data=validation_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,
