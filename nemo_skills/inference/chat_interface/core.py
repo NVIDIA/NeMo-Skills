@@ -15,11 +15,13 @@
 from __future__ import annotations
 
 import logging
-import time
 import requests
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Tuple, Dict
+from pathlib import Path
+import re
+import json
 
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.inference.server.code_execution_model import get_code_execution_model
@@ -53,10 +55,54 @@ class AppConfig:
     # Code-execution related
     initial_code_execution_state: bool = False
     max_code_executions: int = 8
-    add_remaining_code_executions: bool = True
+    add_remaining_code_executions: bool = False
 
     # Model capabilities: "cot", "tir", "both" (toggleable)
-    supported_modes: str = "both"
+    supported_modes: str = "cot"
+    # Path to the model config to get model name
+    model_config_path: str | None = None
+
+    def __post_init__(self):
+        if not self.model_config_path:
+            return
+
+        cfg_path = Path(self.model_config_path)
+        if not cfg_path.is_file():
+            logger.warning("Model config path '%s' does not exist.", cfg_path)
+            return
+
+        model_name: str | None = None
+        try:
+            with cfg_path.open("r", encoding="utf-8") as fp:
+                model_cfg = json.load(fp)
+                model_name = model_cfg.get("_name_or_path")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Could not parse model config JSON '%s': %s", cfg_path, e)
+
+        if not model_name:
+            logger.warning("Could not find '_name_or_path' in model config '%s'.", cfg_path)
+            return
+
+        # ------------------------------------------------------------------
+        # Autodetection rules
+        # ------------------------------------------------------------------
+        openmath_re = re.compile(r"nvidia/OpenMath-Nemotron-\d+\.?\d?B")
+        kaggle_name = "nvidia/OpenMath-Nemotron-14B-Kaggle"
+
+        openmath_match = openmath_re.fullmatch(model_name)
+        if openmath_match:
+            logger.info("Detected %s model- applying model-specific overrides.", model_name)
+            self.add_remaining_code_executions = True
+            self.initial_code_execution_state = True
+            self.supported_modes = "both"
+            return
+
+        if model_name == kaggle_name:
+            logger.info("Detected %s model - applying model-specific overrides.", kaggle_name)
+            self.supported_modes = "tir"
+            self.initial_code_execution_state = True
+            self.code_prompt_config = "generic/math"
+            return
 
 class CodeExecStatus(Enum):
     """High-level availability of the Python code-execution toolchain."""
