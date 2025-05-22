@@ -129,8 +129,9 @@ class ChatUI:
                     value=initial_prompt,
                     label="Prompt Config", 
                     placeholder="e.g., generic/math or openmath/tir",
-                    info="Override prompt config for this chat session (clears on chat reset)"
+                    info="Override prompt config for this session"
                 )
+                self.reset_params_btn = gr.Button("Reset to defaults", variant="secondary", size="sm")
             
             # Sandbox banner (hidden by default)
             self.banner_html = gr.HTML(value="", visible=False)
@@ -154,6 +155,11 @@ class ChatUI:
                 inputs=[self.prompt_config_tb],
                 outputs=[],
             )
+            self.reset_params_btn.click(
+                self.on_reset_params,
+                inputs=[],
+                outputs=[self.max_tokens, self.temperature, self.code_exec_checkbox, self.prompt_config_tb, self.subtitle_md, self.banner_html],
+            )
             self.send_btn.click(
                 self.handle_chat_submit,
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
@@ -164,7 +170,7 @@ class ChatUI:
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
                 outputs=[self.chatbot, self.banner_html, self.send_btn, self.cancel_btn],
             ).then(lambda: gr.update(value=""), None, [self.msg_tb])
-            self.clear_btn.click(self.on_clear_chat, None, [self.chatbot, self.msg_tb, self.prompt_config_tb])
+            self.clear_btn.click(self.on_clear_chat, None, [self.chatbot, self.msg_tb])
             # Bind cancel event – returns updates for both send and cancel buttons.
             self.cancel_btn.click(self.on_cancel, None, [self.send_btn, self.cancel_btn])
 
@@ -246,17 +252,57 @@ class ChatUI:
         )
     
     def on_clear_chat(self):
-        """Clear chat history both in UI and internal state, and reset prompt config override."""
+        """Clear chat history both in UI and internal state."""
         self.turns_for_prompt = []
-        # Reset prompt config to default based on current code execution state
-        default_prompt = self._get_default_prompt_config(self.code_exec_checkbox.value)
-        
-        # Clear the override AFTER getting the default to ensure consistency
+        logger.info("Clear chat: cleared conversation history")
+        return None, ""
+
+    def on_reset_params(self):
+        """Reset all parameters in the accordion to their default values."""
+        # Reset internal state
         self.prompt_config_override = None
         
-        logger.info("Clear chat: resetting prompt config to %s", default_prompt)
-        # Explicitly update the field value using gr.update
-        return None, "", gr.update(value=default_prompt)
+        # Get default values
+        default_max_tokens = 4000
+        default_temperature = 0.0
+        default_code_exec = self.ctx.cfg.initial_code_execution_state
+        default_prompt = self._get_default_prompt_config(default_code_exec)
+        
+        # Update status based on default code execution state
+        self.latest_code_status = self.ctx.loader.get_code_execution_status(default_code_exec)
+        mode_cap = self.ctx.cfg.supported_modes
+        
+        # Handle forced modes
+        if mode_cap != "both":
+            default_code_exec = (mode_cap == "tir")
+            default_prompt = self._get_default_prompt_config(default_code_exec)
+            self.latest_code_status = self.ctx.loader.get_code_execution_status(default_code_exec)
+        
+        # Generate status message
+        if mode_cap != "both":
+            status_msg = (
+                "Model only supports code execution mode." if mode_cap == "tir" 
+                else "Model does not support code execution mode."
+            )
+        else:
+            status_txt = {
+                CodeExecStatus.ENABLED: "Python interpreter ENABLED.",
+                CodeExecStatus.NOT_REQUESTED: "Python interpreter DISABLED.",
+                CodeExecStatus.DISABLED: "Interpreter unavailable.",
+            }[self.latest_code_status]
+            status_msg = f"Status: {status_txt}"
+        
+        logger.info("Reset params: max_tokens=%s, temp=%s, code_exec=%s, prompt=%s", 
+                   default_max_tokens, default_temperature, default_code_exec, default_prompt)
+        
+        return (
+            gr.update(value=default_max_tokens),           # max_tokens
+            gr.update(value=default_temperature),          # temperature  
+            gr.update(value=default_code_exec),            # code_exec_checkbox
+            gr.update(value=default_prompt),               # prompt_config_tb
+            gr.update(value=status_msg),                   # subtitle_md
+            self._banner_from_code_status(self.latest_code_status),  # banner_html
+        )
 
     def handle_chat_submit(self, user_msg: str, max_tokens: int, temperature: float):
         if not user_msg.strip():
