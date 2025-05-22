@@ -31,7 +31,7 @@ class ChatService:
 
     def stream_chat(
         self,
-        user_input: str,
+        turns: list[dict],
         tokens_to_generate: int,
         temperature: float,
         status: CodeExecStatus,
@@ -44,12 +44,12 @@ class ChatService:
             raise RuntimeError("No active LLM available.")
 
         prompt_obj = self._prompts.get(use_code)
-        prompt_kwargs = {"problem": user_input}
-        if use_code:
-            prompt_kwargs["total_code_executions"] = self._loader.cfg.max_code_executions
+        prompt_kwargs = {
+            "turns": turns,
+        }
 
         try:
-            prompt_filled = prompt_obj.fill(prompt_kwargs)
+            prompt_filled = prompt_obj.fill(prompt_kwargs, multi_turn_key="turns")
         except Exception as e:  # noqa: BLE001
             logger.exception("Prompt filling failed")
             raise RuntimeError(f"Error preparing prompt: {e}") from e
@@ -67,7 +67,7 @@ class ChatService:
             raise RuntimeError("LLM did not return a stream iterator.")
 
         for delta in stream_iter_list[0]:
-            yield delta["generation"] 
+            yield delta["generation"]
 
 
 class AppContext:

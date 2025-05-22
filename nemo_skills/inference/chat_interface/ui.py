@@ -72,6 +72,7 @@ class ChatUI:
         self.latest_code_status = CodeExecStatus.NOT_REQUESTED
         # Flag toggled by the "Cancel generation" button to interrupt streaming.
         self.cancel_requested: bool = False
+        self.turns_for_prompt: list[dict] = []
 
         with gr.Blocks(title="AI Chat Interface", theme=gr.themes.Soft(), css=_CUSTOM_CSS) as self.demo:
             # chat panel needs to exist before server panel (server panel references it in outputs list)
@@ -130,7 +131,7 @@ class ChatUI:
                 inputs=[self.msg_tb, self.max_tokens, self.temperature],
                 outputs=[self.chatbot, self.banner_html, self.send_btn, self.cancel_btn],
             ).then(lambda: gr.update(value=""), None, [self.msg_tb])
-            self.clear_btn.click(lambda: (None, ""), None, [self.chatbot, self.msg_tb])
+            self.clear_btn.click(self.on_clear_chat, None, [self.chatbot, self.msg_tb])
             # Bind cancel event – returns updates for both send and cancel buttons.
             self.cancel_btn.click(self.on_cancel, None, [self.send_btn, self.cancel_btn])
 
@@ -186,6 +187,11 @@ class ChatUI:
             gr.update(visible=True, interactive=True),   # send button visible again
             gr.update(visible=False, interactive=False),  # cancel button hidden
         )
+    
+    def on_clear_chat(self):
+        """Clear chat history both in UI and internal state."""
+        self.turns_for_prompt = []
+        return None, ""
 
     def handle_chat_submit(self, user_msg: str, max_tokens: int, temperature: float):
         if not user_msg.strip():
@@ -205,10 +211,26 @@ class ChatUI:
         # Reset cancellation flag and enable the button for this generation.
         self.cancel_requested = False
 
-        history: List = []
+        if not self.ctx.cfg.support_multiturn:
+            # if not multiturn, clear history
+            self.turns_for_prompt = []
+
+        chat_key = self.ctx.cfg.chat_input_key
+        # Prepare the current user turn
+        current_turn: dict = {chat_key: user_msg}
+        if self.latest_code_status == CodeExecStatus.ENABLED:
+            current_turn["total_code_executions"] = self.ctx.cfg.max_code_executions
+
+        self.turns_for_prompt.append(current_turn)
+
+        # Initial UI update – show user question with empty assistant bubble.
+        display_history: List[tuple[str, str]] = [
+            (t[chat_key], _format_output(t.get("assistant", ""))) for t in self.turns_for_prompt
+        ]
+
         bot_response_so_far = ""
         yield (
-            history,
+            display_history,
             gr.update(value="", visible=False),
             gr.update(visible=False, interactive=False),  # hide send
             gr.update(visible=True, interactive=True),    # show cancel
@@ -216,29 +238,47 @@ class ChatUI:
 
         try:
             stream = self.ctx.chat.stream_chat(
-                user_msg, tokens_to_generate=max_tokens, temperature=temperature, status=self.latest_code_status
+                self.turns_for_prompt,
+                max_tokens,
+                temperature,
+                self.latest_code_status,
             )
             for chunk in stream:
                 if self.cancel_requested:
                     break
                 bot_response_so_far += chunk
-                history = [(user_msg, _format_output(bot_response_so_far))]
+
+                # safety check, should not happen
+                if not display_history:
+                    display_history = [(user_msg, "")]
+
+                display_history[-1] = (user_msg, _format_output(bot_response_so_far))
+
                 yield (
-                    history,
+                    display_history,
                     gr.update(value=self.banner_html.value, visible=self.banner_html.visible),
                     gr.update(visible=False),
                     gr.update(),
                 )
 
-            # Stream finished naturally or due to cancellation; disable the button.
+            # Finalise assistant response for this turn and update history display.
+            current_turn["assistant"] = bot_response_so_far
+            if display_history:
+                display_history[-1] = (user_msg, _format_output(bot_response_so_far))
+
             yield (
-                history,
+                display_history,
                 gr.update(value=self.banner_html.value, visible=self.banner_html.visible),
                 gr.update(visible=True, interactive=True),   # show send again
                 gr.update(visible=False, interactive=False), # hide cancel
             )
         except Exception as e:
+            # On error reset last turn to avoid broken history.
+            if self.turns_for_prompt and self.turns_for_prompt[-1] is current_turn:
+                self.turns_for_prompt.pop()
+
             logger.exception("Chat failed")
+
             yield (
                 [(user_msg, f"Error: {e}")],
                 self._banner_from_code_status(CodeExecStatus.DISABLED),

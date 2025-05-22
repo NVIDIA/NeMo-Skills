@@ -57,6 +57,10 @@ class AppConfig:
     max_code_executions: int = 8
     add_remaining_code_executions: bool = False
 
+    # If model supports multiturn conversations
+    support_multiturn: bool = True
+    # Key name used in prompts config for the user's message
+    chat_input_key: str = "problem"
     # Model capabilities: "cot", "tir", "both" (toggleable)
     supported_modes: str = "cot"
     # Path to the model config to get model name
@@ -94,6 +98,7 @@ class AppConfig:
             logger.info("Detected %s model- applying model-specific overrides.", model_name)
             self.add_remaining_code_executions = True
             self.initial_code_execution_state = True
+            self.support_multiturn = False
             self.supported_modes = "both"
             return
 
@@ -101,6 +106,7 @@ class AppConfig:
             logger.info("Detected %s model - applying model-specific overrides.", kaggle_name)
             self.supported_modes = "tir"
             self.initial_code_execution_state = True
+            self.support_multiturn = False
             self.code_prompt_config = "generic/math"
             return
 
