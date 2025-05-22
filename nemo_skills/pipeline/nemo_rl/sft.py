@@ -45,8 +45,8 @@ class NemoRLTask:
     wandb_project: str
     timeout: str
     log_dir: str
+    cache_dir: str
     extra_arguments: str = ""
-    uv_cache_dir: str = "/nemo_run/tmp/uv"
 
     def format_train_args(self):
         cmd = (
@@ -103,8 +103,8 @@ class NemoRLTask:
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
-            f"export NEMO_RL_VENV_DIR=/opt/nemo_rl_venv && " # comes from dockerfile
-            f"export UV_CACHE_DIR={self.uv_cache_dir} && "
+            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && " # comes from dockerfile
+            f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/nemo-rl && "
             f"cd /opt/nemo-rl && "
             f"{preamble_cmd} && "
@@ -131,7 +131,7 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
     log_dir,
-    uv_cache_dir,
+    cache_dir,
 ):
     # TODO: use those
     timeout = get_timeout(cluster_config, partition)
@@ -150,7 +150,7 @@ def get_training_cmd(
             timeout=timeout,
             extra_arguments=extra_arguments,
             log_dir=log_dir,
-            uv_cache_dir=uv_cache_dir,
+            cache_dir=cache_dir,
         )
 
     else:
@@ -204,9 +204,9 @@ def sft_nemo_rl(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    uv_cache_dir: str = typer.Option(
+    cache_dir: str = typer.Option(
         ...,
-        help="Path to the directory where the UV cache will be stored. This should be a mounted "
+        help="Path to the directory where the cache will be stored. This should be a mounted "
         "path so the cache can be reused between jobs.",
     ),
     exclusive: bool = typer.Option(
@@ -238,7 +238,7 @@ def sft_nemo_rl(
             eval_data = train_data
         else:
             check_if_mounted(cluster_config, eval_data)
-        check_if_mounted(cluster_config, uv_cache_dir)
+        check_if_mounted(cluster_config, cache_dir)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
@@ -255,7 +255,7 @@ def sft_nemo_rl(
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
         log_dir=f"{log_dir}/training-logs",
-        uv_cache_dir=uv_cache_dir,
+        cache_dir=cache_dir,
     )
 
     server_config = None
