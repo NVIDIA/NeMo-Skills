@@ -54,7 +54,7 @@ Then we can run the server and the inference code in a single command:
 ```bash
 ns run_cmd \
     --cluster=local \
-    --model=/hf_models/Qwen3-1.7B \
+    --model=Qwen/Qwen3-1.7B \
     --server_type=vllm \
     --server_gpus=1 \
     --with_sandbox \
