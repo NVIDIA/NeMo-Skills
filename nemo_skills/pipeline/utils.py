@@ -1528,7 +1528,8 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
-<<<<<<< HEAD
+        if with_ray:
+            raise ValueError("Ray is not yet supported for multiple commands.")
         if heterogeneous:
             executors[0].het_group_indices = het_group_indices
         return exp.add(
@@ -1537,31 +1538,6 @@ def add_task(
             name="nemo-run",
             dependencies=task_dependencies,
         )
-=======
-        try:
-            if with_ray:
-                raise  ValueError("Ray cluster is not supported yet for multiple tasks")
-            if heterogeneous:
-                executors[0].het_group_indices = het_group_indices
-            return exp.add(
-                [run.Script(inline=command)
-                for command in commands],
-                executor=executors,
-                name="nemo-run",
-                dependencies=task_dependencies,
-            )
-        except AssertionError as e:
-            # AssertionError: Unsupported executor type.
-            if "Unsupported executor type" in str(e):
-                raise ValueError(
-                    "Running this command without --cluster parameter is not supported "
-                    "(even for running locally you need to pick a 'local' cluster). "
-                    "Please specify --cluster. You can run `ns setup` to define your "
-                    "cluster config if you don't have it yet."
-                ) from e
-            else:
-                raise e
->>>>>>> WIP fix ray key
 
 
 def run_exp(exp, cluster_config, sequential=None):
