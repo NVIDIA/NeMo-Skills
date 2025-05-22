@@ -80,10 +80,6 @@ class NemoRLTask:
         )
         return cmd
 
-    def get_preamble_cmd(self):
-        cmd = " echo 'No preamble command to execute, skipping...' "
-        return cmd
-
     def get_script_module(self):
         return "/nemo_run/code/nemo_skills/training/nemo_rl/start_sft_nemo_rl.py "
 
@@ -100,7 +96,6 @@ class NemoRLTask:
 
     def get_cmd(self):
         self.logging_params = self.format_wandb_args()
-        preamble_cmd = self.get_preamble_cmd()
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
@@ -108,7 +103,6 @@ class NemoRLTask:
             f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/nemo-rl && "
             f"cd /opt/nemo-rl && "
-            f"{preamble_cmd} && "
         )
 
         ray_job_cmd = self.get_job_cmd()
