@@ -76,52 +76,26 @@ class ChatUI:
         with gr.Blocks(title="AI Chat Interface", theme=gr.themes.Soft(), css=_CUSTOM_CSS) as self.demo:
             # chat panel needs to exist before server panel (server panel references it in outputs list)
             self._build_chat_panel()
-            self._build_server_config_panel()
 
-        # Show chat by default if launch_mode == "direct"
-        if ctx.cfg.launch_mode == "direct":
-            self.server_group.visible = False
-            self.chat_group.visible = True
-            # Toggle is available only when the backend supports *both* modes.  For single-
-            # mode models ("cot" or "tir") we force the checkbox to the correct state and
-            # disable user interaction.
-            mode_cap = ctx.cfg.supported_modes
-            can_toggle = mode_cap == "both"
-            self.code_exec_checkbox.interactive = can_toggle
-            if not can_toggle:
-                # Force checkbox value based on capabilities.
-                self.code_exec_checkbox.value = (mode_cap == "tir")
-                note = (
-                    "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
-                )
-                self.subtitle_md.value = f"Status: {note}"
+        self.server_group.visible = False
+        self.chat_group.visible = True
+        # Toggle is available only when the backend supports *both* modes.  For single-
+        # mode models ("cot" or "tir") we force the checkbox to the correct state and
+        # disable user interaction.
+        mode_cap = ctx.cfg.supported_modes
+        can_toggle = mode_cap == "both"
+        self.code_exec_checkbox.interactive = can_toggle
+        if not can_toggle:
+            # Force checkbox value based on capabilities.
+            self.code_exec_checkbox.value = (mode_cap == "tir")
+            note = (
+                "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
+            )
+            self.subtitle_md.value = f"Status: {note}"
 
     # ------------------------------------------------------------------
     # UI builders
     # ------------------------------------------------------------------
-    def _build_server_config_panel(self):
-        cfg = self.ctx.cfg
-        with gr.Column(visible=(cfg.launch_mode == "manual")) as self.server_group:
-            gr.Markdown("## Server & Model Configuration")
-            self.host_tb = gr.Textbox(label="Host", value=cfg.host)
-            self.server_dd = gr.Dropdown(["vllm", "sglang", "openai"], value=cfg.server_type, label="Server Type")
-            self.ssh_server_tb = gr.Textbox(label="SSH server (optional)")
-            self.ssh_key_tb = gr.Textbox(label="SSH key path (optional)")
-            self.connect_btn = gr.Button("Connect", variant="primary")
-            self.server_status = gr.Markdown("")
-
-            self.connect_btn.click(
-                fn=self.on_connect,
-                inputs=[self.host_tb, self.server_dd, self.ssh_server_tb, self.ssh_key_tb],
-                outputs=[
-                    self.server_status,
-                    self.server_group,
-                    self.chat_group,
-                    self.code_exec_checkbox,
-                ],
-                api_name="connect",
-            )
-
     def _build_chat_panel(self):
         with gr.Column(visible=False) as self.chat_group:
             gr.Markdown("## Chat")
@@ -164,71 +138,6 @@ class ChatUI:
     # ------------------------------------------------------------------
     # Event callbacks
     # ------------------------------------------------------------------
-    def on_connect(self, host: str, server_type: str, ssh_server: str, ssh_key: str):
-        # Update runtime config before loading
-        self.ctx.cfg.host = host or self.ctx.cfg.host
-        self.ctx.cfg.server_type = server_type or self.ctx.cfg.server_type
-        self.ctx.cfg.ssh_server = ssh_server or None
-        self.ctx.cfg.ssh_key_path = ssh_key or None
-
-        # Replace loader & chat service with new connection details
-        self.ctx.loader = ModelLoader(self.ctx.cfg)
-        self.ctx.chat = ChatService(self.ctx.loader, self.ctx.prompts)
-
-        # Show a notification that we're trying to connect.
-        yield (
-            "<div style='padding-top:10px;font-size: 16px;font-weight: 500;'><span style='color:#6CA0FF'>Connecting to the model server...</span></div>",
-            gr.update(visible=True),  # keep server page visible
-            gr.update(visible=False),  # hide chat page
-            gr.update(interactive=False),
-        )
-
-        mode_cap = self.ctx.cfg.supported_modes
-
-        # --- Generic model --------------------------------------------------
-        if mode_cap in ("cot", "both"):
-            ok_generic, err_generic = self.ctx.loader.load_generic_with_retry()
-            if not ok_generic:
-                yield (
-                    f"<span style='color:red'>Generic model error: {err_generic}</span>",
-                    gr.update(visible=True),
-                    gr.update(visible=False),
-                    gr.update(interactive=False),
-                )
-                return
-        else:
-            ok_generic, err_generic = False, "not requested"
-
-        # --- Code model -----------------------------------------------------
-        if mode_cap == "tir":
-            code_ok, code_err = self.ctx.loader.load_code_and_sandbox_with_retry()
-        elif mode_cap == "both":
-            code_ok, code_err = self.ctx.loader.load_code_and_sandbox()
-        else:
-            code_ok, code_err = False, "not requested"
-
-        status_lines = []
-        if mode_cap in ("cot", "both"):
-            status_lines.append("Generic model ✔" if ok_generic else f"Generic model ❌ ({err_generic})")
-        if mode_cap in ("tir", "both"):
-            status_lines.append("Code model ✔" if code_ok else f"Code model ⚠ ({code_err})")
-
-        # Determine checkbox interactivity based on declared model capabilities.
-        can_toggle = mode_cap == "both"
-        forced_val = (mode_cap == "tir")
-        checkbox_update = (
-            gr.update(interactive=True)
-            if can_toggle
-            else gr.update(interactive=False, value=forced_val)
-        )
-
-        yield (
-            "<br/>".join(status_lines),
-            gr.update(visible=False),  # hide server page
-            gr.update(visible=True),   # show chat page
-            checkbox_update,
-        )
-
     def on_toggle_code_exec(self, checkbox_val: bool):
         # Respect declared capabilities – disallow switching if model is single-mode.
         mode_cap = self.ctx.cfg.supported_modes
@@ -352,4 +261,4 @@ class ChatUI:
             )
             return gr.update(value=html_content, visible=True)
         # otherwise hide
-        return gr.update(value="", visible=False) 
+        return gr.update(value="", visible=False)

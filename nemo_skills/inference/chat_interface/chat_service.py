@@ -80,18 +80,8 @@ class AppContext:
 
         self.chat = ChatService(self.loader, self.prompts)
 
-        # In direct-launch mode we prepare whatever model(s) are needed before
-        # the UI appears so that the chat screen is immediately usable.
-        if self.cfg.launch_mode == "direct":
-            # Load only the models required by the declared capabilities.
-            if self.cfg.supported_modes in ("cot", "both"):
-                # Block until the generic model is reachable so that plain-text
-                # chatting works.
-                self.loader.load_generic_with_retry()
-
-            if self.cfg.supported_modes == "tir":
-                # Block until code model is reachable.
-                self.loader.load_code_and_sandbox_with_retry()
-            elif self.cfg.supported_modes == "both":
-                # Attempt once; UI will surface failures.
-                self.loader.load_code_and_sandbox()
+        # Load only the models required by the declared capabilities.
+        if self.cfg.supported_modes in ("cot", "both"):
+            self.loader.load_generic()
+        if self.cfg.supported_modes in ("tir", "both"):
+            self.loader.load_code_and_sandbox()

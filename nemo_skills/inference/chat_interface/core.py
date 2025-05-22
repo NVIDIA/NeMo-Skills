@@ -55,9 +55,6 @@ class AppConfig:
     max_code_executions: int = 8
     add_remaining_code_executions: bool = True
 
-    # UI behaviour
-    launch_mode: str = "direct"  # or "manual"
-
     # Model capabilities: "cot", "tir", "both" (toggleable)
     supported_modes: str = "both"
 
@@ -146,21 +143,6 @@ class ModelLoader:
             logger.exception("Unexpected error loading generic model")
             return False, str(e)
 
-    def load_generic_with_retry(self, wait: int = 30) -> Tuple[bool, str]:
-        """Keep retrying ``load_generic`` until the model server responds."""
-
-        while True:
-            ok, err = self.load_generic()
-            if ok:
-                return ok, err  # success — propagate upstream
-
-            logger.warning(
-                "Generic LLM not reachable yet (error: %s). Retrying in %d s…",
-                err,
-                wait,
-            )
-            time.sleep(wait)
-
     def load_code_and_sandbox(self) -> Tuple[bool, str]:
         """Attempt to load code-exec model and sandbox."""
         if self._code_llm and self._sandbox:
@@ -225,18 +207,3 @@ class ModelLoader:
     def supports_code_toggle(self) -> bool:
         """Return True if the backend advertises support for both execution modes."""
         return self._cfg.supported_modes == "both"
-
-    def load_code_and_sandbox_with_retry(self, wait: int = 30) -> Tuple[bool, str]:
-        """Keep retrying ``load_code_and_sandbox`` until the code-exec stack responds."""
-
-        while True:
-            ok, err = self.load_code_and_sandbox()
-            if ok:
-                return ok, err  # success — propagate upstream
-
-            logger.warning(
-                "Code-execution stack not reachable yet (error: %s). Retrying in %d s…",
-                err,
-                wait,
-            )
-            time.sleep(wait)
