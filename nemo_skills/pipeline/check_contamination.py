@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from enum import Enum
 from typing import List
 
@@ -20,12 +21,18 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_mounts,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
+    get_mounted_path,
+    is_mounted_filepath,
+    resolve_mount_paths,
     run_exp,
 )
 from nemo_skills.utils import setup_logging
@@ -79,6 +86,7 @@ def check_contamination(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -108,6 +116,7 @@ def check_contamination(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Check contamination between train/test via an LLM call.
 
@@ -126,10 +135,14 @@ def check_contamination(
     get_random_port = server_gpus != 8 and not exclusive
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, input_file)
-    check_if_mounted(cluster_config, output_file)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    input_file, output_file, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={input_file: "/mounted_data/input", output_file: "/mounted_data/output"},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if server_address is None:  # we need to host the model
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
