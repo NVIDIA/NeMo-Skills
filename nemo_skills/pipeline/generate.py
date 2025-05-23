@@ -25,17 +25,23 @@ import typer
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_mounts,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
+    get_mounted_path,
     get_reward_server_command,
     get_server_command,
     get_tunnel,
     get_unmounted_path,
+    resolve_mount_paths,
     run_exp,
+    wrap_cmd,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging, str_ids_to_list
 
@@ -347,28 +353,6 @@ def get_genselect_cmd(
     return cmd, postprocess_cmd
 
 
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
-    if preprocess_cmd:
-        if random_seed is not None:
-            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {preprocess_cmd} && {cmd} "
-    if postprocess_cmd:
-        if random_seed is not None:
-            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {cmd} && {postprocess_cmd} "
-    if wandb_parameters:
-        log_wandb_cmd = (
-            f"python -m nemo_skills.inference.log_samples_wandb "
-            f"    {wandb_parameters['samples_file']} "
-            f"    --name={wandb_parameters['name']} "
-            f"    --project={wandb_parameters['project']} "
-        )
-        if wandb_parameters['group'] is not None:
-            log_wandb_cmd += f" --group={wandb_parameters['group']} "
-        cmd = f"{cmd} && {log_wandb_cmd} "
-    return cmd
-
-
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
@@ -464,6 +448,7 @@ def generate(
         "If not specified, will use the default entrypoint for the server type.",
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     num_random_seeds: int = typer.Option(
         None, help="Specify if want to run many generations with high temperature for the same input"
     ),
@@ -521,6 +506,7 @@ def generate(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
         help="If True, will log random samples from the output files to wandb. "
@@ -581,12 +567,20 @@ def generate(
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
     if chunk_ids is None:
         chunk_ids = [None]
+
+    # Prepare cluster config and mount paths
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
-    else:
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths, create_remote_dir=check_mounted_paths)
+
+    if not log_dir:
         log_dir = f"{output_dir}/generation-logs"
+
+    output_dir, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     get_server_command = server_command_factories[generation_type]
     get_cmd = client_command_factories[generation_type]

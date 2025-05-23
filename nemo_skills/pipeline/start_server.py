@@ -17,12 +17,18 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_if_mounted,
+    check_mounts,
+    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
+    get_mounted_path,
+    is_mounted_filepath,
+    resolve_mount_paths,
 )
 from nemo_skills.utils import setup_logging
 
@@ -65,6 +71,7 @@ def start_server(
     ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
@@ -83,20 +90,21 @@ def start_server(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
     cluster_config = get_cluster_config(cluster, config_dir)
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
     try:
         server_type = server_type.value
     except AttributeError:
         pass
 
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+    log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
     server_config = {
         "model_path": model,

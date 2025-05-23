@@ -20,8 +20,8 @@ from pathlib import Path
 import hydra
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.inference.server.reward_model import get_reward_model
+from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -29,7 +29,9 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class RewardModelConfig(GenerateSolutionsConfig):
-    """LLM reward model parameters."""
+    """LLM reward model parameters. 
+For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """
 
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
     output_file: str | None = None  # Where to save the generations if `input_file` is provided
@@ -44,8 +46,8 @@ class RewardModelConfig(GenerateSolutionsConfig):
     random_seed: str | None = None
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    sandbox: dict = field(default_factory=dict)
 
     # Async loop is currently not supported for reward model
     # Currently reward models are quite fast, so we don't need to use async loop
@@ -61,7 +63,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
     # Reward model specific parameters
     reward_model_type: str = "orm"
 
-    def __post_init__(self):
+    def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
         if self.input_file is None and self.input_dir is not None:
@@ -74,18 +76,13 @@ class RewardModelConfig(GenerateSolutionsConfig):
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
-        # Validate the server parameters - inherited from the generate config
-        self._post_init_validate_server()
-
-        # Validate that certain parameters should only have certain values
-        self._post_init_validate_params()
-
-    def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values"""
-        if self.use_async_loop:
-            raise ValueError("Async generation is not supported for reward model")
-        if self.code_execution:
-            raise ValueError("Code execution is not supported for reward model")
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("use_async_loop", False),
+            ("code_execution", False),
+            ("sandbox", {}),
+        ]
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -116,7 +113,12 @@ def score(cfg: RewardModelConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(RewardModelConfig)
+HELP_MESSAGE = (
+    get_help_message(
+        RewardModelConfig,
+        server_params=server_params(), 
+    )
+)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,9 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class LlmMathJudgeConfig(GenerateSolutionsConfig):
-    """Top-level parameters for the script"""
+    """LLM math judge parameters. 
+For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """
 
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
     output_file: str | None = None  # Where to save the generations if `input_file` is provided
@@ -47,14 +49,14 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     random_seed: str | None = None
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    sandbox: dict = field(default_factory=dict)
 
     # Override the default Generation config here
     prompt_config: str = "judge/math"
     generation_key: str = "judgement"
 
-    def __post_init__(self):
+    def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
         if self.input_file is None and self.input_dir is not None:
@@ -67,12 +69,13 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
         else:
             raise ValueError("`input_file` and `input_dir` cannot be provided at the same time")
 
-        if self.server.server_type != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
-
-        if self.server.server_type == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
-
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("code_execution", False),
+            ("sandbox", {}),
+        ]
+        
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
@@ -109,10 +112,11 @@ def generate(cfg: LlmMathJudgeConfig):
     task.generate()
 
 
-HELP_MESSAGE = get_help_message(
-    LlmMathJudgeConfig,
-    server_params=server_params(),
-    sandbox_params=sandbox_params(),
+HELP_MESSAGE = (
+    get_help_message(
+        LlmMathJudgeConfig,
+        server_params=server_params(), 
+    )
 )
 
 
