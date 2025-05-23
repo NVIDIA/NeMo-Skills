@@ -113,6 +113,8 @@ def retrieve_similar(cfg: RetrieveSimilarConfig):
     retrieve_from_list = read_data(cfg.retrieve_from, cfg.retrieve_key)
     compare_to_list = read_data(cfg.compare_to, cfg.retrieve_key)
 
+    assert all(retrieve_from_list), "retrieve_from_list contains none values"
+    
     retrieve_from_embeddings = encode(model, retrieve_from_list, batch_size=cfg.batch_size)
     compare_to_embeddings = encode(model, compare_to_list, batch_size=cfg.batch_size)
     top_k_indices = top_k_similarity(retrieve_from_embeddings, compare_to_embeddings, cfg.top_k, cfg.chunk_size)
