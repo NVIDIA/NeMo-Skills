@@ -11,31 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-bs4
-click < 8.2.0  # https://github.com/ai-dynamo/dynamo/issues/1039
-datasets
-evalplus @ git+https://github.com/evalplus/evalplus@c91370f
-fire
-
-# needed local code execution server for persistent sessions
-flask
-gradio
-httpx
-huggingface_hub
-hydra-core
-ipython
-math-verify[antlr4_9_3]
-nemo_run @ git+https://github.com/NVIDIA/NeMo-Run.git
-numpy
-openai
-pyyaml
-rank_bm25
-requests
-scikit-learn
-sdp @ git+https://github.com/NVIDIA/NeMo-speech-data-processor@29b9b1ec0ceaf3ffa441c1d01297371b3f8e11d2
-sympy
-tqdm
-transformers
-typer >= 0.13
-wandb
