@@ -1522,7 +1522,7 @@ def add_task(
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
-            run.Script(inline=commands[0], metadata={"use_with_ray_cluster": with_ray}),
+            run.Script(inline=commands[0], metadata=({"use_with_ray_cluster": True} if with_ray else None)),
             executor=executors[0],
             name="nemo-run",
             dependencies=task_dependencies,
