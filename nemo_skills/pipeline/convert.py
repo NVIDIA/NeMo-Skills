@@ -325,6 +325,9 @@ def convert(
         check_mounted_paths=check_mounted_paths,
     )
 
+    if log_dir is None:
+        log_dir = str(Path(output_model) / "conversion-logs")
+
     conversion_cmd_map = {
         ("nemo", "hf"): get_nemo_to_hf_cmd,
         ("hf", "megatron"): get_hf_to_megatron_cmd,

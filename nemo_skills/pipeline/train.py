@@ -331,15 +331,15 @@ def train(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
+    if log_dir is None:
+        log_dir = f"{output_dir}"
+
     nemo_model, output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
         mount_map={nemo_model: None, output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
-
-    if log_dir is None:
-        log_dir = f"{output_dir}/training-logs"
 
     if num_training_jobs > 0:
         if training_data is None:

@@ -219,6 +219,9 @@ def eval(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
+    if log_dir is None:
+        log_dir = f"{output_dir}/eval-logs"
+
     output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
