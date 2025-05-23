@@ -49,11 +49,13 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-Then we can run the server and the inference code in a single command as below. We will also show how to start the code 
-execution server that can be used to run arbitrary code in a sandboxed environment. This can be useful to  
-execute code or to run code that requires a specific environment in a container. **Note**: While the container is 
-a little more secure than running code directly on the host, it is still not a fully secure sandbox and should not 
-be used to run untrusted code.
+Then we can run the server and the inference code in a single command as below. The --with_sandbox argument starts the 
+code execution server that can be used to run arbitrary code in a sandboxed environment and is added here just as a 
+demonstration. While the current example does not use it, this can be useful to execute code or to run code that 
+requires a specific environment in a container. 
+
+**Note**: While the container is a little more secure than running code directly on the host, it is still not a fully 
+secure sandbox and should not be used to run untrusted code.
 
 ```bash
 ns run_cmd \
