@@ -163,7 +163,6 @@ class CheckContaminationTask(GenerationTask):
             # Create a list of lists, where each inner list contains the generation IDs for a data point
             generation_ids = []
             for idx in range(0, len(outputs), query_per_data_point):
-                # We mark each generation ID as "Unfinished" to indicate that it is not done yet
                 generation_ids.append(outputs[idx: idx + query_per_data_point])
 
             return generation_ids
