@@ -2,18 +2,21 @@
 
 The chat interface provides a web UI where you can interactively chat with a deployed model. It supports features like multi-turn conversations and, for certain models like `openmath-nemotron`, code execution capabilities.
 
+![Chat Interface Demo](../assets/chat_interface_demo.gif)
+
 ## Launching
 
 There are two main ways to launch the chat interface:
 ### 1. Via `ns start_server`
 
-Нou can launch the chat interface alongside the model server directly on a cluster or remote machine using the `ns start_server` command:
+You can launch the chat interface alongside the model server directly on a cluster or remote machine using the `ns start_server` command:
 
 ```bash
 ns start_server \
-    --model /hf_models/Qwen3-8B \
+    --model Qwen/Qwen3-8B \
     --server_type vllm \
-    --server_gpus 8 \
+    --server_gpus 1 \
+    --config local \
     --launch_chat_interface \
     [--extra_chat_args "<hydra_options_for_chat_ui>"]
 ```
