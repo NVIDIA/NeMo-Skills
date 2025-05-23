@@ -338,6 +338,9 @@ def train(
         check_mounted_paths=check_mounted_paths,
     )
 
+    if log_dir is None:
+        log_dir = f"{output_dir}/training-logs"
+
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
