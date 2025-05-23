@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 import typer
 
@@ -22,13 +22,15 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
 from nemo_skills.pipeline.utils import (
     add_task,
-    check_if_mounted,
+    check_mounts,
     get_cluster_config,
     get_exp,
+    get_mounted_path,
     get_timeout,
+    resolve_mount_paths,
     run_exp,
 )
-from nemo_skills.utils import setup_logging, get_logger_name
+from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -81,7 +83,7 @@ class NemoRLTask:
         return cmd
 
     def get_script_module(self):
-        return "/nemo_run/code/nemo_skills/training/nemo_rl/start_sft_nemo_rl.py "
+        return "/nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
 
     def get_job_cmd(self):
         ray_job_cmd = (
@@ -202,31 +204,41 @@ def sft_nemo_rl(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
-    """Runs NeMo-RL SFT training """
+    """Runs NeMo-RL SFT training.
+
+    All extra arguments are passed directly to the NeMo-RL SFT script.
+    """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    check_if_mounted(cluster_config, hf_model)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
-    else:
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if log_dir is None:
         log_dir = output_dir
+
+    hf_model, output_dir, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={hf_model: None, output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
         if training_data.startswith("/"):  # could ask to download from HF
-            check_if_mounted(cluster_config, training_data)
+            training_data = get_mounted_path(cluster_config, training_data)
         if validation_data is None:
             validation_data = training_data
         else:
-            check_if_mounted(cluster_config, validation_data)
-        check_if_mounted(cluster_config, cache_dir)
+            validation_data = get_mounted_path(cluster_config, validation_data)
+        cache_dir = get_mounted_path(cluster_config, cache_dir)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,

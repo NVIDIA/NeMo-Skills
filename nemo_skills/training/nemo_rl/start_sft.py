@@ -20,9 +20,6 @@ import pprint
 from functools import partial
 from typing import Any, Dict
 
-from omegaconf import OmegaConf
-from transformers import AutoTokenizer
-
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig, hf_datasets
@@ -32,14 +29,14 @@ from nemo_rl.data.llm_message_utils import get_formatted_message_log
 from nemo_rl.distributed.virtual_cluster import init_ray
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
+from omegaconf import OmegaConf
+from transformers import AutoTokenizer
 
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run SFT training with configuration")
-    parser.add_argument(
-        "--config", type=str, default=None, help="Path to YAML config file"
-    )
+    parser.add_argument("--config", type=str, default=None, help="Path to YAML config file")
 
     # Parse known args for the script
     args, overrides = parser.parse_known_args()
@@ -76,9 +73,7 @@ def sft_preprocessor(
     if length > max_seq_length:
         # make smaller and mask out
         for message in message_log:
-            message["token_ids"] = message["token_ids"][
-                : min(4, max_seq_length // len(message_log))
-            ]
+            message["token_ids"] = message["token_ids"][: min(4, max_seq_length // len(message_log))]
         loss_multiplier = 0.0
 
     output = {
@@ -175,9 +170,7 @@ def main():
     config["logger"]["log_dir"] = get_next_experiment_dir(config["logger"]["log_dir"])
     print(f"📊 Using log directory: {config['logger']['log_dir']}")
     if config["checkpointing"]["enabled"]:
-        print(
-            f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}"
-        )
+        print(f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}")
 
     init_ray()
 

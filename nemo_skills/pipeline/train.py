@@ -23,7 +23,6 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_task,
-    check_if_mounted,
     check_mounts,
     get_cluster_config,
     get_exp,
