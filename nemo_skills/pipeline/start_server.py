@@ -25,11 +25,22 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_free_port,
+    get_generation_command,
     get_mounted_path,
     is_mounted_filepath,
     resolve_mount_paths,
 )
 from nemo_skills.utils import setup_logging
+
+
+def get_gradio_chat_cmd(model, server_type, extra_args):
+    cmd = (
+        "python -m nemo_skills.inference.chat_interface.launch "
+        f"model_config_path={model}/config.json "
+        f"server_type={server_type} "
+        f" {extra_args} "
+    )
+    return cmd
 
 
 class SupportedServers(str, Enum):
@@ -64,6 +75,10 @@ def start_server(
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
+    launch_chat_interface: bool = typer.Option(
+        False, help="If True, will launch a gradio app that provides chat with the model"
+    ),
+    extra_chat_args: str = typer.Option("", help="Extra hydra arguments to be passed to the chat app"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
@@ -102,9 +117,13 @@ def start_server(
     }
 
     with get_exp("server", cluster_config) as exp:
+        cmd = ""
+        if launch_chat_interface:
+            server_address = f"localhost:{server_config['server_port']}"
+            cmd = get_generation_command(server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args))
         add_task(
             exp,
-            cmd="",  # not running anything except the server
+            cmd=cmd,
             task_name='server',
             log_dir=log_dir,
             container=cluster_config["containers"]["nemo-skills"],
