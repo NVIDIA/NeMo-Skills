@@ -1,6 +1,6 @@
 # Chat Interface
 
-The chat interface provides a web UI where you can interactively chat with a deployed model. It supports features like multi-turn conversations and, for certain models like `openmath-nemotron`, code execution capabilities.
+The chat interface provides a web UI where you can interactively chat with a deployed model. It supports features like multi-turn conversations and, for certain models like [OpenMath-Nemotron](https://huggingface.co/collections/nvidia/openmathreasoning-68072c0154a5099573d2e730), code execution capabilities.
 
 ![Chat Interface Demo](../assets/chat_interface_demo.gif)
 
