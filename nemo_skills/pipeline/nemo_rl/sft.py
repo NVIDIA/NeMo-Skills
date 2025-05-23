@@ -62,15 +62,7 @@ class NemoRLTask:
         return cmd
 
     def format_data_args(self):
-        cmd = (
-            f"data.dataset_name=prompt_response_dataset "
-            f"+data.train_data_path={self.prompt_data} "
-            f"+data.val_data_path={self.eval_data} "
-            f"data.add_bos=false "
-            f"data.add_eos=false "
-            f"+data.input_key=input "
-            f"+data.output_key=output "
-        )
+        cmd = f"+data.train_data_path={self.prompt_data} " f"+data.val_data_path={self.eval_data} "
         return cmd
 
     def format_wandb_args(self):
@@ -82,13 +74,10 @@ class NemoRLTask:
         )
         return cmd
 
-    def get_script_module(self):
-        return "/nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
-
     def get_job_cmd(self):
         ray_job_cmd = (
             f"echo 'Starting training' && "
-            f"uv run --active python {self.get_script_module()} "
+            f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
             f"  {self.logging_params} "

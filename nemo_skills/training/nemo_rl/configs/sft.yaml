@@ -2,14 +2,15 @@
 sft:
   ## total number of steps to train will equal
   ## min((max_num_epochs * len(train_dataloader)), max_num_steps)
-  max_num_epochs: 1
-  max_num_steps: 60
+  # setting both to big values by default, so only one needs to be set
+  max_num_epochs: 100000000
+  max_num_steps: 100000000
 
-  val_period: 10
-  val_batches: 8
+  val_period: ${checkpointing.save_period}
+  val_batches: 1
   val_global_batch_size: 32
   val_micro_batch_size: 1
-  val_at_start: true
+  val_at_start: false
   seed: 42
 
 checkpointing:
@@ -17,8 +18,8 @@ checkpointing:
   checkpoint_dir: "results/sft"
   metric_name: "val_loss"
   higher_is_better: false
-  keep_top_k: 3
-  save_period: 10
+  keep_top_k: 50
+  save_period: 100
 
 policy:
   model_name: "meta-llama/Llama-3.2-1B"
@@ -61,10 +62,12 @@ policy:
 
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
-  dataset_name: "squad"
-  add_bos: true
-  add_eos: true
+  dataset_name: prompt_response_dataset
+  add_bos: false
+  add_eos: false
   add_generation_prompt: false
+  input_key: input
+  output_key: output
 
 logger:
   log_dir: "logs"  # Base directory for all logs
