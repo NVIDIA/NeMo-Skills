@@ -55,9 +55,6 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
     # Number of similar items to check. If not provided, will use the number of similar items in the first data point.
     top_k: int | None = None
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def _post_init_validate_data(self):
         """Validate that the data parameters adhere to the expected values"""
         if self.input_file is None:
@@ -150,22 +147,20 @@ class CheckContaminationTask(GenerationTask):
         query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
         
         if not is_async:
-            output_idx = 0
             proc_outputs = []
-            for _ in data_points:
+            for idx in range(0, len(outputs), query_per_data_point):
                 proc_output = {"all_generations": [], "generation": False}
-                for output in outputs[output_idx : output_idx + query_per_data_point]:
+                for output in outputs[idx : idx + query_per_data_point]:
                     proc_output["all_generations"].append(output['generation'])
                     # If any of the generations is True, then the data point is considered contaminated
                     if output['generation'].strip() == "True":
                         proc_output["generation"] = True
                         
                 proc_outputs.append(proc_output)
-                output_idx += query_per_data_point
 
             return proc_outputs
         else:
-            # Club the generation IDs into tuples for each data point
+            # Create a list of lists, where each inner list contains the generation IDs for a data point
             generation_ids = []
             for idx in range(0, len(outputs), query_per_data_point):
                 # We mark each generation ID as "Unfinished" to indicate that it is not done yet
@@ -182,19 +177,21 @@ class CheckContaminationTask(GenerationTask):
         for original_dp_idx, gen_id_list in requests_in_progress.items():
             # Get the LLM generations for all the queries remaining for this data point
             gen_dict_list = self.llm.get_generations(gen_id_list)
-            # If all generations have finished, we can process the "generation" key, otherwise keep it as None
-            rem_gen_id_list = []
+            # List to track the generation IDs correponding to this data point that are not done yet
+            rem_gen_id_list = []  
             for gen_id, gen_dict in zip(gen_id_list, gen_dict_list):
                 if gen_dict['generation'] is None:
-                    # If any of the generations is not done, we cannot process the data point
+                    # This generation is not done yet, so we will add it to the list of remaining generation IDs
                     rem_gen_id_list.append(gen_id)
                 else:
+                    # The entry corresponding to "all_generations" is a list of all the finished generations for this data point
+                    # If it is not present, then this must be the first finished generation for this data point
                     if "all_generations" not in generations[original_dp_idx]:
                         generations[original_dp_idx]['all_generations'] = []
 
                     generations[original_dp_idx]['all_generations'].append(gen_dict['generation'])
                     
-            # Update the requests in progress to include the remaining generation IDs
+            # Update the remaining generation IDs for this data point
             requests_in_progress[original_dp_idx] = rem_gen_id_list
 
             if rem_gen_id_list:
@@ -206,6 +203,7 @@ class CheckContaminationTask(GenerationTask):
                 contaminated = any([generation.strip() == "True" for generation in generations[original_dp_idx]['all_generations']])
                 generations[original_dp_idx]['generation'] = contaminated
 
+        # Return the remaining requests in progress and the generations
         return (requests_in_progress, generations)
 
     def postprocess(self):
@@ -233,7 +231,6 @@ def check_contamination(cfg: CheckContaminationConfig):
 
 
 HELP_MESSAGE = (
-    CheckContaminationConfig.__doc__ + "\n\n" + 
     get_help_message(
         CheckContaminationConfig,
         server_params=server_params(), 

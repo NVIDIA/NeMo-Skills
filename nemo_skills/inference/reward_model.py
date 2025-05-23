@@ -63,9 +63,6 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
     # Reward model specific parameters
     reward_model_type: str = "orm"
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
@@ -117,7 +114,6 @@ def score(cfg: RewardModelConfig):
 
 
 HELP_MESSAGE = (
-    RewardModelConfig.__doc__ + "\n\n" + 
     get_help_message(
         RewardModelConfig,
         server_params=server_params(), 

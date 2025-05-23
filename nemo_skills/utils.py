@@ -288,7 +288,7 @@ Below are the available configuration options and their default values:
     docstring = re.sub(r'{([^}]+(?=\s)[^}]*)}', r'{{\1}}', docstring)
     # Might need to add some other edge-case handling
     # here, so that formatting does not complain
-    docstring = docstring.format(**kwargs)
+    docstring = dataclass_obj.__doc__ + "\n\n" +  docstring.format(**kwargs)
 
     full_help = f"{heading}\n{'-' * 75}\n{docstring}"
     if help_message:

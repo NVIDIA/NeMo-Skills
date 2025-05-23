@@ -56,9 +56,6 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
     prompt_config: str = "judge/math"
     generation_key: str = "judgement"
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def _post_init_validate_data(self):
         if self.random_seed.strip() == 'None':
             self.random_seed = None
@@ -116,7 +113,6 @@ def generate(cfg: LlmMathJudgeConfig):
 
 
 HELP_MESSAGE = (
-    LlmMathJudgeConfig.__doc__ + "\n\n" + 
     get_help_message(
         LlmMathJudgeConfig,
         server_params=server_params(), 
