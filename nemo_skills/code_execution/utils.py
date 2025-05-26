@@ -14,9 +14,11 @@
 
 import logging
 import re
-from typing import Dict, Tuple
+from typing import Tuple
 
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def format_code_output(

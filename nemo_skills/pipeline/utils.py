@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import nemo_run as run
 import yaml
@@ -38,7 +38,21 @@ from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 from torchx.specs.api import AppState
 
-LOG = logging.getLogger(__file__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def wrap_arguments(arguments: str):
+    """Returns a mock context object to allow using the cli entrypoints as functions."""
+
+    class MockContext:
+        def __init__(self, args):
+            self.args = args
+            self.obj = None
+
+    # first one is the cli name
+    return MockContext(args=arguments.split(" "))
 
 
 # TODO: this file is way too big - we need to split it into pieces
@@ -129,6 +143,84 @@ def check_if_mounted(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
+def check_mounts(
+    cluster_config, log_dir: str, mount_map: Dict[str, Optional[str]] = None, check_mounted_paths: bool = False
+):
+    """
+    Utility method to check if the paths are mounted, whether the remote directories exist, create them if they dont exist
+    and finally resolve their mounted paths.
+
+    Args:
+        cluster_config: cluster config dictionary
+        log_dir: optional str representing the log directory
+        mount_map: a dictionary mapping the paths to their default mount locations.
+            Keys must be the mount source, and values must be the mount destination.
+            If the mount destination is None, the path will not be mounted but still checked and remote directory will still be created.
+            Mount destinations must be absolute paths and begin with '/'.
+        check_mounted_paths: if True, will perform remote calls to dynamically mount the provided paths, and create
+            remote directories if required. Finally, will assert that all remote paths are valid files or directories.
+
+    Returns:
+        tuple: a tuple of the mounted paths for the provided paths in mount_map, and the log_dir
+    """
+    # Check if mount map is provided
+    mount_map = mount_map or {}
+
+    # Compute directory of all files
+    remote_dir_list = []
+
+    # Check paths and add to mount list if not mounted
+    if check_mounted_paths:
+        for idx, (path, default_mount) in enumerate(mount_map.items()):
+            if not is_mounted_filepath(cluster_config, path):
+                # check if the path is a file or a directory
+                # so that the directory can be created
+                is_file = os.path.splitext(path) != ""
+                if is_file:
+                    path_dir, _ = os.path.split(path)
+                else:
+                    path_dir = path
+                remote_dir_list.append(path_dir)
+
+                if default_mount is not None:
+                    # Check that path is not empty and is an absolute path
+                    assert (
+                        default_mount[0] == '/'
+                    ), f"Default mount path should be absolute path, given {default_mount}"
+
+                    # Add mount path to the cluster config
+                    add_mount_path(path_dir, default_mount, cluster_config)
+
+    else:
+        # Just check if the paths are mounted
+        for path in mount_map.keys():
+            check_if_mounted(cluster_config, path)
+
+    # check if the paths are mounted, get them if they arent but have mount sources
+    # will error out if there are no corresponding mount sources
+    new_paths = [get_mounted_path(cluster_config, path) for path in mount_map.keys()]
+
+    if log_dir:
+        if check_mounted_paths:
+            # Create log dir in some location that will be mounted
+            remote_dir_list.append(log_dir)
+        else:
+            check_if_mounted(cluster_config, log_dir)
+        log_dir = get_mounted_path(cluster_config, log_dir)
+
+    if check_mounted_paths:
+        # Create missing remote directories
+        if remote_dir_list:
+            create_remote_directory(remote_dir_list, cluster_config)
+
+        # Check that the file or dir exists at the remote location
+        check_remote_mount_directories(list(mount_map.keys()) + [log_dir], cluster_config)
+
+    if new_paths:
+        return *new_paths, log_dir
+    return log_dir
+
+
 def get_mounted_path(cluster_config: dict, path: str):
     """
     Resolve the mounted filepath using the cluster config to merge the mount destination path to the filepath.
@@ -151,7 +243,7 @@ def get_mounted_path(cluster_config: dict, path: str):
 
     # Find which mount path matches the filepaths prefix
     mount_path = None
-    for mount in cluster_config['mounts']:
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         mount_source, mount_dest = mount.split(':')
         if path.startswith(mount_source):
             mount_path = mount
@@ -198,7 +290,7 @@ def get_unmounted_path(cluster_config: dict, path: str):
 
     # Find which mount path matches the filepaths prefix
     mount_path = None
-    for mount in get_mounts_from_config(cluster_config):
+    for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         mount_source, mount_dest = mount.split(':')
         if path.startswith(mount_dest):
             mount_path = mount
@@ -211,7 +303,7 @@ def get_unmounted_path(cluster_config: dict, path: str):
     if mount_path is None:
         raise ValueError(
             f"Could not find a mount path for the file path `{path}`. Check cluster config. Below paths are mounted: \n"
-            f"{cluster_config['mounts']}"
+            f"{cluster_config['mounts'] + ['/nemo_run/code:/nemo_run/code']}"
         )
 
     # replace the mount destination inside the filepath with the mount source
@@ -230,7 +322,7 @@ def add_mount_path(mount_source: str, mount_dest: str, cluster_config):
         raise ValueError("Cluster config is not provided.")
 
     if 'mounts' in cluster_config:
-        original_mounts = get_mounts_from_config(cluster_config)
+        original_mounts = get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']
         added_mount = False
         for mount_path in original_mounts:
             source, destination = mount_path.split(':')
@@ -254,6 +346,12 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
 
     if isinstance(directory, str):
         directory = [directory]
+
+    # Get unmounted path of all directories
+    directory = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directory
+    ]
 
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=directory[0])
@@ -332,6 +430,13 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
         raise ValueError("Cluster config is not provided.")
     if isinstance(directories, str):
         directories = [directories]
+
+    # Get unmounted path of all directories
+    directories = [
+        get_unmounted_path(cluster_config, dir_path) if is_mounted_filepath(cluster_config, dir_path) else dir_path
+        for dir_path in directories
+    ]
+
     if cluster_config.get('executor') != 'slurm':
         tunnel = run.LocalTunnel(job_dir=None)
         all_dirs_exist = True
@@ -476,6 +581,7 @@ def get_reward_server_command(
     cluster_config: dict,
     server_port: int,
     server_args: str = "",
+    server_entrypoint: str | None = None,
 ):
     num_tasks = num_gpus
 
@@ -489,11 +595,12 @@ def get_reward_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_nemo_aligner_reward_model"
         nemo_aligner_reward_model_port = get_free_port(strategy="random", exclude=[server_port])
         server_start_cmd = (
             # Note: The order of the two commands is important as the reward model server
             # needs to be the first command so it can get the HF_TOKEN from the environment
-            f"python -m nemo_skills.inference.server.serve_nemo_aligner_reward_model "
+            f"python -m {server_entrypoint} "
             f"    ++rm_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
@@ -518,8 +625,9 @@ def get_reward_server_command(
         if num_nodes > 1:
             raise ValueError("VLLM server does not support multi-node execution")
 
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_vllm"
         server_start_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -580,6 +688,7 @@ def get_server_command(
     cluster_config: dict,
     server_port: int,
     server_args: str = "",
+    server_entrypoint: str | None = None,
 ):
     num_tasks = num_gpus
 
@@ -593,8 +702,9 @@ def get_server_command(
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_nemo"
         server_start_cmd = (
-            f"python -m nemo_skills.inference.server.serve_nemo "
+            f"python -m {server_entrypoint} "
             f"    gpt_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
@@ -607,9 +717,32 @@ def get_server_command(
         # somehow on slurm nemo needs multiple tasks, but locally only 1
         if cluster_config["executor"] != "slurm":
             num_tasks = 1
+    elif server_type == 'megatron':
+        if cluster_config["executor"] != "slurm":
+            num_tasks = 1
+            prefix = f"torchrun --nproc_per_node {num_gpus}"
+        else:
+            prefix = "python "
+        server_entrypoint = server_entrypoint or "tools/run_text_generation_server.py"
+        # similar to conversion, we don't hold scripts for megatron on our side
+        # and expect it to be in /opt/Megatron-LM in the container
+        server_start_cmd = (
+            f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
+            f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+            f"cd /opt/Megatron-LM && "
+            f"{prefix} {server_entrypoint} "
+            f"    --load {model_path} "
+            f"    --tensor-model-parallel-size {num_gpus} "
+            f"    --pipeline-model-parallel-size {num_nodes} "
+            f"    --use-checkpoint-args "
+            f"    --max-tokens-to-oom 12000000 "
+            f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
+            f"    {server_args} "
+        )
     elif server_type == 'vllm':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_vllm "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -622,8 +755,9 @@ def get_server_command(
             multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_sglang"
         server_start_cmd = (
-            f"python3 -m nemo_skills.inference.server.serve_sglang "
+            f"python3 -m {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --num_nodes {num_nodes} "
@@ -633,9 +767,10 @@ def get_server_command(
         )
         num_tasks = 1
     else:
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
         # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
-            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m nemo_skills.inference.server.serve_trt "
+            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
             f"    --model_path {model_path} "
             f"    --port {server_port} "
             f"    {server_args} "
@@ -655,6 +790,68 @@ def get_sandox_command(cluster_config):
     if cluster_config['executor'] == 'none':
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
+
+
+# TODO: Unify the signature of generate.py to use this
+def configure_client(
+    *,  # Force keyword arguments
+    model: str,
+    server_type: str,
+    server_gpus: int,
+    server_nodes: int,
+    server_address: str,
+    server_port: Optional[int],
+    server_args: str,
+    extra_arguments: str,
+    get_random_port: bool,
+):
+    """
+    Utility function to configure a client for the model inference server.
+
+    Args:
+        model: Mounted Path to the model to evaluate.
+        server_type: String name of the server type.
+        server_address: URL of the server hosting the model.
+        server_gpus: Number of GPUs to use for the server.
+        server_nodes: Number of nodes to use for the server.
+        server_port: Port number for the server.
+        server_args: Additional arguments for the server.
+        extra_arguments: Extra arguments to pass to the command.
+        get_random_port: Whether to get a random port for the server.
+
+    Returns:
+        A tuple containing:
+            - server_config: Configuration for the server.
+            - extra_arguments: Updated extra arguments for the command.
+            - server_address: Address of the server.
+            - server_port: Port number for the server.
+    """
+    if server_address is None:  # we need to host the model
+        if server_port is None:  # if not specified, we will use a random port or 5000 depending get_random_port
+            server_port = get_free_port(strategy="random") if not get_random_port else 5000
+        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
+        server_address = f"localhost:{server_port}"
+
+        server_config = {
+            "model_path": model,
+            "server_type": server_type,
+            "num_gpus": server_gpus,
+            "num_nodes": server_nodes,
+            "server_args": server_args,
+            "server_port": server_port,
+        }
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.host=localhost ++server.port={server_port} "
+        )
+    else:  # model is hosted elsewhere
+        server_config = None
+        extra_arguments = (
+            f"{extra_arguments} ++server.server_type={server_type} "
+            f"++server.base_url={server_address} ++server.model={model} "
+        )
+        server_port = None
+    return server_config, extra_arguments, server_address, server_port
 
 
 @dataclass(kw_only=True)
@@ -750,10 +947,57 @@ def get_cluster_config(cluster=None, config_dir=None):
 
     cluster_config = read_config(config_file)
 
+    # resolve ssh tunnel config
+    if "ssh_tunnel" in cluster_config:
+        cluster_config = update_ssh_tunnel_config(cluster_config)
+
     if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
         set_nemorun_home(cluster_config["job_dir"])
+
+    return cluster_config
+
+
+def update_ssh_tunnel_config(cluster_config: dict):
+    """
+    Update the ssh tunnel configuration in the cluster config to resolve job dir and username.
+    uses the `user` information to populate `job_dir` if in config.
+
+    Args:
+        cluster_config: dict: The cluster configuration dictionary
+
+    Returns:
+        dict: The updated cluster configuration dictionary
+    """
+    if 'ssh_tunnel' not in cluster_config:
+        return cluster_config
+
+    resolve_map = [
+        dict(key='user', default_env_key='USER'),
+        dict(key='job_dir', default_env_key=None),
+        dict(key='identity', default_env_key=None),
+    ]
+
+    for item in resolve_map:
+        key = item['key']
+        default_env_key = item['default_env_key']
+
+        if key in cluster_config['ssh_tunnel']:
+            # Resolve `user` from env if not provided
+            if cluster_config['ssh_tunnel'][key] is None and default_env_key is not None:
+                cluster_config['ssh_tunnel'][key] = os.environ[default_env_key]
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
+
+            elif isinstance(cluster_config['ssh_tunnel'][key], str) and '$' in cluster_config['ssh_tunnel'][key]:
+                cluster_config['ssh_tunnel'][key] = os.path.expandvars(cluster_config['ssh_tunnel'][key])
+                LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
+
+    if "$" in cluster_config['ssh_tunnel']['identity']:
+        raise ValueError(
+            "SSH identity cannot be resolved from environment variables. "
+            "Please provide a valid path to the identity file."
+        )
 
     return cluster_config
 
@@ -767,23 +1011,6 @@ def _get_tunnel_cached(
     shell: str | None = None,
     pre_command: str | None = None,
 ):
-    # If the str provided is an env variable, resolve it
-    if "$" in job_dir:
-        job_dir = os.path.expandvars(job_dir)
-        LOG.info(f"Resolved `job_dir` from env var to `{job_dir}`")
-
-    if "$" in host:
-        host = os.path.expandvars(host)
-        LOG.info(f"Resolved `host` from env var to `{host}`")
-
-    if "$" in user:
-        user = os.path.expandvars(user)
-        LOG.info(f"Resolved `user` from env var to `{user}`")
-
-    if "$" in identity:
-        identity = os.path.expandvars(identity)
-        LOG.info(f"Resolved `identity` from env var to `{identity}`")
-
     return run.SSHTunnel(
         host=host,
         user=user,
@@ -800,7 +1027,7 @@ def tunnel_hash(tunnel):
 
 def get_tunnel(cluster_config):
     if "ssh_tunnel" not in cluster_config:
-        if cluster_config["executor"] != "slurm":
+        if cluster_config["executor"] == "slurm":
             LOG.info("No ssh_tunnel configuration found, assuming we are running from the cluster already.")
         return run.LocalTunnel(job_dir="")
     return _get_tunnel_cached(**cluster_config["ssh_tunnel"])
@@ -1087,6 +1314,28 @@ def get_env_variables(cluster_config):
             logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
 
     return env_vars
+
+
+def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
+    if preprocess_cmd:
+        if random_seed is not None:
+            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {preprocess_cmd} && {cmd} "
+    if postprocess_cmd:
+        if random_seed is not None:
+            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
+        cmd = f" {cmd} && {postprocess_cmd} "
+    if wandb_parameters:
+        log_wandb_cmd = (
+            f"python -m nemo_skills.inference.log_samples_wandb "
+            f"    {wandb_parameters['samples_file']} "
+            f"    --name={wandb_parameters['name']} "
+            f"    --project={wandb_parameters['project']} "
+        )
+        if wandb_parameters['group'] is not None:
+            log_wandb_cmd += f" --group={wandb_parameters['group']} "
+        cmd = f"{cmd} && {log_wandb_cmd} "
+    return cmd
 
 
 def get_mounts_from_config(cluster_config: dict):
