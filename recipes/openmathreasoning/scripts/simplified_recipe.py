@@ -15,7 +15,7 @@
 import argparse
 
 from nemo_skills.dataset.prepare import prepare_datasets
-from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, train, wrap_arguments
+from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
 
 
 def prepare(cluster, num_gpus):
@@ -112,47 +112,72 @@ def run_sdg(cluster, num_gpus):
     )
 
 
-def run_training(cluster, num_gpus):
+def run_training(cluster, num_gpus, training_backend):
     # convert the generated solutions to a format that can be used for training
     # and remove contaminated data
-    run_cmd(
-        ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_data "
-            f"    ++input_files=/workspace/sdg/solutions/output.jsonl "
-            f"    ++output_path=/workspace/sft-data.jsonl "
-            f"    ++prompt_config=generic/math "
-            f"    ++prompt_template=qwen-instruct "
-            f"    ++filters.remove_contaminated=false "
-            f"    ++add_unlabeled=true "
-            f"    ++filters.remove_no_think_tags=true "
-            f"    ++filters.trim_solutions=false"
-        ),
-        cluster=cluster,
-        expname="prepare-training-data",
-        log_dir="/workspace/prepare-training-data",
-        run_after="solution-generation",
-    )
+    # run_cmd(
+    #     ctx=wrap_arguments(
+    #         f"python -m nemo_skills.training.prepare_data "
+    #         f"    ++input_files=/workspace/sdg/solutions/output.jsonl "
+    #         f"    ++output_path=/workspace/sft-data.jsonl "
+    #         f"    ++prompt_config=generic/math "
+    #         f"    ++prompt_template=qwen-instruct "
+    #         f"    ++filters.remove_contaminated=false "
+    #         f"    ++add_unlabeled=true "
+    #         f"    ++filters.remove_no_think_tags=true "
+    #         f"    ++filters.trim_solutions=false"
+    #     ),
+    #     cluster=cluster,
+    #     expname="prepare-training-data",
+    #     log_dir="/workspace/prepare-training-data",
+    #     run_after="solution-generation",
+    # )
 
     # train the model
-    train(
-        ctx=wrap_arguments(
-            f"++model.data.train_ds.max_seq_length=8192 "
-            f"++model.data.train_ds.global_batch_size=32 "
-            f"++model.tensor_model_parallel_size=4 "
-            f"++model.context_parallel_size=2 "
-            f"++model.optim.lr=1e-5 "
-            f"++trainer.sft.max_epochs=2 "
-        ),
-        cluster=cluster,
-        output_dir="/workspace/training",
-        nemo_model="/workspace/qwen2.5-14b-instruct-nemo",
-        num_nodes=1,
-        num_gpus=num_gpus,
-        disable_wandb=True,
-        training_data="/workspace/sft-data.jsonl",
-        expname="training",
-        run_after="prepare-training-data",
-    )
+    if training_backend == "nemo-aligner":
+        train(
+            ctx=wrap_arguments(
+                f"++model.data.train_ds.max_seq_length=8192 "
+                f"++model.data.train_ds.global_batch_size=32 "
+                f"++model.tensor_model_parallel_size=4 "
+                f"++model.context_parallel_size=2 "
+                f"++model.optim.lr=1e-5 "
+                f"++trainer.sft.max_epochs=2 "
+            ),
+            cluster=cluster,
+            output_dir="/workspace/training",
+            nemo_model="/workspace/qwen2.5-14b-instruct-nemo",
+            num_gpus=num_gpus,
+            num_nodes=1,
+            disable_wandb=True,
+            training_data="/workspace/sft-data.jsonl",
+            expname="training",
+            run_after="prepare-training-data",
+        )
+    elif training_backend == "nemo-rl":
+        sft_nemo_rl(
+            ctx=wrap_arguments(
+                '++sft.max_num_epochs=2 '
+                '++policy.dtensor_cfg.tensor_parallel_size=8 '
+                '++policy.max_total_sequence_length=8192 '
+                '++policy.train_global_batch_size=32 '
+                '++policy.optimizer.kwargs.lr=1e-5 '
+                '++policy.dtensor_cfg.sequence_parallel=true '
+                '++policy.dtensor_cfg.activation_checkpointing=true '
+            ),
+            cluster=cluster,
+            output_dir='/workspace/training',
+            hf_model='/workspace/Qwen2.5-14B-Instruct',
+            num_gpus=num_gpus,
+            num_nodes=1,
+            disable_wandb=True,
+            training_data='/workspace/sft-data.jsonl',
+            cache_dir='/workspace/nemo-rl-cache',
+            expname="training",
+            run_after="prepare-training-data",
+        )
+    else:
+        raise ValueError(f"Unknown training backend: {training_backend}")
 
 
 def final_eval(cluster, num_gpus):
@@ -233,10 +258,17 @@ if __name__ == "__main__":
         default=8,
         help="Number of GPUs to use for the job.",
     )
+    parser.add_argument(
+        "--training_backend",
+        type=str,
+        default="nemo-aligner",
+        choices=["nemo-aligner", "nemo-rl"],
+        help="Training backend to use.",
+    )
     args = parser.parse_args()
 
     # prepare(args.cluster, args.num_gpus)
     # initial_eval(args.cluster, args.num_gpus)
     # run_sdg(args.cluster, args.num_gpus)
-    run_training(args.cluster, args.num_gpus)
-    final_eval(args.cluster, args.num_gpus)
+    run_training(args.cluster, args.num_gpus, args.training_backend)
+    # final_eval(args.cluster, args.num_gpus)
