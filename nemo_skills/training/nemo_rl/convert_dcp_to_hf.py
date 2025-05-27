@@ -108,6 +108,9 @@ def main():
     # change release to release.
     tokenizer_name_or_path = config["policy"]["model_name"]
 
+    print(f"Converting checkpoint from {dcp_ckpt_path} to {args.hf_ckpt_path}")
+    print(f"Using tokenizer from: {tokenizer_name_or_path}")
+
     hf_ckpt = convert_dcp_to_hf(
         dcp_ckpt_path=dcp_ckpt_path,
         hf_ckpt_path=args.hf_ckpt_path,
