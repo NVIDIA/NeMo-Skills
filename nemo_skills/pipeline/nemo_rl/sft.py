@@ -139,6 +139,17 @@ def get_training_cmd(
     return task.get_cmd()
 
 
+def get_checkpoint_convert_cmd(output_dir, final_hf_path):
+    cmd = (
+        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"cd /nemo_run/code && "
+        f"python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
+        f"    --training-folder={output_dir} "
+        f"    --hf-ckpt-path={final_hf_path} "
+    )
+    return cmd
+
+
 @nemo_rl_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def sft_nemo_rl(
@@ -149,6 +160,11 @@ def sft_nemo_rl(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
+    final_hf_path: str = typer.Option(
+        None,
+        help="If specified, will save the final HF model to this path. "
+        "If not specified, will save to output_dir/final_hf_model",
+    ),
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
@@ -271,6 +287,29 @@ def sft_nemo_rl(
                 with_sandbox=False,
                 with_ray=True,
             )
+
+        add_task(
+            exp,
+            cmd=get_checkpoint_convert_cmd(
+                output_dir=output_dir,
+                final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+            ),
+            task_name=f"{expname}-convert-final-ckpt",
+            log_dir=f"{log_dir}/convert-final-ckpt",
+            container=cluster_config["containers"]['nemo-rl'],
+            cluster_config=cluster_config,
+            partition=partition,
+            time_min=time_min,
+            num_nodes=1,
+            num_tasks=1,
+            num_gpus=num_gpus,
+            run_after=run_after,
+            reuse_code=reuse_code,
+            reuse_code_exp=reuse_code_exp,
+            task_dependencies=[prev_task] if prev_task is not None else None,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+        )
+
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False)
 
