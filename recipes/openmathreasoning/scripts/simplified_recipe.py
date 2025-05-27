@@ -18,7 +18,7 @@ from nemo_skills.dataset.prepare import prepare_datasets
 from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
 
 
-def prepare(cluster, num_gpus):
+def prepare(cluster, num_gpus, training_backend):
     # data preparation needs to run locally without container, so not wrapping with run_cmd
     prepare_datasets(["aime24", "aime25"])
 
@@ -55,23 +55,24 @@ def prepare(cluster, num_gpus):
         run_after="download-assets",
     )
 
-    # convert Qwen2.5-14B-Instruct to nemo format
-    convert(
-        ctx=wrap_arguments(""),
-        cluster=cluster,
-        input_model="/workspace/Qwen2.5-14B-Instruct",
-        output_model="/workspace/qwen2.5-14b-instruct-nemo",
-        convert_from="hf",
-        convert_to="nemo",
-        num_gpus=num_gpus,
-        model_type="qwen",
-        hf_model_name="Qwen/Qwen2.5-14B-Instruct",
-        expname="convert-14b-nemo",
-        run_after="download-assets",
-    )
+    if training_backend == "nemo-aligner":
+        # convert Qwen2.5-14B-Instruct to nemo format
+        convert(
+            ctx=wrap_arguments(""),
+            cluster=cluster,
+            input_model="/workspace/Qwen2.5-14B-Instruct",
+            output_model="/workspace/qwen2.5-14b-instruct-nemo",
+            convert_from="hf",
+            convert_to="nemo",
+            num_gpus=num_gpus,
+            model_type="qwen",
+            hf_model_name="Qwen/Qwen2.5-14B-Instruct",
+            expname="convert-14b-nemo",
+            run_after="download-assets",
+        )
 
 
-def run_sdg(cluster, num_gpus):
+def run_sdg(cluster, num_gpus, wandb_params):
     postprocess_cmd = (
         f"python /workspace/postprocess_problem_extraction.py "
         f"    /workspace/sdg/problems/output.jsonl "
@@ -92,6 +93,9 @@ def run_sdg(cluster, num_gpus):
         model="/workspace/Qwen2.5-14B-Instruct",
         server_type="vllm",
         server_gpus=num_gpus,
+        log_samples=not wandb_params['disable_wandb'],
+        wandb_group=wandb_params['wandb_group'],
+        wandb_project=wandb_params['wandb_project'],
     )
 
     generate(
@@ -109,10 +113,13 @@ def run_sdg(cluster, num_gpus):
         model='/workspace/qwq32b-trtllm',
         server_type='trtllm',
         server_gpus=num_gpus,
+        log_samples=not wandb_params['disable_wandb'],
+        wandb_group=wandb_params['wandb_group'],
+        wandb_project=wandb_params['wandb_project'],
     )
 
 
-def run_training(cluster, num_gpus, training_backend):
+def run_training(cluster, num_gpus, training_backend, wandb_params):
     # convert the generated solutions to a format that can be used for training
     # and remove contaminated data
     # run_cmd(
@@ -175,12 +182,13 @@ def run_training(cluster, num_gpus, training_backend):
             cache_dir='/workspace/nemo-rl-cache',
             expname="training",
             run_after="prepare-training-data",
+            num_training_jobs=0,
         )
     else:
         raise ValueError(f"Unknown training backend: {training_backend}")
 
 
-def final_eval(cluster, num_gpus):
+def final_eval(cluster, num_gpus, wandb_params):
     # converting back to HF format
     convert(
         ctx=wrap_arguments(""),
@@ -220,7 +228,7 @@ def final_eval(cluster, num_gpus):
     )
 
 
-def initial_eval(cluster, num_gpus):
+def initial_eval(cluster, num_gpus, wandb_params):
     # launching evaluation
     eval(
         ctx=wrap_arguments(""),
@@ -265,10 +273,32 @@ if __name__ == "__main__":
         choices=["nemo-aligner", "nemo-rl"],
         help="Training backend to use.",
     )
+    parser.add_argument(
+        "--disable_wandb",
+        action="store_true",
+        help="Disable Weights & Biases logging.",
+    )
+    parser.add_argument(
+        "--wandb_group",
+        type=str,
+        default="test-pipeline",
+        help="WandB group name for tracking experiments.",
+    )
+    parser.add_argument(
+        "--wandb_project",
+        type=str,
+        default="nemo-skills",
+        help="WandB project name for tracking experiments.",
+    )
     args = parser.parse_args()
 
-    # prepare(args.cluster, args.num_gpus)
-    # initial_eval(args.cluster, args.num_gpus)
-    # run_sdg(args.cluster, args.num_gpus)
-    run_training(args.cluster, args.num_gpus, args.training_backend)
-    # final_eval(args.cluster, args.num_gpus)
+    wandb_params = {
+        "disable_wandb": args.disable_wandb,
+        "wandb_group": args.wandb_group,
+        "wandb_project": args.wandb_project,
+    }
+    # prepare(args.cluster, args.num_gpus, args.training_backend)
+    # initial_eval(args.cluster, args.num_gpus, wandb_params)
+    # run_sdg(args.cluster, args.num_gpus, wandb_params)
+    run_training(args.cluster, args.num_gpus, args.training_backend, wandb_params)
+    # final_eval(args.cluster, args.num_gpus, wandb_params)
