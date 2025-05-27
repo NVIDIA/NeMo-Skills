@@ -36,7 +36,7 @@ def main():
         logging_args = ' --disable-log-requests --disable-log-stats '
 
     cmd = (
-        f'python3 -m vllm.entrypoints.openai.api_server '
+        f'VLLM_USE_V1=0 python3 -m vllm.entrypoints.openai.api_server '
         f'    --model="{args.model}" '
         f'    --served-model-name="{args.model}"'
         f'    --trust-remote-code '
@@ -50,6 +50,8 @@ def main():
     )
 
     print(cmd)
+    import os
+    # print(os.environ["VLLM_USE_V1"])
 
     subprocess.run(cmd, shell=True, check=True)
 
