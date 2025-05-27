@@ -139,11 +139,14 @@ def get_training_cmd(
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path, cache_dir):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+        f"export NEMO_RL_VENV_DIR=/{cache_dir}/nemo_rl_venv && "
+        f"export UV_CACHE_DIR={cache_dir}/uv_cache && "
+        f"export UV_PROJECT=/opt/nemo-rl && "
         f"cd /nemo_run/code && "
-        f"python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
+        f"uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
         f"    --training-folder={output_dir} "
         f"    --hf-ckpt-path={final_hf_path} "
     )
@@ -293,6 +296,7 @@ def sft_nemo_rl(
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+                cache_dir=cache_dir,
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",

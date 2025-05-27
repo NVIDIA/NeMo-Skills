@@ -51,6 +51,10 @@ def find_max_step_folder(training_folder, step_override=None):
     Find the step_X folder with the highest X (or use step_override if given).
     Returns the path to the selected step_X folder, or None if not found.
     """
+    # Check if 'checkpoints' is a subfolder and use it if present
+    checkpoints_path = os.path.join(training_folder, "checkpoints")
+    if os.path.isdir(checkpoints_path):
+        training_folder = checkpoints_path
     step_pattern = re.compile(r"step_(\d+)")
     steps = []
     for entry in os.listdir(training_folder):
