@@ -46,6 +46,7 @@ class NemoRLTask:
     expname: str
     disable_wandb: bool
     wandb_project: str
+    wandb_group: str
     timeout: str
     log_dir: str
     cache_dir: str
@@ -72,6 +73,8 @@ class NemoRLTask:
             f"logger.wandb.name={self.expname} "
             f"++logger.wandb.id={self.expname} "
         )
+        if self.wandb_group:
+            cmd += f"logger.wandb.group={self.wandb_group} "
         return cmd
 
     def get_job_cmd(self):
@@ -114,6 +117,7 @@ def get_training_cmd(
     expname,
     disable_wandb,
     wandb_project,
+    wandb_group,
     extra_arguments,
     log_dir,
     cache_dir,
@@ -130,6 +134,7 @@ def get_training_cmd(
         expname=expname,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         timeout=timeout,
         extra_arguments=extra_arguments,
         log_dir=log_dir,
@@ -176,6 +181,7 @@ def sft_nemo_rl(
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
+    wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
@@ -260,6 +266,7 @@ def sft_nemo_rl(
         expname=expname,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         extra_arguments=extra_arguments,
         log_dir=f"{log_dir}/training-logs",
         cache_dir=cache_dir,

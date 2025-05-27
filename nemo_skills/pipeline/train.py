@@ -61,6 +61,7 @@ class TrainingParams:
     training_algo: TrainingAlgo
     disable_wandb: bool
     wandb_project: str
+    wandb_group: str
     timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
@@ -152,6 +153,7 @@ def get_training_cmd(
     training_algo,
     disable_wandb,
     wandb_project,
+    wandb_group,
     extra_arguments,
 ):
     if validation_data is None:
@@ -159,7 +161,7 @@ def get_training_cmd(
 
     timeout = get_timeout(cluster_config, partition)
 
-    logging_params = get_logging_params(expname, disable_wandb, wandb_project)
+    logging_params = get_logging_params(expname, disable_wandb, wandb_project, wandb_group)
 
     if config_name is None:
         config_name = configs[training_algo]
@@ -181,6 +183,7 @@ def get_training_cmd(
         training_algo=training_algo,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         timeout=timeout,
         extra_arguments=extra_arguments,
         logging_params=logging_params,
@@ -189,7 +192,7 @@ def get_training_cmd(
     return get_cmd(training_params), training_params
 
 
-def get_logging_params(expname, disable_wandb, wandb_project):
+def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
     if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
@@ -200,6 +203,8 @@ def get_logging_params(expname, disable_wandb, wandb_project):
             f"+exp_manager.wandb_logger_kwargs.id={expname} "
             f"+exp_manager.wandb_logger_kwargs.resume=True "
         )
+        if wandb_group:
+            logging_params += f"exp_manager.wandb_logger_kwargs.group={wandb_group} "
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
     return logging_params
@@ -261,6 +266,7 @@ def train(
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
     config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
+    wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
@@ -406,6 +412,7 @@ def train(
         training_algo=training_algo,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         extra_arguments=extra_arguments,
     )
     container = cluster_config["containers"]["nemo"]

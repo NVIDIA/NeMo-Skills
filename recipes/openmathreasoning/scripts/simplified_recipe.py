@@ -186,7 +186,6 @@ def run_training(workspace, cluster, num_gpus, training_backend, wandb_params):
             cache_dir=f'{workspace}/nemo-rl-cache',
             expname="training",
             run_after="prepare-training-data",
-            num_training_jobs=0,
             final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf",
         )
     else:
