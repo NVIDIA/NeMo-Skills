@@ -8,9 +8,9 @@ response = client.chat.completions.create(
     messages=[
         {"role": "user", "content": "What is the capital of France?"},
     ],
-    temperature=0.7,
+    temperature=0.0,
     max_tokens=4,
-    top_p=0.95,
+    top_p=1.0,
     n=1,
     stream=False,
 )
