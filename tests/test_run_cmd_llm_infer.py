@@ -55,12 +55,11 @@ def test_run_cmd_llm_infer():
             f"--server_nodes 1 "
             f"--command '{command}'"
         )
-        job = subprocess.run(cmd, shell=True, check=True, capture_output=True)
-        print(job.stdout)
+        job = subprocess.run(cmd, shell=True, check=True)
+
         jsonl_file = Path(output_dir) / "output.txt"
 
         with open(jsonl_file, "r") as f:
             outputs = f.read()
 
-        print(outputs)
         assert len(outputs) > 0  # just check that output text is not zero.
