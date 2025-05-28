@@ -28,9 +28,9 @@ FROM base AS hermetic
 ARG NEMO_RL_COMMIT
 ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-8e155f9427d9403086505f55c106339957fcba04}
 
-RUN git clone https://github.com/NVIDIA/NeMo-RL.git /opt/nemo-rl && cd /opt/nemo-rl && git checkout ${NEMO_RL_COMMIT}
+RUN git clone https://github.com/NVIDIA/NeMo-RL.git /opt/NeMo-RL && cd /opt/NeMo-RL && git checkout ${NEMO_RL_COMMIT}
 
-WORKDIR /opt/nemo-rl
+WORKDIR /opt/NeMo-RL
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/nemo_rl_venv
 ENV VIRTUAL_ENV=/opt/nemo_rl_venv

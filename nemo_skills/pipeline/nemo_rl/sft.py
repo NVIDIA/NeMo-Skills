@@ -77,8 +77,14 @@ class NemoRLTask:
             cmd += f"++logger.wandb.group={self.wandb_group} "
         return cmd
 
-    def get_job_cmd(self):
-        ray_job_cmd = (
+    def get_cmd(self):
+        self.logging_params = self.format_wandb_args()
+
+        cmd = (
+            f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
+            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && "
+            f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
+            f"export UV_PROJECT=/opt/NeMo-RL && "
             f"echo 'Starting training' && "
             f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"  {self.format_train_args()} "
@@ -86,22 +92,6 @@ class NemoRLTask:
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
-        return ray_job_cmd
-
-    def get_cmd(self):
-        self.logging_params = self.format_wandb_args()
-
-        cmd = (
-            f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/nemo-rl && "
-            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && "
-            f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
-            f"export UV_PROJECT=/opt/nemo-rl && "
-            f"cd /opt/nemo-rl && "
-        )
-
-        ray_job_cmd = self.get_job_cmd()
-
-        cmd = f"{cmd} {ray_job_cmd} "
         return cmd
 
 
@@ -149,7 +139,7 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, cache_dir):
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export NEMO_RL_VENV_DIR=/{cache_dir}/nemo_rl_venv && "
         f"export UV_CACHE_DIR={cache_dir}/uv_cache && "
-        f"export UV_PROJECT=/opt/nemo-rl && "
+        f"export UV_PROJECT=/opt/NeMo-RL && "
         f"cd /nemo_run/code && "
         f"uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
         f"    --training-folder={output_dir} "
