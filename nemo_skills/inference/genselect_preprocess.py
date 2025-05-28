@@ -159,11 +159,9 @@ def create_comparison_instance(clustered_instances, problem, max_soln_samples=8,
     for i, instance in enumerate(sampled_instances):
         comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
         if "judgement" in instance:
-            comparison_instance[f"is_correct_{i}"] = is_correct_judgement(instance["judgement"])
-        elif "is_correct" in instance:
+            comparison_instance[f"judgement_{i}"] = instance["judgement"]
+        if "is_correct" in instance:
             comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
-        else:
-            comparison_instance[f"is_correct_{i}"] = instance["predicted_answer"] == instance["expected_answer"]
 
     comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
 
