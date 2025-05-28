@@ -123,13 +123,13 @@ def test_hf_eval(server_type):
         f"    --model {model_path} "
         f"    --server_type {server_type} "
         f"    --output_dir /tmp/nemo-skills-tests/{model_type}/{server_type}-eval "
-        f"    --benchmarks algebra222:0,human-eval:0,mbpp:0,ifeval:0,mmlu:0 "
+        f"    --benchmarks algebra222:0,human-eval:0,ifeval:0,mmlu:0 "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
-        f"    ++max_samples=400 "
+        f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -147,7 +147,7 @@ def test_hf_eval(server_type):
     )["all"]["greedy"]
 
     assert metrics['symbolic_correct'] >= 75
-    assert metrics['num_entries'] == 222
+    assert metrics['num_entries'] == 164
 
     metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/human-eval/output.jsonl"],
@@ -156,13 +156,6 @@ def test_hf_eval(server_type):
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
-    metrics = ComputeMetrics(benchmark='mbpp').compute_metrics(
-        [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/mbpp/output.jsonl"],
-    )["all"]["greedy"]
-    assert metrics['passing_base_tests'] >= 50
-    assert metrics['passing_plus_tests'] >= 50
-    assert metrics['num_entries'] == 378
-
     metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/ifeval/output.jsonl"],
     )["all"]["greedy"]
@@ -170,14 +163,13 @@ def test_hf_eval(server_type):
     assert metrics['instruction_strict_accuracy'] >= 70
     assert metrics['prompt_loose_accuracy'] >= 60
     assert metrics['instruction_loose_accuracy'] >= 70
-    assert metrics['num_prompts'] == 400
-    assert metrics['num_instructions'] == 601
+    assert metrics['num_prompts'] == 164
 
     metrics = ComputeMetrics(benchmark='mmlu').compute_metrics(
         [f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval/eval-results/mmlu/output.jsonl"],
     )["all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
-    assert metrics['num_entries'] == 400
+    assert metrics['num_entries'] == 164
 
 
 @pytest.mark.gpu

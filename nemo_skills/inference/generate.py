@@ -117,6 +117,7 @@ class GenerateSolutionsConfig:
     def __post_init__(self):
         self._post_init_validate_data()
         self._post_init_validate_server()
+        self._post_init_validate_params()
 
     def _post_init_validate_data(self):
         if self.input_file is not None:
@@ -157,8 +158,14 @@ class GenerateSolutionsConfig:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
     def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values"""
-        pass
+        """Validate that certain parameters are restricted to certain values""" 
+        for (param, default_value) in self._get_disallowed_params():
+            if getattr(self, param) != default_value:
+                raise ValueError(f"{param} must be {default_value}")
+    
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return []
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -457,6 +464,21 @@ class GenerationTask:
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
 
+
+    def get_llm_generations(self, requests_in_progress, generations):
+        """Get the LLM generations from the output file. 
+        To allow for stateful generation, we also pass in the generations dictionary.
+        In most cases, stateful generation is not needed.
+        """
+
+        gen_ids = list(requests_in_progress.values())
+        outputs = self.llm.get_generations(gen_ids)
+
+        for dp_idx, output in zip(requests_in_progress.keys(), outputs):
+            generations[dp_idx] = output
+
+        return (requests_in_progress, generations)
+    
     def async_loop(self, data):
         """Async loop to generate generations."""
 
@@ -474,7 +496,8 @@ class GenerationTask:
 
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
         last_submitted_idx = 0
-        requests_in_progress = {}  # generation_id -> original data_point
+        requests_in_progress = {}  # original data_point_idx -> generation_id
+        generations = []  # original data_point_idx -> generation_dict
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
@@ -489,23 +512,25 @@ class GenerationTask:
                         data,
                         is_async=True,
                     )
+
                     for idx, gen_id in enumerate(generation_ids):
-                        requests_in_progress[gen_id] = remaining_data_points[last_submitted_idx + idx]
+                        requests_in_progress[last_submitted_idx + idx] = gen_id
+                        generations.append({"generation": None})
 
                     last_submitted_idx += num_to_submit
 
-                generations = self.llm.get_generations(list(requests_in_progress.keys()))
+                requests_in_progress, generations = self.get_llm_generations(requests_in_progress, generations)
 
                 outputs_to_dump = []
                 data_points_to_dump = []
-                for (gen_id, original_dp), gen_dict in zip(requests_in_progress.copy().items(), generations):
-                    if gen_dict['generation'] is None:  # not done yet
+                for original_dp_idx in requests_in_progress.copy().keys():
+                    if generations[original_dp_idx]['generation'] is None:  # not done yet
                         continue
                     # remove the completed task from in_progress
-                    requests_in_progress.pop(gen_id)
-
-                    outputs_to_dump.append(gen_dict)
-                    data_points_to_dump.append(original_dp)
+                    requests_in_progress.pop(original_dp_idx)
+                    output_dict = generations[original_dp_idx]
+                    outputs_to_dump.append(output_dict)
+                    data_points_to_dump.append(remaining_data_points[original_dp_idx])
 
                     pbar.update(1)
 
