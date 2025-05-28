@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ def docker_run(command, image_name=None, volume_paths=None):
     if image_name is None:
         image_name = config['containers']['nemo-skills']
     if volume_paths is None:
-        volumes = config['mounts']
+        volume_paths = config['mounts']
 
     client = docker.from_env()
 
@@ -62,4 +62,5 @@ def docker_run(command, image_name=None, volume_paths=None):
 
 
 def docker_rm(paths):
-    docker_run(command=f'rm -rf {' '.join([os.path.abspath(p) for p in paths])}')
+    assert isinstance(paths, list), "paths should be a list of paths to remove"
+    docker_run(command=f"rm -rf {' '.join([os.path.abspath(p) for p in paths])}")

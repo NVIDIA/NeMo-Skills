@@ -19,11 +19,9 @@ from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import ComputeMetrics
 from nemo_skills.pipeline.cli import eval, generate, sft_nemo_rl, train, wrap_arguments
-
-from .utils import docker_rm
+from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu

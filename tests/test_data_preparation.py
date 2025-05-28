@@ -16,10 +16,9 @@ import hashlib
 import sys
 from pathlib import Path
 
-from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
+from conftest import docker_run
 
-sys.path.append(str(Path(__file__).absolute().parent / 'gpu-tests'))
-from utils import docker_run
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
 
 def compute_md5(file_path):
