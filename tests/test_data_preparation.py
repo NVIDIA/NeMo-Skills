@@ -15,9 +15,8 @@
 import hashlib
 from pathlib import Path
 
-from conftest import docker_rm_and_mkdir
-
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
+from tests.conftest import docker_rm_and_mkdir
 
 
 def compute_md5(file_path):

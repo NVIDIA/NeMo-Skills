@@ -20,10 +20,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import docker_rm
 from test_datasets import DATASETS
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
+from tests.conftest import docker_rm
 
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
