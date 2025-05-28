@@ -9,7 +9,7 @@ response = client.chat.completions.create(
         {"role": "user", "content": "What is the capital of France?"},
     ],
     temperature=0.7,
-    max_tokens=128,
+    max_tokens=4,
     top_p=0.95,
     n=1,
     stream=False,

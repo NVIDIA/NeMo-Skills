@@ -41,6 +41,7 @@ def test_run_cmd_llm_infer():
         output_dir = f"/tmp/nemo-skills-tests/qwen2.5/{server_type}-run-cmd"
         command = (
             f"cd /nemo_run/code/tests/scripts/ && "
+            f"rm {os.path.join(output_dir, 'output.txt')} && "
             f"mkdir -p {output_dir} && "
             f"python run_cmd_llm_infer_check.py > {output_dir}/output.txt"
         )
@@ -55,7 +56,7 @@ def test_run_cmd_llm_infer():
             f"--command '{command}'"
         )
         subprocess.run(cmd, shell=True, check=True)
-        time.sleep(240)  # Wait for the server to finish generating
+        time.sleep(30)  # Wait for the server to finish generating
         jsonl_file = Path(output_dir) / "output.txt"
 
         with open(jsonl_file, "r") as f:
