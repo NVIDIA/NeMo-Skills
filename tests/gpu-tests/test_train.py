@@ -73,7 +73,7 @@ def test_sft_nemo_rl():
         ctx=wrap_arguments(
             '++sft.max_num_steps=5 '
             '++policy.dtensor_cfg.tensor_parallel_size=1 '
-            'checkpointing.save_period=2 '
+            '++checkpointing.save_period=2 '
             '++policy.train_global_batch_size=2 '
             '++policy.train_micro_batch_size=1 '
             '++policy.optimizer.kwargs.lr=1e-6 '

@@ -148,11 +148,6 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
 def main():
     """Main entry point."""
     # Parse arguments
-    import os
-
-    print(os.environ.get("RAY_ADDRESS", None), "******************************")
-    os.environ.pop("RAY_ADDRESS", None)
-
     args, overrides = parse_args()
 
     if not args.config:
