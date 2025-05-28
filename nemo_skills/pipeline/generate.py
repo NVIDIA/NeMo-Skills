@@ -579,6 +579,7 @@ def generate(
         cluster_config,
         log_dir=log_dir,
         mount_map={output_dir: None},
+        create_remote_dir=True,
         check_mounted_paths=check_mounted_paths,
     )
 

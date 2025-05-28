@@ -144,7 +144,11 @@ def check_if_mounted(cluster_config, path_to_check):
 
 
 def check_mounts(
-    cluster_config, log_dir: str, mount_map: Dict[str, Optional[str]] = None, check_mounted_paths: bool = False
+    cluster_config,
+    log_dir: str,
+    mount_map: Dict[str, Optional[str]] = None,
+    create_remote_dir: bool = False,
+    check_mounted_paths: bool = False,
 ):
     """
     Utility method to check if the paths are mounted, whether the remote directories exist, create them if they dont exist
@@ -157,6 +161,8 @@ def check_mounts(
             Keys must be the mount source, and values must be the mount destination.
             If the mount destination is None, the path will not be mounted but still checked and remote directory will still be created.
             Mount destinations must be absolute paths and begin with '/'.
+        create_remote_dir: if True, will create the remote directories for the provided paths. Assumes the paths
+            provided are directories.
         check_mounted_paths: if True, will perform remote calls to dynamically mount the provided paths, and create
             remote directories if required. Finally, will assert that all remote paths are valid files or directories.
 
@@ -173,14 +179,16 @@ def check_mounts(
     if check_mounted_paths:
         for idx, (path, default_mount) in enumerate(mount_map.items()):
             if not is_mounted_filepath(cluster_config, path):
-                # check if the path is a file or a directory
-                # so that the directory can be created
-                is_file = os.path.splitext(path) != ""
-                if is_file:
-                    path_dir, _ = os.path.split(path)
-                else:
-                    path_dir = path
-                remote_dir_list.append(path_dir)
+                if create_remote_dir:
+                    # check if the path is a file or a directory
+                    # so that the directory can be created
+                    is_file = os.path.splitext(path) != ""
+                    if is_file:
+                        raise ValueError(
+                            f"Path {path} provided is a file, but create_remote_dir is True. "
+                            f"Please provide a directory instead."
+                        )
+                    remote_dir_list.append(path)
 
                 if default_mount is not None:
                     # Check that path is not empty and is an absolute path
