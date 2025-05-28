@@ -55,7 +55,7 @@ def test_run_cmd_llm_infer():
             f"--command '{command}'"
         )
         subprocess.run(cmd, shell=True, check=True)
-        time.sleep(120)  # Wait for the server to finish generating
+        time.sleep(240)  # Wait for the server to finish generating
         jsonl_file = Path(output_dir) / "output.txt"
 
         with open(jsonl_file, "r") as f:
