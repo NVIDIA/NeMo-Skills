@@ -621,7 +621,7 @@ def generate(
     with get_exp(expname, cluster_config) as exp:
         if generation_type == GenerationType.genselect:
             # Add the preprocessing command for genselect
-            genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + genselect_args
+            genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (genselect_args if genselect_args is not None else "")
             preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
 
             preprocess_task = add_task(

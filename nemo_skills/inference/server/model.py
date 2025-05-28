@@ -578,8 +578,9 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
-            # assuming it's not used and setting a dummy value
-            api_key = "dummy"
+            else:
+                # assuming it's not used and setting a dummy value
+                api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
