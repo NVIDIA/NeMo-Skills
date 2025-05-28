@@ -204,7 +204,7 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
             f"+exp_manager.wandb_logger_kwargs.resume=True "
         )
         if wandb_group:
-            logging_params += f"exp_manager.wandb_logger_kwargs.group={wandb_group} "
+            logging_params += f"++exp_manager.wandb_logger_kwargs.group={wandb_group} "
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
     return logging_params
