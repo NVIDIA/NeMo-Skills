@@ -23,7 +23,7 @@ import yaml
 
 sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline.cli import eval, generate, train, wrap_arguments
+from nemo_skills.pipeline.cli import eval, generate, sft_nemo_rl, train, wrap_arguments
 
 
 def docker_run(image_name, volume_paths, command):
@@ -69,7 +69,7 @@ def test_sft_nemo_rl():
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
-    train(
+    sft_nemo_rl(
         ctx=wrap_arguments(
             '++sft.max_num_steps=5 '
             '++policy.dtensor_cfg.tensor_parallel_size=1 '
@@ -80,14 +80,15 @@ def test_sft_nemo_rl():
         ),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
-        expname="test-sft",
+        expname="test-sft-nemo-rl",
         output_dir=f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl",
-        nemo_model=model_path,
+        hf_model=model_path,
         num_nodes=1,
         num_gpus=1,
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-sft-data.test",
         disable_wandb=True,
+        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation

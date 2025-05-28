@@ -1738,8 +1738,12 @@ def add_task(
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
+        if with_ray and cluster_config["executor"] == "slurm":
+            metadata = {"use_with_ray_cluster": True}
+        else:
+            metadata = None
         return exp.add(
-            run.Script(inline=commands[0], metadata=({"use_with_ray_cluster": True} if with_ray else None)),
+            run.Script(inline=commands[0], metadata=metadata),
             executor=executors[0],
             name="nemo-run",
             dependencies=task_dependencies,
