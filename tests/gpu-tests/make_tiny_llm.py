@@ -26,9 +26,9 @@ if args.model_type == 'qwen':
     model_name = "Qwen/Qwen2.5-1.5B"
     output_dir = "/tmp/nemo-skills-tests/qwen/tiny-model-hf"
     hidden_dim = 64
-    head_dim = 2
+    head_dim = 32
     max_position_embeddings = 256
-    num_attention_heads = 8
+    num_attention_heads = 2
 elif args.model_type == 'qwen_orm':
     # vLLM requires a minimum head dimension size of 32, so we use a larger value here
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
@@ -41,7 +41,7 @@ else:
     model_name = "meta-llama/Llama-3.2-1B-Instruct"
     output_dir = "/tmp/nemo-skills-tests/llama/tiny-model-hf"
     hidden_dim = 128
-    head_dim = 16
+    head_dim = 32
     max_position_embeddings = 256
     num_attention_heads = 8
 
