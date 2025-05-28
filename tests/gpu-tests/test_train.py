@@ -60,7 +60,59 @@ def docker_run(image_name, volume_paths, command):
 
 
 @pytest.mark.gpu
-def test_sft():
+def test_sft_nemo_rl():
+    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+    if not model_type:
+        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
+
+    train(
+        ctx=wrap_arguments(
+            '++sft.max_num_steps=5 '
+            '++policy.dtensor_cfg.tensor_parallel_size=1 '
+            'checkpointing.save_period=2 '
+            '++policy.train_global_batch_size=2 '
+            '++policy.train_micro_batch_size=1 '
+            '++policy.optimizer.kwargs.lr=1e-6 '
+        ),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        expname="test-sft",
+        output_dir=f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl",
+        nemo_model=model_path,
+        num_nodes=1,
+        num_gpus=1,
+        num_training_jobs=1,
+        training_data="/nemo_run/code/tests/data/small-sft-data.test",
+        disable_wandb=True,
+    )
+
+    # checking that the final model can be used for evaluation
+    eval(
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++max_samples=10"),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        model=f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl/final_hf_model",
+        server_type="vllm",
+        output_dir=f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl/evaluation",
+        benchmarks="gsm8k:0",
+        server_gpus=1,
+        server_nodes=1,
+        num_jobs=1,
+    )
+
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl/evaluation/eval-results/gsm8k/output.jsonl"],
+    )["all"]["greedy"]
+    # only checking the total, since model is tiny
+    assert metrics['num_entries'] == 10
+
+
+@pytest.mark.gpu
+def test_sft_aligner():
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
@@ -118,7 +170,7 @@ def test_sft():
 
 
 @pytest.mark.gpu
-def test_dpo():
+def test_dpo_aligner():
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
@@ -179,7 +231,7 @@ def test_dpo():
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("test_mode", ["unit", "integration"])
-def test_rm(test_mode):
+def test_rm_aligner(test_mode):
     seeds_supported_models = ['llama']
     model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
     if not model_path:
