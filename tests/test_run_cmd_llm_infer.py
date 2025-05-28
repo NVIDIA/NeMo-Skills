@@ -29,12 +29,8 @@ def test_run_cmd_llm_infer():
     Starts (if available) TRTLLM, Nemo, and VLLM servers, then sends the same prompt
     with top_logprobs=1. It then compares the logprobs for each token across the models.
     """
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-
     model_info = [
-        ("vllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),
+        ("vllm", 'Qwen/Qwen2.5-0.5B-Instruct'),
     ]
 
     outputs_map = {}
@@ -43,7 +39,7 @@ def test_run_cmd_llm_infer():
             continue
 
         output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-run-cmd"
-        command = f"cd /nemo_run/code/tests/gpu-tests/ && python run_cmd_llm_infer_check.py > {output_dir}/output.txt"
+        command = f"cd /nemo_run/code/tests/ && python run_cmd_llm_infer_check.py > {output_dir}/output.txt"
 
         cmd = (
             f"ns run_cmd "
