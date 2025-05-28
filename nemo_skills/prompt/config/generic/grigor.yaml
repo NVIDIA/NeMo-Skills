@@ -1,0 +1,3 @@
+system: ""
+
+user: "Given the following question and four candidate answers (A, B, C and D), choose the best answer.\n\nQuestion: {question}\nA. {A}\nB. {B}\nC. {C}\nD. {D}\n\nPut the final answer (should be a single letter A, B, C, or D) into a \\boxed{{}}\n\n"
