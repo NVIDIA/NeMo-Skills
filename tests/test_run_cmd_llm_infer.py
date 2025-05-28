@@ -62,4 +62,5 @@ def test_run_cmd_llm_infer():
         with open(jsonl_file, "r") as f:
             outputs = f.read()
 
+        print(outputs)
         assert len(outputs) > 0  # just check that output text is not zero.
