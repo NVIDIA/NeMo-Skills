@@ -55,8 +55,8 @@ def test_run_cmd_llm_infer():
             f"--server_nodes 1 "
             f"--command '{command}'"
         )
-        subprocess.run(cmd, shell=True, check=True)
-
+        job = subprocess.run(cmd, shell=True, check=True, capture_output=True)
+        print(job.stdout)
         jsonl_file = Path(output_dir) / "output.txt"
 
         with open(jsonl_file, "r") as f:
