@@ -166,7 +166,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, wandb_params):
     elif training_backend == "nemo-rl":
         sft_nemo_rl(
             ctx=wrap_arguments(
-                '++sft.max_num_epochs=2 '
+                '++sft.max_num_epochs=4 '  # training for a bit longer here
                 '++policy.dtensor_cfg.tensor_parallel_size=8 '
                 '++policy.max_total_sequence_length=8192 '
                 '++policy.train_global_batch_size=32 '
