@@ -15,13 +15,12 @@
 import json
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
+from tests.conftest import docker_rm
 
 
 def _test_individual_generations(output: dict, server_type: str):
@@ -62,6 +61,7 @@ def test_cross_model_logprobs_consistency():
             continue
 
         output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
+        docker_rm([output_dir])
         cmd = (
             f"ns eval "
             f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "

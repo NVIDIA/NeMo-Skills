@@ -64,3 +64,9 @@ def docker_run(command, image_name=None, volume_paths=None):
 def docker_rm(paths):
     assert isinstance(paths, list), "paths should be a list of paths to remove"
     docker_run(command=f"rm -rf {' '.join([os.path.abspath(p) for p in paths])}")
+
+
+def docker_rm_and_mkdir(file_):
+    directory = Path(file_).absolute().parent
+    rm_mkdir_cmd = f"rm -f {str(file_)} && mkdir -p {str(directory)}"
+    docker_run(rm_mkdir_cmd)

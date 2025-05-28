@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import hashlib
-import sys
 from pathlib import Path
 
-from conftest import docker_run
+from conftest import docker_rm_and_mkdir
 
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
@@ -27,12 +26,6 @@ def compute_md5(file_path):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
-
-
-def docker_rm_and_mkdir(file_):
-    directory = Path(file_).absolute().parent
-    rm_mkdir_cmd = f"rm -f {str(file_)} && mkdir -p {str(directory)}"
-    docker_run(rm_mkdir_cmd)
 
 
 def test_multiple_files():
