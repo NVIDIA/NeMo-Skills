@@ -263,7 +263,7 @@ def summarize_results(
         run = wandb.init(
             project=wandb_project,
             name=wandb_name,
-            id=wandb_name + (wandb_group if wandb_group else ""),
+            id=wandb_name + (wandb_group if wandb_group else "") + wandb_project,
             resume="allow",
             group=wandb_group,
             settings=wandb.Settings(silent=True),

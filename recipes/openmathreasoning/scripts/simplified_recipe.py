@@ -227,8 +227,8 @@ def final_eval(workspace, cluster, num_gpus, training_backend, wandb_params):
     summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
     if not wandb_params['disable_wandb']:
         summarize_cmd += (
-            f" --wandb_name final-eval "
-            f" --wandb_group {wandb_params['wandb_group']} "
+            # not using an actual group parameter but adding to the name as grouping is harder to view in the UI
+            f" --wandb_name {wandb_params['wandb_group']}-final-eval "
             f" --wandb_project {wandb_params['wandb_project']}"
         )
     run_cmd(
@@ -255,11 +255,11 @@ def initial_eval(workspace, cluster, num_gpus, wandb_params):
     )
 
     # summarize results, after the evaluation job is done
-    summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
+    summarize_cmd = f"ns summarize_results {workspace}/evals/baseline "
     if not wandb_params['disable_wandb']:
         summarize_cmd += (
-            f" --wandb_name baseline-eval "
-            f" --wandb_group {wandb_params['wandb_group']} "
+            # not using an actual group parameter but adding to the name as grouping is harder to view in the UI
+            f" --wandb_name {wandb_params['wandb_group']}-baseline-eval "
             f" --wandb_project {wandb_params['wandb_project']}"
         )
     run_cmd(
