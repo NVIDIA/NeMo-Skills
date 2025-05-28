@@ -67,4 +67,4 @@ ns run_cmd \
     cd /nemo_run/code/ && python inference.py
 ```
 
-This will launch the LLM inference server, the
+This will launch the LLM inference server, the sandbox server and then run the inference code in the sandbox.
