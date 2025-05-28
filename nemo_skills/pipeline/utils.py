@@ -666,7 +666,7 @@ def get_ray_server_cmd(start_cmd):
         "        --head "
         "        --port=6379 "
         f"       {ports} && "
-        f"   {start_cmd} ;"
+        f"   {start_cmd} ; "
         "else "
         "    echo 'Starting worker node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
@@ -1550,6 +1550,7 @@ def add_task(
     extra_package_dirs: list[str] | None = None,
     slurm_kwargs: dict | None = None,
     heterogeneous: bool = False,
+    with_ray: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -1737,13 +1738,19 @@ def add_task(
 
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
+        if with_ray and cluster_config["executor"] == "slurm":
+            metadata = {"use_with_ray_cluster": True}
+        else:
+            metadata = None
         return exp.add(
-            run.Script(inline=commands[0]),
+            run.Script(inline=commands[0], metadata=metadata),
             executor=executors[0],
             name="nemo-run",
             dependencies=task_dependencies,
         )
     else:
+        if with_ray:
+            raise ValueError("Ray is not yet supported for multiple commands.")
         if heterogeneous:
             executors[0].het_group_indices = het_group_indices
         return exp.add(
