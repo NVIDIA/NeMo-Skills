@@ -54,11 +54,11 @@ class NemoRLTask:
 
     def format_train_args(self):
         cmd = (
-            f"policy.model_name={self.model} "
-            f"cluster.gpus_per_node={self.num_gpus} "
-            f"cluster.num_nodes={self.num_nodes} "
-            f"logger.log_dir={self.log_dir} "
-            f"checkpointing.checkpoint_dir={self.output_dir}/checkpoints "
+            f"++policy.model_name={self.model} "
+            f"++cluster.gpus_per_node={self.num_gpus} "
+            f"++cluster.num_nodes={self.num_nodes} "
+            f"++logger.log_dir={self.log_dir} "
+            f"++checkpointing.checkpoint_dir={self.output_dir}/checkpoints "
         )
         return cmd
 
@@ -68,13 +68,13 @@ class NemoRLTask:
 
     def format_wandb_args(self):
         cmd = (
-            f"logger.wandb_enabled={not self.disable_wandb} "
-            f"logger.wandb.project={self.wandb_project} "
-            f"logger.wandb.name={self.expname} "
+            f"++logger.wandb_enabled={not self.disable_wandb} "
+            f"++logger.wandb.project={self.wandb_project} "
+            f"++logger.wandb.name={self.expname} "
             f"++logger.wandb.id={self.expname} "
         )
         if self.wandb_group:
-            cmd += f"logger.wandb.group={self.wandb_group} "
+            cmd += f"++logger.wandb.group={self.wandb_group} "
         return cmd
 
     def get_job_cmd(self):
