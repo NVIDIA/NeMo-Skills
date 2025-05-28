@@ -38,12 +38,12 @@ def test_run_cmd_llm_infer():
         if not model_path:
             continue
 
-        output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-run-cmd"
+        output_dir = f"/tmp/nemo-skills-tests/qwen2.5/{server_type}-run-cmd"
         command = f"cd /nemo_run/code/tests/ && python run_cmd_llm_infer_check.py > {output_dir}/output.txt"
 
         cmd = (
             f"ns run_cmd "
-            f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "
+            f"--cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
             f"--model {model_path} "
             f"--server_type {server_type} "
             f"--server_gpus 0 "
