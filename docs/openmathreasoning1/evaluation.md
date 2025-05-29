@@ -6,6 +6,12 @@ We assume you have `/workspace` defined in your [cluster config](../basics/clust
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
+!!! tip "Interactive Chat Interface"
+
+    Besides the benchmark numbers shown below, you can also interactively chat with OpenMath models using our 
+    [chat interface](../basics/chat_interface.md). This allows you to easily test both Chain-of-Thought (CoT) and 
+    Tool-Integrated Reasoning (TIR) modes with code execution in a user-friendly web UI.
+
 !!! note
 
     For small benchmarks such as AIME24 and AIME25 (30 problems each) it is expected to see significant variation

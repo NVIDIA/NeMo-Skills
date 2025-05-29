@@ -21,10 +21,20 @@ from typing import Callable, List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
-from nemo_skills.utils import setup_logging
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_mounts,
+    get_cluster_config,
+    get_exp,
+    get_free_port,
+    get_mounted_path,
+    get_timeout,
+    resolve_mount_paths,
+    run_exp,
+)
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 GRPO_VLLM_PORT = 4321
 
@@ -51,6 +61,7 @@ class TrainingParams:
     training_algo: TrainingAlgo
     disable_wandb: bool
     wandb_project: str
+    wandb_group: str
     timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
@@ -142,6 +153,7 @@ def get_training_cmd(
     training_algo,
     disable_wandb,
     wandb_project,
+    wandb_group,
     extra_arguments,
 ):
     if validation_data is None:
@@ -149,7 +161,7 @@ def get_training_cmd(
 
     timeout = get_timeout(cluster_config, partition)
 
-    logging_params = get_logging_params(expname, disable_wandb, wandb_project)
+    logging_params = get_logging_params(expname, disable_wandb, wandb_project, wandb_group)
 
     if config_name is None:
         config_name = configs[training_algo]
@@ -171,6 +183,7 @@ def get_training_cmd(
         training_algo=training_algo,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         timeout=timeout,
         extra_arguments=extra_arguments,
         logging_params=logging_params,
@@ -179,7 +192,7 @@ def get_training_cmd(
     return get_cmd(training_params), training_params
 
 
-def get_logging_params(expname, disable_wandb, wandb_project):
+def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
     if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
@@ -190,6 +203,8 @@ def get_logging_params(expname, disable_wandb, wandb_project):
             f"+exp_manager.wandb_logger_kwargs.id={expname} "
             f"+exp_manager.wandb_logger_kwargs.resume=True "
         )
+        if wandb_group:
+            logging_params += f"++exp_manager.wandb_logger_kwargs.group={wandb_group} "
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
     return logging_params
@@ -251,6 +266,7 @@ def train(
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
     config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
+    wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
@@ -274,6 +290,7 @@ def train(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -296,6 +313,7 @@ def train(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -316,24 +334,29 @@ def train(
         pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    check_if_mounted(cluster_config, nemo_model)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
-    else:
-        log_dir = output_dir
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if log_dir is None:
+        log_dir = f"{output_dir}"
+
+    nemo_model, output_dir, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={nemo_model: None, output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
-        check_if_mounted(cluster_config, training_data)
+        training_data = get_mounted_path(cluster_config, training_data)
 
     if not final_nemo_path:
         final_nemo_path = f"{output_dir}/model-averaged-nemo"
-    check_if_mounted(cluster_config, final_nemo_path)
+    final_nemo_path = get_mounted_path(cluster_config, final_nemo_path)
 
     if validation_data:
-        check_if_mounted(cluster_config, validation_data)
+        validation_data = get_mounted_path(cluster_config, validation_data)
 
     if " " in str(average_steps):
         raise ValueError("average steps should be separated with commas")
@@ -389,6 +412,7 @@ def train(
         training_algo=training_algo,
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
+        wandb_group=wandb_group,
         extra_arguments=extra_arguments,
     )
     container = cluster_config["containers"]["nemo"]

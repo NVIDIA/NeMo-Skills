@@ -49,6 +49,7 @@ nav:
     - Code packaging: basics/code-packaging.md
     - Prompt format: basics/prompt-format.md
     - Inference: basics/inference.md
+    - Chat Interface: basics/chat_interface.md
     - Sandbox for code execution: basics/sandbox.md
   - Pipelines:
     - pipelines/index.md

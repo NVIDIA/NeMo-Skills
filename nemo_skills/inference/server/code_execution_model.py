@@ -13,20 +13,20 @@
 # limitations under the License.
 
 
-from collections.abc import Generator
 import copy
 import logging
 import re
 import time
 import uuid
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.server.model import BaseModel, TRTLLMModel, get_model, models, trim_after_stop_phrases
-from nemo_skills.utils import nested_dataclass, python_doc_to_cmd_help
+from nemo_skills.inference.server.model import BaseModel, get_model, models, trim_after_stop_phrases
+from nemo_skills.utils import get_logger_name, nested_dataclass, python_doc_to_cmd_help
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
@@ -78,7 +78,7 @@ class CodeExecutionWrapper:
         top_logprobs: int | None = None,
         gen_id: str = None,  # used for cancelling requests if supported
         timeout: int | None = None,
-        max_code_executions: int | None = None, # if not None, will override self.config.max_code_executions
+        max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
     ):
         if not isinstance(prompt, str):
@@ -476,7 +476,9 @@ class CodeExecutionWrapper:
                 # This was the last iteration, intended for final text generation after all code executions.
                 break
 
-            if current_output_segment.endswith(code_end) and current_output_segment.rfind(code_begin) > current_output_segment.rfind(code_end, 0, -1):
+            if current_output_segment.endswith(code_end) and current_output_segment.rfind(
+                code_begin
+            ) > current_output_segment.rfind(code_end, 0, -1):
                 execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
                     timeout=self.config.code_execution_timeout,
@@ -493,8 +495,8 @@ class CodeExecutionWrapper:
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
 
-                yield {'generation': formatted_code_output} # Yield the entire formatted code output as one chunk
-                current_full_prompt += formatted_code_output # Append executed code's output to the prompt
+                yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
+                current_full_prompt += formatted_code_output  # Append executed code's output to the prompt
             else:
                 break
 

@@ -20,10 +20,22 @@ from typing import List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, run_exp
-from nemo_skills.utils import setup_logging
+from nemo_skills.pipeline.utils import (
+    add_mount_path,
+    add_task,
+    check_if_mounted,
+    check_mounts,
+    create_remote_directory,
+    get_cluster_config,
+    get_exp,
+    get_mounted_path,
+    is_mounted_filepath,
+    resolve_mount_paths,
+    run_exp,
+)
+from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_nemo_to_hf_cmd(
@@ -51,6 +63,8 @@ def get_hf_to_trtllm_cmd(
     dtype,
     num_gpus,
     num_nodes,
+    calib_dataset,
+    calib_size,
     extra_arguments,
     trt_prepare_args,
     trt_reuse_tmp_engine,
@@ -59,36 +73,64 @@ def get_hf_to_trtllm_cmd(
         "bf16": "bfloat16",
         "fp16": "float16",
         "fp32": "float32",
+        "fp8": "fp8",
     }[dtype]
 
     tmp_engine_dir = f"{output_model}-tmp"
 
     setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 
-    hf_to_trtllm_cmd = (
-        f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
-        f"    --model_dir {input_model} "
-        f"    --output_dir {tmp_engine_dir} "
-        f"    --dtype {dtype} "
-        f"    --tp_size {num_gpus} "
-        f"    --pp_size {num_nodes} "
-        f"    --workers 16 "
-        f"    {trt_prepare_args} "
-    )
-
-    trtllm_build_cmd = (
-        f"trtllm-build "
-        f"    --checkpoint_dir {tmp_engine_dir} "
-        f"    --output_dir {output_model} "
-        f"    --gpt_attention_plugin {dtype} "
-        f"    --use_paged_context_fmha enable "
-        f"    --max_batch_size 512 "
-        f"    --max_input_len 4096 "
-        f"    --max_seq_len 8192 "
-        f"    --max_num_tokens 8192 "
-        f"    {extra_arguments} && "
-        f"cp {input_model}/tokenizer* {output_model} "
-    )
+    if dtype == "fp8":
+        hf_to_trtllm_cmd = (
+            f"python -m nemo_skills.conversion.hf_to_trtllm_quantize "
+            f"    --model_dir {input_model} "
+            f"    --dtype auto "
+            f"    --qformat {dtype} "
+            f"    --output_dir {tmp_engine_dir} "
+            f"    --calib_size {calib_size} "
+            f"    --calib_dataset {calib_dataset} "
+            f"    --batch_size 4 "
+            f"    --tp_size {num_gpus} "
+            f"    --pp_size {num_nodes} "
+            f"    {trt_prepare_args} "
+        )
+        trtllm_build_cmd = (
+            f"trtllm-build "
+            f"    --checkpoint_dir {tmp_engine_dir} "
+            f"    --output_dir {output_model} "
+            f"    --gemm_plugin auto "
+            f"    --use_paged_context_fmha enable "
+            f"    --max_batch_size 512 "
+            f"    --max_input_len 4096 "
+            f"    --max_seq_len 8192 "
+            f"    --max_num_tokens 8192 "
+            f"    {extra_arguments} && "
+            f"cp {input_model}/tokenizer* {output_model} "
+        )
+    else:
+        hf_to_trtllm_cmd = (
+            f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
+            f"    --model_dir {input_model} "
+            f"    --output_dir {tmp_engine_dir} "
+            f"    --dtype {dtype} "
+            f"    --tp_size {num_gpus} "
+            f"    --pp_size {num_nodes} "
+            f"    --workers 16 "
+            f"    {trt_prepare_args} "
+        )
+        trtllm_build_cmd = (
+            f"trtllm-build "
+            f"    --checkpoint_dir {tmp_engine_dir} "
+            f"    --output_dir {output_model} "
+            f"    --gpt_attention_plugin {dtype} "
+            f"    --use_paged_context_fmha enable "
+            f"    --max_batch_size 512 "
+            f"    --max_input_len 4096 "
+            f"    --max_seq_len 8192 "
+            f"    --max_num_tokens 8192 "
+            f"    {extra_arguments} && "
+            f"cp {input_model}/tokenizer* {output_model} "
+        )
 
     if trt_reuse_tmp_engine:
         cmd = (
@@ -103,8 +145,6 @@ def get_hf_to_trtllm_cmd(
 def get_hf_to_nemo_cmd(
     input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
 ):
-    # Check if the model_type is "nemo"
-
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
@@ -113,6 +153,33 @@ def get_hf_to_nemo_cmd(
         f"    --out-path {output_model} "
         f"    --hf-model-name {hf_model_name} "
         f"    --precision {dtype} "
+        f"    {extra_arguments} "
+    )
+
+    return cmd
+
+
+def get_hf_to_megatron_cmd(
+    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
+):
+    # megatron-lm uses hacky import logic, so would need to copy a lot of files to move conversion on our side
+    # for now just assuming it's available in /opt/Megatron-LM in whatever container is used
+    cmd = (
+        f"export PYTHONPATH=$PYTHONPATH:/opt/Megatron-LM && "
+        f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
+        f"cd /opt/Megatron-LM && "
+        f"python tools/checkpoint/convert.py "
+        f"    --model-type GPT "
+        f"    --loader llama_mistral "
+        f"    --model-size llama3 "
+        f"    --load-dir {input_model} "
+        f"    --saver core "
+        f"    --save-dir {output_model} "
+        f"    --checkpoint-type hf "
+        f"    --tokenizer-model {hf_model_name} "
+        f"    --bf16 "
+        f"    --target-tensor-parallel-size {num_gpus} "  # TODO: is there a way to not specify this?
+        f"    --target-pipeline-parallel-size {num_nodes} "
         f"    {extra_arguments} "
     )
 
@@ -129,6 +196,7 @@ class SupportedFormatsTo(str, Enum):
     nemo = "nemo"
     hf = "hf"
     trtllm = "trtllm"
+    megatron = "megatron"
 
 
 class SupportedFormatsFrom(str, Enum):
@@ -140,6 +208,7 @@ class SupportedDtypes(str, Enum):
     bf16 = "bf16"
     fp16 = "fp16"
     fp32 = "fp32"
+    fp8 = "fp8"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -162,6 +231,14 @@ def convert(
     trt_reuse_tmp_engine: bool = typer.Option(True, help="Whether to reuse the tmp engine for the final conversion"),
     hf_model_name: str = typer.Option(None, help="Name of the model on Hugging Face Hub to convert to/from"),
     dtype: SupportedDtypes = typer.Option("bf16", help="Data type"),
+    calib_dataset: str = typer.Option(
+        None,
+        help="(Required for dtype=fp8) HuggingFace dataset to use for FP8 calibration",
+    ),
+    calib_size: int = typer.Option(
+        4096,
+        help="Optional number of samples to use from the calibration dataset (if dtype=fp8)",
+    ),
     expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
     num_nodes: int = typer.Option(1),
     num_gpus: int = typer.Option(...),
@@ -169,6 +246,7 @@ def convert(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -191,6 +269,7 @@ def convert(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -209,6 +288,13 @@ def convert(
     except AttributeError:
         pass
 
+    # Validate dtype-related requirements
+    if dtype == "fp8":
+        if not calib_dataset:
+            raise ValueError("--calib_dataset is required when dtype is 'fp8'")
+        if convert_to != "trtllm":
+            raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
+
     # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
     if convert_from == "nemo" and convert_to == "trtllm":
         raise ValueError("Conversion from NeMo to TensorRT LLM is not supported directly. Convert to HF first.")
@@ -219,25 +305,44 @@ def convert(
     if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
         raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
 
+    if convert_to == "megatron":
+        if convert_from != "hf":
+            raise ValueError("Conversion to Megatron is only supported from HF models")
+        if model_type != "llama":
+            raise ValueError("Conversion to Megatron is only supported for Llama models")
+        if dtype != "bf16":
+            # TODO: that's probably not true, but need to figure out how it's passed
+            raise ValueError("Conversion to Megatron is only supported for bf16 models")
+
+    # Prepare cluster config and mount paths
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, input_model)
-    check_if_mounted(cluster_config, output_model)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
-    else:
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    input_model, output_model, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={input_model: '/input_model', output_model: '/output_model'},
+        check_mounted_paths=check_mounted_paths,
+    )
+
+    if log_dir is None:
         log_dir = str(Path(output_model) / "conversion-logs")
 
     conversion_cmd_map = {
         ("nemo", "hf"): get_nemo_to_hf_cmd,
+        ("hf", "megatron"): get_hf_to_megatron_cmd,
         ("hf", "nemo"): get_hf_to_nemo_cmd,
         ("hf", "trtllm"): partial(
             get_hf_to_trtllm_cmd,
+            calib_dataset=calib_dataset,
+            calib_size=calib_size,
             trt_prepare_args=trt_prepare_args,
             trt_reuse_tmp_engine=trt_reuse_tmp_engine,
         ),
     }
     container_map = {
         ("nemo", "hf"): cluster_config["containers"]["nemo"],
+        ("hf", "megatron"): cluster_config["containers"]["megatron"],
         ("hf", "nemo"): cluster_config["containers"]["nemo"],
         ("hf", "trtllm"): cluster_config["containers"]["trtllm"],
     }

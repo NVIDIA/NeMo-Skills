@@ -24,11 +24,12 @@ commands and their options.
 Using our pipelines we created [OpenMathReasoning dataset](https://huggingface.co/datasets/nvidia/OpenMathReasoning).
 This dataset contains
 
-* 540K unique mathematical problems sourced from [AoPS forums](https://artofproblemsolving.com/community),
-* 3.2M long chain-of-thought (CoT) solutions
-* 1.7M long tool-integrated reasoning (TIR) solutions
-* 566K samples that select the most promising solution out of many candidates (GenSelect)
-
+* 306K unique mathematical problems sourced from [AoPS forums](https://artofproblemsolving.com/community) with: 
+    * 3.2M long chain-of-thought (CoT) solutions
+    * 1.7M long tool-integrated reasoning (TIR) solutions
+    * 566K samples that select the most promising solution out of many candidates (GenSelect)
+* Additional 193K problems sourced from AoPS forums (problems only, no solutions)
+  
 We used [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) to preprocess problems, and
 [DeepSeek-R1](https://huggingface.co/deepseek-ai/DeepSeek-R1) and [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) to generate solutions.
 

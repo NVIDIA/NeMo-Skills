@@ -14,16 +14,15 @@
 
 import json
 import logging
-from collections import Counter, defaultdict
 from pathlib import Path
 
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.inference.server.model import get_model
-from nemo_skills.utils import unroll_files
+from nemo_skills.utils import get_logger_name, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class MathMetrics(BaseMetrics):
