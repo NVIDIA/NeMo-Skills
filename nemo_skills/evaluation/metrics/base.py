@@ -28,6 +28,14 @@ class BaseMetrics(abc.ABC):
 
     @abc.abstractmethod
     def get_prediction_results(self, prediction):
+        """
+        Extract and compute evaluation metrics from a single prediction.
+
+        This method transforms a raw prediction dictionary into a standardized results dictionary
+        containing boolean or numeric metrics that can be aggregated across multiple predictions.
+        The returned dictionary keys serve as metric names for pass@k, majority@k, and other
+        aggregation strategies.
+        """
         pass
 
     def update(self, predictions):
