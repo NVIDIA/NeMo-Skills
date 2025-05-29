@@ -40,7 +40,6 @@ class NemoRLTask:
     model: str
     output_dir: str
     prompt_data: str
-    eval_data: str
     num_gpus: int
     num_nodes: int
     expname: str
@@ -63,7 +62,7 @@ class NemoRLTask:
         return cmd
 
     def format_data_args(self):
-        cmd = f"+data.train_data_path={self.prompt_data} " f"+data.val_data_path={self.eval_data} "
+        cmd = f"+data.train_data_path={self.prompt_data} "
         return cmd
 
     def format_wandb_args(self):
@@ -87,7 +86,7 @@ class NemoRLTask:
             f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
             f"echo 'Starting training' && "
-            f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_grpo.py "
+            f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
             f"  {self.logging_params} "
@@ -102,7 +101,6 @@ def get_training_cmd(
     hf_model,
     output_dir,
     prompt_data,
-    eval_data,
     num_gpus,
     num_nodes,
     expname,
@@ -119,7 +117,6 @@ def get_training_cmd(
         model=hf_model,
         output_dir=output_dir,
         prompt_data=prompt_data,
-        eval_data=eval_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,
@@ -149,9 +146,9 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, cache_dir):
     return cmd
 
 
-@nemo_rl_app.command(name='grpo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@nemo_rl_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def grpo_nemo_rl(
+def sft_nemo_rl(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
@@ -167,7 +164,6 @@ def grpo_nemo_rl(
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
-    validation_data: str = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -212,9 +208,9 @@ def grpo_nemo_rl(
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
-    """Runs NeMo-RL GRPO training.
+    """Runs NeMo-RL SFT training.
 
-    All extra arguments are passed directly to the NeMo-RL GRPO script.
+    All extra arguments are passed directly to the NeMo-RL SFT script.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
@@ -239,10 +235,6 @@ def grpo_nemo_rl(
             raise ValueError("training_data is required when num_training_jobs > 0")
         if training_data.startswith("/"):  # could ask to download from HF
             training_data = get_mounted_path(cluster_config, training_data)
-        if validation_data is None:
-            validation_data = training_data
-        else:
-            validation_data = get_mounted_path(cluster_config, validation_data)
         cache_dir = get_mounted_path(cluster_config, cache_dir)
 
     train_cmd = get_training_cmd(
@@ -251,7 +243,6 @@ def grpo_nemo_rl(
         hf_model=hf_model,
         output_dir=output_dir,
         prompt_data=training_data,
-        eval_data=validation_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,
@@ -270,7 +261,7 @@ def grpo_nemo_rl(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-grpo-{job_id}',
+                task_name=f'{expname}-sft-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["nemo-rl"],
                 num_gpus=num_gpus,

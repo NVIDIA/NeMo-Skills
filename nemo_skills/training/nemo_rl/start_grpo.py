@@ -63,6 +63,99 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 
 
 # ===============================================================================
+#                             Custom Math Dataset (@nemo-skills)
+# ===============================================================================
+
+from datasets import load_dataset
+
+from nemo_rl.data.interfaces import TaskDataSpec
+
+
+def format_math(data, output_key: str = "expected_answer"):
+    return {
+        "messages": [
+            {
+                "role": "user",
+                "content": data["problem"],
+            },
+            {
+                "role": "assistant",
+                "content": data[output_key],
+            },
+        ],
+        # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
+        "task_name": "math",
+    }
+
+
+def prepare_openinstructmath2_dataset(
+    split: str = "train_1M",
+    seed=42,
+    test_size=0.05,
+    output_key: str = "expected_answer",
+    dataset_path: str = "nvidia/OpenMathInstruct-2",
+):
+    """Load and split the OpenMathInstruct-2 dataset into train and validation sets using HF's train_test_split."""
+    print(
+        "WARNING: For reproducible experiments, preprocess the dataset once and define your own HfDataset subclass that directly uses the preprocessed datasets."
+    )
+
+    # Load the original dataset
+    original_ds = load_dataset(dataset_path, split=split)
+
+    # Split into train and validation sets using HF's train_test_split
+    split_ds = original_ds.train_test_split(test_size=test_size, seed=seed)
+
+    # Format the examples, removing original columns
+    train_formatted = split_ds["train"].map(
+        format_math,
+        remove_columns=split_ds["train"].column_names,
+        fn_kwargs={"output_key": output_key},
+    )
+    val_formatted = split_ds["test"].map(
+        format_math,
+        remove_columns=split_ds["test"].column_names,
+        fn_kwargs={"output_key": output_key},
+    )
+
+    return {
+        "train": train_formatted,
+        "validation": val_formatted,
+    }
+
+
+class CustomOpenMathInstruct2Dataset:
+    def __init__(
+        self,
+        split: str = "train_1M",
+        seed: int = 42,
+        test_size: float = 0.05,
+        output_key: str = "expected_answer",
+        prompt_file: str = None,
+        dataset_path: str = "nvidia/OpenMathInstruct-2",
+    ):
+        """Initialize the dataset with train/validation split.
+
+        Args:
+            seed: Random seed for reproducible splitting
+            test_size: Proportion of data to use for validation (0.0-1.0)
+        """
+        # train, train_1M, train_2M, and train_5M are supported splits.
+        if split not in ["train", "train_1M", "train_2M", "train_5M"]:
+            raise ValueError(
+                f"Invalid split: {split}. Please use 'train', 'train_1M', 'train_2M', or 'train_5M'."
+            )
+
+        self.formatted_ds = prepare_openinstructmath2_dataset(
+            split=split, seed=seed, test_size=test_size, output_key=output_key, dataset_path=dataset_path,
+        )
+
+        self.task_spec = TaskDataSpec(
+            task_name="OpenMathInstruct-2",
+            prompt_file=prompt_file,
+        )
+
+# ===============================================================================
 #                             Math Data Processor
 # ===============================================================================
 TokenizerType = PreTrainedTokenizerBase
@@ -206,7 +299,7 @@ def setup_data(
     # Load OpenMathInstruct2Dataset using nemo rl datasets
     if data_config["dataset_name"] == "OpenMathInstruct-2":
         print("Loading nvidia/OpenMathInstruct2Dataset for training and validation")
-        data: Any = OpenMathInstruct2Dataset()
+        data: Any = OpenMathInstruct2Dataset(dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"))
     elif data_config["dataset_name"] == "DeepScaler":
         print(
             "Loading agentica-org/DeepScaleR-Preview-Dataset for training and validation"

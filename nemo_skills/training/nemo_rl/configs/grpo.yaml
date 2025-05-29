@@ -110,7 +110,7 @@ policy:
 
 data:
   max_input_seq_length: ${policy.max_total_sequence_length} # upper bound, real truncation occurs at vllm.max_model_len
-  prompt_file: "examples/prompts/cot.txt"
+  prompt_file: "/nemo_run/code/nemo_skills/training/nemo_rl/prompts/cot.txt"
   system_prompt_file: null
   dataset_name: "OpenMathInstruct-2"
 
