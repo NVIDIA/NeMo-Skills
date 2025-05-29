@@ -60,7 +60,7 @@ def save_data(language: str):
     num_samples = 0
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = data_dir / f"ugphysics_{language}.jsonl"
+    output_file = data_dir / f"test_{language}.jsonl"
     with open(output_file, "wt", encoding="utf-8") as fout:
         for domain in domains:
             dataset = load_dataset("UGPhysics/ugphysics", domain, split=language)
