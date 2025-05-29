@@ -150,13 +150,13 @@ def setup():
             timeouts = typer.prompt(
                 "\nIf your cluster has a strict time limit for each job, we need to "
                 "know the value to be able to save checkpoints before the job is killed.\n"
-                "Specify as partition1:hh:mm:ss;partition2:hh:mm:ss\n"
+                "Specify as partition1=hh:mm:ss;partition2=hh:mm:ss\n"
                 "Leave empty if you don't have time limits.",
                 default="",
             )
             if timeouts:
                 config["timeouts"] = {
-                    partition.split(":")[0]: partition.split(":")[1] for partition in config["timeouts"].split(";")
+                    partition.split("=")[0]: partition.split("=")[1] for partition in timeouts.split(";")
                 }
 
         # Create the config file
