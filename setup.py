@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import find_packages, setup
 import importlib.util
 import os
 from itertools import chain
+
+from setuptools import setup
 
 spec = importlib.util.spec_from_file_location('version', 'nemo_skills/version.py')
 package_info = importlib.util.module_from_spec(spec)
@@ -35,7 +36,13 @@ requirements = parse_requirements('requirements/main.txt')
 extras_require = {
     'core': requirements,
 }
-install_requires = list(chain(*[extras_require['core'],]))
+install_requires = list(
+    chain(
+        *[
+            extras_require['core'],
+        ]
+    )
+)
 extras_require['all'] = list(chain(*list(extras_require.values())))
 
 setup(
@@ -46,7 +53,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache License, Version 2.0",
     url="https://github.com/NVIDIA/NeMo-Skills",
-    packages=find_packages(),
+    packages=["nemo_skills"],
     python_requires=">=3.10",
     install_requires=install_requires,
     include_package_data=True,
