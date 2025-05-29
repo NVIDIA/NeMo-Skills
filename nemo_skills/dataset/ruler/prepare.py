@@ -33,6 +33,7 @@ default_config = {
     "DEFAULT_GENERATION_ARGS": {
         "inference.tokens_to_generate": 120,
         "prefix_generation_to_response": True,
+        "continue_prefix_generation": True,
         "input_file": "/ruler/ruler_llama_4k/niah-single_1/test.jsonl", # example. will be overwritten
         "dataset": 'null', # overwrite dataset and split to use input_file
         "split": 'null'
@@ -114,7 +115,7 @@ def process_one_file(original_file, output_json_suite_folder, dataset_folder, ev
             original_entry = json.loads(line)
             new_entry = dict(
                 index=original_entry["index"],
-                problem=original_entry["input"],
+                question=original_entry["input"],
                 expected_answer=original_entry["outputs"],
                 length=original_entry["length"],
                 generation=original_entry['answer_prefix']
