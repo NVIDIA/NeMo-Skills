@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import importlib.util
-import os
 from itertools import chain
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 spec = importlib.util.spec_from_file_location('version', 'nemo_skills/version.py')
 package_info = importlib.util.module_from_spec(spec)
@@ -53,7 +52,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache License, Version 2.0",
     url="https://github.com/NVIDIA/NeMo-Skills",
-    packages=["nemo_skills"],
+    packages=find_packages(exclude=["tests"]),
     python_requires=">=3.10",
     install_requires=install_requires,
     include_package_data=True,
