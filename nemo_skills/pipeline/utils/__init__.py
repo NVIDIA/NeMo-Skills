@@ -29,6 +29,7 @@ from nemo_skills.pipeline.utils.cluster import (
     update_ssh_tunnel_config,
 )
 from nemo_skills.pipeline.utils.exp import (
+    CustomJobDetails,
     add_task,
     get_executor,
     get_exp,
