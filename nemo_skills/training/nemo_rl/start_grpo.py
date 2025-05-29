@@ -101,7 +101,14 @@ def prepare_openinstructmath2_dataset(
     )
 
     # Load the original dataset
-    original_ds = load_dataset(dataset_path, split=split)
+    if not dataset_path.startswith('/'):
+        original_ds = load_dataset(dataset_path, split=split)
+    else:
+        import pandas as pd
+        from datasets import Dataset
+        df = pd.read_json(dataset_path, lines=True)
+        df = df[['problem', output_key]]
+        original_ds = Dataset.from_pandas(df)
 
     # Split into train and validation sets using HF's train_test_split
     split_ds = original_ds.train_test_split(test_size=test_size, seed=seed)
