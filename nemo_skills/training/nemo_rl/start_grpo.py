@@ -299,7 +299,7 @@ def setup_data(
     # Load OpenMathInstruct2Dataset using nemo rl datasets
     if data_config["dataset_name"] == "OpenMathInstruct-2":
         print("Loading nvidia/OpenMathInstruct2Dataset for training and validation")
-        data: Any = OpenMathInstruct2Dataset(dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"))
+        data: Any = CustomOpenMathInstruct2Dataset(dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"))
     elif data_config["dataset_name"] == "DeepScaler":
         print(
             "Loading agentica-org/DeepScaleR-Preview-Dataset for training and validation"
