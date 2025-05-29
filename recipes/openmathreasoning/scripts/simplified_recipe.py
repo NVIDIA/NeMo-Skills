@@ -94,7 +94,8 @@ def run_sdg(workspace, cluster, num_gpus, wandb_params):
         server_type="vllm",
         server_gpus=num_gpus,
         log_samples=not wandb_params['disable_wandb'],
-        wandb_group=wandb_params['wandb_group'],
+        # using prefix as group to make it easier to see all sdg steps together
+        wandb_group=wandb_params['wandb_prefix'] + '-sdg',
         wandb_project=wandb_params['wandb_project'],
     )
 
@@ -114,7 +115,8 @@ def run_sdg(workspace, cluster, num_gpus, wandb_params):
         server_type='trtllm',
         server_gpus=num_gpus,
         log_samples=not wandb_params['disable_wandb'],
-        wandb_group=wandb_params['wandb_group'],
+        # using prefix as group to make it easier to see all sdg steps together
+        wandb_group=wandb_params['wandb_prefix'] + '-sdg',
         wandb_project=wandb_params['wandb_project'],
     )
 
@@ -156,10 +158,9 @@ def run_training(workspace, cluster, num_gpus, training_backend, wandb_params):
             num_gpus=num_gpus,
             num_nodes=1,
             disable_wandb=wandb_params['disable_wandb'],
-            wandb_group=wandb_params['wandb_group'],
             wandb_project=wandb_params['wandb_project'],
             training_data=f"{workspace}/sft-data.jsonl",
-            expname="training",
+            expname=wandb_params['wandb_prefix'] + "-training",
             run_after=["prepare-training-data", "convert-14b-nemo"],
         )
     elif training_backend == "nemo-rl":
@@ -179,11 +180,10 @@ def run_training(workspace, cluster, num_gpus, training_backend, wandb_params):
             num_gpus=num_gpus,
             num_nodes=1,
             disable_wandb=wandb_params['disable_wandb'],
-            wandb_group=wandb_params['wandb_group'],
             wandb_project=wandb_params['wandb_project'],
             training_data=f'{workspace}/sft-data.jsonl',
             cache_dir=f'{workspace}/nemo-rl-cache',
-            expname="training",
+            expname=wandb_params['wandb_prefix'] + "-training",
             run_after="prepare-training-data",
             final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf",
         )
@@ -205,7 +205,7 @@ def final_eval(workspace, cluster, num_gpus, training_backend, wandb_params):
             model_type="qwen",
             hf_model_name="Qwen/Qwen2.5-14B-Instruct",
             expname="convert-back-to-hf",
-            run_after="training",
+            run_after=wandb_params['wandb_prefix'] + "-training",
         )
 
     # launching evaluation
@@ -219,15 +219,14 @@ def final_eval(workspace, cluster, num_gpus, training_backend, wandb_params):
         output_dir=f"{workspace}/evals/after-training",
         num_jobs=1 if cluster == "local" else -1,
         expname="final-eval",
-        run_after=["convert-back-to-hf", "training"],
+        run_after=["convert-back-to-hf", wandb_params['wandb_prefix'] + "-training"],
     )
 
     # summarize results, after the evaluation job is done
     summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
     if not wandb_params['disable_wandb']:
         summarize_cmd += (
-            # not using an actual group parameter but adding to the name as grouping is harder to view in the UI
-            f" --wandb_name {wandb_params['wandb_group']}-final-eval "
+            f" --wandb_name {wandb_params['wandb_prefix']}-final-eval "
             f" --wandb_project {wandb_params['wandb_project']}"
         )
     run_cmd(
@@ -257,8 +256,7 @@ def initial_eval(workspace, cluster, num_gpus, wandb_params):
     summarize_cmd = f"ns summarize_results {workspace}/evals/baseline "
     if not wandb_params['disable_wandb']:
         summarize_cmd += (
-            # not using an actual group parameter but adding to the name as grouping is harder to view in the UI
-            f" --wandb_name {wandb_params['wandb_group']}-baseline-eval "
+            f" --wandb_name {wandb_params['wandb_prefix']}-baseline-eval "
             f" --wandb_project {wandb_params['wandb_project']}"
         )
     run_cmd(
@@ -298,10 +296,10 @@ if __name__ == "__main__":
         help="Disable Weights & Biases logging.",
     )
     parser.add_argument(
-        "--wandb_group",
+        "--wandb_prefix",
         type=str,
         default="test-pipeline",
-        help="WandB group name for tracking experiments.",
+        help="Prefix for WandB names of all steps.",
     )
     parser.add_argument(
         "--wandb_project",
@@ -313,7 +311,7 @@ if __name__ == "__main__":
 
     wandb_params = {
         "disable_wandb": args.disable_wandb,
-        "wandb_group": args.wandb_group,
+        "wandb_prefix": args.wandb_prefix,
         "wandb_project": args.wandb_project,
     }
     prepare(args.workspace, args.cluster, args.num_gpus, args.training_backend)
