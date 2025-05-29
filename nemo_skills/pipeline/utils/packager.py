@@ -44,7 +44,7 @@ class RepoMetadata:
 # Registry of external repos that should be packaged with the code in the experiment
 EXTERNAL_REPOS = {
     'nemo_skills': RepoMetadata(
-        name='nemo_skills', path=Path(__file__).absolute().parents[1]
+        name='nemo_skills', path=Path(__file__).absolute().parents[2]
     ),  # path to nemo_skills repo
 }
 

@@ -165,8 +165,8 @@ def get_cluster_config(cluster=None, config_dir=None):
         if (Path.cwd() / 'cluster_configs' / f"{cluster}.yaml").exists():
             return read_config(Path.cwd() / 'cluster_configs' / f"{cluster}.yaml")
 
-        if (Path(__file__).parents[2] / 'cluster_configs' / f"{cluster}.yaml").exists():
-            return read_config(Path(__file__).parents[2] / 'cluster_configs' / f"{cluster}.yaml")
+        if (Path(__file__).parents[3] / 'cluster_configs' / f"{cluster}.yaml").exists():
+            return read_config(Path(__file__).parents[3] / 'cluster_configs' / f"{cluster}.yaml")
 
         raise ValueError(f"Cluster config {cluster} not found in any of the supported folders.")
 
