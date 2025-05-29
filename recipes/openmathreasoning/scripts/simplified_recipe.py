@@ -250,6 +250,7 @@ def initial_eval(workspace, cluster, num_gpus, wandb_params):
         output_dir=f"{workspace}/evals/baseline",
         num_jobs=1,
         expname="baseline-eval",
+        run_after="download-assets",
     )
 
     # summarize results, after the evaluation job is done
