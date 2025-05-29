@@ -94,6 +94,7 @@ def prepare_openinstructmath2_dataset(
     test_size=0.05,
     output_key: str = "expected_answer",
     dataset_path: str = "nvidia/OpenMathInstruct-2",
+    val_dataset_path: str = "nvidia/OpenMathInstruct-2",
 ):
     """Load and split the OpenMathInstruct-2 dataset into train and validation sets using HF's train_test_split."""
     print(
@@ -101,17 +102,12 @@ def prepare_openinstructmath2_dataset(
     )
 
     # Load the original dataset
-    if not dataset_path.startswith('/'):
-        original_ds = load_dataset(dataset_path, split=split)
-    else:
-        import pandas as pd
-        from datasets import Dataset
-        df = pd.read_json(dataset_path, lines=True)
-        df = df[['problem', output_key]]
-        original_ds = Dataset.from_pandas(df)
-
-    # Split into train and validation sets using HF's train_test_split
-    split_ds = original_ds.train_test_split(test_size=test_size, seed=seed)
+    original_ds = extract_dataset(split, output_key, dataset_path)
+    val_ds = extract_dataset(split, output_key, val_dataset_path)
+    split_ds = {
+        'train': original_ds,
+        'test': val_ds,
+    }
 
     # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(
@@ -130,6 +126,17 @@ def prepare_openinstructmath2_dataset(
         "validation": val_formatted,
     }
 
+def extract_dataset(split, output_key, dataset_path):
+    if not dataset_path.startswith('/'):
+        original_ds = load_dataset(dataset_path, split=split)
+    else:
+        import pandas as pd
+        from datasets import Dataset
+        df = pd.read_json(dataset_path, lines=True)
+        df = df[['problem', output_key]]
+        original_ds = Dataset.from_pandas(df)
+    return original_ds
+
 
 class CustomOpenMathInstruct2Dataset:
     def __init__(
@@ -140,6 +147,7 @@ class CustomOpenMathInstruct2Dataset:
         output_key: str = "expected_answer",
         prompt_file: str = None,
         dataset_path: str = "nvidia/OpenMathInstruct-2",
+        val_dataset_path: str = "nvidia/OpenMathInstruct-2",
     ):
         """Initialize the dataset with train/validation split.
 
@@ -154,7 +162,7 @@ class CustomOpenMathInstruct2Dataset:
             )
 
         self.formatted_ds = prepare_openinstructmath2_dataset(
-            split=split, seed=seed, test_size=test_size, output_key=output_key, dataset_path=dataset_path,
+            split=split, seed=seed, test_size=test_size, output_key=output_key, dataset_path=dataset_path, val_dataset_path=val_dataset_path,
         )
 
         self.task_spec = TaskDataSpec(
@@ -306,7 +314,10 @@ def setup_data(
     # Load OpenMathInstruct2Dataset using nemo rl datasets
     if data_config["dataset_name"] == "OpenMathInstruct-2":
         print("Loading nvidia/OpenMathInstruct2Dataset for training and validation")
-        data: Any = CustomOpenMathInstruct2Dataset(dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"))
+        data: Any = CustomOpenMathInstruct2Dataset(
+            dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"),
+            val_dataset_path=data_config.get("val_data_path", "nvidia/OpenMathInstruct-2"),
+        )
     elif data_config["dataset_name"] == "DeepScaler":
         print(
             "Loading agentica-org/DeepScaleR-Preview-Dataset for training and validation"
