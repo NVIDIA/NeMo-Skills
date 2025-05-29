@@ -196,7 +196,7 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
     if not disable_wandb:
         if os.getenv('WANDB_API_KEY') is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
-        wandb_id = expname + (wandb_group if wandb_group else "") + wandb_project
+        wandb_id = expname + ("-" + wandb_group if wandb_group else "") + "-" + wandb_project
         logging_params = (
             f"exp_manager.create_wandb_logger=True "
             f"exp_manager.wandb_logger_kwargs.name={expname} "
