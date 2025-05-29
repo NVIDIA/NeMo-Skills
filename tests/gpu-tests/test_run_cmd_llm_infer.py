@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
 
 
 def test_run_cmd_llm_infer():
