@@ -26,8 +26,8 @@ from tests.conftest import docker_rm
 
 def test_run_cmd_llm_infer():
     """
-    Starts (if available) TRTLLM, Nemo, and VLLM servers, then sends the same prompt
-    with top_logprobs=1. It then compares the logprobs for each token across the models.
+    Uses (if available) VLLM servers, then sends the same prompt
+    with with openai python api to check if generation works.
     """
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
