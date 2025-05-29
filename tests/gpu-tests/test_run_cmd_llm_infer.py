@@ -55,7 +55,7 @@ def test_run_cmd_llm_infer():
 
         cmd = (
             f"ns run_cmd "
-            f"--cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
+            f"--cluster test-local --config_dir {Path(__file__).absolute().parent} "
             f"--model {model_path} "
             f"--server_type {server_type} "
             f"--server_gpus 1 "
