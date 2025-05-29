@@ -86,7 +86,7 @@ class NemoRLTask:
             f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
             f"echo 'Starting training' && "
-            f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
+            f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_grpo.py "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
             f"  {self.logging_params} "
@@ -146,9 +146,9 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, cache_dir):
     return cmd
 
 
-@nemo_rl_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@nemo_rl_app.command(name='grpo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def sft_nemo_rl(
+def grpo_nemo_rl(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
@@ -208,9 +208,9 @@ def sft_nemo_rl(
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
-    """Runs NeMo-RL SFT training.
+    """Runs NeMo-RL GRPO training.
 
-    All extra arguments are passed directly to the NeMo-RL SFT script.
+    All extra arguments are passed directly to the NeMo-RL GRPO script.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
@@ -261,7 +261,7 @@ def sft_nemo_rl(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-sft-{job_id}',
+                task_name=f'{expname}-grpo-{job_id}',
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["nemo-rl"],
                 num_gpus=num_gpus,
