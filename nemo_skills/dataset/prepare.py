@@ -16,9 +16,44 @@ import importlib
 import subprocess
 import sys
 from pathlib import Path
-from nemo_skills.dataset.utils import get_lean4_header, add_header_to_jsonl_inplace
 
-datasets = [d.name for d in (Path(__file__).parents[0]).glob("*") if d.is_dir() and d.name != "__pycache__"]
+from nemo_skills.dataset.utils import add_header_to_jsonl_inplace, get_lean4_header
+
+
+def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False):
+    if datasets and dataset_groups:
+        raise ValueError("Cannot specify both datasets and dataset_groups")
+
+    datasets_dir = Path(__file__).absolute().parents[0]
+
+    if not datasets:
+        default_datasets = [d.name for d in datasets_dir.glob("*") if d.is_dir() and d.name != "__pycache__"]
+        datasets = default_datasets
+
+    if dataset_groups:
+        target_datasets = []
+        for dataset in datasets:
+            dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
+            if dataset_module.DATASET_GROUP in dataset_groups:
+                target_datasets.append(dataset)
+        datasets = target_datasets
+
+    for dataset in datasets:
+        print(f"Preparing {dataset}")
+        dataset_path = datasets_dir / dataset
+        subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'}", shell=True, check=True)
+        dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
+
+        if dataset_module.DATASET_GROUP == "math":
+            if add_lean4_header:
+                jsonl_files = list(dataset_path.glob("*.jsonl"))
+                header = get_lean4_header()
+                for jsonl_file in jsonl_files:
+                    print(f"Adding Lean4 header to {jsonl_file}")
+                    add_header_to_jsonl_inplace(jsonl_file, header)
+
+    return datasets
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Prepare all datasets')
@@ -31,38 +66,8 @@ if __name__ == '__main__':
         help='Can specify a dataset groups here',
     )
     parser.add_argument(
-        '--add_lean4_header',
-        action='store_true',
-        help='Add Lean4 header to JSONL files during preparation'
+        '--add_lean4_header', action='store_true', help='Add Lean4 header to JSONL files during preparation'
     )
     args = parser.parse_args()
 
-    if args.datasets and args.dataset_groups:
-        raise ValueError("Cannot specify both datasets and dataset_groups")
-
-    if not args.datasets:
-        args.datasets = datasets
-
-    if args.dataset_groups:
-        target_datasets = []
-        for dataset in args.datasets:
-            dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-            if dataset_module.DATASET_GROUP in args.dataset_groups:
-                target_datasets.append(dataset)
-        args.datasets = target_datasets
-
-    datasets_dir = Path(__file__).absolute().parents[0]
-    for dataset in args.datasets:
-        print(f"Preparing {dataset}")
-        dataset_path = datasets_dir / dataset
-        subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'}", shell=True, check=True)
-        dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-        
-        if dataset_module.DATASET_GROUP == "math":
-            if args.add_lean4_header:
-                jsonl_files = list(dataset_path.glob("*.jsonl"))
-                header = get_lean4_header()
-                for jsonl_file in jsonl_files:
-                    print(f"Adding Lean4 header to {jsonl_file}")
-                    add_header_to_jsonl_inplace(jsonl_file, header)
-
+    prepare_datasets(args.datasets, args.dataset_groups, args.add_lean4_header)
