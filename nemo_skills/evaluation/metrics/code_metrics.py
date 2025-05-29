@@ -18,8 +18,6 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class CodeMetrics(BaseMetrics):
-    def __init__(self):
-        self.reset()
 
     def get_prediction_results(self, prediction):
         return {
@@ -51,8 +49,4 @@ class CodeMetrics(BaseMetrics):
     def aggregations_to_print(self):
         """We will log all pass/pass@1[k] up to k, but only report the kth one."""
         # pass + pass@1[k]
-        aggregations = [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
-        if self.has_greedy:
-            aggregations = ['greedy'] + aggregations
-
-        return aggregations
+        return [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']

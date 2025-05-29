@@ -23,9 +23,6 @@ class IFMetrics(BaseMetrics):
 
     required_keys = ['follow_instruction_list', 'instruction_id_list']
 
-    def __init__(self):
-        self.reset()
-
     def get_prediction_results(self, prediction):
         """Extract metrics from a prediction."""
         return {
@@ -103,8 +100,4 @@ class IFMetrics(BaseMetrics):
     def aggregations_to_print(self):
         """We will log all pass/pass@1[k] up to k, but only report the kth one."""
         # pass + pass@1[k]
-        aggregations = [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
-        if self.has_greedy:
-            aggregations = ['greedy'] + aggregations
-
-        return aggregations
+        return [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']

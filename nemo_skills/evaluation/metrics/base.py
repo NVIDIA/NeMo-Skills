@@ -18,6 +18,10 @@ from collections import Counter, defaultdict
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
+
+    def __init__(self):
+        self.reset()
+
     @abc.abstractmethod
     def get_metrics(self):
         pass
@@ -29,12 +33,10 @@ class BaseMetrics(abc.ABC):
     def update(self, predictions):
         self.total += 1
         self.max_k = max(self.max_k, len(predictions))
-        self.has_greedy = self.has_greedy or len(predictions) == 1
 
     def reset(self):
         self.total = 0
         self.max_k = 0
-        self.has_greedy = False
         self.agg_mode_dict = defaultdict(lambda: defaultdict(float))
 
     def get_majority_at_k(

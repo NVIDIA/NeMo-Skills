@@ -12,47 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import Counter, defaultdict
-from typing import Union
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 class AnswerJudgementMetrics(BaseMetrics):
-    def __init__(self):
-        self.reset()
 
-    def update_perf_dict(self, perf_dict, is_correct, is_fp, is_fn, invalid_count):
-        perf_dict["total_correct"] += float(is_correct)
-        perf_dict["fp_count"] += float(is_fp)
-        perf_dict["fn_count"] += float(is_fn)
-        perf_dict["invalid_count"] += float(invalid_count)
-    
-    def get_judgement_by_type(self, predictions, judgement_type: str, gt_judgement: bool) -> Union[bool, None]:
-        answers = [c for elem in predictions if (c:=is_correct_judgement(elem['judgement'])) is not None]
-        if len(answers) == 0:
-            return None
-        if judgement_type == "majority":
-            return Counter(answers).most_common(1)[0][0]
-        elif judgement_type == "pass":
-            for answer in answers:
-                if answer == gt_judgement:
-                    return answer
-            return answers[0]
-        else:
-            raise ValueError(f"Invalid judgement type: {judgement_type}")
-    
-    def get_judgement_metrics(self, pred_judgement, gt_judgement):
-        is_fp, is_fn = False, False
-        is_invalid = pred_judgement is None
-        is_correct = pred_judgement == gt_judgement
-        if not is_correct:
-            if pred_judgement == True:
-                is_fp = True
-            elif pred_judgement == False:
-                is_fn = True
-        return is_correct, is_fp, is_fn, is_invalid
-        
+    def get_prediction_results(self, prediction):
+        gt_judgement = is_correct_judgement(prediction['expected_judgement'])
+        pred_judgement = is_correct_judgement(prediction['judgement'])
+        return {
+            'gt_judgement': gt_judgement,
+            'pred_judgement': pred_judgement,
+            'is_correct': pred_judgement == gt_judgement,
+            'is_invalid': pred_judgement is None,
+            'is_fp': pred_judgement == True and gt_judgement == False,
+            'is_fn': pred_judgement == False and gt_judgement == True,
+        }
+
+    def _get_best_prediction(self, agg_mode_dict, prediction_results):
+        gt_judgement = prediction_results[0]['gt_judgement']
+        valid_answers = [elem['pred_judgement'] for elem in prediction_results if not elem['is_invalid']]
+        if len(valid_answers) == 0:
+            return
+
+        pred_answer = valid_answers[0]
+        for answer in valid_answers:
+            if answer == gt_judgement:
+                pred_answer = answer
+                break
+
+        agg_mode_dict['is_correct'] += float(pred_answer == gt_judgement)
+        agg_mode_dict['is_fp'] += float(pred_answer == True and gt_judgement == False)
+        agg_mode_dict['is_fn'] += float(pred_answer == False and gt_judgement == True)
+        agg_mode_dict['is_invalid'] += float(pred_answer is None)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -61,47 +54,44 @@ class AnswerJudgementMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
-        self.total += 1
-        gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
-        if len(predictions) > 1:
-            # Majority@k, Pass@k, Pass@1[k]
-            for k in range(len(predictions), 0, -1):
-                pred_subset = predictions[:k]
-                majority_judgement = self.get_judgement_by_type(pred_subset, "majority", gt_judgement)
-                majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
-                self.update_perf_dict(self.agg_mode_dict[f"majority@{k}"], *majority_metrics)
-
-                pass_judgement = self.get_judgement_by_type(pred_subset, "pass", gt_judgement)
-                pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
-                self.update_perf_dict(self.agg_mode_dict[f"pass@{k}"], *pass_metrics)
-
-                pass1_k_metrics = [self.get_judgement_metrics(is_correct_judgement(prediction['judgement']), gt_judgement) for prediction in pred_subset]
-                avg_pass1_k_metrics = [sum(metrics) / len(metrics) for metrics in zip(*pass1_k_metrics)]
-                self.update_perf_dict(self.agg_mode_dict[f"pass@1[{k}]"], *avg_pass1_k_metrics)
+        super().update(predictions)
+        prediction_results = [self.get_prediction_results(prediction) for prediction in predictions]
 
         # Greedy
         if len(predictions) == 1:
-            per_sample_metrics = self.get_judgement_metrics(is_correct_judgement(predictions[0]['judgement']), gt_judgement)
-            self.update_perf_dict(self.agg_mode_dict["greedy"], *per_sample_metrics)
-            return
-
+            self.get_pass_at_k(
+                self.agg_mode_dict,
+                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
+                prediction_results=prediction_results,
+            )
+        else:
+            # Majority@k, Pass@k, Pass@1[k]
+            self.get_pass_at_k(
+                self.agg_mode_dict,
+                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
+                prediction_results=prediction_results,
+                pass_at_k_fn=self._get_best_prediction,
+            )
+            self.get_majority_at_k(
+                self.agg_mode_dict,
+                predicted_answers=[pred['pred_judgement'] for pred in prediction_results],
+                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
+                prediction_results=prediction_results,
+            )
 
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
             metrics_dict[agg_mode] = {"num_entries": self.total}
 
-            metrics_dict[agg_mode]["correct_judgements"] = (agg_metric_dict["total_correct"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_positives"] = (agg_metric_dict["fp_count"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_negatives"] = (agg_metric_dict["fn_count"] / self.total) * 100.0
-            metrics_dict[agg_mode]["invalid_judgements"] = (agg_metric_dict["invalid_count"] / self.total) * 100.0
+            metrics_dict[agg_mode]["correct_judgements"] = (agg_metric_dict["is_correct"] / self.total) * 100.0
+            metrics_dict[agg_mode]["false_positives"] = (agg_metric_dict["is_fp"] / self.total) * 100.0
+            metrics_dict[agg_mode]["false_negatives"] = (agg_metric_dict["is_fn"] / self.total) * 100.0
+            metrics_dict[agg_mode]["invalid_judgements"] = (agg_metric_dict["is_invalid"] / self.total) * 100.0
 
         return metrics_dict
 
-    def reset(self):
-        self.total = 0
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
-
-    def max_aggregations_to_print(self):
+    def aggregations_to_print(self):
+        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
         # majority + pass + pass@1[k]
-        return 1 + 1 + 1
+        return [f'majority@{self.max_k}', f'pass@{self.max_k}', f'pass@1[{self.max_k}]']

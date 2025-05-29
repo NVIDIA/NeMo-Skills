@@ -170,8 +170,12 @@ def summarize_results(
                 metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
 
             metrics = {}
+            # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
+            #       an extra aggregation to print
+            has_greedy = False
 
             if Path(f'{benchmark_path}/output.jsonl').exists():
+                has_greedy = True
                 metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
                 if len(metrics) > 1:  # has subsets
                     for subset, subset_metrics in metrics.items():
@@ -192,9 +196,13 @@ def summarize_results(
                 for subset, subset_metrics in metrics.items():
                     max_metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_metrics_to_print()
                     aggregations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.aggregations_to_print()
+                    if aggregations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
+                        aggregations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
             else:
                 max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
                 aggregations_to_print[benchmark] = metrics_calculator.aggregations_to_print()
+                if aggregations_to_print[benchmark] is not None and has_greedy:
+                    aggregations_to_print[benchmark].insert(0, 'greedy')
 
         except Exception as e:
             logging.exception(f"Error computing metrics for {benchmark}: {e}")

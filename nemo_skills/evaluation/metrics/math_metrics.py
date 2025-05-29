@@ -26,6 +26,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class MathMetrics(BaseMetrics):
+
     def setup(self, input_files):
         # checking if judgements are ready and fusing them with predictions
         # might get permission errors when running locally, since original file
@@ -50,9 +51,6 @@ class MathMetrics(BaseMetrics):
                         fout.write(json.dumps(prediction) + '\n')
 
                 Path(jsonl_file + '-batch-request-id').unlink()
-
-    def __init__(self):
-        self.reset()
 
     def get_prediction_results(self, prediction):
         result = {}
@@ -211,13 +209,4 @@ class MathMetrics(BaseMetrics):
     def aggregations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
         # majority + pass + 2xRM + pass@1[k]
-        aggregations = [
-            f'majority@{self.max_k}',
-            f'pass@{self.max_k}',
-            f'rm_best@{self.max_k}',
-            f'pass@1[{self.max_k}]',
-        ]
-        if self.has_greedy:
-            aggregations = ['greedy'] + aggregations
-
-        return aggregations
+        return [f'majority@{self.max_k}', f'pass@{self.max_k}', f'rm_best@{self.max_k}', f'pass@1[{self.max_k}]']
