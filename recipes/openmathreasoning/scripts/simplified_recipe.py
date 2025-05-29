@@ -225,9 +225,7 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
     # summarize results, after the evaluation job is done
     summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
     if not wandb_params['disable_wandb']:
-        summarize_cmd += (
-            f" --wandb_name {expname_prefix}-final-eval " f" --wandb_project {wandb_params['wandb_project']}"
-        )
+        summarize_cmd += f" --wandb_name {expname_prefix}-final-eval --wandb_project {wandb_params['wandb_project']}"
     run_cmd(
         ctx=wrap_arguments(summarize_cmd),
         cluster=cluster,
@@ -256,7 +254,7 @@ def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix,
     summarize_cmd = f"ns summarize_results {workspace}/evals/baseline "
     if not wandb_params['disable_wandb']:
         summarize_cmd += (
-            f" --wandb_name {expname_prefix}-baseline-eval " f" --wandb_project {wandb_params['wandb_project']}"
+            f" --wandb_name {expname_prefix}-baseline-eval --wandb_project {wandb_params['wandb_project']}"
         )
     run_cmd(
         ctx=wrap_arguments(summarize_cmd),
