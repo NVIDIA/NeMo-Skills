@@ -17,7 +17,7 @@ import typer
 
 # isort: off
 from nemo_skills.pipeline.app import app
-from nemo_skills.pipeline.utils import wrap_arguments
+
 # isort: on
 
 # need the imports to make sure the commands are registered
@@ -36,6 +36,19 @@ from nemo_skills.pipeline.train import train
 from nemo_skills.pipeline.verl.ppo import ppo_verl
 
 typer.main.get_command_name = lambda name: name
+
+
+def wrap_arguments(arguments: str):
+    """Returns a mock context object to allow using the cli entrypoints as functions."""
+
+    class MockContext:
+        def __init__(self, args):
+            self.args = args
+            self.obj = None
+
+    # first one is the cli name
+    return MockContext(args=arguments.split(" "))
+
 
 if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341

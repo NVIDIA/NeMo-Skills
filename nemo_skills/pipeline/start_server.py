@@ -17,17 +17,12 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
-    add_mount_path,
     add_task,
-    check_if_mounted,
     check_mounts,
-    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
-    get_mounted_path,
-    is_mounted_filepath,
     resolve_mount_paths,
 )
 from nemo_skills.utils import setup_logging
