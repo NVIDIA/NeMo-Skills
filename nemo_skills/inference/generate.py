@@ -143,10 +143,6 @@ class GenerateSolutionsConfig:
             )
 
     def _post_init_validate_server(self):
-        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
-            # TODO: fix that
-            raise ValueError("Prompt template is required for trtllm servers")
-
         if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
             LOG.warning(
                 "NeMo/Megatron implementation of openai chat completions api "
@@ -158,11 +154,11 @@ class GenerateSolutionsConfig:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
     def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values""" 
-        for (param, default_value) in self._get_disallowed_params():
+        """Validate that certain parameters are restricted to certain values"""
+        for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
-    
+
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return []
@@ -464,9 +460,8 @@ class GenerationTask:
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
 
-
     def get_llm_generations(self, requests_in_progress, generations):
-        """Get the LLM generations from the output file. 
+        """Get the LLM generations from the output file.
         To allow for stateful generation, we also pass in the generations dictionary.
         In most cases, stateful generation is not needed.
         """
@@ -478,7 +473,7 @@ class GenerationTask:
             generations[dp_idx] = output
 
         return (requests_in_progress, generations)
-    
+
     def async_loop(self, data):
         """Async loop to generate generations."""
 

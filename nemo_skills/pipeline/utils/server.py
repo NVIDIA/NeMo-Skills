@@ -288,14 +288,16 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'trtllm':
-        server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_trt"
+        server_entrypoint = server_entrypoint or "trtllm-serve"
         server_start_cmd = (
-            f"python {server_entrypoint} "
-            f"    --model_path {model_path} "
+            f"{server_entrypoint} "
+            f"    {model_path} "
             f"    --port {server_port} "
+            f"    --tp_size {num_gpus} "
+            f"    --pp_size {num_nodes} "
             f"    {server_args} "
         )
-        num_tasks = num_gpus
+        num_tasks = 1
     else:
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
