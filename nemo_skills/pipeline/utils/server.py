@@ -13,12 +13,30 @@
 # limitations under the License.
 
 import logging
+from enum import Enum
 from typing import Optional
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+class SupportedServersSelfHosted(str, Enum):
+    trtllm = "trtllm"
+    vllm = "vllm"
+    nemo = "nemo"
+    sglang = "sglang"
+    megatron = "megatron"
+
+
+class SupportedServers(str, Enum):
+    trtllm = "trtllm"
+    vllm = "vllm"
+    nemo = "nemo"
+    sglang = "sglang"
+    megatron = "megatron"
+    openai = "openai"
 
 
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
