@@ -52,7 +52,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache License, Version 2.0",
     url="https://github.com/NVIDIA/NeMo-Skills",
-    packages=find_packages(exclude=["tests"]),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     python_requires=">=3.10",
     install_requires=install_requires,
     include_package_data=True,
