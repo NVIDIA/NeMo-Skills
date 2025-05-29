@@ -121,7 +121,6 @@ def run_sdg(workspace, cluster, num_gpus, wandb_params):
 
 def run_training(workspace, cluster, num_gpus, training_backend, wandb_params):
     # convert the generated solutions to a format that can be used for training
-    # and remove contaminated data
     run_cmd(
         ctx=wrap_arguments(
             f"python -m nemo_skills.training.prepare_data "
