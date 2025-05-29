@@ -37,7 +37,7 @@ class Lean4Metrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
-        self.total += 1
+        super().update(predictions)
         self.get_pass_at_k(
             self.agg_mode_dict,
             ['correct_proof', 'timeout_error'],
@@ -55,10 +55,10 @@ class Lean4Metrics(BaseMetrics):
             }
         return metrics_dict
 
-    def reset(self):
-        self.total = 0
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
+    def aggregations_to_print(self):
+        """Print only the largest k (or "greedy" and the largest pass@k)."""
+        aggregations = [f'pass@{self.max_k}']
+        if self.has_greedy:
+            aggregations = ['greedy'] + aggregations
 
-    def max_aggregations_to_print(self):
-        # Return 1 to print only the largest k (or "greedy" and the largest pass@k)
-        return 1
+        return aggregations

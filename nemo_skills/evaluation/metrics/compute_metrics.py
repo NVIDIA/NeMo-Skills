@@ -73,5 +73,5 @@ class ComputeMetrics:
     def max_metrics_to_print(self):
         return self.calculators['all'].max_metrics_to_print()
 
-    def max_aggregations_to_print(self):
-        return self.calculators['all'].max_aggregations_to_print()
+    def aggregations_to_print(self):
+        return self.calculators['all'].aggregations_to_print()

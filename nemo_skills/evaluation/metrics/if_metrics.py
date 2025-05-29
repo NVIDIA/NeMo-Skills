@@ -56,7 +56,7 @@ class IFMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
-        self.total += 1
+        super().update(predictions)
         self.instruction_total += len(predictions[0]['instruction_id_list'])
 
         strict_predictions = [pred['strict_eval'] for pred in predictions]
@@ -95,12 +95,16 @@ class IFMetrics(BaseMetrics):
         return metrics_dict
 
     def reset(self):
-        self.total = 0
+        super().reset()
         self.instruction_total = 0
         self.strict_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
         self.loose_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
 
-    def max_aggregations_to_print(self):
+    def aggregations_to_print(self):
         """We will log all pass/pass@1[k] up to k, but only report the kth one."""
         # pass + pass@1[k]
-        return 1 + 1
+        aggregations = [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
+        if self.has_greedy:
+            aggregations = ['greedy'] + aggregations
+
+        return aggregations

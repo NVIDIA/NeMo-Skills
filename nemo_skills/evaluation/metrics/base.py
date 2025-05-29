@@ -13,26 +13,29 @@
 # limitations under the License.
 
 import abc
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
     @abc.abstractmethod
-    def update(self, predictions):
-        pass
-
-    @abc.abstractmethod
     def get_metrics(self):
-        pass
-
-    @abc.abstractmethod
-    def reset(self):
         pass
 
     @abc.abstractmethod
     def get_prediction_results(self, prediction):
         pass
+
+    def update(self, predictions):
+        self.total += 1
+        self.max_k = max(self.max_k, len(predictions))
+        self.has_greedy = self.has_greedy or len(predictions) == 1
+
+    def reset(self):
+        self.total = 0
+        self.max_k = 0
+        self.has_greedy = False
+        self.agg_mode_dict = defaultdict(lambda: defaultdict(float))
 
     def get_majority_at_k(
         self, agg_mode_dict, predicted_answers, pred_keys=None, predictions=None, prediction_results=None
@@ -54,7 +57,7 @@ class BaseMetrics(abc.ABC):
         if pred_keys is None:
             pred_keys = prediction_results[0].keys()
 
-        for k in range(len(prediction_results), 1, -1):
+        for k in range(2, len(prediction_results) + 1):
             for pred_field in prediction_results[0].keys():
                 # Get valid answers and their results for this field
                 valid_answers_and_results = [
@@ -99,7 +102,7 @@ class BaseMetrics(abc.ABC):
             for pred_field in pred_keys:
                 agg_mode_dict["greedy"][pred_field] += prediction_results[0][pred_field]
         else:
-            for k in range(len(prediction_results), 0, -1):
+            for k in range(1, len(prediction_results) + 1):
                 # Custom pass@k implementation
                 if pass_at_k_fn is not None:
                     pass_at_k_fn(agg_mode_dict[f"pass@{k}"], prediction_results[:k])
@@ -123,6 +126,6 @@ class BaseMetrics(abc.ABC):
         """No limit by default."""
         return None
 
-    def max_aggregations_to_print(self):
+    def aggregations_to_print(self):
         """No limit by default."""
         return None

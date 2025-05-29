@@ -105,9 +105,10 @@ class MathMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
+        super().update(predictions)
+
         # this shouldn't do any heavy calculation, but just read the metric from existing json entry
         # all the heavy lifting should be done in the evaluation script
-        self.total += 1
         if 'reward_model_score' in predictions[0]:
             self.has_reward = True
 
@@ -200,17 +201,24 @@ class MathMetrics(BaseMetrics):
 
             metrics_dict[agg_mode]["no_answer"] = (agg_metric_dict["no_answer"] / self.total) * 100.0
 
-        print(metrics_dict.keys())
         return metrics_dict
 
     def reset(self):
+        super().reset()
         self.has_sympy = False
         self.has_judge = False
         self.has_reward = False
-        self.total = 0
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
 
-    def max_aggregations_to_print(self):
+    def aggregations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
         # majority + pass + 2xRM + pass@1[k]
-        return 1 + 1 + 2 * self.has_reward + 1
+        aggregations = [
+            f'majority@{self.max_k}',
+            f'pass@{self.max_k}',
+            f'rm_best@{self.max_k}',
+            f'pass@1[{self.max_k}]',
+        ]
+        if self.has_greedy:
+            aggregations = ['greedy'] + aggregations
+
+        return aggregations

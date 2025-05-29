@@ -34,7 +34,7 @@ class CodeMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
-        self.total += 1
+        super().update(predictions)
         self.get_pass_at_k(self.agg_mode_dict, predictions=predictions)
 
     def get_metrics(self):
@@ -48,11 +48,11 @@ class CodeMetrics(BaseMetrics):
 
         return metrics_dict
 
-    def reset(self):
-        self.total = 0
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(float))
-
-    def max_aggregations_to_print(self):
+    def aggregations_to_print(self):
         """We will log all pass/pass@1[k] up to k, but only report the kth one."""
         # pass + pass@1[k]
-        return 1 + 1
+        aggregations = [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
+        if self.has_greedy:
+            aggregations = ['greedy'] + aggregations
+
+        return aggregations
