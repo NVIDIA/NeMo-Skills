@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import docker_rm
 
 
 def test_run_cmd_llm_infer():
@@ -43,9 +44,11 @@ def test_run_cmd_llm_infer():
             continue
 
         output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-run-cmd"
+
+        docker_rm([output_dir])
+
         command = (
             f"cd /nemo_run/code/tests/scripts/ && "
-            f"rm -f {os.path.join(output_dir, 'output.txt')} && "
             f"mkdir -p {output_dir} && "
             f"python run_cmd_llm_infer_check.py > {output_dir}/output.txt"
         )
@@ -55,7 +58,7 @@ def test_run_cmd_llm_infer():
             f"--cluster test-local --config_dir {Path(__file__).absolute().parent / 'gpu-tests'} "
             f"--model {model_path} "
             f"--server_type {server_type} "
-            f"--server_gpus 0 "
+            f"--server_gpus 1 "
             f"--server_nodes 1 "
             f"--command '{command}'"
         )
