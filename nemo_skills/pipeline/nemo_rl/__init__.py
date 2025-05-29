@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
+from typer import Typer
 
-from nemo_skills.pipeline.cli import generate, wrap_arguments
+from nemo_skills.pipeline.app import app
 
+nemo_rl_app = Typer(help="nemo_rl training pipelines (run 'ns nemo_rl --help' for more information)")
 
-def test_error_on_missing_default():
-    with pytest.raises(TypeError):
-        generate(ctx=wrap_arguments(""))
+app.add_typer(nemo_rl_app, name="nemo_rl")

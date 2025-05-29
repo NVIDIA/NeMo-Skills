@@ -15,13 +15,11 @@
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
-from test_data_preparation import docker_rm_and_mkdir
+from tests.conftest import docker_rm_and_mkdir
 
 
 @pytest.mark.gpu
@@ -74,4 +72,3 @@ def test_trtllm_judge():
         f"    {os.path.dirname(output_file)} "
     )
     subprocess.run(cmd, shell=True, check=True)
-    
