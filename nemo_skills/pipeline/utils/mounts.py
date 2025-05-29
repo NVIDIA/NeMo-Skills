@@ -19,7 +19,6 @@ from typing import Dict, Optional
 import nemo_run as run
 
 from nemo_skills.pipeline.utils.cluster import get_tunnel
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
