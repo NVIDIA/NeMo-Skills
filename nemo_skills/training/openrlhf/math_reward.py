@@ -24,23 +24,34 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import prefill_judgement
 
 
-def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[dict]):
-    """Will check if the predicted answer matches expected answer and return 1 or 0 accordingly.
+def reward_func(
+    queries: list[str],
+    prompts: list[str],
+    prompt_metadata: list[dict]
+):
+    """
+    Check if each predicted answer matches the expected answer and return
+    a dict
 
-    Args:
-        queries: list of responses from an actor LLM
-        prompts: list of prompts that queries are generated from
-        prompt_metadata: any other keys from the original data file
-            corresponding to each prompt/query (e.g. expected_answer)
+        {
+            "score": [float],   # here: 1.0 if correct else 0.0
+            "acc":   [int],     # 1 if correct else 0
+            "pred":  [str],     # extracted answers
+        }
     """
     data_points = []
     prefilled_judgements = []
     prefilled_indices = set()
+    preds = []
+
     for idx, (metadata, query) in enumerate(zip(prompt_metadata, queries)):
+        pred = extract_answer(query)
+        preds.append(pred)
+
         dp = {
             "problem": metadata["problem"],
             "expected_answer": metadata["expected_answer"],
-            "predicted_answer": extract_answer(query),
+            "predicted_answer": pred,
         }
         judgement = prefill_judgement(dp)
         if judgement is not None:
@@ -69,5 +80,14 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
         else:
             judgements.append(outputs[generation_idx]["generation"])
             generation_idx += 1
-    is_correct_array = [is_correct_judgement(judgement) for judgement in judgements]
-    return torch.tensor(is_correct_array, dtype=torch.float32)
+
+    is_correct = [is_correct_judgement(j) for j in judgements]
+
+    scores = [float(c) for c in is_correct]     # 1.0 / 0.0
+    accs   = [int(c > 0) for c in is_correct]   # 1 / 0
+
+    return {
+        "score": scores,
+        "acc":   accs,
+        "pred":  preds,
+    }
