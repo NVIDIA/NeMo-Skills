@@ -22,6 +22,7 @@ import typer
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    add_mount_path,
     add_task,
     check_mounts,
     get_cluster_config,
@@ -187,7 +188,7 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    # extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
+    extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -259,13 +260,23 @@ def eval(
         )
 
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
+    benchmark_paths = [None for _ in range(len(benchmarks))]
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-    # TODO(@titu1994): add support for extra_datasets_type in future pr
-    # try:
-    #     extra_datasets_type = extra_datasets_type.value
-    # except AttributeError:
-    #     pass
+    try:
+        extra_datasets_type = extra_datasets_type.value
+    except AttributeError:
+        pass
+
+    if extra_datasets and extra_datasets_type == ExtraDatasetType.mount:
+        benchmark_keys = list(benchmarks.keys())
+        add_mount_path(extra_arguments, '/eval_datasets')
+
+        # Prepend the mount path automatically if not explicitly provided
+        temp_dataset_filepath = f"/eval_dataset/{temp_dataset_filepath}"
+        check_if_mounted(cluster_config, temp_dataset_filepath)
+
+        benchmark_paths[idx] = temp_dataset_filepath
 
     # Check which benchmarks require sandbox
     benchmark_requires_sandbox = {}
