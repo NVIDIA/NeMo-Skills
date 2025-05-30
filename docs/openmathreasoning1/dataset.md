@@ -87,26 +87,29 @@ we do not convert that model, but instead prepare a sharded checkpoint that is m
 
 ```python
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
-from nemo_skills.pipeline.utils import get_ray_server_cmd
 
-cmd = get_ray_server_cmd(
+cluster = 'dfw'
+
+cmd = (
     "python3 nemo_skills/conversion/save_sharded_state.py "
-    "    --model=/hf_models/DeepSeek-R1 "
+    "    --model-path=/hf_models/DeepSeek-R1 "
     "    --output=/hf_models/DeepSeek-R1-tp16 "
     "    --tensor-parallel-size=16 "
-    "    --max_model_len=8192 "
+    "    --context-len=8192 "
     "    --trust-remote-code "
-    "    --enforce-eager "
+    "    --nnodes 2 "
+    "    --dist-init-addr $SLURM_MASTER_NODE:20000 "
+    "    --node-rank $SLURM_PROCID "
 )
 
 run_cmd(
     ctx=wrap_arguments(cmd),
-    cluster="slurm",
+    cluster='slurm',
     num_gpus=8,
     num_nodes=2,
-    # we are using vllm's script to shard but the model can be served with sglang
-    container="vllm",
+    container="sglang",
     log_dir="/hf_models/DeepSeek-R1-tp16",
+    partition="interactive",
 )
 ```
 
@@ -150,9 +153,9 @@ consists of the following stages:
 2. [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
    for all problems where ground-truth answer is not known (`fill_majority_answer` stage).
 3. [Judge answers using an LLM](../pipelines/llm-as-a-judge.md). Only the final answer is compared to the ground-truth (or majority) answer, not the full solution (`judge_answers` stage).
-4. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage). 
-5. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).  
-6. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).   
+4. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
+5. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
+6. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).
 7. Filter out all incorrect solutions and prepare the data for SFT (`prepare_for_sft` stage).
 
 
@@ -179,9 +182,9 @@ focuses on generating solutions that leverage external tools, more specifically,
 5. [Optional] Extract Python code fragments from solutions (`extract_python_fragments`).
 6. [Optional] Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
 7. [Optional] Filter fragments based on novelty/significance scores (`filter_fragments`).
-8. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage). 
-9. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).  
-10. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).   
+8. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
+9. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
+10. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).
 11.  Prepare the final dataset for SFT (`prepare_for_sft` stage).
 
 We provide configurations for two TIR variants:
@@ -206,9 +209,9 @@ You can specify a subset of stages using the `--stages` argument for either mode
 1. Prepare instances comparing different solutions (summaries of these solutions) for a given problem (`prepare_labeling_data` stage).
 2. Generating solutions for the comparison instances where we use a reasoning model to output the judgment of what solution is the top-ranking one according to the model (`label_data` stage).
 3. Extract judgments from the reasoning trace and filter out judgments that pick the wrong solutions (`extract_judgment` stage).
-4. Generate new summaries for these judgment reasoning traces (we generate 4 summary per reasoning trace). These summaries can replace the costly reasoning traces as GenSelect targets (`generate_new_summaries` stage). 
+4. Generate new summaries for these judgment reasoning traces (we generate 4 summary per reasoning trace). These summaries can replace the costly reasoning traces as GenSelect targets (`generate_new_summaries` stage).
 5. Select the best *valid* summary (where the judgment matches the reasoning trace's judgment) as target for GenSelect (`merge_new_summaries` stage).
-6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/openmath/genselect.yaml) (`prepare_for_sft` stage).    
+6. Prepare data for SFT using [the GenSelect template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/openmath/genselect.yaml) (`prepare_for_sft` stage).
 
 
 We provide a configuration `qwq` ([`qwq.yaml`](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/genselect_sdg/qwq.yaml)) which uses the [Qwen/QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model for labeling the comparison instances. You can run this configuration as:

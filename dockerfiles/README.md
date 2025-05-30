@@ -14,6 +14,6 @@ Follow instructions in [TensorRT-LLM documentation](https://nvidia.github.io/Ten
 
 Our current container is built from `v0.19.0` code version.
 
-## Building sglang image
+## Building vllm image
 
-We directly use lmsysorg/sglang:v0.4.6.post5-cu124 image for sglang.
+We directly use vllm/vllm-openai:v0.9.0 image for vllm.
