@@ -63,7 +63,8 @@ def test_trtllm_eval():
 
 
 @pytest.mark.gpu
-def test_trtllm_code_execution_eval():
+@pytest.mark.parametrize("server_type", ['trtllm', 'trtllm-serve'])
+def test_trtllm_code_execution_eval(server_type):
     model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_TRTLLM_MODEL to run this test")
@@ -73,14 +74,14 @@ def test_trtllm_code_execution_eval():
     # we are using the base prompt for llama to make it follow few-shots
     prompt_template = 'llama3-base' if model_type == 'llama' else 'qwen-instruct'
 
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval"
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
 
     cmd = (
         f"ns eval "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --model {model_path} "
-        f"    --server_type trtllm "
+        f"    --server_type {server_type} "
         f"    --output_dir {output_dir} "
         f"    --benchmarks gsm8k:0 "
         f"    --server_gpus 1 "
@@ -107,7 +108,7 @@ def test_trtllm_code_execution_eval():
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ['vllm', 'sglang'])
+@pytest.mark.parametrize("server_type", ['vllm', 'sglang', 'trtllm-serve'])
 def test_hf_eval(server_type):
     # this test expects llama3-instruct to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
@@ -135,7 +136,6 @@ def test_hf_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
-        f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
