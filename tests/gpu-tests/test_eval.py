@@ -136,6 +136,7 @@ def test_hf_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
+        f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
