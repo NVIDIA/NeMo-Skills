@@ -1138,7 +1138,7 @@ class MegatronModel(BaseModel):
 
             result = {'generation': output, 'num_generated_tokens': -1}
             if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
-                if (top_logprobs is not None and top_logprobs != 0):
+                if top_logprobs is not None and top_logprobs != 0:
                     result['logprobs'] = choice.logprobs.token_logprobs
                     result['tokens'] = choice.logprobs.tokens
                 result['top_logprobs'] = choice.logprobs.top_logprobs
