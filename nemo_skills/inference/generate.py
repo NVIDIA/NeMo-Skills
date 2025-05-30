@@ -143,6 +143,10 @@ class GenerateSolutionsConfig:
             )
 
     def _post_init_validate_server(self):
+        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
+            # TODO: fix that
+            raise ValueError("Prompt template is required for trtllm servers")
+
         if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
             LOG.warning(
                 "NeMo/Megatron implementation of openai chat completions api "

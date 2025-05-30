@@ -88,8 +88,6 @@ we do not convert that model, but instead prepare a sharded checkpoint that is m
 ```python
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
-cluster = 'dfw'
-
 cmd = (
     "python3 nemo_skills/conversion/save_sharded_state.py "
     "    --model-path=/hf_models/DeepSeek-R1 "
@@ -104,7 +102,7 @@ cmd = (
 
 run_cmd(
     ctx=wrap_arguments(cmd),
-    cluster='slurm',
+    cluster="slurm",
     num_gpus=8,
     num_nodes=2,
     container="sglang",
