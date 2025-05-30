@@ -1153,7 +1153,7 @@ class MegatronModel(BaseModel):
 
 
 models = {
-    'trtllm': TRTLLMModel,
+    'trtllm': VLLMModel,
     'nemo': NemoModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
