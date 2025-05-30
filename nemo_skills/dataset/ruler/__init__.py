@@ -18,4 +18,4 @@
 # DATASET_GROUP = "chat"
 # METRICS_TYPE = "ruler"
 # DEFAULT_EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type=all"
-# DEFAULT_GENERATION_ARGS = "++inference.tokens_to_generate=50 ++prefix_generation_to_response=True ++continue_prefix_generation=True++input_file=/ruler/ruler_llama_4k/fwe/test.jsonl ++dataset=null ++split=null"
+# DEFAULT_GENERATION_ARGS = "++inference.tokens_to_generate=50 ++prefix_generation_to_response=True ++continue_prefix_generation=True ++input_file=/ruler/ruler_llama_4k/fwe/test.jsonl ++dataset=null ++split=null"

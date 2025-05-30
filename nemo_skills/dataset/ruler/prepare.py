@@ -19,7 +19,14 @@ from pathlib import Path
 import glob
 from shutil import copyfile
 from copy import deepcopy
-# prepare ruler jsons from steps: 
+
+# prepare ruler data from steps: 
+# 1. Go to official ruler repo. https://github.com/NVIDIA/RULER/
+#    Run the script to generate the jsonl files with your intended seq_len, task, tokenizer, template, etc. 
+#    Make sure to use --prepare_for_ns flag. 
+# 2. Run this script to generate the nemo-skills jsonl files and __init__.py file. 
+
+
 
 # Define the configuration as a dictionary
 default_config = {
