@@ -108,8 +108,10 @@ def test_trtllm_code_execution_eval(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ['vllm', 'sglang', 'trtllm-serve'])
-def test_hf_eval(server_type):
+@pytest.mark.parametrize(
+    "server_type,server_args", [('vllm', ''), ('sglang', ''), ('trtllm-serve', '--backend pytorch')]
+)
+def test_hf_eval(server_type, server_args):
     # this test expects llama3-instruct to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
     # mmlu/ifeval will be cut to 400 samples to save time
@@ -136,6 +138,7 @@ def test_hf_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
+        f"    --server_args='{server_args}' "
         f"    ++prompt_template=llama3-instruct "
         f"    ++split=test "
         f"    ++max_samples=164 "
