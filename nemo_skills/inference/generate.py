@@ -120,6 +120,10 @@ class GenerateSolutionsConfig:
         self._post_init_validate_params()
 
     def _post_init_validate_data(self):
+        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
+            # TODO: fix that
+            raise ValueError("Prompt template is required for trtllm servers")
+
         if self.input_file is not None:
             if self.dataset is not None or self.split is not None:
                 raise ValueError("Either `input_file` or `dataset` and `split` should be provided, but not both")
