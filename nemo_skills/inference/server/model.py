@@ -1141,7 +1141,7 @@ class MegatronModel(BaseModel):
                 if top_logprobs is not None and top_logprobs != 0:
                     result['logprobs'] = choice.logprobs.token_logprobs
                     result['tokens'] = choice.logprobs.tokens
-                result['top_logprobs'] = choice.logprobs.top_logprobs
+                    result['top_logprobs'] = choice.logprobs.top_logprobs
                 result['num_generated_tokens'] = len(choice.logprobs.tokens)
             return result
 
