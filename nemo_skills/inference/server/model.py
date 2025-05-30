@@ -875,6 +875,8 @@ class VLLMModel(BaseModel):
         }
         if top_k > 0:
             extra_body["top_k"] = top_k
+        else:
+            extra_body["top_k"] = -1
 
         response = self.oai_client.completions.create(
             model=self.model,
