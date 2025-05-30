@@ -304,8 +304,7 @@ def get_server_command(
             f"{server_entrypoint} "
             f"    {model_path} "
             f"    --port {server_port} "
-            f"    --tp_size {num_gpus} "
-            f"    --pp_size {num_nodes} "
+            f"    --tp_size {num_gpus * num_nodes} "
             f"    {server_args} "
         )
         num_tasks = 1
