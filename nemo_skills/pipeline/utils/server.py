@@ -300,6 +300,8 @@ def get_server_command(
         num_tasks = num_gpus
     elif server_type == 'trtllm-serve':
         server_entrypoint = server_entrypoint or "trtllm-serve"
+        if num_nodes > 1 and server_entrypoint == "trtllm-serve":
+            server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
         server_start_cmd = (
             f"{server_entrypoint} "
             f"    {model_path} "
@@ -307,7 +309,10 @@ def get_server_command(
             f"    --tp_size {num_gpus * num_nodes} "
             f"    {server_args} "
         )
-        num_tasks = 1
+        if num_nodes == 1:
+            num_tasks = 1
+        else:
+            num_tasks = num_gpus
     else:
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
