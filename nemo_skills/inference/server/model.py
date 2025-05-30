@@ -1054,7 +1054,7 @@ class MegatronModel(BaseModel):
             timeout=timeout,
         )
 
-        return self.parse_openai_response(response)
+        return self.parse_openai_response(response, top_logprobs=top_logprobs)
 
     def generate(
         self,
@@ -1106,7 +1106,7 @@ class MegatronModel(BaseModel):
             timeout=timeout,
         )
 
-        outputs = self.parse_openai_response(response, batch=True)
+        outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
 
         if remove_stop_phrases:
             for output in outputs:
@@ -1115,7 +1115,7 @@ class MegatronModel(BaseModel):
         return outputs
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False) -> dict | list[dict]:
+    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None) -> dict | list[dict]:
         """Parse OpenAI response to extract the generated text and other metadata.
 
         Args:
@@ -1126,7 +1126,7 @@ class MegatronModel(BaseModel):
             A single dict with generation info or a list of dicts for batch mode
         """
 
-        def process_choice(choice):
+        def process_choice(choice, top_logprobs: int | None = None):
             output = choice.text
             # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
             if choice.finish_reason == "stop":
@@ -1138,18 +1138,19 @@ class MegatronModel(BaseModel):
 
             result = {'generation': output, 'num_generated_tokens': -1}
             if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
-                result['logprobs'] = choice.logprobs.token_logprobs
-                result['tokens'] = choice.logprobs.tokens
-                result['top_logprobs'] = choice.logprobs.top_logprobs
+                if top_logprobs is not None and top_logprobs != 0:
+                    result['logprobs'] = choice.logprobs.token_logprobs
+                    result['tokens'] = choice.logprobs.tokens
+                    result['top_logprobs'] = choice.logprobs.top_logprobs
                 result['num_generated_tokens'] = len(choice.logprobs.tokens)
             return result
 
         if batch:
-            return [process_choice(choice) for choice in response.choices]
+            return [process_choice(choice, top_logprobs) for choice in response.choices]
         else:
             assert not isinstance(response, list)
             assert len(response.choices) == 1
-            return process_choice(response.choices[0])
+            return process_choice(response.choices[0], top_logprobs)
 
 
 # TODO: unify VLLMModel and OpenAIModel classes
