@@ -24,6 +24,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 class SupportedServersSelfHosted(str, Enum):
     trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -32,6 +33,7 @@ class SupportedServersSelfHosted(str, Enum):
 
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -288,6 +290,15 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'trtllm':
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
+        server_start_cmd = (
+            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
+            f"    --model_path {model_path} "
+            f"    --port {server_port} "
+            f"    {server_args} "
+        )
+        num_tasks = num_gpus
+    elif server_type == 'trtllm-serve':
         server_entrypoint = server_entrypoint or "trtllm-serve"
         server_start_cmd = (
             f"{server_entrypoint} "
