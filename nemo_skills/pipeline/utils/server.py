@@ -307,6 +307,7 @@ def get_server_command(
             f"    {model_path} "
             f"    --port {server_port} "
             f"    --tp_size {num_gpus * num_nodes} "
+            f"    --backend pytorch "
             f"    {server_args} "
         )
         if num_nodes == 1:
