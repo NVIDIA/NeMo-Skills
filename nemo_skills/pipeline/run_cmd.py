@@ -58,7 +58,7 @@ def run_cmd(
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
     model: str = typer.Option(None, help="Path to the model to evaluate"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
-    server_type: str = typer.Option(None, help="Type of server to use"),
+    server_type: pipeline_utils.SupportedServers | None = typer.Option(None, help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),

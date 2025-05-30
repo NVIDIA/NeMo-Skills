@@ -56,6 +56,8 @@ from nemo_skills.pipeline.utils.packager import (
     register_external_repo,
 )
 from nemo_skills.pipeline.utils.server import (
+    SupportedServers,
+    SupportedServersSelfHosted,
     configure_client,
     get_free_port,
     get_generation_command,
