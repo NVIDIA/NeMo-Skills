@@ -868,8 +868,8 @@ class VLLMModel(BaseModel):
             raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         stop_phrases = stop_phrases or []
 
-        if top_k == 0:
-            top_k = -1
+        # if top_k == 0:
+        #     top_k = -1
 
         response = self.oai_client.completions.create(
             model=self.model,
