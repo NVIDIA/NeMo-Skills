@@ -16,7 +16,7 @@ from nemo_skills.version import __version__
 
 # only used in ns setup command to initialize with defaults
 _containers = {
-    'trtllm': 'igitman/nemo-skills-trtllm:0.6.0',
+    'trtllm': 'igitman/nemo-skills-trtllm:0.6.1',
     'vllm': 'vllm/vllm-openai:v0.9.0',
     'sglang': 'igitman/nemo-skills-sglang:0.6.1',
     'nemo': 'igitman/nemo-skills-nemo:0.6.0',

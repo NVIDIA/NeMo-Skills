@@ -868,8 +868,13 @@ class VLLMModel(BaseModel):
             raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         stop_phrases = stop_phrases or []
 
-        if top_k == 0:
-            top_k = -1
+        extra_body = {
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+            "spaces_between_special_tokens": False,
+        }
+        if top_k > 0:
+            extra_body["top_k"] = top_k
 
         response = self.oai_client.completions.create(
             model=self.model,
@@ -886,12 +891,7 @@ class VLLMModel(BaseModel):
             logit_bias=None,
             stream=stream,
             n=1,
-            extra_body={
-                "top_k": top_k,
-                "min_p": min_p,
-                "repetition_penalty": repetition_penalty,
-                "spaces_between_special_tokens": False,
-            },
+            extra_body=extra_body,
             timeout=timeout,
         )
 
@@ -1153,13 +1153,15 @@ class MegatronModel(BaseModel):
             return process_choice(response.choices[0], top_logprobs)
 
 
+# TODO: unify VLLMModel and OpenAIModel classes
 models = {
     'trtllm': TRTLLMModel,
+    'trtllm-serve': VLLMModel,
     'nemo': NemoModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'vllm': VLLMModel,
-    'sglang': VLLMModel,  # interface is the same
+    'sglang': VLLMModel,
 }
 
 

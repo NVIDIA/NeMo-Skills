@@ -24,6 +24,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 class SupportedServersSelfHosted(str, Enum):
     trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -32,6 +33,7 @@ class SupportedServersSelfHosted(str, Enum):
 
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -289,7 +291,6 @@ def get_server_command(
         num_tasks = 1
     elif server_type == 'trtllm':
         server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
-        # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
             f"    --model_path {model_path} "
@@ -297,6 +298,21 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = num_gpus
+    elif server_type == 'trtllm-serve':
+        server_entrypoint = server_entrypoint or "trtllm-serve"
+        if num_nodes > 1 and server_entrypoint == "trtllm-serve":
+            server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
+        server_start_cmd = (
+            f"{server_entrypoint} "
+            f"    {model_path} "
+            f"    --port {server_port} "
+            f"    --tp_size {num_gpus * num_nodes} "
+            f"    {server_args} "
+        )
+        if num_nodes == 1:
+            num_tasks = 1
+        else:
+            num_tasks = num_gpus
     else:
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
