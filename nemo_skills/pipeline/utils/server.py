@@ -288,16 +288,15 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'trtllm':
-        server_entrypoint = server_entrypoint or "trtllm-serve"
+        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
+        # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
-            f"{server_entrypoint} "
-            f"    {model_path} "
+            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
+            f"    --model_path {model_path} "
             f"    --port {server_port} "
-            f"    --tp_size {num_gpus} "
-            f"    --pp_size {num_nodes} "
             f"    {server_args} "
         )
-        num_tasks = 1
+        num_tasks = num_gpus
     else:
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 

@@ -1,0 +1,5 @@
+FROM igitman/nemo-skills-sglang:0.6.1
+
+# patching for sharding states support for DeepSeek-R1
+COPY dockerfiles/sglang.patch /sgl-workspace/sglang.patch
+RUN cd /sgl-workspace/sglang && git apply /sgl-workspace/sglang.patch

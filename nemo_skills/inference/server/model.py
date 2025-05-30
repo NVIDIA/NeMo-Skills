@@ -259,13 +259,6 @@ class BaseModel(abc.ABC):
 
 
 class TRTLLMModel(BaseModel):
-    """Note that the current implementation supports inflight-batching so
-    to make the most use of it, you should submit a large number of prompts
-    at the same time.
-
-    A good default value is 16-32 times bigger than the model's max batch size.
-    """
-
     def _generate_single_base(
         self,
         prompt: str | dict,
@@ -1160,7 +1153,7 @@ class MegatronModel(BaseModel):
 
 
 models = {
-    'trtllm': VLLMModel,  # TRTLLMModel,
+    'trtllm': TRTLLMModel,
     'nemo': NemoModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
