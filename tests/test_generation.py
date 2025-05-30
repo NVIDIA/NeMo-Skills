@@ -17,14 +17,13 @@ import os
 
 # running most things through subprocess since that's how it's usually used
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
-from test_datasets import DATASETS
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.evaluation.metrics import ComputeMetrics
+from tests.conftest import docker_rm
+from tests.test_datasets import DATASETS
 
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
@@ -74,13 +73,16 @@ def test_eval_mtbench_api():
     if not os.getenv('OPENAI_API_KEY'):
         pytest.skip("Define OPENAI_API_KEY to run this test")
 
+    output_dir = '/tmp/nemo-skills-tests/mtbench-api'
+    docker_rm([output_dir])
+
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
         f"    --model=gpt-4o-mini "
         f"    --server_address=https://api.openai.com/v1 "
         f"    --benchmarks=mt-bench:0 "
-        f"    --output_dir=/tmp/nemo-skills-tests/mtbench-api "
+        f"    --output_dir={output_dir} "
         f"    --extra_eval_args=\"++eval_config.use_batch_api=False\""
         f"    ++max_samples=2 "
     )
@@ -88,14 +90,14 @@ def test_eval_mtbench_api():
 
     # checking that summarize results works (just that there are no errors, but can inspect the output as well)
     subprocess.run(
-        f"ns summarize_results /tmp/nemo-skills-tests/mtbench-api",
+        f"ns summarize_results {output_dir}",
         shell=True,
         check=True,
     )
 
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
-        [f"/tmp/nemo-skills-tests/mtbench-api/eval-results/mt-bench/output.jsonl"],
+        [f"{output_dir}/eval-results/mt-bench/output.jsonl"],
     )["all"]["greedy"]
 
     # not having other categories since we just ran with 2 samples

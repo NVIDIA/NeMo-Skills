@@ -259,13 +259,6 @@ class BaseModel(abc.ABC):
 
 
 class TRTLLMModel(BaseModel):
-    """Note that the current implementation supports inflight-batching so
-    to make the most use of it, you should submit a large number of prompts
-    at the same time.
-
-    A good default value is 16-32 times bigger than the model's max batch size.
-    """
-
     def _generate_single_base(
         self,
         prompt: str | dict,
@@ -578,8 +571,9 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY", api_key)
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
-            # assuming it's not used and setting a dummy value
-            api_key = "dummy"
+            else:
+                # assuming it's not used and setting a dummy value
+                api_key = "dummy"
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
@@ -797,18 +791,16 @@ class OpenAIModel(BaseModel):
         """
         Helper generator that yields incremental chunks.
         """
-        prev_delta, cur_delta, stop_suffix = "", "", None
+
         for chunk in response:
-            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+            cur_delta = chunk.choices[0].text
 
-            # Handle stop phrases
-            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
-                stop_suffix = chunk.choices[0].stop_reason
+            if cur_delta:
+                yield {"generation": cur_delta}
 
-            if prev_delta:
-                yield {"generation": prev_delta}
-            if stop_suffix:
-                yield {'generation': stop_suffix}
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
 
 
 class VLLMModel(BaseModel):
@@ -937,24 +929,39 @@ class VLLMModel(BaseModel):
         """
         Helper generator that yields incremental chunks.
         """
-        prev_delta, cur_delta, stop_suffix = "", "", None
-        is_sglang_stop_phrase = False
+
+        emitted_so_far = []
+
         for chunk in response:
-            prev_delta, cur_delta = cur_delta, chunk.choices[0].text
+            cur_delta = chunk.choices[0].text
+            emitted_so_far += [cur_delta]
 
-            # Handle stop phrases
-            ## sglang variant
-            if hasattr(chunk.choices[0], "matched_stop") and isinstance(chunk.choices[0].matched_stop, str):
-                stop_suffix = chunk.choices[0].matched_stop
-                is_sglang_stop_phrase = True
-            ## vllm variant
-            if hasattr(chunk.choices[0], "stop_reason") and isinstance(chunk.choices[0].stop_reason, str):
-                stop_suffix = chunk.choices[0].stop_reason
+            if cur_delta:
+                yield {"generation": cur_delta}
 
-            if prev_delta and not is_sglang_stop_phrase:
-                yield {"generation": prev_delta}
-            if stop_suffix:
-                yield {'generation': stop_suffix}
+            # vllm variant
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            # sglang variant
+            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+
+            # vllm variant - emit stop_reason as is and finish
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
+
+            # sglang variant - emit only not-yet-sent part of matched_stop
+            if matched_stop and isinstance(matched_stop, str):
+                remaining = matched_stop
+                # find the longest prefix of matched_stop that is already at
+                # the end of what we've emitted.
+                emitted_str = "".join(emitted_so_far)
+                max_len = min(len(emitted_str), len(matched_stop))
+                for i in range(max_len, 0, -1):
+                    if emitted_str.endswith(matched_stop[:i]):
+                        remaining = matched_stop[i:]
+                        break
+
+                if remaining:
+                    yield {"generation": remaining}
 
 
 class MegatronModel(BaseModel):

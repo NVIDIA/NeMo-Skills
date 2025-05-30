@@ -33,13 +33,15 @@ def read_predictions(predictions, line_idx, file_handles):
     return data
 
 
-def is_correct_judgement(judgement) -> Union[bool, None]:
-    if 'Judgement:' not in judgement:
-        return None  # improper judgement format, so have to judge as false
-    verdict = judgement.split('Judgement:')[-1].strip()
-    if verdict.lower() == 'yes':
-        return True
-    elif verdict.lower() == 'no':
-        return False
-    else:
+def is_correct_judgement(judgement, return_none=False) -> Union[bool, None]:
+    if 'Judgement:' in judgement:
+        verdict = judgement.split('Judgement:')[-1].strip()
+        if verdict.lower() == 'yes':
+            return True
+        elif verdict.lower() == 'no':
+            return False
+    
+    if return_none:
         return None
+    else:
+        return False  # improper judgement format, so have to judge as false

@@ -15,25 +15,32 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List
 
 import typer
 
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    SupportedServers,
     add_task,
-    check_if_mounted,
+    check_mounts,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
     get_server_command,
+    resolve_mount_paths,
     run_exp,
 )
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+class ExtraDatasetType(str, Enum):
+    copy = "copy"
+    mount = "mount"
 
 
 def get_greedy_cmd(
@@ -102,15 +109,6 @@ def get_sampling_cmd(
     )
 
 
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    openai = "openai"
-    sglang = "sglang"
-    megatron = "megatron"
-
-
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def eval(
@@ -130,7 +128,7 @@ def eval(
     expname: str = typer.Option("eval", help="Name of the experiment"),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
-    server_type: SupportedServers = typer.Option(help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
@@ -153,6 +151,7 @@ def eval(
     ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     add_greedy: bool = typer.Option(
         False,
@@ -180,12 +179,14 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
+    # extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -203,11 +204,17 @@ def eval(
         pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    if log_dir:
-        check_if_mounted(cluster_config, log_dir)
-    else:
+    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
+
+    output_dir, log_dir = check_mounts(
+        cluster_config,
+        log_dir=log_dir,
+        mount_map={output_dir: None},
+        check_mounted_paths=check_mounted_paths,
+    )
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
@@ -246,6 +253,11 @@ def eval(
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
+    # TODO(@titu1994): add support for extra_datasets_type in future pr
+    # try:
+    #     extra_datasets_type = extra_datasets_type.value
+    # except AttributeError:
+    #     pass
 
     # Check which benchmarks require sandbox
     benchmark_requires_sandbox = {}
