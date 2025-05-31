@@ -86,7 +86,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
     Determines which jobs still need to be run based on missing .done files.
     Returns a mapping from random_seed to list of chunk_ids that need processing.
     """
-    if rerun_done:
+    if rerun_done or True:
         return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
 
     status_dir = get_unmounted_path(cluster_config, output_dir)
