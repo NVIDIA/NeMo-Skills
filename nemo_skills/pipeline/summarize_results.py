@@ -158,7 +158,7 @@ def summarize_results(
 
     results = defaultdict(lambda: defaultdict(dict))
     max_metrics_to_print = {}
-    max_aggregations_to_print = {}
+    aggregations_to_print = {}
     for benchmark_path in benchmarks_paths:
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
@@ -195,14 +195,14 @@ def summarize_results(
             if len(metrics) > 1:
                 for subset, subset_metrics in metrics.items():
                     max_metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_metrics_to_print()
-                    max_aggregations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_aggregations_to_print()
-                    if max_aggregations_to_print[f"{benchmark}-{subset}"] is not None:
-                        max_aggregations_to_print[f"{benchmark}-{subset}"] += has_greedy
+                    aggregations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.aggregations_to_print()
+                    if aggregations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
+                        aggregations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
             else:
                 max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
-                max_aggregations_to_print[benchmark] = metrics_calculator.max_aggregations_to_print()
-                if max_aggregations_to_print[benchmark] is not None:
-                    max_aggregations_to_print[benchmark] += has_greedy
+                aggregations_to_print[benchmark] = metrics_calculator.aggregations_to_print()
+                if aggregations_to_print[benchmark] is not None and has_greedy:
+                    aggregations_to_print[benchmark].insert(0, 'greedy')
 
         except Exception as e:
             logging.exception(f"Error computing metrics for {benchmark}: {e}")
@@ -212,7 +212,10 @@ def summarize_results(
             continue
         max_widths = {}
         max_widths['evaluation_mode'] = len('evaluation_mode')
-        for eval_mode, metrics in list(benchmark_results.items())[: max_aggregations_to_print[benchmark]]:
+        for eval_mode in aggregations_to_print[benchmark]:
+            if eval_mode not in benchmark_results:
+                continue
+            metrics = benchmark_results[eval_mode]
             if max_metrics_to_print[benchmark] is None:
                 max_metrics_to_print[benchmark] = len(metrics)
             for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
@@ -229,7 +232,10 @@ def summarize_results(
         ]
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
-        for eval_mode, metrics in list(benchmark_results.items())[: max_aggregations_to_print[benchmark]]:
+        for eval_mode in aggregations_to_print[benchmark]:
+            if eval_mode not in benchmark_results:
+                continue
+            metrics = benchmark_results[eval_mode]
             values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
             for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
                 if isinstance(metric_value, float):
