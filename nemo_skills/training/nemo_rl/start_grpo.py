@@ -130,7 +130,7 @@ class NeMoSkillsDataset:
 # ===============================================================================
 TokenizerType = PreTrainedTokenizerBase
 
-def apply_ns_chat_template(prompt, problem: str, tokenizer: TokenizerType) -> str:
+def apply_ns_chat_template(prompt, problem: str) -> str:
     return prompt.fill({'problem': problem}, return_templated_dict=True)
 
 # TaskDataProcessFnCallable
