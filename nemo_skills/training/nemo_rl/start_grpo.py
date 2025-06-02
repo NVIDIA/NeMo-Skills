@@ -46,7 +46,7 @@ from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 
-from nemo_skills.prompt import get_prompt
+from nemo_skills.prompt.utils import get_prompt
 
 OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
 
