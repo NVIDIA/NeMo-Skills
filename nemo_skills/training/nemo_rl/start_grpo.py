@@ -167,8 +167,8 @@ def setup_data(
     print("\n▶ Setting up data...")
     math_task_spec = TaskDataSpec(
         task_name="math",
-        prompt_file=data_config["prompt_file"],
-        system_prompt_file=data_config["system_prompt_file"],
+        # prompt_file=data_config["prompt_file"],
+        # system_prompt_file=data_config["system_prompt_file"],
     )
 
     dataset = NeMoSkillsDataset()
