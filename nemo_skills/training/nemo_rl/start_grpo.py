@@ -153,11 +153,11 @@ def hf_data_processor(
     }
 
     prompt = get_prompt(
-        prompt_config=prompt_spec.prompt_config,
-        prompt_template=prompt_spec.prompt_template,
-        examples_type=prompt_spec.examples_type,
-        config_dir=prompt_spec.config_dir,
-        template_dir=prompt_spec.template_dir,
+        prompt_config=prompt_spec["prompt_config"],
+        prompt_template=prompt_spec["prompt_template"],
+        examples_type=prompt_spec["examples_type"],
+        config_dir=prompt_spec["config_dir"],
+        template_dir=prompt_spec["template_dir"],
         )
     message_log = apply_ns_chat_template(prompt, problem)
 
@@ -202,7 +202,7 @@ def setup_data(
         # prompt_file=data_config["prompt_file"],
         # system_prompt_file=data_config["system_prompt_file"],
     )
-    prompt_config = data_config.prompt
+    prompt_config = data_config["prompt"]
 
     data = NeMoSkillsDataset(
         data_config["train_data_path"],
