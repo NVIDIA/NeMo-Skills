@@ -135,12 +135,12 @@ def apply_ns_chat_template(prompt, problem: str, tokenizer: TokenizerType) -> st
 
 # TaskDataProcessFnCallable
 def hf_data_processor(
-    prompt_spec,
     datum_dict: dict[str, Any],
     task_data_spec: TaskDataSpec,
     tokenizer: TokenizerType,
     max_seq_length: int,
     idx: int,
+    prompt_spec,
 ) -> DatumSpec:
     """Process a datum dictionary (directly loaded from data/hf_datasets/openmathinstruct2.py) into a DatumSpec for the Math Environment."""
     problem = datum_dict["problem"]
