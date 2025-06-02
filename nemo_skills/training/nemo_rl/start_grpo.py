@@ -162,7 +162,7 @@ def hf_data_processor(
     message_log = apply_ns_chat_template(prompt, problem)
 
     for message in message_log:
-        user_message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
+        message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 
