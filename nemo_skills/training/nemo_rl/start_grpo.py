@@ -17,6 +17,7 @@
 import argparse
 import os
 import pprint
+from functools import partial
 from collections import defaultdict
 from typing import Any, Optional, cast
 
@@ -134,6 +135,7 @@ def apply_ns_chat_template(prompt, problem: str, tokenizer: TokenizerType) -> st
 
 # TaskDataProcessFnCallable
 def hf_data_processor(
+    prompt_spec,
     datum_dict: dict[str, Any],
     task_data_spec: TaskDataSpec,
     tokenizer: TokenizerType,
@@ -149,8 +151,6 @@ def hf_data_processor(
     user_message = {
         "role": "user",
     }
-
-    prompt_spec = task_data_spec.prompt
 
     prompt = get_prompt(
         prompt_config=prompt_spec.prompt_config,
@@ -202,6 +202,7 @@ def setup_data(
         # prompt_file=data_config["prompt_file"],
         # system_prompt_file=data_config["system_prompt_file"],
     )
+    prompt_config = data_config.prompt
 
     data = NeMoSkillsDataset(
         data_config["train_data_path"],
@@ -209,9 +210,9 @@ def setup_data(
     )
 
     task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = (
-        defaultdict(lambda: (math_task_spec, hf_data_processor))
+        defaultdict(lambda: (math_task_spec, partial(hf_data_processor, prompt_spec=prompt_config)))
     )
-    task_data_processors["math"] = (math_task_spec, hf_data_processor)
+    task_data_processors["math"] = (math_task_spec, partial(hf_data_processor, prompt_spec=prompt_config))
 
     math_env = MathEnvironment.options(  # type: ignore # it's wrapped with ray.remote
         runtime_env={
