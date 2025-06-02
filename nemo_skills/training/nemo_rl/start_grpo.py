@@ -83,19 +83,44 @@ def extract_dataset(split, output_key, dataset_path):
         original_ds = Dataset.from_pandas(df)
     return original_ds
 
+def format_math(data, output_key: str = "expected_answer"):
+    return {
+        "problem": data["problem"],
+        # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
+        "task_name": "math",
+    }
+
+def prepare_math_dataset(split_ds, output_key):
+            # Format the examples, removing original columns
+    train_formatted = split_ds["train"].map(
+        format_math,
+        remove_columns=split_ds["train"].column_names,
+        fn_kwargs={"output_key": output_key},
+    )
+    val_formatted = split_ds["validation"].map(
+        format_math,
+        remove_columns=split_ds["validation"].column_names,
+        fn_kwargs={"output_key": output_key},
+    )
+
+    return {
+        "train": train_formatted,
+        "validation": val_formatted,
+    }
+
 class NeMoSkillsDataset:
     """Custom dataset class for NeMo Skills Math Environment."""
 
-    def __init__(self, training_data, validation_data):
+    def __init__(self, training_data, validation_data, output_key="expected_answer"):
         """Initialize the dataset with training and validation data."""
         self.training_data = training_data
         self.validation_data = validation_data
 
         # Load the datasets
-        self.formatted_ds = {
+        self.formatted_ds = prepare_math_dataset({
             "train": extract_dataset("train", "expected_answer", training_data),
             "validation": extract_dataset("validation", "expected_answer", validation_data),
-        }
+        }, output_key=output_key)
 
 
 # ===============================================================================
