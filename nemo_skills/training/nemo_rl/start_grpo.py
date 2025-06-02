@@ -86,6 +86,7 @@ def extract_dataset(split, output_key, dataset_path):
 def format_math(data, output_key: str = "expected_answer"):
     return {
         "problem": data["problem"],
+        "expected_answer": data[output_key],
         # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
         "task_name": "math",
     }
