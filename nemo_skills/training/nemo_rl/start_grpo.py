@@ -86,8 +86,17 @@ def extract_dataset(split, output_key, dataset_path):
 class NeMoSkillsDataset:
     """Custom dataset class for NeMo Skills Math Environment."""
 
-    def __init__(self):
-        pass
+    def __init__(self, training_data, validation_data):
+        """Initialize the dataset with training and validation data."""
+        self.training_data = training_data
+        self.validation_data = validation_data
+
+        # Load the datasets
+        self.formatted_ds = {
+            "train": extract_dataset("train", "expected_answer", training_data),
+            "validation": extract_dataset("validation", "expected_answer", validation_data),
+        }
+
 
 # ===============================================================================
 #                             Math Data Processor
@@ -95,10 +104,7 @@ class NeMoSkillsDataset:
 TokenizerType = PreTrainedTokenizerBase
 
 def apply_ns_chat_template(prompt, problem: str, tokenizer: TokenizerType) -> str:
-    chat_dict = prompt.fill({'problem': problem}, return_templated_dict=True)
-
-
-
+    return prompt.fill({'problem': problem}, return_templated_dict=True)
 
 # TaskDataProcessFnCallable
 def hf_data_processor(
@@ -171,7 +177,10 @@ def setup_data(
         # system_prompt_file=data_config["system_prompt_file"],
     )
 
-    dataset = NeMoSkillsDataset()
+    data = NeMoSkillsDataset(
+        data_config["train_data_path"],
+        data_config["val_data_path"],
+    )
 
     task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = (
         defaultdict(lambda: (math_task_spec, hf_data_processor))

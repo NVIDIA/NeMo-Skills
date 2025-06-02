@@ -116,7 +116,8 @@ data:
     examples_type: null
     config_dir: null
     template_dir: null
-  dataset_name: "OpenMathInstruct-2"
+  train_data_path: ???
+  val_data_path: ???
 
 env:
   math:
