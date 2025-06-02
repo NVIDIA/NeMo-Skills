@@ -46,6 +46,8 @@ from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 
+from nemo_skills.prompt import get_prompt
+
 OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
 
 
@@ -92,6 +94,11 @@ class NeMoSkillsDataset:
 # ===============================================================================
 TokenizerType = PreTrainedTokenizerBase
 
+def apply_ns_chat_template(prompt, problem: str, tokenizer: TokenizerType) -> str:
+    chat_dict = prompt.fill({'problem': problem}, return_templated_dict=True)
+
+
+
 
 # TaskDataProcessFnCallable
 def hf_data_processor(
@@ -104,8 +111,6 @@ def hf_data_processor(
     """Process a datum dictionary (directly loaded from data/hf_datasets/openmathinstruct2.py) into a DatumSpec for the Math Environment."""
     problem = datum_dict["problem"]
     extra_env_info = {"ground_truth": datum_dict["expected_answer"]} # TODO(@georgea): make this  key configurable
-    if task_data_spec.prompt is not None:
-        problem = task_data_spec.prompt.format(problem)
 
     message_log: LLMMessageLogType = []
     # TODO(@georgea): use the nemo-skills formatting and templating
@@ -113,10 +118,19 @@ def hf_data_processor(
         "role": "user",
     }
 
-    message = apply_ns_chat_template(problem, tokenizer)
-    user_message["token_ids"] = tokenizer([message], return_tensors="pt")["input_ids"][0]
-    user_message["content"] = message
-    message_log.append(user_message)
+    prompt_spec = task_data_spec.prompt
+
+    prompt = get_prompt(
+        prompt_config=prompt_spec.prompt_config,
+        prompt_template=prompt_spec.prompt_template,
+        examples_type=prompt_spec.examples_type,
+        config_dir=prompt_spec.config_dir,
+        template_dir=prompt_spec.template_dir,
+        )
+    message_log = apply_ns_chat_template(prompt, problem)
+
+    for message in message_log:
+        user_message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 
