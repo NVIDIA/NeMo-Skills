@@ -106,7 +106,7 @@ class BaseMetrics(abc.ABC):
 
         if pred_keys is None:
             pred_keys = prediction_results[0].keys()
-
+            # print(pred_keys)
         if len(prediction_results) == 1:
             # Single decoding
             for pred_field in pred_keys:

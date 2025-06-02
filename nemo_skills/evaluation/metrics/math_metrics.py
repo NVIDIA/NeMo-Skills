@@ -104,89 +104,43 @@ class MathMetrics(BaseMetrics):
         """
         super().update(predictions)
 
-        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
-        # all the heavy lifting should be done in the evaluation script
+        self.get_pass_at_k(
+            self.agg_mode_dict,
+            predictions=predictions,
+        )
+        self.get_majority_at_k(
+            self.agg_mode_dict,
+            predicted_answers=[pred['predicted_answer'] for pred in predictions],
+            predictions=predictions,
+        )
+
         if 'reward_model_score' in predictions[0]:
-            self.has_reward = True
+            self.get_reward_at_k(
+                self.agg_mode_dict,
+                predicted_answers=[pred['predicted_answer'] for pred in predictions],
+                prediction_results=prediction_results,
+            )
 
-        # Get prediction results
-        prediction_results = [self.get_prediction_results(pred) for pred in predictions]
-
-        if len(predictions) == 1:
-            # Single decoding
-            self.num_decoding = 1
-
-            if self.has_sympy:
-                self.get_pass_at_k(
-                    self.agg_mode_dict,
-                    pred_keys=["correct_sympy"],
-                    prediction_results=prediction_results,
+        # Log discrepancies between the two judgements
+        if self.has_sympy and self.has_judge:
+            prediction_results = [self.get_prediction_results(pred) for pred in predictions]
+            if prediction_results[0]["correct_sympy"] != prediction_results[0]["correct_judge"]:
+                LOG.debug(
+                    "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
+                    "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
+                    bool(prediction_results[0]["correct_sympy"]),
+                    bool(prediction_results[0]["correct_judge"]),
+                    predictions[0]['problem'],
+                    predictions[0]['predicted_answer'],
+                    predictions[0]['expected_answer'],
+                    predictions[0]['judgement'],
                 )
-
-            if self.has_judge:
-                self.get_pass_at_k(
-                    self.agg_mode_dict,
-                    pred_keys=["correct_judge"],
-                    prediction_results=prediction_results,
-                )
-
-            # Log any discrepancy between the two judgements
-            if self.has_sympy and self.has_judge:
-                if prediction_results[0]["correct_sympy"] != prediction_results[0]["correct_judge"]:
-                    LOG.debug(
-                        "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
-                        "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
-                        bool(prediction_results[0]["correct_sympy"]),
-                        bool(prediction_results[0]["correct_judge"]),
-                        predictions[0]['problem'],
-                        predictions[0]['predicted_answer'],
-                        predictions[0]['expected_answer'],
-                        predictions[0]['judgement'],
-                    )
-        else:
-            # Multiple decodings - pass/majority
-            # getting metrics for all k up to len(predictions). Starting from last to make sure it's printed
-            if self.has_sympy:
-                self.get_pass_at_k(
-                    self.agg_mode_dict, pred_keys=["correct_sympy"], prediction_results=prediction_results
-                )
-                self.get_majority_at_k(
-                    self.agg_mode_dict,
-                    pred_keys=["correct_sympy"],
-                    predicted_answers=[pred['predicted_answer'] for pred in predictions],
-                    prediction_results=prediction_results,
-                )
-
-                if self.has_reward:
-                    self.get_reward_at_k(
-                        self.agg_mode_dict,
-                        pred_keys=["correct_sympy"],
-                        predicted_answers=[pred['predicted_answer'] for pred in predictions],
-                        prediction_results=prediction_results,
-                    )
-
-            if self.has_judge:
-                self.get_pass_at_k(
-                    self.agg_mode_dict, pred_keys=["correct_judge"], prediction_results=prediction_results
-                )
-                self.get_majority_at_k(
-                    self.agg_mode_dict,
-                    pred_keys=["correct_judge"],
-                    predicted_answers=[pred['predicted_answer'] for pred in predictions],
-                    prediction_results=prediction_results,
-                )
-
-                if self.has_reward:
-                    self.get_reward_at_k(
-                        self.agg_mode_dict,
-                        pred_keys=["correct_judge"],
-                        predicted_answers=[pred['predicted_answer'] for pred in predictions],
-                        prediction_results=prediction_results,
-                    )
 
     def get_metrics(self):
         metrics_dict = {}
+        # print(self.agg_mode_dict.keys())
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
+            print(agg_mode, agg_metric_dict.keys())
             metrics_dict[agg_mode] = {"num_entries": self.total}
             if self.has_sympy:
                 metrics_dict[agg_mode]["symbolic_correct"] = (agg_metric_dict["correct_sympy"] / self.total) * 100.0
@@ -208,5 +162,4 @@ class MathMetrics(BaseMetrics):
 
     def aggregations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
-        # majority + pass + 2xRM + pass@1[k]
-        return [f'majority@{self.max_k}', f'pass@{self.max_k}', f'rm_best@{self.max_k}', f'pass@1[{self.max_k}]']
+        return [f'pass@1[{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}', f'rm_best@{self.max_k}']
