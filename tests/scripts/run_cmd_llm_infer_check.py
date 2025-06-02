@@ -12,21 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-executor: local
+from openai import OpenAI
 
-containers:
-  trtllm: igitman/nemo-skills-trtllm:0.6.1
-  vllm: vllm/vllm-openai:v0.9.0
-  sglang: igitman/nemo-skills-sglang:0.6.1
-  nemo: igitman/nemo-skills-nemo:0.6.0
-  megatron: igitman/nemo-skills-megatron:0.6.0
-  sandbox: igitman/nemo-skills-sandbox:0.6.1
-  nemo-skills: igitman/nemo-skills:0.6.0
-  verl: igitman/nemo-skills-verl:0.6.0
-  nemo-rl: igitman/nemo-skills-nemo-rl:0.6.0
+client = OpenAI(api_key='EMPTY', base_url=f"http://0.0.0.0:5000/v1", timeout=None)
+api_model = client.models.list().data[0].id
 
-mounts:
-  - /tmp:/tmp
-  # change this if the models are located in a different place
-  # TODO: can we make it simpler?
-  - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+response = client.chat.completions.create(
+    model=api_model,
+    messages=[
+        {"role": "user", "content": "What is the capital of France?"},
+    ],
+    temperature=0.0,
+    max_tokens=4,
+    top_p=1.0,
+    n=1,
+    stream=False,
+)
+print(response.choices[0].message.content)

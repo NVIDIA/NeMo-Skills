@@ -25,6 +25,7 @@ import typer
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
+    SupportedServers,
     add_task,
     check_mounts,
     get_cluster_config,
@@ -42,15 +43,6 @@ from nemo_skills.pipeline.utils import (
 from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    openai = "openai"
-    sglang = "sglang"
-    megatron = "megatron"
 
 
 def get_chunked_rs_filename(
@@ -333,7 +325,7 @@ def get_genselect_cmd(
     output_prefix: str = "output",
 ):
     if eval_args is not None:
-        raise ValueError("Cannot specify eval_args for math judge")
+        raise ValueError("Cannot specify eval_args for genselect")
     cmd = (
         f"python -m {script} "
         f"    ++skip_filled=True "
@@ -434,7 +426,7 @@ def generate(
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
-    server_type: SupportedServers = typer.Option(help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
@@ -672,6 +664,9 @@ def generate(
                 )
                 prev_tasks = initial_tasks
                 for _ in range(dependent_jobs + 1):
+                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                    if chunk_id is not None:
+                        task_name += f'-chunk{chunk_id}'
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
@@ -682,7 +677,7 @@ def generate(
                             # only logging for the first job
                             wandb_parameters=wandb_parameters if job_idx == 0 else None,
                         ),
-                        task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
+                        task_name=task_name,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,

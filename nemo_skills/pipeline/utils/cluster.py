@@ -36,13 +36,6 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def read_config(config_file):
-    with open(config_file, "rt", encoding="utf-8") as fin:
-        cluster_config = yaml.safe_load(fin)
-
-    return cluster_config
-
-
 def get_timeout(cluster_config, partition):
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
@@ -133,6 +126,28 @@ def temporary_env_update(cluster_config, updates):
         cluster_config["env_vars"] = original_env_vars
 
 
+def read_config(config_file):
+    with open(config_file, "rt", encoding="utf-8") as fin:
+        cluster_config = yaml.safe_load(fin)
+
+    # resolve ssh tunnel config
+    if "ssh_tunnel" in cluster_config:
+        cluster_config = update_ssh_tunnel_config(cluster_config)
+
+    if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
+        if "job_dir" not in cluster_config:
+            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        set_nemorun_home(cluster_config["job_dir"])
+
+    if 'trtllm' in cluster_config['containers']:
+        # automatically setting same container for trtllm-serve
+        if 'trtllm-serve' not in cluster_config['containers']:
+            LOG.info("Setting trtllm-serve container to be the same as trtllm.")
+            cluster_config['containers']['trtllm-serve'] = cluster_config['containers']['trtllm']
+
+    return cluster_config
+
+
 def get_cluster_config(cluster=None, config_dir=None):
     """Trying to find an appropriate cluster config.
 
@@ -186,15 +201,6 @@ def get_cluster_config(cluster=None, config_dir=None):
         raise ValueError(f"Cluster config {config_file} not found.")
 
     cluster_config = read_config(config_file)
-
-    # resolve ssh tunnel config
-    if "ssh_tunnel" in cluster_config:
-        cluster_config = update_ssh_tunnel_config(cluster_config)
-
-    if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
-        if "job_dir" not in cluster_config:
-            raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
-        set_nemorun_home(cluster_config["job_dir"])
 
     return cluster_config
 

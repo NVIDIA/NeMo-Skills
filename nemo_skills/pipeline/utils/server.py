@@ -13,12 +13,32 @@
 # limitations under the License.
 
 import logging
+from enum import Enum
 from typing import Optional
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+class SupportedServersSelfHosted(str, Enum):
+    trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
+    vllm = "vllm"
+    nemo = "nemo"
+    sglang = "sglang"
+    megatron = "megatron"
+
+
+class SupportedServers(str, Enum):
+    trtllm = "trtllm"
+    trtllm_serve = "trtllm-serve"
+    vllm = "vllm"
+    nemo = "nemo"
+    sglang = "sglang"
+    megatron = "megatron"
+    openai = "openai"
 
 
 def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
@@ -197,17 +217,17 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm;
     # vllm can also pass model name as "model_path" so we need special processing
-    if server_type != "vllm":
+    if server_type not in ["vllm", "sglang"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
-    elif server_type == "vllm" and model_path.startswith("/"):
+    elif model_path.startswith("/"):
         check_if_mounted(cluster_config, model_path)
 
     if server_type == 'nemo':
-        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_nemo"
+        server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_nemo"
         server_start_cmd = (
-            f"python -m {server_entrypoint} "
+            f"python {server_entrypoint} "
             f"    gpt_model_file={model_path} "
             f"    trainer.devices={num_gpus} "
             f"    trainer.num_nodes={num_nodes} "
@@ -243,9 +263,9 @@ def get_server_command(
             f"    {server_args} "
         )
     elif server_type == 'vllm':
-        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_vllm"
+        server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
-            f"python3 -m {server_entrypoint} "
+            f"python3 {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --port {server_port} "
@@ -258,9 +278,9 @@ def get_server_command(
             multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
-        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_sglang"
+        server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_sglang"
         server_start_cmd = (
-            f"python3 -m {server_entrypoint} "
+            f"python3 {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
             f"    --num_nodes {num_nodes} "
@@ -269,9 +289,8 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = 1
-    else:
+    elif server_type == 'trtllm':
         server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
-        # need this flag for stable Nemotron-4-340B deployment
         server_start_cmd = (
             f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
             f"    --model_path {model_path} "
@@ -279,6 +298,23 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = num_gpus
+    elif server_type == 'trtllm-serve':
+        server_entrypoint = server_entrypoint or "trtllm-serve"
+        if num_nodes > 1 and server_entrypoint == "trtllm-serve":
+            server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
+        server_start_cmd = (
+            f"{server_entrypoint} "
+            f"    {model_path} "
+            f"    --port {server_port} "
+            f"    --tp_size {num_gpus * num_nodes} "
+            f"    {server_args} "
+        )
+        if num_nodes == 1:
+            num_tasks = 1
+        else:
+            num_tasks = num_gpus
+    else:
+        raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
     server_cmd = (
         f"nvidia-smi && "

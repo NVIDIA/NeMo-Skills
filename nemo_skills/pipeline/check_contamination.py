@@ -20,6 +20,7 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.utils import (
+    SupportedServers,
     add_task,
     check_mounts,
     get_cluster_config,
@@ -42,13 +43,6 @@ def get_check_contamination_cmd(input_file, output_file, extra_arguments=""):
     return cmd
 
 
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    openai = "openai"
-
-
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def check_contamination(
@@ -67,7 +61,7 @@ def check_contamination(
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers."
     ),
-    server_type: SupportedServers = typer.Option(SupportedServers.trtllm, help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server."),
     server_entrypoint: str = typer.Option(
