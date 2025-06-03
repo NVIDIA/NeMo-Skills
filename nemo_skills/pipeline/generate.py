@@ -664,6 +664,9 @@ def generate(
                 )
                 prev_tasks = initial_tasks
                 for _ in range(dependent_jobs + 1):
+                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                    if chunk_id is not None:
+                        task_name += f'-chunk{chunk_id}'
                     new_task = add_task(
                         exp,
                         cmd=wrap_cmd(
@@ -674,7 +677,7 @@ def generate(
                             # only logging for the first job
                             wandb_parameters=wandb_parameters if job_idx == 0 else None,
                         ),
-                        task_name=(f'{expname}-rs{seed}' if seed is not None else expname),
+                        task_name=task_name,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
