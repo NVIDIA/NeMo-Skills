@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import docker_rm
+
 
 @pytest.mark.gpu
 def test_hf_trtllm_conversion():
@@ -31,11 +33,14 @@ def test_hf_trtllm_conversion():
         'meta-llama/Meta-Llama-3.1-8B-Instruct' if model_type == 'llama' else 'Qwen/Qwen2.5-Math-7B-Instruct'
     )
 
+    output_model = f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-trtllm/model"
+    docker_rm([output_model])
+
     cmd = (
         f"ns convert "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --input_model {model_path} "
-        f"    --output_model /tmp/nemo-skills-tests/{model_type}/conversion/hf-to-trtllm/model "
+        f"    --output_model {output_model} "
         f"    --convert_from hf "
         f"    --convert_to trtllm "
         f"    --model_type {model_type} "
@@ -44,7 +49,7 @@ def test_hf_trtllm_conversion():
     )
 
     subprocess.run(cmd, shell=True, check=True)
-    assert Path(f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-trtllm/model").exists()
+    assert Path(f"{output_model}").exists()
 
 
 @pytest.mark.gpu
@@ -59,11 +64,14 @@ def test_hf_nemo_conversion():
         'meta-llama/Meta-Llama-3.1-8B-Instruct' if model_type == 'llama' else 'Qwen/Qwen2.5-Math-7B-Instruct'
     )
 
+    output_model = f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-nemo/model"
+    docker_rm([output_model])
+
     cmd = (
         f"ns convert "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --input_model {model_path} "
-        f"    --output_model /tmp/nemo-skills-tests/{model_type}/conversion/hf-to-nemo/model "
+        f"    --output_model {output_model} "
         f"    --convert_from hf "
         f"    --convert_to nemo "
         f"    --model_type {model_type} "
@@ -73,7 +81,7 @@ def test_hf_nemo_conversion():
     )
 
     subprocess.run(cmd, shell=True, check=True)
-    assert Path(f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-nemo/model").exists()
+    assert Path(output_model).exists()
 
 
 @pytest.mark.gpu
@@ -88,11 +96,14 @@ def test_hf_megatron_conversion():
         pytest.skip("Only llama models are supported in Megatron.")
     hf_model_name = 'meta-llama/Meta-Llama-3.1-8B-Instruct'
 
+    output_model = f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-megatron/model"
+    docker_rm([output_model])
+
     cmd = (
         f"ns convert "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --input_model {model_path} "
-        f"    --output_model /tmp/nemo-skills-tests/{model_type}/conversion/hf-to-megatron/model "
+        f"    --output_model {output_model} "
         f"    --convert_from hf "
         f"    --convert_to megatron "
         f"    --model_type {model_type} "
@@ -101,7 +112,7 @@ def test_hf_megatron_conversion():
     )
 
     subprocess.run(cmd, shell=True, check=True)
-    assert Path(f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-megatron/model").exists()
+    assert Path(output_model).exists()
 
 
 @pytest.mark.gpu
@@ -116,11 +127,14 @@ def test_nemo_hf_conversion():
         'meta-llama/Meta-Llama-3.1-8B-Instruct' if model_type == 'llama' else 'Qwen/Qwen2.5-Math-7B-Instruct'
     )
 
+    output_model = f"/tmp/nemo-skills-tests/{model_type}/conversion/nemo-to-hf/model"
+    docker_rm([output_model])
+
     cmd = (
         f"ns convert "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
         f"    --input_model {model_path} "
-        f"    --output_model /tmp/nemo-skills-tests/{model_type}/conversion/nemo-to-hf/model "
+        f"    --output_model {output_model} "
         f"    --convert_from nemo "
         f"    --convert_to hf "
         f"    --model_type {model_type} "
@@ -129,4 +143,4 @@ def test_nemo_hf_conversion():
     )
 
     subprocess.run(cmd, shell=True, check=True)
-    assert Path(f"/tmp/nemo-skills-tests/{model_type}/conversion/nemo-to-hf/model").exists()
+    assert Path(output_model).exists()

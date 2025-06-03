@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from enum import Enum
 from typing import List
 
@@ -21,17 +20,13 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.utils import (
-    add_mount_path,
+    SupportedServers,
     add_task,
-    check_if_mounted,
     check_mounts,
-    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
-    get_mounted_path,
-    is_mounted_filepath,
     resolve_mount_paths,
     run_exp,
 )
@@ -46,13 +41,6 @@ def get_check_contamination_cmd(input_file, output_file, extra_arguments=""):
         f"    {extra_arguments} "
     )
     return cmd
-
-
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    openai = "openai"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -73,7 +61,7 @@ def check_contamination(
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers."
     ),
-    server_type: SupportedServers = typer.Option(SupportedServers.trtllm, help="Type of server to use"),
+    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server."),
     server_entrypoint: str = typer.Option(

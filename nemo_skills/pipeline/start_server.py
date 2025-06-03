@@ -11,23 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from enum import Enum
-
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
-    add_mount_path,
+    SupportedServersSelfHosted,
     add_task,
-    check_if_mounted,
     check_mounts,
-    create_remote_directory,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
-    get_mounted_path,
-    is_mounted_filepath,
     resolve_mount_paths,
 )
 from nemo_skills.utils import setup_logging
@@ -43,14 +37,6 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
     return cmd
 
 
-class SupportedServers(str, Enum):
-    trtllm = "trtllm"
-    vllm = "vllm"
-    nemo = "nemo"
-    sglang = "sglang"
-    megatron = "megatron"
-
-
 @app.command()
 @typer_unpacker
 def start_server(
@@ -60,7 +46,7 @@ def start_server(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     model: str = typer.Option(..., help="Path to the model"),
-    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
+    server_type: SupportedServersSelfHosted = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(..., help="Number of GPUs to use for hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use for hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),

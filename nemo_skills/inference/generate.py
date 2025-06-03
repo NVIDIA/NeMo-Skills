@@ -75,7 +75,7 @@ class GenerateSolutionsConfig:
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    max_concurrent_requests: int = 1024  # Maximum number of concurrent requests to the server for the async loop
+    max_concurrent_requests: int = 512  # Maximum number of concurrent requests to the server for the async loop
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -158,11 +158,11 @@ class GenerateSolutionsConfig:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
     def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values""" 
-        for (param, default_value) in self._get_disallowed_params():
+        """Validate that certain parameters are restricted to certain values"""
+        for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
-    
+
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return []
@@ -464,9 +464,8 @@ class GenerationTask:
                     self.dump_outputs(outputs, data_points_batch, fout)
                     data_points_batch = []
 
-
     def get_llm_generations(self, requests_in_progress, generations):
-        """Get the LLM generations from the output file. 
+        """Get the LLM generations from the output file.
         To allow for stateful generation, we also pass in the generations dictionary.
         In most cases, stateful generation is not needed.
         """
@@ -478,7 +477,7 @@ class GenerationTask:
             generations[dp_idx] = output
 
         return (requests_in_progress, generations)
-    
+
     def async_loop(self, data):
         """Async loop to generate generations."""
 
