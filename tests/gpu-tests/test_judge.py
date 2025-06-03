@@ -15,13 +15,11 @@
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
-from test_data_preparation import docker_rm_and_mkdir
+from tests.conftest import docker_rm_and_mkdir
 
 
 @pytest.mark.gpu
@@ -37,7 +35,7 @@ def test_trtllm_judge():
     prompt_template = 'qwen-instruct'
 
     input_file = "/nemo_run/code/tests/data/output-rs0.test"
-    output_file = "/tmp/nemo-skills-tests/data/judge-output-rs0.jsonl"
+    output_file = "/tmp/nemo-skills-tests/data/math/output-rs0.jsonl"
 
     docker_rm_and_mkdir(output_file)
 
@@ -66,3 +64,11 @@ def test_trtllm_judge():
     for line in lines:
         data = json.loads(line)
         assert 'judgement' in data
+
+    # Adding a summarization step to check that the results are formatted correctly
+    cmd = (
+        f"ns summarize_results "
+        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
+        f"    {os.path.dirname(output_file)} "
+    )
+    subprocess.run(cmd, shell=True, check=True)

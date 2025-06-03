@@ -27,6 +27,8 @@ ns start_server \
 
 If the model needs to execute code, add `--with_sandbox`
 
+You could also launch an interactive web chat application by adding `--launch_chat_interface`, for more details see the [Chat Interface documentation](chat_interface.md).
+
 ## Send inference requests
 
 Click on :material-plus-circle: symbols in the snippet below to learn more details.

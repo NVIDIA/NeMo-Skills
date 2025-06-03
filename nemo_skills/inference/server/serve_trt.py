@@ -207,6 +207,8 @@ def generate(
             "no_repeat_ngram_size",
             "random_seed",
             "num_return_sequences",
+            "min_p",
+            "beam_width_array",
         ]
         rename_params = {"num_beams": "beam_width", "random_seed": "seed"}
         sampling_params = {k: v for k, v in kwargs.items() if k in accepted_parameters}
@@ -217,6 +219,30 @@ def generate(
             sampling_params["top_p"] = None
         if sampling_params.get("top_p_min") == 0.0:
             sampling_params["top_p_min"] = None
+
+        # TODO: improve usage of SamplingConfig. For example,
+        # construct SamplingConfig for each request, rather than one for the whole batch.
+        # Here we use beam width array for each request for Variable-Beam-Width-Search.
+        batch_size = len(batch_input_ids)
+        use_sampling_config_for_each_request = False
+        # Just placeholder for non-Variable-Beam-Width-Search
+        sampling_config_list = [None] * batch_size
+        if (
+            "beam_width_array" in sampling_params
+            and sampling_params["beam_width_array"] is not None
+            and len(sampling_params["beam_width_array"]) == batch_size
+        ):
+            use_sampling_config_for_each_request = True
+            sp_copy = copy.deepcopy(sampling_params)
+            for i in range(batch_size):
+                bwa = sampling_params["beam_width_array"][i]
+                sp_copy["beam_width_array"] = bwa
+                sp_copy["beam_width"] = max(bwa)
+                sampling_config_list[i] = trtllm.SamplingConfig(**sp_copy)
+            # Just placeholder for Variable-Beam-Width-Search and for `runner._check_inputs`
+            max_beam_width = max(sc.beam_width for sc in sampling_config_list)
+            sampling_params["beam_width"] = max_beam_width
+            sampling_params["beam_width_array"] = [max_beam_width] * 8
         sampling_config = trtllm.SamplingConfig(**sampling_params)
     else:
         sampling_config = copy.deepcopy(sampling_config)
@@ -268,6 +294,8 @@ def generate(
         external_draft_tokens_configs = [None] * len(batch_input_ids_list)
         is_draft_target_model = False
 
+    language_adapter_uids = [None] * len(batch_input_ids_list)
+
     requests = [
         trtllm.Request(
             input_token_ids=input_ids,
@@ -287,7 +315,9 @@ def generate(
             end_id=end_id,
             stop_words=stop_words,
             bad_words=bad_words,
-            sampling_config=sampling_config,
+            sampling_config=(
+                sampling_config_each_request if use_sampling_config_for_each_request else sampling_config
+            ),
             lookahead_config=request_lookahead_config,
             streaming=streaming,
             output_config=output_config,
@@ -298,6 +328,7 @@ def generate(
             logits_post_processor_name=logits_post_processor_name,
             external_draft_tokens_config=external_draft_tokens_config,
             skip_cross_attn_blocks=skip_cross_attn_blocks,
+            language_adapter_uid=language_adapter_uid,
         )
         for i, (
             input_ids,
@@ -308,6 +339,8 @@ def generate(
             lora_config,
             logits_post_processor_name,
             external_draft_tokens_config,
+            language_adapter_uid,
+            sampling_config_each_request,
         ) in enumerate(
             zip(
                 batch_input_ids_list,
@@ -318,6 +351,8 @@ def generate(
                 lora_configs,
                 logits_processor_names,
                 external_draft_tokens_configs,
+                language_adapter_uids,
+                sampling_config_list,
             )
         )
     ]
@@ -337,7 +372,6 @@ def generate(
         batch_input_ids_list=batch_input_ids_list,
         streaming=streaming,
         return_all_generated_tokens=return_all_generated_tokens,
-        max_new_tokens=max_new_tokens,
         sampling_config=sampling_config,
         is_draft_target_model=is_draft_target_model,
         stop_words_list=stop_words_list,
@@ -364,7 +398,6 @@ def _stream(
     stop_words_list,
     tokenizer,
     input_lengths,
-    max_new_tokens: int,
     sampling_config=None,
     timeout=None,
     is_draft_target_model: bool = False,
@@ -412,9 +445,9 @@ def _stream(
             streaming=streaming,
             request_ids=request_ids,
             return_all_generated_tokens=return_all_generated_tokens,
-            max_new_tokens=max_new_tokens,
             sampling_config=sampling_config,
             is_draft_target_model=is_draft_target_model,
+            output_generation_logits=False,
         )
         seq_length = output['sequence_lengths'][0].item()
 

@@ -25,9 +25,9 @@ import hydra
 import torch
 from sentence_transformers import SentenceTransformer, util
 
-from nemo_skills.utils import get_help_message, nested_dataclass, setup_logging, unroll_files
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging, unroll_files
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def top_k_similarity(from_emb, to_emb, top_k, chunk_size):
@@ -112,6 +112,9 @@ def retrieve_similar(cfg: RetrieveSimilarConfig):
 
     retrieve_from_list = read_data(cfg.retrieve_from, cfg.retrieve_key)
     compare_to_list = read_data(cfg.compare_to, cfg.retrieve_key)
+
+    assert all(retrieve_from_list), "retrieve_from_list contains none values"
+    assert all(compare_to_list), "compare_to_list contains none values"
 
     retrieve_from_embeddings = encode(model, retrieve_from_list, batch_size=cfg.batch_size)
     compare_to_embeddings = encode(model, compare_to_list, batch_size=cfg.batch_size)

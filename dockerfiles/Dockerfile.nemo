@@ -100,6 +100,8 @@ RUN pip uninstall -y transformer-engine && \
     git submodule init && git submodule update && \
     NVTE_FRAMEWORK=pytorch NVTE_WITH_USERBUFFERS=1 MPI_HOME=/usr/local/mpi pip install .
 
+RUN pip install fire
+    
 # place any util pkgs here
 ARG PYTRITON_VERSION
 RUN pip install --upgrade-strategy only-if-needed nvidia-pytriton==$PYTRITON_VERSION
