@@ -101,6 +101,7 @@ def test_grpo_nemo_rl():
         ctx=wrap_arguments(
             '++grpo.max_num_steps=5 '
             '++grpo.num_prompts_per_step=2 '
+            '++policy.max_total_sequence_length=256 '
             '++policy.dtensor_cfg.tensor_parallel_size=1 '
             '++checkpointing.save_period=2 '
             '++policy.train_global_batch_size=2 '
