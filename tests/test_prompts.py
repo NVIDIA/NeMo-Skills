@@ -132,7 +132,6 @@ def test_qwen_math_prompt_dict_multi_turn():
         ]
     }
     filled = prompt.fill(input_dict, return_templated_dict=True, multi_turn_key='turns')
-    print(filled)
     expected_result = [
         {
             'role': 'system',
