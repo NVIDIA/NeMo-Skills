@@ -133,7 +133,7 @@ TokenizerType = PreTrainedTokenizerBase
 
 @dataclass
 class NSTaskDataSpec(TaskDataSpec):
-    prompt_spec: dict[str, Any]
+    prompt_spec: dict[str, Any] | None = None
 
     def copy_defaults(self, from_spec):
         super().copy_defaults(from_spec)
