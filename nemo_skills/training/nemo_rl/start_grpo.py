@@ -218,7 +218,7 @@ def setup_data(
     prompt_config = data_config["prompt"]
     math_task_spec = NSTaskDataSpec(
         task_name="math",
-        prompt_config=prompt_config,
+        prompt_spec=prompt_config,
     )
 
     data = NeMoSkillsDataset(
