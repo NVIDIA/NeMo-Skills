@@ -130,27 +130,44 @@ class NeMoSkillsDataset:
 # ===============================================================================
 TokenizerType = PreTrainedTokenizerBase
 
+
+class NSTaskDataSpec(TaskDataSpec):
+    prompt_spec: dict[str, Any]
+
+    def copy_defaults(self, from_spec):
+        super().copy_defaults(from_spec)
+        default_attrs = {
+            "prompt_spec": {
+                "prompt_config": 'qwen/math-cot',
+                "prompt_template": 'qwen-instruct',
+                "examples_type": None,
+                "config_dir": None,
+                "template_dir": None,
+
+            }
+        }
+
+        for attr_name, default_value in default_attrs.items():
+            if getattr(self, attr_name) is None:
+                setattr(self, attr_name, default_value)
+
 def apply_ns_chat_template(prompt, problem: str) -> str:
     return prompt.fill({'problem': problem}, return_templated_dict=True)
 
 # TaskDataProcessFnCallable
-def hf_data_processor(
+def ns_data_processor(
     datum_dict: dict[str, Any],
-    task_data_spec: TaskDataSpec,
+    task_data_spec: NSTaskDataSpec,
     tokenizer: TokenizerType,
     max_seq_length: int,
     idx: int,
-    prompt_spec,
 ) -> DatumSpec:
     """Process a datum dictionary (directly loaded from data/hf_datasets/openmathinstruct2.py) into a DatumSpec for the Math Environment."""
     problem = datum_dict["problem"]
-    extra_env_info = {"ground_truth": datum_dict["expected_answer"]} # TODO(@georgea): make this  key configurable
+    prompt_spec = task_data_spec.prompt_spec
+    extra_env_info = {"ground_truth": datum_dict["expected_answer"]}
 
     message_log: LLMMessageLogType = []
-    # TODO(@georgea): use the nemo-skills formatting and templating
-    user_message = {
-        "role": "user",
-    }
 
     prompt = get_prompt(
         prompt_config=prompt_spec["prompt_config"],
@@ -197,12 +214,11 @@ def setup_data(
     dict[str, EnvironmentInterface],
 ]:
     print("\n▶ Setting up data...")
+    prompt_config = data_config["prompt"]
     math_task_spec = TaskDataSpec(
         task_name="math",
-        # prompt_file=data_config["prompt_file"],
-        # system_prompt_file=data_config["system_prompt_file"],
+        prompt_config=prompt_config,
     )
-    prompt_config = data_config["prompt"]
 
     data = NeMoSkillsDataset(
         data_config["train_data_path"],
@@ -210,9 +226,9 @@ def setup_data(
     )
 
     task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = (
-        defaultdict(lambda: (math_task_spec, partial(hf_data_processor, prompt_spec=prompt_config)))
+        defaultdict(lambda: (math_task_spec, ns_data_processor))
     )
-    task_data_processors["math"] = (math_task_spec, partial(hf_data_processor, prompt_spec=prompt_config))
+    task_data_processors["math"] = (math_task_spec, ns_data_processor)
 
     math_env = MathEnvironment.options(  # type: ignore # it's wrapped with ray.remote
         runtime_env={
