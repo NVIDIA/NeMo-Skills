@@ -24,9 +24,9 @@ import yaml
 
 from nemo_skills.code_execution.utils import format_code_output
 from nemo_skills.prompt.few_shot_examples import examples_map
-from nemo_skills.utils import nested_dataclass
+from nemo_skills.utils import get_logger_name, nested_dataclass
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class BM25Retriever:

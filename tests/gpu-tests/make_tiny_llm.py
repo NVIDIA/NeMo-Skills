@@ -25,38 +25,41 @@ args = parser.parse_args()
 if args.model_type == 'qwen':
     model_name = "Qwen/Qwen2.5-1.5B"
     output_dir = "/tmp/nemo-skills-tests/qwen/tiny-model-hf"
-    hidden_dim = 64
-    head_dim = 2
-    max_position_embeddings = 256
-    num_attention_heads = 8
+    kwargs = dict(
+        hidden_size=64,
+        intermediate_size=64,
+        head_dim=32,
+        max_position_embeddings=256,
+        num_attention_heads=2,
+        num_hidden_layers=2,
+    )
 elif args.model_type == 'qwen_orm':
     # vLLM requires a minimum head dimension size of 32, so we use a larger value here
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
     output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
-    hidden_dim = 256
-    head_dim = 32
-    num_attention_heads = 8
-    max_position_embeddings = 2048
+    kwargs = dict(
+        hidden_size=256,
+        intermediate_size=256,
+        head_dim=32,
+        max_position_embeddings=2048,
+        num_attention_heads=8,
+        num_hidden_layers=2,
+    )
 else:
     model_name = "meta-llama/Llama-3.2-1B-Instruct"
     output_dir = "/tmp/nemo-skills-tests/llama/tiny-model-hf"
-    hidden_dim = 128
-    head_dim = 16
-    max_position_embeddings = 256
-    num_attention_heads = 8
-
+    kwargs = dict(
+        hidden_size=256,
+        intermediate_size=256,
+        head_dim=64,
+        max_position_embeddings=256,
+        num_attention_heads=4,
+        num_key_value_heads=4,
+        num_hidden_layers=2,
+    )
 
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-config.update(
-    dict(
-        hidden_size=hidden_dim,
-        head_dim=head_dim,
-        intermediate_size=hidden_dim,
-        num_hidden_layers=2,
-        max_position_embeddings=max_position_embeddings,
-        num_attention_heads=num_attention_heads,
-    )
-)
+config.update(kwargs)
 print("new config", config)
 
 if args.model_type == 'qwen_orm':

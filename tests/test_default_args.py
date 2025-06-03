@@ -12,12 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-from pathlib import Path
-
 import pytest
 
-sys.path.append(str(Path(__file__).absolute().parents[1]))
 from nemo_skills.pipeline.cli import generate, wrap_arguments
 
 
