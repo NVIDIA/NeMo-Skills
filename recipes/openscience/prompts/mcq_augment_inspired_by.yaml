@@ -1,0 +1,27 @@
+few_shot_examples:
+  prefix: ""
+  template: |-
+    Write a new multiple-choice question inspired by the given one. Make the new question reasonable and solvable.
+    Ensure that one of the choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
+    Start directly with the question and DO NOT include any phrases such as "Here is a new multiple-choice question inspired by a given one".
+    After the question is completed finish your response right away.
+    Question:
+    {question}
+    Write another multiple-choice question inspired by this one.
+    Don't just change the numbers and context, but try to create a question that requires another approach to solve.
+    {user_end}{assistant_begin}{augmented_question}{assistant_end}{user_begin}
+  suffix: ""
+  examples_type: open_science_aug
+
+system: ""
+
+user: |-
+  {examples}
+  Write a new multiple-choice question inspired by the given one. Make the new question reasonable and solvable.
+  Ensure that one of the choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
+  Start directly with the question and DO NOT include any phrases such as "Here is a new multiple-choice question inspired by a given one".
+  After the question is completed finish your response right away.
+  Question:
+  {question}
+  Write another multiple-choice question inspired by this one.
+  Don't just change the numbers and context, but try to create a question that requires another approach to solve.
