@@ -24,7 +24,7 @@ from typing import Optional
 
 import typer
 
-from nemo_skills.evaluation.metrics import ComputeMetrics
+from nemo_skills.evaluation.metrics import ComputeMetrics, default_formatting
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     check_if_mounted,
@@ -156,6 +156,8 @@ def summarize_results(
         print(f"No benchmarks found in {results_dir}")
         return
 
+    # TODO: this needs some clean up and refactoring into functions
+
     results = defaultdict(lambda: defaultdict(dict))
     metrics_to_print = {}
     aggregations_to_print = {}
@@ -217,19 +219,19 @@ def summarize_results(
                 continue
             metrics = benchmark_results[eval_mode]
             if metrics_to_print[benchmark] is None:
-                metrics_to_print[benchmark] = list(metrics.keys())
+                metrics_to_print[benchmark] = {metric: default_formatting for metric in metrics}
 
-            for metric_key in metrics_to_print[benchmark]:
+            for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
                 max_widths[metric_key] = max(
                     max_widths.get(metric_key, len(metric_key)),
-                    len(f"{metric_value:.2f}" if isinstance(metric_value, float) else str(metric_value)),
+                    len(str(format_fn(metric_value))),
                 )
             max_widths['evaluation_mode'] = max(max_widths['evaluation_mode'], len(eval_mode))
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark])
+        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
         for eval_mode in aggregations_to_print[benchmark]:
@@ -237,11 +239,9 @@ def summarize_results(
                 continue
             metrics = benchmark_results[eval_mode]
             values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
-            for metric_key in metrics_to_print[benchmark]:
+            for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
-                if isinstance(metric_value, float):
-                    metric_value = f"{metric_value:.2f}%"
-                values.append(f'{str(metric_value):<{max_widths[metric_key]}}')
+                values.append(f'{str(format_fn(metric_value)):<{max_widths[metric_key]}}')
             print(' | '.join(values))
 
         print('\n')

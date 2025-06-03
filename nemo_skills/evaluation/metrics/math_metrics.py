@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
-from nemo_skills.evaluation.metrics.base import BaseMetrics
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.utils import get_logger_name, unroll_files
@@ -26,7 +26,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class MathMetrics(BaseMetrics):
-
     def setup(self, input_files):
         # checking if judgements are ready and fusing them with predictions
         # might get permission errors when running locally, since original file
@@ -55,23 +54,18 @@ class MathMetrics(BaseMetrics):
     def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         correctness_dict = {}
         if 'is_correct' in prediction:
-            self.has_sympy = True
+            has_sympy = True
             correctness_dict["symbolic_correct"] = prediction['is_correct']
         if 'judgement' in prediction:
-            self.has_judge = True
+            has_judge = True
             correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
-        if self.has_sympy and self.has_judge:
+        if has_sympy and has_judge:
             correctness_dict["both_correct"] = (
                 correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
             )
             correctness_dict["any_correct"] = correctness_dict["symbolic_correct"] or correctness_dict["judge_correct"]
 
         return correctness_dict
-
-    def get_prediction_statistics(self, prediction):
-        stats = super().get_prediction_statistics(prediction)
-        stats["no_answer"] = prediction['predicted_answer'] is None
-        return stats
 
     def get_reward_at_k(self, agg_mode_dict, pred_keys, predicted_answers, prediction_results):
         for k in range(len(prediction_results), 1, -1):
@@ -93,6 +87,21 @@ class MathMetrics(BaseMetrics):
                 # Update the metric
                 agg_mode_dict[f"rm_best@{k}"][pred_field] += rm_result
 
+    def _update_metrics_for_pass(
+        self,
+        agg_mode_dict: dict,
+        k: int,
+        predictions: list[dict],
+    ):
+        super()._update_metrics_for_pass(
+            agg_mode_dict,
+            k,
+            predictions,
+        )
+        no_answer_list = [pred['predicted_answer'] is None for pred in predictions[:k]]
+        agg_mode_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
+        agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 
@@ -101,58 +110,49 @@ class MathMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-
+        predicted_answers = [pred['predicted_answer'] for pred in predictions]
         self._compute_pass_at_k(predictions=predictions)
-        self._compute_majority_at_k(
-            predictions=predictions,
-            predicted_answers=[pred['predicted_answer'] for pred in predictions],
-        )
+        self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
         if 'reward_model_score' in predictions[0]:  # TODOODODODODODOODOT TODO
             self.get_reward_at_k(
                 self.agg_mode_dict,
-                predicted_answers=[pred['predicted_answer'] for pred in predictions],
+                predicted_answers=predicted_answers,
                 prediction_results=prediction_results,
             )
 
         # Log discrepancies between the two judgements
-        if self.has_sympy and self.has_judge:
-            for prediction in predictions:
-                correctness_dict = self._get_correctness_dict(prediction)
-                if correctness_dict["symbolic_correct"] != correctness_dict["judge_correct"]:
-                    LOG.debug(
-                        "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
-                        "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
-                        correctness_dict["symbolic_correct"],
-                        correctness_dict["judge_correct"],
-                        prediction['problem'],
-                        prediction['predicted_answer'],
-                        prediction['expected_answer'],
-                        prediction['judgement'],
-                    )
-
-    def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total}
-            if self.has_sympy:
-                metrics_dict[agg_mode]["symbolic_correct"] = (agg_metric_dict["symbolic_correct"] / self.total) * 100.0
-            if self.has_judge:
-                metrics_dict[agg_mode]["judge_correct"] = (agg_metric_dict["judge_correct"] / self.total) * 100.0
-            if self.has_sympy and self.has_judge:
-                metrics_dict[agg_mode]["both_correct"] = (agg_metric_dict["both_correct"] / self.total) * 100.0
-                metrics_dict[agg_mode]["any_correct"] = (agg_metric_dict["any_correct"] / self.total) * 100.0
-
-            # metrics_dict[agg_mode]["no_answer"] = (agg_metric_dict["no_answer"] / self.total) * 100.0
-
-        return metrics_dict
-
-    def reset(self):
-        super().reset()
-        self.has_sympy = False
-        self.has_judge = False
-        self.has_reward = False
+        for prediction in predictions:
+            correctness_dict = self._get_correctness_dict(prediction)
+            if "symbolic_correct" not in correctness_dict or "judge_correct" not in correctness_dict:
+                continue
+            if correctness_dict["symbolic_correct"] != correctness_dict["judge_correct"]:
+                LOG.debug(
+                    "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
+                    "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
+                    correctness_dict["symbolic_correct"],
+                    correctness_dict["judge_correct"],
+                    prediction['problem'],
+                    prediction['predicted_answer'],
+                    prediction['expected_answer'],
+                    prediction['judgement'],
+                )
 
     def aggregations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
-        return [f'pass@1[{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}', f'rm_best@{self.max_k}']
+        return [
+            f'pass@1[{self.max_k}]',
+            f'majority@{self.max_k}',
+            f'pass@{self.max_k}',
+            f'rm_best@{self.max_k}',
+            f'rm_majority@{self.max_k}',
+        ]
+
+    def metrics_to_print(self):
+        return {
+            'num_entries': as_int,
+            'avg_tokens': as_int,
+            'judge_correct': as_percentage,
+            'symbolic_correct': as_percentage,
+            'no_answer': as_percentage,
+        }
