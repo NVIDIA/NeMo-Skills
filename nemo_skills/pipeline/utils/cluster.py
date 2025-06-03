@@ -301,77 +301,95 @@ def progress_callback(transferred: int, total: int) -> None:
 
 
 def cluster_download(
-    tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
+    tunnel: SSHTunnel,
+    remote_path: str,
+    local_path: str,
+    tar_on_remote: bool = True,
+    remote_tar_dir: Optional[str] = None,
+    verbose: bool = True,
 ):
     """
-    Downloads a directory from a remote cluster by creating a tar archive and transferring it.
+    Downloads files from a remote cluster.
+
+    Can optionally create a tar archive on remove and untar locally to speed up the process.
 
     Args:
         tunnel: SSHTunnel connection
-        remote_dir: Path to the directory on remote server
-        local_dir: Local path to save the downloaded directory
+        remote_path: Path to the directory/file on remote server
+        local_path: Local path to save the downloaded directory
+        tar_on_remote: Whether to create a tar archive on the remote server before downloading.
+            Always set it to False if you are downloading a single file.
         remote_tar_dir: Optional directory for temporary tar file creation
         verbose: Print download progress
     """
 
-    remote_dir = remote_dir.rstrip('/')
-    remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
+    if tar_on_remote:  # assuming it's a folder
+        remote_dir = remote_path.rstrip('/')
+        remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
 
-    # Directory where the remote tarball is written
-    remote_tar_dir = remote_tar_dir if remote_tar_dir else remote_dir_parent
-    # Path of the remote tar file
-    remote_tar_filename = f"{remote_dir_name}.tar.gz"
+        # Directory where the remote tarball is written
+        remote_tar_dir = remote_tar_dir if remote_tar_dir else remote_dir_parent
+        # Path of the remote tar file
+        remote_tar_filename = f"{remote_dir_name}.tar.gz"
 
-    # Remote and local tar files
-    remote_tar = f"{os.path.join(remote_tar_dir, remote_tar_filename)}"
-    local_tar = os.path.join(local_dir, remote_tar_filename)
+        # Remote and local tar files
+        remote_tar = f"{os.path.join(remote_tar_dir, remote_tar_filename)}"
+        local_tar = os.path.join(local_path, remote_tar_filename)
 
-    # Get the directory size
-    result = tunnel.run(f'du -sb {remote_dir} | cut -f1')
-    total_size = int(result.stdout.strip())
+        # Get the directory size
+        result = tunnel.run(f'du -sb {remote_dir} | cut -f1')
+        try:
+            total_size = int(result.stdout.strip())
+        except ValueError:
+            LOG.error(f"Cannot find directory {remote_dir} on cluster.")
+            raise
 
-    # Check if result directory compression is streamable
-    streaming_possible = False
-    try:
-        # Check whether the command pv is present on the remote system or not.
-        # Certain systems may not have the `pv` command
-        result = tunnel.run('which pv', warn=True)
-        streaming_possible = result.exited == 0
-    except Exception:
+        # Check if result directory compression is streamable
         streaming_possible = False
+        try:
+            # Check whether the command pv is present on the remote system or not.
+            # Certain systems may not have the `pv` command
+            result = tunnel.run('which pv', warn=True)
+            streaming_possible = result.exited == 0
+        except Exception:
+            streaming_possible = False
 
-    if streaming_possible and verbose:
-        # We can do streaming compression
-        # Command for streaming the compression progress
-        command = (
-            f'cd {remote_dir_parent} && '
-            f'tar --exclude="*.log" -cf - {remote_dir_name} | '
-            f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
-            f'gzip > {remote_tar}'
-        )
-        # Run the remote compression command and stream the progress
-        result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=(not verbose))
+        if streaming_possible and verbose:
+            # We can do streaming compression
+            # Command for streaming the compression progress
+            command = (
+                f'cd {remote_dir_parent} && '
+                f'tar --exclude="*.log" -cf - {remote_dir_name} | '
+                f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
+                f'gzip > {remote_tar}'
+            )
+            # Run the remote compression command and stream the progress
+            result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=(not verbose))
+        else:
+            command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
+            result = tunnel.run(command, hide=(not verbose))
+
+        # Get SFTP client from tunnel's session's underlying client
+        sftp = tunnel.session.client.open_sftp()
+
+        # Use SFTP's get with callback
+        sftp.get(remote_tar, local_tar, callback=progress_callback if verbose else None)
+        print(f"\nTransfer complete: {local_tar}")
+
+        # Extract the tarball locally
+        os.makedirs(local_path, exist_ok=True)
+        with tarfile.open(local_tar, "r:gz") as tar:
+            tar.extractall(path=local_path)
+
+        # Clean up the tarball from the remote server
+        tunnel.run(f'rm {remote_tar}', hide=True)
+
+        # Clean up the local tarball
+        os.remove(local_tar)
     else:
-        command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
-        result = tunnel.run(command, hide=(not verbose))
-
-    # Get SFTP client from tunnel's session's underlying client
-    sftp = tunnel.session.client.open_sftp()
-
-    # Use SFTP's get with callback
-    sftp.get(remote_tar, local_tar, callback=progress_callback if verbose else None)
-    print(f"\nTransfer complete: {local_tar}")
-
-    # Extract the tarball locally
-    os.makedirs(local_dir, exist_ok=True)
-    with tarfile.open(local_tar, "r:gz") as tar:
-        tar.extractall(path=local_dir)
-
-    # Clean up the tarball from the remote server
-    tunnel.run(f'rm {remote_tar}', hide=True)
-
-    # Clean up the local tarball
-    os.remove(local_tar)
+        # If not a tar, just download the file or directory directly
+        tunnel.get(remote_path, local_path)
+        print(f"\nTransfer complete: {local_path}")
 
 
 def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose: bool = True):
