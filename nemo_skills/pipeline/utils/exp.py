@@ -118,7 +118,7 @@ class CustomJobDetails(SlurmJobDetails):
         The command used to list the files is ls -1 {ls_term} 2> /dev/null
         """
         assert self.folder
-        return os.path.join(self.folder, "*srun.log")
+        return os.path.join(self.folder, "*%j_srun.log")
 
 
 def get_executor(
