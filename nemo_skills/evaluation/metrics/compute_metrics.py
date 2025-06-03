@@ -70,8 +70,8 @@ class ComputeMetrics:
 
         return {data_subset: calculator.get_metrics() for data_subset, calculator in self.calculators.items()}
 
-    def max_metrics_to_print(self):
-        return self.calculators['all'].max_metrics_to_print()
+    def metrics_to_print(self):
+        return self.calculators['all'].metrics_to_print()
 
     def aggregations_to_print(self):
         return self.calculators['all'].aggregations_to_print()

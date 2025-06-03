@@ -157,7 +157,7 @@ def summarize_results(
         return
 
     results = defaultdict(lambda: defaultdict(dict))
-    max_metrics_to_print = {}
+    metrics_to_print = {}
     aggregations_to_print = {}
     for benchmark_path in benchmarks_paths:
         benchmark = str(Path(benchmark_path).name)
@@ -194,12 +194,12 @@ def summarize_results(
 
             if len(metrics) > 1:
                 for subset, subset_metrics in metrics.items():
-                    max_metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.max_metrics_to_print()
+                    metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.metrics_to_print()
                     aggregations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.aggregations_to_print()
                     if aggregations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
                         aggregations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
             else:
-                max_metrics_to_print[benchmark] = metrics_calculator.max_metrics_to_print()
+                metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
                 aggregations_to_print[benchmark] = metrics_calculator.aggregations_to_print()
                 if aggregations_to_print[benchmark] is not None and has_greedy:
                     aggregations_to_print[benchmark].insert(0, 'greedy')
@@ -216,9 +216,11 @@ def summarize_results(
             if eval_mode not in benchmark_results:
                 continue
             metrics = benchmark_results[eval_mode]
-            if max_metrics_to_print[benchmark] is None:
-                max_metrics_to_print[benchmark] = len(metrics)
-            for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
+            if metrics_to_print[benchmark] is None:
+                metrics_to_print[benchmark] = list(metrics.keys())
+
+            for metric_key in metrics_to_print[benchmark]:
+                metric_value = metrics[metric_key]
                 max_widths[metric_key] = max(
                     max_widths.get(metric_key, len(metric_key)),
                     len(f"{metric_value:.2f}" if isinstance(metric_value, float) else str(metric_value)),
@@ -227,9 +229,7 @@ def summarize_results(
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(list(benchmark_results.values())[0].keys())[
-            : max_metrics_to_print[benchmark]
-        ]
+        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
         for eval_mode in aggregations_to_print[benchmark]:
@@ -237,7 +237,8 @@ def summarize_results(
                 continue
             metrics = benchmark_results[eval_mode]
             values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
-            for metric_key, metric_value in list(metrics.items())[: max_metrics_to_print[benchmark]]:
+            for metric_key in metrics_to_print[benchmark]:
+                metric_value = metrics[metric_key]
                 if isinstance(metric_value, float):
                     metric_value = f"{metric_value:.2f}%"
                 values.append(f'{str(metric_value):<{max_widths[metric_key]}}')

@@ -177,7 +177,7 @@ class BaseMetrics(abc.ABC):
     def setup(self, input_files):
         pass
 
-    def max_metrics_to_print(self):
+    def metrics_to_print(self):
         """No limit by default."""
         return None
 

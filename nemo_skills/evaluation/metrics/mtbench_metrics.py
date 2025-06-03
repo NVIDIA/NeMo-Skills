@@ -130,6 +130,6 @@ class MtBenchMetrics(BaseMetrics):
         super().reset()
         self.agg_mode_dict = defaultdict(lambda: defaultdict(list))
 
-    def max_metrics_to_print(self):
+    def metrics_to_print(self):
         """We are only printing the averages, but all other metrics can still be found in metrics.json"""
-        return [f'pass@{self.max_k}']
+        return ['num_entries', 'average', 'average_turn1', 'average_turn2']
