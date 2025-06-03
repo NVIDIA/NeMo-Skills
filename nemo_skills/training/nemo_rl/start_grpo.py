@@ -17,7 +17,7 @@
 import argparse
 import os
 import pprint
-from functools import partial
+from dataclasses import dataclass
 from collections import defaultdict
 from typing import Any, Optional, cast
 
@@ -131,6 +131,7 @@ class NeMoSkillsDataset:
 TokenizerType = PreTrainedTokenizerBase
 
 
+@dataclass
 class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any]
 
