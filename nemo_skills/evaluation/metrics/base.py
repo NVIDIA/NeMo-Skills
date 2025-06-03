@@ -42,7 +42,7 @@ class BaseMetrics(abc.ABC):
         }
         """
         raise NotImplementedError(
-            "Needs be implemented in the subclass to use built-in _get_pass_at_k and _get_majority_at_k methods."
+            "Needs be implemented in the subclass to use built-in _compute_pass_at_k and _compute_majority_at_k methods."
         )
 
     def update(self, predictions):
@@ -65,6 +65,7 @@ class BaseMetrics(abc.ABC):
         self.agg_mode_dict = defaultdict(lambda: defaultdict(float))
 
     def _update_metrics_for_majority(
+        self,
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
@@ -73,12 +74,11 @@ class BaseMetrics(abc.ABC):
         predicted_answers: list[str],
         correctness_dicts: list[dict],
         majority_answer: str,
-        majority_count: int,
     ):
         """
         Update the metrics dictionary with additional statistics.
 
-        Called by `_get_majority_at_k` in case there are other metrics we want to log.
+        Called by `_compute_majority_at_k` in case there are other metrics we want to log.
         """
 
         # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties"
@@ -86,7 +86,7 @@ class BaseMetrics(abc.ABC):
 
         agg_mode_dict[f"majority@{k}"][check_correctness_method] += is_correct
 
-    def _get_majority_at_k(
+    def _compute_majority_at_k(
         self, predictions: list[dict], predicted_answers: list[str], agg_mode_dict: dict | None = None
     ):
         """
@@ -133,6 +133,7 @@ class BaseMetrics(abc.ABC):
                 )
 
     def _update_metrics_for_pass(
+        self,
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
@@ -142,7 +143,7 @@ class BaseMetrics(abc.ABC):
         """
         Update the metrics dictionary with additional statistics.
 
-        Called by `_get_pass_at_k` in case there are other metrics we want to log.
+        Called by `_compute_pass_at_k` in case there are other metrics we want to log.
         """
 
         # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens"
@@ -155,7 +156,7 @@ class BaseMetrics(abc.ABC):
         # pass@1[k] - mean of pass@1 across all generations
         agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(is_correct_list) / k
 
-    def _get_pass_at_k(self, predictions: list[dict], agg_mode_dict: dict | None = None):
+    def _compute_pass_at_k(self, predictions: list[dict], agg_mode_dict: dict | None = None):
         """
         Get pass@k metrics for a given set of prediction results.
 

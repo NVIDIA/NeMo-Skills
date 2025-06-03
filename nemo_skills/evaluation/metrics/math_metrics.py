@@ -52,20 +52,21 @@ class MathMetrics(BaseMetrics):
 
                 Path(jsonl_file + '-batch-request-id').unlink()
 
-    def get_prediction_results(self, prediction):
-        result = {}
-        # TODO: rename is_correct since it's only for sympy now?
+    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+        correctness_dict = {}
         if 'is_correct' in prediction:
             self.has_sympy = True
-            result["correct_sympy"] = prediction['is_correct']
+            correctness_dict["symbolic_correct"] = prediction['is_correct']
         if 'judgement' in prediction:
             self.has_judge = True
-            result["correct_judge"] = is_correct_judgement(prediction['judgement'])
+            correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
         if self.has_sympy and self.has_judge:
-            result["both_correct"] = result["correct_sympy"] and result["correct_judge"]
-            result["any_correct"] = result["correct_sympy"] or result["correct_judge"]
+            correctness_dict["both_correct"] = (
+                correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
+            )
+            correctness_dict["any_correct"] = correctness_dict["symbolic_correct"] or correctness_dict["judge_correct"]
 
-        return result
+        return correctness_dict
 
     def get_prediction_statistics(self, prediction):
         stats = super().get_prediction_statistics(prediction)
@@ -101,16 +102,13 @@ class MathMetrics(BaseMetrics):
         """
         super().update(predictions)
 
-        self.get_pass_at_k(
-            self.agg_mode_dict,
-            predictions=predictions,
-        )
-        self.get_majority_at_k(
+        self._compute_pass_at_k(predictions=predictions)
+        self._compute_majority_at_k(
             predictions=predictions,
             predicted_answers=[pred['predicted_answer'] for pred in predictions],
         )
 
-        if 'reward_model_score' in predictions[0]:
+        if 'reward_model_score' in predictions[0]:  # TODOODODODODODOODOT TODO
             self.get_reward_at_k(
                 self.agg_mode_dict,
                 predicted_answers=[pred['predicted_answer'] for pred in predictions],
@@ -119,38 +117,31 @@ class MathMetrics(BaseMetrics):
 
         # Log discrepancies between the two judgements
         if self.has_sympy and self.has_judge:
-            prediction_results = [self.get_prediction_results(pred) for pred in predictions]
-            if prediction_results[0]["correct_sympy"] != prediction_results[0]["correct_judge"]:
-                LOG.debug(
-                    "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
-                    "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
-                    bool(prediction_results[0]["correct_sympy"]),
-                    bool(prediction_results[0]["correct_judge"]),
-                    predictions[0]['problem'],
-                    predictions[0]['predicted_answer'],
-                    predictions[0]['expected_answer'],
-                    predictions[0]['judgement'],
-                )
+            for prediction in predictions:
+                correctness_dict = self._get_correctness_dict(prediction)
+                if correctness_dict["symbolic_correct"] != correctness_dict["judge_correct"]:
+                    LOG.debug(
+                        "Discrepancy between symbolic (%s) and LLM checkers (%s).\n"
+                        "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
+                        correctness_dict["symbolic_correct"],
+                        correctness_dict["judge_correct"],
+                        prediction['problem'],
+                        prediction['predicted_answer'],
+                        prediction['expected_answer'],
+                        prediction['judgement'],
+                    )
 
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
             metrics_dict[agg_mode] = {"num_entries": self.total}
             if self.has_sympy:
-                metrics_dict[agg_mode]["symbolic_correct"] = (
-                    agg_metric_dict["correct_sympy"]['correct'] / self.total
-                ) * 100.0
+                metrics_dict[agg_mode]["symbolic_correct"] = (agg_metric_dict["symbolic_correct"] / self.total) * 100.0
             if self.has_judge:
-                metrics_dict[agg_mode]["judge_correct"] = (
-                    agg_metric_dict["correct_judge"]['correct'] / self.total
-                ) * 100.0
+                metrics_dict[agg_mode]["judge_correct"] = (agg_metric_dict["judge_correct"] / self.total) * 100.0
             if self.has_sympy and self.has_judge:
-                metrics_dict[agg_mode]["both_correct"] = (
-                    agg_metric_dict["both_correct"]['correct'] / self.total
-                ) * 100.0
-                metrics_dict[agg_mode]["any_correct"] = (
-                    agg_metric_dict["any_correct"]['correct'] / self.total
-                ) * 100.0
+                metrics_dict[agg_mode]["both_correct"] = (agg_metric_dict["both_correct"] / self.total) * 100.0
+                metrics_dict[agg_mode]["any_correct"] = (agg_metric_dict["any_correct"] / self.total) * 100.0
 
             # metrics_dict[agg_mode]["no_answer"] = (agg_metric_dict["no_answer"] / self.total) * 100.0
 

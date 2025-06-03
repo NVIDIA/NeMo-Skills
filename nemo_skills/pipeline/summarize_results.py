@@ -229,7 +229,7 @@ def summarize_results(
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
+        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark])
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
 
         for eval_mode in aggregations_to_print[benchmark]:
