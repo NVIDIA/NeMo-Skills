@@ -136,7 +136,7 @@ class BaseMetrics(abc.ABC):
 
         correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
 
-        for k in range(1, len(predictions) + 1):
+        for k in range(2, len(predictions) + 1):
             for check_correctness_method in correctness_dicts[0].keys():
                 # Get valid answers and their results for this field
                 valid_answers_and_results = [

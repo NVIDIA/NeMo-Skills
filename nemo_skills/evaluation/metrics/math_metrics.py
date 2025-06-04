@@ -14,6 +14,7 @@
 
 import json
 import logging
+from collections import defaultdict
 from pathlib import Path
 
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
@@ -67,25 +68,40 @@ class MathMetrics(BaseMetrics):
 
         return correctness_dict
 
-    def get_reward_at_k(self, agg_mode_dict, pred_keys, predicted_answers, prediction_results):
-        for k in range(len(prediction_results), 1, -1):
-            for pred_field in pred_keys:
+    def _compute_reward_at_k(self, predictions: list[dict]):
+        agg_mode_dict = agg_mode_dict or self.agg_mode_dict
+
+        correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
+
+        for k in range(1, len(predictions) + 1):
+            for check_correctness_method in correctness_dicts[0].keys():
+                # Get valid answers and their results for this field
                 valid_answers_and_results = [
-                    (pred, result[pred_field])
-                    for pred, result in zip(predicted_answers[:k], prediction_results[:k])
-                    if pred is not None
+                    (elem['predicted_answer'], correctness_dict[check_correctness_method], elem['reward_model_score'])
+                    for elem, correctness_dict in zip(predictions[:k], correctness_dicts[:k])
+                    if elem['predicted_answer'] is not None
                 ]
 
-                # If no valid answers, mark as incorrect
+                # If no valid answers, it's incorrect
                 if not valid_answers_and_results:
-                    agg_mode_dict[f"rm_best@{k}"][pred_field] += False
-                    continue
+                    is_correct = False
+                    agg_mode_dict[f"rm_best@{k}"]["no_answer"] += 1
+                    agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += 1
+                else:
+                    is_correct_best = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
+                    agg_mode_dict[f"rm_best@{k}"][check_correctness_method] += is_correct_best
 
-                # Answer is the top-scoring reward
-                rm_result = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
+                    answer_to_score_dict = defaultdict(float)
+                    answer_to_correctness_dict = {}
+                    for predicted_answer, is_correct, reward_score in valid_answers_and_results:
+                        answer_to_score_dict[predicted_answer] += reward_score
+                        answer_to_correctness_dict[predicted_answer] = is_correct
 
-                # Update the metric
-                agg_mode_dict[f"rm_best@{k}"][pred_field] += rm_result
+                    top_cum_reward_answer = sorted(
+                        list(answer_to_score_dict.items()), key=lambda x: x[1], reverse=True
+                    )[0][0]
+                    is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
+                    agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
 
     def _update_metrics_for_pass(
         self,
@@ -114,12 +130,8 @@ class MathMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
-        if 'reward_model_score' in predictions[0]:  # TODOODODODODODOODOT TODO
-            self.get_reward_at_k(
-                self.agg_mode_dict,
-                predicted_answers=predicted_answers,
-                prediction_results=prediction_results,
-            )
+        if 'reward_model_score' in predictions[0]:
+            self._compute_reward_at_k(predictions=predictions)
 
         # Log discrepancies between the two judgements
         for prediction in predictions:
