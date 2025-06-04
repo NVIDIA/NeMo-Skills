@@ -221,6 +221,10 @@ def summarize_results(
             if metrics_to_print[benchmark] is None:
                 metrics_to_print[benchmark] = {metric: default_formatting for metric in metrics}
 
+            metrics_to_print[benchmark] = {
+                metric: default_formatting for metric in metrics_to_print[benchmark] if metric in metrics
+            }
+
             for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
                 max_widths[metric_key] = max(

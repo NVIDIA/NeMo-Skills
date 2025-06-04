@@ -54,8 +54,6 @@ class MathMetrics(BaseMetrics):
 
     # TODO: how can we ensure that user-defined aggregations have all the same metrics as in base?
     def _compute_reward_at_k(self, predictions: list[dict]):
-        agg_mode_dict = agg_mode_dict or self.agg_mode_dict
-
         correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
 
         for k in range(1, len(predictions) + 1):
@@ -70,11 +68,11 @@ class MathMetrics(BaseMetrics):
                 # If no valid answers, it's incorrect
                 if not valid_answers_and_results:
                     is_correct = False
-                    agg_mode_dict[f"rm_best@{k}"]["no_answer"] += 1
-                    agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += 1
+                    self.agg_mode_dict[f"rm_best@{k}"]["no_answer"] += 1
+                    self.agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += 1
                 else:
                     is_correct_best = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
-                    agg_mode_dict[f"rm_best@{k}"][check_correctness_method] += is_correct_best
+                    self.agg_mode_dict[f"rm_best@{k}"][check_correctness_method] += is_correct_best
 
                     answer_to_score_dict = defaultdict(float)
                     answer_to_correctness_dict = {}
@@ -86,17 +84,15 @@ class MathMetrics(BaseMetrics):
                         list(answer_to_score_dict.items()), key=lambda x: x[1], reverse=True
                     )[0][0]
                     is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
-                    agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
+                    self.agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
 
     def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         correctness_dict = {}
         if 'is_correct' in prediction:
-            has_sympy = True
             correctness_dict["symbolic_correct"] = prediction['is_correct']
         if 'judgement' in prediction:
-            has_judge = True
             correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
-        if has_sympy and has_judge:
+        if 'judge_correct' in correctness_dict and 'symbolic_correct' in correctness_dict:
             correctness_dict["both_correct"] = (
                 correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
             )
@@ -141,9 +137,9 @@ class MathMetrics(BaseMetrics):
         return [
             f'pass@1[{self.max_k}]',
             f'majority@{self.max_k}',
-            f'pass@{self.max_k}',
             f'rm_best@{self.max_k}',
             f'rm_majority@{self.max_k}',
+            f'pass@{self.max_k}',
         ]
 
     def metrics_to_print(self):
