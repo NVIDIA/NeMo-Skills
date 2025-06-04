@@ -34,7 +34,7 @@ class AnswerJudgementMetrics(BaseMetrics):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
-        is_correct: bool,
+        majority_score: bool | float | int,
         predictions: list[dict],
         predicted_answers: list[str],
         correctness_dicts: list[dict],
@@ -50,7 +50,7 @@ class AnswerJudgementMetrics(BaseMetrics):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
-        is_correct: bool,
+        pass_score: bool | float | int,
         predictions: list[dict],
         correctness_dicts: list[dict],
     ):
@@ -59,7 +59,7 @@ class AnswerJudgementMetrics(BaseMetrics):
         gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
         pred_judgement = is_correct_judgement(predictions[0]['judgement'])
         # if pass is not correct, means all predictions are the same and wrong
-        if not is_correct:
+        if not pass_score:
             self._update_fp_fn(agg_mode_dict[f"pass@{k}"], pred_judgement, gt_judgement)
 
         for pred in predictions[:k]:

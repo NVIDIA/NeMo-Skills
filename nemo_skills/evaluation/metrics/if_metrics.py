@@ -21,30 +21,11 @@ class IFMetrics(BaseMetrics):
     # loosely adapted from
     # https://github.com/google-research/google-research/blob/master/instruction_following_eval/evaluation_main.py
 
-    required_keys = ['follow_instruction_list', 'instruction_id_list']
-
-    def get_prediction_results(self, prediction):
-        """Extract metrics from a prediction."""
+    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         return {
             'prompt': prediction['follow_all_instructions'],
             'instruction': sum(prediction['follow_instruction_list']),
-            'follow_instruction_list': prediction['follow_instruction_list'],
         }
-
-    def _get_best_prediction(self, stats_dict, elems):
-        """Will update using the pass@k strategy (just pass a single-element list to get greedy)."""
-        # computing "pass@k" score
-        follow_instruction_list = elems[0]['follow_instruction_list']
-        for elem in elems:
-            follow_instruction_list = [
-                follow_instruction_list[i] or elem['follow_instruction_list'][i]
-                for i in range(len(follow_instruction_list))
-            ]
-
-        if all(follow_instruction_list):
-            stats_dict['prompt'] += 1
-
-        stats_dict['instruction'] += sum(follow_instruction_list)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -55,25 +36,15 @@ class IFMetrics(BaseMetrics):
         """
         super().update(predictions)
         self.instruction_total += len(predictions[0]['instruction_id_list'])
-
         strict_predictions = [pred['strict_eval'] for pred in predictions]
         loose_predictions = [pred['loose_eval'] for pred in predictions]
 
-        self.get_pass_at_k(
-            self.strict_agg_mode_dict,
-            pred_keys=['prompt', 'instruction'],
-            predictions=strict_predictions,
-            pass_at_k_fn=self._get_best_prediction,
-        )
-        self.get_pass_at_k(
-            self.loose_agg_mode_dict,
-            pred_keys=['prompt', 'instruction'],
-            predictions=loose_predictions,
-            pass_at_k_fn=self._get_best_prediction,
-        )
+        self._compute_pass_at_k(predictions=strict_predictions, agg_mode_dict=self.strict_agg_mode_dict)
+        self._compute_pass_at_k(predictions=loose_predictions, agg_mode_dict=self.loose_agg_mode_dict)
 
     def get_metrics(self):
         metrics_dict = {}
+        print(self.strict_agg_mode_dict)
         for agg_mode in self.strict_agg_mode_dict:
             prompt_strict = self.strict_agg_mode_dict[agg_mode]['prompt'] / self.total * 100.0
             inst_strict = self.strict_agg_mode_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
@@ -98,6 +69,4 @@ class IFMetrics(BaseMetrics):
         self.loose_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
 
     def aggregations_to_print(self):
-        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
-        # pass + pass@1[k]
-        return [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
+        return [f'pass@1[{self.max_k}]', f'pass@{self.max_k}']

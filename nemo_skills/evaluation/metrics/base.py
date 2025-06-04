@@ -78,7 +78,7 @@ class BaseMetrics(abc.ABC):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
-        is_correct: bool,
+        majority_score: bool | float | int,
         predictions: list[dict],
         predicted_answers: list[str],
         correctness_dicts: list[dict],
@@ -124,7 +124,8 @@ class BaseMetrics(abc.ABC):
             agg_mode_dict (Optional[dict]): Dictionary to store aggregated metrics.
                 By default will use self.agg_mode_dict.
         """
-        agg_mode_dict = agg_mode_dict or self.agg_mode_dict
+        if agg_mode_dict is None:
+            agg_mode_dict = self.agg_mode_dict
 
         correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
 
@@ -139,13 +140,13 @@ class BaseMetrics(abc.ABC):
 
                 # If no valid answers, it's incorrect
                 if not valid_answers_and_results:
-                    is_correct = False
+                    majority_score = 0
                     majority_answer = None
                 else:
                     # Find the most common answer and its correctness
-                    majority_answer, is_correct = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    majority_answer, majority_score = Counter(valid_answers_and_results).most_common(1)[0][0]
 
-                agg_mode_dict[f"majority@{k}"][check_correctness_method] += is_correct
+                agg_mode_dict[f"majority@{k}"][check_correctness_method] += majority_score
 
                 # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties"
                 # TODO: implement above metrics
@@ -155,7 +156,7 @@ class BaseMetrics(abc.ABC):
                     agg_mode_dict=agg_mode_dict,
                     k=k,
                     check_correctness_method=check_correctness_method,
-                    is_correct=is_correct,
+                    majority_score=majority_score,
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                     correctness_dicts=correctness_dicts,
@@ -175,7 +176,7 @@ class BaseMetrics(abc.ABC):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
-        is_correct: bool,
+        pass_score: bool | float | int,
         predictions: list[dict],
         correctness_dicts: list[dict],
     ):
@@ -218,7 +219,8 @@ class BaseMetrics(abc.ABC):
             agg_mode_dict (Optional[dict]): Dictionary to store aggregated metrics.
                 By default will use self.agg_mode_dict.
         """
-        agg_mode_dict = agg_mode_dict or self.agg_mode_dict
+        if agg_mode_dict is None:
+            agg_mode_dict = self.agg_mode_dict
         correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
 
         for k in range(1, len(predictions) + 1):
@@ -226,20 +228,20 @@ class BaseMetrics(abc.ABC):
                 # by default logging "correct", "avg_correct_tokens", "avg_incorrect_tokens"
                 # TODO: implement above metrics
 
-                is_correct_list = [
+                scores_list = [
                     correctness_dict[check_correctness_method] for correctness_dict in correctness_dicts[:k]
                 ]
-                is_correct = any(is_correct_list)
-                agg_mode_dict[f"pass@{k}"][check_correctness_method] += is_correct
+                pass_score = max(scores_list)
+                agg_mode_dict[f"pass@{k}"][check_correctness_method] += pass_score
 
                 # pass@1[k] - mean of pass@1 across all generations
-                agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(is_correct_list) / k
+                agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(scores_list) / k
 
                 self._update_correctness_metrics_for_pass(
                     agg_mode_dict=agg_mode_dict,
                     k=k,
                     check_correctness_method=check_correctness_method,
-                    is_correct=is_correct,
+                    pass_score=pass_score,
                     predictions=predictions,
                     correctness_dicts=correctness_dicts,
                 )
