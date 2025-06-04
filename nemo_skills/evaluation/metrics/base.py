@@ -243,10 +243,10 @@ class BaseMetrics(abc.ABC):
                     predictions=predictions,
                     correctness_dicts=correctness_dicts,
                 )
-
-            no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
-            agg_mode_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
-            agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
+            if predicted_answers is not None:
+                no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
+                agg_mode_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
+                agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
 
             self._update_metrics_for_pass(
                 agg_mode_dict=agg_mode_dict,

@@ -18,35 +18,15 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class CodeMetrics(BaseMetrics):
-
-    def get_prediction_results(self, prediction):
+    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         return {
-            "total_correct": prediction['is_correct'],
-            "total_correct_plus": prediction['is_correct-plus'],
+            "passing_base_tests": prediction['is_correct'],
+            "passing_plus_tests": prediction['is_correct-plus'],
         }
 
     def update(self, predictions):
-        """Updating the evaluation results with the current element.
-
-        Args:
-            predictions (list[dict]): aggregated predictions across all generations.
-                The content of the file is benchmark specific.
-        """
         super().update(predictions)
-        self.get_pass_at_k(self.agg_mode_dict, predictions=predictions)
-
-    def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {
-                "num_entries": self.total,
-                "passing_base_tests": agg_metric_dict["total_correct"] / self.total * 100.0,
-                "passing_plus_tests": agg_metric_dict["total_correct_plus"] / self.total * 100.0,
-            }
-
-        return metrics_dict
+        self._compute_pass_at_k(predictions=predictions)
 
     def aggregations_to_print(self):
-        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
-        # pass + pass@1[k]
-        return [f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
+        return [f'pass@1[{self.max_k}]', f'pass@{self.max_k}']
