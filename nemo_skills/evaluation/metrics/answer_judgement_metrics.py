@@ -17,7 +17,7 @@ from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 class AnswerJudgementMetrics(BaseMetrics):
-    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
         gt_judgement = is_correct_judgement(prediction['expected_judgement'])
         pred_judgement = is_correct_judgement(prediction['judgement'])
 
@@ -29,43 +29,44 @@ class AnswerJudgementMetrics(BaseMetrics):
         metrics_dict['false_positives'] += float(is_fp) / divide_by
         metrics_dict['false_negatives'] += float(is_fn) / divide_by
 
-    def _update_correctness_metrics_for_majority(
+    def _update_score_metrics_for_majority(
         self,
-        agg_mode_dict: dict,
+        eval_dict: dict,
         k: int,
-        check_correctness_method: str,
+        score_method: str,
+        score_dicts: list[dict],
         majority_score: bool | float | int,
+        majority_answer: str,
         predictions: list[dict],
         predicted_answers: list[str],
-        correctness_dicts: list[dict],
-        majority_answer: str,
     ):
-        assert check_correctness_method == 'correct_judgements'
+        assert score_method == 'correct_judgements'
         # expected answer is always the same for all predictions, so just take the first one
         gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
-        self._update_fp_fn(agg_mode_dict[f"majority@{k}"], majority_answer, gt_judgement)
+        self._update_fp_fn(eval_dict[f"majority@{k}"], majority_answer, gt_judgement)
 
-    def _update_correctness_metrics_for_pass(
+    def _update_score_metrics_for_pass(
         self,
-        agg_mode_dict: dict,
+        eval_dict: dict,
         k: int,
-        check_correctness_method: str,
+        score_method: str,
+        score_dicts: list[dict],
         pass_score: bool | float | int,
         predictions: list[dict],
-        correctness_dicts: list[dict],
+        predicted_answers: list[str] | None,
     ):
-        assert check_correctness_method == 'correct_judgements'
+        assert score_method == 'correct_judgements'
         # expected answer is always the same for all predictions, so just take the first one
         gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
         pred_judgement = is_correct_judgement(predictions[0]['judgement'])
         # if pass is not correct, means all predictions are the same and wrong
         if not pass_score:
-            self._update_fp_fn(agg_mode_dict[f"pass@{k}"], pred_judgement, gt_judgement)
+            self._update_fp_fn(eval_dict[f"pass@{k}"], pred_judgement, gt_judgement)
 
         for pred in predictions[:k]:
             gt_judgement = is_correct_judgement(pred['expected_judgement'])
             pred_judgement = is_correct_judgement(pred['judgement'])
-            self._update_fp_fn(agg_mode_dict[f"pass@1[{k}]"], pred_judgement, gt_judgement, divide_by=k)
+            self._update_fp_fn(eval_dict[f"pass@1[{k}]"], pred_judgement, gt_judgement, divide_by=k)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -81,6 +82,6 @@ class AnswerJudgementMetrics(BaseMetrics):
 
     def get_metrics(self):
         # renaming no_answer to invalid_judgements
-        for agg_metric_dict in self.agg_mode_dict.values():
+        for agg_metric_dict in self.eval_dict.values():
             agg_metric_dict["invalid_judgements"] = agg_metric_dict.pop("no_answer")
         return super().get_metrics()

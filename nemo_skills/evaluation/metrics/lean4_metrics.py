@@ -21,22 +21,23 @@ class Lean4Metrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def _get_correctness_dict(self, prediction):
+    def _get_score_dict(self, prediction):
         return {"lean4_correct": prediction['proof_status'] == "completed"}
 
-    def _update_correctness_metrics_for_pass(
+    def _update_score_metrics_for_pass(
         self,
-        agg_mode_dict: dict,
+        eval_dict: dict,
         k: int,
-        check_correctness_method: str,
+        score_method: str,
+        score_dicts: list[dict],
         pass_score: bool | float | int,
         predictions: list[dict],
-        correctness_dicts: list[dict],
+        predicted_answers: list[str] | None,
     ):
-        assert check_correctness_method == 'lean4_correct'
+        assert score_method == 'lean4_correct'
         timeout_errors = [pred['proof_status'] == "timeout" for pred in predictions[:k]]
-        agg_mode_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
-        agg_mode_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
+        eval_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
+        eval_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
 
     def update(self, predictions):
         super().update(predictions)

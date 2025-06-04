@@ -83,5 +83,5 @@ class ComputeMetrics:
     def metrics_to_print(self):
         return self.calculators['all'].metrics_to_print()
 
-    def aggregations_to_print(self):
-        return self.calculators['all'].aggregations_to_print()
+    def evaluations_to_print(self):
+        return self.calculators['all'].evaluations_to_print()

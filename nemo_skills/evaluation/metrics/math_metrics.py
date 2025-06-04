@@ -54,14 +54,14 @@ class MathMetrics(BaseMetrics):
 
     # TODO: how can we ensure that user-defined aggregations have all the same metrics as in base?
     def _compute_reward_at_k(self, predictions: list[dict]):
-        correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
+        score_dicts = [self._get_score_dict(pred) for pred in predictions]
 
         for k in range(1, len(predictions) + 1):
-            for check_correctness_method in correctness_dicts[0].keys():
+            for score_method in score_dicts[0].keys():
                 # Get valid answers and their results for this field
                 valid_answers_and_results = [
-                    (elem['predicted_answer'], correctness_dict[check_correctness_method], elem['reward_model_score'])
-                    for elem, correctness_dict in zip(predictions[:k], correctness_dicts[:k])
+                    (elem['predicted_answer'], correctness_dict[score_method], elem['reward_model_score'])
+                    for elem, correctness_dict in zip(predictions[:k], score_dicts[:k])
                     if elem['predicted_answer'] is not None
                 ]
 
@@ -70,7 +70,7 @@ class MathMetrics(BaseMetrics):
                     is_correct = False
                 else:
                     is_correct_best = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
-                    self.agg_mode_dict[f"rm_best@{k}"][check_correctness_method] += is_correct_best
+                    self.eval_dict[f"rm_best@{k}"][score_method] += is_correct_best
 
                     answer_to_score_dict = defaultdict(float)
                     answer_to_correctness_dict = {}
@@ -82,13 +82,13 @@ class MathMetrics(BaseMetrics):
                         list(answer_to_score_dict.items()), key=lambda x: x[1], reverse=True
                     )[0][0]
                     is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
-                    self.agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
+                    self.eval_dict[f"rm_majority@{k}"][score_method] += is_correct_majority
 
             no_answer = all(elem['predicted_answer'] is None for elem in predictions[:k])
-            self.agg_mode_dict[f"rm_best@{k}"]["no_answer"] += no_answer
-            self.agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += no_answer
+            self.eval_dict[f"rm_best@{k}"]["no_answer"] += no_answer
+            self.eval_dict[f"rm_majority@{k}"]["no_answer"] += no_answer
 
-    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
         correctness_dict = {}
         if 'is_correct' in prediction:
             correctness_dict["symbolic_correct"] = prediction['is_correct']
@@ -119,7 +119,7 @@ class MathMetrics(BaseMetrics):
 
         # Log discrepancies between the two judgements
         for prediction in predictions:
-            correctness_dict = self._get_correctness_dict(prediction)
+            correctness_dict = self._get_score_dict(prediction)
             if "symbolic_correct" not in correctness_dict or "judge_correct" not in correctness_dict:
                 continue
             if correctness_dict["symbolic_correct"] != correctness_dict["judge_correct"]:
@@ -134,7 +134,7 @@ class MathMetrics(BaseMetrics):
                     prediction['judgement'],
                 )
 
-    def aggregations_to_print(self):
+    def evaluations_to_print(self):
         """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
         return [
             f'pass@1[{self.max_k}]',

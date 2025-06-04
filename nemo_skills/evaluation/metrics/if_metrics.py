@@ -21,7 +21,7 @@ class IFMetrics(BaseMetrics):
     # loosely adapted from
     # https://github.com/google-research/google-research/blob/master/instruction_following_eval/evaluation_main.py
 
-    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
         return {
             'prompt': prediction['follow_all_instructions'],
             'instruction': sum(prediction['follow_instruction_list']),
@@ -39,16 +39,16 @@ class IFMetrics(BaseMetrics):
         strict_predictions = [pred['strict_eval'] for pred in predictions]
         loose_predictions = [pred['loose_eval'] for pred in predictions]
 
-        self._compute_pass_at_k(predictions=strict_predictions, agg_mode_dict=self.strict_agg_mode_dict)
-        self._compute_pass_at_k(predictions=loose_predictions, agg_mode_dict=self.loose_agg_mode_dict)
+        self._compute_pass_at_k(predictions=strict_predictions, eval_dict=self.strict_eval_dict)
+        self._compute_pass_at_k(predictions=loose_predictions, eval_dict=self.loose_eval_dict)
 
     def get_metrics(self):
         metrics_dict = {}
-        for agg_mode in self.strict_agg_mode_dict:
-            prompt_strict = self.strict_agg_mode_dict[agg_mode]['prompt'] / self.total * 100.0
-            inst_strict = self.strict_agg_mode_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
-            prompt_loose = self.loose_agg_mode_dict[agg_mode]['prompt'] / self.total * 100.0
-            inst_loose = self.loose_agg_mode_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
+        for agg_mode in self.strict_eval_dict:
+            prompt_strict = self.strict_eval_dict[agg_mode]['prompt'] / self.total * 100.0
+            inst_strict = self.strict_eval_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
+            prompt_loose = self.loose_eval_dict[agg_mode]['prompt'] / self.total * 100.0
+            inst_loose = self.loose_eval_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
             metrics_dict[agg_mode] = {
                 "num_prompts": self.total,
                 "num_instructions": self.instruction_total,
@@ -64,5 +64,5 @@ class IFMetrics(BaseMetrics):
     def reset(self):
         super().reset()
         self.instruction_total = 0
-        self.strict_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
-        self.loose_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
+        self.strict_eval_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
+        self.loose_eval_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})

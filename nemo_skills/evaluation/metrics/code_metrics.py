@@ -18,7 +18,7 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class CodeMetrics(BaseMetrics):
-    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
         return {
             "passing_base_tests": prediction['is_correct'],
             "passing_plus_tests": prediction['is_correct-plus'],
@@ -28,5 +28,5 @@ class CodeMetrics(BaseMetrics):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
 
-    def aggregations_to_print(self):
+    def evaluations_to_print(self):
         return [f'pass@1[{self.max_k}]', f'pass@{self.max_k}']
