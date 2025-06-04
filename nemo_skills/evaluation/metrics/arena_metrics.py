@@ -78,9 +78,8 @@ class ArenaMetrics(BaseMetrics):
         # all the heavy lifting should be done in the evaluation script
         super().update(predictions)
         self.scores.append([])
+        self.agg_mode = f"pass@{len(predictions)}"
         if len(predictions) > 1:
-            self.agg_mode = f"pass@{len(predictions)}"
-
             judge_scores = [self._get_judge_score(elem['judgement-gen-base']) for elem in predictions]
             # adding the best score out of all the generations
             possible_scores = ['A>>B', 'A>B', 'A=B', 'B>A', 'B>>A']
@@ -106,9 +105,6 @@ class ArenaMetrics(BaseMetrics):
             else:
                 self.scores[-1].append(None)  # in case judge didn't generate a valid score
         else:
-            # Single prediction
-            self.agg_mode = "pass@1"
-
             self.lengths += predictions[0].get('num_generated_tokens', 0)
             self.scores[-1] = [
                 self._get_judge_score(predictions[0]['judgement-gen-base']),

@@ -24,7 +24,6 @@ from nemo_skills.utils import unroll_files
 
 
 class MtBenchMetrics(BaseMetrics):
-
     def setup(self, input_files):
         # checking if judgements are ready and fusing them with predictions
         # might get permission errors when running locally, since original file
@@ -54,82 +53,71 @@ class MtBenchMetrics(BaseMetrics):
 
                 Path(jsonl_file + '-batch-request-id').unlink()
 
-    def get_prediction_results(self, prediction):
-        return {
-            'rating1': (
-                int(re.search(r'Rating: \[\[(\d+)\]\]', prediction['judgement-turn1']).group(1))
-                if re.search(r'Rating: \[\[(\d+)\]\]', prediction['judgement-turn1'])
-                else None
-            ),
-            'rating2': (
-                int(re.search(r'Rating: \[\[(\d+)\]\]', prediction['judgement-turn2']).group(1))
-                if re.search(r'Rating: \[\[(\d+)\]\]', prediction['judgement-turn2'])
-                else None
-            ),
-        }
-
     def update(self, predictions):
-        """Updating the evaluation results with the current element.
-
-        Args:
-            predictions (list[dict]): aggregated predictions across all generations.
-                The content of the file is benchmark specific.
-        """
         super().update(predictions)
-        category = predictions[0]['category']
-        prediction_results = [self.get_prediction_results(pred) for pred in predictions]
 
-        if len(predictions) == 1:
-            # If single prediction, set it to greedy aggregation mode
-            self.agg_mode_dict['greedy'][category].append(
-                (prediction_results[0]['rating1'], prediction_results[0]['rating2'])
-            )
-        else:
+        self.agg_mode = f"pass@{len(predictions)}"
+        if len(predictions) > 1:
             # TODO: might all have missing judgement?
             # If multiple predictions, set it to "best" aggregation mode
-            k = len(predictions)
-            rating1 = max(x['rating1'] for x in prediction_results if x['rating1'] is not None)
-            rating2 = max(x['rating2'] for x in prediction_results if x['rating2'] is not None)
-            self.agg_mode_dict[f'pass@{k}'][category].append((rating1, rating2))
+
+            rating1 = max(
+                int(re.search(r'Rating: \[\[(\d+)\]\]', elem['judgement-turn1']).group(1))
+                for elem in predictions
+                if re.search(r'Rating: \[\[(\d+)\]\]', elem['judgement-turn1'])
+            )
+            rating2 = max(
+                int(re.search(r'Rating: \[\[(\d+)\]\]', elem['judgement-turn2']).group(1))
+                for elem in predictions
+                if re.search(r'Rating: \[\[(\d+)\]\]', elem['judgement-turn2'])
+            )
+            category = predictions[0]['category']
+            self.scores[category].append((rating1, rating2))
+        else:
+            rating1_match = re.search(r'Rating: \[\[(\d+)\]\]', predictions[0]['judgement-turn1'])
+            rating1 = int(rating1_match.group(1)) if rating1_match else None
+            rating2_match = re.search(r'Rating: \[\[(\d+)\]\]', predictions[0]['judgement-turn2'])
+            rating2 = int(rating2_match.group(1)) if rating2_match else None
+            category = predictions[0]['category']
+            self.scores[category].append((rating1, rating2))
 
     def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {'num_entries': self.total}
+        metrics = {'num_entries': self.total, 'avg_tokens': int(self.avg_tokens / self.total)}
 
-            # Calculate average scores across all categories for each turn
-            all_ratings1 = [r1 for scores in agg_metric_dict.values() for r1, _ in scores if r1 is not None]
-            all_ratings2 = [r2 for scores in agg_metric_dict.values() for _, r2 in scores if r2 is not None]
+        # Calculate average scores across all categories for each turn
+        all_ratings1 = [r1 for scores in self.scores.values() for r1, _ in scores if r1 is not None]
+        all_ratings2 = [r2 for scores in self.scores.values() for _, r2 in scores if r2 is not None]
 
-            all_ratings = all_ratings1 + all_ratings2
-            if all_ratings:
-                metrics_dict[agg_mode]['average'] = sum(all_ratings) / len(all_ratings)
-            if all_ratings1:
-                metrics_dict[agg_mode]['average_turn1'] = sum(all_ratings1) / len(all_ratings1)
-            if all_ratings2:
-                metrics_dict[agg_mode]['average_turn2'] = sum(all_ratings2) / len(all_ratings2)
+        all_ratings = all_ratings1 + all_ratings2
+        if all_ratings:
+            metrics['average'] = sum(all_ratings) / len(all_ratings)
 
-            none_count_turn1 = 0
-            none_count_turn2 = 0
-            for category, scores in agg_metric_dict.items():
-                if not scores:
-                    continue
-                ratings1 = [r1 for r1, _ in scores if r1 is not None]
-                ratings2 = [r2 for _, r2 in scores if r2 is not None]
-                none_count_turn1 += sum(1 for r1, _ in scores if r1 is None)
-                none_count_turn2 += sum(1 for _, r2 in scores if r2 is None)
-                metrics_dict[agg_mode][f'{category}_turn1'] = sum(ratings1) / len(ratings1)
-                metrics_dict[agg_mode][f'{category}_turn2'] = sum(ratings2) / len(ratings2)
-            metrics_dict[agg_mode]['missing_rating_turn1'] = none_count_turn1
-            metrics_dict[agg_mode]['missing_rating_turn2'] = none_count_turn2
-            print("Please see metrics.json for MT-bench per-category breakdown")
+        if all_ratings1:
+            metrics['average_turn1'] = sum(all_ratings1) / len(all_ratings1)
+        if all_ratings2:
+            metrics['average_turn2'] = sum(all_ratings2) / len(all_ratings2)
 
-        return metrics_dict
+        none_count_turn1 = 0
+        none_count_turn2 = 0
+        for category, scores in self.scores.items():
+            if not scores:
+                continue
+            ratings1 = [r1 for r1, _ in scores if r1 is not None]
+            ratings2 = [r2 for _, r2 in scores if r2 is not None]
+            none_count_turn1 += sum(1 for r1, _ in scores if r1 is None)
+            none_count_turn2 += sum(1 for _, r2 in scores if r2 is None)
+            metrics[f'{category}_turn1'] = sum(ratings1) / len(ratings1)
+            metrics[f'{category}_turn2'] = sum(ratings2) / len(ratings2)
+        metrics["missing_rating_turn1"] = none_count_turn1
+        metrics["missing_rating_turn2"] = none_count_turn2
+        print("Please see metrics.json for MT-bench per-category breakdown")
+        return {self.agg_mode: metrics}
 
     def reset(self):
         super().reset()
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(list))
+        self.scores = defaultdict(list)
+        self.agg_mode = "pass@1"
 
     def metrics_to_print(self):
         """We are only printing the averages, but all other metrics can still be found in metrics.json"""
-        return ['num_entries', 'average', 'average_turn1', 'average_turn2']
+        return ['num_entries', 'avg_tokens', 'average', 'average_turn1', 'average_turn2']

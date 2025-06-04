@@ -70,8 +70,8 @@ def test_generation_dryrun_gsm8k(prompt_template):
 
 
 def test_eval_mtbench_api():
-    if not os.getenv('OPENAI_API_KEY'):
-        pytest.skip("Define OPENAI_API_KEY to run this test")
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
 
     output_dir = '/tmp/nemo-skills-tests/mtbench-api'
     docker_rm([output_dir])
@@ -79,11 +79,13 @@ def test_eval_mtbench_api():
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=gpt-4o-mini "
-        f"    --server_address=https://api.openai.com/v1 "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=mt-bench:0 "
         f"    --output_dir={output_dir} "
-        f"    --extra_eval_args=\"++eval_config.use_batch_api=False\""
+        f"    --extra_eval_args=\"++eval_config.use_batch_api=False "
+        f"                        ++eval_config.judge_model='meta/llama-3.1-8b-instruct' "
+        f"                        ++eval_config.base_url='https://integrate.api.nvidia.com/v1'\" "
         f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)
