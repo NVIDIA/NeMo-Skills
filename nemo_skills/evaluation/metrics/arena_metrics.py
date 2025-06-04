@@ -89,7 +89,7 @@ class ArenaMetrics(BaseMetrics):
                 if any([score == possible_score for score in judge_scores]):
                     self.scores[-1].append(possible_score)
                     best_id = judge_scores.index(possible_score)
-                    self.lengths += len(predictions[best_id]['generation'])
+                    self.lengths += predictions[best_id].get('num_generated_tokens', 0)
                     break
             else:
                 self.scores[-1].append(None)  # in case judge didn't generate a valid score
@@ -101,7 +101,7 @@ class ArenaMetrics(BaseMetrics):
                 if any([score == possible_score for score in judge_scores]):
                     self.scores[-1].append(possible_score)
                     best_id = judge_scores.index(possible_score)
-                    self.lengths += len(predictions[best_id]['generation'])
+                    self.lengths += predictions[best_id].get('num_generated_tokens', 0)
                     break
             else:
                 self.scores[-1].append(None)  # in case judge didn't generate a valid score
@@ -109,7 +109,7 @@ class ArenaMetrics(BaseMetrics):
             # Single prediction
             self.agg_mode = "pass@1"
 
-            self.lengths += len(predictions[0]['generation'])
+            self.lengths += predictions[0].get('num_generated_tokens', 0)
             self.scores[-1] = [
                 self._get_judge_score(predictions[0]['judgement-gen-base']),
                 self._get_judge_score(predictions[0]['judgement-base-gen']),
@@ -120,13 +120,12 @@ class ArenaMetrics(BaseMetrics):
 
         metrics = {'num_entries': self.total}
         metrics.update(get_aggregate_score(self.scores))
-        metrics['avg_response_length'] = self.lengths / self.total
+        if self.lengths > 0:
+            metrics['avg_response_tokens'] = int(self.lengths / self.total)
         return {self.agg_mode: metrics}
 
     def reset(self):
         super().reset()
         self.scores = []  # list of lists
         self.lengths = 0
-        self.total = 0
-        # Set automatically
         self.agg_mode = "pass@1"

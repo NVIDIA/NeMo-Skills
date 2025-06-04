@@ -76,7 +76,8 @@ class ComputeMetrics:
             if len(input_files) == 1:
                 if 'pass@1[1]' in metrics[data_subset]:
                     metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1[1]')
-                    metrics[data_subset].pop('pass@1', None)
+                if 'pass@1' in metrics[data_subset]:
+                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1')
         return metrics
 
     def metrics_to_print(self):
