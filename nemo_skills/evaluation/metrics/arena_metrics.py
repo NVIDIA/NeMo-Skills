@@ -14,10 +14,8 @@
 
 import json
 import re
-from collections import defaultdict
 from pathlib import Path
 
-from nemo_skills.evaluation.arena_utils import get_aggregate_score
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.inference.server.model import get_model
@@ -25,6 +23,8 @@ from nemo_skills.utils import unroll_files
 
 
 class ArenaMetrics(BaseMetrics):
+    def __init__(self):
+        self.reset()
 
     def setup(self, input_files):
         # checking if judgements are ready and fusing them with predictions
@@ -57,7 +57,7 @@ class ArenaMetrics(BaseMetrics):
 
     def _get_judge_score(self, judgment):
         # adapted from https://github.com/lm-sys/arena-hard-auto/blob/main/gen_judgment.py
-        pattern = re.compile(r'\[\[([AB<>=]+)\]\]')
+        pattern = re.compile('\[\[([AB<>=]+)\]\]')
         matches = pattern.findall(judgment)
         matches = [m for m in matches if m != ""]
         if len(set(matches)) == 0:
@@ -67,17 +67,6 @@ class ArenaMetrics(BaseMetrics):
         else:
             return None
 
-    def get_prediction_results(self, prediction):
-        return {
-            'lengths': len(prediction['generation']),
-            'scores': [
-                [
-                    self._get_judge_score(prediction['judgement-gen-base']),
-                    self._get_judge_score(prediction['judgement-base-gen']),
-                ]
-            ],
-        }
-
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 
@@ -85,41 +74,59 @@ class ArenaMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
+        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
+        # all the heavy lifting should be done in the evaluation script
         super().update(predictions)
+        self.scores.append([])
+        if len(predictions) > 1:
+            self.agg_mode = f"pass@{len(predictions)}"
 
-        prediction_results = [self.get_prediction_results(pred) for pred in predictions]
-
-        if len(predictions) == 1:
-            # Single prediction
-            self.get_pass_at_k(self.agg_mode_dict, prediction_results=prediction_results)
-        else:
-            k = len(predictions)
-            self.agg_mode_dict[f"pass@{k}"]['scores'].append([])
+            judge_scores = [self._get_judge_score(elem['judgement-gen-base']) for elem in predictions]
+            # adding the best score out of all the generations
             possible_scores = ['A>>B', 'A>B', 'A=B', 'B>A', 'B>>A']
-
             for possible_score in possible_scores:
-                for i in range(2):
-                    judge_scores = [elem['scores'][i] for elem in prediction_results]
-                    if any([score == possible_score for score in judge_scores]):
-                        self.agg_mode_dict[f"pass@{k}"]['scores'][-1].append(possible_score)
-                        best_id = judge_scores.index(possible_score)
-                        self.agg_mode_dict[f"pass@{k}"]['lengths'] += prediction_results[best_id]['lengths']
-                        break
-                else:
-                    self.agg_mode_dict[f"pass@{k}"]['scores'][-1].append(None)
+                # picking the best available score
+                if any([score == possible_score for score in judge_scores]):
+                    self.scores[-1].append(possible_score)
+                    best_id = judge_scores.index(possible_score)
+                    self.lengths += len(predictions[best_id]['generation'])
+                    break
+            else:
+                self.scores[-1].append(None)  # in case judge didn't generate a valid score
+
+            judge_scores = [self._get_judge_score(elem['judgement-base-gen']) for elem in predictions]
+            # second score is grading swapped answers, so we iterate from the end
+            for possible_score in possible_scores[::-1]:
+                # picking the best available score
+                if any([score == possible_score for score in judge_scores]):
+                    self.scores[-1].append(possible_score)
+                    best_id = judge_scores.index(possible_score)
+                    self.lengths += len(predictions[best_id]['generation'])
+                    break
+            else:
+                self.scores[-1].append(None)  # in case judge didn't generate a valid score
+        else:
+            # Single prediction
+            self.agg_mode = "pass@1"
+
+            self.lengths += len(predictions[0]['generation'])
+            self.scores[-1] = [
+                self._get_judge_score(predictions[0]['judgement-gen-base']),
+                self._get_judge_score(predictions[0]['judgement-base-gen']),
+            ]
 
     def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {'num_entries': self.total}
-            metrics_dict[agg_mode].update(get_aggregate_score(agg_metric_dict['scores']))
-            metrics_dict[agg_mode]['avg_response_length'] = agg_metric_dict['lengths'] / self.total
-        return metrics_dict
+        from nemo_skills.evaluation.arena_utils import get_aggregate_score
+
+        metrics = {'num_entries': self.total}
+        metrics.update(get_aggregate_score(self.scores))
+        metrics['avg_response_length'] = self.lengths / self.total
+        return {self.agg_mode: metrics}
 
     def reset(self):
         super().reset()
-        self.agg_mode_dict = defaultdict(lambda: {'scores': [], 'lengths': 0})
-
-    def aggregations_to_print(self):
-        """We will log all pass up to k, but only report the kth one."""
-        return [f'pass@{self.max_k}']
+        self.scores = []  # list of lists
+        self.lengths = 0
+        self.total = 0
+        # Set automatically
+        self.agg_mode = "pass@1"
