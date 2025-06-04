@@ -152,22 +152,22 @@ class BaseMetrics(abc.ABC):
 
                 # In case there are other metrics we need to update
                 self._update_correctness_metrics_for_majority(
-                    agg_mode_dict,
-                    k,
-                    check_correctness_method,
-                    is_correct,
-                    predictions,
-                    predicted_answers,
-                    correctness_dicts,
-                    majority_answer,
+                    agg_mode_dict=agg_mode_dict,
+                    k=k,
+                    check_correctness_method=check_correctness_method,
+                    is_correct=is_correct,
+                    predictions=predictions,
+                    predicted_answers=predicted_answers,
+                    correctness_dicts=correctness_dicts,
+                    majority_answer=majority_answer,
                 )
 
             agg_mode_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
             self._update_metrics_for_majority(
-                agg_mode_dict,
-                k,
-                predictions,
-                predicted_answers,
+                agg_mode_dict=agg_mode_dict,
+                k=k,
+                predictions=predictions,
+                predicted_answers=predicted_answers,
             )
 
     def _update_correctness_metrics_for_pass(
@@ -175,6 +175,7 @@ class BaseMetrics(abc.ABC):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
+        is_correct: bool,
         predictions: list[dict],
         correctness_dicts: list[dict],
     ):
@@ -228,18 +229,19 @@ class BaseMetrics(abc.ABC):
                 is_correct_list = [
                     correctness_dict[check_correctness_method] for correctness_dict in correctness_dicts[:k]
                 ]
-
-                agg_mode_dict[f"pass@{k}"][check_correctness_method] += any(is_correct_list)
+                is_correct = any(is_correct_list)
+                agg_mode_dict[f"pass@{k}"][check_correctness_method] += is_correct
 
                 # pass@1[k] - mean of pass@1 across all generations
                 agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(is_correct_list) / k
 
                 self._update_correctness_metrics_for_pass(
-                    agg_mode_dict,
-                    k,
-                    check_correctness_method,
-                    predictions,
-                    correctness_dicts,
+                    agg_mode_dict=agg_mode_dict,
+                    k=k,
+                    check_correctness_method=check_correctness_method,
+                    is_correct=is_correct,
+                    predictions=predictions,
+                    correctness_dicts=correctness_dicts,
                 )
 
             no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
@@ -247,9 +249,9 @@ class BaseMetrics(abc.ABC):
             agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
 
             self._update_metrics_for_pass(
-                agg_mode_dict,
-                k,
-                predictions,
+                agg_mode_dict=agg_mode_dict,
+                k=k,
+                predictions=predictions,
             )
 
     def setup(self, input_files):

@@ -41,8 +41,8 @@ class AnswerJudgementMetrics(BaseMetrics):
         majority_answer: str,
     ):
         assert check_correctness_method == 'correct_judgements'
-        majority_index = predicted_answers.index(majority_answer)
-        gt_judgement = is_correct_judgement(predictions[majority_index]['expected_judgement'])
+        # expected answer is always the same for all predictions, so just take the first one
+        gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
         self._update_fp_fn(agg_mode_dict[f"majority@{k}"], majority_answer, gt_judgement)
 
     def _update_correctness_metrics_for_pass(
@@ -50,12 +50,17 @@ class AnswerJudgementMetrics(BaseMetrics):
         agg_mode_dict: dict,
         k: int,
         check_correctness_method: str,
+        is_correct: bool,
         predictions: list[dict],
         correctness_dicts: list[dict],
     ):
         assert check_correctness_method == 'correct_judgements'
-        agg_mode_dict[f"pass@{k}"]["false_positives"] = "n/a"
-        agg_mode_dict[f"pass@{k}"]["false_negatives"] = "n/a"
+        # expected answer is always the same for all predictions, so just take the first one
+        gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
+        pred_judgement = is_correct_judgement(predictions[0]['judgement'])
+        # if pass is not correct, means all predictions are the same and wrong
+        if not is_correct:
+            self._update_fp_fn(agg_mode_dict[f"pass@{k}"], pred_judgement, gt_judgement)
 
         for pred in predictions[:k]:
             gt_judgement = is_correct_judgement(pred['expected_judgement'])
@@ -70,7 +75,7 @@ class AnswerJudgementMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-        predicted_answers = [pred['judgement'] for pred in predictions]
+        predicted_answers = [is_correct_judgement(pred['judgement']) for pred in predictions]
         self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
