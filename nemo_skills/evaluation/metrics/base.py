@@ -37,7 +37,6 @@ class BaseMetrics(abc.ABC):
 
         return metrics_dict
 
-    # TODO: rename to score and fix type of output
     def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
         """
         Returns a dictionary with all applicable ways to measure the correctness score for a given prediction.
@@ -153,8 +152,7 @@ class BaseMetrics(abc.ABC):
 
                 eval_dict[f"majority@{k}"][score_method] += majority_score
 
-                # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties"
-                # TODO: implement above metrics
+                # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties" metrics
 
                 # In case there are other metrics we need to update
                 self._update_score_metrics_for_majority(
@@ -232,8 +230,7 @@ class BaseMetrics(abc.ABC):
 
         for k in range(1, len(predictions) + 1):
             for score_method in score_dicts[0].keys():
-                # by default logging "correct", "avg_correct_tokens", "avg_incorrect_tokens"
-                # TODO: implement above metrics
+                # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" metrics
 
                 scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts[:k]]
                 pass_score = max(scores_list)
