@@ -44,7 +44,6 @@ class IFMetrics(BaseMetrics):
 
     def get_metrics(self):
         metrics_dict = {}
-        print(self.strict_agg_mode_dict)
         for agg_mode in self.strict_agg_mode_dict:
             prompt_strict = self.strict_agg_mode_dict[agg_mode]['prompt'] / self.total * 100.0
             inst_strict = self.strict_agg_mode_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
