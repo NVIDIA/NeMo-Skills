@@ -68,7 +68,16 @@ class ComputeMetrics:
                 if data_subset != 'all':
                     self.calculators[data_subset].update(data)
 
-        return {data_subset: calculator.get_metrics() for data_subset, calculator in self.calculators.items()}
+        # collecting metrics from all calculators
+        metrics = {}
+        for data_subset, calculator in self.calculators.items():
+            metrics[data_subset] = calculator.get_metrics()
+            # if there is only a single prediction, we are renaming pass@1 to greedy
+            if len(input_files) == 1:
+                if 'pass@1[1]' in metrics[data_subset]:
+                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1[1]')
+                    metrics[data_subset].pop('pass@1', None)
+        return metrics
 
     def metrics_to_print(self):
         return self.calculators['all'].metrics_to_print()

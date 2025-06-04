@@ -25,10 +25,8 @@ class BaseMetrics(abc.ABC):
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total, "avg_tokens": self.avg_tokens / self.total}
+            metrics_dict[agg_mode] = {"num_entries": self.total, "avg_tokens": int(self.avg_tokens / self.total)}
             for metric_key, metric_value in agg_metric_dict.items():
-                if agg_mode == "pass@1[64]":
-                    print(metric_key, metric_value)
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
@@ -95,11 +93,6 @@ class BaseMetrics(abc.ABC):
         use it for metrics that depend on the correctness method.
         """
 
-        # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties"
-        # TODO: implement above metrics
-
-        agg_mode_dict[f"majority@{k}"][check_correctness_method] += is_correct
-
     def _update_metrics_for_majority(
         self,
         agg_mode_dict: dict,
@@ -117,7 +110,6 @@ class BaseMetrics(abc.ABC):
 
         It can be used for metrics that do not depend on the correctness method.
         """
-        agg_mode_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
 
     def _compute_majority_at_k(
         self, predictions: list[dict], predicted_answers: list[str], agg_mode_dict: dict | None = None
@@ -153,6 +145,11 @@ class BaseMetrics(abc.ABC):
                     # Find the most common answer and its correctness
                     majority_answer, is_correct = Counter(valid_answers_and_results).most_common(1)[0][0]
 
+                agg_mode_dict[f"majority@{k}"][check_correctness_method] += is_correct
+
+                # by default logging "correct", "no_answer", "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties"
+                # TODO: implement above metrics
+
                 # In case there are other metrics we need to update
                 self._update_correctness_metrics_for_majority(
                     agg_mode_dict,
@@ -165,6 +162,7 @@ class BaseMetrics(abc.ABC):
                     majority_answer,
                 )
 
+            agg_mode_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
             self._update_metrics_for_majority(
                 agg_mode_dict,
                 k,
@@ -189,16 +187,6 @@ class BaseMetrics(abc.ABC):
         use it for metrics that depend on the correctness method.
         """
 
-        # by default logging "correct", "avg_correct_tokens", "avg_incorrect_tokens"
-        # TODO: implement above metrics
-
-        is_correct_list = [correctness_dict[check_correctness_method] for correctness_dict in correctness_dicts[:k]]
-
-        agg_mode_dict[f"pass@{k}"][check_correctness_method] += any(is_correct_list)
-
-        # pass@1[k] - mean of pass@1 across all generations
-        agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(is_correct_list) / k
-
     def _update_metrics_for_pass(
         self,
         agg_mode_dict: dict,
@@ -216,40 +204,53 @@ class BaseMetrics(abc.ABC):
         It can be used for metrics that do not depend on the correctness method.
         """
 
-    def _compute_pass_at_k(self, predictions: list[dict], agg_mode_dict: dict | None = None):
+    def _compute_pass_at_k(
+        self, predictions: list[dict], predicted_answers: list[str] | None = None, agg_mode_dict: dict | None = None
+    ):
         """
         Get pass@k metrics for a given set of prediction results.
 
         Args:
             predictions (list): List of generated predictions.
                 Will call `_get_correctness_dict` to see which predictions are correct.
+            predicted_answers (Optional[list]): List of the answers that will be used to compute no_answer metric.
             agg_mode_dict (Optional[dict]): Dictionary to store aggregated metrics.
                 By default will use self.agg_mode_dict.
         """
         agg_mode_dict = agg_mode_dict or self.agg_mode_dict
         correctness_dicts = [self._get_correctness_dict(pred) for pred in predictions]
 
-        if len(predictions) == 1:
-            for check_correctness_method, is_correct in correctness_dicts[0].items():
-                # whenever there is a single decoding, we assume it is greedy
-                agg_mode_dict["greedy"][check_correctness_method] += is_correct
+        for k in range(1, len(predictions) + 1):
+            for check_correctness_method in correctness_dicts[0].keys():
+                # by default logging "correct", "avg_correct_tokens", "avg_incorrect_tokens"
+                # TODO: implement above metrics
 
-                # TODO: how to update extra metrics here?
-        else:
-            for k in range(1, len(predictions) + 1):
-                for check_correctness_method in correctness_dicts[0].keys():
-                    self._update_correctness_metrics_for_pass(
-                        agg_mode_dict,
-                        k,
-                        check_correctness_method,
-                        predictions,
-                        correctness_dicts,
-                    )
-                self._update_metrics_for_pass(
+                is_correct_list = [
+                    correctness_dict[check_correctness_method] for correctness_dict in correctness_dicts[:k]
+                ]
+
+                agg_mode_dict[f"pass@{k}"][check_correctness_method] += any(is_correct_list)
+
+                # pass@1[k] - mean of pass@1 across all generations
+                agg_mode_dict[f"pass@1[{k}]"][check_correctness_method] += sum(is_correct_list) / k
+
+                self._update_correctness_metrics_for_pass(
                     agg_mode_dict,
                     k,
+                    check_correctness_method,
                     predictions,
+                    correctness_dicts,
                 )
+
+            no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
+            agg_mode_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
+            agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
+
+            self._update_metrics_for_pass(
+                agg_mode_dict,
+                k,
+                predictions,
+            )
 
     def setup(self, input_files):
         pass

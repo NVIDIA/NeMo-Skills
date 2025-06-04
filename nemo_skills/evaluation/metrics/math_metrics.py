@@ -52,22 +52,7 @@ class MathMetrics(BaseMetrics):
 
                 Path(jsonl_file + '-batch-request-id').unlink()
 
-    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
-        correctness_dict = {}
-        if 'is_correct' in prediction:
-            has_sympy = True
-            correctness_dict["symbolic_correct"] = prediction['is_correct']
-        if 'judgement' in prediction:
-            has_judge = True
-            correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
-        if has_sympy and has_judge:
-            correctness_dict["both_correct"] = (
-                correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
-            )
-            correctness_dict["any_correct"] = correctness_dict["symbolic_correct"] or correctness_dict["judge_correct"]
-
-        return correctness_dict
-
+    # TODO: how can we ensure that user-defined aggregations have all the same metrics as in base?
     def _compute_reward_at_k(self, predictions: list[dict]):
         agg_mode_dict = agg_mode_dict or self.agg_mode_dict
 
@@ -103,20 +88,21 @@ class MathMetrics(BaseMetrics):
                     is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
                     agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
 
-    def _update_metrics_for_pass(
-        self,
-        agg_mode_dict: dict,
-        k: int,
-        predictions: list[dict],
-    ):
-        super()._update_metrics_for_pass(
-            agg_mode_dict,
-            k,
-            predictions,
-        )
-        no_answer_list = [pred['predicted_answer'] is None for pred in predictions[:k]]
-        agg_mode_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
-        agg_mode_dict[f"pass@1[{k}]"]["no_answer"] += sum(no_answer_list) / k
+    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
+        correctness_dict = {}
+        if 'is_correct' in prediction:
+            has_sympy = True
+            correctness_dict["symbolic_correct"] = prediction['is_correct']
+        if 'judgement' in prediction:
+            has_judge = True
+            correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
+        if has_sympy and has_judge:
+            correctness_dict["both_correct"] = (
+                correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
+            )
+            correctness_dict["any_correct"] = correctness_dict["symbolic_correct"] or correctness_dict["judge_correct"]
+
+        return correctness_dict
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -127,7 +113,7 @@ class MathMetrics(BaseMetrics):
         """
         super().update(predictions)
         predicted_answers = [pred['predicted_answer'] for pred in predictions]
-        self._compute_pass_at_k(predictions=predictions)
+        self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
         if 'reward_model_score' in predictions[0]:

@@ -17,35 +17,50 @@ from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 class AnswerJudgementMetrics(BaseMetrics):
-
-    def get_prediction_results(self, prediction):
+    def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         gt_judgement = is_correct_judgement(prediction['expected_judgement'])
         pred_judgement = is_correct_judgement(prediction['judgement'])
-        return {
-            'gt_judgement': gt_judgement,
-            'pred_judgement': pred_judgement,
-            'is_correct': pred_judgement == gt_judgement,
-            'is_invalid': pred_judgement is None,
-            'is_fp': pred_judgement == True and gt_judgement == False,
-            'is_fn': pred_judgement == False and gt_judgement == True,
-        }
 
-    def _get_best_prediction(self, agg_mode_dict, prediction_results):
-        gt_judgement = prediction_results[0]['gt_judgement']
-        valid_answers = [elem['pred_judgement'] for elem in prediction_results if not elem['is_invalid']]
-        if len(valid_answers) == 0:
-            return
+        return {'correct_judgements': gt_judgement == pred_judgement}
 
-        pred_answer = valid_answers[0]
-        for answer in valid_answers:
-            if answer == gt_judgement:
-                pred_answer = answer
-                break
+    def _update_fp_fn(self, metrics_dict, pred_judgement, gt_judgement, divide_by=1):
+        is_fp = pred_judgement is True and gt_judgement is False
+        is_fn = pred_judgement is False and gt_judgement is True
+        metrics_dict['false_positives'] += float(is_fp) / divide_by
+        metrics_dict['false_negatives'] += float(is_fn) / divide_by
 
-        agg_mode_dict['is_correct'] += float(pred_answer == gt_judgement)
-        agg_mode_dict['is_fp'] += float(pred_answer == True and gt_judgement == False)
-        agg_mode_dict['is_fn'] += float(pred_answer == False and gt_judgement == True)
-        agg_mode_dict['is_invalid'] += float(pred_answer is None)
+    def _update_correctness_metrics_for_majority(
+        self,
+        agg_mode_dict: dict,
+        k: int,
+        check_correctness_method: str,
+        is_correct: bool,
+        predictions: list[dict],
+        predicted_answers: list[str],
+        correctness_dicts: list[dict],
+        majority_answer: str,
+    ):
+        assert check_correctness_method == 'correct_judgements'
+        majority_index = predicted_answers.index(majority_answer)
+        gt_judgement = is_correct_judgement(predictions[majority_index]['expected_judgement'])
+        self._update_fp_fn(agg_mode_dict[f"majority@{k}"], majority_answer, gt_judgement)
+
+    def _update_correctness_metrics_for_pass(
+        self,
+        agg_mode_dict: dict,
+        k: int,
+        check_correctness_method: str,
+        predictions: list[dict],
+        correctness_dicts: list[dict],
+    ):
+        assert check_correctness_method == 'correct_judgements'
+        agg_mode_dict[f"pass@{k}"]["false_positives"] = "n/a"
+        agg_mode_dict[f"pass@{k}"]["false_negatives"] = "n/a"
+
+        for pred in predictions[:k]:
+            gt_judgement = is_correct_judgement(pred['expected_judgement'])
+            pred_judgement = is_correct_judgement(pred['judgement'])
+            self._update_fp_fn(agg_mode_dict[f"pass@1[{k}]"], pred_judgement, gt_judgement, divide_by=k)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -55,43 +70,16 @@ class AnswerJudgementMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-        prediction_results = [self.get_prediction_results(prediction) for prediction in predictions]
-
-        # Greedy
-        if len(predictions) == 1:
-            self.get_pass_at_k(
-                self.agg_mode_dict,
-                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
-                prediction_results=prediction_results,
-            )
-        else:
-            # Majority@k, Pass@k, Pass@1[k]
-            self.get_pass_at_k(
-                self.agg_mode_dict,
-                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
-                prediction_results=prediction_results,
-                pass_at_k_fn=self._get_best_prediction,
-            )
-            self.get_majority_at_k(
-                self.agg_mode_dict,
-                predicted_answers=[pred['pred_judgement'] for pred in prediction_results],
-                pred_keys=['is_correct', 'is_fp', 'is_fn', 'is_invalid'],
-                prediction_results=prediction_results,
-            )
+        predicted_answers = [pred['judgement'] for pred in predictions]
+        self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
+        self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
     def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total}
-
-            metrics_dict[agg_mode]["correct_judgements"] = (agg_metric_dict["is_correct"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_positives"] = (agg_metric_dict["is_fp"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_negatives"] = (agg_metric_dict["is_fn"] / self.total) * 100.0
-            metrics_dict[agg_mode]["invalid_judgements"] = (agg_metric_dict["is_invalid"] / self.total) * 100.0
-
-        return metrics_dict
+        # renaming no_answer to invalid_judgements
+        for agg_metric_dict in self.agg_mode_dict.values():
+            agg_metric_dict["invalid_judgements"] = agg_metric_dict.pop("no_answer")
+        return super().get_metrics()
 
     def aggregations_to_print(self):
         """We will log all pass/pass@1[k] up to k, but only report the kth one."""
-        # majority + pass + pass@1[k]
-        return [f'majority@{self.max_k}', f'pass@{self.max_k}', f'pass@1[{self.max_k}]']
+        return [f'pass@1[{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}']
