@@ -68,8 +68,6 @@ class MathMetrics(BaseMetrics):
                 # If no valid answers, it's incorrect
                 if not valid_answers_and_results:
                     is_correct = False
-                    self.agg_mode_dict[f"rm_best@{k}"]["no_answer"] += 1
-                    self.agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += 1
                 else:
                     is_correct_best = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
                     self.agg_mode_dict[f"rm_best@{k}"][check_correctness_method] += is_correct_best
@@ -85,6 +83,10 @@ class MathMetrics(BaseMetrics):
                     )[0][0]
                     is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
                     self.agg_mode_dict[f"rm_majority@{k}"][check_correctness_method] += is_correct_majority
+
+            no_answer = all(elem['predicted_answer'] is None for elem in predictions[:k])
+            self.agg_mode_dict[f"rm_best@{k}"]["no_answer"] += no_answer
+            self.agg_mode_dict[f"rm_majority@{k}"]["no_answer"] += no_answer
 
     def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         correctness_dict = {}
