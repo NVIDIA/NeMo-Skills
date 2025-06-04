@@ -35,6 +35,7 @@ class BaseMetrics(abc.ABC):
 
         return metrics_dict
 
+    # TODO: rename to score and fix type of output
     def _get_correctness_dict(self, prediction: dict) -> dict[bool]:
         """
         Returns a dictionary with all applicable ways to measure if the prediction is correct.
@@ -264,8 +265,8 @@ class BaseMetrics(abc.ABC):
         return None
 
     def aggregations_to_print(self):
-        """No limit by default."""
-        return None
+        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
+        return [f'pass@1[{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}']
 
 
 def as_percentage(metric_value):

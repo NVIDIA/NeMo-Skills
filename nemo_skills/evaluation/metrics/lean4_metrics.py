@@ -12,49 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.evaluation.metrics.base import BaseMetrics
 from collections import defaultdict
+
+from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class Lean4Metrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
-    def get_prediction_results(self, prediction):
-        return {
-            "correct_proof": prediction['proof_status'] == "completed",
-            "timeout_error": prediction['proof_status'] == "timeout",
-        }
+    def _get_correctness_dict(self, prediction):
+        return {"lean4_correct": prediction['proof_status'] == "completed"}
 
-    def _get_best_prediction(self, stats_dict, elems):
-        stats_dict["correct_proof"] += any(elem['correct_proof'] for elem in elems)
-        stats_dict["timeout_error"] += all(elem['timeout_error'] for elem in elems)
+    def _update_correctness_metrics_for_pass(
+        self,
+        agg_mode_dict: dict,
+        k: int,
+        check_correctness_method: str,
+        pass_score: bool | float | int,
+        predictions: list[dict],
+        correctness_dicts: list[dict],
+    ):
+        assert check_correctness_method == 'lean4_correct'
+        timeout_errors = [pred['proof_status'] == "timeout" for pred in predictions[:k]]
+        agg_mode_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
+        agg_mode_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
 
     def update(self, predictions):
-        """Updating the evaluation results with the current element.
-
-        Args:
-            predictions (list[dict]): aggregated predictions across all generations.
-                The content of the file is benchmark specific.
-        """
         super().update(predictions)
-        self.get_pass_at_k(
-            self.agg_mode_dict,
-            ['correct_proof', 'timeout_error'],
-            predictions,
-            pass_at_k_fn=self._get_best_prediction,
-        )
-
-    def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, metric_values in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {
-                "num_entries": self.total,
-                "lean4_correct": (metric_values["correct_proof"] / self.total) * 100.0,
-                "timeout_error": (metric_values["timeout_error"] / self.total) * 100.0,
-            }
-        return metrics_dict
-
-    def aggregations_to_print(self):
-        """Print only the largest k (or "greedy" and the largest pass@k)."""
-        return [f'pass@{self.max_k}']
+        self._compute_pass_at_k(predictions=predictions)

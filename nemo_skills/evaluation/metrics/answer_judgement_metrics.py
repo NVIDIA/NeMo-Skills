@@ -84,7 +84,3 @@ class AnswerJudgementMetrics(BaseMetrics):
         for agg_metric_dict in self.agg_mode_dict.values():
             agg_metric_dict["invalid_judgements"] = agg_metric_dict.pop("no_answer")
         return super().get_metrics()
-
-    def aggregations_to_print(self):
-        """We will log all pass/pass@1[k] up to k, but only report the kth one."""
-        return [f'pass@1[{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}']

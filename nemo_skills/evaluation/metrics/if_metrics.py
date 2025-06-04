@@ -67,6 +67,3 @@ class IFMetrics(BaseMetrics):
         self.instruction_total = 0
         self.strict_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
         self.loose_agg_mode_dict = defaultdict(lambda: {"prompt": 0.0, "instruction": 0.0})
-
-    def aggregations_to_print(self):
-        return [f'pass@1[{self.max_k}]', f'pass@{self.max_k}']
