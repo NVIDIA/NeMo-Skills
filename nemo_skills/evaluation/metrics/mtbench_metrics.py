@@ -82,8 +82,9 @@ class MtBenchMetrics(BaseMetrics):
             self.scores[category].append((rating1, rating2))
 
     def get_metrics(self):
-        metrics = {'num_entries': self.total, 'avg_tokens': int(self.avg_tokens / self.total)}
-
+        metrics = {'num_entries': self.total}
+        if self.avg_tokens > 0:
+            metrics['avg_tokens'] = int(self.avg_tokens / self.total)
         # Calculate average scores across all categories for each turn
         all_ratings1 = [r1 for scores in self.scores.values() for r1, _ in scores if r1 is not None]
         all_ratings2 = [r2 for scores in self.scores.values() for _, r2 in scores if r2 is not None]

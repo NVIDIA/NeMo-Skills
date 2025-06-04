@@ -25,7 +25,9 @@ class BaseMetrics(abc.ABC):
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total, "avg_tokens": int(self.avg_tokens / self.total)}
+            metrics_dict[agg_mode] = {"num_entries": self.total}
+            if self.avg_tokens > 0:
+                metrics_dict['avg_tokens'] = int(self.avg_tokens / self.total)
             for metric_key, metric_value in agg_metric_dict.items():
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
