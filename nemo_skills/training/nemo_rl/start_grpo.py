@@ -16,6 +16,7 @@
 
 import argparse
 import os
+import json
 import pprint
 from dataclasses import dataclass
 from collections import defaultdict
@@ -66,18 +67,42 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 #                             Custom Math Dataset (@nemo-skills)
 # ===============================================================================
 
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 
 from nemo_rl.data.interfaces import TaskDataSpec
 
-def extract_dataset(split, output_key, dataset_path):
+
+def load_jsonl_as_dataset(
+    filepath: str,
+    force_string: bool = False,
+    keep_fields: Optional[list[str]] = None,
+) -> Dataset:
+    """
+    Load a JSONL file and convert it to a Hugging Face Dataset.
+
+    Args:
+        filepath (str): Path to the .jsonl file.
+
+    Returns:
+        Dataset: Hugging Face Dataset object.
+    """
+    records: list[dict[str, Any]] = []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            records.append(obj)
+
+    return Dataset.from_list(records)
+
+def extract_dataset(split, dataset_path):
     if not dataset_path.startswith('/'):
         original_ds = load_dataset(dataset_path, split=split)
     else:
-        import pandas as pd
-        from datasets import Dataset
-        df = pd.read_json(dataset_path, lines=True, dtype={output_key: str})
-        original_ds = Dataset.from_pandas(df)
+        original_ds = load_jsonl_as_dataset(dataset_path)
     return original_ds
 
 def format_passthrough(data):
