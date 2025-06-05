@@ -76,11 +76,10 @@ class ArenaMetrics(BaseMetrics):
         """
         # this shouldn't do any heavy calculation, but just read the metric from existing json entry
         # all the heavy lifting should be done in the evaluation script
-        self.total += 1
+        super().update(predictions)
         self.scores.append([])
+        self.agg_mode = f"pass@{len(predictions)}"
         if len(predictions) > 1:
-            self.agg_mode = f"pass@{len(predictions)}"
-
             judge_scores = [self._get_judge_score(elem['judgement-gen-base']) for elem in predictions]
             # adding the best score out of all the generations
             possible_scores = ['A>>B', 'A>B', 'A=B', 'B>A', 'B>>A']
@@ -89,7 +88,7 @@ class ArenaMetrics(BaseMetrics):
                 if any([score == possible_score for score in judge_scores]):
                     self.scores[-1].append(possible_score)
                     best_id = judge_scores.index(possible_score)
-                    self.lengths += len(predictions[best_id]['generation'])
+                    self.lengths += predictions[best_id].get('num_generated_tokens', 0)
                     break
             else:
                 self.scores[-1].append(None)  # in case judge didn't generate a valid score
@@ -101,15 +100,12 @@ class ArenaMetrics(BaseMetrics):
                 if any([score == possible_score for score in judge_scores]):
                     self.scores[-1].append(possible_score)
                     best_id = judge_scores.index(possible_score)
-                    self.lengths += len(predictions[best_id]['generation'])
+                    self.lengths += predictions[best_id].get('num_generated_tokens', 0)
                     break
             else:
                 self.scores[-1].append(None)  # in case judge didn't generate a valid score
         else:
-            # Single prediction
-            self.agg_mode = "greedy"
-
-            self.lengths += len(predictions[0]['generation'])
+            self.lengths += predictions[0].get('num_generated_tokens', 0)
             self.scores[-1] = [
                 self._get_judge_score(predictions[0]['judgement-gen-base']),
                 self._get_judge_score(predictions[0]['judgement-base-gen']),
@@ -120,12 +116,12 @@ class ArenaMetrics(BaseMetrics):
 
         metrics = {'num_entries': self.total}
         metrics.update(get_aggregate_score(self.scores))
-        metrics['avg_response_length'] = self.lengths / self.total
+        if self.lengths > 0:
+            metrics['avg_response_tokens'] = int(self.lengths / self.total)
         return {self.agg_mode: metrics}
 
     def reset(self):
+        super().reset()
         self.scores = []  # list of lists
         self.lengths = 0
-        self.total = 0
-        # Set automatically
-        self.agg_mode = "greedy"
+        self.agg_mode = "pass@1"

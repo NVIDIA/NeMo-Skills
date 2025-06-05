@@ -31,9 +31,8 @@ METRICS_MAP = {
     "multichoice": MathMetrics,
 }
 
+
 def get_metrics(metric_type: str):
     if metric_type not in METRICS_MAP:
-        raise ValueError(
-            f"Metric f{metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())}"
-        )
+        raise ValueError(f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())}")
     return METRICS_MAP[metric_type]()
