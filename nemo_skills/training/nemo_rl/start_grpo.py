@@ -91,13 +91,9 @@ def prepare_math_dataset(split_ds, output_key):
             # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(
         format_math,
-        remove_columns=split_ds["train"].column_names,
-        fn_kwargs={"output_key": output_key},
     )
     val_formatted = split_ds["validation"].map(
         format_math,
-        remove_columns=split_ds["validation"].column_names,
-        fn_kwargs={"output_key": output_key},
     )
 
     return {
