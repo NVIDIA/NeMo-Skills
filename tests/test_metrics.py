@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import shutil
 import subprocess
@@ -64,7 +65,7 @@ def test_metrics(tmp_path):
     metrics_path = dst / "metrics.json"
     metrics_ref_path = os.path.join(os.path.dirname(__file__), "data/eval_outputs/eval-results/metrics.json-test")
     with open(metrics_path, "r") as f:
-        metrics = f.read()
+        metrics = json.load(f)
     with open(metrics_ref_path, "r") as f:
-        metrics_ref = f.read()
+        metrics_ref = json.load(f)
     assert metrics == metrics_ref, "metrics.json does not match metrics.json-test"
