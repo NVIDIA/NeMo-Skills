@@ -23,6 +23,6 @@ _containers = {
     'megatron': 'igitman/nemo-skills-megatron:0.6.0',
     'sandbox': 'igitman/nemo-skills-sandbox:0.6.1',
     'nemo-skills': 'igitman/nemo-skills:0.6.0',
-    'verl': 'igitman/nemo-skills-verl:0.6.0',
+    'verl': 'igitman/nemo-skills-verl:0.6.1',
     'nemo-rl': 'igitman/nemo-skills-nemo-rl:0.6.0',
 }
