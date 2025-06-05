@@ -57,6 +57,7 @@ class GenerateSolutionsConfig:
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
+    code_tags: str | None = None # required when using code execution
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
@@ -263,7 +264,9 @@ class GenerationTask:
             dataset_module = importlib.import_module(f"nemo_skills.dataset.{self.cfg.dataset}")
             self.cfg.prompt_config = dataset_module.PROMPT_CONFIG
 
-        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
+        prompt = get_prompt(
+            self.cfg.prompt_config, self.cfg.prompt_template, self.cfg.code_tags, examples_type=self.cfg.examples_type
+        )
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
