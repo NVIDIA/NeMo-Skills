@@ -767,7 +767,7 @@ class OpenAIModel(BaseModel):
 
         choice = response.choices[0]
         output = choice.message.content
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens, 'finish_reason': choice.finish_reason}
         if choice.logprobs:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
@@ -798,7 +798,7 @@ class OpenAIModel(BaseModel):
             if cur_delta:
                 yield {"generation": cur_delta}
 
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            stop_reason = getattr(chunk.choices[0], "finish_reason", None)
             if stop_reason and isinstance(stop_reason, str):
                 yield {"generation": stop_reason}
 

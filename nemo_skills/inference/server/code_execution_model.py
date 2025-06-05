@@ -61,7 +61,7 @@ class CodeExecutionWrapper:
 
     def _generate_single(
         self,
-        prompt: str,
+        prompt: str | list,
         code_begin: str,
         code_end: str,
         code_output_begin: str,
@@ -81,8 +81,15 @@ class CodeExecutionWrapper:
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
     ):
-        if not isinstance(prompt, str):
-            raise NotImplementedError("OpenAI API is not supported yet.")
+        # Handle OpenAI-style dictionary prompts
+        is_openai_format = not isinstance(prompt, str)
+        if is_openai_format:
+            # For OpenAI format, we need to work with the last message content
+            # and update it as we add code execution results
+            original_prompt = copy.deepcopy(prompt)
+            if not prompt or not isinstance(prompt, list) or 'content' not in prompt[-1]:
+                raise ValueError("Invalid OpenAI prompt format")
+            
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
 
@@ -114,10 +121,17 @@ class CodeExecutionWrapper:
             effective_max_code_executions = max_code_executions
 
         # making a copy of prompts to not corrupt original data
-        new_prompt = copy.deepcopy(prompt)
+        if is_openai_format:
+            new_prompt = copy.deepcopy(prompt)
+        else:
+            new_prompt = copy.deepcopy(prompt)
 
         start_time = int(time.time())
-
+        
+        # For OpenAI models, don't add code_end to stop phrases because OpenAI API
+        # automatically removes stop phrases from the response, which breaks code execution detection
+        final_stop_phrases = (stop_phrases if stop_phrases else []) + [code_end]
+            
         request = {
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
@@ -127,7 +141,7 @@ class CodeExecutionWrapper:
             "min_p": min_p,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
-            "stop_phrases": stop_phrases + [code_end],
+            "stop_phrases": final_stop_phrases,
             "timeout": timeout,
         }
         session_id = None
@@ -176,7 +190,18 @@ class CodeExecutionWrapper:
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
             stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
-            request['prompt'] += output
+
+            # openai strips stopwods so we need to add them back manually
+            if is_openai_format and output_dict.get('finish_reason') == 'stop':
+                # check if there's an unfinished code block
+                if output.count(code_end) + 1 == output.count(code_begin):
+                    output += code_end
+            # Update the prompt based on format
+            if is_openai_format:
+                request['prompt'][-1]['content'] += output
+            else:
+                request['prompt'] += output
+
             # if it's the extra iteration, we don't execute the code block and just finish
 
             if generation_index == effective_max_code_executions:
@@ -204,17 +229,30 @@ class CodeExecutionWrapper:
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
                 # adding code output to the prompt
-                request['prompt'] += format_code_output(
+                code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+                
+                if is_openai_format:
+                    request['prompt'][-1]['content'] += code_output
+                else:
+                    request['prompt'] += code_output
+                    
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
                 break
 
-        # removing original prompt
+        # removing original prompt and returning the generation
+        if is_openai_format:
+            original_content = original_prompt[-1]['content'] if original_prompt else ""
+            final_content = request['prompt'][-1]['content']
+            generation = final_content[len(original_content):]
+        else:
+            generation = request['prompt'][len(prompt):]
+            
         return {
-            'generation': request['prompt'][len(prompt) :],
+            'generation': generation,
             'code_rounds_executed': code_rounds_executed,
             'num_generated_tokens': total_num_generated_tokens,
             'generation_time': generation_time,
@@ -433,11 +471,14 @@ class CodeExecutionWrapper:
         """
         Helper method, that implements streaming generation.
         """
+        # Handle OpenAI-style dictionary prompts
+        is_openai_format = not isinstance(prompt, str)
+        
         effective_max_code_executions = self.config.max_code_executions
         if max_code_executions is not None:
             effective_max_code_executions = max_code_executions
 
-        stop_phrases = stop_phrases or []
+        final_stop_phrases = (stop_phrases if stop_phrases else []) + [code_end]
 
         request = {
             'temperature': temperature,
@@ -446,13 +487,13 @@ class CodeExecutionWrapper:
             'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
-            'stop_phrases': stop_phrases + [code_end],
+            'stop_phrases': final_stop_phrases,
             'timeout': timeout,
             'tokens_to_generate': tokens_to_generate,
             'stream': True,
         }
 
-        current_full_prompt = prompt
+        current_full_prompt = copy.deepcopy(prompt)
         session_id = None  # For sandbox state continuity
         for generation_index in range(effective_max_code_executions + 1):
             model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
@@ -470,7 +511,11 @@ class CodeExecutionWrapper:
             if not current_output_segment:
                 break
 
-            current_full_prompt += current_output_segment
+            # Update the prompt based on format
+            if is_openai_format:
+                current_full_prompt[-1]['content'] += current_output_segment
+            else:
+                current_full_prompt += current_output_segment
 
             if generation_index == effective_max_code_executions:
                 # This was the last iteration, intended for final text generation after all code executions.
@@ -496,7 +541,12 @@ class CodeExecutionWrapper:
                 )
 
                 yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
-                current_full_prompt += formatted_code_output  # Append executed code's output to the prompt
+                
+                # Append executed code's output to the prompt
+                if is_openai_format:
+                    current_full_prompt[-1]['content'] += formatted_code_output
+                else:
+                    current_full_prompt += formatted_code_output
             else:
                 break
 
