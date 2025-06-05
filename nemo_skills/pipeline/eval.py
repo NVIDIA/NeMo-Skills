@@ -25,11 +25,8 @@ from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     SupportedServers,
-    add_mount_path,
     add_task,
-    check_if_mounted,
     check_mounts,
-    check_remote_mount_directories,
     cluster_download_file,
     cluster_path_exists,
     get_cluster_config,
@@ -108,27 +105,21 @@ def add_default_args(
     # TODO: some special logic is needed to work with subfolders if benchmark is <>/<>
     if extra_datasets_type == ExtraDatasetType.local:
         benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-        if found_in_extra:
-            input_file = Path(extra_datasets).name / benchmark / f"{split}.jsonl"
-        else:
-            input_file = f"nemo_skills/dataset/{benchmark}/{split}.jsonl"
-
-        input_file = f"/nemo_run/code/{input_file}"
     else:
         try:
             benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
             input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+            found_in_extra = False
         except ModuleNotFoundError:
             if extra_datasets is None:
                 raise ValueError(
                     f"Benchmark {benchmark} not found in nemo_skills.dataset and no extra_datasets provided."
                 )
-            input_file = Path(extra_datasets) / benchmark / f"{split}.jsonl"
             # getting tmp path to download init.py
             with tempfile.TemporaryDirectory() as tmpdir:
-                tmp_path = Path(tmpdir) / f"{benchmark}_init.py"
+                tmp_path = str(Path(tmpdir) / f"{benchmark}_init.py")
                 cluster_dataset_path = get_unmounted_path(
-                    cluster_config, Path(extra_datasets) / benchmark / "__init__.py"
+                    cluster_config, str(Path(extra_datasets) / benchmark / "__init__.py")
                 )
                 cluster_download_file(cluster_config, cluster_dataset_path, tmp_path)
                 benchmark_module, found_in_extra = get_dataset_module(benchmark, dataset_init_path=tmp_path)
@@ -136,20 +127,31 @@ def add_default_args(
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
 
+    if not found_in_extra:
+        input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+        unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
+    else:
+        if extra_datasets_type == ExtraDatasetType.local:
+            # we will package extra datasets and upload to cluster
+            input_file = f"/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
+            unmounted_path = Path(extra_datasets) / benchmark / f"{split}.jsonl"
+        else:
+            input_file = f"{extra_datasets}/{benchmark}/{split}.jsonl"
+            unmounted_path = get_unmounted_path(cluster_config, input_file)
+
+    unmounted_path = str(unmounted_path)
     # checking if data file exists (can check locally as well)
-    if extra_datasets_type == ExtraDatasetType.local or input_file.startswith('/nemo_run/code/'):
-        local_unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
-        if not cluster_path_exists(cluster_config, local_unmounted_path):
+    if found_in_extra and extra_datasets_type == ExtraDatasetType.cluster:
+        if not cluster_path_exists(cluster_config, unmounted_path):
             raise ValueError(
-                f"Data file {local_unmounted_path} does not exist locally. "
+                f"Data file {unmounted_path} does not exist on cluster. "
                 "Please check the benchmark and split parameters. "
                 "Did you forget to run prepare data commands?"
             )
     else:
-        cluster_dataset_path = get_unmounted_path(cluster_config, input_file)
-        if not cluster_path_exists(cluster_config, cluster_dataset_path):
+        if not Path(unmounted_path).exists():
             raise ValueError(
-                f"Data file {cluster_dataset_path} does not exist on cluster. "
+                f"Data file {unmounted_path} does not exist locally. "
                 "Please check the benchmark and split parameters. "
                 "Did you forget to run prepare data commands?"
             )
@@ -241,7 +243,9 @@ def eval(
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
     extra_datasets_type: ExtraDatasetType = typer.Option(
-        "local", help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'"
+        os.getenv("NEMO_SKILLS_EXTRA_DATASETS_TYPE", "local"),
+        help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
     exclusive: bool = typer.Option(
         True,
@@ -272,6 +276,12 @@ def eval(
 
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if extra_datasets_type == ExtraDatasetType.cluster and cluster_config['executor'] != 'slurm':
+        raise ValueError(
+            "Extra datasets type is set to 'cluster', but the executor is not 'slurm'. "
+            "Please use 'local' or change the cluster config."
+        )
 
     if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
@@ -385,6 +395,7 @@ def eval(
             )
 
             LOG.info("Launching task with command %s", " && ".join(cmds))
+            should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
             add_task(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=" && ".join(cmds)),
@@ -399,7 +410,7 @@ def eval(
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                extra_package_dirs=[extra_datasets] if extra_datasets else None,
+                extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                 get_server_command=get_server_command,
                 sandbox_port=None if get_random_port else 6000,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
