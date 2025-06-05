@@ -37,7 +37,7 @@ class BaseMetrics(abc.ABC):
 
         return metrics_dict
 
-    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
         Returns a dictionary with all applicable ways to measure the correctness score for a given prediction.
 

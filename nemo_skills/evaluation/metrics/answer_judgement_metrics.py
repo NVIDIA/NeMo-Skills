@@ -17,7 +17,7 @@ from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 class AnswerJudgementMetrics(BaseMetrics):
-    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         gt_judgement = is_correct_judgement(prediction['expected_judgement'])
         pred_judgement = is_correct_judgement(prediction['judgement'])
 

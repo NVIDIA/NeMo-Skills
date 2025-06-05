@@ -21,7 +21,7 @@ class IFMetrics(BaseMetrics):
     # loosely adapted from
     # https://github.com/google-research/google-research/blob/master/instruction_following_eval/evaluation_main.py
 
-    def _get_score_dict(self, prediction: dict) -> dict[bool | int | float]:
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {
             'prompt': prediction['follow_all_instructions'],
             'instruction': sum(prediction['follow_instruction_list']),
