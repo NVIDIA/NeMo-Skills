@@ -47,6 +47,9 @@ class ComputeMetrics:
         self.calculators = {'all': self.get_metrics_calculator(self.benchmark, self.extra_datasets, self.metric_type)}
         self.calculators['all'].setup(input_files)
 
+        # sorting input files to ensure consistent order
+        input_files = sorted(input_files)
+
         with ExitStack() as stack:
             file_handles = [
                 stack.enter_context(open(file, "rt", encoding="utf-8")) for file in unroll_files(input_files)
