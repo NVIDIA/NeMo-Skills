@@ -16,7 +16,8 @@
 
 from nemo_skills.pipeline.utils.cluster import (
     _get_tunnel_cached,
-    cluster_download,
+    cluster_download_dir,
+    cluster_download_file,
     cluster_upload,
     get_cluster_config,
     get_env_variables,

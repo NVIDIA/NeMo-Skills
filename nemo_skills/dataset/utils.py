@@ -54,11 +54,35 @@ def add_rounding_instruction(data: Dict) -> Dict:
     return data
 
 
-def get_dataset_module(dataset, extra_datasets=None):
+def import_from_path(file_path, module_name=None):
+    if module_name is None:  # unique random name
+        module_name = f"dynamic_module_{int(time.time() * 1000)}"
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def get_dataset_module(dataset, extra_datasets=None, dataset_init_path=None):
+    """
+    Get dataset module either in default folder or in extra datasets folder.
+
+    Search priority:
+    1. `nemo_skills.dataset` folder
+    2. `dataset_init_path` if provided
+    3. extra_datasets parameter if defined
+    4. `NEMO_SKILLS_EXTRA_DATASETS` environment variable
+    """
     try:
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
         found_in_extra = False
     except ModuleNotFoundError:
+        if dataset_init_path is not None:
+            dataset_module = import_from_path(dataset_init_path, dataset)
+            found_in_extra = True
+            return dataset_module, found_in_extra
+
         extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
         if extra_datasets is None:
             raise

@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
 import os
+import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import List
@@ -28,6 +30,8 @@ from nemo_skills.pipeline.utils import (
     check_if_mounted,
     check_mounts,
     check_remote_mount_directories,
+    cluster_download_file,
+    cluster_path_exists,
     get_cluster_config,
     get_exp,
     get_free_port,
@@ -98,30 +102,65 @@ def get_sampling_cmd(
     )
 
 
-def add_default_args(benchmark, split, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets):
+def add_default_args(
+    cluster_config, benchmark, split, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
+):
+    # TODO: some special logic is needed to work with subfolders if benchmark is <>/<>
     if extra_datasets_type == ExtraDatasetType.local:
         benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
+        if found_in_extra:
+            input_file = Path(extra_datasets).name / benchmark / f"{split}.jsonl"
+        else:
+            input_file = f"nemo_skills/dataset/{benchmark}/{split}.jsonl"
+
+        input_file = f"/nemo_run/code/{input_file}"
     else:
-        # TODO: @Igor, need to copy the dataset init here from remote.
-        benchmark_module, found_in_extra = None, True
+        try:
+            benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
+            input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+        except ModuleNotFoundError:
+            if extra_datasets is None:
+                raise ValueError(
+                    f"Benchmark {benchmark} not found in nemo_skills.dataset and no extra_datasets provided."
+                )
+            input_file = Path(extra_datasets) / benchmark / f"{split}.jsonl"
+            # getting tmp path to download init.py
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir) / f"{benchmark}_init.py"
+                cluster_dataset_path = get_unmounted_path(
+                    cluster_config, Path(extra_datasets) / benchmark / "__init__.py"
+                )
+                cluster_download_file(cluster_config, cluster_dataset_path, tmp_path)
+                benchmark_module, found_in_extra = get_dataset_module(benchmark, dataset_init_path=tmp_path)
 
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
 
-    if found_in_extra:
-        if extra_datasets_type == ExtraDatasetType.local:
-            data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-        else:
-            if mounted_dataset_path is None:
-                raise ValueError("Mounted dataset path not provided")
-
-            data_parameters = f"++input_file='{mounted_dataset_path}'"
+    # checking if data file exists (can check locally as well)
+    if extra_datasets_type == ExtraDatasetType.local or input_file.startswith('/nemo_run/code/'):
+        local_unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
+        if not cluster_path_exists(cluster_config, local_unmounted_path):
+            raise ValueError(
+                f"Data file {local_unmounted_path} does not exist locally. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
     else:
-        data_parameters = f"++input_file=/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+        cluster_dataset_path = get_unmounted_path(cluster_config, input_file)
+        if not cluster_path_exists(cluster_config, cluster_dataset_path):
+            raise ValueError(
+                f"Data file {cluster_dataset_path} does not exist on cluster. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
+
+    if cluster_config['executor'] == 'none':
+        input_file = input_file.replace('/nemo_run/code/', '')
 
     extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
-    extra_arguments = f"{data_parameters} {prompt_config_arg} {benchmark_module.GENERATION_ARGS} {extra_arguments}"
+    default_arguments = f"++input_file={input_file} {prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
+    extra_arguments = f"{default_arguments} {extra_arguments}"
 
     requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
 
@@ -279,57 +318,14 @@ def eval(
         )
 
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
-    benchmark_paths = [None for _ in range(len(benchmarks))]
-
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-
-    # if extra_datasets and extra_datasets_type == ExtraDatasetType.cluster:
-    #     benchmark_keys = list(benchmarks.keys())
-    #     add_mount_path(extra_datasets, '/eval_datasets')
-
-    #     # Prepend the mount path automatically if not explicitly provided
-    #     for idx, benchmark_keys in enumerate(benchmarks.keys()):
-    #         temp_dataset_filepath = os.path.join(benchmark_keys[idx], f"{split}.jsonl")
-
-    #         # Check if this is a dataset in the local directory or is unavailable locally and must be searched remotely
-    #         local_filepath = Path(nemo_skills.__file__).parent / "dataset" / temp_dataset_filepath
-    #         if local_filepath.exists():
-    #             # Local filepath
-    #             temp_dataset_filepath = "/nemo_run/code/nemo_skills/dataset/" + temp_dataset_filepath
-    #         else:
-    #             # Assume remote filepath
-    #             temp_dataset_filepath = f"/eval_dataset/{temp_dataset_filepath}"
-
-    #         check_if_mounted(cluster_config, temp_dataset_filepath)
-
-    #         benchmark_paths[idx] = temp_dataset_filepath
-
-    # Check which benchmarks require sandbox
-    # TODO: @Igor - need to download the init files for this check.
-
-    # for benchmark in benchmarks.keys():
-    #     benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-    #     requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
-    #     benchmark_requires_sandbox[benchmark] = requires_sandbox
-    #     if requires_sandbox and not with_sandbox:
-    #         LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
-
-    # # Check remote filepaths
-    # remote_dataset_filepath = []
-    # if extra_datasets and extra_datasets_type == ExtraDatasetType.cluster:
-    #     for idx in range(len(benchmarks)):
-    #         if '/eval_datasets' in benchmark_paths[idx]:
-    #             remote_dataset_filepath.append(get_unmounted_path(cluster_config, benchmark_paths[idx]))
-    #             LOG.info(f"Checking remote filepath with resolved path: {remote_dataset_filepath[-1]}")
-
-    #     if remote_dataset_filepath:
-    #         check_remote_mount_directories(remote_dataset_filepath, cluster_config, exit_on_failure=True)
 
     eval_cmds = []
     benchmark_requires_sandbox = {}
 
     for benchmark, rs_num in benchmarks.items():
         bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
+            cluster_config,
             benchmark,
             split,
             extra_eval_args,
