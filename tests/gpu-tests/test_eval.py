@@ -45,7 +45,6 @@ def test_trtllm_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -89,7 +88,6 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --with_sandbox "
         f"    ++prompt_template={prompt_template} "
         f"    ++examples_type=gsm8k_text_with_code "
-        f"    ++split=test "
         f"    ++max_samples=20 "
         f"    ++code_execution=True "
     )
@@ -140,7 +138,6 @@ def test_hf_eval(server_type, server_args):
         f"    --num_jobs 1 "
         f"    --server_args='{server_args}' "
         f"    ++prompt_template=llama3-instruct "
-        f"    ++split=test "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
     )
@@ -209,7 +206,6 @@ def test_nemo_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -251,7 +247,6 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
         f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )

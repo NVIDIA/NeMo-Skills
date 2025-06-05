@@ -26,13 +26,13 @@ from nemo_skills.pipeline.utils import (
     SupportedServers,
     add_mount_path,
     add_task,
+    check_if_mounted,
     check_mounts,
     check_remote_mount_directories,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
-    get_mounted_path,
     get_server_command,
     get_unmounted_path,
     resolve_mount_paths,
@@ -76,7 +76,7 @@ def get_greedy_cmd(
 
             data_parameters = f"++input_file='{mounted_dataset_path}'"
     else:
-        data_parameters = f"++dataset={benchmark} ++split={split}"
+        data_parameters = f"++input_file=/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
 
     # TODO: @Igor, need to download the init, or at least have the init files locally somehow to get module
     if benchmark_module is not None:
@@ -130,7 +130,7 @@ def get_sampling_cmd(
         extra_arguments=extra_arguments,
         extra_datasets=extra_datasets,
         extra_datasets_type=extra_datasets_type,
-        mounted_dataset_path=mounted_dataset_paths,
+        mounted_dataset_path=mounted_dataset_path,
         num_chunks=num_chunks,
         chunk_ids=chunk_ids,
     )
@@ -206,7 +206,9 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
+    extra_datasets_type: ExtraDatasetType = typer.Option(
+        "copy", help="If you have extra datasets locally, set to 'copy', if on cluster, set to 'mount'"
+    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -227,6 +229,10 @@ def eval(
 
     try:
         server_type = server_type.value
+    except AttributeError:
+        pass
+    try:
+        extra_datasets_type = extra_datasets_type.value
     except AttributeError:
         pass
 
@@ -281,10 +287,6 @@ def eval(
     benchmark_paths = [None for _ in range(len(benchmarks))]
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-    try:
-        extra_datasets_type = extra_datasets_type.value
-    except AttributeError:
-        pass
 
     if extra_datasets and extra_datasets_type == ExtraDatasetType.mount:
         benchmark_keys = list(benchmarks.keys())
@@ -306,17 +308,6 @@ def eval(
             check_if_mounted(cluster_config, temp_dataset_filepath)
 
             benchmark_paths[idx] = temp_dataset_filepath
-
-    # Check that extra args does not have ++split or ++dataset arguments if dataset_dir is provided
-    if (
-        extra_datasets
-        and extra_datasets_type == ExtraDatasetType.mount
-        and ("++split" in extra_arguments or "++dataset" in extra_arguments)
-    ):
-        raise ValueError(
-            "Cannot specify ++split or ++dataset in extra arguments if `extra_datasets` is provided with mount mode. "
-            "Must use --split and --dataset_dir instead."
-        )
 
     # Check which benchmarks require sandbox
     # TODO: @Igor - need to download the init files for this check.
