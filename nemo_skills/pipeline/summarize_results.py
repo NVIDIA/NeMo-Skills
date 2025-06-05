@@ -161,7 +161,7 @@ def summarize_results(
     results = defaultdict(lambda: defaultdict(dict))
     metrics_to_print = {}
     evaluations_to_print = {}
-    for benchmark_path in benchmarks_paths:
+    for benchmark_path in sorted(benchmarks_paths):  # sorting to ensure consistent order
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
             continue

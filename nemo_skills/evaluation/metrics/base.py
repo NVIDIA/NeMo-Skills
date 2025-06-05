@@ -147,6 +147,8 @@ class BaseMetrics(abc.ABC):
                     majority_score = 0
                     majority_answer = None
                 else:
+                    # sorting to ensure reproducible scores in case of ties in majority
+                    valid_answers_and_results = sorted(valid_answers_and_results)
                     # Find the most common answer and its correctness
                     majority_answer, majority_score = Counter(valid_answers_and_results).most_common(1)[0][0]
 
