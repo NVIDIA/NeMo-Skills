@@ -80,20 +80,20 @@ def extract_dataset(split, output_key, dataset_path):
         original_ds = Dataset.from_pandas(df)
     return original_ds
 
-def format_math(data):
+def format_passthrough(data):
     return {
         **data,
         # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
         "task_name": "math",
     }
 
-def prepare_math_dataset(split_ds, output_key):
+def prepare_math_dataset(split_ds):
             # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(
-        format_math,
+        format_passthrough,
     )
     val_formatted = split_ds["validation"].map(
-        format_math,
+        format_passthrough,
     )
 
     return {
@@ -104,16 +104,16 @@ def prepare_math_dataset(split_ds, output_key):
 class NeMoSkillsDataset:
     """Custom dataset class for NeMo Skills Math Environment."""
 
-    def __init__(self, training_data, validation_data, output_key="expected_answer"):
+    def __init__(self, training_data, validation_data):
         """Initialize the dataset with training and validation data."""
         self.training_data = training_data
         self.validation_data = validation_data
 
         # Load the datasets
         self.formatted_ds = prepare_math_dataset({
-            "train": extract_dataset("train", "expected_answer", training_data),
-            "validation": extract_dataset("validation", "expected_answer", validation_data),
-        }, output_key=output_key)
+            "train": extract_dataset("train", training_data),
+            "validation": extract_dataset("validation", validation_data),
+        })
 
 
 # ===============================================================================
@@ -126,8 +126,8 @@ TokenizerType = PreTrainedTokenizerBase
 class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any] | None = None
 
-def apply_ns_chat_template(prompt, problem: str) -> str:
-    return prompt.fill({'problem': problem}, return_templated_dict=True)
+def apply_ns_chat_template(prompt, datum_dict) -> str:
+    return prompt.fill(datum_dict, return_templated_dict=True)
 
 # TaskDataProcessFnCallable
 def ns_data_processor(
@@ -137,7 +137,6 @@ def ns_data_processor(
     max_seq_length: int,
     idx: int,
 ) -> DatumSpec:
-    problem = datum_dict["problem"]
     prompt_spec = task_data_spec.prompt_spec
     extra_env_info = {"ground_truth": datum_dict["expected_answer"]}
 
@@ -150,7 +149,7 @@ def ns_data_processor(
         config_dir=prompt_spec["config_dir"],
         template_dir=prompt_spec["template_dir"],
         )
-    message_log = apply_ns_chat_template(prompt, problem)
+    message_log = apply_ns_chat_template(prompt, datum_dict)
 
     for message in message_log:
         message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
