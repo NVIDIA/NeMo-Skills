@@ -93,7 +93,7 @@ class LLMMathJudgeTask(GenerationTask):
 
         return data
 
-    def prefill_generation(self, data_point):
+    def _prefill_generation(self, data_point):
         """Prefill judgement"""
         judgement = prefill_judgement(data_point)
         if judgement is None:
