@@ -32,8 +32,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class LlmMathJudgeConfig(GenerateSolutionsConfig):
-    """LLM math judge parameters. 
-For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """LLM math judge parameters.
+    For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
     """
 
     input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
@@ -75,7 +75,7 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
             ("code_execution", False),
             ("sandbox", {}),
         ]
-        
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
@@ -93,7 +93,7 @@ class LLMMathJudgeTask(GenerationTask):
 
         return data
 
-    def prefill_generation(self, data_point):
+    def _prefill_generation(self, data_point):
         """Prefill judgement"""
         judgement = prefill_judgement(data_point)
         if judgement is None:
@@ -112,11 +112,9 @@ def generate(cfg: LlmMathJudgeConfig):
     task.generate()
 
 
-HELP_MESSAGE = (
-    get_help_message(
-        LlmMathJudgeConfig,
-        server_params=server_params(), 
-    )
+HELP_MESSAGE = get_help_message(
+    LlmMathJudgeConfig,
+    server_params=server_params(),
 )
 
 
