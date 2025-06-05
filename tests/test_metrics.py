@@ -21,6 +21,13 @@ def test_metrics(tmp_path):
     """Current test is very strict and expects the output to match exactly.
 
     Ideally we should relax that, but keeping like this for now.
+
+    To update the expected output do the following:
+    1. Run the test with `pytest tests/test_metrics.py -s`. It will print the tmp_path it's using.
+    2. Replace the expected output file with the generated one:
+       `cp <tmp_path>/eval-results/summarize_results_output.txt tests/data/eval_outputs/summarize_results_output.txt`
+    3. Replace the metrics.json file with the generated one:
+       `cp <tmp_path>/eval-results/metrics.json tests/data/eval_outputs/eval-results/metrics.json-test`
     """
     # 1. Copy eval-results to tmp_path
     src = os.path.join(os.path.dirname(__file__), "data/eval_outputs/eval-results")
@@ -46,6 +53,8 @@ def test_metrics(tmp_path):
     # 4. Compare output (excluding last line) to expected output file
     output_lines = result.stdout.rstrip('\n').split('\n')
     output_without_last = '\n'.join(output_lines[:-1]) + '\n' if len(output_lines) > 1 else ''
+    with open(os.path.join(dst, "summarize_results_output.txt"), "w") as f:
+        f.write(output_without_last)
     expected_path = os.path.join(os.path.dirname(__file__), "data/eval_outputs/summarize_results_output.txt")
     with open(expected_path, "r") as f:
         expected = f.read()
