@@ -77,14 +77,12 @@ def extract_dataset(split, output_key, dataset_path):
         import pandas as pd
         from datasets import Dataset
         df = pd.read_json(dataset_path, lines=True, dtype={output_key: str})
-        df = df[['problem', output_key]]
         original_ds = Dataset.from_pandas(df)
     return original_ds
 
-def format_math(data, output_key: str = "expected_answer"):
+def format_math(data):
     return {
-        "problem": data["problem"],
-        "expected_answer": data[output_key],
+        **data,
         # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
         "task_name": "math",
     }
