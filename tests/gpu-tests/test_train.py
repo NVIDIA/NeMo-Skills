@@ -99,6 +99,8 @@ def test_grpo_nemo_rl():
 
     grpo_nemo_rl(
         ctx=wrap_arguments(
+            '++data.prompt.prompt_config=qwen/math-cot '
+            '++data.prompt.prompt_template=qwen-instruct '
             '++grpo.max_num_steps=5 '
             '++grpo.num_prompts_per_step=2 '
             '++policy.max_total_sequence_length=256 '
