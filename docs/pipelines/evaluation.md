@@ -143,8 +143,8 @@ Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeM
 PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
-DEFAULT_EVAL_ARGS = "++eval_type=math"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=math"
+GENERATION_ARGS = ""
 ```
 
 The prompt config and default generation arguments are passed to the

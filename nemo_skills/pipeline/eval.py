@@ -80,8 +80,9 @@ def get_greedy_cmd(
 
     # TODO: @Igor, need to download the init, or at least have the init files locally somehow to get module
     if benchmark_module is not None:
-        extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
-        extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
+        extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
+        prompt_config_args = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
+        extra_arguments = f"{benchmark_module.GENERATION_ARGS} {extra_arguments}"
     else:
         extra_eval_args = f" {extra_eval_args}"
         extra_arguments = f" {extra_arguments}"

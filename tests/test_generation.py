@@ -38,7 +38,7 @@ for dataset, splits in DATASETS:
 def test_generation_dryrun_llama(dataset, split):
     """Testing the default prompts for each dataset."""
     prompt_template = "llama3-instruct"
-    extra_args = importlib.import_module(f'nemo_skills.dataset.{dataset}').DEFAULT_GENERATION_ARGS
+    extra_args = importlib.import_module(f'nemo_skills.dataset.{dataset}').GENERATION_ARGS
     cmd = (
         "python nemo_skills/inference/generate.py "
         f"    ++output_file=./test.jsonl "

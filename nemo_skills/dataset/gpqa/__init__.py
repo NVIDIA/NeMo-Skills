@@ -18,5 +18,5 @@
 PROMPT_CONFIG = "generic/general-boxed"
 DATASET_GROUP = "multichoice"
 METRICS_TYPE = "multichoice"
-DEFAULT_EVAL_ARGS = "++eval_type=multichoice"
+EVAL_ARGS = "++eval_type=multichoice"
 DEFAULT_EVAL_SPLIT = "diamond"
