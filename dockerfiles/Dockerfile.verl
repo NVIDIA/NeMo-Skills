@@ -3,10 +3,10 @@ FROM whatcanyousee/verl:ngc-cu124-vllm0.8.5-sglang0.4.6-mcore0.12.0-te2.3
 WORKDIR /opt
 
 # Install verl
-ENV VERL_COMMIT=main
+ENV VERL_COMMIT=2ed63bbf39c22724e4940d97e4b09e4f3e5f6d68
 RUN git clone https://github.com/volcengine/verl.git && \
     cd verl && \
-    git checkout $VERL_COMMIT && \
+    git checkout ${VERL_COMMIT} && \
     pip3 install -e .
 
 RUN pip install fire
