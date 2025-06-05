@@ -22,7 +22,6 @@ from pathlib import Path
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from tests.conftest import docker_rm
 from tests.test_datasets import DATASETS
 
 DATA_TO_TEST = []
@@ -67,43 +66,42 @@ def test_generation_dryrun_gsm8k(prompt_template):
     subprocess.run(cmd, shell=True, check=True)
 
 
-def test_eval_mtbench_api():
-    if not os.getenv('OPENAI_API_KEY'):
-        pytest.skip("Define OPENAI_API_KEY to run this test")
-
-    output_dir = '/tmp/nemo-skills-tests/mtbench-api'
-    docker_rm([output_dir])
+def test_eval_mtbench_api(tmp_path):
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
 
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=gpt-4o-mini "
-        f"    --server_address=https://api.openai.com/v1 "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=mt-bench:0 "
-        f"    --output_dir={output_dir} "
-        f"    --extra_eval_args=\"++eval_config.use_batch_api=False\""
+        f"    --output_dir={tmp_path} "
+        f"    --extra_eval_args=\"++eval_config.use_batch_api=False "
+        f"                        ++eval_config.judge_model='meta/llama-3.1-8b-instruct' "
+        f"                        ++eval_config.base_url='https://integrate.api.nvidia.com/v1'\" "
         f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
     # checking that summarize results works (just that there are no errors, but can inspect the output as well)
     subprocess.run(
-        f"ns summarize_results {output_dir}",
+        f"ns summarize_results {tmp_path}",
         shell=True,
         check=True,
     )
 
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
-        [f"{output_dir}/eval-results/mt-bench/output.jsonl"],
+        [f"{tmp_path}/eval-results/mt-bench/output.jsonl"],
     )["all"]["greedy"]
 
     # not having other categories since we just ran with 2 samples
-    assert metrics['average'] >= 7
-    assert metrics['average_turn1'] >= 7
-    assert metrics['average_turn2'] >= 7
-    assert metrics['writing_turn1'] >= 7
-    assert metrics['writing_turn2'] >= 7
+    assert metrics['average'] >= 6
+    assert metrics['average_turn1'] >= 6
+    assert metrics['average_turn2'] >= 6
+    assert metrics['writing_turn1'] >= 6
+    assert metrics['writing_turn2'] >= 6
     assert metrics['missing_rating_turn1'] < 2
     assert metrics['missing_rating_turn2'] < 2
     assert metrics['num_entries'] == 2
