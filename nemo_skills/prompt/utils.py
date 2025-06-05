@@ -232,6 +232,8 @@ class Prompt:
             multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
                 and use it to construct the prompt. You input_dict should also have "assistant" key in all
                 turns except last containing assistant reply.
+            return_templated_dict: Indicates whether to return a messages list where hte template is used
+                to fill the prompt. If so, a list of dicts with 'role' and 'content'  keys will be returned.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.

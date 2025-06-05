@@ -132,23 +132,6 @@ TokenizerType = PreTrainedTokenizerBase
 class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any] | None = None
 
-    def copy_defaults(self, from_spec):
-        super().copy_defaults(from_spec)
-        default_attrs = {
-            "prompt_spec": {
-                "prompt_config": 'qwen/math-cot',
-                "prompt_template": 'qwen-instruct',
-                "examples_type": None,
-                "config_dir": None,
-                "template_dir": None,
-
-            }
-        }
-
-        for attr_name, default_value in default_attrs.items():
-            if getattr(self, attr_name) is None:
-                setattr(self, attr_name, default_value)
-
 def apply_ns_chat_template(prompt, problem: str) -> str:
     return prompt.fill({'problem': problem}, return_templated_dict=True)
 
