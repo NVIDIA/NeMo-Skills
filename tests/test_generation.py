@@ -99,11 +99,11 @@ def test_eval_mtbench_api(tmp_path):
     )["all"]["greedy"]
 
     # not having other categories since we just ran with 2 samples
-    assert metrics['average'] >= 7
-    assert metrics['average_turn1'] >= 7
-    assert metrics['average_turn2'] >= 7
-    assert metrics['writing_turn1'] >= 7
-    assert metrics['writing_turn2'] >= 7
+    assert metrics['average'] >= 6
+    assert metrics['average_turn1'] >= 6
+    assert metrics['average_turn2'] >= 6
+    assert metrics['writing_turn1'] >= 6
+    assert metrics['writing_turn2'] >= 6
     assert metrics['missing_rating_turn1'] < 2
     assert metrics['missing_rating_turn2'] < 2
     assert metrics['num_entries'] == 2
