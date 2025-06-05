@@ -85,6 +85,6 @@ if __name__ == "__main__":
 
     if args.split == "all":
         for split in ["test", "train"]:
-            save_data(split, args.random_seed)
+            save_data(split)
     else:
-        save_data(args.split, args.random_seed)
+        save_data(args.split)
