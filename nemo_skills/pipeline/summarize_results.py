@@ -222,7 +222,7 @@ def summarize_results(
                 metrics_to_print[benchmark] = {metric: default_formatting for metric in metrics}
 
             metrics_to_print[benchmark] = {
-                metric: default_formatting for metric in metrics_to_print[benchmark] if metric in metrics
+                metric: format_fn for metric, format_fn in metrics_to_print[benchmark].items() if metric in metrics
             }
 
             for metric_key, format_fn in metrics_to_print[benchmark].items():

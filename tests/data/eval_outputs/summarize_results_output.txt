@@ -68,6 +68,6 @@ pass@4          | 3           | 2455       | 100.00%       | 0.00%
 
 ------------------------------- mt-bench ------------------------------
 evaluation_mode | num_entries | average | average_turn1 | average_turn2
-greedy          | 2           | 7.67%   | 8.00%         | 7.00%        
+greedy          | 2           | 7.67    | 8.00          | 7.00         
 
 

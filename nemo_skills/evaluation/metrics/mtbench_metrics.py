@@ -18,7 +18,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
-from nemo_skills.evaluation.metrics.base import BaseMetrics
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.utils import unroll_files
 
@@ -121,4 +121,10 @@ class MtBenchMetrics(BaseMetrics):
 
     def metrics_to_print(self):
         """We are only printing the averages, but all other metrics can still be found in metrics.json"""
-        return ['num_entries', 'avg_tokens', 'average', 'average_turn1', 'average_turn2']
+        return {
+            'num_entries': as_int,
+            'avg_tokens': as_int,
+            'average': as_float,
+            'average_turn1': as_float,
+            'average_turn2': as_float,
+        }

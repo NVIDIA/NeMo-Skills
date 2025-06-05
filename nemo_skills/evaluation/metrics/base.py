@@ -282,6 +282,10 @@ def as_int(metric_value):
     return f"{int(metric_value)}"
 
 
+def as_float(metric_value):
+    return f"{float(metric_value):.2f}"
+
+
 def default_formatting(metric_value):
     """Assumes floats are percentage and rest without changes."""
     if isinstance(metric_value, float):
