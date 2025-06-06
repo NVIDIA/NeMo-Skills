@@ -54,7 +54,7 @@ You can change the number of GPUs if you have more than 1, but don't use more th
 ## Prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare comp-math-24-25 hle
+ns prepare_data comp-math-24-25 hle
 ```
 
 ## Run CoT evaluations

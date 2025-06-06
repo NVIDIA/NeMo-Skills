@@ -34,7 +34,7 @@ If you're only interested in a subset of datasets (e.g. only math-related or cod
 `--dataset_groups ...` and if you only need a couple of specific datasets, list them directly e.g.
 
 ```bash
-python -m nemo_skills.dataset.prepare gsm8k human-eval mmlu ifeval
+ns prepare_data gsm8k human-eval mmlu ifeval
 ```
 
 If you have the repo cloned locally, the data files will be available inside `nemo_skills/dataset/<benchmark>/<split>.jsonl`

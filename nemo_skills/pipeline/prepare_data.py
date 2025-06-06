@@ -53,6 +53,8 @@ def prepare_data(
     """Prepare datasets by running python -m nemo_skills.dataset.prepare"""
     extra_arguments = f'{" ".join(ctx.args)}'
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
+    if data_dir:
+        command += f" && mkdir -p {data_dir} && cp -r /nemo_run/code/nemo_skills/dataset/* {data_dir}"
 
     cluster_config = get_cluster_config(cluster, config_dir=config_dir)
     if cluster_config['executor'] == 'local' and not data_dir:

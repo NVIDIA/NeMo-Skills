@@ -156,9 +156,6 @@ def add_default_args(
                 "Did you forget to run prepare data commands?"
             )
 
-    if cluster_config['executor'] == 'none':
-        input_file = input_file.replace('/nemo_run/code/', '')
-
     extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
     default_arguments = f"++input_file={input_file} {prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
