@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import json
-import time
 import logging
 import sys
-from dataclasses import field
+import time
 from collections import defaultdict
+from dataclasses import field
 
 import hydra
 from tqdm import tqdm
@@ -31,12 +31,9 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class CheckContaminationConfig(GenerateSolutionsConfig):
-    """LLM-based check contamination parameters. 
-For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
+    """LLM-based check contamination parameters.
+    For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
     """
-
-    input_file: str | None = None  # an output of the retrieve_similar.py script
-    output_file: str | None = None  # where to save the generations
 
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -55,20 +52,13 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
     # Number of similar items to check. If not provided, will use the number of similar items in the first data point.
     top_k: int | None = None
 
-    def _post_init_validate_data(self):
-        """Validate that the data parameters adhere to the expected values"""
-        if self.input_file is None:
-            raise ValueError("Input file is required for checking contamination")
-        if self.output_file is None:
-            raise ValueError("Output file is required for checking contamination")
-
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("code_execution", False),
             ("sandbox", {}),
         ]
-        
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_check_contamination_config", node=CheckContaminationConfig)
@@ -102,11 +92,11 @@ class CheckContaminationTask(GenerationTask):
             first_element,
             self.prompt.fill(first_element),
         )
-        
+
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
         query_data = []
-        for similar_item in data_point['similar_items'][:self.cfg.top_k]:
+        for similar_item in data_point['similar_items'][: self.cfg.top_k]:
             query_data.append(
                 {
                     f'{self.cfg.retrieve_key}1': data_point[self.cfg.retrieve_key],
@@ -130,22 +120,20 @@ class CheckContaminationTask(GenerationTask):
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
                 return {"generation": True}
         return None
-    
+
     def llm_generate(self, data_points, data, is_async=False):
         """Override the base class method to create a 1:N mapping between data points and contamination queries."""
         # Create the query instances per data point
         query_data_batch = [
-            query_point 
-            for data_point in data_points 
-            for query_point in self._create_query_data(data_point)
+            query_point for data_point in data_points for query_point in self._create_query_data(data_point)
         ]
-        
+
         # Get the LLM judgement on the queries
         outputs = super().llm_generate(query_data_batch, data, is_async)
-        
+
         # Postprocessing of outputs to create a N:1 mapping between contamination results and data points
         query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
-        
+
         if not is_async:
             proc_outputs = []
             for idx in range(0, len(outputs), query_per_data_point):
@@ -155,7 +143,7 @@ class CheckContaminationTask(GenerationTask):
                     # If any of the generations is True, then the data point is considered contaminated
                     if output['generation'].strip() == "True":
                         proc_output["generation"] = True
-                        
+
                 proc_outputs.append(proc_output)
 
             return proc_outputs
@@ -163,13 +151,13 @@ class CheckContaminationTask(GenerationTask):
             # Create a list of lists, where each inner list contains the generation IDs for a data point
             generation_ids = []
             for idx in range(0, len(outputs), query_per_data_point):
-                generation_ids.append(outputs[idx: idx + query_per_data_point])
+                generation_ids.append(outputs[idx : idx + query_per_data_point])
 
             return generation_ids
 
     def get_llm_generations(self, requests_in_progress, generations):
         """Override the base class method to synchronize the N:1 mapping between contamination results and original data points. This is done by getting the LLM generations for all the queries for each data point and then processing the "generation" key.
-        
+
         requests_in_progress: A dictionary of the form {original_data_point_idx: gen_id_list}
         generations: A dictionary of the form {original_data_point_idx: gen_dict}
         """
@@ -177,7 +165,7 @@ class CheckContaminationTask(GenerationTask):
             # Get the LLM generations for all the queries remaining for this data point
             gen_dict_list = self.llm.get_generations(gen_id_list)
             # List to track the generation IDs correponding to this data point that are not done yet
-            rem_gen_id_list = []  
+            rem_gen_id_list = []
             for gen_id, gen_dict in zip(gen_id_list, gen_dict_list):
                 if gen_dict['generation'] is None:
                     # This generation is not done yet, so we will add it to the list of remaining generation IDs
@@ -189,7 +177,7 @@ class CheckContaminationTask(GenerationTask):
                         generations[original_dp_idx]['all_generations'] = []
 
                     generations[original_dp_idx]['all_generations'].append(gen_dict['generation'])
-                    
+
             # Update the remaining generation IDs for this data point
             requests_in_progress[original_dp_idx] = rem_gen_id_list
 
@@ -199,7 +187,9 @@ class CheckContaminationTask(GenerationTask):
             else:
                 # All generations have finished
                 # If any of the generations is True, then the data point is considered contaminated
-                contaminated = any([generation.strip() == "True" for generation in generations[original_dp_idx]['all_generations']])
+                contaminated = any(
+                    [generation.strip() == "True" for generation in generations[original_dp_idx]['all_generations']]
+                )
                 generations[original_dp_idx]['generation'] = contaminated
 
         # Return the remaining requests in progress and the generations
@@ -229,11 +219,9 @@ def check_contamination(cfg: CheckContaminationConfig):
     task.generate()
 
 
-HELP_MESSAGE = (
-    get_help_message(
-        CheckContaminationConfig,
-        server_params=server_params(), 
-    )
+HELP_MESSAGE = get_help_message(
+    CheckContaminationConfig,
+    server_params=server_params(),
 )
 
 if __name__ == "__main__":

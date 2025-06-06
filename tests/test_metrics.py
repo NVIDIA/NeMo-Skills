@@ -68,4 +68,15 @@ def test_metrics(tmp_path):
         metrics = json.load(f)
     with open(metrics_ref_path, "r") as f:
         metrics_ref = json.load(f)
-    assert metrics == metrics_ref, "metrics.json does not match metrics.json-test"
+
+    def check_metrics_equal(metrics1, metrics2, path=""):
+        if isinstance(metrics1, dict) and isinstance(metrics2, dict):
+            assert set(metrics1.keys()) == set(metrics2.keys()), f"Keys mismatch at {path}"
+            for k in metrics1:
+                check_metrics_equal(metrics1[k], metrics2[k], f"{path}.{k}")
+        elif isinstance(metrics1, (int, float)) and isinstance(metrics2, (int, float)):
+            assert abs(metrics1 - metrics2) < 1e-6, f"Value mismatch at {path}: {metrics1} != {metrics2}"
+        else:
+            assert metrics1 == metrics2, f"Type mismatch at {path}: {type(metrics1)} != {type(metrics2)}"
+
+    check_metrics_equal(metrics, metrics_ref)

@@ -28,7 +28,7 @@ from nemo_skills.evaluation.metrics import ComputeMetrics, default_formatting
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     check_if_mounted,
-    cluster_download,
+    cluster_download_dir,
     cluster_upload,
     get_cluster_config,
     get_tunnel,
@@ -97,12 +97,11 @@ def summarize_results(
             results_dir = get_unmounted_path(cluster_config, results_dir)
         else:
             upload_path = results_dir
-            tunnel = get_tunnel(cluster_config)
             temp_dir = tempfile.mkdtemp()
             print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
             os.makedirs(temp_dir, exist_ok=True)
-            cluster_download(
-                tunnel,
+            cluster_download_dir(
+                cluster_config,
                 get_unmounted_path(cluster_config, results_dir),
                 temp_dir,
                 remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
@@ -255,13 +254,12 @@ def summarize_results(
             json.dump(results, fout, indent=2)
         if upload_path is not None:
             cluster_upload(
-                tunnel,
+                cluster_config,
                 Path(results_dir) / 'metrics.json',
                 Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
                 verbose=verbose,
             )
             print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
-            tunnel.cleanup()
         else:
             print("Metrics are saved to", str(Path(results_dir) / 'metrics.json'))
     except PermissionError:

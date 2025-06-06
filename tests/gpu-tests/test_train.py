@@ -62,9 +62,7 @@ def test_sft_nemo_rl():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(
-            f"++prompt_template={prompt_template} ++split=test ++max_samples=10 ++inference.tokens_to_generate=10"
-        ),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10 ++inference.tokens_to_generate=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/final_hf_model",
@@ -188,7 +186,7 @@ def test_sft_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++batch_size=8 ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
@@ -251,7 +249,7 @@ def test_dpo_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++batch_size=8 ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
