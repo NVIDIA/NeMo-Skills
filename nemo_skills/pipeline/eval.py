@@ -337,12 +337,12 @@ def eval(
         if add_greedy or rs_num == 0:
             if rs_num > 0:
                 # forcing temperature to 0.0 for greedy decoding, but respecting override for samples
-                bench_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
+                greedy_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
             for cmd in get_greedy_cmd(
                 benchmark,
                 output_dir,
                 extra_eval_args=bench_eval_args,
-                extra_arguments=bench_gen_args,
+                extra_arguments=greedy_gen_args,
                 num_chunks=num_chunks,
                 chunk_ids=chunk_ids,
             ):

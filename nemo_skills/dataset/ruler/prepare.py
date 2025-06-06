@@ -166,8 +166,8 @@ if __name__ == "__main__":
             "ERROR: Can't prepare ruler without arguments provided! "
             "Skipping the preparation step.\n"
             "Example ruler prepare command:\n"
-            "ns prepare_data ruler --setup llama_131072 --tokenizer_path meta-llama/Llama-3.1-8B-Instruct "
-            "--max_seq_length 131072 --num_samples 500"
+            "ns prepare_data ruler --setup llama_131072 "
+            "--tokenizer_path meta-llama/Llama-3.1-8B-Instruct --max_seq_length 131072"
         )
         exit(0)
     print(f"Preparing RULER dataset for tasks: {args.tasks} with additional arguments: {ruler_prepare_args}")

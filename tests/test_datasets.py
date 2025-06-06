@@ -52,7 +52,7 @@ DATASETS = [
 
 def test_dataset_scripts():
     # test dataset groups
-    dataset_groups = ["math", "code", "chat", "multichoice"]
+    dataset_groups = ["math", "code", "chat", "multichoice", "long-context"]
     prepared_datasets = set()
     for group in dataset_groups:
         result = subprocess.run(
