@@ -173,7 +173,20 @@ class CodeExecutionWrapper:
                     break
                 request["prompt"] = request.pop("prompts")[0]
             else:
+                output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
+                for _ in range(5):
+                    output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+                    output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
+                    generated_code = code_begin + output_dict['generation']
+                    code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code)
+                    code_output = format_code_output(
+                        execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
+                    )
+                    print(f"We have generated the code {generated_code} with the following output {code_output}")
+
+                print('Okay now doing ground up generation...')
                 output_dict = self.model._generate_single(**request)
+                total_num_generated_tokens += num_generated_tokens
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
@@ -194,28 +207,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start = time.time()
-                header = '\n'.join([
-                    "import Aesop"
-                    "import Mathlib",
-                    "",
-                    "set_option maxHeartbeats 0",
-                    "",
-                    "open BigOperators",
-                    "open Real",
-                    "open Nat",
-                    "open Topology",
-                    "",
-                ])
-                code_execution_header = self.config.code_execution_header + header #"import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
-                execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=code_execution_header + extract_code_to_execute(output, code_begin, code_end),
-                    language=self.config.code_execution_language,
-                    timeout=self.config.code_execution_timeout,
-                    max_output_characters=self.config.max_code_output_characters,
-                    session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
-                )
+                code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, output)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
@@ -237,6 +229,32 @@ class CodeExecutionWrapper:
             'code_execution_time': code_execution_time,
             'stopped_on_repetition': stopped_on_repetition,
         }
+
+    def execute_generated_code(self, code_begin, code_end, output):
+        code_execution_time_start = time.time()
+        header = '\n'.join([
+                    "import Aesop"
+                    "import Mathlib",
+                    "",
+                    "set_option maxHeartbeats 0",
+                    "",
+                    "open BigOperators",
+                    "open Real",
+                    "open Nat",
+                    "open Topology",
+                    "",
+                ])
+        code_execution_header = self.config.code_execution_header + header #"import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
+        execution_dict, session_id = self.sandbox.execute_code(
+                    generated_code=code_execution_header + extract_code_to_execute(output, code_begin, code_end),
+                    language=self.config.code_execution_language,
+                    timeout=self.config.code_execution_timeout,
+                    max_output_characters=self.config.max_code_output_characters,
+                    session_id=session_id,
+                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
+                )
+
+        return code_execution_time_start,execution_dict
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(
