@@ -105,11 +105,11 @@ def add_default_args(
 
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
-
     if not is_on_cluster:
-        if is_mounted_filepath(data_path):
+        if is_mounted_filepath(cluster_config, data_path):
             input_file = f"{data_path}/{benchmark}/{split}.jsonl"
-            unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
+            unmounted_input_file = get_unmounted_path(cluster_config, input_file)
+            unmounted_path = str(Path(__file__).parents[2] / unmounted_input_file.replace('/nemo_run/code/', ''))
         else:
             # will be copied over in this case as it must come from extra datasets
             input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark}/{split}.jsonl"
@@ -272,10 +272,10 @@ def eval(
     if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
 
-    output_dir, log_dir = check_mounts(
+    output_dir, data_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={output_dir: None},
+        mount_map={output_dir: None, data_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
 

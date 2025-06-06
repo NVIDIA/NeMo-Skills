@@ -32,7 +32,7 @@ from nemo_skills.pipeline.utils import (
     cluster_download_dir,
     cluster_upload,
     get_cluster_config,
-    get_tunnel,
+    get_env_variables,
     get_unmounted_path,
     resolve_mount_paths,
 )
@@ -120,6 +120,8 @@ def summarize_results(
                 verbose=verbose,
             )
             results_dir = Path(temp_dir) / Path(results_dir).name
+        env_vars = get_env_variables(cluster_config)
+        data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
     else:
         cluster_config = None
     # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available

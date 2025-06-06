@@ -35,7 +35,7 @@ class ComputeMetrics:
         self.max_samples = max_samples
         self.metric_type = metric_type
 
-        benchmark_module, _ = get_dataset_module(
+        benchmark_module, _, _ = get_dataset_module(
             benchmark,
             data_dir=data_dir,
             cluster_config=cluster_config,
