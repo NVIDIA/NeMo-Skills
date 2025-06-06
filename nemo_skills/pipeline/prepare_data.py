@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.run_cmd import run_cmd as _run_cmd
-from nemo_skills.pipeline.utils import get_cluster_config
+from nemo_skills.pipeline.utils import get_cluster_config, get_env_variables
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -69,17 +69,34 @@ def prepare_data(
         # setting executore to none
         cluster_config['executor'] = 'none'
 
+    if cluster_config['executor'] == 'slurm' and not data_dir:
+        raise ValueError(
+            "Data directory is required to be specified when using slurm executor. "
+            "Please provide --data_dir argument."
+        )
+
+    log_dir = log_dir or data_dir
+
     # we already captured extra arguments
     ctx.args = []
 
     if data_dir:
-        # TODO: automatically add it to cluster config based on user prompt?
-        if not os.getenv("NEMO_SKILLS_DATA_DIR"):
+        env_vars = get_env_variables(cluster_config)
+        data_dir_env_var = env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
+        if data_dir_env_var != data_dir:
+            LOG.warning(
+                f"NEMO_SKILLS_DATA_DIR environment variable is set to {data_dir_env_var}, "
+                f"but you provided --data_dir={data_dir}. "
+                f"Make sure to set NEMO_SKILLS_DATA_DIR={data_dir} in your environment "
+                f"or pass it as an argument to `ns eval`."
+            )
+        if data_dir_env_var is None:
             LOG.warning(
                 f"NEMO_SKILLS_DATA_DIR environment variable is not set. "
                 f"You might want to set it as NEMO_SKILLS_DATA_DIR={data_dir} "
                 f"to avoid always specifying it as a parameter to `ns eval`."
             )
+        # TODO: automatically add it to cluster config based on user prompt?
 
     return _run_cmd(
         ctx=ctx,
