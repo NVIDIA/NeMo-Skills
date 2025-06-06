@@ -100,6 +100,59 @@ After the problem is completed finish your response right away.<|eot_id|><|start
     assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
 
 
+def test_qwen_math_prompt_dict():
+    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
+
+    filled = prompt.fill({'problem': "What's the meaning of life?"}, return_templated_dict=True)
+    expected_result = [
+        {
+            'role': 'system',
+            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
+        },
+
+        {
+            'role': 'user',
+            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
+        }
+    ]
+    assert filled == expected_result
+
+def test_qwen_math_prompt_dict_multi_turn():
+    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
+
+    input_dict = {
+        'turns': [
+            {
+                'problem': 'What\'s the meaning of life?',
+                'assistant': 'The meaning of life is 42',
+            },
+            {
+                'problem': 'Why do you think that\'s the case?',
+            },
+        ]
+    }
+    filled = prompt.fill(input_dict, return_templated_dict=True, multi_turn_key='turns')
+    expected_result = [
+        {
+            'role': 'system',
+            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
+        },
+        {
+            'role': 'user',
+            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
+        },
+        {
+            'role': 'assistant',
+            'content': 'The meaning of life is 42<|im_end|>\n',
+        },
+        {
+            'role': 'user',
+            'content': "<|im_start|>user\nWhy do you think that's the case?<|im_end|>\n<|im_start|>assistant\n",
+        }
+    ]
+    assert filled == expected_result
+
+
 def test_generic_gsm8k_problem_augmentation_prompt():
     prompt = get_prompt('generic/problem-augmentation-similar', 'nemotron-instruct', 'gsm8k_problem_augmentation')
 
