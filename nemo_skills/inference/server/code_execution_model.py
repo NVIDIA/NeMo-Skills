@@ -34,6 +34,7 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     code_execution_language: str = 'python'  # could be python, lean4
+    code_execution_header: str = ''
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
@@ -195,7 +196,7 @@ class CodeExecutionWrapper:
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
                 code_execution_time_start = time.time()
                 execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=extract_code_to_execute(output, code_begin, code_end),
+                    generated_code=self.config.code_execution_header + extract_code_to_execute(output, code_begin, code_end),
                     language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
