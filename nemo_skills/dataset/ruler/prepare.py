@@ -27,7 +27,7 @@ DEFAULT_SETTINGS = """
 PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "long-context"
 METRICS_TYPE = "ruler"
-EVAL_ARGS = "--eval_type=ruler --eval_config.match_type={match_type}"
+EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type={match_type}"
 GENERATION_ARGS = (
     "++inference.tokens_to_generate={tokens_to_generate} "
     "++prefix_generation_to_response=True "

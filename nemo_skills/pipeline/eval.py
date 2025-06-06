@@ -335,8 +335,9 @@ def eval(
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
         if add_greedy or rs_num == 0:
-            # forcing temperature to 0.0 for greedy decoding
-            bench_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
+            if rs_num > 0:
+                # forcing temperature to 0.0 for greedy decoding, but respecting override for samples
+                bench_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
             for cmd in get_greedy_cmd(
                 benchmark,
                 output_dir,
