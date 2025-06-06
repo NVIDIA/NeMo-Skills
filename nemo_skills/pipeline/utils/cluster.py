@@ -300,20 +300,31 @@ def progress_callback(transferred: int, total: int) -> None:
     sys.stdout.flush()
 
 
-def cluster_download(
-    tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
+def cluster_download_file(cluster_config: dict, remote_file: str, local_file: str):
+    tunnel = get_tunnel(cluster_config)
+    tunnel.get(remote_file, local_file)
+
+
+def cluster_path_exists(cluster_config: dict, remote_path: str):
+    tunnel = get_tunnel(cluster_config)
+    result = tunnel.run(f'test -e {remote_path} && echo "Exists"', hide=True, warn=True)
+    return "Exists" in result.stdout
+
+
+def cluster_download_dir(
+    cluster_config: dict, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
 ):
     """
     Downloads a directory from a remote cluster by creating a tar archive and transferring it.
 
     Args:
-        tunnel: SSHTunnel connection
+        cluster_config: dictionary with cluster configuration
         remote_dir: Path to the directory on remote server
         local_dir: Local path to save the downloaded directory
         remote_tar_dir: Optional directory for temporary tar file creation
         verbose: Print download progress
     """
-
+    tunnel = get_tunnel(cluster_config)
     remote_dir = remote_dir.rstrip('/')
     remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
 
@@ -374,17 +385,18 @@ def cluster_download(
     os.remove(local_tar)
 
 
-def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose: bool = True):
+def cluster_upload(cluster_config: dict, local_file: str, remote_dir: str, verbose: bool = True):
     """
     Uploads a file to cluster.
     TODO: extend to a folder.
 
     Args:
-        tunnel: SSHTunnel connection
+        cluster_config: dictionary with cluster configuration
         local_file: Path to the local file to upload
         remote_dir: Cluster path where to save the file
         verbose: Print upload progress
     """
+    tunnel = get_tunnel(cluster_config)
     sftp = tunnel.session.client.open_sftp()
     sftp.put(str(local_file), str(remote_dir), callback=progress_callback if verbose else None)
     print(f"\nTransfer complete")

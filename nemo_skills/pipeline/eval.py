@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
 import os
+import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import List
@@ -25,11 +27,14 @@ from nemo_skills.pipeline.utils import (
     SupportedServers,
     add_task,
     check_mounts,
+    cluster_download_file,
+    cluster_path_exists,
     get_cluster_config,
     get_exp,
     get_free_port,
     get_generation_command,
     get_server_command,
+    get_unmounted_path,
     resolve_mount_paths,
     run_exp,
 )
@@ -39,29 +44,19 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class ExtraDatasetType(str, Enum):
-    copy = "copy"
-    mount = "mount"
+    local = "local"
+    cluster = "cluster"
 
 
 def get_greedy_cmd(
     benchmark,
-    split,
     output_dir,
     output_name='output.jsonl',
     extra_eval_args="",
     extra_arguments="",
-    extra_datasets=None,
     num_chunks=None,
     chunk_ids=None,
 ):
-    benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-    if found_in_extra:
-        data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-    else:
-        data_parameters = f"++dataset={benchmark} ++split={split}"
-
-    extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
-    extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
 
     cmds = []
     if num_chunks is None or chunk_ids is None:
@@ -75,7 +70,6 @@ def get_greedy_cmd(
             f'echo "Evaluating benchmark {benchmark}" && '
             f'python -m nemo_skills.inference.generate '
             f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-            f'    {data_parameters} '
             f'    {chunk_param} '
             f'    {extra_arguments} && '
             f'python -m nemo_skills.evaluation.evaluate_results '
@@ -86,27 +80,93 @@ def get_greedy_cmd(
 
 def get_sampling_cmd(
     benchmark,
-    split,
     output_dir,
     random_seed,
     extra_eval_args="",
     extra_arguments="",
-    extra_datasets=None,
     num_chunks=None,
     chunk_ids=None,
 ):
     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
     return get_greedy_cmd(
         benchmark=benchmark,
-        split=split,
         output_dir=output_dir,
         output_name=f"output-rs{random_seed}.jsonl",
         extra_eval_args=extra_eval_args,
         extra_arguments=extra_arguments,
-        extra_datasets=extra_datasets,
         num_chunks=num_chunks,
         chunk_ids=chunk_ids,
     )
+
+
+def add_default_args(
+    cluster_config, benchmark, split, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
+):
+    # TODO: some special logic is needed to work with subfolders if benchmark is <>/<>
+    if extra_datasets_type == ExtraDatasetType.local:
+        benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
+    else:
+        try:
+            benchmark_module = importlib.import_module(f"nemo_skills.dataset.{benchmark}")
+            input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+            found_in_extra = False
+        except ModuleNotFoundError:
+            if extra_datasets is None:
+                raise ValueError(
+                    f"Benchmark {benchmark} not found in nemo_skills.dataset and no extra_datasets provided."
+                )
+            # getting tmp path to download init.py
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = str(Path(tmpdir) / f"{benchmark}_init.py")
+                cluster_dataset_path = get_unmounted_path(
+                    cluster_config, str(Path(extra_datasets) / benchmark / "__init__.py")
+                )
+                cluster_download_file(cluster_config, cluster_dataset_path, tmp_path)
+                benchmark_module, found_in_extra = get_dataset_module(benchmark, dataset_init_path=tmp_path)
+
+    if split is None:
+        split = getattr(benchmark_module, "EVAL_SPLIT", "test")
+
+    if not found_in_extra:
+        input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
+        unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
+    else:
+        if extra_datasets_type == ExtraDatasetType.local:
+            # we will package extra datasets and upload to cluster
+            input_file = f"/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
+            unmounted_path = Path(extra_datasets) / benchmark / f"{split}.jsonl"
+        else:
+            input_file = f"{extra_datasets}/{benchmark}/{split}.jsonl"
+            unmounted_path = get_unmounted_path(cluster_config, input_file)
+
+    unmounted_path = str(unmounted_path)
+    # checking if data file exists (can check locally as well)
+    if found_in_extra and extra_datasets_type == ExtraDatasetType.cluster:
+        if not cluster_path_exists(cluster_config, unmounted_path):
+            raise ValueError(
+                f"Data file {unmounted_path} does not exist on cluster. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
+    else:
+        if not Path(unmounted_path).exists():
+            raise ValueError(
+                f"Data file {unmounted_path} does not exist locally. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
+
+    if cluster_config['executor'] == 'none':
+        input_file = input_file.replace('/nemo_run/code/', '')
+
+    extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
+    prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
+    default_arguments = f"++input_file={input_file} {prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
+    extra_arguments = f"{default_arguments} {extra_arguments}"
+
+    requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+
+    return extra_arguments, extra_eval_args, requires_sandbox
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -138,7 +198,10 @@ def eval(
         "If not specified, will use the default entrypoint for the server type.",
     ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
-    split: str = typer.Option('test', help="Data split to use for evaluation"),
+    split: str = typer.Option(
+        None,
+        help="Data split to use for evaluation. Will use benchmark-specific default or 'test' if it's not defined.",
+    ),
     num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
     num_chunks: int = typer.Option(
         None,
@@ -179,7 +242,12 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    # extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
+    extra_datasets_type: ExtraDatasetType = typer.Option(
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
+        help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
+    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -202,9 +270,19 @@ def eval(
         server_type = server_type.value
     except AttributeError:
         pass
+    try:
+        extra_datasets_type = extra_datasets_type.value
+    except AttributeError:
+        pass
 
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+
+    if extra_datasets_type == ExtraDatasetType.cluster and cluster_config['executor'] != 'slurm':
+        raise ValueError(
+            "Extra datasets type is set to 'cluster', but the executor is not 'slurm'. "
+            "Please use 'local' or change the cluster config."
+        )
 
     if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
@@ -251,55 +329,49 @@ def eval(
         )
 
     benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
-
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-    # TODO(@titu1994): add support for extra_datasets_type in future pr
-    # try:
-    #     extra_datasets_type = extra_datasets_type.value
-    # except AttributeError:
-    #     pass
 
-    # Check which benchmarks require sandbox
+    eval_cmds = []
     benchmark_requires_sandbox = {}
-    for benchmark in benchmarks.keys():
-        benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-        requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+
+    for benchmark, rs_num in benchmarks.items():
+        bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
+            cluster_config,
+            benchmark,
+            split,
+            extra_eval_args,
+            extra_arguments,
+            extra_datasets_type,
+            extra_datasets,
+        )
         benchmark_requires_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
-    # Create evaluation commands as before
-    eval_cmds = [
-        (cmd, benchmark)
-        for benchmark, rs_num in benchmarks.items()
-        for cmd in get_greedy_cmd(
-            benchmark,
-            split,
-            output_dir,
-            extra_eval_args=extra_eval_args,
-            extra_arguments=extra_arguments,
-            extra_datasets=extra_datasets,
-            num_chunks=num_chunks,
-            chunk_ids=chunk_ids,
-        )
-        if add_greedy or rs_num == 0
-    ]
-    eval_cmds += [
-        (cmd, benchmark)
-        for benchmark, rs_num in benchmarks.items()
-        for rs in range(starting_seed, starting_seed + rs_num)
-        for cmd in get_sampling_cmd(
-            benchmark,
-            split,
-            output_dir,
-            rs,
-            extra_eval_args=extra_eval_args,
-            extra_arguments=extra_arguments,
-            extra_datasets=extra_datasets,
-            num_chunks=num_chunks,
-            chunk_ids=chunk_ids,
-        )
-    ]
+        if add_greedy or rs_num == 0:
+            # forcing temperature to 0.0 for greedy decoding
+            bench_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
+            for cmd in get_greedy_cmd(
+                benchmark,
+                output_dir,
+                extra_eval_args=bench_eval_args,
+                extra_arguments=bench_gen_args,
+                num_chunks=num_chunks,
+                chunk_ids=chunk_ids,
+            ):
+                eval_cmds.append((cmd, benchmark))
+        for rs in range(starting_seed, starting_seed + rs_num):
+            for cmd in get_sampling_cmd(
+                benchmark,
+                output_dir,
+                rs,
+                extra_eval_args=bench_eval_args,
+                extra_arguments=bench_gen_args,
+                num_chunks=num_chunks,
+                chunk_ids=chunk_ids,
+            ):
+                eval_cmds.append((cmd, benchmark))
+
     if num_jobs == -1:
         num_jobs = len(eval_cmds)
     else:
@@ -324,6 +396,7 @@ def eval(
             )
 
             LOG.info("Launching task with command %s", " && ".join(cmds))
+            should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
             add_task(
                 exp,
                 cmd=get_generation_command(server_address=server_address, generation_commands=" && ".join(cmds)),
@@ -338,7 +411,7 @@ def eval(
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                extra_package_dirs=[extra_datasets] if extra_datasets else None,
+                extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                 get_server_command=get_server_command,
                 sandbox_port=None if get_random_port else 6000,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
