@@ -794,13 +794,14 @@ class OpenAIModel(BaseModel):
 
         for chunk in response:
             cur_delta = chunk.choices[0].text
-
-            if cur_delta:
-                yield {"generation": cur_delta}
+            result = {"generation": cur_delta}
 
             stop_reason = getattr(chunk.choices[0], "finish_reason", None)
             if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
+                result["finish_reason"] = "stop"
+
+            if cur_delta:
+                yield result
 
 
 class VLLMModel(BaseModel):

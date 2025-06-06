@@ -191,9 +191,9 @@ class CodeExecutionWrapper:
             # no need to do anything with this as the code below should just exit, so that's only for logging
             stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
 
-            # openai strips stopwods so we need to add them back manually
+            # openai don't show what stop word was triggered, so we assume that it was `code_end`
+            # if there's an unfinished code block
             if is_openai_format and output_dict.get('finish_reason') == 'stop':
-                # check if there's an unfinished code block
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
             # Update the prompt based on format
@@ -510,6 +510,12 @@ class CodeExecutionWrapper:
                 break
             if not current_output_segment:
                 break
+
+            # openai don't show what stop word was triggered, so we assume that it was `code_end`
+            # if there's an unfinished code block
+            if is_openai_format and chunk.get('finish_reason') == 'stop':
+                if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
+                    current_output_segment += code_end
 
             # Update the prompt based on format
             if is_openai_format:
