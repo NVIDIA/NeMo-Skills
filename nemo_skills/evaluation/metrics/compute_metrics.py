@@ -22,29 +22,41 @@ from nemo_skills.utils import unroll_files
 
 
 class ComputeMetrics:
-    def __init__(self, benchmark, extra_datasets=None, max_samples=-1, metric_type=None):
+    def __init__(
+        self,
+        benchmark,
+        data_dir=None,
+        cluster_config=None,
+        extra_datasets=None,
+        extra_datasets_type=None,
+        max_samples=-1,
+        metric_type=None,
+    ):
         self.max_samples = max_samples
-        self.benchmark = benchmark
-        self.extra_datasets = extra_datasets
         self.metric_type = metric_type
+
+        benchmark_module, _, _ = get_dataset_module(
+            benchmark,
+            data_dir=data_dir,
+            cluster_config=cluster_config,
+            extra_datasets=extra_datasets,
+            extra_datasets_type=extra_datasets_type,
+        )
+        if self.metric_type is None:
+            self.metric_type = benchmark_module.METRICS_TYPE
+
         # Dictionary to store metrics calculators for different subsets
         self.calculators = {}
 
-    def get_metrics_calculator(self, benchmark, extra_datasets=None, metric_type=None):
-        if metric_type is None:
-            # Setup metrics calculator
-            benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-            metrics_calculator = get_metrics(benchmark_module.METRICS_TYPE)
-        else:
-            metrics_calculator = get_metrics(metric_type)
+    def get_metrics_calculator(self):
+        metrics_calculator = get_metrics(self.metric_type)
         metrics_calculator.reset()
-
         return metrics_calculator
 
     def compute_metrics(self, input_files):
         """Computing metrics based on the provided input files."""
         # only calling setup on the main one
-        self.calculators = {'all': self.get_metrics_calculator(self.benchmark, self.extra_datasets, self.metric_type)}
+        self.calculators = {'all': self.get_metrics_calculator()}
         self.calculators['all'].setup(input_files)
 
         # sorting input files to ensure consistent order
@@ -62,11 +74,7 @@ class ComputeMetrics:
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:
-                    self.calculators[data_subset] = self.get_metrics_calculator(
-                        self.benchmark,
-                        self.extra_datasets,
-                        self.metric_type,
-                    )
+                    self.calculators[data_subset] = self.get_metrics_calculator()
                 self.calculators['all'].update(data)
                 if data_subset != 'all':
                     self.calculators[data_subset].update(data)

@@ -238,7 +238,7 @@ model for a total of 64 samples)
 First prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare aime24 aime25
+ns prepare_data aime24 aime25
 ```
 
 Then run the following Python script

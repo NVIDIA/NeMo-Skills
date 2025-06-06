@@ -13,7 +13,7 @@ run inference through Nvidia NIM API.
 ## Prepare the seed data
 
 ```bash
-python -m nemo_skills.dataset.prepare gsm8k math
+ns prepare_data gsm8k math
 ```
 
 ## Solution augmentation
