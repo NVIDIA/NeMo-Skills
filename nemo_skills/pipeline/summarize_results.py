@@ -24,6 +24,7 @@ from typing import Optional
 
 import typer
 
+from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.evaluation.metrics import ComputeMetrics, default_formatting
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -58,6 +59,11 @@ def summarize_results(
         help="Specify benchmarks to run (comma separated). "
         "If not specified, all benchmarks in the results_dir will be used.",
     ),
+    data_dir: str = typer.Option(
+        None,
+        help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
+        "Can also specify through NEMO_SKILLS_DATA_DIR environment variable.",
+    ),
     remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
     debug: bool = typer.Option(False, help="Print debug information"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -66,6 +72,12 @@ def summarize_results(
         None,
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
+    ),
+    extra_datasets_type: ExtraDatasetType = typer.Option(
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
+        help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
     metric_type: Optional[str] = typer.Option(
         None,
@@ -108,7 +120,8 @@ def summarize_results(
                 verbose=verbose,
             )
             results_dir = Path(temp_dir) / Path(results_dir).name
-
+    else:
+        cluster_config = None
     # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
 
     # Check for all possible directory structures
@@ -168,7 +181,14 @@ def summarize_results(
             if metric_type is not None:
                 metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
             else:
-                metrics_calculator = ComputeMetrics(benchmark, extra_datasets=extra_datasets, max_samples=max_samples)
+                metrics_calculator = ComputeMetrics(
+                    benchmark,
+                    data_dir=data_dir,
+                    cluster_config=cluster_config,
+                    extra_datasets=extra_datasets,
+                    extra_datasets_type=extra_datasets_type,
+                    max_samples=max_samples,
+                )
 
             metrics = {}
             # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
