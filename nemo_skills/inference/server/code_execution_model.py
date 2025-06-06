@@ -33,6 +33,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
+    code_execution_language: str = 'python'  # could be python, lean4
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
