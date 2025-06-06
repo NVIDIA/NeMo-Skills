@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import os
 from typing import List
 
 import typer
@@ -19,6 +21,9 @@ import typer
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.run_cmd import run_cmd as _run_cmd
 from nemo_skills.pipeline.utils import get_cluster_config
+from nemo_skills.utils import get_logger_name, setup_logging
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -51,6 +56,7 @@ def prepare_data(
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare"""
+    setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
     if data_dir:
@@ -65,6 +71,15 @@ def prepare_data(
 
     # we already captured extra arguments
     ctx.args = []
+
+    if data_dir:
+        # TODO: automatically add it to cluster config based on user prompt?
+        if not os.getenv("NEMO_SKILLS_DATA_DIR"):
+            LOG.warning(
+                f"NEMO_SKILLS_DATA_DIR environment variable is not set. "
+                f"You might want to set it as NEMO_SKILLS_DATA_DIR={data_dir} "
+                f"to avoid always specifying it as a parameter to `ns eval`."
+            )
 
     return _run_cmd(
         ctx=ctx,
@@ -85,3 +100,8 @@ def prepare_data(
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
     )
+
+
+if __name__ == "__main__":
+    typer.main.get_command_name = lambda name: name
+    app()
