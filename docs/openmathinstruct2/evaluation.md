@@ -38,7 +38,7 @@ Change the number of GPUs if you have more than 1 (required for 70B model).
 ## Prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare gsm8k math amc23 aime24 omni-math
+ns prepare_data gsm8k math amc23 aime24 omni-math
 ```
 
 ## Run greedy decoding

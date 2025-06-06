@@ -112,7 +112,7 @@ as an example.
 First, let's prepare the data if you have not done so yet.
 
 ```bash
-python -m nemo_skills.dataset.prepare math
+ns prepare_data math
 ```
 
 Then we can run the generation
