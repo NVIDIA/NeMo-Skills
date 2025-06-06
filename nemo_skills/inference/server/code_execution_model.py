@@ -234,7 +234,7 @@ class CodeExecutionWrapper:
     def execute_generated_code(self, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
         header = '\n'.join([
-                    "import Aesop"
+                    "import Aesop",
                     "import Mathlib",
                     "",
                     "set_option maxHeartbeats 0",
