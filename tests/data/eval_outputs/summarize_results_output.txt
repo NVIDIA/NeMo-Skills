@@ -1,9 +1,9 @@
 Please see metrics.json for MT-bench per-category breakdown
------------------------------------------------------ answer-judge -----------------------------------------------------
-evaluation_mode | num_entries | avg_tokens | correct_judgements | false_positives | false_negatives | invalid_judgements
-pass@1[4]       | 12          | 189        | 43.75%             | 4.17%           | 52.08%          | 0.00%             
-majority@4      | 12          | 189        | 41.67%             | 0.00%           | 58.33%          | 0.00%             
-pass@4          | 12          | 189        | 66.67%             | 0.00%           | 33.33%          | 0.00%             
+-------------------------------------------------------------------- answer-judge --------------------------------------------------------------------
+evaluation_mode | num_entries | avg_tokens | correct_judgements | false_positives | false_negatives | invalid_judgements | precision | recall | f1    
+pass@1[4]       | 12          | 189        | 43.75%             | 18.75%          | 22.92%          | 14.58%             | 58.45%    | 42.86% | 48.32%
+majority@4      | 12          | 189        | 58.33%             | 16.67%          | 25.00%          | 0.00%              | 66.67%    | 57.14% | 61.54%
+pass@4          | 12          | 189        | 66.67%             | 8.33%           | 25.00%          | 0.00%              | 80.00%    | 57.14% | 66.67%
 
 
 ----------------------------------------- arena-hard -----------------------------------------
