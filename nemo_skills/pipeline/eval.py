@@ -243,7 +243,8 @@ def eval(
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
     extra_datasets_type: ExtraDatasetType = typer.Option(
-        os.getenv("NEMO_SKILLS_EXTRA_DATASETS_TYPE", "local"),
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
