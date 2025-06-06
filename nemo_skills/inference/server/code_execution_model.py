@@ -195,8 +195,9 @@ class CodeExecutionWrapper:
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
                 code_execution_time_start = time.time()
+                code_execution_header = self.config.code_execution_header + "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
                 execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=self.config.code_execution_header + extract_code_to_execute(output, code_begin, code_end),
+                    generated_code=code_execution_header + extract_code_to_execute(output, code_begin, code_end),
                     language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
