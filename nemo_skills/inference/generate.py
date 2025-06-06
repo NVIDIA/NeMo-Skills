@@ -51,25 +51,22 @@ class InferenceConfig:
 class GenerateSolutionsConfig:
     """LLM generation parameters."""
 
+    input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
+    prompt_config: str  # How to format the data into prompts
+    prompt_template: str | None = None  # not required for OpenAI server
+    examples_type: str | None = None  # to be able to customize few-shot examples
+
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
-    prompt_template: str | None = None  # not required for OpenAI server
-    prompt_config: str | None = None  # we will fetch it from dataset dir if not provided
     prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
     # if True, model will be prompted to continue "generation" without closing assistant tag
     continue_prefix_generation: bool = False
 
-    examples_type: str | None = None  # to be able to customize few-shot examples
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
-
-    # Can specify one of the existing datasets.
-    dataset: str | None = None
-    split: str | None = None  # Generally one of train/test, but can be anything since it's used as part of a file name
-    input_file: str | None = None  # Can directly specify an input file, if using a custom dataset
 
     batch_size: int = 128
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
@@ -120,17 +117,6 @@ class GenerateSolutionsConfig:
         self._post_init_validate_params()
 
     def _post_init_validate_data(self):
-        if self.input_file is not None:
-            if self.dataset is not None or self.split is not None:
-                raise ValueError("Either `input_file` or `dataset` and `split` should be provided, but not both")
-        else:
-            if self.dataset is None or self.split is None:
-                raise ValueError("Either `input_file` or `dataset` and `split` should be provided")
-            self.input_file = Path(__file__).parents[1] / "dataset" / self.dataset / f"{self.split}.jsonl"
-
-        if self.dataset is None and self.prompt_config is None:
-            raise ValueError("If `dataset` is not provided, `prompt_config` is required")
-
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
             self.total_code_executions_in_prompt = list(self.total_code_executions_in_prompt)
 
@@ -259,10 +245,6 @@ class GenerationTask:
         return llm
 
     def setup_prompt(self):
-        if self.cfg.prompt_config is None:
-            dataset_module = importlib.import_module(f"nemo_skills.dataset.{self.cfg.dataset}")
-            self.cfg.prompt_config = dataset_module.PROMPT_CONFIG
-
         prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
         LOG.info("Prompt used: %s", prompt)
         return prompt
@@ -505,7 +487,8 @@ class GenerationTask:
             while last_submitted_idx < len(remaining_data_points) or len(requests_in_progress) > 0:
                 num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
                 if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
-                    # The full data is passed to the llm_generate function since few-shot examples can come from the entire dataset
+                    # The full data is passed to the llm_generate function
+                    # since few-shot examples can come from the entire dataset
                     generation_ids = self.llm_generate(
                         remaining_data_points[last_submitted_idx : last_submitted_idx + num_to_submit],
                         data,

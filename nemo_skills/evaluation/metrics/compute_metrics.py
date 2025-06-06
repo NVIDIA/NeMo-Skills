@@ -47,6 +47,9 @@ class ComputeMetrics:
         self.calculators = {'all': self.get_metrics_calculator(self.benchmark, self.extra_datasets, self.metric_type)}
         self.calculators['all'].setup(input_files)
 
+        # sorting input files to ensure consistent order
+        input_files = sorted(input_files)
+
         with ExitStack() as stack:
             file_handles = [
                 stack.enter_context(open(file, "rt", encoding="utf-8")) for file in unroll_files(input_files)
@@ -68,10 +71,21 @@ class ComputeMetrics:
                 if data_subset != 'all':
                     self.calculators[data_subset].update(data)
 
-        return {data_subset: calculator.get_metrics() for data_subset, calculator in self.calculators.items()}
+        # collecting metrics from all calculators
+        metrics = {}
+        for data_subset, calculator in self.calculators.items():
+            metrics[data_subset] = calculator.get_metrics()
+            # if there is only a single prediction output.jsonl
+            # we are renaming pass@1 to greedy to be consistent with ns eval logic
+            if len(input_files) == 1 and input_files[0].endswith('output.jsonl'):
+                if 'pass@1[1]' in metrics[data_subset]:
+                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1[1]')
+                if 'pass@1' in metrics[data_subset]:
+                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1')
+        return metrics
 
-    def max_metrics_to_print(self):
-        return self.calculators['all'].max_metrics_to_print()
+    def metrics_to_print(self):
+        return self.calculators['all'].metrics_to_print()
 
-    def max_aggregations_to_print(self):
-        return self.calculators['all'].max_aggregations_to_print()
+    def evaluations_to_print(self):
+        return self.calculators['all'].evaluations_to_print()
