@@ -17,5 +17,5 @@
 PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'chat'
 METRICS_TYPE = "arena"
-DEFAULT_EVAL_ARGS = "++eval_type=arena"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=arena"
+GENERATION_ARGS = ""

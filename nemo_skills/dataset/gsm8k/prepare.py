@@ -15,7 +15,6 @@
 import argparse
 import json
 import os
-import random
 import re
 import urllib.request
 from pathlib import Path
@@ -39,7 +38,7 @@ fixes = {
 }
 
 
-def save_data(split, random_seed, validation_size):
+def save_data(split):
     actual_split = "test" if split == "test" else "train"
     data_dir = Path(__file__).absolute().parent
     original_file = str(data_dir / f"original_{actual_split}.jsonl")
@@ -67,15 +66,6 @@ def save_data(split, random_seed, validation_size):
                 new_entry["expected_answer"] = fixes[original_entry["question"]]
             data.append(new_entry)
 
-    # always shuffling to make it easier to get validation/train out of train_full
-    if split != "test":
-        random.seed(random_seed)
-        random.shuffle(data)
-    if split == "validation":
-        data = data[:validation_size]
-    elif split == "train":
-        data = data[validation_size:]
-
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
@@ -89,14 +79,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split",
         default="all",
-        choices=("all", "test", "validation", "train", "train_full"),
+        choices=("all", "test", "train"),
     )
-    parser.add_argument("--random_seed", type=int, default=42)
-    parser.add_argument("--validation_size", type=int, default=1000)
     args = parser.parse_args()
 
     if args.split == "all":
-        for split in ["test", "validation", "train", "train_full"]:
-            save_data(split, args.random_seed, args.validation_size)
+        for split in ["test", "train"]:
+            save_data(split)
     else:
-        save_data(args.split, args.random_seed, args.validation_size)
+        save_data(args.split)
