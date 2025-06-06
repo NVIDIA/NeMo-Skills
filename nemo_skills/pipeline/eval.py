@@ -107,34 +107,35 @@ def add_default_args(
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
 
-    # if is_mounted_filepath(data_path):
-    #     input_file = f"/nemo_run/code/nemo_skills/dataset/{benchmark}/{split}.jsonl"
-    #     unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
-    # else:
-    #     if extra_datasets_type == ExtraDatasetType.local:
-    #         # we will package extra datasets and upload to cluster
-    #         input_file = f"/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-    #         unmounted_path = Path(extra_datasets) / benchmark / f"{split}.jsonl"
-    #     else:
-    #         input_file = f"{extra_datasets}/{benchmark}/{split}.jsonl"
-    #         unmounted_path = get_unmounted_path(cluster_config, input_file)
+    if not is_on_cluster:
+        if is_mounted_filepath(data_path):
+            input_file = f"{data_path}/{benchmark}/{split}.jsonl"
+            unmounted_path = Path(__file__).parents[2] / input_file.replace('/nemo_run/code/', '')
+        else:
+            # will be copied over in this case as it must come from extra datasets
+            input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark}/{split}.jsonl"
+            unmounted_path = Path(data_path) / benchmark / f"{split}.jsonl"
+    else:
+        # on cluster we will always use the mounted path
+        input_file = f"{data_path}/{benchmark}/{split}.jsonl"
+        unmounted_path = get_unmounted_path(cluster_config, input_file)
 
-    # unmounted_path = str(unmounted_path)
-    # # checking if data file exists (can check locally as well)
-    # if found_in_extra and extra_datasets_type == ExtraDatasetType.cluster:
-    #     if not cluster_path_exists(cluster_config, unmounted_path):
-    #         raise ValueError(
-    #             f"Data file {unmounted_path} does not exist on cluster. "
-    #             "Please check the benchmark and split parameters. "
-    #             "Did you forget to run prepare data commands?"
-    #         )
-    # else:
-    #     if not Path(unmounted_path).exists():
-    #         raise ValueError(
-    #             f"Data file {unmounted_path} does not exist locally. "
-    #             "Please check the benchmark and split parameters. "
-    #             "Did you forget to run prepare data commands?"
-    #         )
+    unmounted_path = str(unmounted_path)
+    # checking if data file exists (can check locally as well)
+    if is_on_cluster:
+        if not cluster_path_exists(cluster_config, unmounted_path):
+            raise ValueError(
+                f"Data file {unmounted_path} does not exist on cluster. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
+    else:
+        if not Path(unmounted_path).exists():
+            raise ValueError(
+                f"Data file {unmounted_path} does not exist locally. "
+                "Please check the benchmark and split parameters. "
+                "Did you forget to run prepare data commands?"
+            )
 
     extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
