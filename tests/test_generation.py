@@ -38,10 +38,12 @@ def test_generation_dryrun_llama(dataset, split):
     """Testing the default prompts for each dataset."""
     prompt_template = "llama3-instruct"
     extra_args = importlib.import_module(f'nemo_skills.dataset.{dataset}').GENERATION_ARGS
+    prompt_config = importlib.import_module(f'nemo_skills.dataset.{dataset}').PROMPT_CONFIG
     cmd = (
         "python nemo_skills/inference/generate.py "
         f"    ++output_file=./test.jsonl "
         f"    ++prompt_template={prompt_template} "
+        f"    ++prompt_config={prompt_config} "
         f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
         f"    ++server.server_type=nemo "
         f"    ++dry_run=True "
@@ -59,6 +61,7 @@ def test_generation_dryrun_gsm8k(prompt_template):
         "python nemo_skills/inference/generate.py "
         f"    ++output_file=./test.jsonl "
         f"    ++prompt_template={prompt_template} "
+        f"    ++prompt_config=generic/math "
         f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
         f"    ++server.server_type=nemo "
         f"    ++dry_run=True "

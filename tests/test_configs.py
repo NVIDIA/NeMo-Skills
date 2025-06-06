@@ -22,6 +22,7 @@ def test_error_on_extra_params():
     # test is not supported
     cmd = (
         "python nemo_skills/inference/generate.py "
+        "    ++prompt_config=generic/math "
         "    ++output_file=./test-results/gsm8k/output.jsonl "
         "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "
         "    ++server.server_type=nemo "
@@ -35,6 +36,7 @@ def test_error_on_extra_params():
     # inside nested dataclass
     cmd = (
         "python nemo_skills/inference/generate.py "
+        "    ++prompt_config=generic/math "
         "    ++output_file=./test-results/gsm8k/output.jsonl "
         "    ++inference.num_few_shots=0 "
         "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "

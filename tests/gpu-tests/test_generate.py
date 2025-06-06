@@ -133,6 +133,7 @@ def test_vllm_generate_seeds():
         f"    --eval_args='++eval_type=math' "
         f"    --with_sandbox "
         f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
+        f"    ++prompt_config=generic/math "
         f"    ++prompt_template=llama3-instruct "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "

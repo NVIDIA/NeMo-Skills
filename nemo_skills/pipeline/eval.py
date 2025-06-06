@@ -13,13 +13,12 @@
 # limitations under the License.
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import List
 
 import typer
 
-from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module, get_default_dataset_module
+from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     SupportedServers,
@@ -226,7 +225,8 @@ def eval(
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
     extra_datasets_type: ExtraDatasetType = typer.Option(
-        os.getenv("NEMO_SKILLS_EXTRA_DATASETS_TYPE", "local"),
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
