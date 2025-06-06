@@ -179,6 +179,7 @@ class CodeExecutionWrapper:
                     output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
                     generated_code = code_begin + output_dict['generation']
                     code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
+                    remaining_code_executions = None
                     code_output = format_code_output(
                         execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                     )
