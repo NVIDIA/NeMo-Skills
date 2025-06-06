@@ -66,6 +66,16 @@ def prepare_task_for_ns(task, data_dir, setup):
 
 
 def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
+    if 'cwe' in tasks:
+        # checking if git-lfs is installed
+        try:
+            subprocess.run(
+                ["git", "lfs", "--version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except subprocess.CalledProcessError:
+            print("Git LFS is not installed. Please install it to prepare 'cwe' ruler task")
+            exit(1)
+
     # 1. installing necessary packages
     subprocess.run(["pip install wonderwords html2text tenacity"], check=True, shell=True)
 
