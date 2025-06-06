@@ -90,7 +90,7 @@ class AnswerJudgementMetrics(BaseMetrics):
         assert score_method == 'correct_judgements'
         # expected answer is always the same for all predictions, so just take the first one
         gt_judgement = is_correct_judgement_or_none(predictions[0]['expected_judgement'])
-        pred_judgements = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions]
+        pred_judgements = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions[:k]]
         if gt_judgement in pred_judgements:
             pred_judgement = gt_judgement
         else:
