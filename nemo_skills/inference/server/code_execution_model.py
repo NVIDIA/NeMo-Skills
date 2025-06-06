@@ -178,7 +178,7 @@ class CodeExecutionWrapper:
                     output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
                     output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
                     generated_code = code_begin + output_dict['generation']
-                    code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code)
+                    code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
                     code_output = format_code_output(
                         execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                     )
@@ -207,7 +207,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, output)
+                code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, output, session_id)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
@@ -230,7 +230,7 @@ class CodeExecutionWrapper:
             'stopped_on_repetition': stopped_on_repetition,
         }
 
-    def execute_generated_code(self, code_begin, code_end, output):
+    def execute_generated_code(self, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
         header = '\n'.join([
                     "import Aesop"
