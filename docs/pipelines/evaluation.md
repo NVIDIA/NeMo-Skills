@@ -27,7 +27,7 @@ Make sure that `/workspace` is mounted inside of your
 You need to run the following commands to prepare the data.
 
 ```bash
-python -m nemo_skills.dataset.prepare
+ns prepare_data
 ```
 
 If you're only interested in a subset of datasets (e.g. only math-related or code-related), run with

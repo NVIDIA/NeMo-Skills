@@ -55,7 +55,10 @@ def prepare_data(
     exclusive: bool = typer.Option(True, "--not_exclusive", help="Disable --exclusive flag"),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
 ):
-    """Prepare datasets by running python -m nemo_skills.dataset.prepare"""
+    """Prepare datasets by running python -m nemo_skills.dataset.prepare.
+
+    Run `python -m nemo_skills.dataset.prepare --help` to see other supported arguments.
+    """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
