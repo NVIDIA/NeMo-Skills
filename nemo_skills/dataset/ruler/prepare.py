@@ -29,19 +29,19 @@ DATASET_GROUP = "long-context"
 METRICS_TYPE = "ruler"
 EVAL_ARGS = "--eval_type=ruler --eval_config.match_type={match_type}"
 GENERATION_ARGS = (
-    "--inference.tokens_to_generate={tokens_to_generate} "
-    "--prefix_generation_to_response=True "
-    "--continue_prefix_generation=True"
+    "++inference.tokens_to_generate={tokens_to_generate} "
+    "++prefix_generation_to_response=True "
+    "++continue_prefix_generation=True"
 )
 """
 TOKENS_TO_GENERATE = {'niah': 128, 'vt': 30, 'cwe': 120, 'fwe': 50, 'qa': 32}
 MATCH_TYPE = {'niah': 'all', 'vt': 'all', 'cwe': 'all', 'fwe': 'all', 'qa': 'part'}
 
 
-def prepare_task_for_ns(task, data_dir):
+def prepare_task_for_ns(task, data_dir, setup):
     """Resaving from data_dir/task/test.jsonl into current folder/task/test.jsonl and adding proper init.py"""
     original_path = Path(data_dir) / task / "test.jsonl"
-    new_path = Path(__file__).parent / task / "test.jsonl"
+    new_path = Path(__file__).parent / setup / task / "test.jsonl"
     Path(new_path).parent.mkdir(parents=True, exist_ok=True)
     with open(original_path, "r", encoding="utf-8") as fin, open(new_path, "w", encoding="utf-8") as fout:
         for line in fin:
@@ -65,7 +65,7 @@ def prepare_task_for_ns(task, data_dir):
         )
 
 
-def get_ruler_data(tasks, ruler_prepare_args, tmp_data_dir=None):
+def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
     # 1. installing necessary packages
     subprocess.run(["pip install wonderwords html2text tenacity"], check=True, shell=True)
 
@@ -116,7 +116,7 @@ def get_ruler_data(tasks, ruler_prepare_args, tmp_data_dir=None):
 
         # resaving the data and creating __init__.py files
         for task in tasks:
-            prepare_task_for_ns(task, Path(tmpdirname) / "ruler_data")
+            prepare_task_for_ns(task, Path(tmpdirname) / "ruler_data", setup)
 
     finally:
         if tmpdir_context is not None:
@@ -147,6 +147,12 @@ if __name__ == "__main__":
         help="List of tasks to prepare for RULER dataset.",
     )
     parser.add_argument(
+        "--setup",
+        type=str,
+        required=True,
+        help="Name of the setup for RULER dataset. Typically should be <model_name>_<sequence_length>.",
+    )
+    parser.add_argument(
         "--tmp_data_dir",
         type=str,
         default=None,
@@ -160,10 +166,10 @@ if __name__ == "__main__":
             "ERROR: Can't prepare ruler without arguments provided! "
             "Skipping the preparation step.\n"
             "Example ruler prepare command:\n"
-            "ns prepare_data ruler --tokenizer_path meta-llama/Llama-3.1-8B-Instruct "
+            "ns prepare_data ruler --setup llama_131072 --tokenizer_path meta-llama/Llama-3.1-8B-Instruct "
             "--max_seq_length 131072 --num_samples 500"
         )
         exit(0)
     print(f"Preparing RULER dataset for tasks: {args.tasks} with additional arguments: {ruler_prepare_args}")
-    get_ruler_data(args.tasks, ruler_prepare_args, tmp_data_dir=args.tmp_data_dir)
+    get_ruler_data(args.tasks, args.setup, ruler_prepare_args, tmp_data_dir=args.tmp_data_dir)
     print("RULER dataset preparation completed.")

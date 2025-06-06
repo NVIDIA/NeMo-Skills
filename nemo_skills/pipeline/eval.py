@@ -94,7 +94,6 @@ def get_sampling_cmd(
 def add_default_args(
     cluster_config, benchmark, split, data_dir, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
 ):
-    # TODO: some special logic is needed to work with subfolders if benchmark is <>/<>
     benchmark_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark,
         data_dir=data_dir,
@@ -102,6 +101,7 @@ def add_default_args(
         extra_datasets=extra_datasets,
         extra_datasets_type=extra_datasets_type,
     )
+    benchmark = benchmark.replace('.', '/')
 
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
