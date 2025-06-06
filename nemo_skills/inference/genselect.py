@@ -43,7 +43,7 @@ class GenSelectConfig:
     output_dir: str  # Where to save the intermediate outputs and final predictions
 
     # Will be set in __post_init__ based on input_dir and random_seed
-    input_file: None = None
+    input_file: str | None = None
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
