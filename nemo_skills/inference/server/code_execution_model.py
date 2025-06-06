@@ -173,21 +173,20 @@ class CodeExecutionWrapper:
                     break
                 request["prompt"] = request.pop("prompts")[0]
             else:
-                output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
-                for _ in range(5):
-                    output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
-                    output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
-                    generated_code = code_begin + output_dict['generation']
-                    code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
-                    remaining_code_executions = None
-                    code_output = format_code_output(
-                        execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                    )
-                    print(f"We have generated the code {generated_code} with the following output {code_output}")
+                # output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
+                # for _ in range(5):
+                #     output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+                #     output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
+                #     generated_code = code_begin + output_dict['generation']
+                #     code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
+                #     remaining_code_executions = None
+                #     code_output = format_code_output(
+                #         execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
+                #     )
+                #     print(f"We have generated the code {generated_code} with the following output {code_output}")
 
-                print('Okay now doing ground up generation...')
+                # print('Okay now doing ground up generation...')
                 output_dict = self.model._generate_single(**request)
-                total_num_generated_tokens += num_generated_tokens
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
