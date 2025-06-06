@@ -29,6 +29,7 @@ def get_ruler_data(tasks, ruler_prepare_args, tmp_data_dir=None):
     # 2. use provided tmp_data_dir or create a temporary directory
     if tmp_data_dir is not None:
         tmpdirname = tmp_data_dir
+        Path(tmpdirname).mkdir(parents=True, exist_ok=True)
         tmpdir_context = None
     else:
         tmpdir_context = tempfile.TemporaryDirectory()

@@ -19,6 +19,7 @@ import re
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from itertools import zip_longest
 
 import yaml
 
@@ -217,6 +218,7 @@ class Prompt:
         prefix_generation_to_response: bool = False,
         continue_prefix_generation: bool = False,
         multi_turn_key: str | None = None,
+        return_templated_dict: bool = False,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -230,6 +232,9 @@ class Prompt:
             multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
                 and use it to construct the prompt. You input_dict should also have "assistant" key in all
                 turns except last containing assistant reply.
+            return_templated_dict: Indicates whether to return a messages list where the template is used
+                to fill the prompt. If so, a list of dicts with 'role' and 'content' keys will be returned. 
+                In this case the final user and assistant messages will include special tokens.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
@@ -243,36 +248,61 @@ class Prompt:
 
         if self.config.template:
             if multi_turn_key is None:
-                prompt_string = self.SYSTEM_FORMAT.format(
+                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                )
-                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                ))
+                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                     user=self.build_user_message(input_dict), **asdict(self.config.template)
-                )
+                ))
+                user_strings = [user_string]
+                assistant_strings = []
                 if generation:
                     # Generation can be part of the input in cases such as reward models
                     if continue_prefix_generation:
                         # Append generation without the closing tag.
-                        prompt_string += generation
+                        prompt_string += (assistant_string := generation)
                     else:
-                        prompt_string += self.TURN_END_FORMAT.format(
+                        prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
                             assistant=generation, **asdict(self.config.template)
-                        )
+                        ))
+                    assistant_strings.append(assistant_string)
+
             else:
-                prompt_string = self.SYSTEM_FORMAT.format(
+                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                )
+                ))
+                user_strings = []
+                assistant_strings = []
                 for turn in input_dict[multi_turn_key][:-1]:
-                    prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                         user=self.build_user_message(turn), **asdict(self.config.template)
-                    )
-                    prompt_string += self.TURN_END_FORMAT.format(
+                    ))
+                    user_strings.append(user_string)
+                    prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
                         assistant=turn["assistant"], **asdict(self.config.template)
-                    )
-                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    ))
+                    assistant_strings.append(assistant_string)
+
+                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                     user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
-                )
+                ))
+                user_strings.append(user_string)
                 prompt_string += generation
+                if generation:
+                    assistant_strings.append(generation)
+
+            if return_templated_dict:
+                messages = [
+                    {'role': 'system', 'content': system_string},
+                ]
+
+                for user_msg, assistant_msg in zip_longest(user_strings, assistant_strings, fillvalue=None):
+                    if user_msg is not None:
+                        messages.append({'role': 'user', 'content': user_msg})
+                    if assistant_msg is not None:
+                        messages.append({'role': 'assistant', 'content': assistant_msg})
+
+                return messages
             return prompt_string
         else:
             if multi_turn_key is None:
