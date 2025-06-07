@@ -46,7 +46,7 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
     benchmark_groups = defaultdict(list)
     for benchmark in results.keys():
         if '.' in benchmark:
-            prefix = benchmark.split('.')[0]
+            prefix = benchmark.rsplit('.', 1)[0]
             benchmark_groups[prefix].append(benchmark)
 
     # Process each group with the same prefix
