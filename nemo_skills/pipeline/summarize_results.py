@@ -38,7 +38,7 @@ from nemo_skills.pipeline.utils import (
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
-LOG = logging.getLogger(get_logger_name(__name__))
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
