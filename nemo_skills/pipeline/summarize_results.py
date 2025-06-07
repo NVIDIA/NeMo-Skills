@@ -36,7 +36,73 @@ from nemo_skills.pipeline.utils import (
     get_unmounted_path,
     resolve_mount_paths,
 )
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
+
+LOG = logging.getLogger(get_logger_name(__name__))
+
+
+def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
+    # Average results for benchmarks with dot notation (e.g., ruler.niah_single_1, ruler.niah_single_2)
+    benchmark_groups = defaultdict(list)
+    for benchmark in results.keys():
+        if '.' in benchmark:
+            prefix = benchmark.split('.')[0]
+            benchmark_groups[prefix].append(benchmark)
+
+    # Process each group with the same prefix
+    for prefix, benchmarks in benchmark_groups.items():
+        if len(benchmarks) <= 1:  # Skip if there's only one benchmark with this prefix
+            continue
+
+        # Create a new entry for the average results
+        results[prefix] = defaultdict(dict)
+
+        # Use metrics_to_print and evaluations_to_print from the first benchmark in the group
+        metrics_to_print[prefix] = metrics_to_print[benchmarks[0]]
+        evaluations_to_print[prefix] = evaluations_to_print[benchmarks[0]]
+
+        # Verify that all benchmarks have the same evaluation modes
+        reference_benchmark = benchmarks[0]
+
+        # Instead of relying on evaluations_to_print, get all evaluation modes directly from results
+        all_eval_modes = set()
+        for benchmark in benchmarks:
+            all_eval_modes.update(results[benchmark].keys())
+
+        # Average the metrics for each evaluation mode
+        for eval_mode in all_eval_modes:
+            # Check if this evaluation mode exists in all benchmarks
+            missing_benchmarks = [b for b in benchmarks if eval_mode not in results[b]]
+            if missing_benchmarks:
+                raise ValueError(f"Evaluation mode '{eval_mode}' missing in benchmarks: {missing_benchmarks}")
+
+            # Get reference metrics from first benchmark to validate others against
+            reference_metrics = set(results[reference_benchmark][eval_mode].keys())
+
+            # Verify all benchmarks have the same metrics
+            for benchmark in benchmarks[1:]:
+                current_metrics = set(results[benchmark][eval_mode].keys())
+                if current_metrics != reference_metrics:
+                    raise ValueError(
+                        f"Metrics mismatch for benchmark '{benchmark}' in mode '{eval_mode}': "
+                        f"Expected {reference_metrics}, got {current_metrics}"
+                    )
+
+            # Calculate averages for each metric
+            for metric_key in reference_metrics:
+                values = []
+                for benchmark in benchmarks:
+                    metric_value = results[benchmark][eval_mode][metric_key]
+                    if not isinstance(metric_value, (int, float)):
+                        raise TypeError(
+                            f"Cannot average non-numeric metric: '{metric_key}' in benchmark '{benchmark}', "
+                            f"evaluation mode '{eval_mode}'. Got type: {type(metric_value)}"
+                        )
+                    values.append(metric_value)
+
+                results[prefix][eval_mode][metric_key] = sum(values) / len(values)
+
+        LOG.info(f"Created averaged results for benchmark group: {prefix}")
 
 
 @app.command()
@@ -228,7 +294,11 @@ def summarize_results(
                     evaluations_to_print[benchmark].insert(0, 'greedy')
 
         except Exception as e:
-            logging.exception(f"Error computing metrics for {benchmark}: {e}")
+            LOG.exception(f"Error computing metrics for {benchmark}: {e}")
+
+    # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
+    # to report average numbers
+    add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
 
     for benchmark, benchmark_results in results.items():
         if not benchmark_results:
