@@ -140,8 +140,7 @@ run prepare_data command with `--data_dir` and `--cluster` options, e.g.
 ns prepare_data \
     --data_dir=/workspace/ns-data \
     --cluster=slurm \
-    ruler --setup llama_128k --tokenizer_path meta-llama/Llama-3.1-8B-Instruct \
-          --max_seq_length 131072 --tmp_data_dir=/workspace/ns-data/raw-ruler-data
+    ruler --setup llama_128k --tokenizer_path meta-llama/Llama-3.1-8B-Instruct --max_seq_length 130900
 ```
 
 Then during evaluation, you'd need to provide the same `data_dir` argument and it will read the data from cluster
@@ -150,7 +149,7 @@ directly. You can also use `NEMO_SKILLS_DATA_DIR` environment variable instead o
 Here is an example evaluation command for ruler that uses data_dir parameter
 
 ```python
-from nemo_skills.pipeline.cli import eval, wrap_arguments
+from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
 
 tasks = [
     "niah_single_1", "niah_single_2","niah_single_3",
@@ -163,15 +162,29 @@ benchmarks = ",".join([f"ruler.llama_128k.{task}:0" for task in tasks])
 eval(
     # using a low number of concurrent requests since it's almost entirely prefill stage
     ctx=wrap_arguments("++max_concurrent_requests=32"),
-    cluster='slurm',
-    model=f"/hf_models/Meta-Llama-3.1-8B-Instruct",
+    cluster="slurm",
+    model="/hf_models/Meta-Llama-3.1-8B-Instruct",
     server_type="sglang",
-    output_dir=f"/workspace/eval-ruler",
-    data_dir=f"/workspace/ns-data",
+    output_dir="/workspace/eval-ruler",
+    data_dir="/workspace/ns-data",
     benchmarks=benchmarks,
     server_gpus=8,
-    expname=f"eval-ruler",
-    num_jobs=1,
+    expname="eval-ruler",
+)
+
+# running summarize results on the cluster as well to avoid downloading the data
+# you can find results in /workspace/eval-ruler/eval-results/metrics.json
+# or add --wandb_name parameter to log to W&B
+cmd = (
+    "python -m nemo_skills.pipeline.summarize_results "
+    "    --data_dir /workspace/ns-data /workspace/eval-ruler/eval-results "
+)
+run_cmd(
+    ctx=wrap_arguments(cmd),
+    cluster="slurm",
+    log_dir="/workspace/eval-ruler/eval-results/summarize_results",
+    expname="summarize-results",
+    run_after="eval-ruler",
 )
 ```
 
