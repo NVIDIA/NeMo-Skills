@@ -61,6 +61,12 @@ class CodeExecutionWrapper:
         """Check if a generation has been requested to be cancelled."""
         return gen_id in self.cancelled_gen_ids
 
+    def check_for_failures(self, code_output: str) -> bool:
+        filters =[
+            lambda x: re.search(r'unexpected token', x, re.IGNORECASE),
+        ]
+        return any(f(code_output) for f in filters)
+
     def _generate_single(
         self,
         prompt: str,
@@ -174,8 +180,10 @@ class CodeExecutionWrapper:
                 request["prompt"] = request.pop("prompts")[0]
             else:
                 old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
-                for _ in range(5):
+                MAX_TRIES = 5
+                for i in range(MAX_TRIES):
                     output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+                    print(f"Request: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
                     output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output})
                     generated_code = code_begin + output_dict['generation']
                     code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
@@ -183,11 +191,12 @@ class CodeExecutionWrapper:
                     code_output = format_code_output(
                         execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                     )
-                    if 'unexpected token' not in code_output:
+                    fails_checks = self.check_for_failures(code_output)
+                    if not fails_checks:
+                        print(f'Successful Generation! on Iteration: {i}')
                         break
                     else:
-                        print(f"Unexpected token in generated code: \n{code_output}.\nRetrying generation...\n")
-                    print(f"Maxed out generations")
+                        print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
                 #     print(f"We have generated the code {generated_code} with the following output {code_output}")
                 output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
                 output_dict['num_generated_tokens'] = num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
