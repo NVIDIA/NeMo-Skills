@@ -102,6 +102,7 @@ def get_default_dataset_module(dataset, data_dir=None, cluster_config=None):
                 with add_to_path(get_unmounted_path(cluster_config, data_dir)):
                     dataset_module = importlib.import_module(dataset)
             else:
+                dataset = dataset.replace('.', '/')
                 dataset_module = _get_dataset_module_from_cluster(cluster_config, f'{data_dir}/{dataset}/__init__.py')
                 is_on_cluster = True
     return dataset_module, data_path, is_on_cluster
@@ -125,6 +126,7 @@ def get_dataset_module(dataset, data_dir=None, cluster_config=None, extra_datase
         dataset_module, data_path, is_on_cluster = get_default_dataset_module(dataset, data_dir, cluster_config)
     except ModuleNotFoundError:
         try:
+            dataset = dataset.replace('.', '/')
             extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
             is_on_cluster = False
             data_path = extra_datasets

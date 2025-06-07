@@ -51,7 +51,6 @@ def test_trtllm_judge():
         f"    ++output_file={output_file} "
         f"    --output_dir={os.path.dirname(output_file)} "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )

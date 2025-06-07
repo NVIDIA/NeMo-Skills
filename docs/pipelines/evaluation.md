@@ -14,6 +14,7 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 - Coding skills: human-eval, mbpp
 - Chat/instruction following: ifeval, arena-hard, mt-bench
 - General knowledge: mmlu, mmlu-pro, gpqa
+- Long context: RULER
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
@@ -42,6 +43,13 @@ and if you installed from pip, they will be downloaded to wherever the repo is i
 
 ```bash
 python -c "import nemo_skills; print(nemo_skills.__path__)"
+```
+
+Some benchmarks (e.g. ruler) require extra parameters to be passed to the prepare_data script. Thus you'd need to explicitly
+call `ns prepare_data` for all of them, e.g. for ruler you can use
+
+```bash
+ns prepare_data ruler --setup=llama_128k --tokenizer_path=meta-llama/Llama-3.1-8B-Instruct --max_seq_length=131072
 ```
 
 ## Greedy decoding
@@ -120,6 +128,65 @@ pass@4          | 164         | 78.66              | 72.56
 ```
 
 If you want to get both multiple samples and greedy results, use `--add_greedy` parameter.
+
+
+## Using data on cluster
+
+Some benchmarks (e.g. ruler) have very large input datasets and it's inefficient to prepare them on local machine and
+keep uploading on cluster with every evaluation job. Instead, you can prepare them on cluster directly. To do that,
+run prepare_data command with `--data_dir` and `--cluster` options, e.g.
+
+```bash
+ns prepare_data \
+    --data_dir=/workspace/ns-data \
+    --cluster=slurm \
+    ruler --setup llama_128k --tokenizer_path meta-llama/Llama-3.1-8B-Instruct --max_seq_length 130900
+```
+
+Then during evaluation, you'd need to provide the same `data_dir` argument and it will read the data from cluster
+directly. You can also use `NEMO_SKILLS_DATA_DIR` environment variable instead of an explicit argument.
+
+Here is an example evaluation command for ruler that uses data_dir parameter
+
+```python
+from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
+
+tasks = [
+    "niah_single_1", "niah_single_2","niah_single_3",
+    "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
+    "niah_multivalue", "niah_multiquery",
+    "vt", "cwe", "fwe", "qa_1", "qa_2",
+]
+benchmarks = ",".join([f"ruler.llama_128k.{task}:0" for task in tasks])
+
+eval(
+    # using a low number of concurrent requests since it's almost entirely prefill stage
+    ctx=wrap_arguments("++max_concurrent_requests=32"),
+    cluster="slurm",
+    model="/hf_models/Meta-Llama-3.1-8B-Instruct",
+    server_type="sglang",
+    output_dir="/workspace/eval-ruler",
+    data_dir="/workspace/ns-data",
+    benchmarks=benchmarks,
+    server_gpus=8,
+    expname="eval-ruler",
+)
+
+# running summarize results on the cluster as well to avoid downloading the data
+# you can find results in /workspace/eval-ruler/eval-results/metrics.json
+# or add --wandb_name parameter to log to W&B
+cmd = (
+    "python -m nemo_skills.pipeline.summarize_results "
+    "    --data_dir /workspace/ns-data /workspace/eval-ruler/eval-results "
+)
+run_cmd(
+    ctx=wrap_arguments(cmd),
+    cluster="slurm",
+    log_dir="/workspace/eval-ruler/eval-results/summarize_results",
+    expname="summarize-results",
+    run_after="eval-ruler",
+)
+```
 
 ## How the benchmarks are defined
 

@@ -22,7 +22,7 @@ _containers = {
     'nemo': 'igitman/nemo-skills-nemo:0.6.0',
     'megatron': 'igitman/nemo-skills-megatron:0.6.0',
     'sandbox': 'igitman/nemo-skills-sandbox:0.6.1',
-    'nemo-skills': 'igitman/nemo-skills:0.6.0',
+    'nemo-skills': 'igitman/nemo-skills:0.6.1',
     'verl': 'igitman/nemo-skills-verl:0.6.1',
-    'nemo-rl': 'igitman/nemo-skills-nemo-rl:0.6.0',
+    'nemo-rl': 'igitman/nemo-skills-nemo-rl:0.6.1',
 }

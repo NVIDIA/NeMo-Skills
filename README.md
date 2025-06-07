@@ -12,6 +12,7 @@ Here are some of the things we support.
     - Coding skills: human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
+    - Long context: RULER
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
@@ -24,12 +25,12 @@ commands and their options.
 Using our pipelines we created [OpenMathReasoning dataset](https://huggingface.co/datasets/nvidia/OpenMathReasoning).
 This dataset contains
 
-* 306K unique mathematical problems sourced from [AoPS forums](https://artofproblemsolving.com/community) with: 
+* 306K unique mathematical problems sourced from [AoPS forums](https://artofproblemsolving.com/community) with:
     * 3.2M long chain-of-thought (CoT) solutions
     * 1.7M long tool-integrated reasoning (TIR) solutions
     * 566K samples that select the most promising solution out of many candidates (GenSelect)
 * Additional 193K problems sourced from AoPS forums (problems only, no solutions)
-  
+
 We used [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) to preprocess problems, and
 [DeepSeek-R1](https://huggingface.co/deepseek-ai/DeepSeek-R1) and [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) to generate solutions.
 
