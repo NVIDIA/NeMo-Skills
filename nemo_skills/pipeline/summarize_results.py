@@ -89,7 +89,7 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                     )
 
             # Calculate averages for each metric
-            for metric_key in reference_metrics:
+            for metric_key in results[reference_benchmark][eval_mode].keys():
                 values = []
                 for benchmark in benchmarks:
                     metric_value = results[benchmark][eval_mode][metric_key]
@@ -101,6 +101,9 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                     values.append(metric_value)
 
                 results[prefix][eval_mode][metric_key] = sum(values) / len(values)
+                # keeping the original float/int types
+                if isinstance(results[reference_benchmark][eval_mode][metric_key], int):
+                    results[prefix][eval_mode][metric_key] = int(results[prefix][eval_mode][metric_key])
 
         LOG.info(f"Created averaged results for benchmark group: {prefix}")
 
