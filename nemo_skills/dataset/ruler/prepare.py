@@ -176,7 +176,7 @@ if __name__ == "__main__":
             "ERROR: Can't prepare ruler without arguments provided! "
             "Skipping the preparation step.\n"
             "Example ruler prepare command:\n"
-            "ns prepare_data ruler --setup llama_131072 "
+            "ns prepare_data ruler --setup llama_128k "
             "--tokenizer_path meta-llama/Llama-3.1-8B-Instruct --max_seq_length 131072"
         )
         exit(0)

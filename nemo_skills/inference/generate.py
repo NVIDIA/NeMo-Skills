@@ -68,11 +68,12 @@ class GenerateSolutionsConfig:
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
-    batch_size: int = 128
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
     skip_filled: bool = False  # If True, will skip the generations that are already in the output file
 
-    max_concurrent_requests: int = 512  # Maximum number of concurrent requests to the server for the async loop
+    # maximum number of concurrent requests to the server for the async loop
+    # if sync loop is used, this is the batch size
+    max_concurrent_requests: int = 512
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -221,9 +222,8 @@ class GenerationTask:
             and self.cfg.multi_turn_key is None
         )
         if self.use_async_loop:
-            LOG.warning(
-                "Async loop is maintaining %d concurrent "
-                "requests throughout execution -- batch_size parameter is ignored!\n"
+            LOG.info(
+                "Async loop is maintaining %d generations in parallel. "
                 "Use max_concurrent_requests to control the number of concurrent requests.",
                 self.cfg.max_concurrent_requests,
             )
@@ -438,7 +438,7 @@ class GenerationTask:
                 else:
                     data_points_batch.append(data_point)
 
-                if len(data_points_batch) == self.cfg.batch_size or idx == len(data) - 1:
+                if len(data_points_batch) == self.cfg.max_concurrent_requests or idx == len(data) - 1:
                     if self.cfg.multi_turn_key is None:
                         outputs = self.llm_generate(data_points_batch, data)
                     else:
