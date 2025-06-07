@@ -180,27 +180,31 @@ class CodeExecutionWrapper:
                 request["prompt"] = request.pop("prompts")[0]
             else:
                 print(f"Request: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
-                old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
-                MAX_TRIES = 5
-                for i in range(MAX_TRIES):
-                    output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
-                    print(f"Request retried: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
-                    output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
-                    generated_code = code_begin + output_dict['generation']
-                    code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
-                    remaining_code_executions = None
-                    code_output = format_code_output(
-                        execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                    )
-                    fails_checks = self.check_for_failures(code_output)
-                    if not fails_checks:
-                        print(f'Successful Generation! on Iteration: {i}')
-                        break
-                    else:
-                        print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
-                #     print(f"We have generated the code {generated_code} with the following output {code_output}")
-                output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
-                output_dict['num_generated_tokens'] = num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
+                try:
+                    old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
+                    MAX_TRIES = 5
+                    for i in range(MAX_TRIES):
+                        output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
+                        print(f"Request retried: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
+                        output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
+                        generated_code = code_begin + output_dict['generation']
+                        code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
+                        remaining_code_executions = None
+                        code_output = format_code_output(
+                            execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
+                        )
+                        fails_checks = self.check_for_failures(code_output)
+                        if not fails_checks:
+                            print(f'Successful Generation! on Iteration: {i}')
+                            break
+                        else:
+                            print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
+                    #     print(f"We have generated the code {generated_code} with the following output {code_output}")
+                    output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
+                    output_dict['num_generated_tokens'] = num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
+                except ValueError as e:
+                    print(f"Error generating code: {e}")
+                    break
 
                 # print('Okay now doing ground up generation...')
                 # output_dict = self.model._generate_single(**request)
