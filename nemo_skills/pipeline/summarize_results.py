@@ -96,6 +96,8 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                 values = []
                 for benchmark in benchmarks:
                     metric_value = results[benchmark][eval_mode][metric_key]
+                    if metric_key == "num_entries":
+                        continue  # Skip averaging num_entries as we'll replace it with num_benchmarks_in_group
                     if not isinstance(metric_value, (int, float)):
                         raise TypeError(
                             f"Cannot average non-numeric metric: '{metric_key}' in benchmark '{benchmark}', "
@@ -103,10 +105,14 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                         )
                     values.append(metric_value)
 
-                new_results[prefix][eval_mode][metric_key] = sum(values) / len(values)
-                # keeping the original float/int types
-                if isinstance(results[reference_benchmark][eval_mode][metric_key], int):
-                    new_results[prefix][eval_mode][metric_key] = int(new_results[prefix][eval_mode][metric_key])
+                if metric_key != "num_entries":
+                    new_results[prefix][eval_mode][metric_key] = sum(values) / len(values)
+                    # keeping the original float/int types
+                    if isinstance(results[reference_benchmark][eval_mode][metric_key], int):
+                        new_results[prefix][eval_mode][metric_key] = int(new_results[prefix][eval_mode][metric_key])
+
+            # Add num_benchmarks_in_group instead of num_entries
+            new_results[prefix][eval_mode]["num_benchmarks_in_group"] = len(benchmarks)
 
         LOG.info(f"Created averaged results for benchmark group: {prefix}")
 
