@@ -18,7 +18,7 @@ import logging
 import os
 import re
 import tempfile
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Optional
 
@@ -49,13 +49,16 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
             prefix = benchmark.rsplit('.', 1)[0]
             benchmark_groups[prefix].append(benchmark)
 
-    # Process each group with the same prefix
+    # Create a new ordered dictionary to ensure prefix benchmarks appear first
+    new_results = OrderedDict()
+
+    # Process each group with the same prefix and add to new dictionary first
     for prefix, benchmarks in benchmark_groups.items():
         if len(benchmarks) <= 1:  # Skip if there's only one benchmark with this prefix
             continue
 
         # Create a new entry for the average results
-        results[prefix] = defaultdict(dict)
+        new_results[prefix] = defaultdict(dict)
 
         # Use metrics_to_print and evaluations_to_print from the first benchmark in the group
         metrics_to_print[prefix] = metrics_to_print[benchmarks[0]]
@@ -100,12 +103,21 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                         )
                     values.append(metric_value)
 
-                results[prefix][eval_mode][metric_key] = sum(values) / len(values)
+                new_results[prefix][eval_mode][metric_key] = sum(values) / len(values)
                 # keeping the original float/int types
                 if isinstance(results[reference_benchmark][eval_mode][metric_key], int):
-                    results[prefix][eval_mode][metric_key] = int(results[prefix][eval_mode][metric_key])
+                    new_results[prefix][eval_mode][metric_key] = int(new_results[prefix][eval_mode][metric_key])
 
         LOG.info(f"Created averaged results for benchmark group: {prefix}")
+
+    # Now add all the original benchmarks to the new ordered dictionary
+    for benchmark, data in results.items():
+        if benchmark not in new_results:  # Skip if already added as a prefix
+            new_results[benchmark] = data
+
+    # Replace the original results with our new ordered one
+    results.clear()
+    results.update(new_results)
 
 
 @app.command()
