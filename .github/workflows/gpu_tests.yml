@@ -53,7 +53,7 @@ jobs:
       if: always()
       run: |
         docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
-        docker stop $(docker ps -a -q)
+        docker ps -a -q | xargs -r docker stop
 
   gpu-tests-qwen:
     runs-on: self-hosted-nemo-gpus-1
@@ -92,7 +92,7 @@ jobs:
       if: always()
       run: |
         docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
-        docker stop $(docker ps -a -q)
+        docker ps -a -q | xargs -r docker stop
 
   gpu-tests-rm:
     runs-on: self-hosted-nemo-gpus-1
@@ -128,4 +128,4 @@ jobs:
       if: always()
       run: |
         docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
-        docker stop $(docker ps -a -q)
+        docker ps -a -q | xargs -r docker stop
