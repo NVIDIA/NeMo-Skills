@@ -31,7 +31,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
-    instances = [json.loads(line) for line in open(file_path, "r")]
+    instances = []
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            if "hmmt_F_2024" in instance["id"]:
+                instances.append(instance)
+
     problem_to_instance = {instance["problem"]: instance for instance in instances}
     return problem_to_instance
 
