@@ -124,11 +124,13 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8):
     comparison_instances = []
     for minibatch_instances in all_minibatch_instances:
         sampled_solutions = [extract_summary(instance["generation"]) for instance in minibatch_instances]
+
+        comparison_instance = deepcopy(minibatch_instances[0])
         consolidated_solutions = ""
         for idx, solution in enumerate(sampled_solutions):
             consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+            comparison_instance[f"solution_{idx}"] = solution
 
-        comparison_instance = deepcopy(minibatch_instances[0])
         comparison_instance["solutions"] = consolidated_solutions
         comparison_instance["max_idx"] = len(sampled_solutions) - 1
         comparison_instance["num_solutions"] = len(sampled_solutions)
@@ -140,7 +142,11 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8):
             if "is_correct" in instance:
                 comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
 
-        comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct"]:
+            if key in comparison_instance:
+                del comparison_instance[key]
+        
+        comparison_instance["expected_answer"] = minibatch_instances[0]["expected_answer"]
         comparison_instances.append(comparison_instance)
 
     return comparison_instances
