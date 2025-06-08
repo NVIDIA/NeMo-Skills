@@ -106,19 +106,15 @@ def probabilistic_ceil(n: float) -> int:
         return math.floor(n)
 
 
-def flatten_instances(clustered_instances):
+
+def minibatchify_instances(clustered_instances, max_soln_samples=8):
     instances = []
     for _, same_answer_instances in clustered_instances:
         instances.extend(same_answer_instances)
-    return instances
-
-
-def minibatchify_instances(clustered_instances, max_soln_samples=8):
-    instances = flatten_instances(clustered_instances)
     random.shuffle(instances)
 
-    return [minibatch_instances for minibatch_instances in instances[::max_soln_samples]]
-
+    minibatch_instances = [instances[i:i+max_soln_samples] for i in range(0, len(instances), max_soln_samples)]
+    return minibatch_instances
 
 def create_comparison_instance(clustered_instances, max_soln_samples=8):
     """Create a comparison instance for a problem."""
