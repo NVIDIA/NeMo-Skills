@@ -41,7 +41,7 @@ jobs:
         pip install -r requirements/common-tests.txt
         ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
@@ -80,7 +80,7 @@ jobs:
         pip install -r requirements/common-tests.txt
         ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
@@ -116,7 +116,7 @@ jobs:
         pip install -e .
         pip install -r requirements/common-tests.txt
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
