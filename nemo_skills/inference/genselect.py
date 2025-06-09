@@ -138,7 +138,7 @@ class GenSelectTask(GenerationTask):
         
             matches = []
             for pattern in patterns:
-                found = re.findall(pattern, generation[-min(200, len(generation)):], re.IGNORECASE)
+                found = re.findall(pattern, generation[-min(2000, len(generation)):], re.IGNORECASE)
                 matches.extend(found)
             
             LOG.warning("All matches found: %s", matches)
