@@ -353,6 +353,7 @@ server_command_factories = {
     GenerationType.reward: get_reward_server_command,
     GenerationType.math_judge: get_server_command,
     GenerationType.genselect: get_server_command,
+    GenerationType.genselect_competition: get_server_command,
 }
 
 client_command_factories = {
@@ -360,6 +361,7 @@ client_command_factories = {
     GenerationType.reward: get_rm_cmd,
     GenerationType.math_judge: get_math_judge_cmd,
     GenerationType.genselect: get_genselect_cmd,
+    GenerationType.genselect_competition: get_genselect_cmd,
 }
 
 client_command_scripts = {
@@ -367,6 +369,7 @@ client_command_scripts = {
     GenerationType.reward: 'nemo_skills.inference.reward_model',
     GenerationType.math_judge: 'nemo_skills.inference.llm_math_judge',
     GenerationType.genselect: 'nemo_skills.inference.genselect',
+    GenerationType.genselect_competition: 'nemo_skills.inference.genselect',
 }
 
 
@@ -607,17 +610,21 @@ def generate(
     has_tasks = False
 
     with get_exp(expname, cluster_config) as exp:
-        if generation_type == GenerationType.genselect:
+        if generation_type == GenerationType.genselect or generation_type == GenerationType.genselect_competition:
             # Add the preprocessing command for genselect
             genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
                 genselect_args if genselect_args is not None else ""
             )
-            preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+
+            if generation_type == GenerationType.genselect:
+                preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+            elif generation_type == GenerationType.genselect_competition:
+                preprocess_cmd = f"python -m nemo_skills.inference.genselect_competition_preprocess {genselect_args}"
 
             preprocess_task = add_task(
                 exp,
                 cmd=preprocess_cmd,
-                task_name="preprocess_genselect",
+                task_name=f"preprocess_genselect-{os.path.basename(output_dir)}",
                 log_dir=f"{output_dir}/preprocess-logs",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,

@@ -31,7 +31,14 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
-    instances = [json.loads(line) for line in open(file_path, "r")]
+    instances = []
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            # if "hmmt_F_2024" in instance["id"]:
+            if "aime25" in instance["id"]:
+                instances.append(instance)
+
     problem_to_instance = {instance["problem"]: instance for instance in instances}
     return problem_to_instance
 
@@ -78,6 +85,48 @@ def read_files(file_paths, single_answer_instances_path):
     return problem_to_clustered_instances
 
 
+
+def test_if_in_competition(file_path):
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            if "judgment_idx" in instance:
+                return True
+            else:
+                return False
+    return False
+
+
+def read_file_competition(file_path):
+    instances = []
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            judgment_idx = instance["judgment_idx"]
+            if judgment_idx is None:
+                judgment_idx = random.randint(0, instance["max_idx"])
+
+            
+    return instances
+
+
+
+def read_competition_files(file_paths):
+    instances = []
+    for file_path in file_paths:
+        instances.extend(read_file(file_path))
+    return instances
+
+
+
+def get_instances_from_files(file_paths, single_answer_instances_path):
+    if test_if_in_competition(file_paths[0]):
+        return read_competition_files(file_paths)
+    else:
+        return read_files(file_paths, single_answer_instances_path)
+
+
+
 def extract_summary(solution, max_length=5000):
     """Extract the summary from the solution."""
     if solution.count("</think>") == 0:
@@ -98,84 +147,60 @@ def extract_summary(solution, max_length=5000):
     return summary.strip()
 
 
-def probabilistic_ceil(n: float) -> int:
-    decimal_part = n - math.floor(n)
-    if random.random() < decimal_part:
-        return math.ceil(n)
-    else:
-        return math.floor(n)
 
 
-def sample_instances(clustered_instances, max_soln_samples=8, sampling_strategy="linear", bayesian_constant=1.0):
-    random.shuffle(clustered_instances)
-
-    answer_counts = []
+def minibatchify_instances(clustered_instances, max_soln_samples=8):
+    instances = []
     for _, same_answer_instances in clustered_instances:
-        answer_counts.append(len(same_answer_instances))
+        instances.extend(same_answer_instances)
+    random.shuffle(instances)
 
-    total_samples = sum(answer_counts)
+    minibatch_instances = [instances[i:i+max_soln_samples] for i in range(0, len(instances), max_soln_samples)]
+    return minibatch_instances
 
-    if sampling_strategy == "sqrt":
-        unnormalized_sampling_probs = [(answer_count / total_samples) ** 0.5 for answer_count in answer_counts]
-        sampling_probs = [
-            sampling_prob / sum(unnormalized_sampling_probs) for sampling_prob in unnormalized_sampling_probs
-        ]
-
-    elif sampling_strategy == "bayesian":
-        pseudo_answer_counts = [(answer_count + bayesian_constant) for answer_count in answer_counts]
-        sampling_probs = [
-            pseudo_answer_count / sum(pseudo_answer_counts) for pseudo_answer_count in pseudo_answer_counts
-        ]
-    else:
-        sampling_probs = [answer_count / total_samples for answer_count in answer_counts]
-
-    # Sample instances from each cluster using the sampling probabilities
-    sampled_instances = []
-    num_samples = min(max_soln_samples, total_samples)
-    for i, (_, same_answer_instances) in enumerate(clustered_instances):
-        cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
-        cur_num_samples = min(max(1, cur_num_samples), len(same_answer_instances))
-        # if cur_num_samples > 0:
-        sampled_instances.extend(random.sample(same_answer_instances, cur_num_samples))
-
-    return sampled_instances[:max_soln_samples]
-
-
-def create_comparison_instance(clustered_instances, problem, max_soln_samples=8, sampling_strategy="linear"):
+def create_comparison_instance(clustered_instances, max_soln_samples=8):
+    """Create a comparison instance for a problem."""
     # Create a consolidated instance
-    sampled_instances = sample_instances(
-        clustered_instances, max_soln_samples=max_soln_samples, sampling_strategy=sampling_strategy
-    )
-    sampled_solutions = [extract_summary(instance["generation"]) for instance in sampled_instances]
-    consolidated_solutions = ""
-    for idx, solution in enumerate(sampled_solutions):
-        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+    all_minibatch_instances = minibatchify_instances(clustered_instances, max_soln_samples)
 
-    comparison_instance = deepcopy(sampled_instances[0])
-    comparison_instance["solutions"] = consolidated_solutions
-    comparison_instance["max_idx"] = len(sampled_solutions) - 1
-    comparison_instance["num_solutions"] = len(sampled_instances)
+    comparison_instances = []
+    for minibatch_instances in all_minibatch_instances:
+        sampled_solutions = [extract_summary(instance["generation"]) for instance in minibatch_instances]
 
-    for i, instance in enumerate(sampled_instances):
-        comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
-        if "judgement" in instance:
-            comparison_instance[f"judgement_{i}"] = instance["judgement"]
-        if "is_correct" in instance:
-            comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
+        comparison_instance = deepcopy(minibatch_instances[0])
+        consolidated_solutions = ""
+        for idx, solution in enumerate(sampled_solutions):
+            consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+            comparison_instance[f"solution_{idx}"] = solution
 
-    comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+        comparison_instance["solutions"] = consolidated_solutions
+        comparison_instance["max_idx"] = len(sampled_solutions) - 1
+        comparison_instance["num_solutions"] = len(sampled_solutions)
 
-    return comparison_instance
+        for i, instance in enumerate(minibatch_instances):
+            comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
+            if "judgement" in instance:
+                comparison_instance[f"judgement_{i}"] = instance["judgement"]
+            if "is_correct" in instance:
+                comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
 
+        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct"]:
+            if key in comparison_instance:
+                del comparison_instance[key]
+        
+        comparison_instance["expected_answer"] = minibatch_instances[0]["expected_answer"]
+        comparison_instances.append(comparison_instance)
+
+    return comparison_instances
 
 
 def preprocess(
-    input_dir, output_dir, max_soln_samples=8, sampling_strategy="linear", num_random_seeds=8, num_input_samples=8
+    input_dir, output_dir, max_soln_samples=8, num_random_seeds=8, num_input_samples=8
 ):
     if output_dir is None:
         raise ValueError("Output directory is required")
 
-    output_dir = os.path.join(output_dir, "comparison_instances")
+    output_dir = os.path.join(output_dir, f"comparison_instances")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
@@ -191,16 +216,13 @@ def preprocess(
     for random_seed in range(num_random_seeds):
         # random.seed(random_seed)
         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-            for problem, clustered_instances in problem_to_clustered_instances.items():
-                comparison_instance = create_comparison_instance(
+            for _, clustered_instances in problem_to_clustered_instances.items():
+                comparison_instances = create_comparison_instance(
                     clustered_instances,
-                    problem,
                     max_soln_samples=max_soln_samples,
-                    sampling_strategy=sampling_strategy,
                 )
-                f.write(json.dumps(comparison_instance) + "\n")
-
-
+                for comparison_instance in comparison_instances:
+                    f.write(json.dumps(comparison_instance) + "\n")
 
 
 @nested_dataclass(kw_only=True)
@@ -208,7 +230,6 @@ class GenSelectPreprocessConfig:
     input_dir: str
     output_dir: str
     max_soln_samples: int = 16
-    sampling_strategy: str = "linear"
     num_random_seeds: int | None = None
     num_input_samples: int | None = None
 
@@ -227,7 +248,6 @@ def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
         input_dir=cfg.input_dir,
         output_dir=cfg.output_dir,
         max_soln_samples=cfg.max_soln_samples,
-        sampling_strategy=cfg.sampling_strategy,
         num_random_seeds=cfg.num_random_seeds,
         num_input_samples=cfg.num_input_samples,
     )
@@ -236,3 +256,5 @@ def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
 if __name__ == "__main__":
     setup_logging()
     genselect_preprocessor()
+    
+
