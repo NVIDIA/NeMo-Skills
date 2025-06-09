@@ -95,43 +95,52 @@ def test_if_in_competition(file_path):
         return False
 
 
-def read_file_competition(file_path):
-    instances = [instance for instance in instances if "judgment_idx" in instance]
+def read_file_competition(file_path, single_answer_instances_path=None):
+    instances = []
+    for line in open(file_path, "r"):
+        instance = json.loads(line)
+        new_instance = {"problem": instance["problem"], "expected_answer": instance["expected_answer"]}
+        for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution"]:
+            if key in instance:
+                new_instance[key] = instance[key]
+        
+        if instance["judgment_idx"] is not None:
+            judgment_idx = instance["judgment_idx"]
+        else:
+            judgment_idx = random.randint(0, instance["max_idx"])
+
+        new_instance["generation"] = instance[f"solution_{judgment_idx}"]
+        new_instance["summary"] = instance[f"solution_{judgment_idx}"]
+        new_instance["is_correct"] = instance[f"is_correct_{judgment_idx}"]
+        new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
+        new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
+
+        
+        instances.append(new_instance)
+
+    
     problem_to_instances = defaultdict(list)
     for instance in instances:
         problem_to_instances[instance["problem"]].append(instance)
+
+    non_single_problem_to_instances = {problem: instances for problem, instances in problem_to_instances.items() if len(instances) > 1}
+    single_problem_to_instances = {problem: instances[0] for problem, instances in problem_to_instances.items() if len(instances) == 1}
     
-    return problem_to_instances
+    if single_answer_instances_path is not None:
+        with open(single_answer_instances_path, "w") as f:
+            for _, instance in single_problem_to_instances.items():
+                f.write(json.dumps(instance) + "\n")
+    
+    return non_single_problem_to_instances
     
     
 
-def read_file_competition(file_path):
-        
-    
-
-            
-    return instances
-
-
-
-def read_competition_files(file_paths, single_answer_instances_path):
-    read_
-    for file_path in file_paths[1:]:
-        instances.extend(read_file(file_path))
-    return instances
-
-
-
-def get_instances_from_files(file_paths, single_answer_instances_path):
-    if test_if_in_competition(file_paths[0]):
-        return read_competition_files(file_paths, single_answer_instances_path)
-    else:
-        return read_files(file_paths, single_answer_instances_path)
-
-
-
-def extract_summary(solution, max_length=5000):
+def extract_summary(instance, max_length=5000):
     """Extract the summary from the solution."""
+    if "summary" in instance:
+        return instance["summary"]
+
+    solution = instance["generation"]
     if solution.count("</think>") == 0:
         if len(solution) < max_length:
             # Probably the solution is a summary itself
@@ -197,6 +206,40 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8):
     return comparison_instances
 
 
+def process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds):
+    for random_seed, input_file in enumerate(input_files):
+        if random_seed == 0:
+            problem_to_clustered_instances = read_file_competition(input_file, os.path.join(output_dir, "single_answer_instances.jsonl"))
+        else:
+            problem_to_clustered_instances = read_file_competition(input_file)
+
+        with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
+            for _, clustered_instances in problem_to_clustered_instances.items():
+                comparison_instances = create_comparison_instance(
+                    clustered_instances,
+                    max_soln_samples=max_soln_samples,
+                )
+                for comparison_instance in comparison_instances:
+                    f.write(json.dumps(comparison_instance) + "\n")
+
+    
+
+
+def process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds):
+    problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
+
+    for random_seed in range(num_random_seeds):
+        # random.seed(random_seed)
+        with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
+            for _, clustered_instances in problem_to_clustered_instances.items():
+                comparison_instances = create_comparison_instance(
+                    clustered_instances,
+                    max_soln_samples=max_soln_samples,
+                )
+                for comparison_instance in comparison_instances:
+                    f.write(json.dumps(comparison_instance) + "\n")
+
+
 def preprocess(
     input_dir, output_dir, max_soln_samples=8, num_random_seeds=8, num_input_samples=8
 ):
@@ -214,18 +257,15 @@ def preprocess(
     if num_input_samples is not None:
         input_files = input_files[:num_input_samples]
         print(f"Using {num_input_samples} / {len(input_files)} input files")
-    problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
 
-    for random_seed in range(num_random_seeds):
-        # random.seed(random_seed)
-        with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-            for _, clustered_instances in problem_to_clustered_instances.items():
-                comparison_instances = create_comparison_instance(
-                    clustered_instances,
-                    max_soln_samples=max_soln_samples,
-                )
-                for comparison_instance in comparison_instances:
-                    f.write(json.dumps(comparison_instance) + "\n")
+    in_competition = test_if_in_competition(input_files[0])
+    
+    if in_competition:
+        process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds)
+    else:
+        process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds)
+
+
 
 
 @nested_dataclass(kw_only=True)
