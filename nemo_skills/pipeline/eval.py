@@ -94,7 +94,6 @@ def get_sampling_cmd(
 def add_default_args(
     cluster_config, benchmark, split, data_dir, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
 ):
-    # TODO: some special logic is needed to work with subfolders if benchmark is <>/<>
     benchmark_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark,
         data_dir=data_dir,
@@ -102,6 +101,7 @@ def add_default_args(
         extra_datasets=extra_datasets,
         extra_datasets_type=extra_datasets_type,
     )
+    benchmark = benchmark.replace('.', '/')
 
     if split is None:
         split = getattr(benchmark_module, "EVAL_SPLIT", "test")
@@ -335,13 +335,16 @@ def eval(
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
         if add_greedy or rs_num == 0:
-            # forcing temperature to 0.0 for greedy decoding
-            bench_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
+            if rs_num > 0:
+                # forcing temperature to 0.0 for greedy decoding, but respecting override for samples
+                greedy_gen_args = f"{bench_gen_args} ++inference.temperature=0.0"
+            else:
+                greedy_gen_args = bench_gen_args
             for cmd in get_greedy_cmd(
                 benchmark,
                 output_dir,
                 extra_eval_args=bench_eval_args,
-                extra_arguments=bench_gen_args,
+                extra_arguments=greedy_gen_args,
                 num_chunks=num_chunks,
                 chunk_ids=chunk_ids,
             ):
