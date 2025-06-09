@@ -87,33 +87,36 @@ def read_files(file_paths, single_answer_instances_path):
 
 
 def test_if_in_competition(file_path):
-    with open(file_path, "r") as f:
-        for line in f:
-            instance = json.loads(line)
-            if "judgment_idx" in instance:
-                return True
-            else:
-                return False
-    return False
+    instances = [json.loads(line) for line in open(file_path, "r")]
+    instances = [instance for instance in instances if "judgment_idx" in instance]
+    if len(instances) > 0:
+        return True
+    else:
+        return False
 
 
 def read_file_competition(file_path):
-    instances = []
-    with open(file_path, "r") as f:
-        for line in f:
-            instance = json.loads(line)
-            judgment_idx = instance["judgment_idx"]
-            if judgment_idx is None:
-                judgment_idx = random.randint(0, instance["max_idx"])
+    instances = [instance for instance in instances if "judgment_idx" in instance]
+    problem_to_instances = defaultdict(list)
+    for instance in instances:
+        problem_to_instances[instance["problem"]].append(instance)
+    
+    return problem_to_instances
+    
+    
+
+def read_file_competition(file_path):
+        
+    
 
             
     return instances
 
 
 
-def read_competition_files(file_paths):
-    instances = []
-    for file_path in file_paths:
+def read_competition_files(file_paths, single_answer_instances_path):
+    read_
+    for file_path in file_paths[1:]:
         instances.extend(read_file(file_path))
     return instances
 
@@ -121,7 +124,7 @@ def read_competition_files(file_paths):
 
 def get_instances_from_files(file_paths, single_answer_instances_path):
     if test_if_in_competition(file_paths[0]):
-        return read_competition_files(file_paths)
+        return read_competition_files(file_paths, single_answer_instances_path)
     else:
         return read_files(file_paths, single_answer_instances_path)
 

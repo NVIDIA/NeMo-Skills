@@ -130,29 +130,28 @@ class GenSelectTask(GenerationTask):
         """Extract the judgment from the generation."""
         judgment = None
 
-        try:
-            patterns = [
-                r"Judgment:\s*(\d+)",  # Allow for extra whitespace
-                r"Judgment:\s*(\d+)[^0-9]*$"  # End of string
-            ]
+        patterns = [
+            r"Judgment:\s*(\d+)",  # Allow for extra whitespace
+            r"Judgment:\s*(\d+)[^0-9]*$"  # End of string
+        ]
+    
+        matches = []
+        for pattern in patterns:
+            found = re.findall(pattern, generation[-min(2000, len(generation)):], re.IGNORECASE)
+            matches.extend(found)
         
-            matches = []
-            for pattern in patterns:
-                found = re.findall(pattern, generation[-min(2000, len(generation)):], re.IGNORECASE)
-                matches.extend(found)
-            
-            LOG.warning("All matches found: %s", matches)
+        LOG.warning("All matches found: %s", matches)
 
-            if matches:
-                number = matches[-1]
-                judgment = int(number)
-                if max_idx is not None and judgment > max_idx:
-                    judgment = None
-            else:
+        if matches:
+            number = matches[-1]
+            judgment = int(number)
+            LOG.warning(f"Judgment: {judgment}")
+            if max_idx is not None and judgment > int(max_idx):
                 judgment = None
-
-        except:
+                LOG.warning(f"Judgment: {judgment}")
+        else:
             judgment = None
+        LOG.warning(f"Judgment: {judgment}")
 
         return judgment
 
@@ -177,7 +176,7 @@ class GenSelectTask(GenerationTask):
                 output_instance = deepcopy(instance)
 
                 judgment = self._extract_judgment(instance['genselect_comparison'], max_idx=instance["max_idx"])
-                if judgment:
+                if judgment is not None:
                     output_instance["judgment_idx"] = judgment
                 else:
                     output_instance["judgment_idx"] = None
