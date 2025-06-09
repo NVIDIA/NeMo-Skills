@@ -767,7 +767,7 @@ class OpenAIModel(BaseModel):
 
         choice = response.choices[0]
         output = choice.message.content
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens, 'finish_reason': choice.finish_reason}
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
@@ -794,14 +794,55 @@ class OpenAIModel(BaseModel):
 
         for chunk in response:
             cur_delta = chunk.choices[0].text
-            result = {"generation": cur_delta}
-
-            stop_reason = getattr(chunk.choices[0], "finish_reason", None)
-            if stop_reason and isinstance(stop_reason, str):
-                result["finish_reason"] = "stop"
 
             if cur_delta:
-                yield result
+                yield {"generation": cur_delta}
+
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
+
+
+class AzureOpenAIModel(OpenAIModel):
+    def __init__(
+        self,
+        host: str = '127.0.0.1',
+        port: str = '5000',
+        model=None,
+        base_url=None,
+        api_key=None,
+        api_version: str = "2024-02-15-preview",
+        max_retries: int = 3,
+        initial_retry_delay: float = 2.0,
+        **kwargs,
+    ):
+        # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__
+        BaseModel.__init__(self, host=host, port=port, **kwargs)
+        from openai import AzureOpenAI
+
+        if model is None:
+            model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
+            if model is None:
+                raise ValueError("model argument is required for Azure OpenAI model.")
+
+        if base_url is None:
+            base_url = os.getenv("AZURE_OPENAI_ENDPOINT")
+            if base_url is None:
+                raise ValueError("base_url is required for Azure OpenAI model.")
+
+        if api_key is None:
+            api_key = os.getenv("AZURE_OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("api_key is required for Azure OpenAI model.")
+
+        self.client = AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=base_url,
+            api_version=api_version,
+        )
+        self.model = model
+        self.max_retries = max_retries
+        self.initial_retry_delay = initial_retry_delay
 
 
 class VLLMModel(BaseModel):
@@ -1161,6 +1202,7 @@ models = {
     'nemo': NemoModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
+    'azureopenai': AzureOpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,
 }
