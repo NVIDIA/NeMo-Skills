@@ -618,20 +618,18 @@ def generate(
             )
 
             if generation_type == GenerationType.genselect:
-                preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+                exec_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
             elif generation_type == GenerationType.genselect_competition:
-                preprocess_cmd = f"python -m nemo_skills.inference.genselect_competition_preprocess {genselect_args}"
+                exec_cmd = f"python -m nemo_skills.inference.genselect_competition_preprocess {genselect_args}"
 
             preprocess_task = add_task(
                 exp,
-                cmd=preprocess_cmd,
+                cmd=exec_cmd,
                 task_name=f"preprocess_genselect-{os.path.basename(output_dir)}",
                 log_dir=f"{output_dir}/preprocess-logs",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 run_after=run_after,
-                reuse_code=reuse_code,
-                reuse_code_exp=reuse_code_exp,
             )
             initial_tasks = [preprocess_task]
 

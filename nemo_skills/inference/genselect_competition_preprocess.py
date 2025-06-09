@@ -238,8 +238,6 @@ def process_competition_files(input_files, output_dir, max_soln_samples, num_ran
                 for comparison_instance in comparison_instances:
                     f.write(json.dumps(comparison_instance) + "\n")
 
-    
-
 
 def process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds):
     problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
