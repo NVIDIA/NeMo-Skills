@@ -192,10 +192,8 @@ class CodeExecutionWrapper:
                     output += code_end
             # Update the prompt based on format
             if is_openai_format:
-                # add assistant turn dict if not already added
-                if request['prompt'][-1]['role'] != 'assistant':
-                    request['prompt'].append({'role': 'assistant', 'content': ""})
-                request['prompt'][-1]['content'] += output
+                request['prompt'].append({'role': 'assistant', 'content': output})
+                request['prompt'].append({'role': 'user', 'content': "continue"})
             else:
                 request['prompt'] += output
 
@@ -231,7 +229,7 @@ class CodeExecutionWrapper:
                 )
                 
                 if is_openai_format:
-                    request['prompt'][-1]['content'] += code_output
+                    request['prompt'][-2]['content'] += code_output
                 else:
                     request['prompt'] += code_output
                     
@@ -242,7 +240,7 @@ class CodeExecutionWrapper:
 
         # removing original prompt and returning the generation
         if is_openai_format:
-            generation = request['prompt'][-1]['content']
+            generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt):]
             
@@ -514,7 +512,8 @@ class CodeExecutionWrapper:
 
             # Update the prompt based on format
             if is_openai_format:
-                current_full_prompt[-1]['content'] += current_output_segment
+                current_full_prompt.append({'role': 'assistant', 'content': current_output_segment})
+                current_full_prompt.append({'role': 'user', 'content': "continue"})
             else:
                 current_full_prompt += current_output_segment
 
@@ -545,7 +544,7 @@ class CodeExecutionWrapper:
                 
                 # Append executed code's output to the prompt
                 if is_openai_format:
-                    current_full_prompt[-1]['content'] += formatted_code_output
+                    current_full_prompt[-2]['content'] += formatted_code_output
                 else:
                     current_full_prompt += formatted_code_output
             else:

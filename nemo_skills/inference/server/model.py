@@ -796,13 +796,18 @@ class OpenAIModel(BaseModel):
         """
 
         for chunk in response:
-            cur_delta = chunk.choices[0].text
+            if hasattr(chunk.choices[0], "delta"):
+                cur_delta = chunk.choices[0].delta.content
+            else:
+                cur_delta = chunk.choices[0].text
 
             finish_reason = getattr(chunk.choices[0], "finish_reason", None)
             result = {"generation": cur_delta}
             if finish_reason:
                 result["finish_reason"] = finish_reason
-
+                if not cur_delta:
+                    result["generation"] = ""
+            
             yield result
 
 
