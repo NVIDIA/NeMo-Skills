@@ -83,12 +83,6 @@ class CodeExecutionWrapper:
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
-        if is_openai_format:
-            # For OpenAI format, we need to work with the last message content
-            # and update it as we add code execution results
-            original_prompt = copy.deepcopy(prompt)
-            if not prompt or not isinstance(prompt, list) or 'content' not in prompt[-1]:
-                raise ValueError("Invalid OpenAI prompt format")
             
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
@@ -198,6 +192,9 @@ class CodeExecutionWrapper:
                     output += code_end
             # Update the prompt based on format
             if is_openai_format:
+                # add assistant turn dict if not already added
+                if request['prompt'][-1]['role'] != 'assistant':
+                    request['prompt'].append({'role': 'assistant', 'content': ""})
                 request['prompt'][-1]['content'] += output
             else:
                 request['prompt'] += output
@@ -245,9 +242,7 @@ class CodeExecutionWrapper:
 
         # removing original prompt and returning the generation
         if is_openai_format:
-            original_content = original_prompt[-1]['content'] if original_prompt else ""
-            final_content = request['prompt'][-1]['content']
-            generation = final_content[len(original_content):]
+            generation = request['prompt'][-1]['content']
         else:
             generation = request['prompt'][len(prompt):]
             

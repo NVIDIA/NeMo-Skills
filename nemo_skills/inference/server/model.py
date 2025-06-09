@@ -778,6 +778,9 @@ class OpenAIModel(BaseModel):
                     logprob[token_logprob.token] = token_logprob.logprob
                 result['top_logprobs'].append(logprob)
 
+        if choice.finish_reason is not None:
+            result["finish_reason"] = choice.finish_reason
+
         return result
 
     def get_model_name_from_server(self):
@@ -795,12 +798,12 @@ class OpenAIModel(BaseModel):
         for chunk in response:
             cur_delta = chunk.choices[0].text
 
-            if cur_delta:
-                yield {"generation": cur_delta}
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            result = {"generation": cur_delta}
+            if finish_reason:
+                result["finish_reason"] = finish_reason
 
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
+            yield result
 
 
 class AzureOpenAIModel(OpenAIModel):
