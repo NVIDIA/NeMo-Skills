@@ -99,12 +99,13 @@ def read_file_competition(file_path, single_answer_instances_path=None):
     instances = []
     for line in open(file_path, "r"):
         instance = json.loads(line)
-        new_instance = {"problem": instance["problem"], "expected_answer": instance["expected_answer"]}
-        for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution", "generation", "is_correct", "judgement", "predicted_answer"]:
-            if key in instance:
-                new_instance[key] = instance[key]
         
         if "judgment_idx" in instance:
+            new_instance = {"problem": instance["problem"], "expected_answer": instance["expected_answer"]}
+            for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution"]:
+                if key in instance:
+                    new_instance[key] = instance[key]
+
             if instance["judgment_idx"] is not None:
                 judgment_idx = instance["judgment_idx"]
             else:
@@ -116,8 +117,9 @@ def read_file_competition(file_path, single_answer_instances_path=None):
             new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
             new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
 
-        
-        instances.append(new_instance)
+            instances.append(new_instance)
+        else:
+            instances.append(instance)
 
     
     problem_to_instances = defaultdict(list)
@@ -132,7 +134,14 @@ def read_file_competition(file_path, single_answer_instances_path=None):
             for _, instance in single_problem_to_instances.items():
                 f.write(json.dumps(instance) + "\n")
     
-    return non_single_problem_to_instances
+    LOG.warning(f"Number of problems with multiple answers: {len(non_single_problem_to_instances)}")
+
+    problem_to_clustered_instances = {problem: (instances[0]["predicted_answer"], instances) for problem, instances in non_single_problem_to_instances.items()}
+    for problem, (predicted_answer, instances) in problem_to_clustered_instances.items():
+        LOG.warning(f"Problem: {problem}, Predicted answer: {predicted_answer}")
+        LOG.warning(f"Number of instances: {len(instances)}")
+        break
+    return problem_to_clustered_instances
     
     
 
