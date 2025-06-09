@@ -50,7 +50,6 @@ def test_vllm_reward():
         f"    --output_dir={os.path.dirname(output_file)} "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
-        f"    ++batch_size=8 "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )

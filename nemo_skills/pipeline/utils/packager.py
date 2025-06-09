@@ -136,6 +136,9 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         else:
             # picking up local dataset files if we are in the right repo
             include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
+            # special logic for any dataset that creates subfolders
+            include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
+            include_patterns.append(str(nemo_skills_dir / "dataset/ruler/*"))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
         root_package = run.GitArchivePackager(
