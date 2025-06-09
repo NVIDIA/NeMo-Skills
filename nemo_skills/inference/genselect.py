@@ -132,15 +132,13 @@ class GenSelectTask(GenerationTask):
 
         try:
             patterns = [
-                r"Judgment: (\d+)",
                 r"Judgment:\s*(\d+)",  # Allow for extra whitespace
-                r"judgment: (\d+)",    # lowercase
                 r"Judgment:\s*(\d+)[^0-9]*$"  # End of string
             ]
         
             matches = []
             for pattern in patterns:
-                found = re.findall(pattern, generation, re.IGNORECASE)
+                found = re.findall(pattern, generation[-min(200, len(generation)):], re.IGNORECASE)
                 matches.extend(found)
             
             LOG.warning("All matches found: %s", matches)
