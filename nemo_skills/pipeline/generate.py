@@ -346,6 +346,7 @@ class GenerationType(str, Enum):
     reward = "reward"
     math_judge = "math_judge"
     genselect = "genselect"
+    genselect_competition = "genselect_competition"
 
 
 server_command_factories = {
