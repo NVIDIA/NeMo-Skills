@@ -36,7 +36,8 @@ def read_file(file_path):
         for line in f:
             instance = json.loads(line)
             # if "hmmt_F_2024" in instance["id"]:
-            if "aime25" in instance["id"]:
+            # if "aime25" in instance["id"]:
+            if True:
                 instances.append(instance)
 
     problem_to_instance = {instance["problem"]: instance for instance in instances}
