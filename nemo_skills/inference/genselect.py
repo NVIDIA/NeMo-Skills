@@ -125,12 +125,13 @@ class GenSelectTask(GenerationTask):
     def get_generation_module(self):
         return "nemo_skills.inference.genselect"
 
+    @classmethod
     def _extract_judgment(self, generation, max_idx=None):
         """Extract the judgment from the generation."""
         judgment = None
 
         try:
-            matches = re.findall(r"Judg[e]?ment: (\d+)", generation)
+            matches = re.findall(r"Judgment: (\d+)", generation)
             # print(matches)
 
             if matches:
@@ -144,27 +145,23 @@ class GenSelectTask(GenerationTask):
         except:
             judgment = None
 
-        if judgment is not None and max_idx is not None:
-            if judgment > max_idx:
-                judgment = None
-
         return judgment
 
     def postprocess(self):
-        # single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")
-        # single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
+        single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")
+        single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
         input_file = self.cfg.output_file
         if self.cfg.dataset is not None:
             benchmark_dir = self.cfg.dataset
         else:
             benchmark_dir = "math"
-        output_file = Path(self.cfg.output_dir) / "postprocessed" / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
-            # for single_answer_instance in single_answer_instances:
-            #     fout.write(json.dumps(single_answer_instance) + '\n')
+            for single_answer_instance in single_answer_instances:
+                fout.write(json.dumps(single_answer_instance) + '\n')
 
             for line in f:
                 instance = json.loads(line)

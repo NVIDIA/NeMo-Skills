@@ -84,6 +84,48 @@ def read_files(file_paths, single_answer_instances_path):
     return problem_to_clustered_instances
 
 
+
+def test_if_in_competition(file_path):
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            if "judgment_idx" in instance:
+                return True
+            else:
+                return False
+    return False
+
+
+def read_file_competition(file_path):
+    instances = []
+    with open(file_path, "r") as f:
+        for line in f:
+            instance = json.loads(line)
+            judgment_idx = instance["judgment_idx"]
+            if judgment_idx is None:
+                judgment_idx = random.randint(0, instance["max_idx"])
+
+            
+    return instances
+
+
+
+def read_competition_files(file_paths):
+    instances = []
+    for file_path in file_paths:
+        instances.extend(read_file(file_path))
+    return instances
+
+
+
+def get_instances_from_files(file_paths, single_answer_instances_path):
+    if test_if_in_competition(file_paths[0]):
+        return read_competition_files(file_paths)
+    else:
+        return read_files(file_paths, single_answer_instances_path)
+
+
+
 def extract_summary(solution, max_length=5000):
     """Extract the summary from the solution."""
     if solution.count("</think>") == 0:
@@ -103,13 +145,6 @@ def extract_summary(solution, max_length=5000):
         summary = summary[-max_length:]
     return summary.strip()
 
-
-def probabilistic_ceil(n: float) -> int:
-    decimal_part = n - math.floor(n)
-    if random.random() < decimal_part:
-        return math.ceil(n)
-    else:
-        return math.floor(n)
 
 
 
@@ -220,3 +255,5 @@ def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
 if __name__ == "__main__":
     setup_logging()
     genselect_preprocessor()
+    
+
