@@ -136,14 +136,19 @@ def read_file_competition(file_path, single_answer_instances_path=None):
     
     LOG.warning(f"Number of problems with multiple answers: {len(non_single_problem_to_instances)}")
 
-    problem_to_clustered_instances = {problem: (instances[0]["predicted_answer"], instances) for problem, instances in non_single_problem_to_instances.items()}
-    for problem, (predicted_answer, instances) in problem_to_clustered_instances.items():
-        LOG.warning(f"Problem: {problem}, Predicted answer: {predicted_answer}")
-        LOG.warning(f"Number of instances: {len(instances)}")
-        break
+    problem_to_clustered_instances = {}
+    for problem, instance_list in non_single_problem_to_instances.items():
+        answer_clusters = defaultdict(list)
+        for instance in instance_list:
+            answer = instance["predicted_answer"]
+            answer_clusters[answer].append(instance)
+
+        problem_to_clustered_instances[problem] = [
+            (answer, instances) for answer, instances in answer_clusters.items()
+        ]
+    
     return problem_to_clustered_instances
-    
-    
+
 
 def extract_summary(instance, max_length=5000):
     """Extract the summary from the solution."""
@@ -187,7 +192,7 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8):
 
     comparison_instances = []
     for minibatch_instances in all_minibatch_instances:
-        sampled_solutions = [extract_summary(instance["generation"]) for instance in minibatch_instances]
+        sampled_solutions = [extract_summary(instance) for instance in minibatch_instances]
 
         comparison_instance = deepcopy(minibatch_instances[0])
         consolidated_solutions = ""
