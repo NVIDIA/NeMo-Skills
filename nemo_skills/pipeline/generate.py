@@ -629,6 +629,9 @@ def generate(
                 log_dir=f"{output_dir}/preprocess-logs",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
             )
             initial_tasks = [preprocess_task]
 
