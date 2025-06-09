@@ -36,9 +36,9 @@ def read_predictions(predictions, line_idx, file_handles):
 def is_correct_judgement(judgement, return_none=False) -> Union[bool, None]:
     if 'Judgement:' in judgement:
         verdict = judgement.split('Judgement:')[-1].strip()
-        if verdict.lower() == 'yes':
+        if verdict.lower().startswith('yes'):
             return True
-        elif verdict.lower() == 'no':
+        elif verdict.lower().startswith('no'):
             return False
     
     if return_none:

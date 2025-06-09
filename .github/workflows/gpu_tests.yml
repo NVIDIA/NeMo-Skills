@@ -39,9 +39,9 @@ jobs:
         pip uninstall -y nemo-skills nemo_run
         pip install -e .
         pip install -r requirements/common-tests.txt
-        python -m nemo_skills.dataset.prepare gsm8k human-eval mbpp algebra222 mmlu ifeval
+        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
@@ -49,10 +49,11 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_llama.sh
-    - name: Cleanup test directory
+    - name: Cleanup
       if: always()
       run: |
-        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
+        docker ps -a -q | xargs -r docker stop
 
   gpu-tests-qwen:
     runs-on: self-hosted-nemo-gpus-1
@@ -77,9 +78,9 @@ jobs:
         pip uninstall -y nemo-skills nemo_run
         pip install -e .
         pip install -r requirements/common-tests.txt
-        python -m nemo_skills.dataset.prepare gsm8k human-eval mbpp algebra222 mmlu ifeval
+        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
@@ -87,10 +88,11 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_qwen.sh
-    - name: Cleanup test directory
+    - name: Cleanup
       if: always()
       run: |
-        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
+        docker ps -a -q | xargs -r docker stop
 
   gpu-tests-rm:
     runs-on: self-hosted-nemo-gpus-1
@@ -114,7 +116,7 @@ jobs:
         pip install -e .
         pip install -r requirements/common-tests.txt
     - name: Run GPU tests
-      timeout-minutes: 120
+      timeout-minutes: 180
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
@@ -122,7 +124,8 @@ jobs:
         nvidia-smi
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_rm.sh
-    - name: Cleanup test directory
+    - name: Cleanup
       if: always()
       run: |
-        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.0 bash -c 'rm -rf /tmp/nemo-skills-tests/mistral_emb /home/azureuser/.nemo_run/'
+        docker run --rm -v /tmp:/tmp -v /home:/home igitman/nemo-skills:0.6.1 bash -c 'rm -rf /tmp/nemo-skills-tests /home/azureuser/.nemo_run/'
+        docker ps -a -q | xargs -r docker stop
