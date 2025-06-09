@@ -100,20 +100,21 @@ def read_file_competition(file_path, single_answer_instances_path=None):
     for line in open(file_path, "r"):
         instance = json.loads(line)
         new_instance = {"problem": instance["problem"], "expected_answer": instance["expected_answer"]}
-        for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution"]:
+        for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution", "generation", "is_correct", "judgement", "predicted_answer"]:
             if key in instance:
                 new_instance[key] = instance[key]
         
-        if instance["judgment_idx"] is not None:
-            judgment_idx = instance["judgment_idx"]
-        else:
-            judgment_idx = random.randint(0, instance["max_idx"])
+        if "judgment_idx" in instance:
+            if instance["judgment_idx"] is not None:
+                judgment_idx = instance["judgment_idx"]
+            else:
+                judgment_idx = random.randint(0, instance["max_idx"])
 
-        new_instance["generation"] = instance[f"solution_{judgment_idx}"]
-        new_instance["summary"] = instance[f"solution_{judgment_idx}"]
-        new_instance["is_correct"] = instance[f"is_correct_{judgment_idx}"]
-        new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
-        new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
+            new_instance["generation"] = instance[f"solution_{judgment_idx}"]
+            new_instance["summary"] = instance[f"solution_{judgment_idx}"]
+            new_instance["is_correct"] = instance[f"is_correct_{judgment_idx}"]
+            new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
+            new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
 
         
         instances.append(new_instance)
