@@ -45,7 +45,7 @@ def get_genselect_cmd(
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def generate(
+def genselect(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
