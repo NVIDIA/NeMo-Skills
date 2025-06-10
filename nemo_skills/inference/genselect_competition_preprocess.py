@@ -66,9 +66,7 @@ def check_if_all_incorrect(answer_clusters):
     if all_incorrect:
         # Choose the most common answer
         most_common_answer = max(answer_clusters, key=lambda x: len(answer_clusters[x]))
-        _, instances = answer_clusters[most_common_answer]
-        instance = instances[0]
-        return instance
+        return answer_clusters[most_common_answer][0]
     else:
         return None
 
