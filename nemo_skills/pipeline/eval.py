@@ -292,8 +292,8 @@ def eval(
 
     if num_chunks:
         chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-    else:
-        chunk_ids = None
+    if chunk_ids is None:
+        chunk_ids = [None]
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")

@@ -278,7 +278,6 @@ def configure_client(
     server_gpus: int,
     server_nodes: int,
     server_address: str,
-    server_port: int | None,
     server_args: str,
     server_entrypoint: str | None,
     get_random_port: bool,
