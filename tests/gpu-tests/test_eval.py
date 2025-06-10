@@ -72,6 +72,7 @@ def test_trtllm_code_execution_eval(server_type):
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for llama to make it follow few-shots
     prompt_template = 'llama3-base' if model_type == 'llama' else 'qwen-instruct'
+    code_tags = 'nemotron' if model_type == 'llama' else 'qwen'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -87,6 +88,7 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_nodes 1 "
         f"    --with_sandbox "
         f"    ++prompt_template={prompt_template} "
+        f"    ++code_tags={code_tags} "
         f"    ++examples_type=gsm8k_text_with_code "
         f"    ++max_samples=20 "
         f"    ++code_execution=True "

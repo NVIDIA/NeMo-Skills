@@ -55,6 +55,7 @@ class GenerateSolutionsConfig:
     output_file: str  # Where to save the generations
     prompt_config: str  # How to format the data into prompts
     prompt_template: str | None = None  # not required for OpenAI server
+    code_tags: str | None = None # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
 
     # Inference server configuration {server_params}
@@ -245,7 +246,7 @@ class GenerationTask:
         return llm
 
     def setup_prompt(self):
-        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
+        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, self.cfg.code_tags, examples_type=self.cfg.examples_type)
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
