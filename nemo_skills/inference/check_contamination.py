@@ -75,7 +75,6 @@ class CheckContaminationTask(GenerationTask):
         # Adjust the batch size to account for the number of similar items
         if self.cfg.top_k is None:
             self.cfg.top_k = len(data[0]['similar_items'])
-        self.cfg.batch_size = max(1, self.cfg.batch_size // self.cfg.top_k // (2 if self.cfg.check_both_ways else 1))
 
         return data
 
