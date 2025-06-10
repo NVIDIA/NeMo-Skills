@@ -73,7 +73,6 @@ def check_if_all_incorrect(answer_clusters):
         return None
 
 
-
 def check_for_single_viable_answer(answer_clusters):
     if len(answer_clusters) == 1:
         # Single answer or no answer
@@ -109,7 +108,6 @@ def check_for_single_viable_answer(answer_clusters):
         return None
 
 
-
 def read_files(file_paths, single_answer_instances_path):
     problem_to_instances = defaultdict(list)
     for file_path in file_paths:
@@ -129,11 +127,13 @@ def read_files(file_paths, single_answer_instances_path):
 
             single_answer_instance = check_for_single_viable_answer(answer_clusters)
             if single_answer_instance is not None:
+                LOG.warning(f"Single answer instance found for problem {problem}")
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
                 # Check if all answers are incorrect
                 instance = check_if_all_incorrect(answer_clusters)
                 if instance is not None:
+                    LOG.warning(f"All incorrect answer instance found for problem {problem}")
                     f.write(json.dumps(instance) + "\n")
                 else:
                     # Write down the instances for problems with multiple answers
