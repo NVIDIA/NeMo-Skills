@@ -162,7 +162,7 @@ class CodeExecutionWrapper:
             if gen_id is not None and self._is_generation_cancelled(gen_id):
                 break
 
-            if self._can_cancel_generations:
+            if False: #self._can_cancel_generations:
                 # Wait for generation to finish while periodically checking for cancellation
                 # TODO: clean up the interface to always use public method, not just in this case
                 request["prompts"] = [request.pop("prompt")]
