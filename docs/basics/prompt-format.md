@@ -134,7 +134,7 @@ If you're implementing a new script, you can use the following code to create a 
 from nemo_skills.prompt.utils import get_prompt
 
 # The third parameter is optional and only needed for code execution
-prompt = get_prompt('generic/math', 'llama3-instruct', 'llama3')
+prompt = get_prompt('generic/math', 'llama3-instruct', code_tags='llama3')
 print(prompt.fill({'problem': "What's 2 + 2?"}))
 ```
 
