@@ -61,6 +61,30 @@ def read_files(file_paths, single_answer_instances_path):
                 answer = instance["predicted_answer"]
                 answer_clusters[answer].append(instance)
 
+            # Check if all answers are incorrect
+            all_incorrect = True
+            for answer, instances in answer_clusters.items():
+                if answer is None:
+                    continue
+                else:
+                    instance = instances[0]
+                    if "judgement" in instance:
+                        if is_correct_judgement(instance["judgement"]):
+                            all_incorrect = False
+                            break
+                    else:
+                        if instance["is_correct"]:
+                            all_incorrect = False
+                            break
+
+            # If all answers are incorrect, just choose the most common answer
+            if all_incorrect:
+                # Choose the most common answer
+                most_common_answer = max(answer_clusters, key=lambda x: len(answer_clusters[x]))
+                _, instances = answer_clusters[most_common_answer]
+                instance = instances[0]
+                f.write(json.dumps(instance) + "\n")
+
             if len(answer_clusters) == 1:
                 # Single answer or no answer
                 _, single_answer_instance_list = list(answer_clusters.items())[0]
@@ -97,7 +121,33 @@ def read_files(file_paths, single_answer_instances_path):
                         (answer, instances) for answer, instances in answer_clusters.items()
                     ]
 
-    LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
+
+        # Also remove problems for which all answers are incorrect
+        # Write down the problems with all incorrect answers to a separate file
+        # If "judgment" is present, use it to determine if the answer is correct
+        # Else use "is_correct" to determine if the answer is correct
+    #     problem_to_incorrect_instances = defaultdict(list)
+    #     for problem, instance_list in problem_to_clustered_instances.items():
+    #         all_incorrect = True
+    #         for instance in instance_list:
+    #             if "judgment" in instance:
+    #                 if is_correct_judgement(instance["judgment"]):
+    #                     all_incorrect = False
+    #                     break
+    #             else:
+    #                 if instance["is_correct"]:
+    #                     all_incorrect = False
+    #                     break
+    #         if all_incorrect:
+    #             problem_to_incorrect_instances[problem].append(instance_list)
+
+    #     LOG.info(f"Number of problems with all incorrect answers: {len(problem_to_incorrect_instances)}")
+        
+    #     with open(os.path.join(os.path.dirname(single_answer_instances_path), "incorrect_instances.jsonl"), "w") as f:
+    #         for problem, instance_list in problem_to_incorrect_instances.items():
+    #             f.write(json.dumps(instance_list[0]) + "\n")
+
+    # LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
     return problem_to_clustered_instances
 
 
