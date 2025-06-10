@@ -142,6 +142,7 @@ class CodeExecutionWrapper:
             "timeout": timeout,
         }
         session_id = None
+        max_new_tokens = tokens_to_generate
         code_rounds_executed = 0
         total_num_generated_tokens = 0
         generation_time = 0
@@ -239,6 +240,8 @@ class CodeExecutionWrapper:
                 request['prompt'] += format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+                # TODO: this  is not quite correct as I think max_tokens will be total tokens rather than new tokens
+                request['tokens_to_generate'] = max_new_tokens - len(tokenizer.encode(request['prompt'], add_special_tokens=True))
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
