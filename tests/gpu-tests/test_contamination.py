@@ -39,13 +39,12 @@ def test_check_contamination():
 
     docker_rm([output_dir])
 
-    # testing example from the docs
     test_sets = ['math-500', 'amc23', 'aime24']
     compare_to = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
     cmd = (
         f"python -m nemo_skills.inference.retrieve_similar "
-        f"    ++retrieve_from='/nemo_run/code/nemo_skills/dataset/math/train.jsonl' "
+        f"    ++retrieve_from='/tmp/nemo-skills-tests/data/contamination-example.test' "
         f"    ++compare_to=\\\'{compare_to}\\\'"
         f"    ++output_file='{output_dir}/math-contamination-retrieved.jsonl' "
         f"    ++top_k=1 "
@@ -75,10 +74,10 @@ def test_check_contamination():
 
     with open(output_file) as fin:
         lines = fin.readlines()
-    # assert len(lines) == 500
+    assert len(lines) == 10
     num_contaminated = 0
     for line in lines:
         data = json.loads(line)
         assert 'contaminated' in data
         num_contaminated += data['contaminated']
-    assert num_contaminated > 0, "No contaminated samples found in the output"
+    assert num_contaminated == 4
