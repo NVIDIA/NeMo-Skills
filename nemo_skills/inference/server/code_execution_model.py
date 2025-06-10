@@ -20,6 +20,7 @@ import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from openai import BadRequestError
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
@@ -206,7 +207,7 @@ class CodeExecutionWrapper:
                     #     print(f"We have generated the code {generated_code} with the following output {code_output}")
                     output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
                     output_dict['num_generated_tokens'] = len(tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
-                except ValueError as e:
+                except BadRequestError as e:
                     print(f"Error generating code: {e}")
                     break
 

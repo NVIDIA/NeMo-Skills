@@ -876,6 +876,8 @@ class VLLMModel(BaseModel):
         if top_k > 0:
             extra_body["top_k"] = top_k
 
+        import uuid
+        print(f'starting generation {(id_ := uuid.uuid4())}')
         response = self.oai_client.completions.create(
             model=self.model,
             prompt=[prompt],
@@ -894,7 +896,8 @@ class VLLMModel(BaseModel):
             extra_body=extra_body,
             timeout=timeout,
         )
-        print(f'Response: {response}')
+        print(f'finished generation {id_}')
+        print(f'Response {id_}: {response}')
 
         if stream:
             return self._stream_chunks(response)
