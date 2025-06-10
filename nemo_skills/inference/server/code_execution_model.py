@@ -204,7 +204,7 @@ class CodeExecutionWrapper:
                             print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
                     #     print(f"We have generated the code {generated_code} with the following output {code_output}")
                     output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
-                    output_dict['num_generated_tokens'] = num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
+                    output_dict['num_generated_tokens'] = len(tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
                 except ValueError as e:
                     print(f"Error generating code: {e}")
                     break
