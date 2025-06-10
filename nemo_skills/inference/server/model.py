@@ -894,6 +894,7 @@ class VLLMModel(BaseModel):
             extra_body=extra_body,
             timeout=timeout,
         )
+        print(f'Response: {response}')
 
         if stream:
             return self._stream_chunks(response)
