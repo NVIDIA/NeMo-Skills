@@ -188,7 +188,7 @@ class CodeExecutionWrapper:
                     MAX_TRIES = 5
                     for i in range(MAX_TRIES):
                         output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
-                        print(f"Request retried: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
+                        print(f"Request retried: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                         output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
                         generated_code = code_begin + output_dict['generation']
                         code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
