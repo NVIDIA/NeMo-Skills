@@ -175,21 +175,42 @@ def extract_summary(instance, max_length=5000):
     return summary.strip()
 
 
+def minibatchify_instances(clustered_instances, max_soln_samples=8, use_diversity=False):
+    if not use_diversity:
+        # Original behavior
+        instances = []
+        for _, same_answer_instances in clustered_instances:
+            instances.extend(same_answer_instances)
+        random.shuffle(instances)
+        minibatch_instances = [instances[i:i+max_soln_samples] for i in range(0, len(instances), max_soln_samples)]
+        return minibatch_instances
+    
+    else:
+        # Diversity-based distribution
+        # Sort clusters by size (smallest first)
+        sorted_clusters = sorted(clustered_instances, key=lambda x: len(x[1]))
+        
+        # Create ordered list prioritizing diversity
+        distributed_instances = []
+        for _, same_answer_instances in sorted_clusters:
+            shuffled_instances = same_answer_instances.copy()
+            random.shuffle(shuffled_instances)
+            distributed_instances.extend(shuffled_instances)
+        
+        # Create minibatches using round-robin distribution
+        num_batches = (len(distributed_instances) + max_soln_samples - 1) // max_soln_samples
+        minibatch_instances = [[] for _ in range(num_batches)]
+        
+        for i, instance in enumerate(distributed_instances):
+            minibatch_instances[i % num_batches].append(instance)
+        
+        return minibatch_instances
 
 
-def minibatchify_instances(clustered_instances, max_soln_samples=8):
-    instances = []
-    for _, same_answer_instances in clustered_instances:
-        instances.extend(same_answer_instances)
-    random.shuffle(instances)
-
-    minibatch_instances = [instances[i:i+max_soln_samples] for i in range(0, len(instances), max_soln_samples)]
-    return minibatch_instances
-
-def create_comparison_instance(clustered_instances, max_soln_samples=8):
+def create_comparison_instance(clustered_instances, max_soln_samples=8, use_diversity=False):
     """Create a comparison instance for a problem."""
     # Create a consolidated instance
-    all_minibatch_instances = minibatchify_instances(clustered_instances, max_soln_samples)
+    all_minibatch_instances = minibatchify_instances(clustered_instances, max_soln_samples, use_diversity)
 
     comparison_instances = []
     for minibatch_instances in all_minibatch_instances:
@@ -222,7 +243,7 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8):
     return comparison_instances
 
 
-def process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds):
+def process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity):
     for random_seed, input_file in enumerate(input_files):
         if random_seed == 0:
             problem_to_clustered_instances = read_file_competition(input_file, os.path.join(output_dir, "single_answer_instances.jsonl"))
@@ -234,12 +255,13 @@ def process_competition_files(input_files, output_dir, max_soln_samples, num_ran
                 comparison_instances = create_comparison_instance(
                     clustered_instances,
                     max_soln_samples=max_soln_samples,
+                    use_diversity=use_diversity,
                 )
                 for comparison_instance in comparison_instances:
                     f.write(json.dumps(comparison_instance) + "\n")
 
 
-def process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds):
+def process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity):
     problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
 
     for random_seed in range(num_random_seeds):
@@ -249,13 +271,14 @@ def process_non_competition_files(input_files, output_dir, max_soln_samples, num
                 comparison_instances = create_comparison_instance(
                     clustered_instances,
                     max_soln_samples=max_soln_samples,
+                    use_diversity=use_diversity,
                 )
                 for comparison_instance in comparison_instances:
                     f.write(json.dumps(comparison_instance) + "\n")
 
 
 def preprocess(
-    input_dir, output_dir, max_soln_samples=8, num_random_seeds=8, num_input_samples=8
+    input_dir, output_dir, max_soln_samples=8, num_random_seeds=8, num_input_samples=8, use_diversity=False
 ):
     if output_dir is None:
         raise ValueError("Output directory is required")
@@ -275,9 +298,9 @@ def preprocess(
     in_competition = test_if_in_competition(input_files[0])
     
     if in_competition:
-        process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds)
+        process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity)
     else:
-        process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds)
+        process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity)
 
 
 
@@ -289,6 +312,7 @@ class GenSelectPreprocessConfig:
     max_soln_samples: int = 16
     num_random_seeds: int | None = None
     num_input_samples: int | None = None
+    use_diversity: bool = False
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -307,6 +331,7 @@ def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
         max_soln_samples=cfg.max_soln_samples,
         num_random_seeds=cfg.num_random_seeds,
         num_input_samples=cfg.num_input_samples,
+        use_diversity=cfg.use_diversity,
     )
 
 
