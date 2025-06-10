@@ -59,6 +59,7 @@ class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
     math_judge = "math_judge"
+    check_contamination = "check_contamination"
     # genselect = "genselect"
 
 
@@ -66,6 +67,7 @@ GENERATION_MODULE_MAP = {
     GenerationType.generate: "nemo_skills.inference.generate",
     GenerationType.reward: "nemo_skills.inference.reward_model",
     GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
+    GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
 }
 
 
@@ -321,7 +323,7 @@ def generate(
                     preprocess_cmd=preprocess_cmd,
                     postprocess_cmd=postprocess_cmd,
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    script=generation_task.get_generation_module(),
+                    script=generation_module,
                 )
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname

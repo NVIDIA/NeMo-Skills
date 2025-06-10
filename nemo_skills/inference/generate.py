@@ -175,17 +175,6 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
 
 class GenerationTask:
     @classmethod
-    def get_generation_module(cls) -> str:
-        """
-        Returns the path to the script module that performs the generation task.
-        Override this method to customize the generation module.
-
-        Returns:
-            str: Path to the generation module.
-        """
-        return "nemo_skills.inference.generate"
-
-    @classmethod
     def get_generation_default_args(cls) -> str:
         """
         Returns the default arguments for the generation task.

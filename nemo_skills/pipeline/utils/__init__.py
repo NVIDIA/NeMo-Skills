@@ -44,6 +44,7 @@ from nemo_skills.pipeline.utils.generation import (
     get_chunked_rs_filename,
     get_generation_cmd,
     get_remaining_jobs,
+    wrap_cmd,
 )
 from nemo_skills.pipeline.utils.mounts import (
     add_mount_path,
@@ -71,5 +72,4 @@ from nemo_skills.pipeline.utils.server import (
     get_reward_server_command,
     get_server_command,
     wait_for_server,
-    wrap_cmd,
 )

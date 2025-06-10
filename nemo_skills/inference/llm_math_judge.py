@@ -74,10 +74,6 @@ class LLMMathJudgeTask(GenerationTask):
 
         super().dump_outputs(outputs, data_points, fout)
 
-    @classmethod
-    def get_generation_module(cls) -> str:
-        return "nemo_skills.inference.llm_math_judge"
-
 
 GENERATION_TASK_CLASS = LLMMathJudgeTask
 

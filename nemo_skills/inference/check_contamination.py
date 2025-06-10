@@ -209,6 +209,9 @@ class CheckContaminationTask(GenerationTask):
             LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)
 
 
+GENERATION_TASK_CLASS = CheckContaminationTask
+
+
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name='base_check_contamination_config')
 def check_contamination(cfg: CheckContaminationConfig):

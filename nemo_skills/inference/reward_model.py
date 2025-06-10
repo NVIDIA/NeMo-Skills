@@ -83,10 +83,6 @@ class RewardModelTask(GenerationTask):
 
         return get_reward_server_command
 
-    @classmethod
-    def get_generation_module(cls) -> str:
-        return "nemo_skills.inference.reward_model"
-
 
 GENERATION_TASK_CLASS = RewardModelTask
 
