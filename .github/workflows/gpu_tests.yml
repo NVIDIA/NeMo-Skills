@@ -47,6 +47,7 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         nvidia-smi
+        export DOCKER_CLIENT_TIMEOUT=120
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_llama.sh
     - name: Cleanup
@@ -86,6 +87,7 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         nvidia-smi
+        export DOCKER_CLIENT_TIMEOUT=120
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_qwen.sh
     - name: Cleanup
@@ -122,6 +124,7 @@ jobs:
       run: |
         cd ${{ github.run_id }}
         nvidia-smi
+        export DOCKER_CLIENT_TIMEOUT=120
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ./tests/gpu-tests/run_rm.sh
     - name: Cleanup

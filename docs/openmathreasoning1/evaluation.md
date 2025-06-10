@@ -188,7 +188,8 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --with_sandbox \
-    ++prompt_template=openmath-instruct \
+    ++code_tags=openmath \
+    ++prompt_template=qwen-instruct \
     ++prompt_config=openmath/tir \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -210,7 +211,8 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --with_sandbox \
-    ++prompt_template=openmath-instruct \
+    ++code_tags=openmath \
+    ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
