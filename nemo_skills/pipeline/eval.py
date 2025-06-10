@@ -26,56 +26,6 @@ from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-# def get_greedy_cmd(
-#     benchmark,
-#     output_dir,
-#     output_name='output.jsonl',
-#     extra_eval_args="",
-#     extra_arguments="",
-#     num_chunks=None,
-#     chunk_ids=None,
-# ):
-#     cmds = []
-#     if num_chunks is None or chunk_ids is None:
-#         chunk_params = ["++chunk_id=null ++num_chunks=null"]
-#         chunked_output_names = [output_name]
-#     else:
-#         chunk_params = [f"++chunk_id={chunk_id} ++num_chunks={num_chunks}" for chunk_id in chunk_ids]
-#         chunked_output_names = [get_chunked_filename(chunk_id, output_name) for chunk_id in chunk_ids]
-#     for chunk_param, chunked_output_name in zip(chunk_params, chunked_output_names):
-#         cmds.append(
-#             f'echo "Evaluating benchmark {benchmark}" && '
-#             f'python -m nemo_skills.inference.generate '
-#             f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-#             f'    {chunk_param} '
-#             f'    {extra_arguments} && '
-#             f'python -m nemo_skills.evaluation.evaluate_results '
-#             f'    ++input_files={output_dir}/eval-results/{benchmark}/{chunked_output_name} {extra_eval_args}'
-#         )
-#     return cmds
-
-
-# def get_sampling_cmd(
-#     benchmark,
-#     output_dir,
-#     random_seed,
-#     extra_eval_args="",
-#     extra_arguments="",
-#     num_chunks=None,
-#     chunk_ids=None,
-# ):
-#     extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
-#     return get_greedy_cmd(
-#         benchmark=benchmark,
-#         output_dir=output_dir,
-#         output_name=f"output-rs{random_seed}.jsonl",
-#         extra_eval_args=extra_eval_args,
-#         extra_arguments=extra_arguments,
-#         num_chunks=num_chunks,
-#         chunk_ids=chunk_ids,
-#     )
-
-
 def add_default_args(
     cluster_config, benchmark, split, data_dir, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
 ):
@@ -169,7 +119,9 @@ def eval(
         None,
         help="Data split to use for evaluation. Will use benchmark-specific default or 'test' if it's not defined.",
     ),
-    num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
+    num_jobs: int = typer.Option(
+        None, help="Number of jobs to split the evaluation into. By default will run all benchmarks/seeds in parallel."
+    ),
     num_chunks: int = typer.Option(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
@@ -337,7 +289,7 @@ def eval(
         if rs_num == 0:
             random_seeds = [None]
         else:
-            random_seeds = list(range(rs_num))
+            random_seeds = list(range(starting_seed, starting_seed + rs_num))
 
         benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
         remaining_jobs = pipeline_utils.get_remaining_jobs(
@@ -370,8 +322,12 @@ def eval(
                 )
                 eval_cmds.append((cmd, benchmark))
 
-    if num_jobs == -1:
-        num_jobs = len(eval_cmds)
+    if num_jobs is None:
+        if cluster_config['executor'] == 'slurm':
+            num_jobs = len(eval_cmds)
+        else:
+            # for local executor, it makes no sense to use other values
+            num_jobs = 1
 
     # Create job batches with benchmark info
     job_batches = []

@@ -127,8 +127,6 @@ evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
 pass@4          | 164         | 78.66              | 72.56
 ```
 
-If you want to get both multiple samples and greedy results, use `--add_greedy` parameter.
-
 
 ## Using data on cluster
 
