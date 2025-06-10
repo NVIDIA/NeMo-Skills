@@ -123,12 +123,12 @@ def add_default_args(
 
     extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
-    default_arguments = f"++input_file={input_file} {prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
+    default_arguments = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
     extra_arguments = f"{default_arguments} {extra_arguments}"
 
     requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
 
-    return extra_arguments, extra_eval_args, requires_sandbox
+    return input_file, extra_arguments, extra_eval_args, requires_sandbox
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -320,7 +320,7 @@ def eval(
     has_tasks = False
 
     for benchmark, rs_num in benchmarks.items():
-        bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
+        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
             cluster_config,
             benchmark,
             split,
@@ -358,6 +358,7 @@ def eval(
             for chunk_id in chunk_ids:
                 has_tasks = True
                 cmd = pipeline_utils.get_generation_cmd(
+                    input_file=bench_input_file,
                     output_dir=benchmark_output_dir,
                     extra_arguments=bench_gen_args,
                     random_seed=seed,

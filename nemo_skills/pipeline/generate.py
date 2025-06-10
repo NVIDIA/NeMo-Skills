@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
 from enum import Enum
 from typing import List
@@ -18,7 +19,6 @@ from typing import List
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
 
@@ -60,6 +60,13 @@ class GenerationType(str, Enum):
     reward = "reward"
     math_judge = "math_judge"
     # genselect = "genselect"
+
+
+GENERATION_MODULE_MAP = {
+    GenerationType.generate: "nemo_skills.inference.generate",
+    GenerationType.reward: "nemo_skills.inference.reward_model",
+    GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
+}
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -132,7 +139,7 @@ def generate(
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
     ),
-    genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
+    # genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -150,9 +157,6 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    output_prefix: str = typer.Option(
-        "output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
-    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -188,15 +192,6 @@ def generate(
     extra_arguments = f'{" ".join(ctx.args)}'
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-
-    chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
-    if chunking_enabled and generation_type != GenerationType.generate:
-        logging.error(
-            "Chunking is enabled, but generation type is not 'generate'. "
-            "Chunking is only supported for generation type 'generate'."
-            "This may result in superfluous generation jobs."
-        )
-        raise ValueError("Chunking is only supported for generation type 'generate'")
 
     try:
         server_type = server_type.value
@@ -242,26 +237,21 @@ def generate(
         check_mounted_paths=check_mounted_paths,
     )
 
-    get_server_command = server_command_factories[generation_type]
-    get_cmd = client_command_factories[generation_type]
-    cmd_script = client_command_scripts[generation_type]
     original_server_address = server_address
 
-    # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
-    if (
-        generation_type == GenerationType.generate
-        and ctx.obj is not None
-        and isinstance(ctx.obj, dict)
-        and 'generation_task_type' in ctx.obj
-    ):
-        generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
-        assert issubclass(
-            generation_task, GenerationTask
-        ), f"`generation_task_type` must be a subclass of GenerationTask"
-        cmd_script = generation_task.get_generation_module()
-        cmd_extra_args = generation_task.get_generation_default_args()
-        cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
+    if generation_module is not None and generation_type is not None:
+        raise ValueError("Cannot specify both generation_module and generation_type. ")
+    if generation_module is None:
+        generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
+    generation_task = importlib.import_module(generation_module)
+    if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+        raise ValueError(
+            f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+            "Please provide a valid generation module."
+        )
+    generation_task = generation_task.GENERATION_TASK_CLASS
+    extra_arguments = f"{generation_task.get_generation_default_args()} {extra_arguments}"
     extra_arguments_original = extra_arguments
 
     # Treat no random seeds as a single None seed to unify the code paths
@@ -274,31 +264,30 @@ def generate(
         random_seeds=random_seeds,
         chunk_ids=chunk_ids,
         rerun_done=rerun_done,
-        output_prefix=output_prefix,
     )
     has_tasks = False
 
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        if generation_type == GenerationType.genselect:
-            # Add the preprocessing command for genselect
-            genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
-                genselect_args if genselect_args is not None else ""
-            )
-            preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+        # if generation_type == GenerationType.genselect:
+        #     # Add the preprocessing command for genselect
+        #     genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
+        #         genselect_args if genselect_args is not None else ""
+        #     )
+        #     preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
 
-            preprocess_task = pipeline_utils.add_task(
-                exp,
-                cmd=preprocess_cmd,
-                task_name="preprocess_genselect",
-                log_dir=f"{output_dir}/preprocess-logs",
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-            )
-            initial_tasks = [preprocess_task]
+        #     preprocess_task = pipeline_utils.add_task(
+        #         exp,
+        #         cmd=preprocess_cmd,
+        #         task_name="preprocess_genselect",
+        #         log_dir=f"{output_dir}/preprocess-logs",
+        #         container=cluster_config["containers"]["nemo-skills"],
+        #         cluster_config=cluster_config,
+        #     )
+        #     initial_tasks = [preprocess_task]
 
-        else:
-            initial_tasks = None
-
+        # else:
+        #     initial_tasks = None
+        prev_tasks = None
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
@@ -306,7 +295,6 @@ def generate(
                     output_dir,
                     random_seed=seed,
                     chunk_id=None,
-                    output_prefix=output_prefix,
                 )
             for chunk_id in chunk_ids:
                 has_tasks = True
@@ -321,20 +309,20 @@ def generate(
                     extra_arguments=extra_arguments_original,
                     get_random_port=get_random_port,
                 )
-                cmd = get_cmd(
+                cmd = pipeline_utils.get_generation_cmd(
+                    input_file=input_file,
+                    input_dir=input_dir,
                     random_seed=seed,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
-                    output_prefix=output_prefix,
                     preprocess_cmd=preprocess_cmd,
                     postprocess_cmd=postprocess_cmd,
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    script=cmd_script,
+                    script=generation_task.get_generation_module(),
                 )
-                prev_tasks = initial_tasks
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:
@@ -355,7 +343,7 @@ def generate(
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
-                        get_server_command=get_server_command,
+                        get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]

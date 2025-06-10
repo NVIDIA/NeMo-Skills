@@ -30,16 +30,14 @@ def get_chunked_rs_filename(
     output_dir: str,
     random_seed: int = None,
     chunk_id: int = None,
-    output_prefix: str = "output",
 ) -> str:
     """
-    Return a path of the form: {output_dir}/{output_prefix}[-rsSEED][-chunkK].jsonl
-    If `output_prefix` is None, fallback to 'output' in place of {output_prefix}.
+    Return a path of the form: {output_dir}/output[-rsSEED][-chunkK].jsonl
     """
     if random_seed is not None:
-        base_filename = f"{output_prefix}-rs{random_seed}.jsonl"
+        base_filename = f"output-rs{random_seed}.jsonl"
     else:
-        base_filename = f"{output_prefix}.jsonl"
+        base_filename = f"output.jsonl"
 
     # If chunking is enabled, add the chunk suffix
     if chunk_id is not None:
@@ -47,21 +45,19 @@ def get_chunked_rs_filename(
     return os.path.join(output_dir, base_filename)
 
 
-def get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix="output"):
+def get_expected_done_files(output_dir, random_seeds, chunk_ids):
     """
     Returns a mapping of (seed, chunk_id) to expected .done file paths
     """
     file_map = {}
     for seed in random_seeds:
         for chunk_id in chunk_ids:
-            output_file = get_chunked_rs_filename(
-                output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix
-            )
+            output_file = get_chunked_rs_filename(output_dir, random_seed=seed, chunk_id=chunk_id)
             file_map[(seed, chunk_id)] = f"{output_file}.done"
     return file_map
 
 
-def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done, output_prefix="output"):
+def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done):
     """
     Determines which jobs still need to be run based on missing .done files.
     Returns a mapping from random_seed to list of chunk_ids that need processing.
@@ -70,7 +66,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
 
     status_dir = get_unmounted_path(cluster_config, output_dir)
-    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix=output_prefix)
+    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids)
 
     check_commands = []
     for (seed, chunk_id), filepath in expected_files.items():
@@ -156,7 +152,9 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
 def get_generation_cmd(
     output_dir,
-    extra_arguments,
+    input_file=None,
+    input_dir=None,
+    extra_arguments="",
     random_seed=None,
     eval_args=None,
     chunk_id=None,
@@ -165,44 +163,44 @@ def get_generation_cmd(
     postprocess_cmd=None,
     wandb_parameters=None,
     script: str = 'nemo_skills.inference.generate',
-    output_prefix: str = "output",
 ):
-    """
-    Construct the generation command for language model inference.
+    """Construct the generation command for language model inference."""
+    if input_file is None and input_dir is None:
+        raise ValueError("Either input_file or input_dir must be provided.")
+    if input_file is not None and input_dir is not None:
+        raise ValueError("Please provide either input_file or input_dir, not both.")
 
-    If chunk_id is provided, chunking logic is used.
-    If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
-    with a base name (plus `-rsSEED` or chunk info as needed).
-    """
+    # in this case we are running on the output of another generate command
+    # and doing 1-1 mapping of random seeds
+    if input_dir is not None:
+        if random_seed is None:
+            raise ValueError("If input_dir is provided, random_seed must also be specified.")
+        input_file = f"{input_dir}/output-rs{random_seed}.jsonl"
+
     # First get the unchunked filename for the output file
     output_file = get_chunked_rs_filename(
         output_dir=output_dir,
         random_seed=random_seed,
-        output_prefix=output_prefix,
     )
-    cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
+    cmd = f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
     job_end_cmd = ""
 
-    if random_seed is not None:
+    if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations
         cmd += (
             f"    ++inference.random_seed={random_seed} "
-            f"    ++inference.temperature=1.0 "
+            f"    ++inference.temperature=0.7 "
             f"    ++inference.top_k=0 "
             f"    ++inference.top_p=0.95 "
         )
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(
-            output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix
-        )
+        output_file = get_chunked_rs_filename(output_dir, random_seed=random_seed, chunk_id=chunk_id)
         donefiles = []
         # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
         # the current run (as we don't want to merge partial jobs)
         for cur_chunk_id in range(num_chunks):
-            filename = get_chunked_rs_filename(
-                output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_prefix=output_prefix
-            )
+            filename = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id)
             donefile = f"{filename}.done"
             donefiles.append(donefile)
 
@@ -212,9 +210,7 @@ def get_generation_cmd(
             job_end_cmd = f"touch {donefiles[chunk_id]} "
 
         # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(
-            output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix
-        )
+        merged_output_file = get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed)
         merge_cmd = (
             f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
             f"{' '.join([f[:-5] for f in donefiles])}"
