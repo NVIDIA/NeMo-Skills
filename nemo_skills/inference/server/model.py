@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient, Stream
+from openai import AzureOpenAI, DefaultHttpxClient, OpenAI, Stream
 
 from nemo_skills.utils import get_logger_name
 
@@ -551,7 +551,6 @@ class OpenAIModel(BaseModel):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        from openai import OpenAI
 
         if model is None:
             model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
@@ -826,22 +825,18 @@ class AzureOpenAIModel(OpenAIModel):
     ):
         # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__
         BaseModel.__init__(self, host=host, port=port, **kwargs)
-        from openai import AzureOpenAI
 
+        model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
         if model is None:
-            model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
-            if model is None:
-                raise ValueError("model argument is required for Azure OpenAI model.")
+            raise ValueError("model argument is required for Azure OpenAI model.")
 
+        base_url = base_url or os.getenv("AZURE_OPENAI_ENDPOINT")
         if base_url is None:
-            base_url = os.getenv("AZURE_OPENAI_ENDPOINT")
-            if base_url is None:
-                raise ValueError("base_url is required for Azure OpenAI model.")
+            raise ValueError("base_url is required for Azure OpenAI model.")
 
-        if api_key is None:
-            api_key = os.getenv("AZURE_OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("api_key is required for Azure OpenAI model.")
+        api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("api_key is required for Azure OpenAI model.")
 
         self.client = AzureOpenAI(
             api_key=api_key,

@@ -107,9 +107,6 @@ class CodeExecutionWrapper:
                 max_code_executions=max_code_executions,
             )
 
-        if stop_phrases is None:
-            stop_phrases = []
-
         effective_max_code_executions = self.config.max_code_executions
         if max_code_executions is not None:
             effective_max_code_executions = max_code_executions
@@ -121,11 +118,9 @@ class CodeExecutionWrapper:
             new_prompt = copy.deepcopy(prompt)
 
         start_time = int(time.time())
-        
-        # For OpenAI models, don't add code_end to stop phrases because OpenAI API
-        # automatically removes stop phrases from the response, which breaks code execution detection
-        final_stop_phrases = (stop_phrases if stop_phrases else []) + [code_end]
-            
+
+        stop_phrases = stop_phrases or []
+
         request = {
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
@@ -135,7 +130,7 @@ class CodeExecutionWrapper:
             "min_p": min_p,
             "random_seed": random_seed,
             "repetition_penalty": repetition_penalty,
-            "stop_phrases": final_stop_phrases,
+            "stop_phrases": stop_phrases + [code_end],
             "timeout": timeout,
         }
         session_id = None
@@ -471,7 +466,7 @@ class CodeExecutionWrapper:
         if max_code_executions is not None:
             effective_max_code_executions = max_code_executions
 
-        final_stop_phrases = (stop_phrases if stop_phrases else []) + [code_end]
+        stop_phrases = stop_phrases or []
 
         request = {
             'temperature': temperature,
@@ -480,7 +475,7 @@ class CodeExecutionWrapper:
             'min_p': min_p,
             'repetition_penalty': repetition_penalty,
             'random_seed': random_seed,
-            'stop_phrases': final_stop_phrases,
+            'stop_phrases': stop_phrases + [code_end],
             'timeout': timeout,
             'tokens_to_generate': tokens_to_generate,
             'stream': True,
