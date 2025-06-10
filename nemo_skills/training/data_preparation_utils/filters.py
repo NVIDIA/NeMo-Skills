@@ -387,13 +387,13 @@ class SplitArithmetic(BaseFilter):
 
 
 class CodeTextFilter(BaseParallelProcessor):
-    def __init__(self, filter_type, prompt_template, solution_key='generation', **kwargs):
+    def __init__(self, filter_type, code_tags, solution_key='generation', **kwargs):
         if 'in_memory_chunksize' not in kwargs:
             kwargs['in_memory_chunksize'] = 100000000
         if 'chunksize' not in kwargs:
             kwargs['chunksize'] = 100000
         super().__init__(**kwargs)
-        self.prompt_template = prompt_template
+        self.code_tags = code_tags
         self.text_filter_type = filter_type
         self.solution_key = solution_key
 
@@ -436,8 +436,8 @@ class CodeTextFilter(BaseParallelProcessor):
         self.prepare()
         os.makedirs(os.path.dirname(self.output_manifest_file), exist_ok=True)
         metrics = []
-        prompt = load_config(self.prompt_template, Path(__file__).absolute().parents[2] / 'prompt' / 'template')
-        code_begin_token = prompt.config.template.code_begin
+        code_tags_config = load_config(self.code_tags, Path(__file__).absolute().parents[2] / 'prompt' / 'code_tags')
+        code_begin_token = code_tags_config.code_begin
 
         with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
             for manifest_chunk in self._chunk_manifest():

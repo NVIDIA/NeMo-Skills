@@ -17,7 +17,7 @@ from nemo_skills.prompt.utils import get_prompt
 
 
 def test_generic_math_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation', 'llama3-instruct', 'math_problem_augmentation')
+    prompt = get_prompt('generic/problem-augmentation', 'llama3-instruct', examples_type='math_problem_augmentation')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -154,7 +154,7 @@ def test_qwen_math_prompt_dict_multi_turn():
 
 
 def test_generic_gsm8k_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation-similar', 'nemotron-instruct', 'gsm8k_problem_augmentation')
+    prompt = get_prompt('generic/problem-augmentation-similar', 'nemotron-instruct', examples_type='gsm8k_problem_augmentation')
 
     expected_prompt = """<extra_id_0>System
 
@@ -304,7 +304,7 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt('generic/math', 'llama3-base', 'math_text_with_code')
+    prompt = get_prompt('generic/math', 'llama3-base', 'nemotron', examples_type='math_text_with_code')
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -479,7 +479,7 @@ Here is the problem you need to solve:
 
 
 def test_llama_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'llama3-instruct', 'math_text_with_code')
+    prompt = get_prompt('generic/math', 'llama3-instruct', 'llama3', examples_type='math_text_with_code')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -670,7 +670,7 @@ Here is the problem you need to solve:
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'qwen-instruct', 'math_text_with_code')
+    prompt = get_prompt('generic/math', 'qwen-instruct', 'qwen', examples_type='math_text_with_code')
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -1095,7 +1095,7 @@ theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 
 
 
 def test_minif2f_deepseek_fewshot_prompt():
-    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', 'minif2f_deepseek_fewshot')
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', examples_type='minif2f_deepseek_fewshot')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
