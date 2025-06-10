@@ -251,7 +251,7 @@ def eval(
         raise ValueError("benchmarks should be separated with commas")
 
     # TODO: random port will not really work here as we need to move this in the loop
-    get_random_port = server_gpus != 8 and not exclusive
+    get_random_port = server_gpus != 8 and not exclusive and server_type != "megatron"
     server_config, server_address, extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,
@@ -346,7 +346,6 @@ def eval(
                 benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
             )
 
-            LOG.info("Launching task with command %s", " && ".join(cmds))
             should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
             pipeline_utils.add_task(
                 exp,

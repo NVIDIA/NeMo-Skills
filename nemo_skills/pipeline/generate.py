@@ -177,7 +177,7 @@ def generate(
     else:
         wandb_parameters = None
 
-    get_random_port = server_gpus != 8 and not exclusive
+    get_random_port = server_gpus != 8 and not exclusive and server_type != "megatron"
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
