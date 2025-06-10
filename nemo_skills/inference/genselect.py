@@ -130,15 +130,9 @@ class GenSelectTask(GenerationTask):
         """Extract the judgment from the generation."""
         judgment = None
 
-        patterns = [
-            r"Judgment:\s*(\d+)",  # Allow for extra whitespace
-            r"Judgment:\s*(\d+)[^0-9]*$"  # End of string
-        ]
+        pattern = r"Judgment:\s*\**(\d+)\**"
     
-        matches = []
-        for pattern in patterns:
-            found = re.findall(pattern, generation[-min(2000, len(generation)):], re.IGNORECASE)
-            matches.extend(found)
+        matches = re.findall(pattern, generation[-min(2000, len(generation)):], re.IGNORECASE)
         
         LOG.warning("All matches found: %s", matches)
 
