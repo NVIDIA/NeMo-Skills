@@ -184,6 +184,8 @@ class CodeExecutionWrapper:
                     break
                 request["prompt"] = request.pop("prompts")[0]
             else:
+                if request['tokens_to_generate'] <= 0:
+                    break
                 print(f"Request: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                 try:
                     old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
@@ -272,6 +274,7 @@ class CodeExecutionWrapper:
                     "open Topology",
                     "",
                 ])
+        # prompt = get_prompt()
         code_execution_header = self.config.code_execution_header + header #"import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
         execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=code_execution_header + extract_code_to_execute(output, code_begin, code_end),
