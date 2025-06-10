@@ -12,24 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
 from typing import List
 
 import typer
 
+import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import wrap_cmd
-from nemo_skills.pipeline.utils import (
-    SupportedServers,
-    add_task,
-    check_mounts,
-    get_cluster_config,
-    get_exp,
-    get_free_port,
-    get_generation_command,
-    resolve_mount_paths,
-    run_exp,
-)
 from nemo_skills.utils import setup_logging
 
 
@@ -61,7 +50,7 @@ def check_contamination(
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers."
     ),
-    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
+    server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server."),
     server_entrypoint: str = typer.Option(
@@ -120,48 +109,38 @@ def check_contamination(
     except AttributeError:
         pass
 
-    get_random_port = server_gpus != 8 and not exclusive
+    cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
+    cluster_config = pipeline_utils.resolve_mount_paths(
+        cluster_config, mount_paths, create_remote_dir=check_mounted_paths
+    )
 
-    cluster_config = get_cluster_config(cluster, config_dir)
-    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
-
-    input_file, output_file, log_dir = check_mounts(
+    input_file, output_file, log_dir = pipeline_utils.check_mounts(
         cluster_config,
         log_dir=log_dir,
         mount_map={input_file: "/mounted_data/input", output_file: "/mounted_data/output"},
         check_mounted_paths=check_mounted_paths,
     )
 
-    if server_address is None:  # we need to host the model
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port(strategy="random") if get_random_port else 5000
-        server_address = f"localhost:{server_port}"
+    get_random_port = server_gpus != 8 and not exclusive
+    server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+        model=model,
+        server_type=server_type,
+        server_address=server_address,
+        server_gpus=server_gpus,
+        server_nodes=server_nodes,
+        server_args=server_args,
+        server_entrypoint=server_entrypoint,
+        extra_arguments=extra_arguments,
+        get_random_port=get_random_port,
+    )
 
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-            "server_entrypoint": server_entrypoint,
-            "server_port": server_port,
-        }
-        extra_arguments += f" ++server.server_type={server_type} "
-        extra_arguments += f" ++server.host=localhost "
-        extra_arguments += f" ++server.port={server_port} "
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments += (
-            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
-        )
-
-    with get_exp(expname, cluster_config) as exp:
+    with pipeline_utils.get_exp(expname, cluster_config) as exp:
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
-            new_task = add_task(
+            new_task = pipeline_utils.add_task(
                 exp,
                 cmd=wrap_cmd(
-                    get_generation_command(
+                    pipeline_utils.wait_for_server(
                         server_address=server_address,
                         generation_commands=get_check_contamination_cmd(input_file, output_file, extra_arguments),
                     ),
@@ -182,7 +161,7 @@ def check_contamination(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             )
             prev_tasks = [new_task]
-        run_exp(exp, cluster_config)
+        pipeline_utils.run_exp(exp, cluster_config)
 
     return exp
 

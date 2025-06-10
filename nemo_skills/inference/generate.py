@@ -196,6 +196,19 @@ class GenerationTask:
         """
         return ""
 
+    @classmethod
+    def get_server_command_fn(cls) -> callable:
+        """
+        Returns the function to get the server command for the generation task.
+        Override this method to customize the server command function.
+
+        Returns:
+            callable: Function that returns the server command.
+        """
+        from nemo_skills.pipeline.utils import get_server_command
+
+        return get_server_command
+
     def __init__(self, cfg: GenerateSolutionsConfig):
         """
         Class that represents a generation task. It implements a template of steps to generate solutions using LLMs.
@@ -572,6 +585,9 @@ class GenerationTask:
             self.sync_loop(data)
 
         self.postprocess()
+
+
+GENERATION_TASK_CLASS = GenerationTask
 
 
 # Update the hydra main to use the class method
