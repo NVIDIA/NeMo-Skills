@@ -35,6 +35,10 @@ from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+# Add a module-level set to track which environment variables have been logged
+_logged_required_env_vars = set()
+_logged_optional_env_vars = set()
+
 
 def get_timeout(cluster_config, partition):
     if 'timeouts' not in cluster_config:
@@ -67,20 +71,30 @@ def get_env_variables(cluster_config):
     Returns:
         dict: dictionary of environment
     """
+    global _logged_required_env_vars, _logged_optional_env_vars
+
     env_vars = {}
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
+        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+
         if "=" in env_var:
             if env_var.count("=") == 1:
-                env_var, value = env_var.split("=")
+                env_var_name, value = env_var.split("=")
+                env_var_name = env_var_name.strip()
+                value = value.strip()
             else:
                 raise ValueError(f"Invalid required environment variable format: {env_var}")
-            env_vars[env_var.strip()] = value.strip()
-            logging.info(f"Adding required environment variable {env_var}")
+            env_vars[env_var_name] = value
+            if env_var_name not in _logged_required_env_vars:
+                LOG.info(f"Adding required environment variable {env_var_name} from config")
+                _logged_required_env_vars.add(env_var_name)
         elif env_var in os.environ:
-            logging.info(f"Adding required environment variable {env_var} from environment")
             env_vars[env_var] = os.environ[env_var]
+            if env_var not in _logged_required_env_vars:
+                LOG.info(f"Adding required environment variable {env_var} from environment")
+                _logged_required_env_vars.add(env_var)
         else:
             raise ValueError(f"Required environment variable {env_var} not found.")
 
@@ -94,21 +108,33 @@ def get_env_variables(cluster_config):
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
     for env_var in optional_env_vars + always_optional_env_vars:
+        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+
         if "=" in env_var:
             if env_var.count("=") == 1:
-                env_var, value = env_var.split("=")
+                env_var_name, value = env_var.split("=")
+                env_var_name = env_var_name.strip()
+                value = value.strip()
             else:
                 raise ValueError(f"Invalid optional environment variable format: {env_var}")
-            env_vars[env_var.strip()] = value.strip()
-            logging.info(f"Adding optional environment variable {env_var}")
+            env_vars[env_var_name] = value
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from config")
+                _logged_optional_env_vars.add(env_var_name)
         elif env_var in os.environ:
-            logging.info(f"Adding optional environment variable {env_var} from environment")
             env_vars[env_var] = os.environ[env_var]
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var} from environment")
+                _logged_optional_env_vars.add(env_var)
         elif env_var in default_factories:
             env_vars[env_var] = default_factories[env_var]()
-            logging.info(f"Adding optional environment variable {env_var} from environment")
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var} from environment")
+                _logged_optional_env_vars.add(env_var)
         else:
-            logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
+                _logged_optional_env_vars.add(env_var)
 
     return env_vars
 
