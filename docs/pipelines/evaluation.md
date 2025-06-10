@@ -77,14 +77,14 @@ ns summarize_results --cluster local /workspace/test-eval
 Which should print the following
 
 ```
-------------------------- gsm8k -------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 1319        | 82.34            | 0.91
+--------------------------------- gsm8k ---------------------------------
+evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
+greedy          | 1319        | 169        | 83.40%           | 1.97%
 
 
------------------------------- human-eval -----------------------------
-evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
-greedy          | 164         | 67.68              | 62.20
+------------------------------------ human-eval ------------------------------------
+evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
+greedy          | 164         | 228        | 70.12%             | 62.80%
 ```
 
 The [summarize_results](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/summarize_results.py) script
@@ -123,9 +123,10 @@ majority@4      | 1319        | 161        | 88.10%           | 0.08%
 pass@4          | 1319        | 161        | 93.25%           | 0.08%
 
 
------------------------------- human-eval -----------------------------
-evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
-pass@4          | 164         | 78.66              | 72.56
+------------------------------------ human-eval ------------------------------------
+evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
+pass@1[4]       | 164         | 251        | 64.18%             | 59.30%
+pass@4          | 164         | 251        | 82.32%             | 78.05%
 ```
 
 

@@ -30,12 +30,12 @@ def test_trtllm_judge():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != 'llama':
+    if model_type != 'qwen':
         pytest.skip("Only running this test for qwen models")
     prompt_template = 'qwen-instruct'
 
     input_dir = "/nemo_run/code/tests/data"
-    output_dir = "/tmp/nemo-skills-tests/data/math"
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/judge/math"
 
     docker_rm([output_dir])
 

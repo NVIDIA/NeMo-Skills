@@ -39,7 +39,7 @@ jobs:
         pip uninstall -y nemo-skills nemo_run
         pip install -e .
         pip install -r requirements/common-tests.txt
-        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
+        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval math amc23 aime24
     - name: Run GPU tests
       timeout-minutes: 180
       env:
@@ -78,7 +78,7 @@ jobs:
         pip uninstall -y nemo-skills nemo_run
         pip install -e .
         pip install -r requirements/common-tests.txt
-        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval
+        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval math amc23 aime24
     - name: Run GPU tests
       timeout-minutes: 180
       env:

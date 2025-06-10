@@ -24,6 +24,8 @@ pytest tests/gpu-tests/test_logprobs.py -s -x
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
+pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x
+pytest tests/gpu-tests/test_contamination.py -s -x
 
 # for sft we are using the tiny random model to run much faster
 docker run --rm \

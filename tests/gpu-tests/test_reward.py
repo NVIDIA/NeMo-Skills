@@ -33,7 +33,7 @@ def test_vllm_reward():
     prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     input_dir = "/nemo_run/code/tests/data"
-    output_dir = "/tmp/nemo-skills-tests/data/rm"
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/rm"
 
     docker_rm([output_dir])
 

@@ -231,10 +231,11 @@ Next, you need to run LLM inference to check those closest found problems from t
 We use the Llama3.1-405B-Instruct model for this, and here's one way of doing it via Nvidia API catalog.
 
 ```bash
-ns check_contamination \
+ns generate \
     --cluster=slurm \
+    --generation_type=check_contamination \
     --input_file=/workspace/new-problems-solution-augmentation/contamination-retrieved.jsonl \
-    --output_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl \
+    --output_dir=/workspace/new-problems-solution-augmentation/contamination-llm \
     --server_type=openai \
     --model=meta/llama-3.1-405b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1 \
@@ -267,7 +268,7 @@ python -m nemo_skills.training.prepare_data \
     ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
     ++max_solution_length=1024 \
     ++filters.remove_contaminated=true \
-    ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl
+    ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm/output.jsonl
 ```
 
 ## Dataset contamination explorer

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
-from nemo_skills.pipeline.cli import check_contamination, generate, run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
 
 def get_stage_expname(base_expname, stage_name, suffix):
@@ -163,7 +163,6 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     """Runs decontamination against specified test sets."""
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
-    output_file = stage_config.get("output_file", f"{output_dir}/contamination-labeled.jsonl")
 
     datasets = stage_config.get('datasets', [])
     datasets_paths = ",".join([f"/nemo_run/code/nemo_skills/dataset/{d}/test.jsonl" for d in datasets])
@@ -191,12 +190,12 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     # Second step: check contamination
     check_contamination_expname = f"{expname}-2"
 
-    check_contamination(
+    generate(
         ctx=wrap_arguments(stage_config.get('inline_args', '')),
+        generation_type='check_contamination',
         cluster=cluster,
         input_file=f"{output_dir}/retrieved-test.jsonl",
-        output_file=output_file,
-        log_dir=f"{output_dir}/logs",
+        output_dir=output_dir,
         expname=check_contamination_expname,
         run_after=retrieval_expname,
         **stage_config.get('stage_kwargs', {}),
