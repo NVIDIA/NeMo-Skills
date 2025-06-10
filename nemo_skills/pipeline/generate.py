@@ -81,7 +81,7 @@ def generate(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     input_file: str = typer.Option(
-        ..., help="Path to the input data file. Can either specify input_file or input_dir, but not both. "
+        None, help="Path to the input data file. Can either specify input_file or input_dir, but not both. "
     ),
     input_dir: str = typer.Option(
         None,

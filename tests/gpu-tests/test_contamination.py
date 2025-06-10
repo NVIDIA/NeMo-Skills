@@ -31,21 +31,21 @@ def test_check_contamination():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != 'qwen':
-        pytest.skip("Only running this test for qwen models")
-    prompt_template = 'qwen-instruct'
+    if model_type != 'llama':
+        pytest.skip("Only running this test for llama models")
+    prompt_template = 'llama3-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/contamination"
 
     docker_rm([output_dir])
 
     test_sets = ['math-500', 'amc23', 'aime24']
-    compare_to = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
+    retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
     cmd = (
         f"python -m nemo_skills.inference.retrieve_similar "
-        f"    ++retrieve_from='/tmp/nemo-skills-tests/data/contamination-example.test' "
-        f"    ++compare_to=\\\'{compare_to}\\\'"
+        f"    ++retrieve_from=\\\'{retrieve_from}\\\' "
+        f"    ++compare_to=/nemo_run/code/tests/data/contamination-example.test "
         f"    ++output_file='{output_dir}/math-contamination-retrieved.jsonl' "
         f"    ++top_k=1 "
     )

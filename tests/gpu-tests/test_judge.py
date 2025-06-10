@@ -30,9 +30,9 @@ def test_trtllm_judge():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != 'qwen':
-        pytest.skip("Only running this test for qwen models")
-    prompt_template = 'qwen-instruct'
+    if model_type != 'llama':
+        pytest.skip("Only running this test for llama models")
+    prompt_template = 'llama3-instruct'
 
     input_dir = "/nemo_run/code/tests/data"
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/judge/math"
