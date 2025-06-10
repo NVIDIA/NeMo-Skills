@@ -28,6 +28,9 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, python_doc_to_c
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained("GAIR/LIMO")
+
 
 @nested_dataclass(kw_only=True)
 class CodeExecutionConfig:
@@ -179,7 +182,7 @@ class CodeExecutionWrapper:
                     break
                 request["prompt"] = request.pop("prompts")[0]
             else:
-                print(f"Request: prompt len {len(request['prompt'])}, requested tokens {request['tokens_to_generate']}")
+                print(f"Request: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                 try:
                     old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
                     MAX_TRIES = 5
