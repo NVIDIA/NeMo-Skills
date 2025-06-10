@@ -78,9 +78,24 @@ def read_files(file_paths, single_answer_instances_path):
 
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
-                problem_to_clustered_instances[problem] = [
-                    (answer, instances) for answer, instances in answer_clusters.items()
-                ]
+                if len(answer_clusters) == 2 and (None in list(answer_clusters.keys())):
+                    # Only one real answer because the other one is None
+                    for answer, instances in answer_clusters.items():
+                        if answer is None:
+                            continue
+                        else:
+                            instance = instances[0]
+                            single_answer_instance = deepcopy(instance)
+                            single_answer_instance["is_correct"] = (
+                                is_correct_judgement(instance["judgement"])
+                                if "judgement" in instance
+                                else instance["is_correct"]
+                            )
+                            f.write(json.dumps(single_answer_instance) + "\n")
+                else:
+                    problem_to_clustered_instances[problem] = [
+                        (answer, instances) for answer, instances in answer_clusters.items()
+                    ]
 
     LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
     return problem_to_clustered_instances
