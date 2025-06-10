@@ -203,6 +203,10 @@ def minibatchify_instances(clustered_instances, max_soln_samples=8, use_diversit
         
         for i, instance in enumerate(distributed_instances):
             minibatch_instances[i % num_batches].append(instance)
+
+        # Shuffle the individual minibatches in place
+        for minibatch in minibatch_instances:
+            random.shuffle(minibatch)
         
         return minibatch_instances
 
@@ -301,8 +305,6 @@ def preprocess(
         process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity)
     else:
         process_non_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity)
-
-
 
 
 @nested_dataclass(kw_only=True)
