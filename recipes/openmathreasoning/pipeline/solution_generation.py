@@ -69,9 +69,10 @@ def judge_answers(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
 
     generate(
-        ctx=wrap_arguments(f"++input_dir={input_dir} " f"{stage_config.get('inline_args', '')} "),
+        ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
         cluster=cluster,
         generation_type="math_judge",
+        input_dir=input_dir,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -263,9 +264,10 @@ def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             cur_input_dir = f"{input_dir}/output-rs{random_seed}"
             cur_output_dir = f"{output_dir}/output-rs{random_seed}"
             generate(
-                ctx=wrap_arguments(f"++input_dir={cur_input_dir} " f"{stage_config.get('inline_args', '')} "),
+                ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
                 cluster=cluster,
                 generation_type="math_judge",
+                input_dir=cur_input_dir,
                 output_dir=cur_output_dir,
                 expname=expname,
                 run_after=run_after,
@@ -273,9 +275,10 @@ def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             )
     else:
         generate(
-            ctx=wrap_arguments(f"++input_dir={input_dir} " f"{stage_config.get('inline_args', '')} "),
+            ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
             cluster=cluster,
             generation_type="math_judge",
+            input_dir=input_dir,
             output_dir=output_dir,
             expname=expname,
             run_after=run_after,
