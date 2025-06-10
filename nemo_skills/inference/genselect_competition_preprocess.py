@@ -44,6 +44,72 @@ def read_file(file_path):
     return problem_to_instance
 
 
+
+def check_if_all_incorrect(answer_clusters):
+    # Check if all answers are incorrect
+        all_incorrect = True
+        for answer, instances in answer_clusters.items():
+            if answer is None:
+                continue
+            else:
+                instance = instances[0]
+                if "judgement" in instance:
+                    if is_correct_judgement(instance["judgement"]):
+                        all_incorrect = False
+                        break
+                else:
+                    if instance["is_correct"]:
+                        all_incorrect = False
+                        break
+
+        # If all answers are incorrect, just choose the most common answer
+        if all_incorrect:
+            # Choose the most common answer
+            most_common_answer = max(answer_clusters, key=lambda x: len(answer_clusters[x]))
+            _, instances = answer_clusters[most_common_answer]
+            instance = instances[0]
+            return instance
+        else:
+            return None
+
+
+
+def check_for_single_viable_answer(answer_clusters):
+    if len(answer_clusters) == 1:
+        # Single answer or no answer
+        _, single_answer_instance_list = list(answer_clusters.items())[0]
+        instance = single_answer_instance_list[0]
+        single_answer_instance = deepcopy(instance)
+        if single_answer_instance["predicted_answer"] is None:
+            # The only predicted answer across seeds is None
+            single_answer_instance["is_correct"] = False
+        else:
+            single_answer_instance["is_correct"] = (
+                is_correct_judgement(instance["judgement"])
+                if "judgement" in instance
+                else instance["is_correct"]
+            )
+        return single_answer_instance
+
+    elif (len(answer_clusters) == 2 and (None in list(answer_clusters.keys()))):
+        # Only one real answer because the other one is None
+        for answer, instances in answer_clusters.items():
+            if answer is None:
+                continue
+            else:
+                instance = instances[0]
+                single_answer_instance = deepcopy(instance)
+                single_answer_instance["is_correct"] = (
+                    is_correct_judgement(instance["judgement"])
+                    if "judgement" in instance
+                    else instance["is_correct"]
+                )
+                return single_answer_instance
+    else:
+        return None
+
+
+
 def read_files(file_paths, single_answer_instances_path):
     problem_to_instances = defaultdict(list)
     for file_path in file_paths:
@@ -61,93 +127,20 @@ def read_files(file_paths, single_answer_instances_path):
                 answer = instance["predicted_answer"]
                 answer_clusters[answer].append(instance)
 
-            # Check if all answers are incorrect
-            all_incorrect = True
-            for answer, instances in answer_clusters.items():
-                if answer is None:
-                    continue
-                else:
-                    instance = instances[0]
-                    if "judgement" in instance:
-                        if is_correct_judgement(instance["judgement"]):
-                            all_incorrect = False
-                            break
-                    else:
-                        if instance["is_correct"]:
-                            all_incorrect = False
-                            break
-
-            # If all answers are incorrect, just choose the most common answer
-            if all_incorrect:
-                # Choose the most common answer
-                most_common_answer = max(answer_clusters, key=lambda x: len(answer_clusters[x]))
-                _, instances = answer_clusters[most_common_answer]
-                instance = instances[0]
+            if check_if_all_incorrect(answer_clusters) is not None:
+                instance = check_if_all_incorrect(answer_clusters)
                 f.write(json.dumps(instance) + "\n")
+                continue
 
-            if len(answer_clusters) == 1:
-                # Single answer or no answer
-                _, single_answer_instance_list = list(answer_clusters.items())[0]
-                instance = single_answer_instance_list[0]
-                single_answer_instance = deepcopy(instance)
-                if single_answer_instance["predicted_answer"] is None:
-                    # The only predicted answer across seeds is None
-                    single_answer_instance["is_correct"] = False
-                else:
-                    single_answer_instance["is_correct"] = (
-                        is_correct_judgement(instance["judgement"])
-                        if "judgement" in instance
-                        else instance["is_correct"]
-                    )
-
+            single_answer_instance = check_for_single_viable_answer(answer_clusters)
+            if single_answer_instance is not None:
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
-                if len(answer_clusters) == 2 and (None in list(answer_clusters.keys())):
-                    # Only one real answer because the other one is None
-                    for answer, instances in answer_clusters.items():
-                        if answer is None:
-                            continue
-                        else:
-                            instance = instances[0]
-                            single_answer_instance = deepcopy(instance)
-                            single_answer_instance["is_correct"] = (
-                                is_correct_judgement(instance["judgement"])
-                                if "judgement" in instance
-                                else instance["is_correct"]
-                            )
-                            f.write(json.dumps(single_answer_instance) + "\n")
-                else:
-                    problem_to_clustered_instances[problem] = [
-                        (answer, instances) for answer, instances in answer_clusters.items()
-                    ]
+                problem_to_clustered_instances[problem] = [
+                    (answer, instances) for answer, instances in answer_clusters.items()
+                ]
 
 
-        # Also remove problems for which all answers are incorrect
-        # Write down the problems with all incorrect answers to a separate file
-        # If "judgment" is present, use it to determine if the answer is correct
-        # Else use "is_correct" to determine if the answer is correct
-    #     problem_to_incorrect_instances = defaultdict(list)
-    #     for problem, instance_list in problem_to_clustered_instances.items():
-    #         all_incorrect = True
-    #         for instance in instance_list:
-    #             if "judgment" in instance:
-    #                 if is_correct_judgement(instance["judgment"]):
-    #                     all_incorrect = False
-    #                     break
-    #             else:
-    #                 if instance["is_correct"]:
-    #                     all_incorrect = False
-    #                     break
-    #         if all_incorrect:
-    #             problem_to_incorrect_instances[problem].append(instance_list)
-
-    #     LOG.info(f"Number of problems with all incorrect answers: {len(problem_to_incorrect_instances)}")
-        
-    #     with open(os.path.join(os.path.dirname(single_answer_instances_path), "incorrect_instances.jsonl"), "w") as f:
-    #         for problem, instance_list in problem_to_incorrect_instances.items():
-    #             f.write(json.dumps(instance_list[0]) + "\n")
-
-    # LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
     return problem_to_clustered_instances
 
 
