@@ -67,7 +67,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
     status_dir = get_unmounted_path(cluster_config, output_dir)
     expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids)
-
     check_commands = []
     for (seed, chunk_id), filepath in expected_files.items():
         unmounted_path = filepath.replace(output_dir, status_dir)
@@ -75,7 +74,6 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         seed_str = "NONE" if seed is None else str(seed)
         chunk_str = "NONE" if chunk_id is None else str(chunk_id)
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
-
     # If random_seeds has more than N elements, split commands into groups of N
     request_size = 16
     if len(random_seeds) > request_size:

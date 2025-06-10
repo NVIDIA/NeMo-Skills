@@ -299,7 +299,7 @@ def eval(
             chunk_ids=chunk_ids,
             rerun_done=rerun_done,
         )
-        for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
@@ -307,7 +307,7 @@ def eval(
                     random_seed=seed,
                     chunk_id=None,
                 )
-            for chunk_id in chunk_ids:
+            for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,

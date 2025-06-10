@@ -116,10 +116,11 @@ ns eval \
 you will see the following output after summarizing results
 
 ```
--------------------------- gsm8k ---------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-majority@4      | 1319        | 87.95            | 0.00
-pass@4          | 1319        | 93.78            | 0.00
+--------------------------------- gsm8k ---------------------------------
+evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[4]       | 1319        | 161        | 78.96%           | 6.01%
+majority@4      | 1319        | 161        | 88.10%           | 0.08%
+pass@4          | 1319        | 161        | 93.25%           | 0.08%
 
 
 ------------------------------ human-eval -----------------------------
