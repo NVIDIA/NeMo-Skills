@@ -31,7 +31,7 @@ ns generate \
     --num_random_seeds=512 \
     --output_dir=/workspace/solution-augmentation/math \
     --eval_args="++eval_type=math" \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
     ++prompt_template=llama3-base
@@ -49,7 +49,7 @@ ns generate \
     --num_random_seeds=64 \
     --output_dir=/workspace/solution-augmentation/gsm8k \
     --eval_args="++eval_type=math" \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
     ++prompt_template=llama3-base
@@ -69,7 +69,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=80 \
     --output_dir=/workspace/problem-augmentation/math \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
     ++prompt_template=llama3-instruct \
@@ -87,7 +87,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=10 \
     --output_dir=/workspace/problem-augmentation/gsm8k \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
     ++prompt_template=llama3-instruct \
@@ -117,8 +117,8 @@ for i in range(80):
         server_nodes=2,
         num_random_seeds=32,
         output_dir=f"/workspace/new-problems-solution-augmentation/math/problem-set{i}",
+        input_file=f"/workspace/solution-augmentation/math/generation/output-rs{i}",
         ctx=wrap_arguments(
-            f"++input_file=/workspace/solution-augmentation/math/generation/output-rs{i} "
             f"++prompt_config=generic/math-base "
             f"++examples_type=math_text_detailed "
             f"++prompt_template=llama3-base "
@@ -142,8 +142,8 @@ for i in range(10):
         server_nodes=2,
         num_random_seeds=32,
         output_dir=f"/workspace/new-problems-solution-augmentation/gsm8k/problem-set{i}",
+        input_file=f"/workspace/solution-augmentation/gsm8k/generation/output-rs{i}",
         ctx=wrap_arguments(
-            f"++input_file=/workspace/solution-augmentation/gsm8k/generation/output-rs{i} "
             f"++prompt_config=generic/math-base "
             f"++examples_type=gsm8k_text_detailed "
             f"++prompt_template=llama3-base "
