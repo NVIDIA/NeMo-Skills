@@ -52,7 +52,6 @@ class TrainingParams:
     training_data: str
     validation_data: str
     num_gpus: int
-    tp: int | None
     num_nodes: int
     expname: str
     training_algo: TrainingAlgo
@@ -80,7 +79,7 @@ def get_cmd(params: TrainingParams) -> str:
         f"echo 'Starting training' && "
         f"{params.training_script} "
         f"    {params.config_params}"
-        f"    ++model.tensor_model_parallel_size={params.tp or params.num_gpus} "
+        f"    ++model.tensor_model_parallel_size={params.num_gpus} "
         f"    trainer.devices={params.num_gpus} "
         f"    trainer.num_nodes={params.num_nodes} "
         f"    {params.logging_params} "
@@ -129,7 +128,6 @@ def get_training_cmd(
     training_data,
     validation_data,
     num_gpus,
-    tp,
     num_nodes,
     expname,
     training_algo,
@@ -160,7 +158,6 @@ def get_training_cmd(
         validation_data=validation_data,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
-        tp=tp,
         expname=expname,
         training_algo=training_algo,
         disable_wandb=disable_wandb,
