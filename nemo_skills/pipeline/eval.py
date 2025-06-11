@@ -114,6 +114,7 @@ def eval(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option(
         None,
@@ -339,6 +340,7 @@ def eval(
             benchmarks_in_job.add(benchmark)
         job_batches.append((cmds, benchmarks_in_job))
 
+    should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
         for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
             # Check if any benchmark in this job requires sandbox
@@ -346,27 +348,30 @@ def eval(
                 benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
             )
 
-            should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
-            pipeline_utils.add_task(
-                exp,
-                cmd=pipeline_utils.wait_for_server(
-                    server_address=server_address, generation_commands=" && ".join(cmds)
-                ),
-                task_name=f'{expname}-{idx}',
-                log_dir=log_dir,
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-                partition=partition,
-                time_min=time_min,
-                server_config=server_config,
-                with_sandbox=job_needs_sandbox,
-                sandbox_port=None if get_random_port else 6000,
-                run_after=run_after,
-                reuse_code_exp=reuse_code_exp,
-                reuse_code=reuse_code,
-                extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-            )
+            prev_tasks = None
+            for _ in range(dependent_jobs + 1):
+                new_task = pipeline_utils.add_task(
+                    exp,
+                    cmd=pipeline_utils.wait_for_server(
+                        server_address=server_address, generation_commands=" && ".join(cmds)
+                    ),
+                    task_name=f'{expname}-{idx}',
+                    log_dir=log_dir,
+                    container=cluster_config["containers"]["nemo-skills"],
+                    cluster_config=cluster_config,
+                    partition=partition,
+                    time_min=time_min,
+                    server_config=server_config,
+                    with_sandbox=job_needs_sandbox,
+                    sandbox_port=None if get_random_port else 6000,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    task_dependencies=prev_tasks,
+                    extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                )
+                prev_tasks = [new_task]
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config)
 

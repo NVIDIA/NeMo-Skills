@@ -24,6 +24,8 @@ from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging,
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+# TODO: add num_jobs here for consistency with eval?
+
 
 class GenerationType(str, Enum):
     generate = "generate"
@@ -238,7 +240,6 @@ def generate(
     has_tasks = False
 
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        prev_tasks = None
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
@@ -274,6 +275,7 @@ def generate(
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     script=generation_module,
                 )
+                prev_tasks = None
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:

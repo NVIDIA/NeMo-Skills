@@ -184,7 +184,6 @@ def genselect(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
         )
-        prev_tasks = [preprocess_task]
         for seed in remaining_jobs.keys():
             has_tasks = True
             server_config, server_address, extra_arguments = pipeline_utils.configure_client(
@@ -203,6 +202,7 @@ def genselect(
                 preprocess_cmd=preprocess_cmd,
                 postprocess_cmd=postprocess_cmd,
             )
+            prev_tasks = [preprocess_task]
             for _ in range(dependent_jobs + 1):
                 task_name = f'{expname}-rs{seed}' if seed is not None else expname
                 new_task = pipeline_utils.add_task(
