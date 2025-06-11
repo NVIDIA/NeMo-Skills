@@ -228,7 +228,7 @@ Here is a sample command to run GenSelect evaluation:
 
 ```bash
 ns genselect \
-    --genselect_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
+    --preprocess_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
     --model=/trt_models/openmath-nemotron-1.5b \
     ++prompt_template=qwen-instruct \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \

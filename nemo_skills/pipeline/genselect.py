@@ -84,7 +84,7 @@ def genselect(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
+    preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -171,10 +171,10 @@ def genselect(
 
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
         # Add the preprocessing command for genselect
-        genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
-            genselect_args if genselect_args is not None else ""
+        preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
+            preprocess_args if preprocess_args is not None else ""
         )
-        preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
+        preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
         preprocess_task = pipeline_utils.add_task(
             exp,
