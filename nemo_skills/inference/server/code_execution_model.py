@@ -26,6 +26,7 @@ from nemo_skills.code_execution import extract_code_to_execute, format_code_outp
 from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.inference.server.model import BaseModel, get_model, models, trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass, python_doc_to_cmd_help
+from nemo_skills.prompt.utils import get_prompt
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -42,6 +43,29 @@ class CodeExecutionConfig:
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
+    normalizer_host: str = 'localhost'
+    normalizer_port: str = '5000'
+
+def extract_code_from_normalizer(response) -> str:
+    raise ValueError(f'Response from normalizer! {response}')
+    # return text
+
+def extract_last_incomplete_theorem(md_text: str) -> str | None:
+    # Find all ```lean4 code blocks
+    code_blocks = re.findall(r"```lean4\s+(.*?)```", md_text, flags=re.DOTALL)
+
+    last_match = None
+    for block in code_blocks:
+        # Match a theorem ending with "by" on its own line (possibly with a comment)
+        theorems = re.findall(
+            r"(theorem\s+\w+\s*.*?:=.*?by(?:\s*--.*)?\s*$)",
+            block,
+            flags=re.DOTALL | re.MULTILINE
+        )
+        if theorems:
+            last_match = theorems[-1]
+
+    return last_match
 
 
 class CodeExecutionWrapper:
@@ -60,6 +84,12 @@ class CodeExecutionWrapper:
             self._can_cancel_generations = True
         else:
             self._can_cancel_generations = False
+
+        from nemo_skills.inference.server.model import TRTLLMModel
+        self.normalizer_model = TRTLLMModel(
+            host=config.normalizer_host,
+            port=config.normalizer_port,
+        )
 
     def _is_generation_cancelled(self, gen_id):
         """Check if a generation has been requested to be cancelled."""
@@ -195,7 +225,7 @@ class CodeExecutionWrapper:
                         print(f"Request retried: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                         output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
                         generated_code = code_begin + output_dict['generation']
-                        code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, generated_code, session_id)
+                        code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, generated_code, session_id)
                         remaining_code_executions = None
                         code_output = format_code_output(
                             execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
@@ -235,7 +265,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = self.execute_generated_code(code_begin, code_end, output, session_id)
+                code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, output, session_id)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
@@ -260,7 +290,7 @@ class CodeExecutionWrapper:
             'stopped_on_repetition': stopped_on_repetition,
         }
 
-    def execute_generated_code(self, code_begin, code_end, output, session_id):
+    def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
         header = '\n'.join([
                     "import Aesop",
@@ -274,10 +304,32 @@ class CodeExecutionWrapper:
                     "open Topology",
                     "",
                 ])
-        # prompt = get_prompt()
-        code_execution_header = self.config.code_execution_header + header #"import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
+        code_block = extract_code_to_execute(output, code_begin, code_end)
+        data = {
+            "formal_statement": extract_last_incomplete_theorem(input_prompt),
+            "header": header,
+            "code": code_block,
+        }
+        prompt = get_prompt(prompt_config='/nemo_run/code/lean-tir/prompts/code-execution-normalization-v01', prompt_template='qwen-instruct-lean4')
+        prompt_text = prompt.fill(data)
+
+        request = {
+            "prompt": prompt_text,
+            "tokens_to_generate": 7 * 1024,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 0.95,
+            "min_p": 0.0,
+            "random_seed": 0,
+            "repetition_penalty": 1.0,
+            "stop_phrases": prompt.stop_phrases,
+            "timeout": 300,
+        }
+        session_id = None
+        normalized_response = self.normalizer_model._generate_single(**request)
+        extracted_code = extract_code_from_normalizer(normalized_response)
         execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=code_execution_header + extract_code_to_execute(output, code_begin, code_end),
+                    generated_code=extracted_code,
                     language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
