@@ -225,18 +225,18 @@ class CodeExecutionWrapper:
                         output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
                         print(f"Request retried: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                         output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
-                        generated_code = code_begin + output_dict['generation']
-                        code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, generated_code, session_id)
-                        remaining_code_executions = None
-                        code_output = format_code_output(
-                            execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                        )
-                        fails_checks = self.check_for_failures(code_output)
-                        if not fails_checks:
-                            print(f'Successful Generation! on Iteration: {i}')
-                            break
-                        else:
-                            print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
+                        # generated_code = code_begin + output_dict['generation']
+                        # code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, generated_code, session_id)
+                        # remaining_code_executions = None
+                        # code_output = format_code_output(
+                        #     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
+                        # )
+                        # fails_checks = self.check_for_failures(code_output)
+                        # if not fails_checks:
+                        #     print(f'Successful Generation! on Iteration: {i}')
+                        #     break
+                        # else:
+                        #     print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
                     #     print(f"We have generated the code {generated_code} with the following output {code_output}")
                     output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
                     output_dict['num_generated_tokens'] = len(tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
@@ -266,6 +266,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                print('Executing code!!!.')
                 code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, output, session_id)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -311,8 +312,10 @@ class CodeExecutionWrapper:
             "header": header,
             "code": code_block,
         }
+        print('Filling prompt')
         prompt = get_prompt(prompt_config='/nemo_run/code/lean-tir/prompts/code-execution-normalization-v01', prompt_template='qwen-instruct-lean4')
         prompt_text = prompt.fill(data)
+        print(prompt_text)
 
         request = {
             "prompt": prompt_text,
@@ -327,6 +330,7 @@ class CodeExecutionWrapper:
             "timeout": 300,
         }
         session_id = None
+        print('About to normalize')
         normalized_response = self.normalizer_model._generate_single(**request)
         extracted_code = extract_code_from_normalizer(normalized_response)
         execution_dict, session_id = self.sandbox.execute_code(
