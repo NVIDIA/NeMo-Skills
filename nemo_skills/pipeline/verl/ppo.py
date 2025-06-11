@@ -87,8 +87,8 @@ class PPOVerlTask:
             "   actor_rollout_ref.ref.fsdp_config.param_offload=True "
             "   algorithm.kl_ctrl.kl_coef=0 "
             "   trainer.critic_warmup=0 "
-            "   +trainer.val_before_train=True "
-            "   trainer.val_generations_to_log_to_wandb=1 "
+            "   ++trainer.val_before_train=False "
+            "   +trainer.val_generations_to_log_to_wandb=1 "
             "   trainer.save_freq=20 "
             "   trainer.test_freq=20 "
             "   trainer.default_hdfs_dir=null "
@@ -148,6 +148,7 @@ class PPOVerlTask:
             f"export HYDRA_FULL_ERROR=1 && "
             f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
+            f"export ROCR_VISIBLE_DEVICES= && "
             f"cd /nemo_run/code && "
             f"{preamble_cmd} && "
         )

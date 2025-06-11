@@ -16,11 +16,12 @@
 
 import argparse
 import os
+import json
 import pprint
+from dataclasses import dataclass
 from collections import defaultdict
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
-import torch
 from omegaconf import OmegaConf
 from transformers import PreTrainedTokenizerBase
 
@@ -28,8 +29,6 @@ from nemo_rl.algorithms.grpo import MasterConfig, grpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset
-from nemo_rl.data.hf_datasets.deepscaler import DeepScalerDataset
-from nemo_rl.data.hf_datasets.openmathinstruct2 import OpenMathInstruct2Dataset
 from nemo_rl.data.interfaces import (
     DatumSpec,
     LLMMessageLogType,
@@ -45,6 +44,8 @@ from nemo_rl.environments.math_environment import MathEnvironment
 from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
+
+from nemo_skills.prompt.utils import get_prompt
 
 OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
 
@@ -66,59 +67,58 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 #                             Custom Math Dataset (@nemo-skills)
 # ===============================================================================
 
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 
 from nemo_rl.data.interfaces import TaskDataSpec
 
 
-def format_math(data, output_key: str = "expected_answer"):
+def load_jsonl_as_dataset(
+    filepath: str,
+    force_string: bool = False,
+    keep_fields: Optional[list[str]] = None,
+) -> Dataset:
+    """
+    Load a JSONL file and convert it to a Hugging Face Dataset.
+
+    Args:
+        filepath (str): Path to the .jsonl file.
+
+    Returns:
+        Dataset: Hugging Face Dataset object.
+    """
+    records: list[dict[str, Any]] = []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            records.append(obj)
+
+    return Dataset.from_list(records)
+
+def extract_dataset(split, dataset_path):
+    if not dataset_path.startswith('/'):
+        original_ds = load_dataset(dataset_path, split=split)
+    else:
+        original_ds = load_jsonl_as_dataset(dataset_path)
+    return original_ds
+
+def format_passthrough(data):
     return {
-        "messages": [
-            {
-                "role": "user",
-                "content": data["problem"],
-            },
-            {
-                "role": "assistant",
-                "content": data[output_key],
-            },
-        ],
+        **data,
         # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
         "task_name": "math",
     }
 
-
-def prepare_openinstructmath2_dataset(
-    split: str = "train_1M",
-    seed=42,
-    test_size=0.05,
-    output_key: str = "expected_answer",
-    dataset_path: str = "nvidia/OpenMathInstruct-2",
-    val_dataset_path: str = "nvidia/OpenMathInstruct-2",
-):
-    """Load and split the OpenMathInstruct-2 dataset into train and validation sets using HF's train_test_split."""
-    print(
-        "WARNING: For reproducible experiments, preprocess the dataset once and define your own HfDataset subclass that directly uses the preprocessed datasets."
-    )
-
-    # Load the original dataset
-    original_ds = extract_dataset(split, output_key, dataset_path)
-    val_ds = extract_dataset(split, output_key, val_dataset_path)
-    split_ds = {
-        'train': original_ds,
-        'test': val_ds,
-    }
-
-    # Format the examples, removing original columns
+def prepare_math_dataset(split_ds):
+            # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(
-        format_math,
-        remove_columns=split_ds["train"].column_names,
-        fn_kwargs={"output_key": output_key},
+        format_passthrough,
     )
-    val_formatted = split_ds["test"].map(
-        format_math,
-        remove_columns=split_ds["test"].column_names,
-        fn_kwargs={"output_key": output_key},
+    val_formatted = split_ds["validation"].map(
+        format_passthrough,
     )
 
     return {
@@ -126,49 +126,20 @@ def prepare_openinstructmath2_dataset(
         "validation": val_formatted,
     }
 
-def extract_dataset(split, output_key, dataset_path):
-    if not dataset_path.startswith('/'):
-        original_ds = load_dataset(dataset_path, split=split)
-    else:
-        import pandas as pd
-        from datasets import Dataset
-        df = pd.read_json(dataset_path, lines=True)
-        df = df[['problem', output_key]]
-        original_ds = Dataset.from_pandas(df)
-    return original_ds
+class NeMoSkillsDataset:
+    """Custom dataset class for NeMo Skills Math Environment."""
 
+    def __init__(self, training_data, validation_data):
+        """Initialize the dataset with training and validation data."""
+        self.training_data = training_data
+        self.validation_data = validation_data
 
-class CustomOpenMathInstruct2Dataset:
-    def __init__(
-        self,
-        split: str = "train_1M",
-        seed: int = 42,
-        test_size: float = 0.05,
-        output_key: str = "expected_answer",
-        prompt_file: str = None,
-        dataset_path: str = "nvidia/OpenMathInstruct-2",
-        val_dataset_path: str = "nvidia/OpenMathInstruct-2",
-    ):
-        """Initialize the dataset with train/validation split.
+        # Load the datasets
+        self.formatted_ds = prepare_math_dataset({
+            "train": extract_dataset("train", training_data),
+            "validation": extract_dataset("validation", validation_data),
+        })
 
-        Args:
-            seed: Random seed for reproducible splitting
-            test_size: Proportion of data to use for validation (0.0-1.0)
-        """
-        # train, train_1M, train_2M, and train_5M are supported splits.
-        if split not in ["train", "train_1M", "train_2M", "train_5M"]:
-            raise ValueError(
-                f"Invalid split: {split}. Please use 'train', 'train_1M', 'train_2M', or 'train_5M'."
-            )
-
-        self.formatted_ds = prepare_openinstructmath2_dataset(
-            split=split, seed=seed, test_size=test_size, output_key=output_key, dataset_path=dataset_path, val_dataset_path=val_dataset_path,
-        )
-
-        self.task_spec = TaskDataSpec(
-            task_name="OpenMathInstruct-2",
-            prompt_file=prompt_file,
-        )
 
 # ===============================================================================
 #                             Math Data Processor
@@ -176,33 +147,37 @@ class CustomOpenMathInstruct2Dataset:
 TokenizerType = PreTrainedTokenizerBase
 
 
+@dataclass
+class NSTaskDataSpec(TaskDataSpec):
+    prompt_spec: dict[str, Any] | None = None
+
+def apply_ns_chat_template(prompt, datum_dict) -> str:
+    return prompt.fill(datum_dict, return_templated_dict=True)
+
 # TaskDataProcessFnCallable
-def hf_data_processor(
+def ns_data_processor(
     datum_dict: dict[str, Any],
-    task_data_spec: TaskDataSpec,
+    task_data_spec: NSTaskDataSpec,
     tokenizer: TokenizerType,
     max_seq_length: int,
     idx: int,
 ) -> DatumSpec:
-    """Process a datum dictionary (directly loaded from data/hf_datasets/openmathinstruct2.py) into a DatumSpec for the Math Environment."""
-    user_message = datum_dict["messages"]
-    problem = user_message[0]["content"]
-    extra_env_info = {"ground_truth": user_message[1]["content"]}
+    prompt_spec = task_data_spec.prompt_spec
+    extra_env_info = {"ground_truth": datum_dict["expected_answer"]}
 
     message_log: LLMMessageLogType = []
-    user_message = {
-        "role": "user",
-        "content": task_data_spec.prompt.format(problem),
-    }
-    message: list[str] = tokenizer.apply_chat_template(  # type: ignore
-        [user_message],
-        tokenize=False,
-        add_generation_prompt=True,
-        add_special_tokens=False,
-    )
-    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
-    user_message["content"] = message[0]
-    message_log.append(user_message)
+
+    prompt = get_prompt(
+        prompt_config=prompt_spec["prompt_config"],
+        prompt_template=prompt_spec["prompt_template"],
+        examples_type=prompt_spec["examples_type"],
+        config_dir=prompt_spec["config_dir"],
+        template_dir=prompt_spec["template_dir"],
+        )
+    message_log = apply_ns_chat_template(prompt, datum_dict)
+
+    for message in message_log:
+        message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 
@@ -226,74 +201,6 @@ def hf_data_processor(
     return output
 
 
-# Example of a generic math data processor
-# TaskDataProcessFnCallable
-def math_data_processor(
-    datum_dict: dict[str, Any],
-    task_data_spec: TaskDataSpec,
-    tokenizer: TokenizerType,
-    max_seq_length: int,
-    idx: int,
-) -> DatumSpec:
-    """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Math Environment."""
-    problem = datum_dict["problem"]
-    solution = str(datum_dict["expected_answer"])
-    extra_env_info = {"ground_truth": solution}
-
-    message_log: LLMMessageLogType = []
-
-    # system prompt
-    if task_data_spec.system_prompt:
-        sys_prompt: dict[str, str | torch.Tensor] = {
-            "role": "system",
-            "content": task_data_spec.system_prompt,
-        }
-        sys = tokenizer.apply_chat_template(
-            [cast(dict[str, str], sys_prompt)],
-            tokenize=False,
-            add_generation_prompt=False,
-            add_special_tokens=False,
-        )
-        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
-        message_log.append(sys_prompt)
-
-    # user prompt
-    if task_data_spec.prompt:
-        problem = task_data_spec.prompt.format(problem)
-    user_message = {"role": "user", "content": problem}
-    message = tokenizer.apply_chat_template(
-        [user_message],
-        tokenize=False,
-        add_generation_prompt=True,
-        add_special_tokens=False,
-    )
-    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
-    user_message["content"] = message
-    message_log.append(user_message)
-
-    length = sum(len(m["token_ids"]) for m in message_log)
-
-    loss_multiplier = 1.0
-    if length > max_seq_length:
-        # make smaller and mask out
-        for indiv_message in message_log:
-            indiv_message["token_ids"] = indiv_message["token_ids"][
-                : min(4, max_seq_length // len(message_log))
-            ]
-        loss_multiplier = 0.0
-
-    output: DatumSpec = {
-        "message_log": message_log,
-        "length": length,
-        "extra_env_info": extra_env_info,
-        "loss_multiplier": loss_multiplier,
-        "idx": idx,
-    }
-    if "task_name" in datum_dict:
-        output["task_name"] = datum_dict["task_name"]
-    return output
-
-
 def setup_data(
     tokenizer: TokenizerType,
     data_config: DataConfig,
@@ -305,31 +212,21 @@ def setup_data(
     dict[str, EnvironmentInterface],
 ]:
     print("\n▶ Setting up data...")
-    math_task_spec = TaskDataSpec(
+    prompt_config = data_config["prompt"]
+    math_task_spec = NSTaskDataSpec(
         task_name="math",
-        prompt_file=data_config["prompt_file"],
-        system_prompt_file=data_config["system_prompt_file"],
+        prompt_spec=prompt_config,
     )
 
-    # Load OpenMathInstruct2Dataset using nemo rl datasets
-    if data_config["dataset_name"] == "OpenMathInstruct-2":
-        print("Loading nvidia/OpenMathInstruct2Dataset for training and validation")
-        data: Any = CustomOpenMathInstruct2Dataset(
-            dataset_path=data_config.get("train_data_path", "nvidia/OpenMathInstruct-2"),
-            val_dataset_path=data_config.get("val_data_path", "nvidia/OpenMathInstruct-2"),
-        )
-    elif data_config["dataset_name"] == "DeepScaler":
-        print(
-            "Loading agentica-org/DeepScaleR-Preview-Dataset for training and validation"
-        )
-        data: Any = DeepScalerDataset()
-    else:
-        raise ValueError(f"No processor for dataset {data_config['dataset_name']}.")
+    data = NeMoSkillsDataset(
+        data_config["train_data_path"],
+        data_config["val_data_path"],
+    )
 
     task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = (
-        defaultdict(lambda: (math_task_spec, hf_data_processor))
+        defaultdict(lambda: (math_task_spec, ns_data_processor))
     )
-    task_data_processors["math"] = (math_task_spec, hf_data_processor)
+    task_data_processors["math"] = (math_task_spec, ns_data_processor)
 
     math_env = MathEnvironment.options(  # type: ignore # it's wrapped with ray.remote
         runtime_env={

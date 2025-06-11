@@ -8,8 +8,8 @@ if running on slurm or using different paths.
 
 !!! tip "Interactive Chat Interface"
 
-    Besides the benchmark numbers shown below, you can also interactively chat with OpenMath models using our 
-    [chat interface](../basics/chat_interface.md). This allows you to easily test both Chain-of-Thought (CoT) and 
+    Besides the benchmark numbers shown below, you can also interactively chat with OpenMath models using our
+    [chat interface](../basics/chat_interface.md). This allows you to easily test both Chain-of-Thought (CoT) and
     Tool-Integrated Reasoning (TIR) modes with code execution in a user-friendly web UI.
 
 !!! note
@@ -54,7 +54,7 @@ You can change the number of GPUs if you have more than 1, but don't use more th
 ## Prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare comp-math-24-25 hle
+ns prepare_data comp-math-24-25 hle
 ```
 
 ## Run CoT evaluations
@@ -230,7 +230,6 @@ ns generate \
     --genselect_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
     --model=/trt_models/openmath-nemotron-1.5b \
     ++prompt_template=qwen-instruct \
-    ++dataset=hle \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \
     --cluster=local \
     --server_type=trtllm \

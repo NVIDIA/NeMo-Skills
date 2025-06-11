@@ -19,7 +19,7 @@ Let's say you want to check for contamination of [MATH](https://github.com/hendr
 training set with MATH, AMC-23 and AIME-24 test sets. First, get the data
 
 ```bash
-python -m nemo_skills.dataset.prepare math amc23 aime24
+ns prepare_data math amc23 aime24
 ```
 
 Then we need to retrieve top-k similar questions from the training set. Assuming

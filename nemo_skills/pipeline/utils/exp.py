@@ -29,7 +29,7 @@ from nemo_skills.pipeline.utils.cluster import get_env_variables, get_tunnel, te
 from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
 from nemo_skills.pipeline.utils.packager import get_packager
 from nemo_skills.pipeline.utils.server import get_free_port, get_server_command
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, remove_handlers
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -497,6 +497,8 @@ def run_exp(exp, cluster_config, sequential=None):
 
 
 def get_exp(expname, cluster_config):
+    # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
+    remove_handlers()
     if cluster_config['executor'] == 'slurm':
         return run.Experiment(expname)
     # hiding all nemo-run logs otherwise as they are not useful locally

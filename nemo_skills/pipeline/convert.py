@@ -71,7 +71,7 @@ def get_hf_to_trtllm_cmd(
         "fp8": "fp8",
     }[dtype]
 
-    tmp_engine_dir = f"{output_model}-tmp"
+    tmp_engine_dir = f"{output_model}-tmp-ckpt"
 
     setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 

@@ -41,6 +41,10 @@ class GenSelectConfig:
 
     input_dir: str  # Directory where the original predictions are saved
     output_dir: str  # Where to save the intermediate outputs and final predictions
+
+    # Will be set in __post_init__ based on input_dir and random_seed
+    input_file: str | None = None
+
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
@@ -48,10 +52,6 @@ class GenSelectConfig:
     prompt_config: str = "openmath/genselect"  # GenSelect template
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
-
-    # Can specify one of the existing datasets.
-    dataset: str | None = None
-    split: str | None = None  # Generally one of train/test, but can be anything since it's used as part of a file name
 
     batch_size: int = 128
     max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
@@ -105,6 +105,12 @@ class GenSelectConfig:
 
         if self.server["server_type"] == "openai" and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
+
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("input_file", None),
+        ]
 
 
 cs = hydra.core.config_store.ConfigStore.instance()

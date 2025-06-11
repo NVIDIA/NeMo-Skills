@@ -13,7 +13,7 @@ run inference through Nvidia NIM API.
 ## Prepare the seed data
 
 ```bash
-python -m nemo_skills.dataset.prepare gsm8k math
+ns prepare_data gsm8k math
 ```
 
 ## Solution augmentation
@@ -31,8 +31,7 @@ ns generate \
     --num_random_seeds=512 \
     --output_dir=/workspace/solution-augmentation/math \
     --eval_args="++eval_type=math" \
-    ++dataset=math \
-    ++split=train_full \
+    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
     ++prompt_template=llama3-base
@@ -50,8 +49,7 @@ ns generate \
     --num_random_seeds=64 \
     --output_dir=/workspace/solution-augmentation/gsm8k \
     --eval_args="++eval_type=math" \
-    ++dataset=gsm8k \
-    ++split=train_full \
+    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
     ++prompt_template=llama3-base
@@ -71,8 +69,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=80 \
     --output_dir=/workspace/problem-augmentation/math \
-    ++dataset=math \
-    ++split=train_full \
+    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
     ++prompt_template=llama3-instruct \
@@ -90,8 +87,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=10 \
     --output_dir=/workspace/problem-augmentation/gsm8k \
-    ++dataset=gsm8k \
-    ++split=train_full \
+    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
     ++prompt_template=llama3-instruct \

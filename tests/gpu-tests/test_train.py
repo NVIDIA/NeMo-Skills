@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline.cli import eval, generate, sft_nemo_rl, train, wrap_arguments
+from nemo_skills.pipeline.cli import eval, generate, grpo_nemo_rl, sft_nemo_rl, train, wrap_arguments
 from tests.conftest import docker_rm
 
 
@@ -62,9 +62,69 @@ def test_sft_nemo_rl():
 
     # checking that the final model can be used for evaluation
     eval(
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10 ++inference.tokens_to_generate=10"),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        model=f"{output_dir}/final_hf_model",
+        server_type="vllm",
+        output_dir=f"{output_dir}/evaluation",
+        benchmarks="gsm8k:0",
+        server_gpus=1,
+        server_nodes=1,
+        num_jobs=1,
+    )
+
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
+    )["all"]["greedy"]
+    # only checking the total, since model is tiny
+    assert metrics['num_entries'] == 10
+
+
+@pytest.mark.gpu
+def test_grpo_nemo_rl():
+    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+    if not model_type:
+        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
+
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-grpo-nemo-rl"
+
+    # need to clean up current cluster configuration as we mount /tmp and it causes problems
+    docker_rm(['/tmp/ray/ray_current_cluster', output_dir])
+
+    grpo_nemo_rl(
         ctx=wrap_arguments(
-            f"++prompt_template={prompt_template} ++split=test ++max_samples=10 ++inference.tokens_to_generate=10"
+            '++data.prompt.prompt_config=qwen/math-cot '
+            '++data.prompt.prompt_template=qwen-instruct '
+            '++grpo.max_num_steps=5 '
+            '++grpo.num_prompts_per_step=2 '
+            '++policy.max_total_sequence_length=256 '
+            '++policy.dtensor_cfg.tensor_parallel_size=1 '
+            '++checkpointing.save_period=2 '
+            '++policy.train_global_batch_size=2 '
+            '++policy.train_micro_batch_size=1 '
+            '++policy.optimizer.kwargs.lr=1e-6 '
         ),
+        cluster="test-local",
+        config_dir=Path(__file__).absolute().parent,
+        expname="test-grpo-nemo-rl",
+        output_dir=output_dir,
+        hf_model=model_path,
+        num_nodes=1,
+        num_gpus=1,
+        num_training_jobs=1,
+        training_data="/nemo_run/code/tests/data/small-grpo-data.test",
+        disable_wandb=True,
+        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
+    )
+
+    # checking that the final model can be used for evaluation
+    eval(
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10 ++inference.tokens_to_generate=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/final_hf_model",
@@ -124,7 +184,7 @@ def test_sft_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
@@ -187,7 +247,7 @@ def test_dpo_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
@@ -269,10 +329,7 @@ def test_rm_aligner(test_mode):
 
     generate(
         ctx=wrap_arguments(
-            f"++batch_size=2 "
-            f"++input_dir={input_dir_greedy} "
-            f"++prompt_config=generic/math-base "
-            f"++prompt_template=llama3-base "
+            f"++input_dir={input_dir_greedy} " f"++prompt_config=generic/math-base " f"++prompt_template=llama3-base "
         ),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
@@ -295,7 +352,6 @@ def test_rm_aligner(test_mode):
     if model_type in seeds_supported_models:
         generate(
             ctx=wrap_arguments(
-                f"++batch_size=2 "
                 f"++input_dir={input_dir_seeds} "
                 f"++prompt_config=generic/math-base "
                 f"++prompt_template=llama3-base "

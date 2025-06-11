@@ -112,7 +112,7 @@ as an example.
 First, let's prepare the data if you have not done so yet.
 
 ```bash
-python -m nemo_skills.dataset.prepare math
+ns prepare_data math
 ```
 
 Then we can run the generation
@@ -127,8 +127,7 @@ ns generate \
        --num_random_seeds=32 \
        --output_dir=/workspace/synthetic-math-solutions \
        --eval_args="++eval_type=math" \
-       ++dataset=math \
-       ++split=train_full \
+       ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++prompt_template=llama3-base
@@ -139,8 +138,7 @@ in the TensorRT-LLM format (highly recommended for large-scale inference).
 See [checkpoint conversion](../pipelines/checkpoint-conversion.md) to learn more about how to convert
 models to different formats.
 
-Note that in this case we do not pass an input file, but instead specify a dataset and
-a split, which will pick a prepared input from `nemo_skills/dataset/math/train_full.jsonl`.
+Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
 and a [template for the base model](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
 (we found Llama 3.1 follows few-shots much better without chat tokens).

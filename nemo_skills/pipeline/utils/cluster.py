@@ -35,6 +35,10 @@ from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+# Add a module-level set to track which environment variables have been logged
+_logged_required_env_vars = set()
+_logged_optional_env_vars = set()
+
 
 def get_timeout(cluster_config, partition):
     if 'timeouts' not in cluster_config:
@@ -67,20 +71,30 @@ def get_env_variables(cluster_config):
     Returns:
         dict: dictionary of environment
     """
+    global _logged_required_env_vars, _logged_optional_env_vars
+
     env_vars = {}
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
+        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+
         if "=" in env_var:
             if env_var.count("=") == 1:
-                env_var, value = env_var.split("=")
+                env_var_name, value = env_var.split("=")
+                env_var_name = env_var_name.strip()
+                value = value.strip()
             else:
                 raise ValueError(f"Invalid required environment variable format: {env_var}")
-            env_vars[env_var.strip()] = value.strip()
-            logging.info(f"Adding required environment variable {env_var}")
+            env_vars[env_var_name] = value
+            if env_var_name not in _logged_required_env_vars:
+                LOG.info(f"Adding required environment variable {env_var_name} from config")
+                _logged_required_env_vars.add(env_var_name)
         elif env_var in os.environ:
-            logging.info(f"Adding required environment variable {env_var} from environment")
             env_vars[env_var] = os.environ[env_var]
+            if env_var not in _logged_required_env_vars:
+                LOG.info(f"Adding required environment variable {env_var} from environment")
+                _logged_required_env_vars.add(env_var)
         else:
             raise ValueError(f"Required environment variable {env_var} not found.")
 
@@ -94,21 +108,33 @@ def get_env_variables(cluster_config):
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
     for env_var in optional_env_vars + always_optional_env_vars:
+        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+
         if "=" in env_var:
             if env_var.count("=") == 1:
-                env_var, value = env_var.split("=")
+                env_var_name, value = env_var.split("=")
+                env_var_name = env_var_name.strip()
+                value = value.strip()
             else:
                 raise ValueError(f"Invalid optional environment variable format: {env_var}")
-            env_vars[env_var.strip()] = value.strip()
-            logging.info(f"Adding optional environment variable {env_var}")
+            env_vars[env_var_name] = value
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from config")
+                _logged_optional_env_vars.add(env_var_name)
         elif env_var in os.environ:
-            logging.info(f"Adding optional environment variable {env_var} from environment")
             env_vars[env_var] = os.environ[env_var]
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var} from environment")
+                _logged_optional_env_vars.add(env_var)
         elif env_var in default_factories:
             env_vars[env_var] = default_factories[env_var]()
-            logging.info(f"Adding optional environment variable {env_var} from environment")
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var} from environment")
+                _logged_optional_env_vars.add(env_var)
         else:
-            logging.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
+            if env_var not in _logged_optional_env_vars:
+                LOG.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
+                _logged_optional_env_vars.add(env_var)
 
     return env_vars
 
@@ -300,20 +326,31 @@ def progress_callback(transferred: int, total: int) -> None:
     sys.stdout.flush()
 
 
-def cluster_download(
-    tunnel: SSHTunnel, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
+def cluster_download_file(cluster_config: dict, remote_file: str, local_file: str):
+    tunnel = get_tunnel(cluster_config)
+    tunnel.get(remote_file, local_file)
+
+
+def cluster_path_exists(cluster_config: dict, remote_path: str):
+    tunnel = get_tunnel(cluster_config)
+    result = tunnel.run(f'test -e {remote_path} && echo "Exists"', hide=True, warn=True)
+    return "Exists" in result.stdout
+
+
+def cluster_download_dir(
+    cluster_config: dict, remote_dir: str, local_dir: str, remote_tar_dir: Optional[str] = None, verbose: bool = True
 ):
     """
     Downloads a directory from a remote cluster by creating a tar archive and transferring it.
 
     Args:
-        tunnel: SSHTunnel connection
+        cluster_config: dictionary with cluster configuration
         remote_dir: Path to the directory on remote server
         local_dir: Local path to save the downloaded directory
         remote_tar_dir: Optional directory for temporary tar file creation
         verbose: Print download progress
     """
-
+    tunnel = get_tunnel(cluster_config)
     remote_dir = remote_dir.rstrip('/')
     remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
 
@@ -374,17 +411,18 @@ def cluster_download(
     os.remove(local_tar)
 
 
-def cluster_upload(tunnel: SSHTunnel, local_file: str, remote_dir: str, verbose: bool = True):
+def cluster_upload(cluster_config: dict, local_file: str, remote_dir: str, verbose: bool = True):
     """
     Uploads a file to cluster.
     TODO: extend to a folder.
 
     Args:
-        tunnel: SSHTunnel connection
+        cluster_config: dictionary with cluster configuration
         local_file: Path to the local file to upload
         remote_dir: Cluster path where to save the file
         verbose: Print upload progress
     """
+    tunnel = get_tunnel(cluster_config)
     sftp = tunnel.session.client.open_sftp()
     sftp.put(str(local_file), str(remote_dir), callback=progress_callback if verbose else None)
     print(f"\nTransfer complete")

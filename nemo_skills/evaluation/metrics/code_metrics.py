@@ -18,42 +18,12 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class CodeMetrics(BaseMetrics):
-    def __init__(self):
-        self.reset()
-
-    def update(self, predictions):
-        """Updating the evaluation results with the current element.
-
-        Args:
-            predictions (list[dict]): aggregated predictions across all generations.
-                The content of the file is benchmark specific.
-        """
-        self.total += 1
-
-        if len(predictions) > 1:
-            self.agg_mode = f"pass@{len(predictions)}"
-
-            self.total_correct += any([elem['is_correct'] for elem in predictions])
-            self.total_correct_plus += any([elem['is_correct-plus'] for elem in predictions])
-        else:
-            # If single prediction, set it to greedy aggregation mode
-            self.agg_mode = "greedy"
-
-            self.total_correct += predictions[0]['is_correct']
-            self.total_correct_plus += predictions[0]['is_correct-plus']
-
-    def get_metrics(self):
-        metrics_dict = {
-            "num_entries": self.total,
-            "passing_base_tests": self.total_correct / self.total * 100.0,
-            "passing_plus_tests": self.total_correct_plus / self.total * 100.0,
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        return {
+            "passing_base_tests": prediction['is_correct'],
+            "passing_plus_tests": prediction['is_correct-plus'],
         }
 
-        return {self.agg_mode: metrics_dict}
-
-    def reset(self):
-        self.total = 0
-        self.total_correct = 0
-        self.total_correct_plus = 0
-        # Aggregation mode is automatically set
-        self.agg_mode = "greedy"
+    def update(self, predictions):
+        super().update(predictions)
+        self._compute_pass_at_k(predictions=predictions)
