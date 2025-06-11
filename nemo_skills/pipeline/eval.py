@@ -329,6 +329,8 @@ def eval(
         else:
             # for local executor, it makes no sense to use other values
             num_jobs = 1
+    if num_jobs < 0:
+        num_jobs = len(eval_cmds)
 
     # Create job batches with benchmark info
     job_batches = []
