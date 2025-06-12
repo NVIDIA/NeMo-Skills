@@ -31,8 +31,10 @@ from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_a
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
+from nemo_skills.evaluation.code_evaluators.livecodebench import eval_livecodebench
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
 
 # TODO: split into multiple files
 
@@ -107,7 +109,7 @@ def eval_code(cfg):
             for sample in samples:
                 sample['is_correct'] = evalplus_grades['eval'][sample['task_id']][0]['base_status'] == "pass"
                 sample['is_correct-plus'] = (
-                    sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
+                        sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
                 )
                 f.write(json.dumps(sample) + "\n")
 
@@ -180,7 +182,7 @@ def eval_arena(cfg):
             data = [json.loads(line) for line in fin]
 
         if eval_config.skip_filled and all(
-            'judgement-gen-base' in data_point and 'judgement-base-gen' in data_point for data_point in data
+                'judgement-gen-base' in data_point and 'judgement-base-gen' in data_point for data_point in data
         ):
             continue
 
@@ -223,7 +225,7 @@ def eval_arena(cfg):
             # saving to a tmp file to avoid corrupting original generation in case something goes wrong
             with open(output_file, "at" if eval_config.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
                 for data_idx, data_point in enumerate(
-                    tqdm(data, initial=starting_idx, total=len(data) + starting_idx)
+                        tqdm(data, initial=starting_idx, total=len(data) + starting_idx)
                 ):
                     # adding required fields for judgement prompt
                     to_add = data_point.copy()
@@ -284,7 +286,7 @@ def eval_mtbench(cfg):
             data = [json.loads(line) for line in fin]
 
         if eval_config.skip_filled and all(
-            'judgement-turn1' in data_point and 'judgement-turn2' in data_point for data_point in data
+                'judgement-turn1' in data_point and 'judgement-turn2' in data_point for data_point in data
         ):
             continue
 
@@ -334,7 +336,7 @@ def eval_mtbench(cfg):
             # saving to a tmp file to avoid corrupting original generation in case something goes wrong
             with open(output_file, "at" if eval_config.skip_filled else "wt", encoding="utf-8", buffering=1) as fout:
                 for data_idx, data_point in enumerate(
-                    tqdm(data, initial=starting_idx, total=len(data) + starting_idx)
+                        tqdm(data, initial=starting_idx, total=len(data) + starting_idx)
                 ):
                     # adding required fields for judgement prompt turn1
                     to_add = deepcopy(data_point)
@@ -484,6 +486,7 @@ EVALUATOR_MAP = {
     'lean4-statement': eval_lean4_statement,
     'multichoice': eval_mcq,
     'ruler': eval_ruler,
+    'livecodebench': eval_livecodebench,
 }
 
 
