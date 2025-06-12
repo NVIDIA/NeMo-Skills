@@ -31,6 +31,7 @@ DATASETS = [
     ('gsm8k', ['train', 'test']),
     ('hle', ['math', 'text']),
     ('human-eval', ['test']),
+    ('livecodebench', ['test']),
     ('ifeval', ['test']),
     ('math', ['train', 'test']),
     ('math-odyssey', ['test']),
