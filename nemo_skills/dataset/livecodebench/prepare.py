@@ -1,7 +1,22 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import json
 import os
 from datetime import datetime
+
 from datasets import load_dataset
 from dateutil.relativedelta import relativedelta
 
@@ -14,10 +29,7 @@ class PromptConstants:
 
 def parse_data(release_version='release_latest'):
     data = load_dataset(
-        "livecodebench/code_generation_lite",
-        split="test",
-        version_tag=release_version,
-        trust_remote_code=True
+        "livecodebench/code_generation_lite", split="test", version_tag=release_version, trust_remote_code=True
     )
     # data has the following fields
     # question_title: str
@@ -68,9 +80,15 @@ def clean_data(dataset):
         return data
 
     remove_columns = [
-        'question_title', 'contest_id',
-        'public_test_cases', 'private_test_cases', 'metadata',
-        'question_content', 'platform', 'question_id', 'starter_code'
+        'question_title',
+        'contest_id',
+        'public_test_cases',
+        'private_test_cases',
+        'metadata',
+        'question_content',
+        'platform',
+        'question_id',
+        'starter_code',
     ]
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
@@ -105,11 +123,14 @@ if __name__ == '__main__':
         for problem in data:
             input_date = datetime.strptime(problem['contest_date'], '%Y-%m-%dT%H:%M:%S').date()
             if start_date <= input_date <= end_date:
-                json.dump({
-                    "task_id": problem["task_id"],
-                    "question": problem["question"],
-                    "difficulty": problem["difficulty"]
-                }, f)
+                json.dump(
+                    {
+                        "task_id": problem["task_id"],
+                        "question": problem["question"],
+                        "difficulty": problem["difficulty"],
+                    },
+                    f,
+                )
                 f.write('\n')
 
     # test_v5_2408_2502.jsonl: 279 samples
