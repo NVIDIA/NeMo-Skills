@@ -23,12 +23,13 @@ ns generate \
     --server_type=openai \
     --server_address=https://api.openai.com/v1 \
     --output_dir=/workspace/test-eval-judge/eval-results/math \
-    ++input_dir=/workspace/test-eval/eval-results/math
+    --input_dir=/workspace/test-eval/eval-results/math \
+    --num_random_seeds=<num seeds used for generation>
 ```
 
-This will run the judge pipeline on the data inside `eval-results/math` folder and judge solutions from `output.jsonl` file.
-If you ran the benchmark with N samples (e.g. using `math:8`) and want to judge all of them, add `--num_random_seeds=8`.
-Note that if you want to judge both greedy generations and samples, you'd need to run the command two times.
+This will run the judge pipeline on the data inside `eval-results/math` folder and judge solutions from `output-rsX.jsonl` files.
+If you ran the benchmark with greedy decoding (e.g. using `math:0`) then
+use `--input_file=/workspace/test-eval/eval-results/math/output.jsonl` instead of `--input_dir` and `--num_random_seeds` arguments.
 
 In this example we use gpt-4o from OpenAI, but you can use Llama-405B (that you can host on cluster yourself) or any
 other models. If you have multiple benchmarks, you would need to run the command multiple times.

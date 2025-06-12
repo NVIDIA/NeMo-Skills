@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import docker_rm_and_mkdir
+from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu
@@ -32,10 +32,10 @@ def test_vllm_reward():
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
-    input_file = "/nemo_run/code/tests/data/output-rs0.test"
-    output_file = "/tmp/nemo-skills-tests/data/rm-output-rs0.jsonl"
+    input_dir = "/nemo_run/code/tests/data"
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/rm"
 
-    docker_rm_and_mkdir(output_file)
+    docker_rm([output_dir])
 
     cmd = (
         f"ns generate "
@@ -45,15 +45,18 @@ def test_vllm_reward():
         f"    --generation_type reward "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++input_file={input_file} "
-        f"    ++output_file={output_file} "
-        f"    --output_dir={os.path.dirname(output_file)} "
+        f"    --input_dir={input_dir} "
+        f"    --output_dir={output_dir} "
+        f"    --num_random_seeds=1 "
+        f"    --preprocess_cmd='cp {input_dir}/output-rs0.test {input_dir}/output-rs0.jsonl' "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
     subprocess.run(cmd, shell=True, check=True)
+
+    output_file = f"{output_dir}/output-rs0.jsonl"
 
     # no evaluation by default - checking just the number of lines and that there is a "reward_model_score" key
     with open(output_file) as fin:
