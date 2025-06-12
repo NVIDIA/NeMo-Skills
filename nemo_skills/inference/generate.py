@@ -176,17 +176,6 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
 
 class GenerationTask:
     @classmethod
-    def get_generation_module(cls) -> str:
-        """
-        Returns the path to the script module that performs the generation task.
-        Override this method to customize the generation module.
-
-        Returns:
-            str: Path to the generation module.
-        """
-        return "nemo_skills.inference.generate"
-
-    @classmethod
     def get_generation_default_args(cls) -> str:
         """
         Returns the default arguments for the generation task.
@@ -196,6 +185,19 @@ class GenerationTask:
             Dict: Default arguments for the generation task.
         """
         return ""
+
+    @classmethod
+    def get_server_command_fn(cls) -> callable:
+        """
+        Returns the function to get the server command for the generation task.
+        Override this method to customize the server command function.
+
+        Returns:
+            callable: Function that returns the server command.
+        """
+        from nemo_skills.pipeline.utils import get_server_command
+
+        return get_server_command
 
     def __init__(self, cfg: GenerateSolutionsConfig):
         """
@@ -573,6 +575,9 @@ class GenerationTask:
             self.sync_loop(data)
 
         self.postprocess()
+
+
+GENERATION_TASK_CLASS = GenerationTask
 
 
 # Update the hydra main to use the class method

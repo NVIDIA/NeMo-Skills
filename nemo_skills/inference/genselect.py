@@ -47,48 +47,13 @@ class GenSelectConfig:
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
-    # Prompt configuration - path to yaml files
-    prompt_template: str | None = None  # not required for OpenAI server
     prompt_config: str = "openmath/genselect"  # GenSelect template
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
-    batch_size: int = 128
-    max_samples: int = -1  # If > 0, will stop after generating this many samples. Useful for debugging
-    skip_filled: bool = False  # If True, will skip the generations that are already in the output file
-
-    max_concurrent_requests: int = 1024  # Maximum number of concurrent requests to the server for the async loop
-    # chunk the dataset into equal sized parts and index into them
-    num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
-    chunk_id: int | None = None  # if specified, will index the specified chunk only
-
     generation_key: str = "genselect_comparison"
 
-    # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
-    # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
-    # to `output_file`-async (and put it back in order after all generations are done)
-    use_async_loop: bool = True
-    async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
-
-    # can add this flag to just print the first prompt instead of running generation
-    # useful to double check that your data can be loaded and prompt has what you expect
-    dry_run: bool = False
-
-    # Added some of these extra parameters eventhough they are not used in the GenSelect pipeline
-    # This is because we use the GenerationTask class and it expects these parameters
-    extra_stop_phrases: list[str] = field(default_factory=list)
-    multi_turn_key: str | None = None
-
-    prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
-    # if True, model will be prompted to continue "generation" without closing assistant tag
-    continue_prefix_generation: bool = False
-
-    examples_type: str | None = None  # to be able to customize few-shot examples
     sandbox: dict = field(default_factory=dict)
-    code_execution: bool = False
-    total_code_executions_in_prompt: Any = None
-    # When True, total_code_executions_in_prompt override model defaults
-    override_max_code_executions: bool = False
 
     def __post_init__(self):
         if self.inference.random_seed is None:

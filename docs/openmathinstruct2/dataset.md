@@ -31,7 +31,7 @@ ns generate \
     --num_random_seeds=512 \
     --output_dir=/workspace/solution-augmentation/math \
     --eval_args="++eval_type=math" \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
     ++prompt_template=llama3-base
@@ -49,7 +49,7 @@ ns generate \
     --num_random_seeds=64 \
     --output_dir=/workspace/solution-augmentation/gsm8k \
     --eval_args="++eval_type=math" \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
     ++prompt_template=llama3-base
@@ -69,7 +69,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=80 \
     --output_dir=/workspace/problem-augmentation/math \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
     ++prompt_template=llama3-instruct \
@@ -87,7 +87,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=10 \
     --output_dir=/workspace/problem-augmentation/gsm8k \
-    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
     ++prompt_template=llama3-instruct \
@@ -117,8 +117,8 @@ for i in range(80):
         server_nodes=2,
         num_random_seeds=32,
         output_dir=f"/workspace/new-problems-solution-augmentation/math/problem-set{i}",
+        input_file=f"/workspace/solution-augmentation/math/generation/output-rs{i}",
         ctx=wrap_arguments(
-            f"++input_file=/workspace/solution-augmentation/math/generation/output-rs{i} "
             f"++prompt_config=generic/math-base "
             f"++examples_type=math_text_detailed "
             f"++prompt_template=llama3-base "
@@ -142,8 +142,8 @@ for i in range(10):
         server_nodes=2,
         num_random_seeds=32,
         output_dir=f"/workspace/new-problems-solution-augmentation/gsm8k/problem-set{i}",
+        input_file=f"/workspace/solution-augmentation/gsm8k/generation/output-rs{i}",
         ctx=wrap_arguments(
-            f"++input_file=/workspace/solution-augmentation/gsm8k/generation/output-rs{i} "
             f"++prompt_config=generic/math-base "
             f"++examples_type=gsm8k_text_detailed "
             f"++prompt_template=llama3-base "
@@ -231,10 +231,11 @@ Next, you need to run LLM inference to check those closest found problems from t
 We use the Llama3.1-405B-Instruct model for this, and here's one way of doing it via Nvidia API catalog.
 
 ```bash
-ns check_contamination \
+ns generate \
     --cluster=slurm \
+    --generation_type=check_contamination \
     --input_file=/workspace/new-problems-solution-augmentation/contamination-retrieved.jsonl \
-    --output_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl \
+    --output_dir=/workspace/new-problems-solution-augmentation/contamination-llm \
     --server_type=openai \
     --model=meta/llama-3.1-405b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1 \
@@ -267,7 +268,7 @@ python -m nemo_skills.training.prepare_data \
     ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
     ++max_solution_length=1024 \
     ++filters.remove_contaminated=true \
-    ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm.jsonl
+    ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm/output.jsonl
 ```
 
 ## Dataset contamination explorer

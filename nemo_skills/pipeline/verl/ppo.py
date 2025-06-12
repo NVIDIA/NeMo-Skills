@@ -20,17 +20,8 @@ from typing import List, Optional
 
 import typer
 
+import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import (
-    add_task,
-    check_if_mounted,
-    get_cluster_config,
-    get_exp,
-    get_free_port,
-    get_ray_server_cmd,
-    get_timeout,
-    run_exp,
-)
 from nemo_skills.pipeline.verl import verl_app
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -154,7 +145,7 @@ class PPOVerlTask:
         )
 
         ray_job_cmd = self.get_job_cmd()
-        ray_server_cmd = get_ray_server_cmd(ray_job_cmd)
+        ray_server_cmd = pipeline_utils.get_ray_server_cmd(ray_job_cmd)
 
         cmd = f"{cmd} {ray_server_cmd} "
         return cmd
@@ -176,7 +167,7 @@ def get_training_cmd(
     extra_arguments,
 ):
     # TODO: use those
-    timeout = get_timeout(cluster_config, partition)
+    timeout = pipeline_utils.get_timeout(cluster_config, partition)
 
     if task is None:
         task = PPOVerlTask(
@@ -282,23 +273,23 @@ def ppo_verl(
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
-    cluster_config = get_cluster_config(cluster, config_dir)
-    check_if_mounted(cluster_config, output_dir)
-    check_if_mounted(cluster_config, hf_model)
+    cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
+    pipeline_utils.check_if_mounted(cluster_config, output_dir)
+    pipeline_utils.check_if_mounted(cluster_config, hf_model)
     if log_dir:
-        check_if_mounted(cluster_config, log_dir)
+        pipeline_utils.check_if_mounted(cluster_config, log_dir)
     else:
         log_dir = output_dir
 
     if not final_ckpt_path:
         final_ckpt_path = f"{output_dir}/final_hf_checkpoint"
-    check_if_mounted(cluster_config, final_ckpt_path)
+    pipeline_utils.check_if_mounted(cluster_config, final_ckpt_path)
 
     if num_training_jobs > 0:
         if prompt_data is None:
             raise ValueError("prompt_data is required when num_training_jobs > 0")
         if prompt_data.startswith("/"):  # could ask to download from HF
-            check_if_mounted(cluster_config, prompt_data)
+            pipeline_utils.check_if_mounted(cluster_config, prompt_data)
 
     # Check if custom PPOVerlTask is provided via ctx.obj['ppo_task'], use that if available
     if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
@@ -325,7 +316,7 @@ def ppo_verl(
 
     server_config = None
     if server_type is not None:
-        get_random_port = server_gpus != 8 and not exclusive
+        get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
         if server_address is None:  # we need to host the model
             assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
             server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -354,7 +345,7 @@ def ppo_verl(
             f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
         ]
 
-    with get_exp(expname, cluster_config) as exp:
+    with pipeline_utils.get_exp(expname, cluster_config) as exp:
         prev_task = None
         for job_id in range(num_training_jobs):
             if job_id == num_training_jobs - 1 and convert_last_ckpt_to_hf:
@@ -365,7 +356,7 @@ def ppo_verl(
                 cp_last_ckpt_cmd = f'cp -r "{hf_input}" "{final_ckpt_path}"/'
 
                 train_cmd = f'{train_cmd} && {convert_cmd} && {cp_last_ckpt_cmd}'
-            prev_task = add_task(
+            prev_task = pipeline_utils.add_task(
                 exp,
                 cmd=train_cmd,
                 task_name=f'{expname}-ppo-{job_id}',
@@ -387,7 +378,7 @@ def ppo_verl(
                 with_sandbox=with_sandbox,
             )
         # explicitly setting sequential to False since we set dependencies directly
-        run_exp(exp, cluster_config, sequential=False)
+        pipeline_utils.run_exp(exp, cluster_config, sequential=False)
 
     return exp
 

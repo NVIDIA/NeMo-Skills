@@ -57,7 +57,6 @@ def test_sft_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-sft-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
@@ -119,7 +118,6 @@ def test_grpo_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-grpo-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
@@ -328,11 +326,10 @@ def test_rm_aligner(test_mode):
     assert os.path.exists(f"{output_dir}/model-averaged-nemo")
 
     generate(
-        ctx=wrap_arguments(
-            f"++input_dir={input_dir_greedy} " f"++prompt_config=generic/math-base " f"++prompt_template=llama3-base "
-        ),
+        ctx=wrap_arguments("++prompt_config=generic/math-base ++prompt_template=llama3-base "),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
+        input_file=f"{input_dir_greedy}/output.jsonl",
         output_dir=f"{output_dir}/score",
         server_type="nemo",
         generation_type="reward",
@@ -351,13 +348,10 @@ def test_rm_aligner(test_mode):
 
     if model_type in seeds_supported_models:
         generate(
-            ctx=wrap_arguments(
-                f"++input_dir={input_dir_seeds} "
-                f"++prompt_config=generic/math-base "
-                f"++prompt_template=llama3-base "
-            ),
+            ctx=wrap_arguments(f"++prompt_config=generic/math-base " f"++prompt_template=llama3-base "),
             cluster="test-local",
             config_dir=Path(__file__).absolute().parent,
+            input_dir=input_dir_seeds,
             output_dir=f"{output_dir}/score",
             server_type="nemo",
             generation_type="reward",
