@@ -328,5 +328,5 @@ Here are some suggestions on how to make your generation jobs more efficient
     )
     ```
 
-   If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
-   a dependent [run_cmd command](./run-cmd.md).
+    If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
+    a dependent [run_cmd command](./run-cmd.md).
