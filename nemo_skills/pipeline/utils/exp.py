@@ -458,12 +458,13 @@ def add_task(
         for idx in range(len(commands)):
             commands[idx] = commands[idx].replace('/nemo_run/code', './')
 
+    if with_ray and cluster_config["executor"] == "slurm":
+        metadata = {"use_with_ray_cluster": True}
+    else:
+        metadata = None
+
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
-        if with_ray and cluster_config["executor"] == "slurm":
-            metadata = {"use_with_ray_cluster": True}
-        else:
-            metadata = None
         return exp.add(
             run.Script(inline=commands[0], metadata=metadata),
             executor=executors[0],
@@ -471,12 +472,13 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
-        if with_ray:
-            raise ValueError("Ray is not yet supported for multiple commands.")
         if heterogeneous:
             executors[0].het_group_indices = het_group_indices
         return exp.add(
-            [run.Script(inline=command) for command in commands],
+            [
+                run.Script(inline=command, metadata=(metadata if idx == 0 else None))
+                for idx, command in enumerate(commands)
+            ],
             executor=executors,
             name="nemo-run",
             dependencies=task_dependencies,
