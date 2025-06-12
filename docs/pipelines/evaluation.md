@@ -11,7 +11,7 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 
 - Math problem solving: math, aime24, aime25, omni-math (and many more)
 - Formal proofs in Lean: minif2f, proofnet
-- Coding skills: human-eval, mbpp
+- Coding skills: LCB, human-eval, mbpp
 - Chat/instruction following: ifeval, arena-hard, mt-bench
 - General knowledge: mmlu, mmlu-pro, gpqa
 - Long context: RULER
