@@ -252,7 +252,7 @@ def eval(
         raise ValueError("benchmarks should be separated with commas")
 
     # TODO: random port will not really work here as we need to move this in the loop
-    get_random_port = server_gpus != 8 and not exclusive and server_type != "megatron"
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
     server_config, server_address, extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,

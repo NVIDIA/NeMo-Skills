@@ -60,6 +60,10 @@ def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) 
         raise ValueError(f"Strategy {strategy} not supported.")
 
 
+def should_get_random_port(server_gpus, exclusive, server_type):
+    return server_gpus != 8 and not exclusive and server_type != "megatron"
+
+
 def wait_for_server(server_address, generation_commands):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "

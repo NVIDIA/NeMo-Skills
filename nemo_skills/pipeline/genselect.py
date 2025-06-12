@@ -128,7 +128,7 @@ def genselect(
     except AttributeError:
         pass
 
-    get_random_port = server_gpus != 8 and not exclusive and server_type != "megatron"
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
