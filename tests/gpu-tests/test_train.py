@@ -57,7 +57,6 @@ def test_sft_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-sft-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
@@ -119,7 +118,6 @@ def test_grpo_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-grpo-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
