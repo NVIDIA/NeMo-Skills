@@ -186,6 +186,7 @@ def grpo_nemo_rl(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
+    with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(
         None,
@@ -271,7 +272,7 @@ def grpo_nemo_rl(
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
-                with_sandbox=False,
+                with_sandbox=with_sandbox,
                 with_ray=True,
             )
 
