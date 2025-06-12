@@ -11,10 +11,10 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 
 - Math problem solving: math, aime24, aime25, omni-math (and many more)
 - Formal proofs in Lean: minif2f, proofnet
-- Coding skills: LCB, human-eval, mbpp
+- Coding skills: lcb, human-eval, mbpp
 - Chat/instruction following: ifeval, arena-hard, mt-bench
 - General knowledge: mmlu, mmlu-pro, gpqa
-- Long context: RULER
+- Long context: ruler
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 

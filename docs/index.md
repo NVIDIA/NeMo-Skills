@@ -13,10 +13,10 @@ Here are some of the things we support.
 - [Model evaluation](pipelines/evaluation.md): Evaluate your models on many popular benchmarks
     - Math problem solving: math, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: LCB, human-eval, mbpp
+    - Coding skills: lcb, human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
-    - Long context: RULER
+    - Long context: ruler
 - [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
 
 To get started, follow this [tutorial](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
