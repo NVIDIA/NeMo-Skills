@@ -320,12 +320,13 @@ Here are some suggestions on how to make your generation jobs more efficient
    random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
    logic on each output file, e.g.
 
-        ```python
-        generate(
-            # ...
-            postprocess_cmd="python /nemo_run/code/my_script.py --input <output_dir>/output-{random_seed}.jsonl"
-        )
-        ```
+    ```python
+    cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
+    generate(
+        # ...
+        postprocess_cmd=cmd
+    )
+    ```
 
-    If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
-    a dependent [run_cmd command](./run-cmd.md).
+   If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
+   a dependent [run_cmd command](./run-cmd.md).
