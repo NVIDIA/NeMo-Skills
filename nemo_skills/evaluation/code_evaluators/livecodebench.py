@@ -19,6 +19,7 @@ import subprocess
 import sys
 from dataclasses import field
 
+from nemo_skills.evaluation.code_utils import preprocess_code
 from nemo_skills.utils import nested_dataclass, unroll_files
 
 
@@ -41,10 +42,16 @@ class LiveCodeBenchEvaluatorConfig:
 
 
 def eval_livecodebench(cfg):
-    install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
-
-    from livecodebench.evaluate import evaluate
-    from nemo_skills.evaluation.code_utils import preprocess_code
+    try:
+        from livecodebench.evaluate import evaluate
+    except ImportError:
+        print("Package 'livecodebench' not found. Attempting to install...")
+        install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
+        try:
+            from livecodebench.evaluate import evaluate
+        except ImportError:
+            print("Failed to install 'livecodebench'. Please install it manually.")
+            raise
 
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
     assert eval_config.language in ["python", "cpp"]
@@ -69,5 +76,5 @@ def eval_livecodebench(cfg):
             language=eval_config.language,
             test_file=None if eval_config.language == "python" else eval_config.test_file,
             num_process_evaluate=12,
-            timeout=6 if eval_config.language == "python" else 30
+            timeout=6 if eval_config.language == "python" else 30,
         )
