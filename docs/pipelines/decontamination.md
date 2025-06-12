@@ -62,7 +62,7 @@ generate(
     server_type="openai",
     server_address="https://integrate.api.nvidia.com/v1",
 )
-
+```
 
 This script will print an output that looks like this
 
