@@ -174,11 +174,11 @@ def genselect(
         preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
             preprocess_args if preprocess_args is not None else ""
         )
-        preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
+        task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
         preprocess_task = pipeline_utils.add_task(
             exp,
-            cmd=preprocess_cmd,
+            cmd=task_preprocess_cmd,
             task_name="preprocess_genselect",
             log_dir=f"{output_dir}/preprocess-logs",
             container=cluster_config["containers"]["nemo-skills"],
