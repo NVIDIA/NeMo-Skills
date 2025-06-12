@@ -55,6 +55,7 @@ class GenerateSolutionsConfig:
     output_file: str  # Where to save the generations
     prompt_config: str  # How to format the data into prompts
     prompt_template: str | None = None  # not required for OpenAI server
+    code_tags: str | None = None # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
 
     # Inference server configuration {server_params}
@@ -175,17 +176,6 @@ def combine_stop_phrases(prompt_phrases, extra_phrases):
 
 class GenerationTask:
     @classmethod
-    def get_generation_module(cls) -> str:
-        """
-        Returns the path to the script module that performs the generation task.
-        Override this method to customize the generation module.
-
-        Returns:
-            str: Path to the generation module.
-        """
-        return "nemo_skills.inference.generate"
-
-    @classmethod
     def get_generation_default_args(cls) -> str:
         """
         Returns the default arguments for the generation task.
@@ -195,6 +185,19 @@ class GenerationTask:
             Dict: Default arguments for the generation task.
         """
         return ""
+
+    @classmethod
+    def get_server_command_fn(cls) -> callable:
+        """
+        Returns the function to get the server command for the generation task.
+        Override this method to customize the server command function.
+
+        Returns:
+            callable: Function that returns the server command.
+        """
+        from nemo_skills.pipeline.utils import get_server_command
+
+        return get_server_command
 
     def __init__(self, cfg: GenerateSolutionsConfig):
         """
@@ -245,7 +248,7 @@ class GenerationTask:
         return llm
 
     def setup_prompt(self):
-        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, examples_type=self.cfg.examples_type)
+        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, self.cfg.code_tags, examples_type=self.cfg.examples_type)
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
@@ -572,6 +575,9 @@ class GenerationTask:
             self.sync_loop(data)
 
         self.postprocess()
+
+
+GENERATION_TASK_CLASS = GenerationTask
 
 
 # Update the hydra main to use the class method

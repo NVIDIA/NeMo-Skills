@@ -57,7 +57,7 @@ ns generate \
     --model=meta/llama-3.1-8b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1 \
     --output_dir=/workspace/test-generate \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml
 ```
 
@@ -70,7 +70,7 @@ ns generate \
     --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/test-generate \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
     ++prompt_template=llama3-instruct \
     ++skip_filled=False
@@ -127,7 +127,7 @@ ns generate \
        --num_random_seeds=32 \
        --output_dir=/workspace/synthetic-math-solutions \
        --eval_args="++eval_type=math" \
-       ++input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+       --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++prompt_template=llama3-base

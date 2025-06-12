@@ -2,7 +2,7 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/check_contamination.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/check_contamination.py)
+    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
 
     All extra parameters are passed to [nemo_skills/inference/check_contamination.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/check_contamination.py)
 
@@ -27,7 +27,7 @@ you have `/workspace` defined in your [cluster config](../basics/cluster-configs
 you can do it in the following way
 
 ```python
-from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
+from nemo_skills.pipeline.cli import wrap_arguments, run_cmd, generate
 
 
 test_sets = ['math', 'amc23', 'aime24']
@@ -52,14 +52,16 @@ run_cmd(
 Next, you need to run LLM inference to check those closest found questions from the output file. Here is an example
 using Llama-405B from Nvidia API catalog, but you can replace it with OpenAI models or self-hosted models.
 
-```
-ns check_contamination \
-    --cluster=local \
-    --input_file=/workspace/math-contamination-retrieved.jsonl \
-    --output_file=/workspace/math-contamination-results.jsonl \
-    --server_type=openai \
-    --model=meta/llama-3.1-405b-instruct \
-    --server_address=https://integrate.api.nvidia.com/v1
+```python
+generate(
+    cluster="local",
+    generation_type="check_contamination",
+    input_file="/workspace/math-contamination-retrieved.jsonl",
+    output_dir="/workspace/math-contamination-results",
+    model="meta/llama-3.1-405b-instruct",
+    server_type="openai",
+    server_address="https://integrate.api.nvidia.com/v1",
+)
 ```
 
 This script will print an output that looks like this
@@ -74,7 +76,8 @@ If you want instead to clean your training data from contaminated examples all t
 you need to swap values for the `retrieve_from` and `compare_to` arguments in the `retrieve_similar` step
 since we now want to make a check for each training set example and find closest test set problems.
 
-After you get `/workspace/math-contamination-results.jsonl`, you can pass it into [prepare_data command](training.md#preparing-the-data)
+After you get `/workspace/math-contamination-results/output.jsonl`,
+you can pass it into [prepare_data command](training.md#preparing-the-data)
 with `++contamination_file=...` option.
 
 See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../openmathinstruct2/dataset.md#decontamination).

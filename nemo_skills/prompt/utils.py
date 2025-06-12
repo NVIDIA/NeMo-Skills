@@ -81,6 +81,20 @@ class FewShotExamplesConfig:
 
 
 @nested_dataclass(kw_only=True)
+class CodeTags:
+    # used to execute code within these tags
+    code_begin: str = '```python\n'
+    code_end: str = '```\n'
+
+    # used to extract the code output
+    code_output_begin: str = '```output\n'
+    code_output_end: str = '```\n'
+
+    # used to post-process code output
+    code_output_format: str = 'qwen'
+
+
+@nested_dataclass(kw_only=True)
 class PromptTemplate:
     text_begin: str
     system_begin: str
@@ -93,20 +107,13 @@ class PromptTemplate:
     # TODO: should stop phrases not be here?
     stop_phrases: List[str]
 
-    # used to execute code within these tags
-    code_begin: str = '<llm-code>'
-    code_end: str = '</llm-code>'
-    # used to extract the code output
-    code_output_begin: str = '<llm-code-output>'
-    code_output_end: str = '</llm-code-output>'
-    code_output_format: str = 'qwen'
-
 
 @nested_dataclass(kw_only=True)
 class PromptConfig:
     user: str
     system: str = ""
     template: PromptTemplate = None
+    code_tags: CodeTags = None
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
 
 
@@ -125,15 +132,15 @@ class Prompt:
 
         # replacing code/code-output separators in the examples if present
         example_dict = example_dict.copy()
-        if 'solution' in example_dict:
+        if 'solution' in example_dict and self.config.code_tags:
 
             def replace_code_output(match):
                 code_output = match.group(2)
                 formatted_output = format_code_output(
                     execution_dict={"process_status": "completed", "stdout": code_output, "stderr": ""},
-                    code_output_begin=self.config.template.code_output_begin,
-                    code_output_end=self.config.template.code_output_end,
-                    code_output_format=self.config.template.code_output_format,
+                    code_output_begin=self.config.code_tags.code_output_begin,
+                    code_output_end=self.config.code_tags.code_output_end,
+                    code_output_format=self.config.code_tags.code_output_format,
                 )
                 return formatted_output
 
@@ -141,9 +148,9 @@ class Prompt:
             example_dict["solution"] = re.sub(pattern, replace_code_output, example_dict["solution"], flags=re.DOTALL)
 
             example_dict["solution"] = example_dict["solution"].replace(
-                "{code_begin}", self.config.template.code_begin
+                "{code_begin}", self.config.code_tags.code_begin
             )
-            example_dict["solution"] = example_dict["solution"].replace("{code_end}", self.config.template.code_end)
+            example_dict["solution"] = example_dict["solution"].replace("{code_end}", self.config.code_tags.code_end)
             example_dict["solution"] = example_dict["solution"].replace("{code_output_begin}", "")
             example_dict["solution"] = example_dict["solution"].replace("{code_output_end}", "")
 
@@ -204,12 +211,16 @@ class Prompt:
 
     def get_code_execution_args(self):
         """Returns the code execution arguments."""
+        if self.config.code_tags is None:
+            raise ValueError(
+                "Please provide 'code_tags' in your prompt configuration before calling get_code_execution_args()."
+            )
         return {
-            "code_begin": self.config.template.code_begin,
-            "code_end": self.config.template.code_end,
-            "code_output_begin": self.config.template.code_output_begin,
-            "code_output_end": self.config.template.code_output_end,
-            "code_output_format": self.config.template.code_output_format,
+            "code_begin": self.config.code_tags.code_begin,
+            "code_end": self.config.code_tags.code_end,
+            "code_output_begin": self.config.code_tags.code_output_begin,
+            "code_output_end": self.config.code_tags.code_output_end,
+            "code_output_format": self.config.code_tags.code_output_format,
         }
 
     def fill(
@@ -371,24 +382,40 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
 def get_prompt(
     prompt_config: str | dict,
     prompt_template: str | dict | None = None,
+    code_tags: str | dict | None = None,
     examples_type: str | None = None,
     config_dir: str | None = None,
     template_dir: str | None = None,
+    code_tags_dir: str | None = None,
 ) -> Prompt:
     if template_dir is None:
         template_dir = Path(__file__).parent.absolute() / 'template'
+    if code_tags_dir is None:
+        code_tags_dir = Path(__file__).parent.absolute() / 'code_tags'
+
     if isinstance(prompt_config, str):
         config = load_config(prompt_config, config_dir)
     else:
         config = prompt_config
+
+    template_obj = None
     if prompt_template is not None:
         if isinstance(prompt_template, str):
-            template = load_config(prompt_template, template_dir)
+            template_dict = load_config(prompt_template, template_dir)
         else:
-            template = prompt_template
-        prompt = Prompt(PromptConfig(**config, template=PromptTemplate(**template)))
-    else:
-        prompt = Prompt(PromptConfig(**config))
+            template_dict = prompt_template
+        template_obj = PromptTemplate(**template_dict)
+    code_tags_obj = None
+    if code_tags is not None:
+        if isinstance(code_tags, str):
+            code_tags_dict = load_config(code_tags, code_tags_dir)
+        else:
+            code_tags_dict = code_tags
+        code_tags_obj = CodeTags(**code_tags_dict)
+    
+    prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
+
     if examples_type is not None:
         prompt.config.few_shot_examples.examples_type = examples_type
+
     return prompt

@@ -317,6 +317,8 @@ def add_task(
     het_group_indices = []
     total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
+    LOG.info("Adding a task with commands:")
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
@@ -348,6 +350,7 @@ def add_task(
         executors.append(server_executor)
         het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Server command: %s", server_cmd)
 
     # then goes the main task(s) unless it's empty
     if cmd:
@@ -386,6 +389,7 @@ def add_task(
                 )
                 het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Main command(s): %s", ", ".join(cmd))
 
     # finally a sandbox if needed
     if with_sandbox:
@@ -421,6 +425,7 @@ def add_task(
             executors.append(sandbox_executor)
             het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Sandbox command: %s", commands[-1])
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)

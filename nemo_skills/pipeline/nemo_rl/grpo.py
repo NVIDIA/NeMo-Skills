@@ -49,7 +49,6 @@ class NemoRLTask:
     wandb_group: str
     timeout: str
     log_dir: str
-    cache_dir: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -63,7 +62,7 @@ class NemoRLTask:
         return cmd
 
     def format_data_args(self):
-        cmd = f"+data.train_data_path={self.prompt_data} " f"+data.val_data_path={self.eval_data} "
+        cmd = f"+data.train_data_path={self.prompt_data} +data.val_data_path={self.eval_data} "
         return cmd
 
     def format_wandb_args(self):
@@ -83,8 +82,6 @@ class NemoRLTask:
 
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
-            f"export NEMO_RL_VENV_DIR=/{self.cache_dir}/nemo_rl_venv && "
-            f"export UV_CACHE_DIR={self.cache_dir}/uv_cache && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
             f"echo 'Starting training' && "
             f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_grpo.py "
@@ -111,7 +108,6 @@ def get_training_cmd(
     wandb_group,
     extra_arguments,
     log_dir,
-    cache_dir,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -129,17 +125,14 @@ def get_training_cmd(
         timeout=timeout,
         extra_arguments=extra_arguments,
         log_dir=log_dir,
-        cache_dir=cache_dir,
     )
 
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path, cache_dir):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export NEMO_RL_VENV_DIR=/{cache_dir}/nemo_rl_venv && "
-        f"export UV_CACHE_DIR={cache_dir}/uv_cache && "
         f"export UV_PROJECT=/opt/NeMo-RL && "
         f"cd /nemo_run/code && "
         f"uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
@@ -199,11 +192,6 @@ def grpo_nemo_rl(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    cache_dir: str = typer.Option(
-        ...,
-        help="Path to the directory where the NeMo-RL uv cache will be stored. This should be a mounted "
-        "path so the cache can be reused between jobs.",
-    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -243,7 +231,6 @@ def grpo_nemo_rl(
             validation_data = training_data
         else:
             validation_data = get_mounted_path(cluster_config, validation_data)
-        cache_dir = get_mounted_path(cluster_config, cache_dir)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
@@ -260,7 +247,6 @@ def grpo_nemo_rl(
         wandb_group=wandb_group,
         extra_arguments=extra_arguments,
         log_dir=f"{log_dir}/training-logs",
-        cache_dir=cache_dir,
     )
 
     server_config = None
@@ -294,7 +280,6 @@ def grpo_nemo_rl(
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
-                cache_dir=cache_dir,
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",

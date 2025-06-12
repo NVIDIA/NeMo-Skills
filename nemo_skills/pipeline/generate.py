@@ -11,403 +11,35 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
+import importlib
 import logging
-import os
-import shlex
-import subprocess
-from collections import defaultdict
 from enum import Enum
 from typing import List
 
 import typer
 
-from nemo_skills.inference.generate import GenerationTask
+import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import (
-    SupportedServers,
-    add_task,
-    check_mounts,
-    get_cluster_config,
-    get_exp,
-    get_free_port,
-    get_generation_command,
-    get_reward_server_command,
-    get_server_command,
-    get_tunnel,
-    get_unmounted_path,
-    resolve_mount_paths,
-    run_exp,
-    wrap_cmd,
-)
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging, str_ids_to_list
+from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-
-def get_chunked_rs_filename(
-    output_dir: str,
-    random_seed: int = None,
-    chunk_id: int = None,
-    output_prefix: str = "output",
-) -> str:
-    """
-    Return a path of the form:
-      {output_dir}/{output_prefix}[-rsSEED][-chunkK].jsonl
-    If `output_prefix` is None, fallback to 'output' in place of {output_prefix}.
-    """
-    if random_seed is not None:
-        base_filename = f"{output_prefix}-rs{random_seed}.jsonl"
-    else:
-        base_filename = f"{output_prefix}.jsonl"
-
-    # If chunking is enabled, add the chunk suffix
-    if chunk_id is not None:
-        base_filename = get_chunked_filename(chunk_id, base_filename)
-    return os.path.join(output_dir, base_filename)
-
-
-def get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix="output"):
-    """
-    Returns a mapping of (seed, chunk_id) to expected .done file paths
-    """
-    file_map = {}
-    for seed in random_seeds:
-        for chunk_id in chunk_ids:
-            output_file = get_chunked_rs_filename(
-                output_dir, random_seed=seed, chunk_id=chunk_id, output_prefix=output_prefix
-            )
-            file_map[(seed, chunk_id)] = f"{output_file}.done"
-    return file_map
-
-
-def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, rerun_done, output_prefix="output"):
-    """
-    Determines which jobs still need to be run based on missing .done files.
-    Returns a mapping from random_seed to list of chunk_ids that need processing.
-    """
-    if rerun_done:
-        return {seed: copy.deepcopy(chunk_ids) for seed in random_seeds}
-
-    status_dir = get_unmounted_path(cluster_config, output_dir)
-    expected_files = get_expected_done_files(output_dir, random_seeds, chunk_ids, output_prefix=output_prefix)
-
-    check_commands = []
-    for (seed, chunk_id), filepath in expected_files.items():
-        unmounted_path = filepath.replace(output_dir, status_dir)
-        # Create identifiers that can be parsed from output
-        seed_str = "NONE" if seed is None else str(seed)
-        chunk_str = "NONE" if chunk_id is None else str(chunk_id)
-        check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
-
-    # If random_seeds has more than N elements, split commands into groups of N
-    request_size = 16
-    if len(random_seeds) > request_size:
-        outputs = []
-        for i in range(0, len(check_commands), request_size):
-            group = check_commands[i : i + request_size]
-            command = f"bash -c '{'; '.join(group)}'"
-            if cluster_config['executor'] == 'slurm':
-                out = get_tunnel(cluster_config).run(command).stdout.strip()
-            else:
-                out = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
-            outputs.append(out)
-        output = "\n".join(outputs).strip()
-    else:
-        command = f"bash -c '{'; '.join(check_commands)}'"
-        if cluster_config['executor'] == 'slurm':
-            output = get_tunnel(cluster_config).run(command).stdout.strip()
-        else:
-            output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
-
-    # Parse results into a mapping of missing jobs
-    missing_jobs = defaultdict(list)
-    for line in output.splitlines():
-        if line.startswith("MISSING:"):
-            _, seed_str, chunk_str = line.split(":")
-            seed = None if seed_str == "NONE" else int(seed_str)
-            chunk = None if chunk_str == "NONE" else int(chunk_str)
-            missing_jobs[seed].append(chunk)
-
-    done_jobs = defaultdict(list)
-    for seed, chunk_id in expected_files.keys():
-        if chunk_id not in missing_jobs[seed]:
-            done_jobs[seed].append(chunk_id)
-
-    done_jobs_str = ", ".join(
-        [
-            (
-                f"{seed}"
-                if not any(chunk is not None for chunk in chunks)
-                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
-            )
-            for seed, chunks in done_jobs.items()
-            if chunks
-        ]
-    )
-    missing_jobs_str = ", ".join(
-        [
-            (
-                f"{seed}"
-                if not any(chunk is not None for chunk in chunks)
-                else f"{seed} (chunks: {', '.join(str(chunk) for chunk in chunks if chunk is not None)})"
-            )
-            for seed, chunks in missing_jobs.items()
-            if chunks
-        ]
-    )
-
-    if missing_jobs_str:
-        # only printing this if there are some missing and some done
-        if done_jobs_str:
-            LOG.warning(
-                "The following jobs are incomplete and will be launched: seeds %s",
-                missing_jobs_str,
-            )
-            LOG.warning(
-                "The following jobs are completed and will be skipped (to override set --rerun_done): seeds %s",
-                done_jobs_str,
-            )
-    else:
-        LOG.warning("All jobs are completed. No jobs will be launched (to override set --rerun_done).")
-
-    return missing_jobs
-
-
-def get_cmd(
-    output_dir,
-    extra_arguments,
-    random_seed=None,
-    eval_args=None,
-    chunk_id=None,
-    num_chunks=None,
-    postprocess_cmd=None,
-    script: str = 'nemo_skills.inference.generate',
-    output_prefix: str = "output",
-):
-    """
-    Construct the generation command for language model inference.
-
-    If chunk_id is provided, chunking logic is used.
-    If output_prefix is provided, it replaces the default 'output*.jsonl' filenames
-    with a base name (plus `-rsSEED` or chunk info as needed).
-    """
-    # First get the unchunked filename for the output file
-    output_file = get_chunked_rs_filename(
-        output_dir=output_dir,
-        random_seed=random_seed,
-        output_prefix=output_prefix,
-    )
-    cmd = f"python -m {script} ++skip_filled=True ++output_file={output_file} "
-    job_end_cmd = ""
-
-    if random_seed is not None:
-        cmd += (
-            f"    ++inference.random_seed={random_seed} "
-            f"    ++inference.temperature=1.0 "
-            f"    ++inference.top_k=0 "
-            f"    ++inference.top_p=0.95 "
-        )
-
-    if chunk_id is not None:
-        cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
-        output_file = get_chunked_rs_filename(
-            output_dir, random_seed=random_seed, chunk_id=chunk_id, output_prefix=output_prefix
-        )
-        donefiles = []
-        # we are always waiting for all chunks in num_chunks, no matter chunk_ids in
-        # the current run (as we don't want to merge partial jobs)
-        for cur_chunk_id in range(num_chunks):
-            donefile = f"{get_chunked_rs_filename(output_dir=output_dir, random_seed=random_seed, chunk_id=cur_chunk_id, output_prefix=output_prefix)}.done"
-            donefiles.append(donefile)
-
-        if job_end_cmd:
-            job_end_cmd += f" && touch {donefiles[chunk_id]} "
-        else:
-            job_end_cmd = f"touch {donefiles[chunk_id]} "
-
-        # getting file name as if there is no chunking since that's where we want to merge
-        merged_output_file = get_chunked_rs_filename(
-            output_dir=output_dir, random_seed=random_seed, output_prefix=output_prefix
-        )
-        merge_cmd = (
-            f"python -m nemo_skills.inference.merge_chunks {merged_output_file} "
-            f"{' '.join([f[:-5] for f in donefiles])}"
-        )
-        if postprocess_cmd:
-            postprocess_cmd = shlex.quote(postprocess_cmd)
-            merge_cmd = f"{merge_cmd} -- {postprocess_cmd}"
-        postprocess_cmd = f"{job_end_cmd} && {merge_cmd}"
-
-    else:  # only writing a single status file
-        if job_end_cmd:
-            job_end_cmd += f" && touch {output_file}.done "
-        else:
-            job_end_cmd = f"touch {output_file}.done "
-
-        if postprocess_cmd:
-            postprocess_cmd = f"{job_end_cmd} && {postprocess_cmd}"
-        else:
-            postprocess_cmd = job_end_cmd
-
-    cmd += f" {extra_arguments} "
-
-    if eval_args:
-        cmd += (
-            f" && python -m nemo_skills.evaluation.evaluate_results "
-            f"    ++input_files={output_file} "
-            f"    {eval_args} "
-        )
-
-    return cmd, postprocess_cmd
-
-
-# TODO: support chunking for reward model and math judge
-
-
-def get_rm_cmd(
-    output_dir,
-    extra_arguments,
-    random_seed=None,
-    eval_args=None,
-    chunk_id=None,
-    num_chunks=None,
-    postprocess_cmd=None,
-    script: str = 'nemo_skills.inference.reward_model',
-    output_prefix: str = "output",
-):
-    if eval_args is not None:
-        raise ValueError("Cannot specify eval_args for reward model")
-
-    cmd = (
-        f"python -m {script} "
-        f"    ++skip_filled=True "
-        f"    ++output_dir={output_dir} "
-        f"    ++random_seed={random_seed} "
-    )
-    cmd += f" {extra_arguments} "
-    print(cmd)
-    return cmd, postprocess_cmd
-
-
-def get_math_judge_cmd(
-    output_dir,
-    extra_arguments,
-    random_seed=None,
-    eval_args=None,
-    chunk_id=None,
-    num_chunks=None,
-    postprocess_cmd=None,
-    script: str = 'nemo_skills.inference.llm_math_judge',
-    output_prefix: str = "output",
-):
-    if eval_args is not None:
-        raise ValueError("Cannot specify eval_args for math judge")
-    cmd = (
-        f"python -m {script} "
-        f"    ++skip_filled=True "
-        f"    ++output_dir={output_dir} "
-        f"    ++random_seed={random_seed} "
-    )
-    cmd += f" {extra_arguments} "
-    return cmd, postprocess_cmd
-
-
-def get_genselect_cmd(
-    output_dir,
-    extra_arguments,
-    random_seed=None,
-    eval_args=None,
-    chunk_id=None,
-    num_chunks=None,
-    postprocess_cmd=None,
-    script: str = 'nemo_skills.inference.genselect',
-    output_prefix: str = "output",
-):
-    if eval_args is not None:
-        raise ValueError("Cannot specify eval_args for genselect")
-    cmd = (
-        f"python -m {script} "
-        f"    ++skip_filled=True "
-        f"    ++input_dir={output_dir}/comparison_instances "
-        f"    ++output_dir={output_dir} "
-        f"    ++inference.random_seed={random_seed} "
-        f"    ++inference.temperature=0.7 "
-        f"    ++inference.tokens_to_generate=2048 "
-        f"    ++inference.top_k=0 "
-        f"    ++inference.top_p=0.95 "
-    )
-    cmd += f" {extra_arguments} "
-    return cmd, postprocess_cmd
+# TODO: add num_jobs here for consistency with eval?
 
 
 class GenerationType(str, Enum):
     generate = "generate"
     reward = "reward"
     math_judge = "math_judge"
-    genselect = "genselect"
+    check_contamination = "check_contamination"
 
 
-server_command_factories = {
-    GenerationType.generate: get_server_command,
-    GenerationType.reward: get_reward_server_command,
-    GenerationType.math_judge: get_server_command,
-    GenerationType.genselect: get_server_command,
+GENERATION_MODULE_MAP = {
+    GenerationType.generate: "nemo_skills.inference.generate",
+    GenerationType.reward: "nemo_skills.inference.reward_model",
+    GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
+    GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
 }
-
-client_command_factories = {
-    GenerationType.generate: get_cmd,
-    GenerationType.reward: get_rm_cmd,
-    GenerationType.math_judge: get_math_judge_cmd,
-    GenerationType.genselect: get_genselect_cmd,
-}
-
-client_command_scripts = {
-    GenerationType.generate: 'nemo_skills.inference.generate',
-    GenerationType.reward: 'nemo_skills.inference.reward_model',
-    GenerationType.math_judge: 'nemo_skills.inference.llm_math_judge',
-    GenerationType.genselect: 'nemo_skills.inference.genselect',
-}
-
-
-def configure_client(
-    generation_type,
-    server_gpus,
-    server_type,
-    server_address,
-    server_port,
-    server_nodes,
-    model,
-    server_args,
-    server_entrypoint,
-    extra_arguments,
-):
-    if server_address is None:  # we need to host the model
-        server_port = get_free_port(strategy="random")
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = f"localhost:{server_port}"
-
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-            "server_entrypoint": server_entrypoint,
-            "server_port": server_port,
-        }
-        extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.host=localhost ++server.port={server_port} "
-        )
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.base_url={server_address} ++server.model={model} "
-        )
-        server_port = None
-    return server_config, extra_arguments, server_address, server_port
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -419,14 +51,30 @@ def generate(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
+    input_file: str = typer.Option(
+        None, help="Path to the input data file. Can either specify input_file or input_dir, but not both. "
+    ),
+    input_dir: str = typer.Option(
+        None,
+        help="Path to the input data directory. Can either specify input_file or input_dir, but not both. "
+        "If input_file is not provided, will use output-rs{{seed}}.jsonl inside input_dir as input_files. "
+        "In this case, the random seed parameter is used both for input and for output files, which "
+        "means it's a 1-1 mapping (not 1-num_random_seeds as in the case of input_file).",
+    ),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
-    generation_type: GenerationType = typer.Option(GenerationType.generate, help="Type of generation to perform"),
+    generation_type: GenerationType | None = typer.Option(None, help="Type of generation to perform"),
+    generation_module: str = typer.Option(
+        None,
+        help="Path to the generation module to use. "
+        "If not specified, will use the registered generation module for the "
+        "generation type (which is required in this case).",
+    ),
     model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
     ),
-    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
+    server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
     server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
@@ -464,7 +112,6 @@ def generate(
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
     ),
-    genselect_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -482,9 +129,6 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    output_prefix: str = typer.Option(
-        "output", help="Optional base name for output .jsonl files. If provided, will be used in place of 'output'."
-    ),
     exclusive: bool = typer.Option(
         True,
         "--not_exclusive",
@@ -499,7 +143,7 @@ def generate(
         False,
         help="If True, will log random samples from the output files to wandb. "
         "Requires WANDB_API_KEY to be set in the environment. "
-        "Use expname/wandb_group/wandb_project to specify where to log.",
+        "Use wandb_name/wandb_group/wandb_project to specify where to log.",
     ),
     wandb_name: str = typer.Option(
         None,
@@ -518,15 +162,8 @@ def generate(
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f'{" ".join(ctx.args)}'
-
-    chunking_enabled = (num_chunks is not None) or (chunk_ids is not None)
-    if chunking_enabled and generation_type != GenerationType.generate:
-        logging.error(
-            "Chunking is enabled, but generation type is not 'generate'. "
-            "Chunking is only supported for generation type 'generate'."
-            "This may result in superfluous generation jobs."
-        )
-        raise ValueError("Chunking is only supported for generation type 'generate'")
+    LOG.info("Starting generation job")
+    LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
     try:
         server_type = server_type.value
@@ -542,7 +179,7 @@ def generate(
     else:
         wandb_parameters = None
 
-    get_random_port = server_gpus != 8 and not exclusive
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
@@ -557,126 +194,95 @@ def generate(
         chunk_ids = [None]
 
     # Prepare cluster config and mount paths
-    cluster_config = get_cluster_config(cluster, config_dir)
-    cluster_config = resolve_mount_paths(cluster_config, mount_paths, create_remote_dir=check_mounted_paths)
+    cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
+    cluster_config = pipeline_utils.resolve_mount_paths(
+        cluster_config, mount_paths, create_remote_dir=check_mounted_paths
+    )
 
     if not log_dir:
         log_dir = f"{output_dir}/generation-logs"
 
-    output_dir, log_dir = check_mounts(
+    output_dir, log_dir = pipeline_utils.check_mounts(
         cluster_config,
         log_dir=log_dir,
         mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
 
-    get_server_command = server_command_factories[generation_type]
-    get_cmd = client_command_factories[generation_type]
-    cmd_script = client_command_scripts[generation_type]
     original_server_address = server_address
 
-    # If GenerationType is `generate`, check if custom GenerationTask is provided via ctx.obj['generation_task_type']
-    if (
-        generation_type == GenerationType.generate
-        and ctx.obj is not None
-        and isinstance(ctx.obj, dict)
-        and 'generation_task_type' in ctx.obj
-    ):
-        generation_task = ctx.obj['generation_task_type']  # type: type(GenerationTask)
-        assert issubclass(
-            generation_task, GenerationTask
-        ), f"`generation_task_type` must be a subclass of GenerationTask"
-        cmd_script = generation_task.get_generation_module()
-        cmd_extra_args = generation_task.get_generation_default_args()
-        cmd_script = f"{cmd_script.strip()} {cmd_extra_args.strip()}"
+    if generation_module is not None and generation_type is not None:
+        raise ValueError("Cannot specify both generation_module and generation_type. ")
+    if generation_module is None:
+        generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
+    generation_task = importlib.import_module(generation_module)
+    if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+        raise ValueError(
+            f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+            "Please provide a valid generation module."
+        )
+    generation_task = generation_task.GENERATION_TASK_CLASS
+    extra_arguments = f"{generation_task.get_generation_default_args()} {extra_arguments}"
     extra_arguments_original = extra_arguments
 
     # Treat no random seeds as a single None seed to unify the code paths
     if not random_seeds:
         random_seeds = [None]
 
-    remaining_jobs = get_remaining_jobs(
+    remaining_jobs = pipeline_utils.get_remaining_jobs(
         cluster_config=cluster_config,
         output_dir=output_dir,
         random_seeds=random_seeds,
         chunk_ids=chunk_ids,
         rerun_done=rerun_done,
-        output_prefix=output_prefix,
     )
     has_tasks = False
 
-    with get_exp(expname, cluster_config) as exp:
-        if generation_type == GenerationType.genselect:
-            # Add the preprocessing command for genselect
-            genselect_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
-                genselect_args if genselect_args is not None else ""
-            )
-            preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {genselect_args}"
-
-            preprocess_task = add_task(
-                exp,
-                cmd=preprocess_cmd,
-                task_name="preprocess_genselect",
-                log_dir=f"{output_dir}/preprocess-logs",
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-            )
-            initial_tasks = [preprocess_task]
-
-        else:
-            initial_tasks = None
-
-        for job_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+        for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = get_chunked_rs_filename(
+                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
                     output_dir,
                     random_seed=seed,
                     chunk_id=None,
-                    output_prefix=output_prefix,
                 )
             for chunk_id in chunk_ids:
                 has_tasks = True
-                server_port = get_free_port(strategy="random") if get_random_port else 5000
-                server_config, extra_arguments, server_address, server_port = configure_client(
-                    generation_type=generation_type,
-                    server_gpus=server_gpus,
+                server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+                    model=model,
                     server_type=server_type,
                     server_address=original_server_address,
-                    server_port=server_port,
+                    server_gpus=server_gpus,
                     server_nodes=server_nodes,
-                    model=model,
                     server_args=server_args,
                     server_entrypoint=server_entrypoint,
                     extra_arguments=extra_arguments_original,
+                    get_random_port=get_random_port,
                 )
-                cmd, full_postprocess_cmd = get_cmd(
+                cmd = pipeline_utils.get_generation_cmd(
+                    input_file=input_file,
+                    input_dir=input_dir,
                     random_seed=seed,
                     output_dir=output_dir,
                     extra_arguments=extra_arguments,
                     eval_args=eval_args,
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
-                    output_prefix=output_prefix,
+                    preprocess_cmd=preprocess_cmd,
                     postprocess_cmd=postprocess_cmd,
-                    script=cmd_script,
+                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                    script=generation_module,
                 )
-                prev_tasks = initial_tasks
+                prev_tasks = None
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:
                         task_name += f'-chunk{chunk_id}'
-                    new_task = add_task(
+                    new_task = pipeline_utils.add_task(
                         exp,
-                        cmd=wrap_cmd(
-                            get_generation_command(server_address=server_address, generation_commands=cmd),
-                            preprocess_cmd,
-                            full_postprocess_cmd,
-                            random_seed=seed,
-                            # only logging for the first job
-                            wandb_parameters=wandb_parameters if job_idx == 0 else None,
-                        ),
+                        cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
                         task_name=task_name,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
@@ -690,12 +296,12 @@ def generate(
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=prev_tasks,
-                        get_server_command=get_server_command,
+                        get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     )
                     prev_tasks = [new_task]
         if has_tasks:
-            run_exp(exp, cluster_config)
+            pipeline_utils.run_exp(exp, cluster_config)
 
     if has_tasks:
         return exp

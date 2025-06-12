@@ -80,12 +80,9 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
     generate(
-        ctx=wrap_arguments(
-            f"++input_file={workspace}/data.jsonl "
-            f"++prompt_config={workspace}/extract-problems.yaml "
-            f"++prompt_template=qwen-instruct "
-        ),
+        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml " f"++prompt_template=qwen-instruct "),
         cluster=cluster,
+        input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/sdg/problems",
         postprocess_cmd=postprocess_cmd,
         expname=f"{expname_prefix}-problem-extraction",
@@ -101,13 +98,13 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
     generate(
         ctx=wrap_arguments(
-            f"++input_file={workspace}/sdg/extracted-problems.jsonl "
             f"++prompt_config=generic/math "
             f"++inference.temperature=0.6 "
             f"++inference.tokens_to_generate=8192 "
             f"++prompt_template=qwen-instruct "
         ),
         cluster=cluster,
+        input_file=f"{workspace}/sdg/extracted-problems.jsonl",
         output_dir=f'{workspace}/sdg/solutions',
         expname=f'{expname_prefix}-solution-generation',
         run_after=[f'{expname_prefix}-problem-extraction', f'{expname_prefix}-convert-qwq-trtllm'],
@@ -182,7 +179,6 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
             disable_wandb=wandb_params['disable_wandb'],
             wandb_project=wandb_params['wandb_project'],
             training_data=f'{workspace}/sft-data.jsonl',
-            cache_dir=f'{workspace}/nemo-rl-cache',
             expname=f"{expname_prefix}-training",
             run_after=f"{expname_prefix}-prepare-training-data",
             final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf",
