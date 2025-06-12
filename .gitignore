@@ -36,3 +36,5 @@ cluster_configs/*
 !cluster_configs/example-*.yaml
 
 nemo_skills/dataset/ruler/*/
+.idea/
+.idea/*
