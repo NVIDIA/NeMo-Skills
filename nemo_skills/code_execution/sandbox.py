@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import uuid
+import re
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
 from typing import Dict, List, Optional, Tuple
@@ -89,6 +90,54 @@ def write_tmp_files_back(input_files):
                     fout.write(line)
         # then replacing original file with tmp file
         os.replace(manifest + "-tmp", manifest)
+
+
+def extract_proof_only(lean_code: str) -> str:
+    lines = lean_code.strip().splitlines()
+    if not lines:
+        return ""
+
+    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_idx = None
+
+    # 1. Find where the theorem starts
+    for i, line in enumerate(lines):
+        if header_start_pattern.match(line):
+            header_start_idx = i
+            break
+
+    if header_start_idx is None:
+        return lean_code.strip()
+
+    # 2. Find where ':=' occurs, starting from the header
+    header_end_idx = None
+    for i in range(header_start_idx, len(lines)):
+        if ":=" in lines[i]:
+            header_end_idx = i
+            break
+
+    if header_end_idx is None:
+        return lean_code.strip()
+
+    # 3. Extract the line after ':='
+    header_line, after = lines[header_end_idx].split(":=", 1)
+    proof_first_line = after.strip()
+
+    # 4. Collect proof lines
+    if proof_first_line:
+        proof_lines = [proof_first_line] + lines[header_end_idx + 1:]
+    else:
+        proof_lines = lines[header_end_idx + 1:]
+
+    # 5. Remove leading 'by' (with or without indentation)
+    if proof_lines:
+        first = proof_lines[0].lstrip()
+        if first == "by":
+            proof_lines = proof_lines[1:]
+        elif first.startswith("by "):
+            proof_lines[0] = first[3:]  # Strip 'by '
+
+    return "\n".join(proof_lines).rstrip()
 
 
 class Sandbox(abc.ABC):
@@ -285,6 +334,7 @@ print(json.dumps(to_return))
         use_predicted_proof_key: bool = False,
         final_answer_key: str = "**FINAL ANSWER**",
         restate_formal_statement: bool = True,
+        strip_theorem_from_proof: bool = True,
     ):
         """Will write if the results are correct back into the original files."""
 
@@ -318,7 +368,7 @@ print(json.dumps(to_return))
                             line_dict["predicted_proof"] = (
                                 line_dict["header"]
                                 + (line_dict["formal_statement"] if restate_formal_statement else '')
-                                + generation
+                                + extract_proof_only(generation) if strip_theorem_from_proof else generation
                             )
                         else:
                             if "predicted_proof" not in line_dict:
