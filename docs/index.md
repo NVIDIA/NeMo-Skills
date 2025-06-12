@@ -13,7 +13,7 @@ Here are some of the things we support.
 - [Model evaluation](pipelines/evaluation.md): Evaluate your models on many popular benchmarks
     - Math problem solving: math, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: human-eval, mbpp
+    - Coding skills: LCB, human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
     - Long context: RULER
