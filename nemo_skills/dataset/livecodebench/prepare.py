@@ -150,7 +150,7 @@ if __name__ == '__main__':
     if args.release_version == 'all' and args.start_date == 'all' and args.end_date == 'all':
         # Prepare all splits
         for release_version, start_date, end_date in DEFAULT_SPLITS:
-            print(f"Preparing data for {release_version} from {start_date} to {end_date}")
+            print(f"Processing data for {release_version} from {start_date} to {end_date}")
             prepare(start_date, end_date, release_version, args.output_dir)
     else:
         if args.release_version == 'all' or args.start_date == 'all' or args.end_date == 'all':
