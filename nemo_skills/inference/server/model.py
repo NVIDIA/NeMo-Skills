@@ -720,7 +720,7 @@ class OpenAIModel(BaseModel):
             metadata = self.client.batches.create(
                 input_file_id=batch_file_id,
                 endpoint="/v1/chat/completions",
-                completion_window="24h",
+                completion_window="24h",  # the only supported value, but should finish faster
                 metadata={"description": "batch job"},
             )
 
