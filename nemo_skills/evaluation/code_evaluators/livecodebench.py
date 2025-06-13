@@ -14,13 +14,15 @@
 
 
 import json
+import logging
 import shutil
 import subprocess
 import sys
-from dataclasses import field
 
 from nemo_skills.evaluation.code_utils import preprocess_code
-from nemo_skills.utils import nested_dataclass, unroll_files
+from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def install_from_git(git_url):
@@ -31,10 +33,9 @@ def install_from_git(git_url):
         print(f"Error during installation: {e}")
 
 
+# TODO: use sandbox
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
-    # Sandbox configuration {sandbox_params}
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'fast'})
     dataset: str = "livecodebench"
     language: str = "python"  # "cpp" is another option now
     release_version: str = "v5"
@@ -45,12 +46,12 @@ def eval_livecodebench(cfg):
     try:
         from livecodebench.evaluate import evaluate
     except ImportError:
-        print("Package 'livecodebench' not found. Attempting to install...")
+        LOG.info("Package 'livecodebench' not found. Attempting to install...")
         install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
         try:
             from livecodebench.evaluate import evaluate
         except ImportError:
-            print("Failed to install 'livecodebench'. Please install it manually.")
+            LOG.info("Failed to install 'livecodebench'. Please install it manually.")
             raise
 
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
@@ -78,3 +79,14 @@ def eval_livecodebench(cfg):
             num_process_evaluate=12,
             timeout=6 if eval_config.language == "python" else 30,
         )
+
+        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+            eval_grades = json.load(fin)
+        # adding is_correct key to allow compute_metrics to work
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                sample['graded_list'] = eval_grades['eval'][sample['task_id']][0]['graded_list']
+                f.write(json.dumps(sample) + "\n")
+
+        # moving eval file to ensure metrics are recomputed
+        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')

@@ -31,7 +31,17 @@ DATASETS = [
     ('gsm8k', ['train', 'test']),
     ('hle', ['math', 'text']),
     ('human-eval', ['test']),
-    ('livecodebench', ['test']),
+    (
+        'livecodebench',
+        [
+            'test_v5_2408_2502',
+            'test_v5_2410_2502',
+            'test_v5_2410_2504',
+            'test_v6_2408_2502',
+            'test_v6_2410_2502',
+            'test_v6_2410_2504',
+        ],
+    ),
     ('ifeval', ['test']),
     ('math', ['train', 'test']),
     ('math-odyssey', ['test']),
@@ -56,8 +66,9 @@ def test_dataset_scripts():
     dataset_groups = ["math", "code", "chat", "multichoice"]  # not testing long-context as it requires extra args
     prepared_datasets = set()
     for group in dataset_groups:
+        # not using ns interface here as it takes quite a bit longer in the CI
         result = subprocess.run(
-            f'ns prepare_data --dataset_groups {group}',
+            f'python -m nemo_skills.dataset.prepare --dataset_groups {group}',
             shell=True,
             capture_output=True,
             text=True,

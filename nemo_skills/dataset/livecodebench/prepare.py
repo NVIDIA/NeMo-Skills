@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 
 from datasets import load_dataset
 from dateutil.relativedelta import relativedelta
@@ -94,30 +95,21 @@ def clean_data(dataset):
     return dataset
 
 
-if __name__ == '__main__':
-    # Write an argparse to a json file, read it in and parse it
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output_dir', type=str, default='.')
-    parser.add_argument('--release_version', type=str, default='v5')
-    parser.add_argument('--start_date', type=str, default='2024-08', help="End date in YYYY-MM format")
-    parser.add_argument('--end_date', type=str, default='2025-02', help="End date in YYYY-MM format")
-
-    args = parser.parse_args()
-
-    start_date, end_date = parse_month_range(args.start_date, args.end_date)
+def prepare(start_date, end_date, release_version, output_dir):
+    start_date, end_date = parse_month_range(start_date, end_date)
     start_yymm = start_date.strftime("%y%m")
     end_yymm = end_date.strftime("%y%m")
-    output_file_path = os.path.join(args.output_dir, f"test_{args.release_version}_{start_yymm}_{end_yymm}.jsonl")
+    output_file_path = os.path.join(output_dir, f"test_{release_version}_{start_yymm}_{end_yymm}.jsonl")
 
-    assert args.release_version in ["v1", "v2", "v3", "v4", "v5", "v6"]
+    assert release_version in ["v1", "v2", "v3", "v4", "v5", "v6"]
 
-    data = parse_data(release_version=f"release_{args.release_version}")
+    data = parse_data(release_version=f"release_{release_version}")
     data = clean_data(data)
     print("Len of data: ", len(data))
 
     print("Writing to file...")
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     with open(output_file_path, 'w') as f:
         for problem in data:
@@ -128,14 +120,49 @@ if __name__ == '__main__':
                         "task_id": problem["task_id"],
                         "question": problem["question"],
                         "difficulty": problem["difficulty"],
+                        "subset_for_metrics": problem["difficulty"],
                     },
                     f,
                 )
                 f.write('\n')
 
+
+DEFAULT_SPLITS = [
+    ('v5', '2024-08', '2025-02'),
+    ('v5', '2024-10', '2025-02'),
+    ('v5', '2024-10', '2025-04'),
+    ('v6', '2024-08', '2025-02'),
+    ('v6', '2024-10', '2025-02'),
+    ('v6', '2024-10', '2025-04'),
+]
+
+
+if __name__ == '__main__':
+    # Write an argparse to a json file, read it in and parse it
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output_dir', type=str, default=str(Path(__file__).parent))
+    parser.add_argument('--release_version', type=str, default='all')
+    parser.add_argument('--start_date', type=str, default='all', help="End date in YYYY-MM format")
+    parser.add_argument('--end_date', type=str, default='all', help="End date in YYYY-MM format")
+
+    args = parser.parse_args()
+
+    if args.release_version == 'all' and args.start_date == 'all' and args.end_date == 'all':
+        # Prepare all splits
+        for release_version, start_date, end_date in DEFAULT_SPLITS:
+            print(f"Preparing data for {release_version} from {start_date} to {end_date}")
+            prepare(start_date, end_date, release_version, args.output_dir)
+    else:
+        if args.release_version == 'all' or args.start_date == 'all' or args.end_date == 'all':
+            raise ValueError(
+                "If preparing a custom split, you must specify all "
+                "--release_version, --start_date, and --end_date arguments."
+            )
+        prepare(args.start_date, args.end_date, args.release_version, args.output_dir)
+
     # test_v5_2408_2502.jsonl: 279 samples
     # test_v5_2410_2502.jsonl: 166 samples
     # test_v5_2410_2504.jsonl: 166 samples
     # test_v6_2408_2502.jsonl: 374 samples
-    # test_v6_2408_2502.jsonl: 261 samples
+    # test_v6_2410_2502.jsonl: 261 samples
     # test_v6_2410_2504.jsonl: 341 samples
