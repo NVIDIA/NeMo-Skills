@@ -4,4 +4,5 @@ user: |-
   Read the question below and check if the provided answer to the question is correct. Make sure to conclude with **correct** or **incorrect**.
 
   Question: {problem}
-  Answer: {generation}
+  Answer: {cot}
+  
