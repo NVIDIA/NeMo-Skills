@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.evaluation.metrics.code_metrics import LiveCodeBenchMetrics
-
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'eval/livecodebench/python_codegen'
 DATASET_GROUP = 'code'
