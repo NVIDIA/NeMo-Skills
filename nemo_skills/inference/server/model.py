@@ -591,17 +591,7 @@ class OpenAIModel(BaseModel):
         self.initial_retry_delay = initial_retry_delay
 
     def _is_reasoning_model(self, model_name: str) -> bool:
-        """Check if the model is a reasoning model that requires special handling.
-        
-        Reasoning models (o1, o3, o4 series) have different parameter requirements:
-        - Use max_completion_tokens instead of max_tokens
-        - Don't support: temperature, top_p, presence_penalty, frequency_penalty, 
-          logprobs, top_logprobs, logit_bias
-        - Support reasoning_effort parameter ("low", "medium", "high")
-        - Convert system messages to developer messages automatically
-        """
-        reasoning_models = ['o1-preview', 'o1-mini', 'o1', 'o3-mini', 'o3-preview', 'o3', 'o4-mini', 'o4']
-        return any(reasoning_model in model_name.lower() for reasoning_model in reasoning_models)
+        return re.match(r"^o\d", model_name)
 
     def _build_request_params(
         self,
