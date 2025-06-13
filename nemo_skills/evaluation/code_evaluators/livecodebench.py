@@ -85,7 +85,7 @@ def eval_livecodebench(cfg):
         # adding is_correct key to allow compute_metrics to work
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
-                sample['graded_list'] = eval_grades['eval'][sample['task_id']][0]['graded_list']
+                sample['graded_list'] = eval_grades['eval'][sample['task_id']]['graded_list']
                 f.write(json.dumps(sample) + "\n")
 
         # moving eval file to ensure metrics are recomputed
