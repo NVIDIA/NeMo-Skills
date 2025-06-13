@@ -67,12 +67,15 @@ def test_dataset_scripts():
     prepared_datasets = set()
     for group in dataset_groups:
         # not using ns interface here as it takes quite a bit longer in the CI
+        cmd = f"python -m nemo_skills.dataset.prepare --dataset_groups {group}"
+        print(f"Running command (output is captured): {cmd}")
         result = subprocess.run(
-            f'python -m nemo_skills.dataset.prepare --dataset_groups {group}',
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
         )
+        print("Finished")
         assert result.returncode == 0, f"Preparation of {group} dataset group failed"
 
         group_datasets = set(
