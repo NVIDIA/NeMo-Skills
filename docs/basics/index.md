@@ -54,7 +54,7 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
         --model=meta/llama-3.1-8b-instruct \
         --server_address=https://integrate.api.nvidia.com/v1 \
         --output_dir=./generation \
-        ++input_file=./input.jsonl \
+        --input_file=./input.jsonl \
         ++prompt_config=./prompt.yaml
     ```
 
@@ -67,7 +67,7 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
         --model=gpt-4o-mini \
         --server_address=https://api.openai.com/v1 \
         --output_dir=./generation \
-        ++input_file=./input.jsonl \
+        --input_file=./input.jsonl \
         ++prompt_config=./prompt.yaml
     ```
 
@@ -98,9 +98,9 @@ config might look like
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.3
-  nemo: igitman/nemo-skills-nemo:0.5.3
+  trtllm: igitman/nemo-skills-trtllm:0.6.1
+  vllm: vllm/vllm-openai:v0.9.0
+  nemo: igitman/nemo-skills-nemo:0.6.1
   # ... there are some more containers defined here
 
 env_vars:
@@ -144,7 +144,7 @@ ns generate \
     --model=Qwen/Qwen2.5-1.5B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/generation-local \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml
 ```
 
@@ -176,7 +176,7 @@ ns generate \
     --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
     --server_gpus=1 \
     --output_dir=/workspace/generation-local-trtllm \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
     ++prompt_template=qwen-instruct # (3)!
 ```
@@ -215,7 +215,7 @@ ns generate \
     --server_type=vllm \
     --model=Qwen/Qwen2.5-1.5B-Instruct \
     --server_gpus=1 \
-    ++input_file=/nemo_run/code/input.jsonl \
+    --input_file=/nemo_run/code/input.jsonl \
     ++prompt_config=/nemo_run/code/prompt.yaml \
     --output_dir=/workspace/generation # (2)!
 ```

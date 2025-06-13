@@ -141,7 +141,7 @@ ns generate \
     --server_type=trtllm \
     --server_gpus=4 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
-    ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
+    --input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
 ```
 
 Alternatively, you can use an API model like gpt-4o, but the results might be different.
@@ -155,7 +155,7 @@ ns generate \
     --server_type=openai \
     --server_address=https://api.openai.com/v1 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
-    ++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
+    --input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results/hle
 ```
 
 To print the metrics run
@@ -227,9 +227,8 @@ All other commands are the same as in the [CoT part](#run-cot-evaluations).
 Here is a sample command to run GenSelect evaluation:
 
 ```bash
-ns generate \
-    --generation_type=genselect \
-    --genselect_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
+ns genselect \
+    --preprocess_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
     --model=/trt_models/openmath-nemotron-1.5b \
     ++prompt_template=qwen-instruct \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \

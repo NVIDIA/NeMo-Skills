@@ -4,7 +4,7 @@ Some dockerfiles are directly included in this folder and for some others the in
 To build one of the existing dockerfiles use a command like this
 
 ```
-docker build -t igitman/nemo-skills-nemo:0.6.0 -f dockerfiles/Dockerfile.nemo .
+docker build -t igitman/nemo-skills-nemo:0.6.1 -f dockerfiles/Dockerfile.nemo .
 ```
 It might take a long time for some of the images.
 

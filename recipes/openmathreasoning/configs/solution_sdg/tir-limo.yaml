@@ -8,7 +8,7 @@ suffix: tir-limo
 # This should be the output of the problem_generation.py pipeline
 input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
-contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/contamination-labeled.jsonl
+contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/output.jsonl
 # Number of solutions per each problem from the input file to generate
 num_random_seeds_to_generate: 16
 # Can define initial dependency for the `generate_solutions` stage to run after
@@ -31,7 +31,7 @@ pipeline_stages:
   - generate_solutions          # Generate initial TIR solutions
   - fill_majority_answer        # Fill missing ground truth answers if any
   - judge_answers               # Judge correctness based on final answer
-  - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags 
+  - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags
   - extract_python_fragments    # Extract python fragments for novelty/significance judgement
   - judge_novelty               # Judge the novelty of extracted fragments
   - judge_significance          # Judge the significance of extracted fragments

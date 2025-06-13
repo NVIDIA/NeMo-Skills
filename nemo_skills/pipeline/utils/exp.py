@@ -317,6 +317,8 @@ def add_task(
     het_group_indices = []
     total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
+    LOG.info("Adding a task with commands:")
+
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
@@ -348,6 +350,7 @@ def add_task(
         executors.append(server_executor)
         het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Server command: %s", server_cmd)
 
     # then goes the main task(s) unless it's empty
     if cmd:
@@ -386,6 +389,7 @@ def add_task(
                 )
                 het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Main command(s): %s", ", ".join(cmd))
 
     # finally a sandbox if needed
     if with_sandbox:
@@ -421,6 +425,7 @@ def add_task(
             executors.append(sandbox_executor)
             het_group_indices.append(het_group)
         het_group += 1
+        LOG.info("Sandbox command: %s", commands[-1])
 
     if cluster_config["executor"] != "local":
         tunnel = get_tunnel(cluster_config)
@@ -453,12 +458,13 @@ def add_task(
         for idx in range(len(commands)):
             commands[idx] = commands[idx].replace('/nemo_run/code', './')
 
+    if with_ray and cluster_config["executor"] == "slurm":
+        metadata = {"use_with_ray_cluster": True}
+    else:
+        metadata = None
+
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
-        if with_ray and cluster_config["executor"] == "slurm":
-            metadata = {"use_with_ray_cluster": True}
-        else:
-            metadata = None
         return exp.add(
             run.Script(inline=commands[0], metadata=metadata),
             executor=executors[0],
@@ -466,12 +472,13 @@ def add_task(
             dependencies=task_dependencies,
         )
     else:
-        if with_ray:
-            raise ValueError("Ray is not yet supported for multiple commands.")
         if heterogeneous:
             executors[0].het_group_indices = het_group_indices
         return exp.add(
-            [run.Script(inline=command) for command in commands],
+            [
+                run.Script(inline=command, metadata=(metadata if idx == 0 else None))
+                for idx, command in enumerate(commands)
+            ],
             executor=executors,
             name="nemo-run",
             dependencies=task_dependencies,
