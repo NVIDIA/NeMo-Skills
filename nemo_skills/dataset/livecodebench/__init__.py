@@ -12,29 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*.json
-*.tar.gz
-*.tar
-*.npy
-*.info
-*.jsonl
-*.csv
-nemo_experiments
-wandb
-build
-.hypothesis
-*.zip
-*.egg-info
-*.xml
-*.DS_Store
-.coverage
-
-__pycache__
-.ipynb_checkpoints
-
-cluster_configs/*
-!cluster_configs/example-*.yaml
-
-nemo_skills/dataset/ruler/*/
-.idea/
-.idea/*
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+PROMPT_CONFIG = 'eval/livecodebench/python_codegen'
+DATASET_GROUP = 'code'
+METRICS_TYPE = 'livecodebench'
+EVAL_SPLIT = 'test_v5_2408_2502'
+EVAL_ARGS = "++eval_type=livecodebench ++eval_config.dataset=livecodebench"
+GENERATION_ARGS = ""
