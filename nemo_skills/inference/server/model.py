@@ -812,28 +812,6 @@ class OpenAIModel(BaseModel):
                     self.max_retries,
                 )
                 time.sleep(wait_time)
-            except openai.BadRequestError as e:
-                # this likely only works for Nvidia-hosted models
-                if hasattr(e, 'body') and isinstance(e.body, dict) and 'detail' in e.body:
-                    msg = e.body['detail']
-                    # expected message:
-                    # This model's maximum context length is N tokens.
-                    # However, you requested X tokens (Y in the messages, Z in the completion).
-                    # Please reduce the length of the messages or completion.
-                    if msg.startswith("This model's maximum context length is"):
-                        numbers = re.findall(r"\d+", msg)
-                        max_tokens = int(numbers[0]) - int(numbers[2])
-                        LOG.warning("Reached max tokens! Reducing the number of tokens to generate to %d", max_tokens)
-                        # Update the appropriate parameter
-                        if "max_completion_tokens" in request_params:
-                            request_params["max_completion_tokens"] = max_tokens
-                        else:
-                            request_params["max_tokens"] = max_tokens
-                        response = self.client.chat.completions.create(**request_params)
-                        break
-                
-                # Re-raise the original error if we can't handle it
-                raise
             except AttributeError:
                 LOG.error("Unexpected response from OpenAI API: %s", response)
                 raise
