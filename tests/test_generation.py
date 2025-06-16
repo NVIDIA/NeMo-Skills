@@ -22,13 +22,12 @@ from pathlib import Path
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from tests.test_datasets import DATASETS
 
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
 prompt_templates = [f[:-5] for f in os.listdir(template_folder) if f.endswith('.yaml')]
 
-for dataset, splits in DATASETS:
+for dataset, splits in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test')]:
     for split in splits:
         DATA_TO_TEST.append((dataset, split))
 
