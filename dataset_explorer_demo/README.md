@@ -17,7 +17,7 @@
 
    ```
    python -m nemo_skills.inference.retrieve_similar \
-       ++retrieve_from=../nemo_skills/dataset/math/train_full.jsonl \
+       ++retrieve_from=../nemo_skills/dataset/math/train.jsonl \
        ++compare_to="../nemo_skills/dataset/<benchmark>/test.jsonl" \
        ++output_file=./similar-retrieved-math-train/<benchmark>.jsonl \
        ++top_k=5

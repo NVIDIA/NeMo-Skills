@@ -88,7 +88,7 @@ def check_mounts(
 
     # Check paths and add to mount list if not mounted
     if check_mounted_paths:
-        for idx, (path, default_mount) in enumerate(mount_map.items()):
+        for path, default_mount in mount_map.items():
             if not is_mounted_filepath(cluster_config, path):
                 # check if the path is a file or a directory
                 # so that the directory can be created
@@ -110,12 +110,13 @@ def check_mounts(
                     ), f"Default mount path should be absolute path, given {default_mount}"
 
                     # Add mount path to the cluster config
-                    add_mount_path(path_dir, default_mount, cluster_config)
+                    add_mount_path(path, default_mount, cluster_config)
 
     else:
         # Just check if the paths are mounted
         for path in mount_map.keys():
-            check_if_mounted(cluster_config, path)
+            if path is not None:
+                check_if_mounted(cluster_config, path)
 
     # check if the paths are mounted, get them if they arent but have mount sources
     # will error out if there are no corresponding mount sources

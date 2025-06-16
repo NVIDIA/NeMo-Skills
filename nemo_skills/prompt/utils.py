@@ -19,6 +19,7 @@ import re
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from itertools import zip_longest
 
 import yaml
 
@@ -80,6 +81,20 @@ class FewShotExamplesConfig:
 
 
 @nested_dataclass(kw_only=True)
+class CodeTags:
+    # used to execute code within these tags
+    code_begin: str = '```python\n'
+    code_end: str = '```\n'
+
+    # used to extract the code output
+    code_output_begin: str = '```output\n'
+    code_output_end: str = '```\n'
+
+    # used to post-process code output
+    code_output_format: str = 'qwen'
+
+
+@nested_dataclass(kw_only=True)
 class PromptTemplate:
     text_begin: str
     system_begin: str
@@ -92,20 +107,13 @@ class PromptTemplate:
     # TODO: should stop phrases not be here?
     stop_phrases: List[str]
 
-    # used to execute code within these tags
-    code_begin: str = '<llm-code>'
-    code_end: str = '</llm-code>'
-    # used to extract the code output
-    code_output_begin: str = '<llm-code-output>'
-    code_output_end: str = '</llm-code-output>'
-    code_output_format: str = 'qwen'
-
 
 @nested_dataclass(kw_only=True)
 class PromptConfig:
     user: str
     system: str = ""
     template: PromptTemplate = None
+    code_tags: CodeTags = None
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
 
 
@@ -124,15 +132,15 @@ class Prompt:
 
         # replacing code/code-output separators in the examples if present
         example_dict = example_dict.copy()
-        if 'solution' in example_dict:
+        if 'solution' in example_dict and self.config.code_tags:
 
             def replace_code_output(match):
                 code_output = match.group(2)
                 formatted_output = format_code_output(
                     execution_dict={"process_status": "completed", "stdout": code_output, "stderr": ""},
-                    code_output_begin=self.config.template.code_output_begin,
-                    code_output_end=self.config.template.code_output_end,
-                    code_output_format=self.config.template.code_output_format,
+                    code_output_begin=self.config.code_tags.code_output_begin,
+                    code_output_end=self.config.code_tags.code_output_end,
+                    code_output_format=self.config.code_tags.code_output_format,
                 )
                 return formatted_output
 
@@ -140,9 +148,9 @@ class Prompt:
             example_dict["solution"] = re.sub(pattern, replace_code_output, example_dict["solution"], flags=re.DOTALL)
 
             example_dict["solution"] = example_dict["solution"].replace(
-                "{code_begin}", self.config.template.code_begin
+                "{code_begin}", self.config.code_tags.code_begin
             )
-            example_dict["solution"] = example_dict["solution"].replace("{code_end}", self.config.template.code_end)
+            example_dict["solution"] = example_dict["solution"].replace("{code_end}", self.config.code_tags.code_end)
             example_dict["solution"] = example_dict["solution"].replace("{code_output_begin}", "")
             example_dict["solution"] = example_dict["solution"].replace("{code_output_end}", "")
 
@@ -203,12 +211,16 @@ class Prompt:
 
     def get_code_execution_args(self):
         """Returns the code execution arguments."""
+        if self.config.code_tags is None:
+            raise ValueError(
+                "Please provide 'code_tags' in your prompt configuration before calling get_code_execution_args()."
+            )
         return {
-            "code_begin": self.config.template.code_begin,
-            "code_end": self.config.template.code_end,
-            "code_output_begin": self.config.template.code_output_begin,
-            "code_output_end": self.config.template.code_output_end,
-            "code_output_format": self.config.template.code_output_format,
+            "code_begin": self.config.code_tags.code_begin,
+            "code_end": self.config.code_tags.code_end,
+            "code_output_begin": self.config.code_tags.code_output_begin,
+            "code_output_end": self.config.code_tags.code_output_end,
+            "code_output_format": self.config.code_tags.code_output_format,
         }
 
     def fill(
@@ -217,6 +229,7 @@ class Prompt:
         prefix_generation_to_response: bool = False,
         continue_prefix_generation: bool = False,
         multi_turn_key: str | None = None,
+        return_templated_dict: bool = False,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -230,6 +243,9 @@ class Prompt:
             multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
                 and use it to construct the prompt. You input_dict should also have "assistant" key in all
                 turns except last containing assistant reply.
+            return_templated_dict: Indicates whether to return a messages list where the template is used
+                to fill the prompt. If so, a list of dicts with 'role' and 'content' keys will be returned. 
+                In this case the final user and assistant messages will include special tokens.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
@@ -243,36 +259,61 @@ class Prompt:
 
         if self.config.template:
             if multi_turn_key is None:
-                prompt_string = self.SYSTEM_FORMAT.format(
+                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                )
-                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                ))
+                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                     user=self.build_user_message(input_dict), **asdict(self.config.template)
-                )
+                ))
+                user_strings = [user_string]
+                assistant_strings = []
                 if generation:
                     # Generation can be part of the input in cases such as reward models
                     if continue_prefix_generation:
                         # Append generation without the closing tag.
-                        prompt_string += generation
+                        prompt_string += (assistant_string := generation)
                     else:
-                        prompt_string += self.TURN_END_FORMAT.format(
+                        prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
                             assistant=generation, **asdict(self.config.template)
-                        )
+                        ))
+                    assistant_strings.append(assistant_string)
+
             else:
-                prompt_string = self.SYSTEM_FORMAT.format(
+                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
                     system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                )
+                ))
+                user_strings = []
+                assistant_strings = []
                 for turn in input_dict[multi_turn_key][:-1]:
-                    prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                         user=self.build_user_message(turn), **asdict(self.config.template)
-                    )
-                    prompt_string += self.TURN_END_FORMAT.format(
+                    ))
+                    user_strings.append(user_string)
+                    prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
                         assistant=turn["assistant"], **asdict(self.config.template)
-                    )
-                prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    ))
+                    assistant_strings.append(assistant_string)
+
+                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
                     user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
-                )
+                ))
+                user_strings.append(user_string)
                 prompt_string += generation
+                if generation:
+                    assistant_strings.append(generation)
+
+            if return_templated_dict:
+                messages = [
+                    {'role': 'system', 'content': system_string},
+                ]
+
+                for user_msg, assistant_msg in zip_longest(user_strings, assistant_strings, fillvalue=None):
+                    if user_msg is not None:
+                        messages.append({'role': 'user', 'content': user_msg})
+                    if assistant_msg is not None:
+                        messages.append({'role': 'assistant', 'content': assistant_msg})
+
+                return messages
             return prompt_string
         else:
             if multi_turn_key is None:
@@ -341,24 +382,40 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
 def get_prompt(
     prompt_config: str | dict,
     prompt_template: str | dict | None = None,
+    code_tags: str | dict | None = None,
     examples_type: str | None = None,
     config_dir: str | None = None,
     template_dir: str | None = None,
+    code_tags_dir: str | None = None,
 ) -> Prompt:
     if template_dir is None:
         template_dir = Path(__file__).parent.absolute() / 'template'
+    if code_tags_dir is None:
+        code_tags_dir = Path(__file__).parent.absolute() / 'code_tags'
+
     if isinstance(prompt_config, str):
         config = load_config(prompt_config, config_dir)
     else:
         config = prompt_config
+
+    template_obj = None
     if prompt_template is not None:
         if isinstance(prompt_template, str):
-            template = load_config(prompt_template, template_dir)
+            template_dict = load_config(prompt_template, template_dir)
         else:
-            template = prompt_template
-        prompt = Prompt(PromptConfig(**config, template=PromptTemplate(**template)))
-    else:
-        prompt = Prompt(PromptConfig(**config))
+            template_dict = prompt_template
+        template_obj = PromptTemplate(**template_dict)
+    code_tags_obj = None
+    if code_tags is not None:
+        if isinstance(code_tags, str):
+            code_tags_dict = load_config(code_tags, code_tags_dir)
+        else:
+            code_tags_dict = code_tags
+        code_tags_obj = CodeTags(**code_tags_dict)
+    
+    prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
+
     if examples_type is not None:
         prompt.config.few_shot_examples.examples_type = examples_type
+
     return prompt

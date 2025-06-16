@@ -14,9 +14,9 @@
 
 import json
 import os
-import urllib.request
-from pathlib import Path
 import subprocess
+from pathlib import Path
+
 URL = "https://github.com/openai/prm800k/raw/main/prm800k/math_splits/test.jsonl"
 
 
@@ -26,8 +26,9 @@ if __name__ == "__main__":
     data_folder.mkdir(exist_ok=True)
     output_file = str(data_folder / "test.jsonl")
 
-    subprocess.run(["wget", "-q", "--no-check-certificate", "--content-disposition", "-O", original_file, URL], check=True)
-
+    subprocess.run(
+        ["wget", "-q", "--no-check-certificate", "--content-disposition", "-O", original_file, URL], check=True
+    )
 
     data = []
 

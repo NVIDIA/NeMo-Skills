@@ -21,8 +21,8 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_free_port,
-    get_generation_command,
     resolve_mount_paths,
+    wait_for_server,
 )
 from nemo_skills.utils import setup_logging
 
@@ -106,7 +106,7 @@ def start_server(
         cmd = ""
         if launch_chat_interface:
             server_address = f"localhost:{server_config['server_port']}"
-            cmd = get_generation_command(server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args))
+            cmd = wait_for_server(server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args))
         add_task(
             exp,
             cmd=cmd,

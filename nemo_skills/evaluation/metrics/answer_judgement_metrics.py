@@ -12,47 +12,99 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import Counter, defaultdict
-from typing import Union
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
+from functools import partial
+from collections import defaultdict
 
+is_correct_judgement_or_none = partial(is_correct_judgement, return_none=True)
 
 class AnswerJudgementMetrics(BaseMetrics):
     def __init__(self):
-        self.reset()
+        super().__init__()
+        # Store individual TP/FP/FN/TN values as N x K matrix (N datapoints, K samples each)
+        self.total_positives = 0
+        self.individual_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+    
+    def reset(self):
+        super().reset()
+        self.individual_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+    
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        gt_judgement = is_correct_judgement_or_none(prediction['expected_judgement'])
+        pred_judgement = is_correct_judgement_or_none(prediction['judgement'])
 
-    def update_perf_dict(self, perf_dict, is_correct, is_fp, is_fn, invalid_count):
-        perf_dict["total_correct"] += float(is_correct)
-        perf_dict["fp_count"] += float(is_fp)
-        perf_dict["fn_count"] += float(is_fn)
-        perf_dict["invalid_count"] += float(invalid_count)
-    
-    def get_judgement_by_type(self, predictions, judgement_type: str, gt_judgement: bool) -> Union[bool, None]:
-        answers = [c for elem in predictions if (c:=is_correct_judgement(elem['judgement'])) is not None]
-        if len(answers) == 0:
-            return None
-        if judgement_type == "majority":
-            return Counter(answers).most_common(1)[0][0]
-        elif judgement_type == "pass":
-            for answer in answers:
-                if answer == gt_judgement:
-                    return answer
-            return answers[0]
-        else:
-            raise ValueError(f"Invalid judgement type: {judgement_type}")
-    
-    def get_judgement_metrics(self, pred_judgement, gt_judgement):
-        is_fp, is_fn = False, False
-        is_invalid = pred_judgement is None
-        is_correct = pred_judgement == gt_judgement
-        if not is_correct:
-            if pred_judgement == True:
-                is_fp = True
-            elif pred_judgement == False:
-                is_fn = True
-        return is_correct, is_fp, is_fn, is_invalid
+        return {'correct_judgements': gt_judgement == pred_judgement}
+
+    def _store_individual_metrics(self, agg_key, pred_judgement, gt_judgement, sample_idx=0):
+        """Store individual TP/FP/FN/TN values in N x K matrix structure."""
+        is_fp = pred_judgement is True and gt_judgement is False
+        is_fn = pred_judgement is False and gt_judgement is True
+        is_tp = pred_judgement is True and gt_judgement is True
+        is_tn = pred_judgement is False and gt_judgement is False
         
+        # Store in N x K matrix: [datapoint_idx][sample_idx]
+        # This is hacky, but the only way to access the datapoint_idx
+        datapoint_idx = self.total - 1
+        self.individual_metrics[agg_key][datapoint_idx][sample_idx] = {
+            'tp': float(is_tp),
+            'fp': float(is_fp), 
+            'fn': float(is_fn),
+            'tn': float(is_tn)
+        }
+
+    def _update_fp_fn(self, metrics_dict, pred_judgement, gt_judgement, divide_by=1):
+        is_fp = pred_judgement is True and gt_judgement is False
+        is_fn = pred_judgement is False and gt_judgement is True
+        
+        metrics_dict['false_positives'] += float(is_fp) / divide_by
+        metrics_dict['false_negatives'] += float(is_fn) / divide_by
+
+    def _update_score_metrics_for_majority(
+        self,
+        eval_dict: dict,
+        k: int,
+        score_method: str,
+        score_dicts: list[dict],
+        majority_score: bool | float | int,
+        majority_answer: str,
+        predictions: list[dict],
+        predicted_answers: list[str],
+    ):
+        assert score_method == 'correct_judgements'
+        # expected answer is always the same for all predictions, so just take the first one
+        gt_judgement = is_correct_judgement_or_none(predictions[0]['expected_judgement'])
+        self._update_fp_fn(eval_dict[f"majority@{k}"], majority_answer, gt_judgement)
+        self._store_individual_metrics(f"majority@{k}", majority_answer, gt_judgement)
+
+    def _update_score_metrics_for_pass(
+        self,
+        eval_dict: dict,
+        k: int,
+        score_method: str,
+        score_dicts: list[dict],
+        pass_score: bool | float | int,
+        predictions: list[dict],
+        predicted_answers: list[str] | None,
+    ):
+        assert score_method == 'correct_judgements'
+        # expected answer is always the same for all predictions, so just take the first one
+        gt_judgement = is_correct_judgement_or_none(predictions[0]['expected_judgement'])
+        pred_judgements = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions[:k]]
+        if gt_judgement in pred_judgements:
+            pred_judgement = gt_judgement
+        else:
+            not_none_pred_judgements = [pred_judgement for pred_judgement in pred_judgements if pred_judgement is not None]
+            pred_judgement = not_none_pred_judgements[0] if not_none_pred_judgements else None
+
+        self._update_fp_fn(eval_dict[f"pass@{k}"], pred_judgement, gt_judgement)
+        self._store_individual_metrics(f"pass@{k}", pred_judgement, gt_judgement)
+
+        for sample_idx, pred in enumerate(predictions[:k]):
+            gt_judgement = is_correct_judgement_or_none(pred['expected_judgement'])
+            pred_judgement = is_correct_judgement_or_none(pred['judgement'])
+            self._update_fp_fn(eval_dict[f"pass@1[{k}]"], pred_judgement, gt_judgement, divide_by=k)
+            self._store_individual_metrics(f"pass@1[{k}]", pred_judgement, gt_judgement, sample_idx)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -61,47 +113,70 @@ class AnswerJudgementMetrics(BaseMetrics):
             predictions (list[dict]): aggregated predictions across all generations.
                 The content of the file is benchmark specific.
         """
-        self.total += 1
-        gt_judgement = is_correct_judgement(predictions[0]['expected_judgement'])
-        if len(predictions) > 1:
-            # Majority@k, Pass@k, Pass@1[k]
-            for k in range(len(predictions), 0, -1):
-                pred_subset = predictions[:k]
-                majority_judgement = self.get_judgement_by_type(pred_subset, "majority", gt_judgement)
-                majority_metrics = self.get_judgement_metrics(majority_judgement, gt_judgement)
-                self.update_perf_dict(self.agg_mode_dict[f"majority@{k}"], *majority_metrics)
+        super().update(predictions)
+        self.total_positives += float(is_correct_judgement_or_none(predictions[0]['expected_judgement']) is True)
+        predicted_answers = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions]
+        self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
+        self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
-                pass_judgement = self.get_judgement_by_type(pred_subset, "pass", gt_judgement)
-                pass_metrics = self.get_judgement_metrics(pass_judgement, gt_judgement)
-                self.update_perf_dict(self.agg_mode_dict[f"pass@{k}"], *pass_metrics)
-
-                pass1_k_metrics = [self.get_judgement_metrics(is_correct_judgement(prediction['judgement']), gt_judgement) for prediction in pred_subset]
-                avg_pass1_k_metrics = [sum(metrics) / len(metrics) for metrics in zip(*pass1_k_metrics)]
-                self.update_perf_dict(self.agg_mode_dict[f"pass@1[{k}]"], *avg_pass1_k_metrics)
-
-        # Greedy
-        if len(predictions) == 1:
-            per_sample_metrics = self.get_judgement_metrics(is_correct_judgement(predictions[0]['judgement']), gt_judgement)
-            self.update_perf_dict(self.agg_mode_dict["greedy"], *per_sample_metrics)
-            return
-
+    def _compute_precision_recall_f1(self, datapoint_metrics):
+        """Compute unbiased precision, recall, F1 by averaging over K samples."""
+        # Find the maximum number of samples K across all datapoints
+        max_k = max(len(sample_metrics) for sample_metrics in datapoint_metrics.values())
+        
+        # Compute metrics for each of the K samples, then average across K
+        sample_precision_values = []
+        sample_recall_values = []
+        sample_f1_values = []
+        
+        for sample_idx in range(max_k):
+            # Aggregate TP, FP, FN across all N datapoints for sample k
+            total_tp, total_fp, total_fn = 0, 0, 0
+            
+            for sample_metrics in datapoint_metrics.values():
+                metrics = sample_metrics[sample_idx]
+                total_tp += metrics['tp']
+                total_fp += metrics['fp']
+                total_fn += metrics['fn']
+            
+            # Compute precision for sample k
+            if total_tp + total_fp > 0:
+                sample_precision = total_tp / (total_tp + total_fp)
+            else:
+                sample_precision = 1.0
+            sample_precision_values.append(sample_precision)
+            
+            # Compute recall for sample k
+            if self.total_positives > 0:
+                sample_recall = total_tp / self.total_positives
+            else:
+                sample_recall = 1.0
+            sample_recall_values.append(sample_recall)
+            
+            # Compute F1 for sample k
+            if sample_precision + sample_recall > 0:
+                sample_f1 = 2 * (sample_precision * sample_recall) / (sample_precision + sample_recall)
+            else:
+                sample_f1 = 0.0
+            sample_f1_values.append(sample_f1)
+        
+        # Average across all K samples
+        return {
+            'precision': 100 * sum(sample_precision_values) / max_k,
+            'recall': 100 * sum(sample_recall_values) / max_k,
+            'f1': 100 * sum(sample_f1_values) / max_k,
+        }
 
     def get_metrics(self):
-        metrics_dict = {}
-        for agg_mode, agg_metric_dict in self.agg_mode_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total}
+        # renaming no_answer to invalid_judgements
+        for agg_metric_dict in self.eval_dict.values():
+            agg_metric_dict["invalid_judgements"] = agg_metric_dict.pop("no_answer")
+        
+        metrics_dict = super().get_metrics()
 
-            metrics_dict[agg_mode]["correct_judgements"] = (agg_metric_dict["total_correct"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_positives"] = (agg_metric_dict["fp_count"] / self.total) * 100.0
-            metrics_dict[agg_mode]["false_negatives"] = (agg_metric_dict["fn_count"] / self.total) * 100.0
-            metrics_dict[agg_mode]["invalid_judgements"] = (agg_metric_dict["invalid_count"] / self.total) * 100.0
-
+        # Compute unbiased precision, recall, F1 by averaging over K samples
+        for agg_key, datapoint_metrics in self.individual_metrics.items():
+            if agg_key in metrics_dict:
+                metrics_dict[agg_key].update(self._compute_precision_recall_f1(datapoint_metrics))
+                
         return metrics_dict
-
-    def reset(self):
-        self.total = 0
-        self.agg_mode_dict = defaultdict(lambda: defaultdict(int))
-
-    def max_aggregations_to_print(self):
-        # majority + pass + pass@1[k]
-        return 1 + 1 + 1

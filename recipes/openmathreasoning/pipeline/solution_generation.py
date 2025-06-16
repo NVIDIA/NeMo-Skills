@@ -14,6 +14,7 @@
 
 import argparse
 from pathlib import Path
+
 from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
@@ -26,15 +27,13 @@ def get_stage_expname(base_expname, stage_name, suffix):
 def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    
+
     generate(
         ctx=wrap_arguments(
-            f"++input_file={input_file} "
-            f"++prompt_config=generic/math "
-            f"++inference.temperature=0.7 "
-            f"{stage_config.get('inline_args', '')} "
+            f"++prompt_config=generic/math " f"++inference.temperature=0.7 " f"{stage_config.get('inline_args', '')} "
         ),
         cluster=cluster,
+        input_file=input_file,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -45,7 +44,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
 def fill_majority_answer(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
-    
+
     cmd = (
         f'python -m nemo_skills.evaluation.aggregate_answers '
         f'    ++input_dir={input_dir} '
@@ -68,14 +67,12 @@ def fill_majority_answer(cluster, expname, run_after, stage_config, **kwargs):
 def judge_answers(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
-    
+
     generate(
-        ctx=wrap_arguments(
-            f"++input_dir={input_dir} "
-            f"{stage_config.get('inline_args', '')} "
-        ),
+        ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
         cluster=cluster,
         generation_type="math_judge",
+        input_dir=input_dir,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -87,7 +84,7 @@ def postprocess_tir_generations(cluster, expname, run_after, stage_config, **kwa
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
     output_file = f"{output_dir}/postprocessed_output.jsonl"
-    
+
     code_begin = stage_config.get('code_begin')
     code_end = stage_config.get('code_end')
     new_code_begin = stage_config.get('new_code_begin')
@@ -115,10 +112,10 @@ def postprocess_tir_generations(cluster, expname, run_after, stage_config, **kwa
 def extract_python_fragments(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
-    
+
     input_file = f"{input_dir}/postprocessed_output.jsonl"
     output_file = f"{output_dir}/output_fragments.jsonl"
-    
+
     code_begin = stage_config.get('code_begin')
     code_end = stage_config.get('code_end')
 
@@ -152,7 +149,7 @@ def _run_fragment_judge(
     """Helper function to run the generation command for judging fragments."""
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
-    
+
     input_file = f"{input_dir}/output_fragments.jsonl"
     generation_key = f"fragment_{judge_type}"
 
@@ -164,12 +161,12 @@ def _run_fragment_judge(
         ctx=wrap_arguments(
             f"++prompt_template={stage_config.get('prompt_template', 'qwen-instruct')} "
             f"++prompt_config={prompt_config} "
-            f"++input_file={input_file} "
             f"++generation_key={generation_key} "
             f"++skip_filled=True "
             f"{stage_config.get('inline_args', '')}"
         ),
         cluster=cluster,
+        input_file=input_file,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -205,7 +202,7 @@ def filter_fragments(cluster, expname, run_after, stage_config, **kwargs):
     novelty_dir = stage_config["novelty_dir"]
     significance_dir = stage_config["significance_dir"]
     output_dir = stage_config["output_dir"]
-    
+
     output_file = f"{output_dir}/filtered_output.jsonl"
 
     filter_cmd = (
@@ -235,11 +232,9 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             cur_output_dir = f"{output_dir}/output-rs{random_seed}"
 
             generate(
-                ctx=wrap_arguments(
-                    f"++input_file={input_file} "
-                    f"{stage_config.get('inline_args', '')} "
-                ),
+                ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
                 cluster=cluster,
+                input_file=input_file,
                 output_dir=cur_output_dir,
                 expname=expname,
                 run_after=run_after,
@@ -248,17 +243,14 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
     else:
         input_file = stage_config["input_file"]
         generate(
-            ctx=wrap_arguments(
-                f"++input_file={input_file} "
-                f"{stage_config.get('inline_args', '')} "
-            ),
+            ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
             cluster=cluster,
+            input_file=input_file,
             output_dir=output_dir,
             expname=expname,
             run_after=run_after,
             **stage_config.get('stage_kwargs', {}),
         )
-        
 
 
 def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
@@ -272,12 +264,10 @@ def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             cur_input_dir = f"{input_dir}/output-rs{random_seed}"
             cur_output_dir = f"{output_dir}/output-rs{random_seed}"
             generate(
-                ctx=wrap_arguments(
-                    f"++input_dir={cur_input_dir} "
-                    f"{stage_config.get('inline_args', '')} "
-                ),
+                ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
                 cluster=cluster,
                 generation_type="math_judge",
+                input_dir=cur_input_dir,
                 output_dir=cur_output_dir,
                 expname=expname,
                 run_after=run_after,
@@ -285,12 +275,10 @@ def judge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
             )
     else:
         generate(
-            ctx=wrap_arguments(
-                f"++input_dir={input_dir} "
-                f"{stage_config.get('inline_args', '')} "
-            ),
+            ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
             cluster=cluster,
             generation_type="math_judge",
+            input_dir=input_dir,
             output_dir=output_dir,
             expname=expname,
             run_after=run_after,
@@ -347,19 +335,19 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
     output_file = f"{output_dir}/sft-data.jsonl"
-    
+
     prompt_config = stage_config.get("prompt_config")
     if not prompt_config:
         raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
-    
+
     prompt_template = stage_config.get("prompt_template")
     if not prompt_template:
         raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
-    
+
     contamination_file = stage_config.get('contamination_file')
     if not contamination_file:
         raise ValueError("`contamination_file` is not defined in `prepare_for_sft` stage config")
-    
+
     cmd = (
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
         f"    ++input_files='{input_file}' "
@@ -388,10 +376,10 @@ def get_available_configs(config_dir):
     config_dir = Path(config_dir)
     if not config_dir.exists() or not config_dir.is_dir():
         return []
-    
+
     yaml_files = list(config_dir.glob("*.yaml"))
     config_names = [file.stem for file in yaml_files]
-    
+
     return config_names
 
 
@@ -416,7 +404,7 @@ stages_map = {
 if __name__ == '__main__':
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
     available_configs = get_available_configs(config_dir)
-    
+
     parser = argparse.ArgumentParser(description='OpenMathReasoning-1 solution generation pipeline')
     parser.add_argument(
         '--mode',
@@ -426,18 +414,17 @@ if __name__ == '__main__':
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
-        '--stages', type=str, default=None,
+        '--stages',
+        type=str,
+        default=None,
         help='Comma-separated list of stages to run. If not specified, runs all stages from the config.',
     )
 
     args = parser.parse_args()
 
     config_path = config_dir / f"{args.mode}.yaml"
-    config = OmegaConf.to_container(
-        OmegaConf.load(config_path), resolve=True,
-        structured_config_mode="dict"
-    )
-    
+    config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True, structured_config_mode="dict")
+
     if 'pipeline_stages' not in config or not config['pipeline_stages']:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
     full_stage_sequence = config['pipeline_stages']
@@ -465,21 +452,18 @@ if __name__ == '__main__':
     suffix = config.get('suffix', args.mode)
     cluster = config['cluster']
     expname_base = config['expname']
-    
+
     # --- Run selected stages ---
     for stage in stages_to_run:
         print(f"\n--- Running stage: {stage} ---")
         stage_func = stages_map[stage]
         stage_config = config.get('stages', {}).get(stage, {})
-        
+
         current_expname = get_stage_expname(expname_base, stage, suffix)
 
         dep_stages = stage_config.get('dependencies')
         if dep_stages is not None:
-            dependencies = [
-                get_stage_expname(expname_base, dep_stage, suffix)
-                for dep_stage in dep_stages
-            ]
+            dependencies = [get_stage_expname(expname_base, dep_stage, suffix) for dep_stage in dep_stages]
         else:
             dependencies = config.get('initial_dependency', None)
 

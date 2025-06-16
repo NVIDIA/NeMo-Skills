@@ -11,9 +11,10 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 
 - Math problem solving: math, aime24, aime25, omni-math (and many more)
 - Formal proofs in Lean: minif2f, proofnet
-- Coding skills: human-eval, mbpp
+- Coding skills: livecodebench, human-eval, mbpp
 - Chat/instruction following: ifeval, arena-hard, mt-bench
 - General knowledge: mmlu, mmlu-pro, gpqa
+- Long context: ruler
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
@@ -27,14 +28,14 @@ Make sure that `/workspace` is mounted inside of your
 You need to run the following commands to prepare the data.
 
 ```bash
-python -m nemo_skills.dataset.prepare
+ns prepare_data
 ```
 
 If you're only interested in a subset of datasets (e.g. only math-related or code-related), run with
 `--dataset_groups ...` and if you only need a couple of specific datasets, list them directly e.g.
 
 ```bash
-python -m nemo_skills.dataset.prepare gsm8k human-eval mmlu ifeval
+ns prepare_data gsm8k human-eval mmlu ifeval
 ```
 
 If you have the repo cloned locally, the data files will be available inside `nemo_skills/dataset/<benchmark>/<split>.jsonl`
@@ -42,6 +43,13 @@ and if you installed from pip, they will be downloaded to wherever the repo is i
 
 ```bash
 python -c "import nemo_skills; print(nemo_skills.__path__)"
+```
+
+Some benchmarks (e.g. ruler) require extra parameters to be passed to the prepare_data script. Thus you'd need to explicitly
+call `ns prepare_data` for all of them, e.g. for ruler you can use
+
+```bash
+ns prepare_data ruler --setup=llama_128k --tokenizer_path=meta-llama/Llama-3.1-8B-Instruct --max_seq_length=131072
 ```
 
 ## Greedy decoding
@@ -69,14 +77,14 @@ ns summarize_results --cluster local /workspace/test-eval
 Which should print the following
 
 ```
-------------------------- gsm8k -------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 1319        | 82.34            | 0.91
+--------------------------------- gsm8k ---------------------------------
+evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
+greedy          | 1319        | 169        | 83.40%           | 1.97%
 
 
------------------------------- human-eval -----------------------------
-evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
-greedy          | 164         | 67.68              | 62.20
+------------------------------------ human-eval ------------------------------------
+evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
+greedy          | 164         | 228        | 70.12%             | 62.80%
 ```
 
 The [summarize_results](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/summarize_results.py) script
@@ -108,18 +116,77 @@ ns eval \
 you will see the following output after summarizing results
 
 ```
--------------------------- gsm8k ---------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-majority@4      | 1319        | 87.95            | 0.00
-pass@4          | 1319        | 93.78            | 0.00
+--------------------------------- gsm8k ---------------------------------
+evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[4]       | 1319        | 161        | 78.96%           | 6.01%
+majority@4      | 1319        | 161        | 88.10%           | 0.08%
+pass@4          | 1319        | 161        | 93.25%           | 0.08%
 
 
------------------------------- human-eval -----------------------------
-evaluation_mode | num_entries | passing_base_tests | passing_plus_tests
-pass@4          | 164         | 78.66              | 72.56
+------------------------------------ human-eval ------------------------------------
+evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
+pass@1[4]       | 164         | 251        | 64.18%             | 59.30%
+pass@4          | 164         | 251        | 82.32%             | 78.05%
 ```
 
-If you want to get both multiple samples and greedy results, use `--add_greedy` parameter.
+
+## Using data on cluster
+
+Some benchmarks (e.g. ruler) have very large input datasets and it's inefficient to prepare them on local machine and
+keep uploading on cluster with every evaluation job. Instead, you can prepare them on cluster directly. To do that,
+run prepare_data command with `--data_dir` and `--cluster` options, e.g.
+
+```bash
+ns prepare_data \
+    --data_dir=/workspace/ns-data \
+    --cluster=slurm \
+    ruler --setup llama_128k --tokenizer_path meta-llama/Llama-3.1-8B-Instruct --max_seq_length 130900
+```
+
+Then during evaluation, you'd need to provide the same `data_dir` argument and it will read the data from cluster
+directly. You can also use `NEMO_SKILLS_DATA_DIR` environment variable instead of an explicit argument.
+
+Here is an example evaluation command for ruler that uses data_dir parameter
+
+```python
+from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
+
+tasks = [
+    "niah_single_1", "niah_single_2","niah_single_3",
+    "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
+    "niah_multivalue", "niah_multiquery",
+    "vt", "cwe", "fwe", "qa_1", "qa_2",
+]
+benchmarks = ",".join([f"ruler.llama_128k.{task}:0" for task in tasks])
+
+eval(
+    # using a low number of concurrent requests since it's almost entirely prefill stage
+    ctx=wrap_arguments("++max_concurrent_requests=32"),
+    cluster="slurm",
+    model="/hf_models/Meta-Llama-3.1-8B-Instruct",
+    server_type="sglang",
+    output_dir="/workspace/eval-ruler",
+    data_dir="/workspace/ns-data",
+    benchmarks=benchmarks,
+    server_gpus=8,
+    expname="eval-ruler",
+)
+
+# running summarize results on the cluster as well to avoid downloading the data
+# you can find results in /workspace/eval-ruler/eval-results/metrics.json
+# or add --wandb_name parameter to log to W&B
+cmd = (
+    "python -m nemo_skills.pipeline.summarize_results "
+    "    --data_dir /workspace/ns-data /workspace/eval-ruler/eval-results "
+)
+run_cmd(
+    ctx=wrap_arguments(cmd),
+    cluster="slurm",
+    log_dir="/workspace/eval-ruler/eval-results/summarize_results",
+    expname="summarize-results",
+    run_after="eval-ruler",
+)
+```
 
 ## How the benchmarks are defined
 
@@ -138,13 +205,12 @@ Let's look at gsm8k to understand a bit more how each part of the evaluation wor
 Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/gsm8k/__init__.py) we see the following
 
 ```python
-
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
-DEFAULT_EVAL_ARGS = "++eval_type=math"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=math"
+GENERATION_ARGS = ""
 ```
 
 The prompt config and default generation arguments are passed to the

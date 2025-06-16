@@ -129,7 +129,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     sandbox = get_sandbox()  # localhost by default
     llm = get_code_execution_model(server_type="vllm", sandbox=sandbox)
-    prompt = get_prompt('generic/default', 'llama3-instruct') # (1)!
+    prompt = get_prompt('generic/default', 'llama3-instruct', code_tags='llama3') # (1)!
     prompt.config.system = ( # (2)!
         "Environment: ipython\n\n"
         "Use Python to solve this math problem."

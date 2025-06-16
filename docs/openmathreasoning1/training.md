@@ -33,13 +33,15 @@ for inference_mode in ["cot", "tir", "genselect"]:
     dataset[inference_mode] = dataset[inference_mode].rename_column("problem", "input")
     dataset[inference_mode] = dataset[inference_mode].rename_column("generated_solution", "output")
 
+    code_tags = None
     if inference_mode == 'cot':
         prompt_config = 'generic/math'
     if inference_mode == 'tir':
         prompt_config = 'openmath/tir'
+        code_tags = 'openmath'
     if inference_mode == 'genselect':  # already formatted
         prompt_config = {'user': '{problem}'}
-    prompt = get_prompt(prompt_config, 'qwen-instruct')
+    prompt = get_prompt(prompt_config, 'qwen-instruct', code_tags)
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 
@@ -275,15 +277,17 @@ for inference_mode in ["cot", "tir", "genselect"]:
     dataset[inference_mode] = dataset[inference_mode].rename_column("problem", "input")
     dataset[inference_mode] = dataset[inference_mode].rename_column("generated_solution", "output")
 
+    code_tags = None
     if inference_mode == 'cot':
         prompt_config = 'generic/math'
     if inference_mode == 'tir':
         prompt_config = 'openmath/tir'
+        code_tags = 'openmath'
     if inference_mode == 'genselect':  # already formatted
         prompt_config = {'user': '{problem}'}
     func = partial(filter_func, inference_mode=inference_mode)
     dataset[inference_mode] = dataset[inference_mode].filter(func, num_proc=20)
-    prompt = get_prompt(prompt_config, 'qwen-instruct')
+    prompt = get_prompt(prompt_config, 'qwen-instruct', code_tags)
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 

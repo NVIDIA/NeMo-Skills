@@ -1,19 +1,15 @@
-FROM verlai/verl:ngc-th2.4.0-cu124-vllm0.6.3-te1.7-v0.0.4
-
+FROM whatcanyousee/verl:ngc-cu124-vllm0.8.5-sglang0.4.6-mcore0.12.0-te2.3
 # Set working directory
 WORKDIR /opt
 
 # Install verl
-ENV VERL_COMMIT=db57bb4331f86769719d3ab2a2e7c1d90d26dc1e
-RUN git clone https://github.com/titu1994/verl.git && \
+ENV VERL_COMMIT=2ed63bbf39c22724e4940d97e4b09e4f3e5f6d68
+RUN git clone https://github.com/volcengine/verl.git && \
     cd verl && \
-    git checkout $VERL_COMMIT && \
+    git checkout ${VERL_COMMIT} && \
     pip3 install -e .
 
-# Install vllm flash-attn
-RUN pip3 uninstall -y vllm flash-attn
-RUN pip3 install vllm==0.7.3
-RUN MAX_JOBS=4 NINJA_FLAGS="-j4" pip3 install --no-cache-dir --no-build-isolation flash-attn
+RUN pip install fire
 RUN pip3 install -U pynvml
 
 

@@ -20,11 +20,10 @@
 
 !!! warning
 
-    OpenRLHF and verl support is experimental and incomplete. We use the following
-    custom forks and it might not be easy to switch to official repositories versions.
+    OpenRLHF support is experimental and incomplete. We use the following
+    custom fork and it might not be easy to switch to official repositories versions.
 
     * OpenRLHF: https://github.com/Kipok/OpenRLHF
-    * verl: https://github.com/titu1994/verl
 
     The documentation here is incomplete and we advise you to open an issue if you
     plan to try something that is not covered below to get additional support.

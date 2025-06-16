@@ -3,6 +3,7 @@ processors_to_run: all
 output_path: ???
 prompt_config: null
 prompt_template: null
+code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
 input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
@@ -238,7 +239,7 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.filters.CodeTextFilter
     should_run: ${filters.code_text_filter}
     filter_type: ${filters.code_text_filter}
-    prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     solution_key: ${output_key}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
@@ -251,6 +252,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     input_key: ${input_key}
     output_key: ${output_key}
     chat_format: ${chat_format}

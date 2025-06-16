@@ -19,7 +19,6 @@ import typer
 
 from nemo_skills.pipeline import utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.generate import wrap_cmd
 from nemo_skills.pipeline.utils import add_task, check_mounts, get_exp, run_exp
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -62,6 +61,11 @@ def run_cmd(
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
+    server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
@@ -119,16 +123,15 @@ def run_cmd(
 
     with get_exp(expname, cluster_config) as exp:
         # Setup server config if model is provided
-        server_port = None if get_random_port else 5000
         if model is not None:
-            server_config, extra_arguments, server_address, server_port = pipeline_utils.configure_client(
+            server_config, server_address, extra_arguments = pipeline_utils.configure_client(
                 model=model,
                 server_type=server_type,
                 server_address=server_address,
-                server_port=server_port,
                 server_gpus=server_gpus,
                 server_nodes=server_nodes,
                 server_args=server_args,
+                server_entrypoint=server_entrypoint,
                 extra_arguments=extra_arguments,  # this is empty string by design
                 get_random_port=get_random_port,
             )
@@ -137,11 +140,11 @@ def run_cmd(
 
         # Prepare command
         cmd = get_cmd(command=command)
-        cmd = wrap_cmd(cmd, preprocess_cmd, postprocess_cmd)
+        cmd = pipeline_utils.wrap_cmd(cmd, preprocess_cmd, postprocess_cmd)
 
         # Wrap command with generation command if model is provided
         if model is not None and server_config is not None:
-            cmd = pipeline_utils.get_generation_command(server_address, cmd)
+            cmd = pipeline_utils.wait_for_server(server_address, cmd)
 
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
@@ -157,7 +160,7 @@ def run_cmd(
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
-                sandbox_port=server_port,
+                sandbox_port=None if get_random_port else 6000,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,

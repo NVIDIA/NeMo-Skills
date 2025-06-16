@@ -25,7 +25,7 @@ This might sound a little complicated, so let's see how it works through an exam
         --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
         --server_gpus=1 \
         --output_dir=/workspace/generation-local-trtllm \
-        ++input_file=/workspace/input.jsonl \
+        --input_file=/workspace/input.jsonl \
         ++prompt_config=/workspace/prompt.yaml \
         ++prompt_template=qwen-instruct
     ```
@@ -40,11 +40,11 @@ This might sound a little complicated, so let's see how it works through an exam
         server_type="trtllm",
         model="/workspace/qwen2.5-1.5b-instruct-trtllm",
         server_gpus=1,
-        output_dir=f"/workspace/generation-local-trtllm",
+        output_dir="/workspace/generation-local-trtllm",
+        input_file="/workspace/input.jsonl",
         ctx=wrap_arguments(
-            f"++input_file=/workspace/input.jsonl "
-            f"++prompt_config=/workspace/prompt.yaml "
-            f"++prompt_template=qwen-instruct "
+            "++prompt_config=/workspace/prompt.yaml "
+            "++prompt_template=qwen-instruct "
         ),
     )
     ```
@@ -88,16 +88,16 @@ All scripts inside pipeline folder have the following parameters.
 - **--run_after**: Can be used in conjunction with `--expname` to chain jobs to
   run one after another (only applicable on slurm). E.g. run training job with
   `--expname my-training-run` and then launch an eval with `--run_after my-training-run`.
-- **--mount_paths**: Can be used to mount additional paths to the cluster config dynamically. 
+- **--mount_paths**: Can be used to mount additional paths to the cluster config dynamically.
   This is useful if you want to access some data that is not mounted in cluster config. E.g. use
   `--mount_paths /my/remote/workspace:/workspace` to mount `/workspace` folder from the host
   machine to the slurm job.
 - **--check_mounted_paths**: This flag offers a few different capabilities for convenience:
-    - Check if the paths specified in the script are mounted correctly. This is useful if you want to make 
-    sure that the paths that are mounted are available  on remote machine before running the job. 
-    E.g. use `--check_mounted_paths` to check if `/my/remote/workspace` folder from the host machine 
+    - Check if the paths specified in the script are mounted correctly. This is useful if you want to make
+    sure that the paths that are mounted are available  on remote machine before running the job.
+    E.g. use `--check_mounted_paths` to check if `/my/remote/workspace` folder from the host machine
     is a folder that exists and can be mounted.
-    - In many cases, if the directory does not exist, we will create it for you. This is useful for 
+    - In many cases, if the directory does not exist, we will create it for you. This is useful for
     output and log directories.
     - If paths are provided but not mounted, often times we will dynamically mount them for you.
 - **--partition**: Can be used to run in a specific slurm partition (e.g. commonly used

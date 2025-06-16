@@ -3,6 +3,7 @@ processors_to_run: all
 output_path: ???
 prompt_config: null
 prompt_template: null
+code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
 input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
@@ -82,6 +83,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     task_name: math
     input_key: ${input_key}
     metadata: ${metadata}

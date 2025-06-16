@@ -50,7 +50,8 @@ class AppConfig:
     # Prompt configuration
     base_prompt_config: str = "generic/math"
     code_prompt_config: str = "openmath/tir"
-    prompt_template: str = "openmath-instruct"
+    prompt_template: str = "qwen-instruct"
+    code_tags: str = "openmath"
 
     # Code-execution related
     initial_code_execution_state: bool = False

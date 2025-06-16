@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 import openai
 import requests
-from openai import DefaultHttpxClient, Stream
+from openai import AzureOpenAI, DefaultHttpxClient, OpenAI, Stream
 
 from nemo_skills.utils import get_logger_name
 
@@ -551,7 +551,6 @@ class OpenAIModel(BaseModel):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        from openai import OpenAI
 
         if model is None:
             model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
@@ -778,6 +777,9 @@ class OpenAIModel(BaseModel):
                     logprob[token_logprob.token] = token_logprob.logprob
                 result['top_logprobs'].append(logprob)
 
+        if choice.finish_reason is not None:
+            result["finish_reason"] = choice.finish_reason
+
         return result
 
     def get_model_name_from_server(self):
@@ -793,14 +795,57 @@ class OpenAIModel(BaseModel):
         """
 
         for chunk in response:
-            cur_delta = chunk.choices[0].text
+            if hasattr(chunk.choices[0], "delta"):
+                cur_delta = chunk.choices[0].delta.content
+            else:
+                cur_delta = chunk.choices[0].text
 
-            if cur_delta:
-                yield {"generation": cur_delta}
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            result = {"generation": cur_delta}
+            if finish_reason:
+                result["finish_reason"] = finish_reason
+                if not cur_delta:
+                    result["generation"] = ""
+            
+            yield result
 
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
+
+class AzureOpenAIModel(OpenAIModel):
+    def __init__(
+        self,
+        host: str = '127.0.0.1',
+        port: str = '5000',
+        model=None,
+        base_url=None,
+        api_key=None,
+        api_version: str = "2024-02-15-preview",
+        max_retries: int = 3,
+        initial_retry_delay: float = 2.0,
+        **kwargs,
+    ):
+        # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__
+        BaseModel.__init__(self, host=host, port=port, **kwargs)
+
+        model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
+        if model is None:
+            raise ValueError("model argument is required for Azure OpenAI model.")
+
+        base_url = base_url or os.getenv("AZURE_OPENAI_ENDPOINT")
+        if base_url is None:
+            raise ValueError("base_url is required for Azure OpenAI model.")
+
+        api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("api_key is required for Azure OpenAI model.")
+
+        self.client = AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=base_url,
+            api_version=api_version,
+        )
+        self.model = model
+        self.max_retries = max_retries
+        self.initial_retry_delay = initial_retry_delay
 
 
 class VLLMModel(BaseModel):
@@ -1160,6 +1205,7 @@ models = {
     'nemo': NemoModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
+    'azureopenai': AzureOpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,
 }

@@ -31,6 +31,17 @@ DATASETS = [
     ('gsm8k', ['train', 'test']),
     ('hle', ['math', 'text']),
     ('human-eval', ['test']),
+    (
+        'livecodebench',
+        [
+            'test_v5_2408_2502',
+            'test_v5_2410_2502',
+            'test_v5_2410_2504',
+            'test_v6_2408_2502',
+            'test_v6_2410_2502',
+            'test_v6_2410_2504',
+        ],
+    ),
     ('ifeval', ['test']),
     ('math', ['train', 'test']),
     ('math-odyssey', ['test']),
@@ -52,28 +63,30 @@ DATASETS = [
 
 def test_dataset_scripts():
     # test dataset groups
-    dataset_groups = ["math", "code", "chat", "multichoice"]
+    dataset_groups = ["math", "code", "chat", "multichoice"]  # not testing long-context as it requires extra args
     prepared_datasets = set()
     for group in dataset_groups:
+        # not using ns interface here as it takes quite a bit longer in the CI
+        cmd = f"python -m nemo_skills.dataset.prepare --dataset_groups {group}"
+        print(f"Running command (output is captured): {cmd}")
         result = subprocess.run(
-            f'python {Path(__file__).absolute().parents[1] / "nemo_skills" / "dataset" / "prepare.py"} --dataset_groups {group}',
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
         )
+        print("Finished")
         assert result.returncode == 0, f"Preparation of {group} dataset group failed"
 
-        group_datasets = set(line.split()[1] for line in result.stdout.split('\n') if line.startswith("Preparing"))
+        group_datasets = set(
+            line.split("Preparing ")[1].strip() for line in result.stdout.split('\n') if "Preparing" in line
+        )
         prepared_datasets.update(group_datasets)
 
         # Check if at least one dataset from the group was prepared
         assert len(group_datasets) > 0, f"No datasets were prepared for group {group}"
 
     all_datasets = set(dataset for dataset, _ in DATASETS)
-
-    # TODO: remove after MATH is back online
-    all_datasets.discard('math')
-    prepared_datasets.discard('math')
 
     assert (
         prepared_datasets == all_datasets
@@ -99,4 +112,5 @@ def test_dataset_init_defaults():
             "code",
             "chat",
             "multichoice",
+            "long-context",
         ], f"{dataset} has invalid DATASET_GROUP"

@@ -310,6 +310,7 @@ class WriteFinalSftManifest(BaseProcessor):
         self,
         prompt_config: str,
         prompt_template: str,
+        code_tags: str,
         chat_format: str | None = None,  # nemotron/llama/None
         input_key: str = "input",
         output_key: str = "output",
@@ -328,14 +329,14 @@ class WriteFinalSftManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template)
+            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
         else:
             if prompt_template:
                 LOG.warning(
                     "Prompt template is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template)
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template, code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
@@ -412,6 +413,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self,
         prompt_config: str,
         prompt_template: str,
+        code_tags: str,
         task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
@@ -430,7 +432,7 @@ class WriteFinalRLManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template)
+            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
         else:
             LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 

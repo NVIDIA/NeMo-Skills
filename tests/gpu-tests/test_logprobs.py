@@ -72,8 +72,6 @@ def test_cross_model_logprobs_consistency():
             f"--server_gpus 1 "
             f"--server_nodes 1 "
             f"++prompt_template={prompt_template} "
-            f"++split=test "
-            f"++batch_size=8 "
             f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
             f"++inference.tokens_to_generate=20 "

@@ -1,11 +1,16 @@
 # Prompt utilities
 
-Our prompts are configured via two input yaml files: prompt template and prompt config.
+Our prompts are configured via three yaml files:
+
+1. **Prompt template** - defines model-specific chat format and special tokens
+2. **Prompt config** - contains the actual prompt text with placeholders  
+3. **Code tags** - specifies code formatting tokens, required for code execution
+
 
 ## Prompt template
 
 The template file defines model-specific special tokens, e.g. bos, turn tokens,
-user/assistant/system message, special tokens for code execution, etc. All of the
+user/assistant/system message, etc. All of the
 templates that we support by default are available in
 [nemo_skills/prompt/template](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template)
 folder. Here is an example template for
@@ -34,13 +39,6 @@ assistant_begin: "<|start_header_id|>assistant<|end_header_id|>\n\n"
 assistant_end: "<|eot_id|>"
 
 stop_phrases: ["<|eot_id|>"]
-
-# used to execute code within these tags
-code_begin: '<|python_tag|>'
-code_end: '<|eom_id|>'
-# used to extract the code output
-code_output_begin: '<|start_header_id|>ipython<|end_header_id|>'
-code_output_end: '<|eot_id|><|start_header_id|>assistant<|end_header_id|>'
 ```
 
 You can specify a particular template with `++prompt_template=...`. If you don't add a .yaml extension (e.g.
@@ -96,22 +94,47 @@ prompt the `gsm8k_standard_few_shot` examples from
 [here](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/few_shot_examples/gsm8k.py) are used.
 
 
+## Code tags
+
+Code tags define the special tokens that models use to mark executable code blocks and their output. Code tags are required when using code execution.
+All code tags that we support by default are available in
+[nemo_skills/prompt/code_tags](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/code_tags).
+
+Here is an example code tags file for the [llama3](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/code_tags/llama3.yaml) family:
+
+```yaml
+# Code tags for llama3 family models
+
+# used to execute code within these tags
+code_begin: "<|python_tag|>"
+code_end: "<|eom_id|>"
+
+# used to extract the code output
+code_output_begin: "<|start_header_id|>ipython<|end_header_id|>"
+code_output_end: "<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+
+# how to post-process the captured output (choices: llama, qwen)
+code_output_format: "llama"
+```
+
 ## Prompt API
 
-If you're running one of the pipeline scripts, you can control the prompt by using
+If you're running one of the pipeline scripts, you can control the prompt by using:
 
 ```bash
 ++prompt_template=...
 ++prompt_config=...
+++code_tags=...
 ++examples_type=...
 ```
 
-If you're implementing a new script, you can use the following code to create a prompt and then use it
+If you're implementing a new script, you can use the following code to create a prompt and then use it:
 
 ```python
 from nemo_skills.prompt.utils import get_prompt
 
-prompt = get_prompt('generic/math', 'llama3-instruct')
+# The third parameter is optional and only needed for code execution
+prompt = get_prompt('generic/math', 'llama3-instruct', code_tags='llama3')
 print(prompt.fill({'problem': "What's 2 + 2?"}))
 ```
 

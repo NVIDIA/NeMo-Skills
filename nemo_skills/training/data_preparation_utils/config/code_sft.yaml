@@ -17,6 +17,7 @@ num_output_samples: null
 
 prompt_config: null
 prompt_template: null
+code_tags: null
 chat_format: null  # null/nemotron/llama
 
 input_key: input  # key to group samples by before code_text_filter
@@ -49,6 +50,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     input_key: question
     output_key: ${output_key}
     chat_format: ${chat_format}

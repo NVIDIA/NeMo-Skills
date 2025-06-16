@@ -19,9 +19,4 @@ user_begin: "<｜User｜>"
 user_end: ""
 assistant_begin: "<｜Assistant｜>"
 assistant_end: ""
-code_begin: '<llm-code>\n'
-code_end: '</llm-code>\n'
-code_output_begin: '<llm-code-output>\n'
-code_output_end: '</llm-code-output>\n'
-code_output_format: "qwen"
 stop_phrases: ["<|EOT|>", "<｜end▁of▁sentence｜>", "\n\n\n\n\n\n"]

@@ -16,5 +16,5 @@
 PROMPT_CONFIG = 'generic/codegen'
 DATASET_GROUP = 'code'
 METRICS_TYPE = "code"
-DEFAULT_EVAL_ARGS = "++eval_type=code ++eval_config.dataset=mbpp"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=code ++eval_config.dataset=mbpp"
+GENERATION_ARGS = ""

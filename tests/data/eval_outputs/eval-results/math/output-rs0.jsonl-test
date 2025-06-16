@@ -1,0 +1,7 @@
+{"num_generated_tokens": 3492, "predicted_answer": "70", "is_correct": true, "reward_model_score": 0.9999997126314468, "subset_for_metrics": "aime25"}
+{"num_generated_tokens": 18527, "predicted_answer": "300", "is_correct": false, "reward_model_score": 0.8714748610635069, "subset_for_metrics": "aime25"}
+{"num_generated_tokens": 15360, "predicted_answer": "16", "is_correct": true, "reward_model_score": 0.9879462204837635, "subset_for_metrics": "aime25"}
+{"num_generated_tokens": 8041, "predicted_answer": "117", "is_correct": true, "reward_model_score": 0.9991169541522155, "subset_for_metrics": "aime25"}
+{"num_generated_tokens": 13023, "predicted_answer": "279", "is_correct": true, "reward_model_score": 0.07159119944455247, "subset_for_metrics": "aime25"}
+{"num_generated_tokens": 4600, "predicted_answer": "504", "is_correct": true, "reward_model_score": 0.9908743626108194, "subset_for_metrics": "aime24"}
+{"num_generated_tokens": 11945, "predicted_answer": "271", "is_correct": false, "reward_model_score": 0.3720487831734568, "subset_for_metrics": "aime24"}
