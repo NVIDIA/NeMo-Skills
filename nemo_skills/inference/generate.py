@@ -53,7 +53,7 @@ class GenerateSolutionsConfig:
 
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
-    prompt_config: str  # How to format the data into prompts
+    prompt_config: str  | None = None  # How to format the data into prompts
     prompt_template: str | None = None  # not required for OpenAI server
     prompt_format: str = "ns"  # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     code_tags: str | None = None # required when using code execution
@@ -151,6 +151,10 @@ class GenerateSolutionsConfig:
         if self.prompt_format not in ["ns", "openai"]:
             raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
         
+        if self.prompt_format == "openai":
+            assert self.prompt_config is None, "prompt_config is not supported for OpenAI server"
+            assert self.prompt_template is None, "prompt_template is not supported for OpenAI server"
+        
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
@@ -236,7 +240,8 @@ class GenerationTask:
             )
 
     def setup_llm(self):
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] != "openai":
+        if (self.cfg.prompt_template is None 
+            and self.cfg.server["server_type"] not in ["openai", "vllm", "sglang"]):
             with open_dict(self.cfg.server):
                 self.cfg.server["server_type"] = "openai"
                 self.cfg.server["model"] = "model"
@@ -367,7 +372,7 @@ class GenerationTask:
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         if self.cfg.prompt_format == "openai":
-            return data_point
+            return data_point["messages"]
         
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
         if total_code_executions_in_prompt is not None:
@@ -385,20 +390,15 @@ class GenerationTask:
 
     def llm_generate(self, data_points, data, is_async=False):
 
-        if self.cfg.prompt_format == "openai":
-            # Use messages directly for chat completions API
-            generation_params = {
-                "prompts": [dp["messages"] for dp in data_points],
-                **asdict(self.cfg.inference),
-                **self.extra_generate_params,
-            }
-        else:
-            generation_params = {
-                "prompts": [self.fill_prompt(dp, data) for dp in data_points],
-                "stop_phrases": combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
-                **asdict(self.cfg.inference),
-                **self.extra_generate_params,
-            }
+        generation_params = {
+            "prompts": [self.fill_prompt(dp, data) for dp in data_points],
+            "stop_phrases": combine_stop_phrases(
+                self.prompt.stop_phrases if self.prompt is not None else None, 
+                self.extra_stop_phrases
+            ),
+            **asdict(self.cfg.inference),
+            **self.extra_generate_params,
+        }
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:

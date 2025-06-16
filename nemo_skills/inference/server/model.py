@@ -92,7 +92,7 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int | list[int],
         temperature: float | list[float],
         top_p: float | list[float],
@@ -123,7 +123,7 @@ class BaseModel(abc.ABC):
 
     def generate_async(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -206,7 +206,7 @@ class BaseModel(abc.ABC):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -266,7 +266,7 @@ class BaseModel(abc.ABC):
 class TRTLLMModel(BaseModel):
     def _generate_single_base(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -317,17 +317,17 @@ class TRTLLMModel(BaseModel):
         else:
             return output_dict['generation_id']
 
-    def _generate_single_async(self, prompt: str | dict, **kwargs):
+    def _generate_single_async(self, prompt: str | list, **kwargs):
         """Asynchronous generation."""
         return self._generate_single_base(prompt, generate_endpoint="generate_async", **kwargs)
 
-    def _generate_single(self, prompt: str | dict, **kwargs):
+    def _generate_single(self, prompt: str | list, **kwargs):
         """Synchronous generation."""
         return self._generate_single_base(prompt, generate_endpoint="generate", **kwargs)
 
     def generate_async(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -427,7 +427,7 @@ class TRTLLMModel(BaseModel):
 class NemoModel(BaseModel):
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int | list[int] = 512,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -484,7 +484,7 @@ class NemoModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -960,7 +960,7 @@ class VLLMModel(BaseModel):
 
     def _generate_single(
         self,
-        prompt: str | dict | list,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -1219,7 +1219,7 @@ class MegatronModel(BaseModel):
 
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -1268,7 +1268,7 @@ class MegatronModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
