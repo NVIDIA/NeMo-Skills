@@ -93,16 +93,20 @@ def has_thought(gen: str) -> bool:
     return gen.count("<think>") == 1 and gen.count("</think>") == 1
 
 
-def process_prediction_group(records: List[Dict[str, Any]]) -> Optional[Tuple[List[Dict[str, Any]], str, int, int]]:
+def process_prediction_group(
+    records: List[Dict[str, Any]], min_samples: int, majority_threshold: float, generation_field: str
+) -> Optional[Tuple[List[Dict[str, Any]], str, int, int]]:
     # Keep only entries with a valid thought block and boxed answer
-    valid_records = [r for r in records if has_thought(r["generation"]) and get_answer_after_think(r["generation"])]
+    valid_records = [
+        r for r in records if has_thought(r[generation_field]) and get_answer_after_think(r[generation_field])
+    ]
     if not valid_records:
         return None
 
     # Count occurrences of each answer letter
     counts: Dict[str, int] = defaultdict(int)
     for rec in valid_records:
-        letter = get_answer_after_think(rec["generation"])
+        letter = get_answer_after_think(rec[generation_field])
         if letter:
             counts[letter] += 1
     if not counts:
@@ -111,7 +115,10 @@ def process_prediction_group(records: List[Dict[str, Any]]) -> Optional[Tuple[Li
     # Determine the most common answer
     consensus_letter = max(sorted(counts.items()), key=lambda kv: kv[1])[0]
     # Select all records matching this consensus
-    consensus_records = [r for r in valid_records if get_answer_after_think(r["generation"]) == consensus_letter]
+    consensus_records = [r for r in valid_records if get_answer_after_think(r[generation_field]) == consensus_letter]
+    if len(consensus_records) < min_samples or sum(counts.values()) * majority_threshold > len(consensus_records):
+        return None
+
     return (
         consensus_records,
         consensus_letter,
@@ -135,8 +142,32 @@ def main() -> None:
     parser.add_argument(
         "--meta_keys",
         required=False,
+        default=[],
         nargs="+",
     )
+    parser.add_argument(
+        "--majority_threshold",
+        type=float,
+        default=0,
+        help="Minimum fraction of consensus votes required to accept a majority decision",
+    )
+    parser.add_argument(
+        "--min_samples", type=int, default=0, help="Minimum number of samples required to perform majority voting"
+    )
+    parser.add_argument("--file_name", type=str, default="filtered", help="Name of the output file")
+    parser.add_argument(
+        "--question_field",
+        type=str,
+        default="question",
+        help="Name of the field in the input data containing the question",
+    )
+    parser.add_argument(
+        "--generation_field",
+        type=str,
+        default="generation",
+        help="Name of the field in the input data containing the model's generated response",
+    )
+
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -155,13 +186,18 @@ def main() -> None:
         with open(fp, "r", encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
-                question_groups[data["question"]].append(data)
+                question_groups[data[args.question_field]].append(data)
     logging.info("Collected %d unique questions.", len(question_groups))
 
     # Process groups in parallel
     results: List[Tuple[List[Dict[str, Any]], str, int, int]] = []
     with Pool(cpu_count()) as pool:
-        tasks = [pool.apply_async(process_prediction_group, (grp,)) for grp in question_groups.values()]
+        tasks = [
+            pool.apply_async(
+                process_prediction_group, (grp, args.min_samples, args.majority_threshold, args.generation_field)
+            )
+            for grp in question_groups.values()
+        ]
         question_groups.clear()  # free memory
         for task in tqdm(tasks, desc="Processing groups", total=len(tasks), unit="group"):
             out = task.get()
@@ -169,19 +205,18 @@ def main() -> None:
                 results.append(out)
 
     # Write filtered outputs
-    only_one_path = os.path.join(args.output_dir, "filtered.jsonl")
-    all_path = os.path.join(args.output_dir, "filtered_all.jsonl")
+    only_one_path = os.path.join(args.output_dir, f"{args.file_name}.jsonl")
+    all_path = os.path.join(args.output_dir, f"{args.file_name}_all.jsonl")
     was_warned_missing = set()
     with open(only_one_path, "w", encoding="utf-8") as f1, open(all_path, "w", encoding="utf-8") as f2:
         for recs, letter, cnt, total in tqdm(results, desc="Writing files", unit="entry"):
             # Write a single entry per question
             first = recs[0]
             entry = {
-                "problem": first["question"],
-                "generation": first["generation"],
+                "problem": first[args.question_field],
+                "generation": first[args.generation_field],
                 "expected_answer": letter,
                 "majority_res": f"{cnt}/{total}",
-                "is_correct": True,
             }
             for key in args.meta_keys:
                 if key in first:
@@ -193,11 +228,10 @@ def main() -> None:
             # Write all consensus-matching entries
             for r in recs:
                 entry_all = {
-                    "problem": r["question"],
-                    "generation": r["generation"],
+                    "problem": r[args.question_field],
+                    "generation": r[args.generation_field],
                     "expected_answer": letter,
                     "majority_res": f"{cnt}/{total}",
-                    "is_correct": True,
                 }
                 for key in args.meta_keys:
                     if key in r:
