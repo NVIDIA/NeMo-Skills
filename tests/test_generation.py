@@ -27,9 +27,8 @@ DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
 prompt_templates = [f[:-5] for f in os.listdir(template_folder) if f.endswith('.yaml')]
 
-for dataset, splits in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test')]:
-    for split in splits:
-        DATA_TO_TEST.append((dataset, split))
+for dataset, split in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test')]:
+    DATA_TO_TEST.append((dataset, split))
 
 
 @pytest.mark.parametrize("dataset,split", DATA_TO_TEST)
