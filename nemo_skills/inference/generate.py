@@ -152,9 +152,10 @@ class GenerateSolutionsConfig:
             raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
         
         if self.prompt_format == "openai":
-            assert self.prompt_config is None, "prompt_config is not supported for OpenAI server"
-            assert self.prompt_template is None, "prompt_template is not supported for OpenAI server"
-        
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
+        else:
+            assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
