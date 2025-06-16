@@ -92,7 +92,7 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int | list[int],
         temperature: float | list[float],
         top_p: float | list[float],
@@ -123,7 +123,7 @@ class BaseModel(abc.ABC):
 
     def generate_async(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -206,7 +206,7 @@ class BaseModel(abc.ABC):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -266,7 +266,7 @@ class BaseModel(abc.ABC):
 class TRTLLMModel(BaseModel):
     def _generate_single_base(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -317,17 +317,17 @@ class TRTLLMModel(BaseModel):
         else:
             return output_dict['generation_id']
 
-    def _generate_single_async(self, prompt: str | dict, **kwargs):
+    def _generate_single_async(self, prompt: str | list, **kwargs):
         """Asynchronous generation."""
         return self._generate_single_base(prompt, generate_endpoint="generate_async", **kwargs)
 
-    def _generate_single(self, prompt: str | dict, **kwargs):
+    def _generate_single(self, prompt: str | list, **kwargs):
         """Synchronous generation."""
         return self._generate_single_base(prompt, generate_endpoint="generate", **kwargs)
 
     def generate_async(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -427,7 +427,7 @@ class TRTLLMModel(BaseModel):
 class NemoModel(BaseModel):
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int | list[int] = 512,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -484,7 +484,7 @@ class NemoModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -960,7 +960,7 @@ class VLLMModel(BaseModel):
 
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -974,6 +974,24 @@ class VLLMModel(BaseModel):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for VLLM
     ) -> dict | Stream:
+        
+        # Handle chat completions for message format
+        if isinstance(prompt, list):
+            return self._generate_chat_completion(
+                messages=prompt,
+                tokens_to_generate=tokens_to_generate,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                min_p=min_p,
+                repetition_penalty=repetition_penalty,
+                random_seed=random_seed,
+                top_logprobs=top_logprobs,
+                timeout=timeout,
+                stop_phrases=stop_phrases,
+                stream=stream,
+            )
+        
         if isinstance(prompt, dict):
             raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         stop_phrases = stop_phrases or []
@@ -1010,6 +1028,54 @@ class VLLMModel(BaseModel):
 
         return self.parse_openai_response(response)
 
+    def _generate_chat_completion(
+        self,
+        messages: list,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
+        stop_phrases: list[str] | None = None,
+        stream: bool = False,
+    ) -> dict | Stream:
+        """Generate using chat completions API for message format."""
+        stop_phrases = stop_phrases or []
+
+        extra_body = {
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+        }
+        if top_k > 0:
+            extra_body["top_k"] = top_k
+
+        response = self.oai_client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            max_tokens=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            seed=random_seed,
+            stop=stop_phrases,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            logprobs=top_logprobs is not None,
+            top_logprobs=top_logprobs,
+            stream=stream,
+            n=1,
+            extra_body=extra_body,
+            timeout=timeout,
+        )
+
+        if stream:
+            return self._stream_chunks_chat(response)
+
+        return self.parse_chat_completion_response(response)
+
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
         assert not isinstance(response, list)
@@ -1028,6 +1094,29 @@ class VLLMModel(BaseModel):
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
             result['top_logprobs'] = choice.logprobs.top_logprobs
+        return result
+        
+    @classmethod
+    def parse_chat_completion_response(cls, response) -> dict:
+        """Parse chat completion response."""
+        assert len(response.choices) == 1
+        choice = response.choices[0]
+        output = choice.message.content
+        
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs and choice.logprobs.content:
+            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
+            result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+        
+        if choice.finish_reason:
+            result["finish_reason"] = choice.finish_reason
+            
         return result
 
     def get_model_name_from_server(self):
@@ -1072,7 +1161,17 @@ class VLLMModel(BaseModel):
 
                 if remaining:
                     yield {"generation": remaining}
-
+    
+    def _stream_chunks_chat(self, response):
+        """Helper generator for chat completion streaming."""
+        for chunk in response:
+            if hasattr(chunk.choices[0], "delta") and chunk.choices[0].delta.content:
+                cur_delta = chunk.choices[0].delta.content
+                yield {"generation": cur_delta}
+            
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            if finish_reason:
+                yield {"generation": "", "finish_reason": finish_reason}
 
 class MegatronModel(BaseModel):
     # it's partially openai-compatible but not fully, so can't easily reuse the other class..
@@ -1120,7 +1219,7 @@ class MegatronModel(BaseModel):
 
     def _generate_single(
         self,
-        prompt: str | dict,
+        prompt: str | list,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -1169,7 +1268,7 @@ class MegatronModel(BaseModel):
 
     def generate(
         self,
-        prompts: list[str | dict],
+        prompts: list[str | list],
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
