@@ -13,7 +13,3 @@ It might take a long time for some of the images.
 Follow instructions in [TensorRT-LLM documentation](https://nvidia.github.io/TensorRT-LLM/installation/build-from-source-linux.html#option-1-build-tensorrt-llm-in-one-step).
 
 Our current container is built from `v0.19.0` code version.
-
-## Building vllm image
-
-We directly use vllm/vllm-openai:v0.9.0 image for vllm.
