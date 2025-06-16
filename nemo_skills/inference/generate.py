@@ -53,8 +53,9 @@ class GenerateSolutionsConfig:
 
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
-    prompt_config: str  # How to format the data into prompts
+    prompt_config: str  | None = None  # How to format the data into prompts
     prompt_template: str | None = None  # not required for OpenAI server
+    prompt_format: str = "ns"  # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     code_tags: str | None = None # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
 
@@ -147,6 +148,14 @@ class GenerateSolutionsConfig:
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
+        if self.prompt_format not in ["ns", "openai"]:
+            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
+        
+        if self.prompt_format == "openai":
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
+        else:
+            assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
@@ -232,7 +241,8 @@ class GenerationTask:
             )
 
     def setup_llm(self):
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] != "openai":
+        if (self.cfg.prompt_template is None 
+            and self.cfg.server["server_type"] not in ["openai", "vllm", "sglang"]):
             with open_dict(self.cfg.server):
                 self.cfg.server["server_type"] = "openai"
                 self.cfg.server["model"] = "model"
@@ -248,12 +258,22 @@ class GenerationTask:
         return llm
 
     def setup_prompt(self):
+
+        if self.cfg.prompt_format == "openai":
+            return None
+    
         prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, self.cfg.code_tags, examples_type=self.cfg.examples_type)
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
     def log_example_prompt(self, data):
         data_point = deepcopy(data[0])
+
+        if self.cfg.prompt_format == "openai":
+            #print the prompt in openai format
+            LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
+            return
+        
         if self.cfg.multi_turn_key is None:
             LOG.info(
                 "Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data)
@@ -352,6 +372,9 @@ class GenerationTask:
     # TODO: data will not include any samples skipped after restart
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
+        if self.cfg.prompt_format == "openai":
+            return data_point["messages"]
+        
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
         if total_code_executions_in_prompt is not None:
             if isinstance(total_code_executions_in_prompt, (list, tuple)):
@@ -367,9 +390,13 @@ class GenerationTask:
         )
 
     def llm_generate(self, data_points, data, is_async=False):
+
         generation_params = {
             "prompts": [self.fill_prompt(dp, data) for dp in data_points],
-            "stop_phrases": combine_stop_phrases(self.prompt.stop_phrases, self.extra_stop_phrases),
+            "stop_phrases": combine_stop_phrases(
+                self.prompt.stop_phrases if self.prompt is not None else None, 
+                self.extra_stop_phrases
+            ),
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
         }
