@@ -55,9 +55,8 @@ class GenerateSolutionsConfig:
     output_file: str  # Where to save the generations
     prompt_config: str | None = None  # How to format the data into prompts
     prompt_template: str | None = None  # not required for OpenAI server
-    prompt_format: str = (
-        "ns"  # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
-    )
+    # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
+    prompt_format: str = "ns"
     system_message: str | None = None  # can override the default system message in the config
     code_tags: str | None = None  # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
