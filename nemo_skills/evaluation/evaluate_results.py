@@ -76,8 +76,11 @@ def evaluate_results(cfg: EvaluateResultsConfig):
                 samples = [json.loads(line) for line in f]
             with open(jsonl_file, "wt", encoding="utf-8") as f:
                 for sample in samples:
-                    sample["_full_generation"] = sample["generation"]
-                    sample["generation"] = sample["generation"].split(cfg.thinking_separator)[-1].strip()
+                    if cfg.thinking_separator in sample["generation"]:
+                        sample["_full_generation"] = sample["generation"]
+                        sample["generation"] = sample["generation"].split(cfg.thinking_separator)[-1].strip()
+                    sample["_has_think_tags"] = cfg.thinking_separator in sample["generation"]
+
                     f.write(json.dumps(sample) + "\n")
 
     evaluate(cfg)
