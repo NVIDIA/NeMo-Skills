@@ -99,7 +99,7 @@ executor: local
 
 containers:
   trtllm: igitman/nemo-skills-trtllm:0.6.1
-  vllm: vllm/vllm-openai:v0.9.0
+  vllm: igitman/nemo-skills-vllm:0.6.1
   nemo: igitman/nemo-skills-nemo:0.6.1
   # ... there are some more containers defined here
 
