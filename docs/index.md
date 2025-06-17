@@ -13,11 +13,12 @@ Here are some of the things we support.
 - [Model evaluation](pipelines/evaluation.md): Evaluate your models on many popular benchmarks
     - Math problem solving: math, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: human-eval, mbpp
+    - Coding skills: livecodebench, human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
-    - Long context: RULER
-- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/).
+    - Long context: ruler
+- [Model training](pipelines/training.md): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
+
 
 To get started, follow this [tutorial](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
 commands and their options.

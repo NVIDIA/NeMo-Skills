@@ -27,6 +27,7 @@ from tqdm import tqdm
 import re
 
 from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.evaluation.code_evaluators.livecodebench import eval_livecodebench
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_answer
 from nemo_skills.inference.server.model import get_model
@@ -34,6 +35,7 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
 
 # TODO: split into multiple files
 
@@ -514,6 +516,7 @@ EVALUATOR_MAP = {
     'lean4-statement': eval_lean4_statement,
     'multichoice': eval_mcq,
     'ruler': eval_ruler,
+    'livecodebench': eval_livecodebench,
 }
 
 
