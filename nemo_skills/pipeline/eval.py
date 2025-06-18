@@ -285,7 +285,7 @@ def eval(
 
     cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
-    server_config, server_address, cur_extra_arguments = pipeline_utils.configure_client(
+    job_server_config, job_server_address, cur_extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,
         server_address=server_address,
@@ -347,8 +347,8 @@ def eval(
                 job_cmds.append(cmd)
 
                 if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
-                    job_batches.append((job_cmds, job_needs_sandbox, server_config, server_address))
-                    server_config, server_address, cur_extra_arguments = pipeline_utils.configure_client(
+                    job_batches.append((job_cmds, job_needs_sandbox, job_server_config, job_server_address))
+                    job_server_config, job_server_address, cur_extra_arguments = pipeline_utils.configure_client(
                         model=model,
                         server_type=server_type,
                         server_address=server_address,
@@ -367,13 +367,13 @@ def eval(
 
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        for idx, (cmds, job_needs_sandbox, server_config, server_address) in enumerate(job_batches):
+        for idx, (cmds, job_needs_sandbox, job_server_config, job_server_address) in enumerate(job_batches):
             prev_tasks = None
             for _ in range(dependent_jobs + 1):
                 new_task = pipeline_utils.add_task(
                     exp,
                     cmd=pipeline_utils.wait_for_server(
-                        server_address=server_address, generation_commands=" && ".join(cmds)
+                        server_address=job_server_address, generation_commands=" && ".join(cmds)
                     ),
                     task_name=f'{expname}-{idx}',
                     log_dir=log_dir,
@@ -381,7 +381,7 @@ def eval(
                     cluster_config=cluster_config,
                     partition=partition,
                     time_min=time_min,
-                    server_config=server_config,
+                    server_config=job_server_config,
                     with_sandbox=job_needs_sandbox,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
