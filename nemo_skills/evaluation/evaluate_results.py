@@ -75,6 +75,12 @@ def evaluate_results(cfg: EvaluateResultsConfig):
         for jsonl_file in unroll_files(cfg.input_files):
             with open(jsonl_file, encoding="utf-8") as f:
                 samples = [json.loads(line) for line in f]
+                for sample in samples:
+                    if cfg.generation_key not in sample:
+                        raise ValueError(
+                            f"Key {cfg.generation_key} not found in a sample, but remove_thinking=True is specified. "
+                            "Use generation_key parameter to specify the key containing the generations."
+                        )
             with open(jsonl_file, "wt", encoding="utf-8") as f:
                 for sample in samples:
                     if cfg.thinking_separator in sample[cfg.generation_key]:
