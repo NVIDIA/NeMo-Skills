@@ -328,6 +328,20 @@ def eval(
                     chunk_id=None,
                 )
             for chunk_id in benchmark_chunk_ids:
+                has_tasks = True
+                cmd = pipeline_utils.get_generation_cmd(
+                    input_file=bench_input_file,
+                    output_dir=benchmark_output_dir,
+                    extra_arguments=f"{bench_gen_args} {cur_extra_arguments}",
+                    random_seed=seed,
+                    eval_args=f"{bench_eval_args} {extra_eval_args}",
+                    chunk_id=chunk_id,
+                    num_chunks=num_chunks,
+                    # only logging for the first seed
+                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                )
+                job_cmds.append(cmd)
+
                 if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
                     job_batches.append((job_cmds, job_needs_sandbox, server_config, server_address))
                     server_config, server_address, cur_extra_arguments = pipeline_utils.configure_client(
@@ -345,19 +359,6 @@ def eval(
                     job_needs_sandbox = False
                     job_cmds = []
 
-                has_tasks = True
-                cmd = pipeline_utils.get_generation_cmd(
-                    input_file=bench_input_file,
-                    output_dir=benchmark_output_dir,
-                    extra_arguments=f"{bench_gen_args} {cur_extra_arguments}",
-                    random_seed=seed,
-                    eval_args=f"{bench_eval_args} {extra_eval_args}",
-                    chunk_id=chunk_id,
-                    num_chunks=num_chunks,
-                    # only logging for the first seed
-                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                )
-                job_cmds.append(cmd)
                 cur_eval += 1
 
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
