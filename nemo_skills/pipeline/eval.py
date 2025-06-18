@@ -255,6 +255,11 @@ def eval(
     benchmark_remaining_jobs = {}
     total_evals = 0
     for benchmark, rs_num in benchmarks.items():
+        if rs_num == 0:
+            random_seeds = [None]
+        else:
+            random_seeds = list(range(starting_seed, starting_seed + rs_num))
+
         benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
         benchmark_remaining_jobs[benchmark] = pipeline_utils.get_remaining_jobs(
             cluster_config=cluster_config,
@@ -323,7 +328,7 @@ def eval(
                     chunk_id=None,
                 )
             for chunk_id in benchmark_chunk_ids:
-                if cur_job_idx != eval_to_job_map[cur_eval]:
+                if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
                     job_batches.append((job_cmds, job_needs_sandbox, server_config, server_address))
                     server_config, server_address, cur_extra_arguments = pipeline_utils.configure_client(
                         model=model,
