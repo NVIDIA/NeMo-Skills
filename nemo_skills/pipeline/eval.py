@@ -272,6 +272,10 @@ def eval(
             for chunk_id in benchmark_chunk_ids:
                 total_evals += 1
 
+    if num_jobs < 0:
+        # if num_jobs is -1, we run all benchmarks in parallel
+        num_jobs = total_evals
+
     evals_per_job = total_evals // num_jobs if num_jobs > 0 else total_evals
     remainder = total_evals % num_jobs
     eval_to_job_map = []
