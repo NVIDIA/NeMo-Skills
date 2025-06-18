@@ -1,18 +1,3 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 import abc
 import json
 import logging
@@ -261,6 +246,179 @@ class BaseModel(abc.ABC):
             time.sleep(1)
 
         return all_generations
+
+
+class OpenAIAPIModel(BaseModel):
+    """
+    Base class for models using an OpenAI-compatible API.
+    Handles client setup, SSH tunneling, and a unified generation flow.
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        api_key: str = "EMPTY",
+        base_url: str | None = None,
+        max_retries: int = 3,
+        initial_retry_delay: float = 2.0,
+        use_v1_endpoint: bool = True,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.max_retries = max_retries
+        self.initial_retry_delay = initial_retry_delay
+
+        self._tunnel = None
+        if self.ssh_server and self.ssh_key_path:
+            import sshtunnel
+
+            if '@' in self.ssh_server:
+                ssh_username, ssh_server = self.ssh_server.split('@')
+            else:
+                ssh_server = self.ssh_server
+                ssh_username = None
+
+            self._tunnel = sshtunnel.SSHTunnelForwarder(
+                (ssh_server, 22),
+                ssh_username=ssh_username,
+                ssh_pkey=self.ssh_key_path,
+                remote_bind_address=(self.server_host, int(self.server_port)),
+            )
+            self._tunnel.start()
+            self.server_host = '127.0.0.1'
+            self.server_port = str(self._tunnel.local_bind_port)
+
+        if base_url is None:
+            v1_suffix = "/v1" if use_v1_endpoint else ""
+            base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+
+        http_client = DefaultHttpxClient(
+            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+            transport=httpx.HTTPTransport(retries=3),
+        )
+
+        self.client = openai.OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=None,
+            http_client=http_client,
+        )
+        self.model = model or self.get_model_name_from_server()
+
+    def __del__(self):
+        if self._tunnel:
+            self._tunnel.stop()
+
+    def get_model_name_from_server(self):
+        model_list = self.client.models.list()
+        if not model_list.data:
+            raise ValueError("No models available on the server.")
+        return model_list.data[0].id
+
+    def _make_api_call(self, api_func, params):
+        retry_count = 0
+        retry_delay = self.initial_retry_delay
+        while True:
+            try:
+                return api_func(**params)
+            except openai.RateLimitError as e:
+                retry_count += 1
+                if retry_count > self.max_retries:
+                    LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
+                    raise
+                retry_after = getattr(e, 'retry_after', None)
+                wait_time = float(retry_after) if retry_after is not None else retry_delay
+                LOG.warning(
+                    "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
+                    wait_time,
+                    retry_count,
+                    self.max_retries,
+                )
+                time.sleep(wait_time)
+                if retry_after is None:
+                    retry_delay *= 2  # Exponential backoff if no header is provided
+            except Exception as e:
+                LOG.error("Unexpected error during API call: %s", str(e))
+                raise
+
+    @abc.abstractmethod
+    def _build_chat_request_params(self, **kwargs) -> dict:
+        pass
+
+    @abc.abstractmethod
+    def _build_completion_request_params(self, **kwargs) -> dict:
+        pass
+
+    def _generate_single(
+        self,
+        prompt: str | list,
+        stream: bool = False,
+        **kwargs,
+    ) -> dict | Stream:
+        if isinstance(prompt, list):
+            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+            response = self._make_api_call(self.client.chat.completions.create, request_params)
+            if stream:
+                return self._stream_chat_chunks(response)
+            return self._parse_chat_completion_response(response)
+        
+        elif isinstance(prompt, str):
+            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+            response = self._make_api_call(self.client.completions.create, request_params)
+            if stream:
+                return self._stream_completion_chunks(response)
+            return self._parse_completion_response(response)
+
+        raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+
+    def _parse_completion_response(self, response: "openai.types.Completion") -> dict:
+        choice = response.choices[0]
+        output = choice.text
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs:
+            result['logprobs'] = choice.logprobs.token_logprobs
+            result['tokens'] = choice.logprobs.tokens
+            result['top_logprobs'] = choice.logprobs.top_logprobs
+        if choice.finish_reason:
+            result["finish_reason"] = choice.finish_reason
+        return result
+
+    def _parse_chat_completion_response(self, response) -> dict:
+        choice = response.choices[0]
+        output = choice.message.content
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        if choice.logprobs and choice.logprobs.content:
+            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
+            result['tokens'] = [tok.token for tok in choice.logprobs.content]
+            result['top_logprobs'] = []
+            for token_logprob in choice.logprobs.content:
+                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
+                if token_logprob.token not in logprob:
+                    logprob[token_logprob.token] = token_logprob.logprob
+                result['top_logprobs'].append(logprob)
+        if choice.finish_reason:
+            result["finish_reason"] = choice.finish_reason
+        return result
+    
+    def _stream_completion_chunks(self, response):
+        emitted_so_far = []
+        for chunk in response:
+            cur_delta = chunk.choices[0].text
+            emitted_so_far.append(cur_delta)
+            if cur_delta:
+                yield {"generation": cur_delta}
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason} # vllm variant
+    
+    def _stream_chat_chunks(self, response):
+        for chunk in response:
+            cur_delta = chunk.choices[0].delta.content or ""
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            result = {"generation": cur_delta}
+            if finish_reason:
+                result["finish_reason"] = finish_reason
+            yield result
 
 
 class TRTLLMModel(BaseModel):
@@ -546,54 +704,47 @@ class NemoModel(BaseModel):
         return outputs
 
 
-class OpenAIModel(BaseModel):
+class OpenAIModel(OpenAIAPIModel):
     def __init__(
         self,
         host: str = '127.0.0.1',
         port: str = '5000',
-        model=None,
-        base_url=None,
-        api_key=None,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         max_retries: int = 3,
         initial_retry_delay: float = 2.0,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-
+        model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
         if model is None:
-            model = os.getenv("NEMO_SKILLS_OPENAI_MODEL")
-            if model is None:
-                raise ValueError("model argument is required for OpenAI model.")
+            raise ValueError("model argument is required for OpenAI model.")
 
         if base_url is None:
-            # if not provided, we assume it's served on host/port
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
         if api_key is None:
-            if base_url is not None and 'api.nvidia.com' in base_url:
-                api_key = os.getenv("NVIDIA_API_KEY", api_key)
-                if not api_key:
-                    raise ValueError("NVIDIA_API_KEY is required for Nvidia-hosted models.")
-            elif base_url is not None and 'api.openai.com' in base_url:
-                api_key = os.getenv("OPENAI_API_KEY", api_key)
-                if not api_key:
-                    raise ValueError("OPENAI_API_KEY is required for OpenAI models.")
-            else:
-                # assuming it's not used and setting a dummy value
-                api_key = "dummy"
+            if 'api.nvidia.com' in base_url:
+                api_key = os.getenv("NVIDIA_API_KEY")
+            elif 'api.openai.com' in base_url:
+                api_key = os.getenv("OPENAI_API_KEY")
 
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.model = model
-        if self.model == "model":  # that's a placeholder, so trying to find real name
-            self.model = self.get_model_name_from_server()
+        if not api_key:
+            raise ValueError("API key is required for OpenAI/NVIDIA models and could not be found.")
 
-        self.max_retries = max_retries
-        self.initial_retry_delay = initial_retry_delay
+        super().__init__(model=model, api_key=api_key, base_url=base_url, max_retries=max_retries, initial_retry_delay=initial_retry_delay, **kwargs)
+
+    def preprocess_request(self, request: dict):
+        """OpenAI doesn't use top_k, so we don't apply the greedy conversion."""
+        pass
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         return re.match(r"^o\d", model_name)
 
-    def _build_request_params(
+    def _build_completion_request_params(self, **kwargs) -> dict:
+        raise NotImplementedError("OpenAIModel only supports chat completions. Use a list of messages as a prompt.")
+
+    def _build_chat_request_params(
         self,
         messages: list[dict],
         tokens_to_generate: int,
@@ -604,26 +755,30 @@ class OpenAIModel(BaseModel):
         repetition_penalty: float,
         random_seed: int,
         stop_phrases: list[str],
-        timeout: int | None = None,
-        top_logprobs: int | None = None,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
+        timeout: int | None,
+        top_logprobs: int | None,
+        stream: bool,
+        reasoning_effort: str | None,
     ) -> dict:
-        """Build request parameters based on model type (reasoning vs non-reasoning)."""
-        # OpenAI API validations
+        # Validations
         if top_k != 0:
-            raise ValueError("`top_k` is not supported by OpenAI API, please set it to default value `0`.")
+            raise ValueError("`top_k` is not supported by OpenAI API, please set it to 0.")
         if min_p > 0:
-            raise ValueError("`min_p` is not supported by OpenAI API, please set it to default value `0.0`.")
-        if top_logprobs is not None and top_logprobs > 1 and "integrate.api.nvidia.com" in str(self.client.base_url):
-            raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
+            raise ValueError("`min_p` is not supported by OpenAI API, please set it to 0.0.")
         if stream and top_logprobs is not None:
-            raise ValueError("`top_logprobs` is not supported with stream=True")
-        
-        is_reasoning = self._is_reasoning_model(self.model)
-        
-        if is_reasoning:
-            # Reasoning model validations
+            raise ValueError("`top_logprobs` is not supported with stream=True.")
+
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "seed": random_seed,
+            "stop": stop_phrases or None,
+            "timeout": timeout,
+            "stream": stream,
+        }
+
+        if self._is_reasoning_model(self.model):
+            # Reasoning model specific validations and parameters
             if temperature != 0.0:
                 raise ValueError("`temperature` is not supported by reasoning models, please set it to default value `0.0`.")
             if top_p != 0.95:
@@ -632,44 +787,21 @@ class OpenAIModel(BaseModel):
                 raise ValueError("`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`.")
             if top_logprobs is not None:
                 raise ValueError("`top_logprobs` is not supported by reasoning models, please set it to `None`.")
-                
-            # Convert system to developer messages
-            processed_messages = [
-                {**msg, "role": "developer"} if msg.get("role") == "system" else msg 
-                for msg in messages
-            ]
             
-            params = {
-                "model": self.model,
-                "messages": processed_messages,
-                "max_completion_tokens": tokens_to_generate,
-                "seed": random_seed,
-                "stop": stop_phrases,
-                "timeout": timeout,
-                "stream": stream,
-            }
-            
+            params["max_completion_tokens"] = tokens_to_generate
+            params["messages"] = [{**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages]
             if reasoning_effort:
                 params["reasoning_effort"] = reasoning_effort
-                
         else:
+            # Standard model parameters
             if reasoning_effort is not None:
-                raise ValueError("`reasoning_effort` is only supported by reasoning models, please set it to `None`.")
-            
-            params = {
-                "model": self.model,
-                "messages": messages,
-                "max_tokens": tokens_to_generate,
-                "temperature": temperature,
-                "top_p": top_p,
-                "presence_penalty": repetition_penalty,
-                "seed": random_seed,
-                "stop": stop_phrases,
-                "logprobs": top_logprobs is not None,
-                "top_logprobs": top_logprobs,
-                "timeout": timeout,
-                "stream": stream,
-            }
+                raise ValueError("`reasoning_effort` is only supported by reasoning models.")
+            params["presence_penalty"] = repetition_penalty
+            params["logprobs"] = top_logprobs is not None
+            params["top_logprobs"] = top_logprobs
+            params["max_tokens"] = tokens_to_generate
+            params["temperature"] = temperature
+            params["top_p"] = top_p
         
         return params
 
@@ -694,7 +826,7 @@ class OpenAIModel(BaseModel):
         with open("requests.jsonl", "wt", encoding='utf-8') as fout:
             for idx, prompt in enumerate(prompts):
                 # Reuse the existing parameter building logic
-                params = self._build_request_params(
+                params = self._build_chat_request_params(
                     messages=prompt,
                     tokens_to_generate=tokens_to_generate,
                     temperature=temperature,
@@ -706,6 +838,8 @@ class OpenAIModel(BaseModel):
                     stop_phrases=stop_phrases,
                     top_logprobs=top_logprobs,
                     reasoning_effort=reasoning_effort,
+                    stream=False, # not supported in batch
+                    timeout=None, # not supported in batch
                 )
                 
                 fout.write(json.dumps({
@@ -747,132 +881,6 @@ class OpenAIModel(BaseModel):
 
         return metadata, outputs
 
-    def preprocess_request(self, request: dict):
-        """OpenAI doesn't support top-k, so not making any changes here."""
-        pass
-
-    def _generate_single(
-        self,
-        prompt: dict,
-        tokens_to_generate: int,
-        temperature: float,
-        top_p: float,
-        top_k: int,
-        min_p: float,
-        repetition_penalty: float,
-        random_seed: int,
-        stop_phrases: list[str],
-        timeout: int | None = None,
-        top_logprobs: int | None = None,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-    ) -> dict | Stream:
-        # Build request parameters using the centralized function
-        request_params = self._build_request_params(
-            messages=prompt,
-            tokens_to_generate=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            random_seed=random_seed,
-            stop_phrases=stop_phrases,
-            timeout=timeout,
-            top_logprobs=top_logprobs,
-            stream=stream,
-            reasoning_effort=reasoning_effort,
-        )
-        
-        retry_count = 0
-        retry_delay = self.initial_retry_delay
-
-        while True:
-            try:
-                response = self.client.chat.completions.create(**request_params)
-                break  # Success, exit the retry loop
-            except openai.RateLimitError as e:
-                retry_count += 1
-                if retry_count > self.max_retries:
-                    LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
-                    raise
-
-                # Extract retry-after header if available, otherwise use exponential backoff
-                retry_after = getattr(e, 'retry_after', None)
-                if retry_after is not None and isinstance(retry_after, (int, float)):
-                    wait_time = retry_after
-                else:
-                    wait_time = retry_delay
-                    retry_delay *= 2  # Exponential backoff
-
-                LOG.warning(
-                    "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
-                    wait_time,
-                    retry_count,
-                    self.max_retries,
-                )
-                time.sleep(wait_time)
-            except AttributeError:
-                LOG.error("Unexpected response from OpenAI API: %s", response)
-                raise
-            except Exception as e:
-                LOG.error("Unexpected error during API call: %s", str(e))
-                raise
-
-        if stream:
-            return self._stream_chunks(response)
-
-        choice = response.choices[0]
-        output = choice.message.content
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        
-        # Add reasoning token info if available (for reasoning models)
-        if hasattr(response.usage, 'completion_tokens_details') and response.usage.completion_tokens_details:
-            if hasattr(response.usage.completion_tokens_details, 'reasoning_tokens'):
-                result['reasoning_tokens'] = response.usage.completion_tokens_details.reasoning_tokens
-        
-        if choice.logprobs:
-            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
-            result['tokens'] = [tok.token for tok in choice.logprobs.content]
-            result['top_logprobs'] = []
-            for token_logprob in choice.logprobs.content:
-                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
-                if token_logprob.token not in logprob:
-                    logprob[token_logprob.token] = token_logprob.logprob
-                result['top_logprobs'].append(logprob)
-
-        if choice.finish_reason is not None:
-            result["finish_reason"] = choice.finish_reason
-
-        return result
-
-    def get_model_name_from_server(self):
-        model_list = self.client.models.list()
-        # TODO: this is a bit hacky, but will go away when we switch to a unified openai api for all models
-        assert len(model_list.data) == 1, "Unexpected number of models returned by OpenAI API."
-        model_name = model_list.data[0].id
-        return model_name
-
-    def _stream_chunks(self, response):
-        """
-        Helper generator that yields incremental chunks.
-        """
-
-        for chunk in response:
-            if hasattr(chunk.choices[0], "delta"):
-                cur_delta = chunk.choices[0].delta.content
-            else:
-                cur_delta = chunk.choices[0].text
-
-            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-            result = {"generation": cur_delta}
-            if finish_reason:
-                result["finish_reason"] = finish_reason
-                if not cur_delta:
-                    result["generation"] = ""
-            
-            yield result
-
 
 class AzureOpenAIModel(OpenAIModel):
     def __init__(
@@ -887,24 +895,25 @@ class AzureOpenAIModel(OpenAIModel):
         initial_retry_delay: float = 2.0,
         **kwargs,
     ):
-        # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__
+        # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__ logic
         BaseModel.__init__(self, host=host, port=port, **kwargs)
+        self._tunnel = None
 
         model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
         if model is None:
             raise ValueError("model argument is required for Azure OpenAI model.")
 
-        base_url = base_url or os.getenv("AZURE_OPENAI_ENDPOINT")
-        if base_url is None:
-            raise ValueError("base_url is required for Azure OpenAI model.")
+        azure_endpoint = base_url or os.getenv("AZURE_OPENAI_ENDPOINT")
+        if azure_endpoint is None:
+            raise ValueError("base_url/AZURE_OPENAI_ENDPOINT is required for Azure OpenAI model.")
 
         api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("api_key is required for Azure OpenAI model.")
+            raise ValueError("api_key/AZURE_OPENAI_API_KEY is required for Azure OpenAI model.")
 
         self.client = AzureOpenAI(
             api_key=api_key,
-            azure_endpoint=base_url,
+            azure_endpoint=azure_endpoint,
             api_version=api_version,
         )
         self.model = model
@@ -912,90 +921,11 @@ class AzureOpenAIModel(OpenAIModel):
         self.initial_retry_delay = initial_retry_delay
 
 
-class VLLMModel(BaseModel):
+class VLLMModel(OpenAIAPIModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # TODO: move this to base model?
-        self._tunnel = None
-        if self.ssh_server and self.ssh_key_path:
-            import sshtunnel
-
-            if '@' in self.ssh_server:
-                ssh_username, ssh_server = self.ssh_server.split('@')
-            else:
-                ssh_server = self.ssh_server
-                ssh_username = None
-
-            self._tunnel = sshtunnel.SSHTunnelForwarder(
-                (ssh_server, 22),
-                ssh_username=ssh_username,
-                ssh_pkey=self.ssh_key_path,
-                remote_bind_address=(self.server_host, int(self.server_port)),
-            )
-            self._tunnel.start()
-            # Use localhost with tunneled port for OpenAI client
-            # This way all traffic to server_host:server_port goes through SSH tunnel
-            self.server_host = '127.0.0.1'
-            self.server_port = str(self._tunnel.local_bind_port)
-
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
-        self.oai_client = openai.OpenAI(
-            api_key="EMPTY",
-            base_url=f"http://{self.server_host}:{self.server_port}/v1",
-            timeout=None,
-            http_client=http_client,
-        )
-
-        self.model_name_server = self.get_model_name_from_server()
-        self.model = self.model_name_server
-
-    def __del__(self):
-        if self._tunnel:
-            self._tunnel.stop()
-
-    def _generate_single(
-        self,
-        prompt: str | list,
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        top_logprobs: int | None = None,
-        timeout: int | None = None,
-        stop_phrases: list[str] | None = None,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,  # Ignored for VLLM
-    ) -> dict | Stream:
-        
-        # Handle chat completions for message format
-        if isinstance(prompt, list):
-            return self._generate_chat_completion(
-                messages=prompt,
-                tokens_to_generate=tokens_to_generate,
-                temperature=temperature,
-                top_p=top_p,
-                top_k=top_k,
-                min_p=min_p,
-                repetition_penalty=repetition_penalty,
-                random_seed=random_seed,
-                top_logprobs=top_logprobs,
-                timeout=timeout,
-                stop_phrases=stop_phrases,
-                stream=stream,
-            )
-        
-        if isinstance(prompt, dict):
-            raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
-        stop_phrases = stop_phrases or []
-
+    def _build_request_body(self, top_k, min_p, repetition_penalty):
         extra_body = {
             "min_p": min_p,
             "repetition_penalty": repetition_penalty,
@@ -1003,239 +933,96 @@ class VLLMModel(BaseModel):
         }
         if top_k > 0:
             extra_body["top_k"] = top_k
-
-        response = self.oai_client.completions.create(
-            model=self.model,
-            prompt=[prompt],
-            max_tokens=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            seed=random_seed,
-            stop=stop_phrases,
-            echo=False,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            logprobs=top_logprobs,
-            logit_bias=None,
-            stream=stream,
-            n=1,
-            extra_body=extra_body,
-            timeout=timeout,
-        )
-
-        if stream:
-            return self._stream_chunks(response)
-
-        return self.parse_openai_response(response)
-
-    def _generate_chat_completion(
-        self,
-        messages: list,
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        top_logprobs: int | None = None,
-        timeout: int | None = None,
-        stop_phrases: list[str] | None = None,
-        stream: bool = False,
-    ) -> dict | Stream:
-        """Generate using chat completions API for message format."""
-        stop_phrases = stop_phrases or []
-
-        extra_body = {
-            "min_p": min_p,
-            "repetition_penalty": repetition_penalty,
-        }
-        if top_k > 0:
-            extra_body["top_k"] = top_k
-
-        response = self.oai_client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            seed=random_seed,
-            stop=stop_phrases,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            logprobs=top_logprobs is not None,
-            top_logprobs=top_logprobs,
-            stream=stream,
-            n=1,
-            extra_body=extra_body,
-            timeout=timeout,
-        )
-
-        if stream:
-            return self._stream_chunks_chat(response)
-
-        return self.parse_chat_completion_response(response)
-
-    @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion") -> dict:
-        assert not isinstance(response, list)
-        assert len(response.choices) == 1
-        choice = response.choices[0]
-        output = choice.text
-        # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-        if choice.finish_reason == "stop":
-            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
-                output += choice.stop_reason
-            # sglang has a little different api here
-            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
-                output += choice.matched_stop
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        if choice.logprobs:
-            result['logprobs'] = choice.logprobs.token_logprobs
-            result['tokens'] = choice.logprobs.tokens
-            result['top_logprobs'] = choice.logprobs.top_logprobs
-        return result
-        
-    @classmethod
-    def parse_chat_completion_response(cls, response) -> dict:
-        """Parse chat completion response."""
-        assert len(response.choices) == 1
-        choice = response.choices[0]
-        output = choice.message.content
-        
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        if choice.logprobs and choice.logprobs.content:
-            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
-            result['tokens'] = [tok.token for tok in choice.logprobs.content]
-            result['top_logprobs'] = []
-            for token_logprob in choice.logprobs.content:
-                logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
-                if token_logprob.token not in logprob:
-                    logprob[token_logprob.token] = token_logprob.logprob
-                result['top_logprobs'].append(logprob)
-        
-        if choice.finish_reason:
-            result["finish_reason"] = choice.finish_reason
-            
-        return result
-
-    def get_model_name_from_server(self):
-        model_list = self.oai_client.models.list()
-        model_name = model_list.data[0].id
-        return model_name
-
-    def _stream_chunks(self, response):
-        """
-        Helper generator that yields incremental chunks.
-        """
-
-        emitted_so_far = []
-
-        for chunk in response:
-            cur_delta = chunk.choices[0].text
-            emitted_so_far += [cur_delta]
-
-            if cur_delta:
-                yield {"generation": cur_delta}
-
-            # vllm variant
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            # sglang variant
-            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
-
-            # vllm variant - emit stop_reason as is and finish
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
-
-            # sglang variant - emit only not-yet-sent part of matched_stop
-            if matched_stop and isinstance(matched_stop, str):
-                remaining = matched_stop
-                # find the longest prefix of matched_stop that is already at
-                # the end of what we've emitted.
-                emitted_str = "".join(emitted_so_far)
-                max_len = min(len(emitted_str), len(matched_stop))
-                for i in range(max_len, 0, -1):
-                    if emitted_str.endswith(matched_stop[:i]):
-                        remaining = matched_stop[i:]
-                        break
-
-                if remaining:
-                    yield {"generation": remaining}
+        return extra_body
     
-    def _stream_chunks_chat(self, response):
-        """Helper generator for chat completion streaming."""
-        for chunk in response:
-            if hasattr(chunk.choices[0], "delta") and chunk.choices[0].delta.content:
-                cur_delta = chunk.choices[0].delta.content
-                yield {"generation": cur_delta}
-            
-            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-            if finish_reason:
-                yield {"generation": "", "finish_reason": finish_reason}
-
-class MegatronModel(BaseModel):
-    # it's partially openai-compatible but not fully, so can't easily reuse the other class..
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        # TODO: duplication with vllm class, need to address this
-        self._tunnel = None
-        if self.ssh_server and self.ssh_key_path:
-            import sshtunnel
-
-            if '@' in self.ssh_server:
-                ssh_username, ssh_server = self.ssh_server.split('@')
-            else:
-                ssh_server = self.ssh_server
-                ssh_username = None
-
-            self._tunnel = sshtunnel.SSHTunnelForwarder(
-                (ssh_server, 22),
-                ssh_username=ssh_username,
-                ssh_pkey=self.ssh_key_path,
-                remote_bind_address=(self.server_host, int(self.server_port)),
-            )
-            self._tunnel.start()
-            # Use localhost with tunneled port for OpenAI client
-            # This way all traffic to server_host:server_port goes through SSH tunnel
-            self.server_host = '127.0.0.1'
-            self.server_port = str(self._tunnel.local_bind_port)
-
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
-        self.oai_client = openai.OpenAI(
-            api_key="EMPTY",
-            base_url=f"http://{self.server_host}:{self.server_port}",  # note there is no /v1 here
-            timeout=None,
-            http_client=http_client,
-        )
-
-    def __del__(self):
-        if self._tunnel:
-            self._tunnel.stop()
-
-    def _generate_single(
+    def _build_completion_request_params(
         self,
-        prompt: str | list,
-        tokens_to_generate: int = 512,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        top_logprobs: int | None = None,
-        timeout: int | None = None,
-        stop_phrases: list[str] | None = None,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,  # Ignored for Megatron
-    ) -> dict | Stream:
-        if isinstance(prompt, dict):
-            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
-        if stream is True:
+        prompt: str,
+        tokens_to_generate: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        repetition_penalty: float,
+        random_seed: int,
+        stop_phrases: list[str],
+        timeout: int | None,
+        top_logprobs: int | None,
+        stream: bool,
+        **kwargs, # to capture reasoning_effort
+    ) -> dict:
+        return {
+            "model": self.model,
+            "prompt": [prompt],
+            "max_tokens": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "seed": random_seed,
+            "stop": stop_phrases or None,
+            "logprobs": top_logprobs,
+            "stream": stream,
+            "timeout": timeout,
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+        }
+
+    def _build_chat_request_params(
+        self,
+        messages: list[dict],
+        tokens_to_generate: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        repetition_penalty: float,
+        random_seed: int,
+        stop_phrases: list[str],
+        timeout: int | None,
+        top_logprobs: int | None,
+        stream: bool,
+        **kwargs, # to capture reasoning_effort
+    ) -> dict:
+        return {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "seed": random_seed,
+            "stop": stop_phrases or None,
+            "logprobs": top_logprobs is not None,
+            "top_logprobs": top_logprobs,
+            "stream": stream,
+            "timeout": timeout,
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+        }
+
+
+class MegatronModel(OpenAIAPIModel):
+    def __init__(self, **kwargs):
+        # Megatron uses a non-standard base URL (no /v1) and a fixed model name.
+        super().__init__(model="model", use_v1_endpoint=False, **kwargs)
+
+    def _build_chat_request_params(self, **kwargs) -> dict:
+        raise NotImplementedError("Megatron server does not support chat completions.")
+
+    def _build_completion_request_params(
+        self,
+        prompt: str,
+        tokens_to_generate: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        repetition_penalty: float,
+        random_seed: int,
+        stop_phrases: list[str],
+        timeout: int | None,
+        top_logprobs: int | None,
+        stream: bool,
+        **kwargs,
+    ) -> dict:
+        # Parameter validation specific to Megatron
+        if stream:
             raise NotImplementedError("Megatron server does not support streaming.")
         if min_p > 0:
             raise NotImplementedError("Megatron server does not support min_p parameter.")
@@ -1244,27 +1031,18 @@ class MegatronModel(BaseModel):
         if top_k != 0:
             raise NotImplementedError("Megatron server does not support top_k parameter.")
 
-        stop_phrases = stop_phrases or []
-
-        response = self.oai_client.completions.create(
-            model="model",
-            prompt=[prompt],
-            max_tokens=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            seed=random_seed,
-            stop=stop_phrases,
-            echo=False,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            logprobs=top_logprobs,
-            logit_bias=None,
-            stream=stream,
-            n=1,
-            timeout=timeout,
-        )
-
-        return self.parse_openai_response(response, top_logprobs=top_logprobs)
+        return {
+            "model": self.model,
+            "prompt": [prompt],
+            "max_tokens": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "seed": random_seed,
+            "stop": stop_phrases or None,
+            "logprobs": top_logprobs,
+            "stream": stream,
+            "timeout": timeout,
+        }
 
     def generate(
         self,
@@ -1281,74 +1059,41 @@ class MegatronModel(BaseModel):
         timeout: int | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,  # Ignored for Megatron
+        **kwargs,
     ) -> dict | Stream:
-        # overriding generate to provide batched support as there is on inflight-batching
-        if isinstance(prompts[0], dict):
-            raise NotImplementedError("Megatron server does not support OpenAI \"messages\" as prompt.")
-        if stream is True:
-            raise NotImplementedError("Megatron server does not support streaming.")
-        if min_p > 0:
-            raise NotImplementedError("Megatron server does not support min_p parameter.")
-        if repetition_penalty != 1.0:
-            raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
-        if top_k != 0:
-            raise NotImplementedError("Megatron server does not support top_k parameter.")
-        stop_phrases = stop_phrases or []
-
-        if top_logprobs is None:
-            top_logprobs = 0
-
-        response = self.oai_client.completions.create(
-            model="model",
-            prompt=prompts,
-            max_tokens=tokens_to_generate,
+        # Overriding generate to provide its own batching support, bypassing the parent's async logic.
+        params = self._build_completion_request_params(
+            prompt=None, # Not used for batch call
+            tokens_to_generate=tokens_to_generate,
             temperature=temperature,
             top_p=top_p,
-            seed=random_seed,
-            stop=stop_phrases,
-            echo=False,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            logprobs=top_logprobs,
-            logit_bias=None,
-            stream=stream,
-            n=1,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            random_seed=random_seed,
+            stop_phrases=stop_phrases,
+            top_logprobs=top_logprobs or 0,
             timeout=timeout,
+            stream=stream,
         )
-
+        params["prompt"] = prompts # Replace single prompt with batch
+        
+        response = self.client.completions.create(**params)
         outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
 
         if remove_stop_phrases:
             for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases or [])
 
         return outputs
 
     @classmethod
     def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None) -> dict | list[dict]:
-        """Parse OpenAI response to extract the generated text and other metadata.
-
-        Args:
-            response: The response from OpenAI API
-            batch: Whether the response contains multiple generations (batch mode)
-
-        Returns:
-            A single dict with generation info or a list of dicts for batch mode
-        """
-
+        """A specific parser kept for the custom batch generate method."""
         def process_choice(choice, top_logprobs: int | None = None):
             output = choice.text
-            # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
-            if choice.finish_reason == "stop":
-                if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
-                    output += choice.stop_reason
-                # sglang has a little different api here
-                if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
-                    output += choice.matched_stop
-
             result = {'generation': output, 'num_generated_tokens': -1}
-            if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
+            if choice.logprobs and choice.logprobs.tokens:
                 if top_logprobs is not None and top_logprobs != 0:
                     result['logprobs'] = choice.logprobs.token_logprobs
                     result['tokens'] = choice.logprobs.tokens
@@ -1358,13 +1103,10 @@ class MegatronModel(BaseModel):
 
         if batch:
             return [process_choice(choice, top_logprobs) for choice in response.choices]
-        else:
-            assert not isinstance(response, list)
-            assert len(response.choices) == 1
-            return process_choice(response.choices[0], top_logprobs)
+        
+        return process_choice(response.choices[0], top_logprobs)
 
 
-# TODO: unify VLLMModel and OpenAIModel classes
 models = {
     'trtllm': TRTLLMModel,
     'trtllm-serve': VLLMModel,
