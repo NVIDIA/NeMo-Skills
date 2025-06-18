@@ -191,10 +191,10 @@ mmlu_few_shot_college_biology = [
         "topic": 'college_biology',
     },
     {
-        "problem": 'The presence of homologous structures in two different organisms, such as the humerus in the front limb of a human and a bird, indicates that\nA. the human and bird are polyphyletic species\nB. a human's and bird's evolution is convergent\nC. the human and bird belong to a clade\nD. the human and bird developed by analogy',
+        "problem": "The presence of homologous structures in two different organisms, such as the humerus in the front limb of a human and a bird, indicates that\nA. the human and bird are polyphyletic species\nB. a human's and bird's evolution is convergent\nC. the human and bird belong to a clade\nD. the human and bird developed by analogy",
         "options": "A. the human and bird are polyphyletic species\nB. a human's and bird's evolution is convergent\nC. the human and bird belong to a clade\nD. the human and bird developed by analogy",
-        "solution": 'The answer is (C).',
-        "topic": 'college_biology',
+        "solution": "The answer is (C).",
+        "topic": "college_biology",
     },
     {
         "problem": 'According to the pressure-flow model of movement of phloem contents, photosynthate movement from source to sink is driven by\nA. an ATP-dependent pressure-flow pump\nB. a water-pressure potential gradient\nC. transpiration\nD. apoplastic diffusion',
@@ -680,16 +680,16 @@ mmlu_few_shot_high_school_computer_science = [
         "topic": 'high_school_computer_science',
     },
     {
-        "problem": 'Many Web browsers allow users to open anonymous windows. During a browsing session in an anonymous window, the browser does not record a browsing history or a list of downloaded files. When the anonymous window is exited, cookies created during the session are deleted. Which of the following statements about browsing sessions in an anonymous window is true?\nA. The activities of a user browsing in an anonymous window will not be visible to people who monitor the user's network, such as the system administrator.\nB. Items placed in a Web store's shopping cart for future purchase during the anonymous browsing session will not be saved on the user's computer.\nC. A user will not be able to log in to e-mail or social media accounts during the anonymous browsing session.\nD. A user browsing in an anonymous window will be protected from viruses launched from any web sites visited or files downloaded.',
+        "problem": "Many Web browsers allow users to open anonymous windows. During a browsing session in an anonymous window, the browser does not record a browsing history or a list of downloaded files. When the anonymous window is exited, cookies created during the session are deleted. Which of the following statements about browsing sessions in an anonymous window is true?\nA. The activities of a user browsing in an anonymous window will not be visible to people who monitor the user's network, such as the system administrator.\nB. Items placed in a Web store's shopping cart for future purchase during the anonymous browsing session will not be saved on the user's computer.\nC. A user will not be able to log in to e-mail or social media accounts during the anonymous browsing session.\nD. A user browsing in an anonymous window will be protected from viruses launched from any web sites visited or files downloaded.",
         "options": "A. The activities of a user browsing in an anonymous window will not be visible to people who monitor the user's network, such as the system administrator.\nB. Items placed in a Web store's shopping cart for future purchase during the anonymous browsing session will not be saved on the user's computer.\nC. A user will not be able to log in to e-mail or social media accounts during the anonymous browsing session.\nD. A user browsing in an anonymous window will be protected from viruses launched from any web sites visited or files downloaded.",
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_computer_science',
+        "solution": "The answer is (B).",
+        "topic": "high_school_computer_science",
     },
     {
         "problem": 'What is the output of "abc"[::-1] in Python 3?\nA. Error\nB. abc\nC. cba\nD. c',
-        "options": 'A. Error\nB. abc\nC. cba\nD. c',
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_computer_science',
+        "options": "A. Error\nB. abc\nC. cba\nD. c",
+        "solution": "The answer is (C).",
+        "topic": "high_school_computer_science",
     },
     {
         "problem": 'In the program below, the initial value of x is 5 and the initial value of y is 10.  IF (X < O)  {  DISPLAY ("Foxtrot")  }  ELSE  {  IF (X > y)  {    DISPLAY ("Hotel")  }  ELSE   {    IF (y > O)    {    DISPLAY ("November")    }    ELSE    {    DISPLAY ("Yankee")    }  }  }    What is displayed as a result of running the program?\nA. Foxtrot\nB. Hotel\nC. November\nD. Yankee',
@@ -707,67 +707,67 @@ mmlu_few_shot_high_school_computer_science = [
 
 mmlu_few_shot_high_school_european_history = [
     {
-        "problem": 'This question refers to the following information. The following excerpt is from a pamphlet. You will do me the justice to remember, that I have always strenuously supported the Right of every man to his own opinion, however different that opinion might be to mine. He who denies to another this right, makes a slave of himself to his present opinion, because he precludes himself the right of changing it. The most formidable weapon against errors of every kind is Reason. I have never used any other, and I trust I never shall. The circumstance that has now taken place in France of the total abolition of the whole national order of priesthood, and of everything appertaining to compulsive systems of religion, and compulsive articles of faith, has not only precipitated my intention, but rendered a work of this kind exceedingly necessary, lest in the general wreck of superstition, of false systems of government, and false theology, we lose sight of morality, of humanity, and of the theology that is true. I believe in one God, and no more; and I hope for happiness beyond this life. I believe in the equality of man; and I believe that religious duties consist in doing justice, loving mercy, and endeavoring to make our fellow-creatures happy. I do not believe in the creed professed by the Jewish church, by the Roman church, by the Greek church, by the Turkish church, by the Protestant church, nor by any church that I know of. My own mind is my own church. All national institutions of churches, whether Jewish, Christian or Turkish, appear to me no other than human inventions, set up to terrify and enslave mankind, and monopolize power and profit. I do not mean by this declaration to condemn those who believe otherwise; they have the same right to their belief as I have to mine. —Thomas Paine, The Age of Reason, 1794–1795 Which of the following Enlightenment philosophes designed a system of checks and balances for government to avoid abuses of power?\nA. Jean Jacques Rousseau\nB. Baron Montesquieu\nC. Mary Wollstonecraft\nD. Adam Smith',
-        "options": 'A. Jean Jacques Rousseau\nB. Baron Montesquieu\nC. Mary Wollstonecraft\nD. Adam Smith',
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_european_history',
+        "problem": "This question refers to the following information. The following excerpt is from a pamphlet. You will do me the justice to remember, that I have always strenuously supported the Right of every man to his own opinion, however different that opinion might be to mine. He who denies to another this right, makes a slave of himself to his present opinion, because he precludes himself the right of changing it. The most formidable weapon against errors of every kind is Reason. I have never used any other, and I trust I never shall. The circumstance that has now taken place in France of the total abolition of the whole national order of priesthood, and of everything appertaining to compulsive systems of religion, and compulsive articles of faith, has not only precipitated my intention, but rendered a work of this kind exceedingly necessary, lest in the general wreck of superstition, of false systems of government, and false theology, we lose sight of morality, of humanity, and of the theology that is true. I believe in one God, and no more; and I hope for happiness beyond this life. I believe in the equality of man; and I believe that religious duties consist in doing justice, loving mercy, and endeavoring to make our fellow-creatures happy. I do not believe in the creed professed by the Jewish church, by the Roman church, by the Greek church, by the Turkish church, by the Protestant church, nor by any church that I know of. My own mind is my own church. All national institutions of churches, whether Jewish, Christian or Turkish, appear to me no other than human inventions, set up to terrify and enslave mankind, and monopolize power and profit. I do not mean by this declaration to condemn those who believe otherwise; they have the same right to their belief as I have to mine. —Thomas Paine, The Age of Reason, 1794–1795 Which of the following Enlightenment philosophes designed a system of checks and balances for government to avoid abuses of power?\nA. Jean Jacques Rousseau\nB. Baron Montesquieu\nC. Mary Wollstonecraft\nD. Adam Smith",
+        "options": "A. Jean Jacques Rousseau\nB. Baron Montesquieu\nC. Mary Wollstonecraft\nD. Adam Smith",
+        "solution": "The answer is (B).",
+        "topic": "high_school_european_history",
     },
     {
-        "problem": 'This question refers to the following information. Read the following excerpt. The revolutionary seed had penetrated into every country and spread more or less. It was greatly developed under the régime of the military despotism of Bonaparte. His conquests displaced a number of laws, institutions, and customs; broke through bonds sacred among all nations, strong enough to resist time itself; which is more than can be said of certain benefits conferred by these innovators. The monarchs will fulfil the duties imposed upon them by Him who, by entrusting them with power, has charged them to watch over the maintenance of justice, and the rights of all, to avoid the paths of error, and tread firmly in the way of truth. Placed beyond the passions which agitate society, it is in days of trial chiefly that they are called upon to despoil realities of their false appearances, and to show themselves as they are, fathers invested with the authority belonging by right to the heads of families, to prove that, in days of mourning, they know how to be just, wise, and therefore strong, and that they will not abandon the people whom they ought to govern to be the sport of factions, to error and its consequences, which must involve the loss of society. Union between the monarchs is the basis of the policy which must now be followed to save society from total ruin. . . . Let them not confound concessions made to parties with the good they ought to do for their people, in modifying, according to their recognized needs, such branches of the administration as require it. Let them be just, but strong; beneficent, but strict. Let them maintain religious principles in all their purity, and not allow the faith to be attacked and morality interpreted according to the social contract or the visions of foolish sectarians. Let them suppress Secret Societies; that gangrene of society. —Klemens von Metternich, Political Confession of Faith, 1820 Which of the following was the greatest cause of the fears expressed by Metternich in the document above?\nA. The ideas of personal liberty and nationalism conceived during the Enlightenment resulted in radical revolutions that could spread throughout Europe.\nB. The conquest of Europe by Napoleon led to the creation of new factions and shifted the European balance of power.\nC. The power of monarchs had grown to the point where it needed to be checked by other powers within each nation or domination of civilians would occur.\nD. The rising and falling economic cycle of the newly emerging capitalist economy could lead to civilian unrest that must be suppressed.',
-        "options": 'A. The ideas of personal liberty and nationalism conceived during the Enlightenment resulted in radical revolutions that could spread throughout Europe.\nB. The conquest of Europe by Napoleon led to the creation of new factions and shifted the European balance of power.\nC. The power of monarchs had grown to the point where it needed to be checked by other powers within each nation or domination of civilians would occur.\nD. The rising and falling economic cycle of the newly emerging capitalist economy could lead to civilian unrest that must be suppressed.',
-        "solution": 'The answer is (A).',
-        "topic": 'high_school_european_history',
+        "problem": "This question refers to the following information. Read the following excerpt. The revolutionary seed had penetrated into every country and spread more or less. It was greatly developed under the régime of the military despotism of Bonaparte. His conquests displaced a number of laws, institutions, and customs; broke through bonds sacred among all nations, strong enough to resist time itself; which is more than can be said of certain benefits conferred by these innovators. The monarchs will fulfil the duties imposed upon them by Him who, by entrusting them with power, has charged them to watch over the maintenance of justice, and the rights of all, to avoid the paths of error, and tread firmly in the way of truth. Placed beyond the passions which agitate society, it is in days of trial chiefly that they are called upon to despoil realities of their false appearances, and to show themselves as they are, fathers invested with the authority belonging by right to the heads of families, to prove that, in days of mourning, they know how to be just, wise, and therefore strong, and that they will not abandon the people whom they ought to govern to be the sport of factions, to error and its consequences, which must involve the loss of society. Union between the monarchs is the basis of the policy which must now be followed to save society from total ruin. . . . Let them not confound concessions made to parties with the good they ought to do for their people, in modifying, according to their recognized needs, such branches of the administration as require it. Let them be just, but strong; beneficent, but strict. Let them maintain religious principles in all their purity, and not allow the faith to be attacked and morality interpreted according to the social contract or the visions of foolish sectarians. Let them suppress Secret Societies; that gangrene of society. —Klemens von Metternich, Political Confession of Faith, 1820 Which of the following was the greatest cause of the fears expressed by Metternich in the document above?\nA. The ideas of personal liberty and nationalism conceived during the Enlightenment resulted in radical revolutions that could spread throughout Europe.\nB. The conquest of Europe by Napoleon led to the creation of new factions and shifted the European balance of power.\nC. The power of monarchs had grown to the point where it needed to be checked by other powers within each nation or domination of civilians would occur.\nD. The rising and falling economic cycle of the newly emerging capitalist economy could lead to civilian unrest that must be suppressed.",
+        "options": "A. The ideas of personal liberty and nationalism conceived during the Enlightenment resulted in radical revolutions that could spread throughout Europe.\nB. The conquest of Europe by Napoleon led to the creation of new factions and shifted the European balance of power.\nC. The power of monarchs had grown to the point where it needed to be checked by other powers within each nation or domination of civilians would occur.\nD. The rising and falling economic cycle of the newly emerging capitalist economy could lead to civilian unrest that must be suppressed.",
+        "solution": "The answer is (A).",
+        "topic": "high_school_european_history",
     },
     {
         "problem": 'This question refers to the following information. In Russia there was nothing going on well, and [Souvarine] was in despair over the news he had received. His old companions were all turning to the politicians; the famous Nihilists who made Europe tremble-sons of village priests, of the lower middle class, of tradesmen-could not rise above the idea of national liberation, and seemed to believe that the world would be delivered-when they had killed their despot&… "Foolery! They\'ll never get out of it with their foolery." Then, lowering his voice still more, in a few bitter words he described his old dream of fraternity. He had renounced his rank and his fortune; he had gone among workmen, only in the hope of seeing at last the foundation of a new society of labour in common. All the sous in his pockets had long gone to the urchins of the settlement; he had been as tender as a brother with the colliers, smiling at their suspicion, winning them over by his quiet workmanlike ways and his dislike of chattering. But decidedly the fusion had not taken place. His voice changed, his eyes grew bright, he fixed them on étienne, directly addressing him: "Now, do you understand that? These hatworkers at Marseilles who have won the great lottery prize of a hundred thousand francs have gone off at once and invested it, declaring that they are going to live without doing anything! Yes, that is your idea, all of you French workmen; you want to unearth a treasure in order to devour it alone afterwards in some lazy, selfish corner. You may cry out as much as you like against the rich, you haven\'t got courage enough to give back to the poor the money that luck brings you. You will never be worthy of happiness as long as you own anything, and your hatred of the bourgeois proceeds solely from an angry desire to be bourgeois yourselves in their place." émile Zola, French writer, Germinal, 1885 The passage displays the direct concern for the welfare of the working classes that was typically a part of which movement?\nA. Capitalist\nB. Scientific\nC. Communist\nD. Existentialist',
-        "options": 'A. Capitalist\nB. Scientific\nC. Communist\nD. Existentialist',
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_european_history',
+        "options": "A. Capitalist\nB. Scientific\nC. Communist\nD. Existentialist",
+        "solution": "The answer is (C).",
+        "topic": "high_school_european_history",
     },
     {
-        "problem": 'This question refers to the following information. The excerpts below are from the Navigation Acts of 1651. [A]fter the first day of December, one thousand six hundred fifty and one, and from thence forwards, no goods or commodities whatsoever of the growth, production or manufacture of Asia, Africa or America, or of any part thereof; or of any islands belonging to them, or which are described or laid down in the usual maps or cards of those places, as well of the English plantations as others, shall be imported or brought into this Commonwealth of England, or into Ireland, or any other lands, islands, plantations, or territories to this Commonwealth belonging, or in their possession, in any other ship or ships, vessel or vessels whatsoever, but only in such as do truly and without fraud belong only to the people of this Commonwealth, or the plantations thereof, as the proprietors or right owners thereof; and whereof the master and mariners are also of the people of this Commonwealth, under the penalty of the forfeiture and loss of all the goods that shall be imported contrary to this act, , , , [N]o goods or commodities of the growth, production, or manufacture of Europe, or of any part thereof, shall after the first day of December, one thousand six hundred fifty and one, be imported or brought into this Commonwealth of England, or any other lands or territories to this Commonwealth belonging, or in their possession, in any ship or ships, vessel or vessels whatsoever, but in such as do truly and without fraud belong only to the people of this Commonwealth, and in no other, except only such foreign ships and vessels as do truly and properly belong to the people of that country or place, of which the said goods are the growth, production or manufacture. Which of the following best describes the outcome of the Navigation Acts of 1651?\nA. They served as a catalyst for the growth of English shipping and overseas trade, but did little to limit the prospects of the Dutch in the seventeenth century.\nB. They brought about almost immediate hardships for the Dutch economy as their dominance of overseas trade quickly ended.\nC. They were rescinded during the restoration of the Stuarts as they sought normal diplomatic relations with the Dutch so not as to need Parliament's financial support for war.\nD. They led to nearly a century of recurrent war between England and the Netherlands, which would not end until after American independence.',
+        "problem": "This question refers to the following information. The excerpts below are from the Navigation Acts of 1651. [A]fter the first day of December, one thousand six hundred fifty and one, and from thence forwards, no goods or commodities whatsoever of the growth, production or manufacture of Asia, Africa or America, or of any part thereof; or of any islands belonging to them, or which are described or laid down in the usual maps or cards of those places, as well of the English plantations as others, shall be imported or brought into this Commonwealth of England, or into Ireland, or any other lands, islands, plantations, or territories to this Commonwealth belonging, or in their possession, in any other ship or ships, vessel or vessels whatsoever, but only in such as do truly and without fraud belong only to the people of this Commonwealth, or the plantations thereof, as the proprietors or right owners thereof; and whereof the master and mariners are also of the people of this Commonwealth, under the penalty of the forfeiture and loss of all the goods that shall be imported contrary to this act, , , , [N]o goods or commodities of the growth, production, or manufacture of Europe, or of any part thereof, shall after the first day of December, one thousand six hundred fifty and one, be imported or brought into this Commonwealth of England, or any other lands or territories to this Commonwealth belonging, or in their possession, in any ship or ships, vessel or vessels whatsoever, but in such as do truly and without fraud belong only to the people of this Commonwealth, and in no other, except only such foreign ships and vessels as do truly and properly belong to the people of that country or place, of which the said goods are the growth, production or manufacture. Which of the following best describes the outcome of the Navigation Acts of 1651?\nA. They served as a catalyst for the growth of English shipping and overseas trade, but did little to limit the prospects of the Dutch in the seventeenth century.\nB. They brought about almost immediate hardships for the Dutch economy as their dominance of overseas trade quickly ended.\nC. They were rescinded during the restoration of the Stuarts as they sought normal diplomatic relations with the Dutch so not as to need Parliament's financial support for war.\nD. They led to nearly a century of recurrent war between England and the Netherlands, which would not end until after American independence.",
         "options": "A. They served as a catalyst for the growth of English shipping and overseas trade, but did little to limit the prospects of the Dutch in the seventeenth century.\nB. They brought about almost immediate hardships for the Dutch economy as their dominance of overseas trade quickly ended.\nC. They were rescinded during the restoration of the Stuarts as they sought normal diplomatic relations with the Dutch so not as to need Parliament's financial support for war.\nD. They led to nearly a century of recurrent war between England and the Netherlands, which would not end until after American independence.",
-        "solution": 'The answer is (A).',
-        "topic": 'high_school_european_history',
+        "solution": "The answer is (A).",
+        "topic": "high_school_european_history",
     },
     {
         "problem": "This question refers to the following information. Albeit the king's Majesty justly and rightfully is and ought to be the supreme head of the Church of England, and so is recognized by the clergy of this realm in their convocations, yet nevertheless, for corroboration and confirmation thereof, and for increase of virtue in Christ's religion within this realm of England, and to repress and extirpate all errors, heresies, and other enormities and abuses heretofore used in the same, be it enacted, by authority of this present Parliament, that the king, our sovereign lord, his heirs and successors, kings of this realm, shall be taken, accepted, and reputed the only supreme head in earth of the Church of England, called Anglicans Ecclesia; and shall have and enjoy, annexed and united to the imperial crown of this realm, as well the title and style thereof, as all honors, dignities, preeminences, jurisdictions, privileges, authorities, immunities, profits, and commodities to the said dignity of the supreme head of the same Church belonging and appertaining; and that our said sovereign lord, his heirs and successors, kings of this realm, shall have full power and authority from time to time to visit, repress, redress, record, order, correct, restrain, and amend all such errors, heresies, abuses, offenses, contempts, and enormities, whatsoever they be, which by any manner of spiritual authority or jurisdiction ought or may lawfully be reformed, repressed, ordered, redressed, corrected, restrained, or amended, most to the pleasure of Almighty God, the increase of virtue in Christ's religion, and for the conservation of the peace, unity, and tranquility of this realm; any usage, foreign land, foreign authority, prescription, or any other thing or things to the contrary hereof notwithstanding. English Parliament, Act of Supremacy, 1534 From the passage, one may infer that the English Parliament wished to argue that the Act of Supremacy would\nA. give the English king a new position of authority\nB. give the position of head of the Church of England to Henry VIII alone and exclude his heirs\nC. establish Calvinism as the one true theology in England\nD. end various forms of corruption plaguing the Church in England",
-        "options": 'A. give the English king a new position of authority\nB. give the position of head of the Church of England to Henry VIII alone and exclude his heirs\nC. establish Calvinism as the one true theology in England\nD. end various forms of corruption plaguing the Church in England',
-        "solution": 'The answer is (D).',
-        "topic": 'high_school_european_history',
+        "options": "A. give the English king a new position of authority\nB. give the position of head of the Church of England to Henry VIII alone and exclude his heirs\nC. establish Calvinism as the one true theology in England\nD. end various forms of corruption plaguing the Church in England",
+        "solution": "The answer is (D).",
+        "topic": "high_school_european_history",
     },
 ]
 
 mmlu_few_shot_high_school_geography = [
     {
-        "problem": 'The rate of natural increase of a population is found by subtracting the\nA. crude death rate from the crude birth date.\nB. crude birth rate from the crude death rate.\nC. doubling time from the crude birth rate.\nD. fertility rate from the crude death rate.',
-        "options": 'A. crude death rate from the crude birth date.\nB. crude birth rate from the crude death rate.\nC. doubling time from the crude birth rate.\nD. fertility rate from the crude death rate.',
-        "solution": 'The answer is (A).',
-        "topic": 'high_school_geography',
+        "problem": "The rate of natural increase of a population is found by subtracting the\nA. crude death rate from the crude birth date.\nB. crude birth rate from the crude death rate.\nC. doubling time from the crude birth rate.\nD. fertility rate from the crude death rate.",
+        "options": "A. crude death rate from the crude birth date.\nB. crude birth rate from the crude death rate.\nC. doubling time from the crude birth rate.\nD. fertility rate from the crude death rate.",
+        "solution": "The answer is (A).",
+        "topic": "high_school_geography",
     },
     {
-        "problem": 'During the third stage of the demographic transition model, which of the following is true?\nA. Birth rates increase and population growth rate is less rapid.\nB. Birth rates decline and population growth rate is less rapid.\nC. Birth rates increase and population growth rate increases.\nD. Birth rates decrease and population growth rate increases.',
-        "options": 'A. Birth rates increase and population growth rate is less rapid.\nB. Birth rates decline and population growth rate is less rapid.\nC. Birth rates increase and population growth rate increases.\nD. Birth rates decrease and population growth rate increases.',
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_geography',
+        "problem": "During the third stage of the demographic transition model, which of the following is true?\nA. Birth rates increase and population growth rate is less rapid.\nB. Birth rates decline and population growth rate is less rapid.\nC. Birth rates increase and population growth rate increases.\nD. Birth rates decrease and population growth rate increases.",
+        "options": "A. Birth rates increase and population growth rate is less rapid.\nB. Birth rates decline and population growth rate is less rapid.\nC. Birth rates increase and population growth rate increases.\nD. Birth rates decrease and population growth rate increases.",
+        "solution": "The answer is (B).",
+        "topic": "high_school_geography",
     },
     {
-        "problem": 'Which of the following statements is NOT accurate regarding the services provided by local governments in the United States?\nA. Duplication of efforts occurs often.\nB. Social problems of the central city spill over into the surrounding residential suburbs.\nC. Inefficiency in providing services occurs often.\nD. One neighborhood's efforts to reduce pollution are always supported by neighboring communities.',
+        "problem": "Which of the following statements is NOT accurate regarding the services provided by local governments in the United States?\nA. Duplication of efforts occurs often.\nB. Social problems of the central city spill over into the surrounding residential suburbs.\nC. Inefficiency in providing services occurs often.\nD. One neighborhood's efforts to reduce pollution are always supported by neighboring communities.",
         "options": "A. Duplication of efforts occurs often.\nB. Social problems of the central city spill over into the surrounding residential suburbs.\nC. Inefficiency in providing services occurs often.\nD. One neighborhood's efforts to reduce pollution are always supported by neighboring communities.",
-        "solution": 'The answer is (D).',
-        "topic": 'high_school_geography',
+        "solution": "The answer is (D).",
+        "topic": "high_school_geography",
     },
     {
-        "problem": 'The practice of hiring a foreign third-party service provider to run an operation is called\nA. outsourcing.\nB. offshoring.\nC. maquiladoras.\nD. locational interdependence.',
-        "options": 'A. outsourcing.\nB. offshoring.\nC. maquiladoras.\nD. locational interdependence.',
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_geography',
+        "problem": "The practice of hiring a foreign third-party service provider to run an operation is called\nA. outsourcing.\nB. offshoring.\nC. maquiladoras.\nD. locational interdependence.",
+        "options": "A. outsourcing.\nB. offshoring.\nC. maquiladoras.\nD. locational interdependence.",
+        "solution": "The answer is (B).",
+        "topic": "high_school_geography",
     },
     {
-        "problem": 'Which one of the following items is an example of nonmaterial culture?\nA. Dove soap\nB. Dove candy bar\nC. Dove symbol\nD. A dove (bird)',
-        "options": 'A. Dove soap\nB. Dove candy bar\nC. Dove symbol\nD. A dove (bird)',
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_geography',
+        "problem": "Which one of the following items is an example of nonmaterial culture?\nA. Dove soap\nB. Dove candy bar\nC. Dove symbol\nD. A dove (bird)",
+        "options": "A. Dove soap\nB. Dove candy bar\nC. Dove symbol\nD. A dove (bird)",
+        "solution": "The answer is (C).",
+        "topic": "high_school_geography",
     },
 ]
 
@@ -791,16 +791,16 @@ mmlu_few_shot_high_school_government_and_politics = [
         "topic": 'high_school_government_and_politics',
     },
     {
-        "problem": 'Which of the following statements about cabinet departments is FALSE?\nA. They are established by the legislative branch.\nB. Their members often don't have much influence over presidential decisions.\nC. They cannot all be run by leaders who belong to the same political party the president does.\nD. Not every federal agency is a cabinet department.',
+        "problem": "Which of the following statements about cabinet departments is FALSE?\nA. They are established by the legislative branch.\nB. Their members often don't have much influence over presidential decisions.\nC. They cannot all be run by leaders who belong to the same political party the president does.\nD. Not every federal agency is a cabinet department.",
         "options": "A. They are established by the legislative branch.\nB. Their members often don't have much influence over presidential decisions.\nC. They cannot all be run by leaders who belong to the same political party the president does.\nD. Not every federal agency is a cabinet department.",
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_government_and_politics',
+        "solution": "The answer is (C).",
+        "topic": "high_school_government_and_politics",
     },
     {
-        "problem": 'Which of the following best states an argument made by James Madison in The Federalist number 10?\nA. Honest politicians can prevent factions from developing.\nB. Factions are more likely to occur in large republics than in small ones.\nC. The negative effects of factionalism can be reduced by a republican government.\nD. Free elections are the people's best defense against factionalism.',
+        "problem": "Which of the following best states an argument made by James Madison in The Federalist number 10?\nA. Honest politicians can prevent factions from developing.\nB. Factions are more likely to occur in large republics than in small ones.\nC. The negative effects of factionalism can be reduced by a republican government.\nD. Free elections are the people's best defense against factionalism.",
         "options": "A. Honest politicians can prevent factions from developing.\nB. Factions are more likely to occur in large republics than in small ones.\nC. The negative effects of factionalism can be reduced by a republican government.\nD. Free elections are the people's best defense against factionalism.",
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_government_and_politics',
+        "solution": "The answer is (C).",
+        "topic": "high_school_government_and_politics",
     },
 ]
 
@@ -1004,34 +1004,34 @@ mmlu_few_shot_high_school_statistics = [
 
 mmlu_few_shot_high_school_us_history = [
     {
-        "problem": 'This question refers to the following information. "Society in every state is a blessing, but government even in its best state is but a necessary evil; in its worst state an intolerable one; for when we suffer, or are exposed to the same miseries by a government, which we might expect in a country without government, our calamity is heightened by reflecting that we furnish the means by which we suffer. Government, like dress, is the badge of lost innocence; the palaces of kings are built on the ruins of the bowers of paradise. For were the impulses of conscience clear, uniform, and irresistibly obeyed, man would need no other lawgiver; but that not being the case, he finds it necessary to surrender up a part of his property to furnish means for the protection of the rest; and this he is induced to do by the same prudence which in every other case advises him out of two evils to choose the least. Wherefore, security being the true design and end of government, it unanswerably follows that whatever form thereof appears most likely to ensure it to us, with the least expense and greatest benefit, is preferable to all others." Thomas Paine, Common Sense, 1776 Which of the following "miseries" alluded to above were most condemned by Anti-Federalists of the post-Revolutionary era?\nA. Organized response to Bacon's Rebellion\nB. Federal response to Shays's Rebellion\nC. Federal response to the Whiskey Rebellion\nD. Federal response to Pontiac's Rebellion',
+        "problem": 'This question refers to the following information. "Society in every state is a blessing, but government even in its best state is but a necessary evil; in its worst state an intolerable one; for when we suffer, or are exposed to the same miseries by a government, which we might expect in a country without government, our calamity is heightened by reflecting that we furnish the means by which we suffer. Government, like dress, is the badge of lost innocence; the palaces of kings are built on the ruins of the bowers of paradise. For were the impulses of conscience clear, uniform, and irresistibly obeyed, man would need no other lawgiver; but that not being the case, he finds it necessary to surrender up a part of his property to furnish means for the protection of the rest; and this he is induced to do by the same prudence which in every other case advises him out of two evils to choose the least. Wherefore, security being the true design and end of government, it unanswerably follows that whatever form thereof appears most likely to ensure it to us, with the least expense and greatest benefit, is preferable to all others." Thomas Paine, Common Sense, 1776 Which of the following "miseries" alluded to above were most condemned by Anti-Federalists of the post-Revolutionary era?\nA. Organized response to Bacon\'s Rebellion\nB. Federal response to Shays\'s Rebellion\nC. Federal response to the Whiskey Rebellion\nD. Federal response to Pontiac\'s Rebellion',
         "options": "A. Organized response to Bacon's Rebellion\nB. Federal response to Shays's Rebellion\nC. Federal response to the Whiskey Rebellion\nD. Federal response to Pontiac's Rebellion",
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_us_history',
+        "solution": "The answer is (C).",
+        "topic": "high_school_us_history",
     },
     {
         "problem": 'This question refers to the following information. "As our late Conduct at the Conestoga Manor and Lancaster have occasioned much Speculation & a great diversity of Sentiments in this and neighboring Governments; some vindicating & others condemning it; some charitably alleviating the Crime, & others maliciously painting it in the most odious & detestable Colours, we think it our duty to lay before the Publick, the whole Matter as it appeared, & still appears, to us. . . . "If these things are not sufficient to prove an unjustifiable Attachment in the Quakers to the Indians Savages, a fixed Resolution to befriend them & an utter insensibility to human Distresses, let us consider a few more recent Facts. When we found the last Summer that we were likely to get no Assistance from the Government, some Volunteers went out at our own Expense, determined to drive our Enemies from our Borders; & when we came near to the great Island, we understood that a Number of their Warriors had gone out against our Frontiers. Upon this we returned and came up with them and fought with them at the Munfey Hill where we lost some of our Men & killed some of their Warriors & thereby saved our Frontiers from this Story in another Expedition. But no sooner had we destroyed their Provisions on the great Island, & ruined their trade with the good People at Bethlehem, but these very Indians, who were justly suspected of having murdered our Friends in Northampton County, were by the Influence of some Quakers taken under the Protection of the Government to screen them from the Resentments of the Friends and Relations of the Murdered, & to support them thro the Winter." —"Apology of the Paxton Boys" (pamphlet), 1764 (Note: "apology" in this context should be read as an explanation, not an admission of guilt or regret.) The sentiments expressed in the explanation above reflect which of the ongoing tensions during the colonial period of American history?\nA. Tensions between British policies and the aspirations of North American colonists.\nB. Tensions between American Indians allied with the French and those allied with the British.\nC. Tensions between freed African Americans and white planters.\nD. Tensions between backcountry settlers and elites within colonial America.',
         "options": 'A. Tensions between British policies and the aspirations of North American colonists.\nB. Tensions between American Indians allied with the French and those allied with the British.\nC. Tensions between freed African Americans and white planters.\nD. Tensions between backcountry settlers and elites within colonial America.',
-        "solution": 'The answer is (D).',
-        "topic": 'high_school_us_history',
+        "solution": "The answer is (D).",
+        "topic": "high_school_us_history",
     },
     {
-        "problem": 'This question refers to the following information. "In the new Code of Laws which I suppose it will be necessary for you to make I desire you would Remember the Ladies, and be more generous and favorable to them than your ancestors. Do not put such unlimited power into the hands of the Husbands. Remember all Men would be tyrants if they could. If particular care and attention is not paid to the Ladies we are determined to foment a Rebellion, and will not hold ourselves bound by any Laws in which we have no voice, or Representation." Abigail Adams, in a letter to John Adams, 1776 "Special legislation for woman has placed us in a most anomalous position. Women invested with the rights of citizens in one section—voters, jurors, office-holders—crossing an imaginary line, are subjects in the next. In some States, a married woman may hold property and transact business in her own name; in others, her earnings belong to her husband. In some States, a woman may testify against her husband, sue and be sued in the courts; in others, she has no redress in case of damage to person, property, or character. In case of divorce on account of adultery in the husband, the innocent wife is held to possess no right to children or property, unless by special decree of the court. But in no State of the Union has the wife the right to her own person, or to any part of the joint earnings of the co-partnership during the life of her husband. In some States women may enter the law schools and practice in the courts; in others they are forbidden. In some universities girls enjoy equal educational advantages with boys, while many of the proudest institutions in the land deny them admittance, though the sons of China, Japan and Africa are welcomed there. But the privileges already granted in the several States are by no means secure." Susan B. Anthony, "Declaration of Rights for Women," July 4, 1876 The sentiments expressed in the second excerpt by Susan B. Anthony are most likely in support of\nA. the Equal Rights Amendment\nB. universal suffrage\nC. states' rights\nD. prohibition',
+        "problem": 'This question refers to the following information. "In the new Code of Laws which I suppose it will be necessary for you to make I desire you would Remember the Ladies, and be more generous and favorable to them than your ancestors. Do not put such unlimited power into the hands of the Husbands. Remember all Men would be tyrants if they could. If particular care and attention is not paid to the Ladies we are determined to foment a Rebellion, and will not hold ourselves bound by any Laws in which we have no voice, or Representation." Abigail Adams, in a letter to John Adams, 1776 "Special legislation for woman has placed us in a most anomalous position. Women invested with the rights of citizens in one section—voters, jurors, office-holders—crossing an imaginary line, are subjects in the next. In some States, a married woman may hold property and transact business in her own name; in others, her earnings belong to her husband. In some States, a woman may testify against her husband, sue and be sued in the courts; in others, she has no redress in case of damage to person, property, or character. In case of divorce on account of adultery in the husband, the innocent wife is held to possess no right to children or property, unless by special decree of the court. But in no State of the Union has the wife the right to her own person, or to any part of the joint earnings of the co-partnership during the life of her husband. In some States women may enter the law schools and practice in the courts; in others they are forbidden. In some universities girls enjoy equal educational advantages with boys, while many of the proudest institutions in the land deny them admittance, though the sons of China, Japan and Africa are welcomed there. But the privileges already granted in the several States are by no means secure." Susan B. Anthony, "Declaration of Rights for Women," July 4, 1876 The sentiments expressed in the second excerpt by Susan B. Anthony are most likely in support of\nA. the Equal Rights Amendment\nB. universal suffrage\nC. states\' rights\nD. prohibition',
         "options": "A. the Equal Rights Amendment\nB. universal suffrage\nC. states' rights\nD. prohibition",
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_us_history',
+        "solution": "The answer is (B).",
+        "topic": "high_school_us_history",
     },
     {
         "problem": 'This question refers to the following information. Our leaders talk about stopping aggression from the north, but this was a struggle among groups of Vietnamese until we intervened. We seem bent upon saving the Vietnamese from Ho Chi Minh even if we have to kill them and demolish their country to do it. As the native people survey bombed-out villages, women and children burned by napalm, rice crops destroyed and cities overrun with our military personnel, they are doubtless saying secretly of the Vietcong guerillas and of the American forces, "A plague on both your houses." … Stop the bombing, north and south, end search and destroy offensive sweeps, and confine our military action to holding operations on the ground. Bombing the north has failed to halt or seriously check the flow of troops to the south and may, in fact, have prompted a much greater war effort by Hanoi. —Senator George McGovern, "The Lessons of Vietnam," April 25, 1967 Which of the following opinions from the 1960s most directly reflects the perspective of George McGovern\'s speech?\nA. Americans must maximize their technological edge in Vietnam.\nB. American bombing in Vietnam is step by step leading to progress in the war.\nC. American bombing in Vietnam is a failure.\nD. America must not give in to defeatism about the war in Vietnam.',
         "options": 'A. Americans must maximize their technological edge in Vietnam.\nB. American bombing in Vietnam is step by step leading to progress in the war.\nC. American bombing in Vietnam is a failure.\nD. America must not give in to defeatism about the war in Vietnam.',
-        "solution": 'The answer is (C).',
-        "topic": 'high_school_us_history',
+        "solution": "The answer is (C).",
+        "topic": "high_school_us_history",
     },
     {
         "problem": 'This question refers to the following information. I come not to urge personal claims, nor to seek individual benefits; I appear as the advocate of those who cannot plead their own cause; I come as the friend of those who are deserted, oppressed, and desolate. In the Providence of God, I am the voice of the maniac whose piercing cries from the dreary dungeons of your jails penetrate not your Halls of Legislation. I am the Hope of the poor crazed beings who pine in the cells, and stalls, and cages, and waste rooms of your poor-houses. I am the Revelation of hundreds of wailing, suffering creatures, hidden in your private dwellings, and in pens and cabins—shut out, cut off from all healing influences, from all mind-restoring cares.… Could their melancholy histories be spread before you as revealed to my grieved spirit during the last three months, how promptly, how earnestly would you search out the most approved means of relief; how trifling, how insignificant, by comparison, would appear the sacrifices you are asked to make; how would a few dimes and dollars, gathered from each citizen, diminish in value as a possession, compared with the certain benefits and vast good to be secured for the suffering insane...by the consecration and application of a sufficient fund to the construction of a suitable hospital.… —Dorothea Dix, Memorial Soliciting a State Hospital for the Protection and Cure of the Insane, Submitted to the General Assembly of North Carolina, November 1848 Dorothea Dix can best be compared to whom?\nA. Abigail Adams\nB. Clara Barton\nC. Shirley Temple\nD. Hillary Clinton',
         "options": 'A. Abigail Adams\nB. Clara Barton\nC. Shirley Temple\nD. Hillary Clinton',
-        "solution": 'The answer is (B).',
-        "topic": 'high_school_us_history',
+        "solution": "The answer is (B).",
+        "topic": "high_school_us_history",
     },
 ]
 
@@ -1096,8 +1096,8 @@ mmlu_few_shot_human_aging = [
     {
         "problem": 'All other things being equal, which of the following persons is more likely to show osteoporosis?\nA. An older Hispanic American woman\nB. An older African American woman\nC. An older Asian American woman\nD. An older Native American woman',
         "options": 'A. An older Hispanic American woman\nB. An older African American woman\nC. An older Asian American woman\nD. An older Native American woman',
-        "solution": 'The answer is (C).',
-        "topic": 'human_aging',
+        "solution": "The answer is (C).",
+        "topic": "human_aging",
     },
 ]
 
@@ -1105,98 +1105,98 @@ mmlu_few_shot_human_sexuality = [
     {
         "problem": 'Morning sickness is typically a problem:\nA. during the first trimester\nB. during the second trimester\nC. during the third trimester\nD. all through the pregnancy',
         "options": 'A. during the first trimester\nB. during the second trimester\nC. during the third trimester\nD. all through the pregnancy',
-        "solution": 'The answer is (A).',
-        "topic": 'human_sexuality',
+        "solution": "The answer is (A).",
+        "topic": "human_sexuality",
     },
     {
         "problem": 'A woman who knows she has active herpes and untreated syphilis but continues to have sex without informing her partners of her condition has, in psychoanalytic terms:\nA. a strong ego\nB. a weak superego\nC. a weak id\nD. a strong superego',
         "options": 'A. a strong ego\nB. a weak superego\nC. a weak id\nD. a strong superego',
-        "solution": 'The answer is (B).',
-        "topic": 'human_sexuality',
+        "solution": "The answer is (B).",
+        "topic": "human_sexuality",
     },
     {
         "problem": "Women's ability to have multiple orgasms is primarily due to:\nA. the fact that they do not have a refractory period.\nB. the response of the inner layers of the vagina.\nC. having alternating orgasms in different locations.\nD. the G-Spot.",
         "options": 'A. the fact that they do not have a refractory period.\nB. the response of the inner layers of the vagina.\nC. having alternating orgasms in different locations.\nD. the G-Spot.',
-        "solution": 'The answer is (A).',
-        "topic": 'human_sexuality',
+        "solution": "The answer is (A).",
+        "topic": "human_sexuality",
     },
     {
-        "problem": 'The nature of homosexual activities that occur during preadolescence include all but which of the following?\nA. sexual intercourse\nB. circle jerks\nC. exhibitionism\nD. touching each other's genitals',
+        "problem": "The nature of homosexual activities that occur during preadolescence include all but which of the following?\nA. sexual intercourse\nB. circle jerks\nC. exhibitionism\nD. touching each other's genitals",
         "options": "A. sexual intercourse\nB. circle jerks\nC. exhibitionism\nD. touching each other's genitals",
-        "solution": 'The answer is (A).',
-        "topic": 'human_sexuality',
+        "solution": "The answer is (A).",
+        "topic": "human_sexuality",
     },
     {
         "problem": 'The most common disorder among men who seek sexual therapy is:\nA. premature ejaculation\nB. inhibited ejaculation\nC. erectile disorder\nD. ejaculatory disorder',
         "options": 'A. premature ejaculation\nB. inhibited ejaculation\nC. erectile disorder\nD. ejaculatory disorder',
-        "solution": 'The answer is (C).',
-        "topic": 'human_sexuality',
+        "solution": "The answer is (C).",
+        "topic": "human_sexuality",
     },
 ]
 
 mmlu_few_shot_international_law = [
     {
-        "problem": 'What types of force does Article 2(4) of the UN Charter prohibit?\nA. Article 2(4) encompasses only armed force\nB. Article 2(4) encompasses all types of force, including sanctions\nC. Article 2(4) encompasses all interference in the domestic affairs of States\nD. Article 2(4) encompasses force directed only against a State's territorial integrity',
+        "problem": "What types of force does Article 2(4) of the UN Charter prohibit?\nA. Article 2(4) encompasses only armed force\nB. Article 2(4) encompasses all types of force, including sanctions\nC. Article 2(4) encompasses all interference in the domestic affairs of States\nD. Article 2(4) encompasses force directed only against a State's territorial integrity",
         "options": "A. Article 2(4) encompasses only armed force\nB. Article 2(4) encompasses all types of force, including sanctions\nC. Article 2(4) encompasses all interference in the domestic affairs of States\nD. Article 2(4) encompasses force directed only against a State's territorial integrity",
-        "solution": 'The answer is (A).',
-        "topic": 'international_law',
+        "solution": "The answer is (A).",
+        "topic": "international_law",
     },
     {
         "problem": 'What is the judge ad hoc?\nA. If a party to a contentious case before the ICJ does not have a national sitting as judge, it is entitled to nominate someone as a judge solely for that case, with the title of judge ad hoc\nB. Judge ad hoc is the member of the bench of the ICJ with a casting vote\nC. Judge ad hoc is a surrogate judge, in case a judge is disqualified or passes away\nD. Judge ad hoc is the judge that each party will always nominate in every contentious case',
         "options": 'A. If a party to a contentious case before the ICJ does not have a national sitting as judge, it is entitled to nominate someone as a judge solely for that case, with the title of judge ad hoc\nB. Judge ad hoc is the member of the bench of the ICJ with a casting vote\nC. Judge ad hoc is a surrogate judge, in case a judge is disqualified or passes away\nD. Judge ad hoc is the judge that each party will always nominate in every contentious case',
-        "solution": 'The answer is (A).',
-        "topic": 'international_law',
+        "solution": "The answer is (A).",
+        "topic": "international_law",
     },
     {
-        "problem": 'Would a reservation to the definition of torture in the ICCPR be acceptable in contemporary practice?\nA. This is an acceptable reservation if the reserving country's legislation employs a different definition\nB. This is an unacceptable reservation because it contravenes the object and purpose of the ICCPR\nC. This is an unacceptable reservation because the definition of torture in the ICCPR is consistent with customary international law\nD. This is an acceptable reservation because under general international law States have the right to enter reservations to treaties',
+        "problem": "Would a reservation to the definition of torture in the ICCPR be acceptable in contemporary practice?\nA. This is an acceptable reservation if the reserving country's legislation employs a different definition\nB. This is an unacceptable reservation because it contravenes the object and purpose of the ICCPR\nC. This is an unacceptable reservation because the definition of torture in the ICCPR is consistent with customary international law\nD. This is an acceptable reservation because under general international law States have the right to enter reservations to treaties",
         "options": "A. This is an acceptable reservation if the reserving country's legislation employs a different definition\nB. This is an unacceptable reservation because it contravenes the object and purpose of the ICCPR\nC. This is an unacceptable reservation because the definition of torture in the ICCPR is consistent with customary international law\nD. This is an acceptable reservation because under general international law States have the right to enter reservations to treaties",
-        "solution": 'The answer is (B).',
-        "topic": 'international_law',
+        "solution": "The answer is (B).",
+        "topic": "international_law",
     },
     {
         "problem": "When 'consent' can serve as a circumstance precluding the wrongfulness of a State conduct?\nA. Consent can serve as a circumstance precluding the wrongfulness whenever it is given\nB. Consent can never serve as a circumstance precluding wrongfulness\nC. Consent can serve as a circumstance precluding wrongfulness, provided the consent is valid and to the extent that the conduct remains within the limits of the consent given\nD. Consent can always serve as a circumstance precluding wrongfulness, no matter which organ of the State gives it",
         "options": 'A. Consent can serve as a circumstance precluding the wrongfulness whenever it is given\nB. Consent can never serve as a circumstance precluding wrongfulness\nC. Consent can serve as a circumstance precluding wrongfulness, provided the consent is valid and to the extent that the conduct remains within the limits of the consent given\nD. Consent can always serve as a circumstance precluding wrongfulness, no matter which organ of the State gives it',
-        "solution": 'The answer is (C).',
-        "topic": 'international_law',
+        "solution": "The answer is (C).",
+        "topic": "international_law",
     },
     {
         "problem": 'How the consent to be bound of a State may be expressed?\nA. The consent of a State to be bound is expressed only by ratification\nB. The consent of a state to be bound by a treaty may be expressed by signature, ratification, acceptance, approval or accession\nC. The consent of a State to be bound is expressed by signature\nD. The consent of a State to be bound is expressed by whatever means they choose',
         "options": 'A. The consent of a State to be bound is expressed only by ratification\nB. The consent of a state to be bound by a treaty may be expressed by signature, ratification, acceptance, approval or accession\nC. The consent of a State to be bound is expressed by signature\nD. The consent of a State to be bound is expressed by whatever means they choose',
-        "solution": 'The answer is (B).',
-        "topic": 'international_law',
+        "solution": "The answer is (B).",
+        "topic": "international_law",
     },
 ]
 
 mmlu_few_shot_jurisprudence = [
     {
-        "problem": 'Which position does Rawls claim is the least likely to be adopted by the POP (people in the original position)?\nA. The POP would choose equality above liberty.\nB. The POP would opt for the 'maximin' strategy.\nC. The POP would opt for the 'difference principle'.\nD. The POP would reject the 'system of natural liberty.'',
+        "problem": "Which position does Rawls claim is the least likely to be adopted by the POP (people in the original position)?\nA. The POP would choose equality above liberty.\nB. The POP would opt for the 'maximin' strategy.\nC. The POP would opt for the 'difference principle'.\nD. The POP would reject the 'system of natural liberty.'",
         "options": "A. The POP would choose equality above liberty.\nB. The POP would opt for the 'maximin' strategy.\nC. The POP would opt for the 'difference principle'.\nD. The POP would reject the 'system of natural liberty.'",
-        "solution": 'The answer is (A).',
-        "topic": 'jurisprudence',
+        "solution": "The answer is (A).",
+        "topic": "jurisprudence",
     },
     {
         "problem": 'Functions of the law include all but which of the following?\nA. maximizing individual freedom\nB. providing a basis for compromise\nC. keeping the peace\nD. promoting the principles of the free enterprise system',
         "options": 'A. maximizing individual freedom\nB. providing a basis for compromise\nC. keeping the peace\nD. promoting the principles of the free enterprise system',
-        "solution": 'The answer is (D).',
-        "topic": 'jurisprudence',
+        "solution": "The answer is (D).",
+        "topic": "jurisprudence",
     },
     {
         "problem": "Which word best summarizes Weber's explanation of the development of formally rational law?\nA. Authority.\nB. Charisma.\nC. Co-operation.\nD. Capitalism.",
         "options": 'A. Authority.\nB. Charisma.\nC. Co-operation.\nD. Capitalism.',
-        "solution": 'The answer is (D).',
-        "topic": 'jurisprudence',
+        "solution": "The answer is (D).",
+        "topic": "jurisprudence",
     },
     {
         "problem": 'The ________ School of jurisprudence postulates that the law is based on what is "correct."\nA. Natural Law\nB. Analytical\nC. Historical\nD. Sociological',
         "options": 'A. Natural Law\nB. Analytical\nC. Historical\nD. Sociological',
-        "solution": 'The answer is (A).',
-        "topic": 'jurisprudence',
+        "solution": "The answer is (A).",
+        "topic": "jurisprudence",
     },
     {
         "problem": "Iverson Jewelers wrote a letter to Miller, 'We have received an exceptionally fine self winding Rolox watch which we will sell to you at a very favorable price.'\nA. The letter is an offer to sell\nB. A valid offer cannot be made by letter.\nC. The letter contains a valid offer which will terminate within a reasonable time.\nD. The letter lacks one of the essential elements of an offer.",
         "options": 'A. The letter is an offer to sell\nB. A valid offer cannot be made by letter.\nC. The letter contains a valid offer which will terminate within a reasonable time.\nD. The letter lacks one of the essential elements of an offer.',
-        "solution": 'The answer is (D).',
-        "topic": 'jurisprudence',
+        "solution": "The answer is (D).",
+        "topic": "jurisprudence",
     },
 ]
 
@@ -1204,32 +1204,32 @@ mmlu_few_shot_logical_fallacies = [
     {
         "problem": "If someone attacks the character of an opposing arguer, instead of responding to that opponent's arguments, the first person has probably committed which of the following fallacies?\nA. tu quoque\nB. horse laugh\nC. argument against the person\nD. ignoratio elenchi",
         "options": 'A. tu quoque\nB. horse laugh\nC. argument against the person\nD. ignoratio elenchi',
-        "solution": 'The answer is (C).',
-        "topic": 'logical_fallacies',
+        "solution": "The answer is (C).",
+        "topic": "logical_fallacies",
     },
     {
-        "problem": 'The complex question fallacy consists of\nA. arguing something is inferior just because it doesn't do something it was never intended to do.\nB. including more than one claim in the proposition and treating proof for one claim as proof for all the claims.\nC. drawing a conclusion before examining the evidence, and only considering evidence that supports that conclusion.\nD. asking a question that includes either an unproven assumption or more than one question, thus making a straightforward yes or no answer meaningless.',
+        "problem": "The complex question fallacy consists of\nA. arguing something is inferior just because it doesn't do something it was never intended to do.\nB. including more than one claim in the proposition and treating proof for one claim as proof for all the claims.\nC. drawing a conclusion before examining the evidence, and only considering evidence that supports that conclusion.\nD. asking a question that includes either an unproven assumption or more than one question, thus making a straightforward yes or no answer meaningless.",
         "options": "A. arguing something is inferior just because it doesn't do something it was never intended to do.\nB. including more than one claim in the proposition and treating proof for one claim as proof for all the claims.\nC. drawing a conclusion before examining the evidence, and only considering evidence that supports that conclusion.\nD. asking a question that includes either an unproven assumption or more than one question, thus making a straightforward yes or no answer meaningless.",
-        "solution": 'The answer is (D).',
-        "topic": 'logical_fallacies',
+        "solution": "The answer is (D).",
+        "topic": "logical_fallacies",
     },
     {
         "problem": 'Which of the following is true of a valid categorical syllogism?\nA. The minor premise must deny the antecedent\nB. The major premise must affirm the consequent\nC. The middle term must be used in at least one premise in a universal or unqualified sense\nD. All of the above',
         "options": 'A. The minor premise must deny the antecedent\nB. The major premise must affirm the consequent\nC. The middle term must be used in at least one premise in a universal or unqualified sense\nD. All of the above',
-        "solution": 'The answer is (C).',
-        "topic": 'logical_fallacies',
+        "solution": "The answer is (C).",
+        "topic": "logical_fallacies",
     },
     {
         "problem": 'Arguing that what is true of the parts must be true of the whole is the fallacy of...\nA. Division\nB. Composition\nC. Appeal to the person\nD. Appeal to ignorance',
         "options": 'A. Division\nB. Composition\nC. Appeal to the person\nD. Appeal to ignorance',
-        "solution": 'The answer is (B).',
-        "topic": 'logical_fallacies',
+        "solution": "The answer is (B).",
+        "topic": "logical_fallacies",
     },
     {
         "problem": 'When an arguer causes confusion during refutation because of real or feigned lack of an ability to engage in refutation, that arguer may have committed the fallacy of\nA. poor sportsmanship\nB. appeal to compassion\nC. argument against the person\nD. ignorance of refutation',
         "options": 'A. poor sportsmanship\nB. appeal to compassion\nC. argument against the person\nD. ignorance of refutation',
-        "solution": 'The answer is (D).',
-        "topic": 'logical_fallacies',
+        "solution": "The answer is (D).",
+        "topic": "logical_fallacies",
     },
 ]
 
@@ -1237,8 +1237,8 @@ mmlu_few_shot_machine_learning = [
     {
         "problem": 'A 6-sided die is rolled 15 times and the results are: side 1 comes up 0 times; side 2: 1 time; side 3: 2 times; side 4: 3 times; side 5: 4 times; side 6: 5 times. Based on these results, what is the probability of side 3 coming up when using Add-1 Smoothing?\nA. 2.0/15\nB. 1.0/7\nC. 3.0/16\nD. 1.0/5',
         "options": 'A. 2.0/15\nB. 1.0/7\nC. 3.0/16\nD. 1.0/5',
-        "solution": 'The answer is (B).',
-        "topic": 'machine_learning',
+        "solution": "The answer is (B).",
+        "topic": "machine_learning",
     },
     {
         "problem": 'Which image data augmentation is most common for natural images?\nA. random crop and horizontal flip\nB. random crop and vertical flip\nC. posterization\nD. dithering',
@@ -1369,32 +1369,32 @@ mmlu_few_shot_miscellaneous = [
     {
         "problem": 'How many axles does a standard automobile have?\nA. one\nB. two\nC. four\nD. eight',
         "options": 'A. one\nB. two\nC. four\nD. eight',
-        "solution": 'The answer is (B).',
-        "topic": 'miscellaneous',
+        "solution": "The answer is (B).",
+        "topic": "miscellaneous",
     },
     {
         "problem": 'What place is named in the title of the 1979 live album by rock legends Cheap Trick?\nA. Budapest\nB. Budokan\nC. Bhutan\nD. Britain',
         "options": 'A. Budapest\nB. Budokan\nC. Bhutan\nD. Britain',
-        "solution": 'The answer is (B).',
-        "topic": 'miscellaneous',
+        "solution": "The answer is (B).",
+        "topic": "miscellaneous",
     },
     {
-        "problem": 'Who is the shortest man to ever win an NBA slam dunk competition?\nA. Anthony 'Spud' Webb\nB. Michael 'Air' Jordan\nC. Tyrone 'Muggsy' Bogues\nD. Julius 'Dr J' Erving',
+        "problem": "Who is the shortest man to ever win an NBA slam dunk competition?\nA. Anthony 'Spud' Webb\nB. Michael 'Air' Jordan\nC. Tyrone 'Muggsy' Bogues\nD. Julius 'Dr J' Erving",
         "options": "A. Anthony 'Spud' Webb\nB. Michael 'Air' Jordan\nC. Tyrone 'Muggsy' Bogues\nD. Julius 'Dr J' Erving",
-        "solution": 'The answer is (A).',
-        "topic": 'miscellaneous',
+        "solution": "The answer is (A).",
+        "topic": "miscellaneous",
     },
     {
         "problem": 'What is produced during photosynthesis?\nA. hydrogen\nB. nylon\nC. oxygen\nD. light',
         "options": 'A. hydrogen\nB. nylon\nC. oxygen\nD. light',
-        "solution": 'The answer is (C).',
-        "topic": 'miscellaneous',
+        "solution": "The answer is (C).",
+        "topic": "miscellaneous",
     },
     {
-        "problem": 'Which of these songs was a Top 10 hit for the rock band The Police?\nA. 'Radio Ga-Ga'\nB. 'Ob-la-di Ob-la-da'\nC. 'De Do Do Do De Da Da Da'\nD. 'In-a-Gadda-Da-Vida'',
+        "problem": "Which of these songs was a Top 10 hit for the rock band The Police?\nA. 'Radio Ga-Ga'\nB. 'Ob-la-di Ob-la-da'\nC. 'De Do Do Do De Da Da Da'\nD. 'In-a-Gadda-Da-Vida'",
         "options": "A. 'Radio Ga-Ga'\nB. 'Ob-la-di Ob-la-da'\nC. 'De Do Do Do De Da Da Da'\nD. 'In-a-Gadda-Da-Vida'",
-        "solution": 'The answer is (C).',
-        "topic": 'miscellaneous',
+        "solution": "The answer is (C).",
+        "topic": "miscellaneous",
     },
 ]
 
@@ -1598,7 +1598,7 @@ mmlu_few_shot_professional_accounting = [
 
 mmlu_few_shot_professional_law = [
     {
-        "problem": 'A state legislature has recently enacted a statute making it a misdemeanor to curse or revile or use obscene or opprobrious language toward or in reference to a police officer perfonning his duties. A student at a state university organized a demonstration on campus to protest the war. The rally was attended by a group of 50 students who shouted anti-war messages at cars passing by. To show his contempt for the United States, the student sewed the American flag to the rear of his jeans. When a police officer saw the flag sown on the student\'s jeans, he approached and told him to remove the flag or he would be placed under arrest. The student became angered and shouted at the police officer, "Listen, you bastard, I\'ll wear this rag anywhere I please. " The student was subsequently placed under arrest and charged with violating the state statute. The student subsequently brings suit in state court challenging the constitutionality of the statute. The strongest constitutional argument for the student is that\nA. the statute is void for vagueness under the Fourteenth Amendment's due process clause.\nB. the statute is invalid because it violates the petitioner's freedom of speech under the First Amendment.\nC. the statute is an abridgment of freedom of speech under the First Amendment because less restrictive means are available for achieving the same purpose.\nD. the statute is overbroad and consequently invalid under the First and FourteenthAmendments.',
+        "problem": 'A state legislature has recently enacted a statute making it a misdemeanor to curse or revile or use obscene or opprobrious language toward or in reference to a police officer perfonning his duties. A student at a state university organized a demonstration on campus to protest the war. The rally was attended by a group of 50 students who shouted anti-war messages at cars passing by. To show his contempt for the United States, the student sewed the American flag to the rear of his jeans. When a police officer saw the flag sown on the student\'s jeans, he approached and told him to remove the flag or he would be placed under arrest. The student became angered and shouted at the police officer, "Listen, you bastard, I\'ll wear this rag anywhere I please. " The student was subsequently placed under arrest and charged with violating the state statute. The student subsequently brings suit in state court challenging the constitutionality of the statute. The strongest constitutional argument for the student is that\nA. the statute is void for vagueness under the Fourteenth Amendment\'s due process clause.\nB. the statute is invalid because it violates the petitioner\'s freedom of speech under the First Amendment.\nC. the statute is an abridgment of freedom of speech under the First Amendment because less restrictive means are available for achieving the same purpose.\nD. the statute is overbroad and consequently invalid under the First and FourteenthAmendments.',
         "options": "A. the statute is void for vagueness under the Fourteenth Amendment's due process clause.\nB. the statute is invalid because it violates the petitioner's freedom of speech under the First Amendment.\nC. the statute is an abridgment of freedom of speech under the First Amendment because less restrictive means are available for achieving the same purpose.\nD. the statute is overbroad and consequently invalid under the First and FourteenthAmendments.",
         "solution": 'The answer is (D).',
         "topic": 'professional_law',
@@ -1616,7 +1616,7 @@ mmlu_few_shot_professional_law = [
         "topic": 'professional_law',
     },
     {
-        "problem": "On October 1, 1980, a developer, owner of several hundred acres in a rural county, drafted a general development plan for the area. The duly recorded plan imposed elaborate limitations and restrictions upon the land in the plan, which was to be developed as a residential district. The restrictions were to extend to all persons acquiring any of the lots and to their heirs, assigns, and lessees. It was further provided that all subsequent owners would be charged with due notice of the restrictions. Among those restrictions in the general plan were the following:(22) A franchise right is created in a strip of land 10 feet in width along the rear of each lot for the use of public utility companies with right of ingress and egress. (23) No house or structure of any kind shall be built on the aforementioned strip of land running through the said blocks. In 2000, a retiree purchased one of the lots, built a house, and erected a fence in the rear of his property within the restricted area. In 2004, a teacher purchased a lot adjacent to the retiree's property and built a new house. Two years later, a librarian purchased the lot that adjoined the teacher's property. The three deeds to those properties each contained references to the deed book where the general plan was recorded. In 2008, the librarian began the construction of a seven-foot post-and-rail fence along the line dividing his lot with the teacher's, and along the center of the area subject to the franchise right. Although the teacher objected to its construction, the fence was completed. If the teacher seeks a mandatory injunction to compel removal of the librarian's fence, the court will most likely\nA. grant relief, because the fence was in violation of the easement restriction. \nB. grant relief, because the encroachment of the fence violated the restriction in the original plan. \nC. deny relief, because the teacher failed to enforce the restriction against the retiree. \nD. deny relief, because the fence would not be construed as "a structure" within the terms of the restriction. ",
+        "problem": "On October 1, 1980, a developer, owner of several hundred acres in a rural county, drafted a general development plan for the area. The duly recorded plan imposed elaborate limitations and restrictions upon the land in the plan, which was to be developed as a residential district. The restrictions were to extend to all persons acquiring any of the lots and to their heirs, assigns, and lessees. It was further provided that all subsequent owners would be charged with due notice of the restrictions. Among those restrictions in the general plan were the following:(22) A franchise right is created in a strip of land 10 feet in width along the rear of each lot for the use of public utility companies with right of ingress and egress. (23) No house or structure of any kind shall be built on the aforementioned strip of land running through the said blocks. In 2000, a retiree purchased one of the lots, built a house, and erected a fence in the rear of his property within the restricted area. In 2004, a teacher purchased a lot adjacent to the retiree's property and built a new house. Two years later, a librarian purchased the lot that adjoined the teacher's property. The three deeds to those properties each contained references to the deed book where the general plan was recorded. In 2008, the librarian began the construction of a seven-foot post-and-rail fence along the line dividing his lot with the teacher's, and along the center of the area subject to the franchise right. Although the teacher objected to its construction, the fence was completed. If the teacher seeks a mandatory injunction to compel removal of the librarian's fence, the court will most likely\nA. grant relief, because the fence was in violation of the easement restriction. \nB. grant relief, because the encroachment of the fence violated the restriction in the original plan. \nC. deny relief, because the teacher failed to enforce the restriction against the retiree. \nD. deny relief, because the fence would not be construed as \"a structure\" within the terms of the restriction. ",
         "options": 'A. grant relief, because the fence was in violation of the easement restriction. \nB. grant relief, because the encroachment of the fence violated the restriction in the original plan. \nC. deny relief, because the teacher failed to enforce the restriction against the retiree. \nD. deny relief, because the fence would not be construed as "a structure" within the terms of the restriction. ',
         "solution": 'The answer is (B).',
         "topic": 'professional_law',
@@ -1664,7 +1664,7 @@ mmlu_few_shot_professional_medicine = [
 
 mmlu_few_shot_professional_psychology = [
     {
-        "problem": 'One of your therapy clients asks your advice about a good weight- reduction program. You have investigated the programs in the community and are enrolled in the one you consider the best. This program offers a $50 bonus to its patrons for each new person they bring into the program. Under these circumstances, your most appropriate response would be to\nA. tell your client the pros and cons of each program you know about except for the one in which you are enrolled\nB. recommend to your client the program in which you are enrolled and explain the $50 bonus you will receive\nC. recommend to your client the program in which you are enrolled and offer to have the $50 bonus credited to your client's account in the program\nD. tell your client the pros and cons of each program you know about, but do not claim the $50 bonus if your client enrolls in your program',
+        "problem": "One of your therapy clients asks your advice about a good weight- reduction program. You have investigated the programs in the community and are enrolled in the one you consider the best. This program offers a $50 bonus to its patrons for each new person they bring into the program. Under these circumstances, your most appropriate response would be to\nA. tell your client the pros and cons of each program you know about except for the one in which you are enrolled\nB. recommend to your client the program in which you are enrolled and explain the $50 bonus you will receive\nC. recommend to your client the program in which you are enrolled and offer to have the $50 bonus credited to your client's account in the program\nD. tell your client the pros and cons of each program you know about, but do not claim the $50 bonus if your client enrolls in your program",
         "options": "A. tell your client the pros and cons of each program you know about except for the one in which you are enrolled\nB. recommend to your client the program in which you are enrolled and explain the $50 bonus you will receive\nC. recommend to your client the program in which you are enrolled and offer to have the $50 bonus credited to your client's account in the program\nD. tell your client the pros and cons of each program you know about, but do not claim the $50 bonus if your client enrolls in your program",
         "solution": 'The answer is (D).',
         "topic": 'professional_psychology',
@@ -1682,8 +1682,8 @@ mmlu_few_shot_professional_psychology = [
         "topic": 'professional_psychology',
     },
     {
-        "problem": "Carl Jung believed that a client's transference:\nA. is a fantasy that distracts the client from reality.\nB. represents “mixed feelings” toward the therapist. \nC. "is a form of ""acting out."""\nD. reflects the client’s personal and collective unconscious.",
-        "options": 'A. is a fantasy that distracts the client from reality.\nB. represents “mixed feelings” toward the therapist. \nC. "is a form of ""acting out."""\nD. reflects the client’s personal and collective unconscious.',
+        "problem": "Carl Jung believed that a client's transference:\nA. is a fantasy that distracts the client from reality.\nB. represents “mixed feelings” toward the therapist. \nC. \"is a form of \"\"acting out.\"\"\"\nD. reflects the client’s personal and collective unconscious.",
+        "options": "A. is a fantasy that distracts the client from reality.\nB. represents “mixed feelings” toward the therapist. \nC. \"is a form of \"\"acting out.\"\"\"\nD. reflects the client’s personal and collective unconscious.",
         "solution": 'The answer is (D).',
         "topic": 'professional_psychology',
     },
@@ -1730,7 +1730,7 @@ mmlu_few_shot_public_relations = [
 
 mmlu_few_shot_security_studies = [
     {
-        "problem": 'What distinguishes coercive diplomacy from military force?\nA. Compellence is another term for coercive diplomacy, but covering a narrower set of criteria; compellence covers those threats aimed at initiating adversary action. A threat to coerce a state to give up part of its territory would count as coercive diplomacy, as long as that threat proactively initiates action before reactive diplomacy is taken.\nB. Coercive diplomacy constitutes the threats of limited force to induce adversary's incentive to comply with the coercer's demands. It is an influence strategy that is intended to obtain compliance: the use of force to defeat an opponent first does not count. It leaves an element of choice with the target to comply, or to continue.\nC. Military force, or the threat of military force, utilises fear to achieve strategic objectives. Coercive diplomacy is differentiated from this approach, because it does not use fear as a tool for coercing an adversary.\nD. Coercive diplomacy is employed to use force but to limit its effects on the international community. Coercive diplomacy is an aggressive strategy that is intended to obtain compliance through defeat. It does not leave an element of choice with the target, the target either being forced to comply or engage in conflict. It seeks to control by imposing compliance by removing any opportunity for negotiation or concession.',
+        "problem": "What distinguishes coercive diplomacy from military force?\nA. Compellence is another term for coercive diplomacy, but covering a narrower set of criteria; compellence covers those threats aimed at initiating adversary action. A threat to coerce a state to give up part of its territory would count as coercive diplomacy, as long as that threat proactively initiates action before reactive diplomacy is taken.\nB. Coercive diplomacy constitutes the threats of limited force to induce adversary's incentive to comply with the coercer's demands. It is an influence strategy that is intended to obtain compliance: the use of force to defeat an opponent first does not count. It leaves an element of choice with the target to comply, or to continue.\nC. Military force, or the threat of military force, utilises fear to achieve strategic objectives. Coercive diplomacy is differentiated from this approach, because it does not use fear as a tool for coercing an adversary.\nD. Coercive diplomacy is employed to use force but to limit its effects on the international community. Coercive diplomacy is an aggressive strategy that is intended to obtain compliance through defeat. It does not leave an element of choice with the target, the target either being forced to comply or engage in conflict. It seeks to control by imposing compliance by removing any opportunity for negotiation or concession.",
         "options": "A. Compellence is another term for coercive diplomacy, but covering a narrower set of criteria; compellence covers those threats aimed at initiating adversary action. A threat to coerce a state to give up part of its territory would count as coercive diplomacy, as long as that threat proactively initiates action before reactive diplomacy is taken.\nB. Coercive diplomacy constitutes the threats of limited force to induce adversary's incentive to comply with the coercer's demands. It is an influence strategy that is intended to obtain compliance: the use of force to defeat an opponent first does not count. It leaves an element of choice with the target to comply, or to continue.\nC. Military force, or the threat of military force, utilises fear to achieve strategic objectives. Coercive diplomacy is differentiated from this approach, because it does not use fear as a tool for coercing an adversary.\nD. Coercive diplomacy is employed to use force but to limit its effects on the international community. Coercive diplomacy is an aggressive strategy that is intended to obtain compliance through defeat. It does not leave an element of choice with the target, the target either being forced to comply or engage in conflict. It seeks to control by imposing compliance by removing any opportunity for negotiation or concession.",
         "solution": 'The answer is (B).',
         "topic": 'security_studies',
@@ -1820,7 +1820,7 @@ mmlu_few_shot_us_foreign_policy = [
         "topic": 'us_foreign_policy',
     },
     {
-        "problem": 'How did Donald Trump attack globalization in the 2016 campaign?\nA. Globalization had made men like him too rich\nB. Globalization only benefited certain American states, such as New York\nC. Liberal elites had encouraged globalization, while 'ordinary Americans' lost jobs because of it\nD. Globalization encouraged damaging trade wars',
+        "problem": "How did Donald Trump attack globalization in the 2016 campaign?\nA. Globalization had made men like him too rich\nB. Globalization only benefited certain American states, such as New York\nC. Liberal elites had encouraged globalization, while 'ordinary Americans' lost jobs because of it\nD. Globalization encouraged damaging trade wars",
         "options": "A. Globalization had made men like him too rich\nB. Globalization only benefited certain American states, such as New York\nC. Liberal elites had encouraged globalization, while 'ordinary Americans' lost jobs because of it\nD. Globalization encouraged damaging trade wars",
         "solution": 'The answer is (C).',
         "topic": 'us_foreign_policy',
