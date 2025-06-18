@@ -16,5 +16,5 @@
 PROMPT_CONFIG = 'judge/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "answer-judgement"
-EVAL_ARGS = "++eval_type=answer_judgement"
+EVAL_ARGS = "++eval_type=answer_judgement ++generation_key=judgement"
 GENERATION_ARGS = "++generation_key=judgement"
