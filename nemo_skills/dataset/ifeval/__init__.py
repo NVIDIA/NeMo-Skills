@@ -16,5 +16,5 @@
 PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'chat'
 METRICS_TYPE = "if"
-EVAL_ARGS = "++eval_type=if"
+EVAL_ARGS = "++eval_type=if ++generation_key=response"
 GENERATION_ARGS = "++generation_key=response"
