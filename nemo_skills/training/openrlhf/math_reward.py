@@ -19,7 +19,7 @@ import torch
 
 from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.inference.model import get_model
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import prefill_judgement
 

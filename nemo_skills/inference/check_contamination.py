@@ -23,7 +23,7 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
+from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
