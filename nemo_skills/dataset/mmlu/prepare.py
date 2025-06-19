@@ -148,6 +148,7 @@ def save_data(split):
             )
 
             new_entry['subset_for_metrics'] = subcategories[subject][0]
+            new_entry['examples_type'] = f'mmlu_few_shot_{new_entry["subtopic"]}'
             data.append(new_entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:
@@ -162,13 +163,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--split",
-        default="all",
+        default="test",
         choices=("dev", "test", "val"),
     )
     args = parser.parse_args()
 
-    if args.split == "all":
-        for split in ["dev", "test", "val"]:
-            save_data(split)
-    else:
-        save_data(args.split)
+    save_data(args.split)
