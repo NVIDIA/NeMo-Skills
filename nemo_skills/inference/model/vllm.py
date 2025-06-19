@@ -22,7 +22,7 @@ from openai import BadRequestError
 
 from nemo_skills.utils import get_logger_name
 
-from .base import OpenAIAPIModel, BaseRewardModel
+from .base import BaseRewardModel, OpenAIAPIModel
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -40,7 +40,7 @@ class VLLMModel(OpenAIAPIModel):
         if top_k > 0:
             extra_body["top_k"] = top_k
         return extra_body
-    
+
     def _build_completion_request_params(
         self,
         prompt: str,
@@ -55,7 +55,7 @@ class VLLMModel(OpenAIAPIModel):
         timeout: int | None,
         top_logprobs: int | None,
         stream: bool,
-        **kwargs, # to capture reasoning_effort
+        reasoning_effort: str | None,
     ) -> dict:
         return {
             "model": self.model,
@@ -68,7 +68,7 @@ class VLLMModel(OpenAIAPIModel):
             "logprobs": top_logprobs,
             "stream": stream,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
 
     def _build_chat_request_params(
@@ -85,7 +85,7 @@ class VLLMModel(OpenAIAPIModel):
         timeout: int | None,
         top_logprobs: int | None,
         stream: bool,
-        **kwargs, # to capture reasoning_effort
+        reasoning_effort: str | None,
     ) -> dict:
         return {
             "model": self.model,
@@ -99,7 +99,7 @@ class VLLMModel(OpenAIAPIModel):
             "top_logprobs": top_logprobs,
             "stream": stream,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
 
 
