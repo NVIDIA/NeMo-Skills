@@ -26,9 +26,7 @@ from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def add_default_args(
-    cluster_config, benchmark, split, data_dir, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
-):
+def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_type, extra_datasets):
     benchmark_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark,
         data_dir=data_dir,
@@ -71,14 +69,11 @@ def add_default_args(
                 "Did you forget to run prepare data commands?"
             )
 
-    extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
-    default_arguments = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
-    extra_arguments = f"{default_arguments} {extra_arguments}"
-
+    benchmark_gen_args = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
     requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
 
-    return input_file, extra_arguments, extra_eval_args, requires_sandbox
+    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -164,11 +159,7 @@ def eval(
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -251,9 +242,49 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    # TODO: random port will not really work here as we need to move this in the loop
+    benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
+    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
+
+    if num_jobs is None:
+        if cluster_config['executor'] == 'slurm':
+            num_jobs = -1  # -1 means run all benchmarks in parallel
+        else:
+            # for local executor, it makes no sense to use other values
+            num_jobs = 1
+
+    benchmark_remaining_jobs = {}
+    total_evals = 0
+    for benchmark, rs_num in benchmarks.items():
+        if rs_num == 0:
+            random_seeds = [None]
+        else:
+            random_seeds = list(range(starting_seed, starting_seed + rs_num))
+
+        benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
+        benchmark_remaining_jobs[benchmark] = pipeline_utils.get_remaining_jobs(
+            cluster_config=cluster_config,
+            output_dir=benchmark_output_dir,
+            random_seeds=random_seeds,
+            chunk_ids=chunk_ids,
+            rerun_done=rerun_done,
+        )
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
+            total_evals += len(benchmark_chunk_ids)
+
+    if num_jobs < 0:
+        # if num_jobs is -1, we run all benchmarks in parallel
+        num_jobs = total_evals
+
+    evals_per_job = total_evals // num_jobs if num_jobs > 0 else total_evals
+    remainder = total_evals % num_jobs
+    eval_to_job_map = []
+    for i in range(num_jobs):
+        count = evals_per_job + (1 if i < remainder else 0)
+        eval_to_job_map.extend([i] * count)
+
+    cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
-    server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,
         server_address=server_address,
@@ -265,12 +296,13 @@ def eval(
         get_random_port=get_random_port,
     )
 
-    benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
-    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-
-    eval_cmds = []
-    benchmark_requires_sandbox = {}
+    cur_eval = 0
+    job_batches = []
+    job_cmds = []
+    job_benchmarks = set()
     has_tasks = False
+
+    benchmark_required_sandbox = {}
 
     for benchmark, rs_num in benchmarks.items():
         bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
@@ -278,12 +310,10 @@ def eval(
             benchmark,
             split,
             data_dir,
-            extra_eval_args,
-            extra_arguments,
             extra_datasets_type,
             extra_datasets,
         )
-        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        benchmark_required_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
@@ -293,14 +323,7 @@ def eval(
             random_seeds = list(range(starting_seed, starting_seed + rs_num))
 
         benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
-        remaining_jobs = pipeline_utils.get_remaining_jobs(
-            cluster_config=cluster_config,
-            output_dir=benchmark_output_dir,
-            random_seeds=random_seeds,
-            chunk_ids=chunk_ids,
-            rerun_done=rerun_done,
-        )
-        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(remaining_jobs.items()):
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
@@ -310,52 +333,49 @@ def eval(
                 )
             for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
+                job_benchmarks.add(benchmark)
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,
                     output_dir=benchmark_output_dir,
-                    extra_arguments=bench_gen_args,
+                    extra_arguments=f"{bench_gen_args} {job_extra_arguments}",
                     random_seed=seed,
-                    eval_args=bench_eval_args,
+                    eval_args=f"{bench_eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )
-                eval_cmds.append((cmd, benchmark))
+                job_cmds.append(cmd)
 
-    if num_jobs is None:
-        if cluster_config['executor'] == 'slurm':
-            num_jobs = len(eval_cmds)
-        else:
-            # for local executor, it makes no sense to use other values
-            num_jobs = 1
-    if num_jobs < 0:
-        num_jobs = len(eval_cmds)
+                if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
+                    job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
+                    job_batches.append((job_cmds, job_needs_sandbox, job_server_config, job_server_address))
+                    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
+                        model=model,
+                        server_type=server_type,
+                        server_address=server_address,
+                        server_gpus=server_gpus,
+                        server_nodes=server_nodes,
+                        server_args=server_args,
+                        server_entrypoint=server_entrypoint,
+                        extra_arguments=extra_arguments,
+                        get_random_port=get_random_port,
+                    )
+                    cur_job_idx += 1
+                    job_cmds = []
+                    job_benchmarks = set()
 
-    # Create job batches with benchmark info
-    job_batches = []
-    for i in range(num_jobs):
-        cmds = []
-        benchmarks_in_job = set()
-        for cmd, benchmark in eval_cmds[i::num_jobs]:
-            cmds.append(cmd)
-            benchmarks_in_job.add(benchmark)
-        job_batches.append((cmds, benchmarks_in_job))
+                cur_eval += 1
 
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
-            # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(
-                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
-            )
-
+        for idx, (cmds, job_needs_sandbox, job_server_config, job_server_address) in enumerate(job_batches):
             prev_tasks = None
             for _ in range(dependent_jobs + 1):
                 new_task = pipeline_utils.add_task(
                     exp,
                     cmd=pipeline_utils.wait_for_server(
-                        server_address=server_address, generation_commands=" && ".join(cmds)
+                        server_address=job_server_address, generation_commands=" && ".join(cmds)
                     ),
                     task_name=f'{expname}-{idx}',
                     log_dir=log_dir,
@@ -363,8 +383,8 @@ def eval(
                     cluster_config=cluster_config,
                     partition=partition,
                     time_min=time_min,
-                    server_config=server_config,
-                    with_sandbox=job_needs_sandbox,
+                    server_config=job_server_config,
+                    with_sandbox=job_needs_sandbox or with_sandbox,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,

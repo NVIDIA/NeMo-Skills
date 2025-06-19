@@ -28,7 +28,6 @@ import yaml
 from huggingface_hub import get_token
 from invoke import StreamWatcher
 from nemo_run.config import set_nemorun_home
-from nemo_run.core.tunnel import SSHTunnel
 from omegaconf import DictConfig
 
 from nemo_skills.utils import get_logger_name
