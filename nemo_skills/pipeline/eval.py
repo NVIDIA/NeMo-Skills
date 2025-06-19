@@ -269,8 +269,7 @@ def eval(
             rerun_done=rerun_done,
         )
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
-            for chunk_id in benchmark_chunk_ids:
-                total_evals += 1
+            total_evals += len(benchmark_chunk_ids)
 
     if num_jobs < 0:
         # if num_jobs is -1, we run all benchmarks in parallel
@@ -285,7 +284,7 @@ def eval(
 
     cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
-    job_server_config, job_server_address, cur_extra_arguments = pipeline_utils.configure_client(
+    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,
         server_address=server_address,
@@ -300,8 +299,10 @@ def eval(
     cur_eval = 0
     job_batches = []
     job_cmds = []
-    job_needs_sandbox = False
+    job_benchmarks = set()
     has_tasks = False
+
+    benchmark_required_sandbox = {}
 
     for benchmark, rs_num in benchmarks.items():
         bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
@@ -312,8 +313,7 @@ def eval(
             extra_datasets_type,
             extra_datasets,
         )
-        if requires_sandbox:
-            job_needs_sandbox = True
+        benchmark_required_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
             LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
 
@@ -333,10 +333,11 @@ def eval(
                 )
             for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
+                job_benchmarks.add(benchmark)
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,
                     output_dir=benchmark_output_dir,
-                    extra_arguments=f"{bench_gen_args} {cur_extra_arguments}",
+                    extra_arguments=f"{bench_gen_args} {job_extra_arguments}",
                     random_seed=seed,
                     eval_args=f"{bench_eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
@@ -347,8 +348,9 @@ def eval(
                 job_cmds.append(cmd)
 
                 if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
+                    job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
                     job_batches.append((job_cmds, job_needs_sandbox, job_server_config, job_server_address))
-                    job_server_config, job_server_address, cur_extra_arguments = pipeline_utils.configure_client(
+                    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
                         model=model,
                         server_type=server_type,
                         server_address=server_address,
@@ -360,8 +362,8 @@ def eval(
                         get_random_port=get_random_port,
                     )
                     cur_job_idx += 1
-                    job_needs_sandbox = False
                     job_cmds = []
+                    job_benchmarks = set()
 
                 cur_eval += 1
 
@@ -382,7 +384,7 @@ def eval(
                     partition=partition,
                     time_min=time_min,
                     server_config=job_server_config,
-                    with_sandbox=job_needs_sandbox,
+                    with_sandbox=job_needs_sandbox or with_sandbox,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
