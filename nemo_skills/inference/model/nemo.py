@@ -15,7 +15,7 @@
 import json
 
 from .base import BaseModel, BaseRewardModel
-from .utils import trim_after_stop_phrases, RequestException
+from .utils import RequestException, trim_after_stop_phrases
 
 
 class NemoModel(BaseModel):

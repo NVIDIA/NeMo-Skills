@@ -14,23 +14,23 @@
 
 from nemo_skills.utils import python_doc_to_cmd_help
 
+from .azure import AzureOpenAIModel
+
 # Base classes
-from .base import BaseModel, OpenAIAPIModel, BaseRewardModel
+from .base import BaseModel, BaseRewardModel, OpenAIAPIModel
+
+# Code execution
+from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
+from .megatron import MegatronModel
+from .nemo import NemoModel, NemoRewardModel
+from .openai import OpenAIModel
 
 # Model implementations
 from .trtllm import TRTLLMModel
-from .nemo import NemoModel, NemoRewardModel
-from .vllm import VLLMModel, VLLMRewardModel
-from .openai import OpenAIModel
-from .azure import AzureOpenAIModel
-from .megatron import MegatronModel
-
-# Code execution
-from .code_execution import CodeExecutionWrapper, CodeExecutionConfig
 
 # Utilities
-from .utils import trim_after_stop_phrases, RequestException
-
+from .utils import RequestException, trim_after_stop_phrases
+from .vllm import VLLMModel, VLLMRewardModel
 
 # Model registry
 models = {
@@ -108,4 +108,4 @@ __all__ = [
     # Registries
     'models',
     'reward_models',
-] 
+]

@@ -14,20 +14,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
-import requests
+import re
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Tuple, Dict
 from pathlib import Path
-import re
-import json
+from typing import Any, Dict, Tuple
 
-from nemo_skills.inference.model import get_model, get_code_execution_model
-from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.prompt.utils import get_prompt, Prompt
+import requests
 from openai import APIConnectionError
 from requests.exceptions import ConnectionError
+
+from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.inference.model import get_code_execution_model, get_model
+from nemo_skills.prompt.utils import Prompt, get_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ class AppConfig:
             self.code_prompt_config = "generic/math"
             return
 
+
 class CodeExecStatus(Enum):
     """High-level availability of the Python code-execution toolchain."""
 
@@ -137,7 +139,7 @@ class PromptManager:
             logger.debug("Loading prompt config override: %s", prompt_config_override)
             prompt = get_prompt(prompt_config=prompt_config_override, prompt_template=self._cfg.prompt_template)
             return prompt
-        
+
         path = self._cfg.code_prompt_config if use_code else self._cfg.base_prompt_config
         if path in self._cache:
             return self._cache[path]
@@ -177,7 +179,6 @@ class ModelLoader:
     @property
     def cfg(self):  # noqa: D401
         return self._cfg
-
 
     def load_generic(self) -> Tuple[bool, str]:
         """Attempt to load the generic/inference-only model."""

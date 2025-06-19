@@ -25,9 +25,9 @@ import openai
 import requests
 from openai import DefaultHttpxClient, Stream
 
-from .utils import trim_after_stop_phrases
-
 from nemo_skills.utils import get_logger_name
+
+from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -366,7 +366,7 @@ class OpenAIAPIModel(BaseModel):
             if stream:
                 return self._stream_chat_chunks(response)
             return self._parse_chat_completion_response(response)
-        
+
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
             response = self._make_api_call(self.client.completions.create, request_params)
@@ -404,7 +404,7 @@ class OpenAIAPIModel(BaseModel):
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
         return result
-    
+
     def _stream_completion_chunks(self, response):
         emitted_so_far = []
         for chunk in response:
@@ -414,8 +414,8 @@ class OpenAIAPIModel(BaseModel):
                 yield {"generation": cur_delta}
             stop_reason = getattr(chunk.choices[0], "stop_reason", None)
             if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason} # vllm variant
-    
+                yield {"generation": stop_reason}  # vllm variant
+
     def _stream_chat_chunks(self, response):
         for chunk in response:
             cur_delta = chunk.choices[0].delta.content or ""

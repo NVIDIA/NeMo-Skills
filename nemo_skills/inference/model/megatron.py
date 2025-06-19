@@ -84,7 +84,7 @@ class MegatronModel(OpenAIAPIModel):
     ) -> dict | Stream:
         # Overriding generate to provide its own batching support, bypassing the parent's async logic.
         params = self._build_completion_request_params(
-            prompt=None, # Not used for batch call
+            prompt=None,  # Not used for batch call
             tokens_to_generate=tokens_to_generate,
             temperature=temperature,
             top_p=top_p,
@@ -97,8 +97,8 @@ class MegatronModel(OpenAIAPIModel):
             timeout=timeout,
             stream=stream,
         )
-        params["prompt"] = prompts # Replace single prompt with batch
-        
+        params["prompt"] = prompts  # Replace single prompt with batch
+
         response = self.client.completions.create(**params)
         outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
 
@@ -109,8 +109,11 @@ class MegatronModel(OpenAIAPIModel):
         return outputs
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None) -> dict | list[dict]:
+    def parse_openai_response(
+        cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None
+    ) -> dict | list[dict]:
         """A specific parser kept for the custom batch generate method."""
+
         def process_choice(choice, top_logprobs: int | None = None):
             output = choice.text
             result = {'generation': output, 'num_generated_tokens': -1}
@@ -124,5 +127,5 @@ class MegatronModel(OpenAIAPIModel):
 
         if batch:
             return [process_choice(choice, top_logprobs) for choice in response.choices]
-        
+
         return process_choice(response.choices[0], top_logprobs)

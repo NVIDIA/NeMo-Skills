@@ -47,7 +47,14 @@ class OpenAIModel(OpenAIAPIModel):
         if not api_key:
             raise ValueError("API key is required for OpenAI/NVIDIA models and could not be found.")
 
-        super().__init__(model=model, api_key=api_key, base_url=base_url, max_retries=max_retries, initial_retry_delay=initial_retry_delay, **kwargs)
+        super().__init__(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            max_retries=max_retries,
+            initial_retry_delay=initial_retry_delay,
+            **kwargs,
+        )
 
     def preprocess_request(self, request: dict):
         """OpenAI doesn't use top_k, so we don't apply the greedy conversion."""
@@ -95,16 +102,24 @@ class OpenAIModel(OpenAIAPIModel):
         if self._is_reasoning_model(self.model):
             # Reasoning model specific validations and parameters
             if temperature != 0.0:
-                raise ValueError("`temperature` is not supported by reasoning models, please set it to default value `0.0`.")
+                raise ValueError(
+                    "`temperature` is not supported by reasoning models, please set it to default value `0.0`."
+                )
             if top_p != 0.95:
-                raise ValueError("`top_p` is not supported by reasoning models, please set it to default value `0.95`.")
+                raise ValueError(
+                    "`top_p` is not supported by reasoning models, please set it to default value `0.95`."
+                )
             if repetition_penalty != 1.0:
-                raise ValueError("`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`.")
+                raise ValueError(
+                    "`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`."
+                )
             if top_logprobs is not None:
                 raise ValueError("`top_logprobs` is not supported by reasoning models, please set it to `None`.")
-            
+
             params["max_completion_tokens"] = tokens_to_generate
-            params["messages"] = [{**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages]
+            params["messages"] = [
+                {**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages
+            ]
             if reasoning_effort:
                 params["reasoning_effort"] = reasoning_effort
         else:
@@ -117,7 +132,7 @@ class OpenAIModel(OpenAIAPIModel):
             params["max_tokens"] = tokens_to_generate
             params["temperature"] = temperature
             params["top_p"] = top_p
-        
+
         return params
 
     def batch_generate(
@@ -153,16 +168,21 @@ class OpenAIModel(OpenAIAPIModel):
                     stop_phrases=stop_phrases,
                     top_logprobs=top_logprobs,
                     reasoning_effort=reasoning_effort,
-                    stream=False, # not supported in batch
-                    timeout=None, # not supported in batch
+                    stream=False,  # not supported in batch
+                    timeout=None,  # not supported in batch
                 )
-                
-                fout.write(json.dumps({
-                    "custom_id": f"{idx}",
-                    "method": "POST",
-                    "url": "/v1/chat/completions",
-                    "body": params,
-                }) + "\n")
+
+                fout.write(
+                    json.dumps(
+                        {
+                            "custom_id": f"{idx}",
+                            "method": "POST",
+                            "url": "/v1/chat/completions",
+                            "body": params,
+                        }
+                    )
+                    + "\n"
+                )
 
         with open("requests.jsonl", "rb") as batch_file_handle:
             batch_file_id = self.client.files.create(file=batch_file_handle, purpose="batch").id

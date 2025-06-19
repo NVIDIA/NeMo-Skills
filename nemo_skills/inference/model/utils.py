@@ -23,5 +23,6 @@ def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
     escaped_stop_phrases = [re.escape(sp) for sp in stop_phrases]
     return re.split("|".join(escaped_stop_phrases), text, maxsplit=1)[0]
 
+
 class RequestException(RuntimeError):
     pass
