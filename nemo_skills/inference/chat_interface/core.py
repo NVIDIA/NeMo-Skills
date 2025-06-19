@@ -23,8 +23,7 @@ from pathlib import Path
 import re
 import json
 
-from nemo_skills.inference.server.model import get_model
-from nemo_skills.inference.server.code_execution_model import get_code_execution_model
+from nemo_skills.inference.model import get_model, get_code_execution_model
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.prompt.utils import get_prompt, Prompt
 from openai import APIConnectionError
