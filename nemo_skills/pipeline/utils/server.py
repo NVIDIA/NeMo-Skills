@@ -253,7 +253,10 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        if num_nodes > 1:
+            server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        else:
+            server_start_cmd = start_vllm_cmd
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:
