@@ -376,7 +376,7 @@ class OpenAIAPIModel(BaseModel):
             if stream:
                 return self._stream_chat_chunks(response)
             return self._parse_chat_completion_response(response)
-        
+
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
             response = self._make_api_call(self.client.completions.create, request_params)
@@ -414,7 +414,7 @@ class OpenAIAPIModel(BaseModel):
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
         return result
-    
+
     def _stream_completion_chunks(self, response):
         emitted_so_far = []
         for chunk in response:
@@ -424,8 +424,8 @@ class OpenAIAPIModel(BaseModel):
                 yield {"generation": cur_delta}
             stop_reason = getattr(chunk.choices[0], "stop_reason", None)
             if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason} # vllm variant
-    
+                yield {"generation": stop_reason}  # vllm variant
+
     def _stream_chat_chunks(self, response):
         for chunk in response:
             cur_delta = chunk.choices[0].delta.content or ""
@@ -747,7 +747,14 @@ class OpenAIModel(OpenAIAPIModel):
         if not api_key:
             raise ValueError("API key is required for OpenAI/NVIDIA models and could not be found.")
 
-        super().__init__(model=model, api_key=api_key, base_url=base_url, max_retries=max_retries, initial_retry_delay=initial_retry_delay, **kwargs)
+        super().__init__(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            max_retries=max_retries,
+            initial_retry_delay=initial_retry_delay,
+            **kwargs,
+        )
 
     def preprocess_request(self, request: dict):
         """OpenAI doesn't use top_k, so we don't apply the greedy conversion."""
@@ -795,16 +802,24 @@ class OpenAIModel(OpenAIAPIModel):
         if self._is_reasoning_model(self.model):
             # Reasoning model specific validations and parameters
             if temperature != 0.0:
-                raise ValueError("`temperature` is not supported by reasoning models, please set it to default value `0.0`.")
+                raise ValueError(
+                    "`temperature` is not supported by reasoning models, please set it to default value `0.0`."
+                )
             if top_p != 0.95:
-                raise ValueError("`top_p` is not supported by reasoning models, please set it to default value `0.95`.")
+                raise ValueError(
+                    "`top_p` is not supported by reasoning models, please set it to default value `0.95`."
+                )
             if repetition_penalty != 1.0:
-                raise ValueError("`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`.")
+                raise ValueError(
+                    "`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`."
+                )
             if top_logprobs is not None:
                 raise ValueError("`top_logprobs` is not supported by reasoning models, please set it to `None`.")
-            
+
             params["max_completion_tokens"] = tokens_to_generate
-            params["messages"] = [{**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages]
+            params["messages"] = [
+                {**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages
+            ]
             if reasoning_effort:
                 params["reasoning_effort"] = reasoning_effort
         else:
@@ -817,7 +832,7 @@ class OpenAIModel(OpenAIAPIModel):
             params["max_tokens"] = tokens_to_generate
             params["temperature"] = temperature
             params["top_p"] = top_p
-        
+
         return params
 
     def batch_generate(
@@ -853,16 +868,21 @@ class OpenAIModel(OpenAIAPIModel):
                     stop_phrases=stop_phrases,
                     top_logprobs=top_logprobs,
                     reasoning_effort=reasoning_effort,
-                    stream=False, # not supported in batch
-                    timeout=None, # not supported in batch
+                    stream=False,  # not supported in batch
+                    timeout=None,  # not supported in batch
                 )
-                
-                fout.write(json.dumps({
-                    "custom_id": f"{idx}",
-                    "method": "POST",
-                    "url": "/v1/chat/completions",
-                    "body": params,
-                }) + "\n")
+
+                fout.write(
+                    json.dumps(
+                        {
+                            "custom_id": f"{idx}",
+                            "method": "POST",
+                            "url": "/v1/chat/completions",
+                            "body": params,
+                        }
+                    )
+                    + "\n"
+                )
 
         with open("requests.jsonl", "rb") as batch_file_handle:
             batch_file_id = self.client.files.create(file=batch_file_handle, purpose="batch").id
@@ -949,7 +969,7 @@ class VLLMModel(OpenAIAPIModel):
         if top_k > 0:
             extra_body["top_k"] = top_k
         return extra_body
-    
+
     def _build_completion_request_params(
         self,
         prompt: str,
@@ -964,7 +984,7 @@ class VLLMModel(OpenAIAPIModel):
         timeout: int | None,
         top_logprobs: int | None,
         stream: bool,
-        **kwargs, # to capture reasoning_effort
+        **kwargs,  # to capture reasoning_effort
     ) -> dict:
         return {
             "model": self.model,
@@ -977,7 +997,7 @@ class VLLMModel(OpenAIAPIModel):
             "logprobs": top_logprobs,
             "stream": stream,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
 
     def _build_chat_request_params(
@@ -994,7 +1014,7 @@ class VLLMModel(OpenAIAPIModel):
         timeout: int | None,
         top_logprobs: int | None,
         stream: bool,
-        **kwargs, # to capture reasoning_effort
+        **kwargs,  # to capture reasoning_effort
     ) -> dict:
         return {
             "model": self.model,
@@ -1008,7 +1028,7 @@ class VLLMModel(OpenAIAPIModel):
             "top_logprobs": top_logprobs,
             "stream": stream,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty)
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
 
 
@@ -1078,7 +1098,7 @@ class MegatronModel(OpenAIAPIModel):
     ) -> dict | Stream:
         # Overriding generate to provide its own batching support, bypassing the parent's async logic.
         params = self._build_completion_request_params(
-            prompt=None, # Not used for batch call
+            prompt=None,  # Not used for batch call
             tokens_to_generate=tokens_to_generate,
             temperature=temperature,
             top_p=top_p,
@@ -1091,8 +1111,8 @@ class MegatronModel(OpenAIAPIModel):
             timeout=timeout,
             stream=stream,
         )
-        params["prompt"] = prompts # Replace single prompt with batch
-        
+        params["prompt"] = prompts  # Replace single prompt with batch
+
         response = self.client.completions.create(**params)
         outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
 
@@ -1103,8 +1123,11 @@ class MegatronModel(OpenAIAPIModel):
         return outputs
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None) -> dict | list[dict]:
+    def parse_openai_response(
+        cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None
+    ) -> dict | list[dict]:
         """A specific parser kept for the custom batch generate method."""
+
         def process_choice(choice, top_logprobs: int | None = None):
             output = choice.text
             result = {'generation': output, 'num_generated_tokens': -1}
@@ -1118,7 +1141,7 @@ class MegatronModel(OpenAIAPIModel):
 
         if batch:
             return [process_choice(choice, top_logprobs) for choice in response.choices]
-        
+
         return process_choice(response.choices[0], top_logprobs)
 
 
