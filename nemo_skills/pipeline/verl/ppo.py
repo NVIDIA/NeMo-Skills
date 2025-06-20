@@ -42,6 +42,7 @@ class PPOVerlTask:
     timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
+    script_module: str = "verl.trainer.main_ppo"
 
     def get_ray_launch_cmd(self):
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
@@ -116,7 +117,7 @@ class PPOVerlTask:
         return cmd
 
     def get_script_module(self):
-        return "verl.trainer.main_ppo"  # Must use https://github.com/titu1994/verl/
+        return self.script_module
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
@@ -165,6 +166,7 @@ def get_training_cmd(
     disable_wandb,
     wandb_project,
     extra_arguments,
+    script_module="verl.trainer.main_ppo",
 ):
     # TODO: use those
     timeout = pipeline_utils.get_timeout(cluster_config, partition)
@@ -183,6 +185,7 @@ def get_training_cmd(
             timeout=timeout,
             extra_arguments=extra_arguments,
             logging_params="",  # Updated later
+            script_module=script_module,
         )
 
     else:
@@ -266,6 +269,10 @@ def ppo_verl(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
+    script_module: str = typer.Option(
+        "verl.trainer.main_ppo",
+        help="The script module to run. "
+    ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -312,6 +319,7 @@ def ppo_verl(
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
+        script_module=script_module,
     )
 
     server_config = None
