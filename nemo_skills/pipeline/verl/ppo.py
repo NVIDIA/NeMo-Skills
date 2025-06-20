@@ -52,7 +52,7 @@ class PPOVerlTask:
 
     def format_train_args(self):
         verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-dir {self.verl_config_dir} --config-path {self.verl_config_name} "
-        if config_path == '':
+        if verl_config == '':
             cmd = (
                 "   algorithm.adv_estimator=grpo "
                 "   data.train_batch_size=128 "
