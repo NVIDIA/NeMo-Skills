@@ -43,15 +43,15 @@ class PPOVerlTask:
     extra_arguments: str = ""
     logging_params: str = ""
     script_module: str = "verl.trainer.main_ppo"
-    config_dir: str = None
-    config_path: str = None
+    verl_config_dir: str = None
+    verl_config_name: str = None
 
     def get_ray_launch_cmd(self):
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
         return cmd
 
     def format_train_args(self):
-        config_path = '' if ((self.config_dir is None) and (self.config_path is None)) else f" --config-dir {self.config_dir} --config-path {self.config_path} "
+        verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-dir {self.verl_config_dir} --config-path {self.verl_config_name} "
         if config_path == '':
             cmd = (
                 "   algorithm.adv_estimator=grpo "
@@ -92,7 +92,7 @@ class PPOVerlTask:
             )
         else:
             cmd = (
-                f"  {config_path} "
+                f"  {verl_config} "
 
         cmd += (
             f"   actor_rollout_ref.model.path={self.model} "
@@ -178,6 +178,8 @@ def get_training_cmd(
     wandb_project,
     extra_arguments,
     script_module="verl.trainer.main_ppo",
+    verl_config_dir=None,
+    verl_config_name=None,
 ):
     # TODO: use those
     timeout = pipeline_utils.get_timeout(cluster_config, partition)
@@ -197,6 +199,8 @@ def get_training_cmd(
             extra_arguments=extra_arguments,
             logging_params="",  # Updated later
             script_module=script_module,
+            verl_config_dir=verl_config_dir,
+            verl_config_name=verl_config_name,
         )
 
     else:
@@ -284,6 +288,14 @@ def ppo_verl(
         "verl.trainer.main_ppo",
         help="The script module to run. "
     ),
+    verl_config_dir: str = typer.Option(
+        None,
+        help="The directory containing the Verl config files. "
+    ),
+    verl_config_name: str = typer.Option(
+        None,
+        help="The name of the Verl config file to use. "
+    ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -331,6 +343,8 @@ def ppo_verl(
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
         script_module=script_module,
+        verl_config_dir=verl_config_dir,
+        verl_config_name=verl_config_name,
     )
 
     server_config = None
