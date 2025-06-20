@@ -51,7 +51,7 @@ class PPOVerlTask:
         return cmd
 
     def format_train_args(self):
-        verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-dir {self.verl_config_dir} --config-path {self.verl_config_name} "
+        verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-path {self.verl_config_dir} --config-path {self.verl_config_name} "
         if verl_config == '':
             cmd = (
                 "   algorithm.adv_estimator=grpo "
