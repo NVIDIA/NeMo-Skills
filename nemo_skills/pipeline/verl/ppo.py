@@ -91,8 +91,7 @@ class PPOVerlTask:
                 ""
             )
         else:
-            cmd = (
-                f"  {verl_config} "
+            cmd = f"  {verl_config} "
 
         cmd += (
             f"   actor_rollout_ref.model.path={self.model} "
