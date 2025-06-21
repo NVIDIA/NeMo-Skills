@@ -22,6 +22,7 @@ from collections import defaultdict
 from copy import deepcopy
 
 import hydra
+import re
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
@@ -182,7 +183,12 @@ def preprocess(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")))
+    # Extract numeric index from filename for proper sorting
+    def extract_index(filename):
+        match = re.search(r'output-rs(\d+)', os.path.basename(filename))
+        return int(match.group(1)) if match else 0
+
+    input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")), key=extract_index)
     if num_input_samples is not None:
         input_files = input_files[:num_input_samples]
         print(f"Using {num_input_samples} / {len(input_files)} input files")
@@ -199,8 +205,6 @@ def preprocess(
                     sampling_strategy=sampling_strategy,
                 )
                 f.write(json.dumps(comparison_instance) + "\n")
-
-
 
 
 @nested_dataclass(kw_only=True)
