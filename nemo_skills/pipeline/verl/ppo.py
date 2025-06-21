@@ -42,54 +42,65 @@ class PPOVerlTask:
     timeout: str
     extra_arguments: str = ""
     logging_params: str = ""
+    script_module: str = "verl.trainer.main_ppo"
+    verl_config_dir: str = None
+    verl_config_name: str = None
 
     def get_ray_launch_cmd(self):
         cmd = "ray job submit --address='http://127.0.0.1:8265' -- "
         return cmd
 
     def format_train_args(self):
-        cmd = (
-            "   algorithm.adv_estimator=grpo "
-            "   data.train_batch_size=128 "
-            "   data.val_batch_size=512 "
-            "   data.max_prompt_length=1024 "
-            "   data.max_response_length=8192 "
+        verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-path {self.verl_config_dir} --config-name {self.verl_config_name} "
+        if verl_config == '':
+            cmd = (
+                "   algorithm.adv_estimator=grpo "
+                "   data.train_batch_size=128 "
+                "   data.val_batch_size=512 "
+                "   data.max_prompt_length=1024 "
+                "   data.max_response_length=8192 "
+                "   actor_rollout_ref.actor.optim.lr=1e-6 "
+                "   actor_rollout_ref.model.use_remove_padding=True "
+                "   actor_rollout_ref.actor.ppo_mini_batch_size=64 "
+                "   actor_rollout_ref.actor.use_dynamic_bsz=True "
+                "   actor_rollout_ref.actor.ppo_max_token_len_per_gpu=32768 "
+                "   actor_rollout_ref.actor.use_kl_loss=True "
+                "   actor_rollout_ref.actor.kl_loss_coef=0.0 "
+                "   actor_rollout_ref.actor.kl_loss_type=low_var_kl "
+                "   actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 "
+                "   actor_rollout_ref.model.enable_gradient_checkpointing=True "
+                "   actor_rollout_ref.actor.fsdp_config.param_offload=False "
+                "   +actor_rollout_ref.actor.fsdp_config.grad_offload=False "
+                "   actor_rollout_ref.actor.fsdp_config.optimizer_offload=False "
+                "   actor_rollout_ref.rollout.tensor_model_parallel_size=1 "
+                "   actor_rollout_ref.rollout.name=vllm "
+                "   actor_rollout_ref.rollout.temperature=0.6 "
+                "   actor_rollout_ref.rollout.gpu_memory_utilization=0.85 "
+                "   actor_rollout_ref.rollout.enforce_eager=False "
+                "   actor_rollout_ref.rollout.free_cache_engine=False "
+                "   actor_rollout_ref.rollout.n=8 "
+                "   actor_rollout_ref.ref.fsdp_config.param_offload=True "
+                "   algorithm.kl_ctrl.kl_coef=0 "
+                "   trainer.critic_warmup=0 "
+                "   ++trainer.val_before_train=False "
+                "   +trainer.val_generations_to_log_to_wandb=1 "
+                "   trainer.save_freq=20 "
+                "   trainer.test_freq=20 "
+                "   trainer.default_hdfs_dir=null "
+                "   trainer.total_epochs=30 "
+                ""
+            )
+        else:
+            cmd = f"  {verl_config} "
+
+        cmd += (
             f"   actor_rollout_ref.model.path={self.model} "
-            "   actor_rollout_ref.actor.optim.lr=1e-6 "
-            "   actor_rollout_ref.model.use_remove_padding=True "
-            "   actor_rollout_ref.actor.ppo_mini_batch_size=64 "
-            "   actor_rollout_ref.actor.use_dynamic_bsz=True "
-            "   actor_rollout_ref.actor.ppo_max_token_len_per_gpu=32768 "
-            "   actor_rollout_ref.actor.use_kl_loss=True "
-            "   actor_rollout_ref.actor.kl_loss_coef=0.0 "
-            "   actor_rollout_ref.actor.kl_loss_type=low_var_kl "
-            "   actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 "
-            "   actor_rollout_ref.model.enable_gradient_checkpointing=True "
-            "   actor_rollout_ref.actor.fsdp_config.param_offload=False "
-            "   +actor_rollout_ref.actor.fsdp_config.grad_offload=False "
-            "   actor_rollout_ref.actor.fsdp_config.optimizer_offload=False "
-            "   actor_rollout_ref.rollout.tensor_model_parallel_size=1 "
-            "   actor_rollout_ref.rollout.name=vllm "
-            "   actor_rollout_ref.rollout.temperature=0.6 "
-            "   actor_rollout_ref.rollout.gpu_memory_utilization=0.85 "
-            "   actor_rollout_ref.rollout.enforce_eager=False "
-            "   actor_rollout_ref.rollout.free_cache_engine=False "
-            "   actor_rollout_ref.rollout.n=8 "
-            "   actor_rollout_ref.ref.fsdp_config.param_offload=True "
-            "   algorithm.kl_ctrl.kl_coef=0 "
-            "   trainer.critic_warmup=0 "
-            "   ++trainer.val_before_train=False "
-            "   +trainer.val_generations_to_log_to_wandb=1 "
-            "   trainer.save_freq=20 "
-            "   trainer.test_freq=20 "
-            "   trainer.default_hdfs_dir=null "
             f"   trainer.default_local_dir={self.output_dir}/checkpoints "
-            "   trainer.total_epochs=30 "
             f"   trainer.n_gpus_per_node={self.num_gpus} "
             f"   trainer.nnodes={self.num_nodes} "
             f"  +trainer.timeout={self.timeout} "
-            ""
         )
+
         return cmd
 
     def format_data_args(self):
@@ -116,7 +127,7 @@ class PPOVerlTask:
         return cmd
 
     def get_script_module(self):
-        return "verl.trainer.main_ppo"  # Must use https://github.com/titu1994/verl/
+        return self.script_module
 
     def get_job_cmd(self):
         ray_job_cmd = self.get_ray_launch_cmd()
@@ -165,6 +176,9 @@ def get_training_cmd(
     disable_wandb,
     wandb_project,
     extra_arguments,
+    script_module="verl.trainer.main_ppo",
+    verl_config_dir=None,
+    verl_config_name=None,
 ):
     # TODO: use those
     timeout = pipeline_utils.get_timeout(cluster_config, partition)
@@ -183,6 +197,9 @@ def get_training_cmd(
             timeout=timeout,
             extra_arguments=extra_arguments,
             logging_params="",  # Updated later
+            script_module=script_module,
+            verl_config_dir=verl_config_dir,
+            verl_config_name=verl_config_name,
         )
 
     else:
@@ -266,6 +283,18 @@ def ppo_verl(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
+    script_module: str = typer.Option(
+        "verl.trainer.main_ppo",
+        help="The script module to run. "
+    ),
+    verl_config_dir: str = typer.Option(
+        None,
+        help="The directory containing the Verl config files. "
+    ),
+    verl_config_name: str = typer.Option(
+        None,
+        help="The name of the Verl config file to use. "
+    ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -312,6 +341,9 @@ def ppo_verl(
         disable_wandb=disable_wandb,
         wandb_project=wandb_project,
         extra_arguments=extra_arguments,
+        script_module=script_module,
+        verl_config_dir=verl_config_dir,
+        verl_config_name=verl_config_name,
     )
 
     server_config = None
