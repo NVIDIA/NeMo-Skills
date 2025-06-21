@@ -20,7 +20,7 @@ import os
 import random
 from collections import defaultdict
 from copy import deepcopy
-
+import re
 import hydra
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
@@ -357,7 +357,7 @@ def preprocess(
         return int(match.group(1)) if match else 0
 
     input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")), key=extract_index)
-    
+
     if num_input_samples is not None:
         input_files = input_files[:num_input_samples]
         print(f"Using {num_input_samples} / {len(input_files)} input files")
