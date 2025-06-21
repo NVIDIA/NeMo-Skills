@@ -92,11 +92,7 @@ def run_cmd(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
 ):
@@ -120,6 +116,11 @@ def run_cmd(
     )
 
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
+
+    # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
+    # as cpu jobs almost always need more resources than automatically allocated by slurm
+    if exclusive is None and num_gpus is None:
+        exclusive = True
 
     with get_exp(expname, cluster_config) as exp:
         # Setup server config if model is provided

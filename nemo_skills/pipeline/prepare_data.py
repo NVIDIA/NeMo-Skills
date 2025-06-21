@@ -52,7 +52,7 @@ def prepare_data(
     config_dir: str = typer.Option(None, help="Custom cluster config directory"),
     with_sandbox: bool = typer.Option(False, help="Start a sandbox container alongside"),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
-    exclusive: bool = typer.Option(True, "--not_exclusive", help="Disable --exclusive flag"),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare.
