@@ -15,7 +15,7 @@
 import logging
 import sys
 from dataclasses import field
-from pathlib import Path
+import os
 
 import hydra
 
@@ -68,8 +68,8 @@ For the full list of supported parameters, use 'python -m nemo_skills.inference.
             self.random_seed = None
         if self.input_file is None and self.input_dir is not None:
             seed = f'-rs{self.random_seed}' if self.random_seed is not None else ''
-            self.input_file = Path(self.input_dir) / f"output{seed}.jsonl"
-            self.output_file = Path(self.output_dir) / f"output{seed}.jsonl"
+            self.input_file = os.path.join(self.input_dir, f"output{seed}.jsonl")
+            self.output_file = os.path.join(self.output_dir, f"output{seed}.jsonl")
         elif self.input_file is not None and self.input_dir is None:
             if self.output_file is None:
                 raise ValueError("Output file should be provided if providing `input_file`")

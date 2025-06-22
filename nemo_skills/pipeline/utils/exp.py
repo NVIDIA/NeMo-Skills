@@ -364,6 +364,14 @@ def add_task(
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
                 commands.append(cur_cmd)
+                print(f"cur_cmd: {cur_cmd}")
+                print(f"cur_container: {cur_container}")
+                print(f"num_nodes: {num_nodes}")
+                print(f"cur_tasks: {cur_tasks}")
+                print(f"num_gpus: {num_gpus}")
+                print(f"partition: {partition}")
+                print(f"time_min: {time_min}")
+                print(f"dependencies: {dependencies}")
                 executors.append(
                     get_executor(
                         cluster_config=cluster_config,
