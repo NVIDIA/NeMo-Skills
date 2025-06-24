@@ -242,7 +242,7 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
+    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, 0) for b in benchmarks.split(",")]}
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
     if num_jobs is None:
@@ -274,6 +274,9 @@ def eval(
     if num_jobs < 0:
         # if num_jobs is -1, we run all benchmarks in parallel
         num_jobs = total_evals
+
+    if num_jobs == 0:
+        return None
 
     evals_per_job = total_evals // num_jobs if num_jobs > 0 else total_evals
     remainder = total_evals % num_jobs
