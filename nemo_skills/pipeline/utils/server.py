@@ -199,7 +199,7 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm;
     # vllm can also pass model name as "model_path" so we need special processing
-    if server_type not in ["vllm", "sglang"]:
+    if server_type not in ["vllm", "sglang", "trtllm-serve"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
