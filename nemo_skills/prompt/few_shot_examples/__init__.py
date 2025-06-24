@@ -15,13 +15,20 @@ from nemo_skills.prompt.few_shot_examples.gsm8k import examples_map as examples_
 from nemo_skills.prompt.few_shot_examples.math import examples_map as examples_math
 from nemo_skills.prompt.few_shot_examples.lean4 import examples_map as examples_lean4
 from nemo_skills.prompt.few_shot_examples.mmlu_pro import examples_map as examples_mmlu_pro
+from nemo_skills.prompt.few_shot_examples.mmlu import examples_map as examples_mmlu
 from nemo_skills.prompt.few_shot_examples.open_science import examples_map as examples_open_science
 
-examples_map = examples_gsm8k.copy()
-examples_map.update(examples_math)
-examples_map.update(examples_lean4)
-examples_map.update(examples_mmlu_pro)
-examples_map.update(examples_open_science)
-assert len(examples_map) == len(examples_gsm8k) + len(examples_math) + len(
-    examples_lean4
-) + len(examples_mmlu_pro) + len(examples_open_science), "Duplicate keys in examples!"
+all_example_sets = [
+    examples_gsm8k,
+    examples_math,
+    examples_lean4,
+    examples_mmlu_pro,
+    examples_mmlu,
+    examples_open_science,
+]
+
+examples_map = {k: v for d in all_example_sets for k, v in d.items()}
+
+# Verify no duplicate keys exist across example sets
+expected_total_examples = sum(len(example_set) for example_set in all_example_sets)
+assert len(examples_map) == expected_total_examples, f"Duplicate keys in examples!"
