@@ -1,0 +1,6 @@
+system: ""
+
+user: |-
+  Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: \boxed{{A/B/C/D/E/F/G/H/I/J}}' (e.g. 'Answer: \boxed{{A}}'). 
+
+  {problem}
