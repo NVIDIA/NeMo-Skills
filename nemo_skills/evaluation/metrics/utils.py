@@ -20,11 +20,15 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def read_predictions(predictions, line_idx, file_handles):
+def read_predictions(predictions, line_idx, file_handles, sequence_length):
     data = []
     for file_idx, prediction in enumerate(predictions):
         try:
             prediction_dict = json.loads(prediction)
+            if sequence_length != None:
+                if int(prediction_dict['num_generated_tokens']) > sequence_length: 
+                    prediction_dict['is_correct'] = False
+                
         except Exception as e:
             LOG.error(f"\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
             raise

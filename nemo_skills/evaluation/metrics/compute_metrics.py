@@ -31,10 +31,11 @@ class ComputeMetrics:
         extra_datasets_type=None,
         max_samples=-1,
         metric_type=None,
+        max_seq_len=None,
     ):
         self.max_samples = max_samples
         self.metric_type = metric_type
-
+        self.max_seq_len = max_seq_len
         benchmark_module, _, _ = get_dataset_module(
             benchmark,
             data_dir=data_dir,
@@ -70,7 +71,7 @@ class ComputeMetrics:
             for idx, predictions in enumerate(zip_longest(*file_handles)):
                 if idx == self.max_samples:
                     break
-                data = read_predictions(predictions, idx, file_handles)
+                data = read_predictions(predictions, idx, file_handles, self.max_seq_len)
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:
