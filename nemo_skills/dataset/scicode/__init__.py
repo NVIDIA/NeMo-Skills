@@ -13,9 +13,9 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'eval/scicode/...'
+PROMPT_CONFIG = 'eval/scicode/default'
 DATASET_GROUP = 'code'
 METRICS_TYPE = '...'
 EVAL_SPLIT = 'test'
 EVAL_ARGS = "++eval_type=scicode"
-GENERATION_ARGS = ""
+GENERATION_ARGS = "++generation_module=nemo_skills.inference.eval.scicode"

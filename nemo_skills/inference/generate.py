@@ -481,10 +481,7 @@ class GenerationTask:
                     data_points_batch = []
 
     def get_llm_generations(self, requests_in_progress, generations):
-        """Get the LLM generations from the output file.
-        To allow for stateful generation, we also pass in the generations dictionary.
-        In most cases, stateful generation is not needed.
-        """
+        """Get the completed LLM generations that were submitted asynchronously."""
 
         gen_ids = list(requests_in_progress.values())
         outputs = self.llm.get_generations(gen_ids)
