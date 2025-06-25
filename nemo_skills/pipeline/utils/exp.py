@@ -493,7 +493,21 @@ def run_exp(exp, cluster_config, sequential=None):
     if cluster_config['executor'] != 'slurm':
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
-        exp.run(detach=True, sequential=False if sequential is None else sequential)
+        try:
+            exp.run(detach=True, sequential=False if sequential is None else sequential)
+        except RuntimeError as e:
+            if 'Your repo has uncommitted changes.' in str(e):
+                raise RuntimeError(
+                    "You're running ns commands from a git repo - in this case we "
+                    "always try to package it and upload to the cluster "
+                    "(or store a copy in ~/.nemo_run if running locally).\n"
+                    "If you don't need it to be uploaded, cd away from a git repo and rerun the command.\n"
+                    "If you do want to upload the code, either commit the changes "
+                    "or set NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1 "
+                    "environment variable to skip the check (but not-committed code will not be packaged)."
+                )
+            else:
+                raise
 
         # caching the experiment code for reuse
         tunnel = get_tunnel(cluster_config)
