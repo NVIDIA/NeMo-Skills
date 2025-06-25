@@ -27,6 +27,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 JUDGE_MODEL = 'gpt-4-1106-preview'
+JUDGE_SERVER = 'openai'
 
 
 @nested_dataclass(kw_only=True)

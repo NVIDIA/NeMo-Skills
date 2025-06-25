@@ -14,13 +14,19 @@
 
 import logging
 import sys
-from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, field
+from functools import partial
 
 import hydra
 
 from nemo_skills.inference.eval.scicode_utils import generate_response_with_steps
-from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
+from nemo_skills.inference.generate import (
+    GenerateSolutionsConfig,
+    GenerationTask,
+    InferenceConfig,
+    combine_stop_phrases,
+)
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -90,13 +96,25 @@ Example:
 ```
 /no_think
 """.strip()
-
+        generation_params = {
+            "stop_phrases": combine_stop_phrases(
+                self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
+            ),
+            **asdict(self.cfg.inference),
+            **self.extra_generate_params,
+        }
         for i in range(total_steps):
             # this comes from original implementation, not fully sure what's the reason for this if
             if (problem_id == "13" and i == 5) or (problem_id == "62" and i == 0) or (problem_id == "76" and i == 2):
                 continue
             previous_llm_code = generate_response_with_steps(
-                data_point, i + 1, total_steps, prompt_template, previous_llm_code, False, self.llm._generate_single
+                data_point,
+                i + 1,
+                total_steps,
+                prompt_template,
+                previous_llm_code,
+                False,
+                partial(self.llm._generate_single, **generation_params),
             )
 
     def llm_generate(self, data_points, data, is_async=False):

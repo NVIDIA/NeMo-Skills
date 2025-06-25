@@ -20,6 +20,7 @@ from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_statement, eval_math
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
+from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 
 
 def dummy_eval(cfg):
@@ -38,6 +39,7 @@ EVALUATOR_MAP = {
     'multichoice': eval_mcq,
     'ruler': eval_ruler,
     'livecodebench': eval_livecodebench,
+    'scicode': eval_scicode,
 }
 
 
