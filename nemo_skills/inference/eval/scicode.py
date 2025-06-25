@@ -107,7 +107,7 @@ Example:
             # this comes from original implementation, not fully sure what's the reason for this if
             if (problem_id == "13" and i == 5) or (problem_id == "62" and i == 0) or (problem_id == "76" and i == 2):
                 continue
-            previous_llm_code = generate_response_with_steps(
+            previous_llm_code, full_task_solution = generate_response_with_steps(
                 data_point,
                 i + 1,
                 total_steps,
