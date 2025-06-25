@@ -28,6 +28,7 @@ def read_predictions(predictions, line_idx, file_handles, sequence_length = None
             if sequence_length != None:
                 if int(prediction_dict['num_generated_tokens']) > sequence_length: 
                     prediction_dict['is_correct'] = False
+                    prediction_dict['predicted_answer'] = None
         except Exception as e:
             LOG.error(f"\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
             raise
