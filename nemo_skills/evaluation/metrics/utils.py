@@ -20,7 +20,7 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def read_predictions(predictions, line_idx, file_handles, sequence_length):
+def read_predictions(predictions, line_idx, file_handles, sequence_length = None):
     data = []
     for file_idx, prediction in enumerate(predictions):
         try:
