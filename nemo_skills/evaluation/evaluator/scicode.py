@@ -36,7 +36,7 @@ DEV_STEP_NUM = 50
 def test_code(model_name, split, log_dir, output_dir, with_background=False):
     # adapted from https://github.com/scicode-bench/SciCode/blob/main/eval/scripts/test_generated_code.py
 
-    with open('/workspace/NeMo-Skills/nemo_skills/dataset/scicode/test.jsonl') as fin:
+    with open('/home/igitman/workspace/NeMo-Skills/nemo_skills/dataset/scicode/test.jsonl') as fin:
         scicode_data = [json.loads(line) for line in fin]
     json_dct = {}
     json_idx = {}
@@ -46,7 +46,7 @@ def test_code(model_name, split, log_dir, output_dir, with_background=False):
         json_idx[prob_data['problem_id']] = scicode_data.index(prob_data)
     start_time = time.time()
 
-    code_dir_ = Path('/workspace/NeMo-Skills/tmp-scicode-dir')
+    code_dir_ = Path('/home/igitman/workspace/NeMo-Skills/tmp-scicode-dir')
     tmp_dir = Path(f'tmp_{start_time}')
 
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,7 @@ def test_code(model_name, split, log_dir, output_dir, with_background=False):
 
 import h5py
 import scipy
-H5PY_FILE = "/workspace/NeMo-Skills/test_data.h5"
+H5PY_FILE = "/home/igitman/workspace/NeMo-Skills/test_data.h5"
 
 def process_hdf5_list(group):
     lst = []
@@ -166,12 +166,13 @@ def process_hdf5_to_tuple(step_id, test_num, h5py_file=H5PY_FILE):
                         f.write(line + '\n')
 
     def run_script(script_path):
+        script_path = str(script_path)
         try:
-            subprocess.run(['python', script_path], check=True, capture_output=True, text=True, timeout=1800)
+            subprocess.run(['python', script_path], check=True, text=True, timeout=1800)
             return 0
         except subprocess.CalledProcessError as e:
             print(f"Error running script {script_path}: {e}")
-            print(e.output)
+            print(e)
             return 1
         except subprocess.TimeoutExpired as e:
             print(f"Runtime error while running script {script_path}: {e}")
