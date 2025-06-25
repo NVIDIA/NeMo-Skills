@@ -14,6 +14,7 @@
 
 import logging
 import sys
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
@@ -87,6 +88,7 @@ Example:
 
 [Insert the Python code here based on the provided function header and dependencies.]
 ```
+/no_think
 """.strip()
 
         for i in range(total_steps):
@@ -94,19 +96,26 @@ Example:
             if (problem_id == "13" and i == 5) or (problem_id == "62" and i == 0) or (problem_id == "76" and i == 2):
                 continue
             previous_llm_code = generate_response_with_steps(
-                data_point, i + 1, total_steps, prompt_template, previous_llm_code, False
+                data_point, i + 1, total_steps, prompt_template, previous_llm_code, False, self.llm._generate_single
             )
 
     def llm_generate(self, data_points, data, is_async=False):
-        for data_point in data_points:
-            self.generate_single_answer(data_point, data, is_async)
+        futures = []
+
+        with ThreadPoolExecutor() as executor:
+            for data_point in data_points:
+                future = executor.submit(self.generate_single_answer, data_point, data, is_async)
+                futures.append(future)
+
+        return futures
 
     def get_llm_generations(self, requests_in_progress, generations):
-        gen_ids = list(requests_in_progress.values())
-        # outputs = self.llm.get_generations(gen_ids)
-
-        for dp_idx in requests_in_progress.keys():
-            generations[dp_idx] = {'generation': 'tmp'}
+        for dp_idx, future in requests_in_progress.items():
+            if future.done():
+                future.result()
+                generations[dp_idx] = {'generation': 'tmp'}
+            else:
+                generations[dp_idx] = {'generation': None}
 
         return requests_in_progress, generations
 

@@ -141,7 +141,7 @@ def save_response_with_steps(prob_data: dict, response: str, previous_code: str,
 
 
 def generate_response_with_steps(
-    prob_data: dict, num_steps: int, tot_steps: int, prompt_template, previous_llm_code, with_background
+    prob_data: dict, num_steps: int, tot_steps: int, prompt_template, previous_llm_code, with_background, generate_fn
 ) -> None:
     prob_id = prob_data["problem_id"]
     for prev_step in range(num_steps - 1):
@@ -154,7 +154,7 @@ def generate_response_with_steps(
                 # TODO
                 prev_file_path = Path("/workspace/SciCode/eval", "data", f"{prob_id}.{prev_step+1}.txt")
             else:
-                prev_file_path = Path('./tmp-scicode-dir' / f"{prob_id}.{prev_step + 1}.py")
+                prev_file_path = Path('/workspace/NeMo-Skills/tmp-scicode-dir' / f"{prob_id}.{prev_step + 1}.py")
             if prev_file_path.is_file():
                 prev_file_content = prev_file_path.read_text(encoding='utf-8')
                 func_name = extract_function_name(prob_data["sub_steps"][prev_step]["function_header"])
@@ -167,13 +167,9 @@ def generate_response_with_steps(
         prob_data, num_steps, prompt_template, previous_llm_code, with_background
     )
 
-    # model_kwargs = {}
-    # if "claude" in model:
-    #     model_kwargs["max_tokens"] = 4096
-    # model_kwargs["temperature"] = self.temperature
-    # # write the response to a file if it doesn't exist
-    # model_fct = get_model_function(model, **model_kwargs)
-    response_from_llm = "here is my response"  # model_fct(prompt)
+    response_from_llm = generate_fn(prompt)['generation']
     previous_llm_code[num_steps - 1] = extract_python_script(response_from_llm)
-    save_response_with_steps(prob_data, response_from_llm, previous_code, num_steps, Path('./tmp-scicode-dir'))
+    save_response_with_steps(
+        prob_data, response_from_llm, previous_code, num_steps, Path('/workspace/NeMo-Skills/tmp-scicode-dir')
+    )
     return previous_llm_code

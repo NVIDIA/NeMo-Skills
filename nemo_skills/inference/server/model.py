@@ -1130,7 +1130,6 @@ class VLLMModel(BaseModel):
         return result
 
     def get_model_name_from_server(self):
-        return "asdf"
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
