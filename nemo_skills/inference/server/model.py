@@ -619,26 +619,31 @@ class OpenAIModel(BaseModel):
             raise ValueError("`top_logprobs` > 1 is not supported by Nvidia-hosted models.")
         if stream and top_logprobs is not None:
             raise ValueError("`top_logprobs` is not supported with stream=True")
-        
+
         is_reasoning = self._is_reasoning_model(self.model)
-        
+
         if is_reasoning:
             # Reasoning model validations
             if temperature != 0.0:
-                raise ValueError("`temperature` is not supported by reasoning models, please set it to default value `0.0`.")
+                raise ValueError(
+                    "`temperature` is not supported by reasoning models, please set it to default value `0.0`."
+                )
             if top_p != 0.95:
-                raise ValueError("`top_p` is not supported by reasoning models, please set it to default value `0.95`.")
+                raise ValueError(
+                    "`top_p` is not supported by reasoning models, please set it to default value `0.95`."
+                )
             if repetition_penalty != 1.0:
-                raise ValueError("`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`.")
+                raise ValueError(
+                    "`repetition_penalty` is not supported by reasoning models, please set it to default value `1.0`."
+                )
             if top_logprobs is not None:
                 raise ValueError("`top_logprobs` is not supported by reasoning models, please set it to `None`.")
-                
+
             # Convert system to developer messages
             processed_messages = [
-                {**msg, "role": "developer"} if msg.get("role") == "system" else msg 
-                for msg in messages
+                {**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in messages
             ]
-            
+
             params = {
                 "model": self.model,
                 "messages": processed_messages,
@@ -648,14 +653,14 @@ class OpenAIModel(BaseModel):
                 "timeout": timeout,
                 "stream": stream,
             }
-            
+
             if reasoning_effort:
                 params["reasoning_effort"] = reasoning_effort
-                
+
         else:
             if reasoning_effort is not None:
                 raise ValueError("`reasoning_effort` is only supported by reasoning models, please set it to `None`.")
-            
+
             params = {
                 "model": self.model,
                 "messages": messages,
@@ -670,7 +675,7 @@ class OpenAIModel(BaseModel):
                 "timeout": timeout,
                 "stream": stream,
             }
-        
+
         return params
 
     def batch_generate(
@@ -707,13 +712,18 @@ class OpenAIModel(BaseModel):
                     top_logprobs=top_logprobs,
                     reasoning_effort=reasoning_effort,
                 )
-                
-                fout.write(json.dumps({
-                    "custom_id": f"{idx}",
-                    "method": "POST",
-                    "url": "/v1/chat/completions",
-                    "body": params,
-                }) + "\n")
+
+                fout.write(
+                    json.dumps(
+                        {
+                            "custom_id": f"{idx}",
+                            "method": "POST",
+                            "url": "/v1/chat/completions",
+                            "body": params,
+                        }
+                    )
+                    + "\n"
+                )
 
         with open("requests.jsonl", "rb") as batch_file_handle:
             batch_file_id = self.client.files.create(file=batch_file_handle, purpose="batch").id
@@ -783,7 +793,7 @@ class OpenAIModel(BaseModel):
             stream=stream,
             reasoning_effort=reasoning_effort,
         )
-        
+
         retry_count = 0
         retry_delay = self.initial_retry_delay
 
@@ -825,12 +835,12 @@ class OpenAIModel(BaseModel):
         choice = response.choices[0]
         output = choice.message.content
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        
+
         # Add reasoning token info if available (for reasoning models)
         if hasattr(response.usage, 'completion_tokens_details') and response.usage.completion_tokens_details:
             if hasattr(response.usage.completion_tokens_details, 'reasoning_tokens'):
                 result['reasoning_tokens'] = response.usage.completion_tokens_details.reasoning_tokens
-        
+
         if choice.logprobs:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
@@ -870,7 +880,7 @@ class OpenAIModel(BaseModel):
                 result["finish_reason"] = finish_reason
                 if not cur_delta:
                     result["generation"] = ""
-            
+
             yield result
 
 
@@ -974,7 +984,7 @@ class VLLMModel(BaseModel):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for VLLM
     ) -> dict | Stream:
-        
+
         # Handle chat completions for message format
         if isinstance(prompt, list):
             return self._generate_chat_completion(
@@ -991,7 +1001,7 @@ class VLLMModel(BaseModel):
                 stop_phrases=stop_phrases,
                 stream=stream,
             )
-        
+
         if isinstance(prompt, dict):
             raise NotImplementedError("TODO: need to add this support, but not implemented yet.")
         stop_phrases = stop_phrases or []
@@ -1095,14 +1105,14 @@ class VLLMModel(BaseModel):
             result['tokens'] = choice.logprobs.tokens
             result['top_logprobs'] = choice.logprobs.top_logprobs
         return result
-        
+
     @classmethod
     def parse_chat_completion_response(cls, response) -> dict:
         """Parse chat completion response."""
         assert len(response.choices) == 1
         choice = response.choices[0]
         output = choice.message.content
-        
+
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
@@ -1113,13 +1123,14 @@ class VLLMModel(BaseModel):
                 if token_logprob.token not in logprob:
                     logprob[token_logprob.token] = token_logprob.logprob
                 result['top_logprobs'].append(logprob)
-        
+
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-            
+
         return result
 
     def get_model_name_from_server(self):
+        return "asdf"
         model_list = self.oai_client.models.list()
         model_name = model_list.data[0].id
         return model_name
@@ -1161,17 +1172,18 @@ class VLLMModel(BaseModel):
 
                 if remaining:
                     yield {"generation": remaining}
-    
+
     def _stream_chunks_chat(self, response):
         """Helper generator for chat completion streaming."""
         for chunk in response:
             if hasattr(chunk.choices[0], "delta") and chunk.choices[0].delta.content:
                 cur_delta = chunk.choices[0].delta.content
                 yield {"generation": cur_delta}
-            
+
             finish_reason = getattr(chunk.choices[0], "finish_reason", None)
             if finish_reason:
                 yield {"generation": "", "finish_reason": finish_reason}
+
 
 class MegatronModel(BaseModel):
     # it's partially openai-compatible but not fully, so can't easily reuse the other class..
@@ -1326,7 +1338,9 @@ class MegatronModel(BaseModel):
         return outputs
 
     @classmethod
-    def parse_openai_response(cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None) -> dict | list[dict]:
+    def parse_openai_response(
+        cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None
+    ) -> dict | list[dict]:
         """Parse OpenAI response to extract the generated text and other metadata.
 
         Args:

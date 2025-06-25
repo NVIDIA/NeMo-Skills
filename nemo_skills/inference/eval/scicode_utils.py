@@ -17,6 +17,7 @@
 import ast
 import logging
 import re
+from pathlib import Path
 
 from nemo_skills.utils import get_logger_name
 
@@ -150,10 +151,10 @@ def generate_response_with_steps(
                 or (prob_id == "62" and prev_step == 0)
                 or (prob_id == "76" and prev_step == 2)
             ):
-                assert False
-                # prev_file_path = Path("eval", "data", f"{prob_id}.{prev_step+1}.txt")
+                # TODO
+                prev_file_path = Path("/workspace/SciCode/eval", "data", f"{prob_id}.{prev_step+1}.txt")
             else:
-                prev_file_path = './tmp-scicode-dir' / f"{prob_id}.{prev_step + 1}.py"
+                prev_file_path = Path('./tmp-scicode-dir' / f"{prob_id}.{prev_step + 1}.py")
             if prev_file_path.is_file():
                 prev_file_content = prev_file_path.read_text(encoding='utf-8')
                 func_name = extract_function_name(prob_data["sub_steps"][prev_step]["function_header"])
@@ -174,5 +175,5 @@ def generate_response_with_steps(
     # model_fct = get_model_function(model, **model_kwargs)
     response_from_llm = "here is my response"  # model_fct(prompt)
     previous_llm_code[num_steps - 1] = extract_python_script(response_from_llm)
-    save_response_with_steps(prob_data, response_from_llm, previous_code, num_steps, './tmp-scicode-dir')
+    save_response_with_steps(prob_data, response_from_llm, previous_code, num_steps, Path('./tmp-scicode-dir'))
     return previous_llm_code

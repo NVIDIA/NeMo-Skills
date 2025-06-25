@@ -18,4 +18,5 @@ DATASET_GROUP = 'code'
 METRICS_TYPE = '...'
 EVAL_SPLIT = 'test'
 EVAL_ARGS = "++eval_type=scicode"
-GENERATION_ARGS = "++generation_module=nemo_skills.inference.eval.scicode"
+GENERATION_ARGS = ""
+GENERATION_MODULE = "nemo_skills.inference.eval.scicode"

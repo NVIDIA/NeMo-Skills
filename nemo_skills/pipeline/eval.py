@@ -73,7 +73,9 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
     benchmark_gen_args = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
     requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
 
-    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox
+    generation_module = getattr(benchmark_module, "GENERATION_MODULE")
+
+    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox, generation_module
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -308,7 +310,7 @@ def eval(
     benchmark_required_sandbox = {}
 
     for benchmark, rs_num in benchmarks.items():
-        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
+        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox, generation_module = add_default_args(
             cluster_config,
             benchmark,
             split,
@@ -337,14 +339,25 @@ def eval(
             for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
                 job_benchmarks.add(benchmark)
+                import importlib
+
+                generation_task = importlib.import_module(generation_module)
+                if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+                    raise ValueError(
+                        f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+                        "Please provide a valid generation module."
+                    )
+                generation_task = generation_task.GENERATION_TASK_CLASS
+
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,
                     output_dir=benchmark_output_dir,
-                    extra_arguments=f"{bench_gen_args} {job_extra_arguments}",
+                    extra_arguments=f"{generation_task.get_generation_default_args()} {bench_gen_args} {job_extra_arguments}",
                     random_seed=seed,
                     eval_args=f"{bench_eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
+                    script=generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )
@@ -374,6 +387,7 @@ def eval(
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
         for idx, (cmds, job_needs_sandbox, job_server_config, job_server_address) in enumerate(job_batches):
             prev_tasks = None
+
             for _ in range(dependent_jobs + 1):
                 new_task = pipeline_utils.add_task(
                     exp,
@@ -393,6 +407,8 @@ def eval(
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
                     task_dependencies=prev_tasks,
+                    # TODO: some kind of assert?
+                    # get_server_command=generation_task.get_server_command_fn(),
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 )
