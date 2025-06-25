@@ -14,9 +14,12 @@
 
 import json
 import logging
+import shutil
+import subprocess
 import time
 from pathlib import Path
 
+import numpy as np
 from tqdm import tqdm
 
 from nemo_skills.evaluation.math_grader import extract_answer
@@ -24,12 +27,17 @@ from nemo_skills.utils import get_logger_name, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+PROB_NUM = 80
+DEV_PROB_NUM = 15
+STEP_NUM = 288
+DEV_STEP_NUM = 50
 
-def test_code(model_name, split, code_dir, log_dir, output_dir, with_background=False):
+
+def test_code(model_name, split, log_dir, output_dir, with_background=False):
     # adapted from https://github.com/scicode-bench/SciCode/blob/main/eval/scripts/test_generated_code.py
 
-    scicode_data = read_from_hf_dataset(split)
-    scicode_data = [data for data in scicode_data]
+    with open('/workspace/NeMo-Skills/nemo_skills/dataset/scicode/test.jsonl') as fin:
+        scicode_data = [json.loads(line) for line in fin]
     json_dct = {}
     json_idx = {}
 
@@ -57,9 +65,97 @@ def test_code(model_name, split, code_dir, log_dir, output_dir, with_background=
             with open(assert_file, 'w', encoding='utf-8') as f:
                 f.write(code_content)
                 f.write(
-                    f"""
+                    """
 
-from scicode.parse.parse import process_hdf5_to_tuple
+import h5py
+import scipy
+H5PY_FILE = "/workspace/NeMo-Skills/test_data.h5"
+
+def process_hdf5_list(group):
+    lst = []
+    for key in group.keys():
+        lst.append(group[key][()])
+    return lst
+
+
+def process_hdf5_dict(group):
+    dict = {}
+    for key, obj in group.items():
+        if isinstance(obj, h5py.Group):
+            dict[key] = process_hdf5_sparse_matrix(obj['sparse_matrix'])
+        elif isinstance(obj[()], bytes):
+            dict[key] = obj[()].decode('utf-8', errors='strict')
+        else:
+            try:
+                tmp = float(key)
+                dict[tmp] = obj[()]
+            except ValueError:
+                dict[key] = obj[()]
+    return dict
+
+
+def process_hdf5_sparse_matrix(group):
+    data = group['data'][()]
+    shape = tuple(group['shape'][()])
+    if 'row' in group and 'col' in group:
+        row = group['row'][()]
+        col = group['col'][()]
+        return scipy.sparse.coo_matrix((data, (row, col)), shape=shape)
+    elif 'blocksize' in group:
+        indices = group['indices'][()]
+        indptr = group['indptr'][()]
+        blocksize = tuple(group['blocksize'][()])
+        return scipy.sparse.bsr_matrix((data, indices, indptr), shape=shape, blocksize=blocksize)
+    else:
+        indices = group['indices'][()]
+        indptr = group['indptr'][()]
+        return scipy.sparse.csr_matrix((data, indices, indptr), shape=shape)
+
+
+def process_hdf5_datagroup(group):
+    for key in group.keys():
+        if key == "list":
+            return process_hdf5_list(group[key])
+        if key == "sparse_matrix":
+            return process_hdf5_sparse_matrix(group[key])
+        else:
+            return process_hdf5_dict(group)
+
+
+def process_hdf5_to_tuple(step_id, test_num, h5py_file=H5PY_FILE):
+    data_lst = []
+    with h5py.File(h5py_file, 'r') as f:
+        for test_id in range(test_num):
+            group_path = f'{step_id}/test{test_id + 1}'
+            if isinstance(f[group_path], h5py.Group):
+                group = f[group_path]  # test1, test2, test3
+                num_keys = [key for key in group.keys()]
+                if len(num_keys) == 1:  # only 1 var in the test
+                    subgroup = group[num_keys[0]]
+                    if isinstance(subgroup, h5py.Dataset):
+                        if isinstance(subgroup[()], bytes):
+                            data_lst.append(subgroup[()].decode('utf-8', errors='strict'))
+                        else:
+                            data_lst.append(subgroup[()])
+                    elif isinstance(subgroup, h5py.Group):
+                        data_lst.append(process_hdf5_datagroup(subgroup))
+                else:
+                    var_lst = []
+                    for key in group.keys():  # var1, var2, var3
+                        subgroup = group[key]
+                        if isinstance(subgroup, h5py.Dataset):
+                            if isinstance(subgroup[()], bytes):
+                                var_lst.append(subgroup[()].decode('utf-8', errors='strict'))
+                            else:
+                                var_lst.append(subgroup[()])
+                        elif isinstance(subgroup, h5py.Group):
+                            var_lst.append(process_hdf5_datagroup(subgroup))
+                    data_lst.append(tuple(var_lst))
+            else:
+                raise FileNotFoundError(f'Path {group_path} not found in the file.')
+    return data_lst
+
+
 
 """
                 )
@@ -95,7 +191,7 @@ from scicode.parse.parse import process_hdf5_to_tuple
             prob_id = func_id.split('.')[0]
             print(f'Testing function {func_id} ...')
             tot_prob[int(prob_id) - 1] += 1
-            logs_dir_ = Path(log_dir, model_name, _get_background_dir(with_background))
+            logs_dir_ = Path(log_dir, model_name)
             logs_dir_.mkdir(parents=True, exist_ok=True)
             logs_file = Path(logs_dir_, f'{file_path.stem}.txt')
             if logs_file.exists():
@@ -131,7 +227,7 @@ from scicode.parse.parse import process_hdf5_to_tuple
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    with open(f'{output_dir}/{model_name}_{_get_background_dir(with_background)}.txt', 'w') as f:
+    with open(f'{output_dir}/{model_name}.txt', 'w') as f:
         f.write(
             f'correct problems: {correct_prob_num}/{DEV_PROB_NUM if (split == "validation") else PROB_NUM - DEV_PROB_NUM}\n'
         )
@@ -140,18 +236,19 @@ from scicode.parse.parse import process_hdf5_to_tuple
         f.write('\ncorrect problems: ')
         f.write(f'\n\n{[i + 1 for i in range(PROB_NUM) if correct_prob[i] == tot_prob[i] and tot_prob[i] != 0]}\n')
 
-    with open(f'{output_dir}/{model_name}_{_get_background_dir(with_background)}.json', 'w', encoding='utf-8') as f:
+    with open(f'{output_dir}/{model_name}.json', 'w', encoding='utf-8') as f:
         json.dump(correct_dict, f, indent=4)
 
     shutil.rmtree(tmp_dir)
 
 
 def eval_scicode(cfg):
-    for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
-            data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
-            for sample in tqdm(data):
-                sample['predicted_answer'] = extract_answer(sample["generation"])
-                sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
-                fout.write(json.dumps(sample) + "\n")
+    test_code('model', 'test', 'tmp-scicode-eval', 'tmp-scicode-eval')
+    # for file in unroll_files(cfg.input_files):
+    #     with open(file, 'rt', encoding='utf-8') as fin:
+    #         data = [json.loads(line) for line in fin]
+    #     with open(file, 'wt', encoding='utf-8') as fout:
+    #         for sample in tqdm(data):
+    #             sample['predicted_answer'] = extract_answer(sample["generation"])
+    #             sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
+    #             fout.write(json.dumps(sample) + "\n")
