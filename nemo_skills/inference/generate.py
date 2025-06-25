@@ -412,6 +412,7 @@ class GenerationTask:
         generate_method = self.llm.generate_async if is_async else self.llm.generate
         return generate_method(**generation_params)
 
+    # TODO: rewrite mtbench to have turns separated in data file and remove this method
     def llm_generate_multi_turn(self, data_points, data):
         # TODO: this will not be efficient if different elements have different number of turns
         # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
@@ -491,7 +492,7 @@ class GenerationTask:
         for dp_idx, output in zip(requests_in_progress.keys(), outputs):
             generations[dp_idx] = output
 
-        return (requests_in_progress, generations)
+        return requests_in_progress, generations
 
     def async_loop(self, data):
         """Async loop to generate generations."""
