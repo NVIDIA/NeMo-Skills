@@ -154,11 +154,13 @@ def generate_response_with_steps(
                 # TODO
                 prev_file_path = Path("/workspace/SciCode/eval", "data", f"{prob_id}.{prev_step+1}.txt")
             else:
-                prev_file_path = Path('/workspace/NeMo-Skills/tmp-scicode-dir' / f"{prob_id}.{prev_step + 1}.py")
+                prev_file_path = Path('/workspace/NeMo-Skills/tmp-scicode-dir2' / f"{prob_id}.{prev_step + 1}.py")
+                assert False
             if prev_file_path.is_file():
                 prev_file_content = prev_file_path.read_text(encoding='utf-8')
                 func_name = extract_function_name(prob_data["sub_steps"][prev_step]["function_header"])
                 function_code = get_function_from_code(prev_file_content, func_name)
+                print(prev_file_path, function_code)
                 previous_llm_code[prev_step] = function_code
             else:
                 raise Exception(f'Generating {prob_id} step {num_steps} ahead of step {prev_step + 1}.')
@@ -170,6 +172,6 @@ def generate_response_with_steps(
     response_from_llm = generate_fn(prompt)['generation']
     previous_llm_code[num_steps - 1] = extract_python_script(response_from_llm)
     save_response_with_steps(
-        prob_data, response_from_llm, previous_code, num_steps, Path('/workspace/NeMo-Skills/tmp-scicode-dir')
+        prob_data, response_from_llm, previous_code, num_steps, Path('/workspace/NeMo-Skills/tmp-scicode-dir2')
     )
     return previous_llm_code
