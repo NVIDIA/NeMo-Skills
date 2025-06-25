@@ -119,7 +119,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         include_patterns = []
         include_pattern_relative_paths = []
 
-    check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
+    check_uncommited_changes = not bool(int(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0)))
 
     # are we in a git repo? If yes, we are uploading the current code
     repo_path = get_git_repo_path(path=None)  # check if we are in a git repo in pwd
