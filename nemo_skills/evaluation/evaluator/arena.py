@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,21 +14,11 @@
 
 import json
 import logging
-import re
-import shutil
-import subprocess
-from argparse import Namespace
 from copy import deepcopy
-from dataclasses import asdict, field
 from pathlib import Path
-from typing import Any, Callable, Dict
 
 from tqdm import tqdm
 
-from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.evaluation.code_evaluators.livecodebench import eval_livecodebench
-from nemo_skills.evaluation.constants import JUDGE_MODEL
-from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_answer
 from nemo_skills.inference.server.model import get_model
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
@@ -36,118 +26,7 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-# TODO: split into multiple files
-
-
-def eval_mcq(cfg):
-    for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
-            data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
-            for sample in tqdm(data):
-                sample['predicted_answer'] = extract_answer(sample["generation"])
-                sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
-                fout.write(json.dumps(sample) + "\n")
-
-
-@nested_dataclass(kw_only=True)
-class MathEvaluatorConfig:
-    numeric_precision: int = 15
-    timeout: int = 10
-    # if True will not attempt to re-extract based on \boxed or regex
-    use_predicted_answer_key: bool = False
-
-    extract_from_boxed: bool = True
-    # only used if extract_from_boxed is False
-    extract_regex: str = r"The final answer is (.+)$"
-    take_modulo: int | None = None  # will take modulo of the gt and predicted answers if not None
-
-
-def eval_math(cfg):
-    eval_config = MathEvaluatorConfig(**cfg.eval_config)
-
-    eval_config = asdict(eval_config)
-    batch_evaluate_results(
-        input_files=cfg.input_files,
-        **eval_config,
-    )
-
-
-def eval_code(cfg):
-    # TODO: need to move it to a separate docker (either our sandbox or separate srun)
-    from evalplus.evaluate import evaluate
-    from omegaconf import OmegaConf
-
-    from nemo_skills.evaluation.code_utils import preprocess_code
-
-    # processing each generation separately (TODO: evalplus can do it together, but need to figure out the format)
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line)) for line in f]
-        # all changes will be done with a new key "completion", so it's ok to write to the same file
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
-        eval_config = {
-            "samples": jsonl_file,
-            "base_only": False,
-            "parallel": None,
-            "i_just_wanna_run": False,
-            "test_details": False,
-            "min_time_limit": 1,
-            "gt_time_limit_factor": 4.0,
-            "mini": False,
-            "noextreme": False,
-            "version": "default",
-        }
-        eval_config.update(OmegaConf.to_container(cfg.eval_config))
-        evaluate(Namespace(**eval_config))
-        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
-            evalplus_grades = json.load(fin)
-        # adding is_correct key to allow compute_metrics to work
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample['is_correct'] = evalplus_grades['eval'][sample['task_id']][0]['base_status'] == "pass"
-                sample['is_correct-plus'] = (
-                    sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
-                )
-                f.write(json.dumps(sample) + "\n")
-
-        # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
-
-
-def eval_if(cfg):
-    for jsonl_file in unroll_files(cfg.input_files):
-        parent_dir = Path(jsonl_file).absolute().parent
-        cmd = (
-            'cd /opt/benchmarks/google-research && python -m instruction_following_eval.evaluation_main '
-            f'--input_data={jsonl_file} '
-            f'--input_response_data={jsonl_file} '
-            f'--output_dir={parent_dir} '
-        )
-        subprocess.run(cmd, shell=True, check=True)
-        # fusing eval metrics back into the generation file
-        with open(jsonl_file, "rt", encoding="utf-8") as f:
-            samples = [json.loads(line) for line in f]
-
-        with open(parent_dir / 'eval_results_loose.jsonl', 'rt', encoding="utf-8") as f:
-            eval_results = [json.loads(line) for line in f]
-        for sample, eval_result in zip(samples, eval_results):
-            sample['loose_eval'] = eval_result
-
-        with open(parent_dir / 'eval_results_strict.jsonl', 'rt', encoding="utf-8") as f:
-            eval_results = [json.loads(line) for line in f]
-        for sample, eval_result in zip(samples, eval_results):
-            sample['strict_eval'] = eval_result
-
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
-
-        # removing metric files to avoid reusing them
-        (parent_dir / 'eval_results_loose.jsonl').unlink()
-        (parent_dir / 'eval_results_strict.jsonl').unlink()
+JUDGE_MODEL = 'gpt-4-1106-preview'
 
 
 @nested_dataclass(kw_only=True)
@@ -378,132 +257,3 @@ def eval_mtbench(cfg):
 
             # removing judgement file
             Path(output_file).unlink()
-
-
-def dummy_eval(cfg):
-    return
-
-
-@nested_dataclass(kw_only=True)
-class LeanEvaluatorConfig:
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
-    num_parallel_requests: int = 10
-    in_memory_lines: int = 500
-    timeout: float = 30.0
-    ignore_cache: bool = False
-    final_answer_key: str = "**FINAL ANSWER**"
-    restate_formal_statement: bool = True
-
-
-def eval_lean4_proof(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
-
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop('sandbox')
-    sandbox.batch_evaluate_results(
-        input_files=cfg.input_files,
-        answer_format='lean4-proof',
-        **eval_config_dict,
-    )
-
-
-def eval_lean4_statement(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
-
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop('sandbox')
-    sandbox.batch_evaluate_results(
-        input_files=cfg.input_files,
-        answer_format='lean4-statement',
-        **eval_config_dict,
-    )
-
-
-@nested_dataclass(kw_only=True)
-class RulerEvaluatorConfig:
-    parse_func: str = "default"
-    match_type: str
-
-
-def eval_ruler(cfg):
-    def default_parse(prediction):
-        prediction = prediction.strip()
-        # Remove all non-printable characters
-        np_pattern = re.compile(r'[\x00-\x1f]')
-        pp_predict = np_pattern.sub('\n', prediction).strip()
-        return pp_predict
-
-    def string_match_all_single(preds, refs):
-        """the metric function with input (predictions: [str], references: [[str]]) to compute score."""
-        preds = [preds]
-        refs = [refs]
-        score = [
-            sum([1.0 if r.lower() in pred.lower() else 0.0 for r in ref]) / len(ref) for pred, ref in zip(preds, refs)
-        ][0]
-        return score
-
-    def string_match_part_single(preds, refs):
-        preds = [preds]
-        refs = [refs]
-        score = [
-            sum([max([1.0 if r.lower() in pred.lower() else 0.0 for r in ref]) for pred, ref in zip(preds, refs)])
-        ][0]
-        return score
-
-    eval_config = RulerEvaluatorConfig(**cfg.eval_config)
-
-    parse_funcs = {
-        'default': default_parse,
-    }
-    match_type_funcs = {
-        'all': string_match_all_single,
-        'part': string_match_part_single,
-    }
-
-    for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
-            data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
-            for sample in tqdm(data):
-                parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
-                sample['is_correct'] = match_type_funcs[eval_config.match_type](
-                    sample['generation'], sample['expected_answer']
-                )
-                sample['predicted_answer'] = parse_result
-                fout.write(json.dumps(sample) + "\n")
-
-
-EVALUATOR_MAP = {
-    'math': eval_math,
-    'code': eval_code,
-    'if': eval_if,
-    'arena': eval_arena,
-    'mt-bench': eval_mtbench,
-    'answer_judgement': dummy_eval,
-    'lean4-proof': eval_lean4_proof,
-    'lean4-statement': eval_lean4_statement,
-    'multichoice': eval_mcq,
-    'ruler': eval_ruler,
-    'livecodebench': eval_livecodebench,
-}
-
-
-def is_evaluator_registered(eval_type: str):
-    return eval_type in EVALUATOR_MAP
-
-
-def register_evaluator(eval_type: str, eval_fn: Callable[[Dict[str, Any]], None]):
-    if is_evaluator_registered(eval_type):
-        raise ValueError(f"Evaluator for {eval_type} already registered")
-
-    EVALUATOR_MAP[eval_type] = eval_fn
-
-
-def evaluate(cfg):
-    if cfg.eval_type not in EVALUATOR_MAP:
-        raise ValueError(
-            f"Evaluator not found for type: {cfg.eval_type}.\nSupported types: {str(EVALUATOR_MAP.keys())}"
-        )
-    return EVALUATOR_MAP[cfg.eval_type](cfg)
