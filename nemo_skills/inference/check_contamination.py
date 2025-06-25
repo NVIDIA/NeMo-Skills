@@ -113,7 +113,7 @@ class CheckContaminationTask(GenerationTask):
 
         return query_data
 
-    def _prefill_generation(self, data_point):
+    def prefill_generation(self, data_point):
         """Prefill contamination if there is a string match between the problem and the similar items"""
         for similar_item in data_point['similar_items']:
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
