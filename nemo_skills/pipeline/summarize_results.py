@@ -342,6 +342,7 @@ def summarize_results(
         print(
             f"Results are synced to wandb project {wandb_project} under the name {wandb_name} and group {wandb_group}"
         )
+    return results
 
 
 if __name__ == "__main__":
