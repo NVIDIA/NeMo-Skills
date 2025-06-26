@@ -475,6 +475,118 @@ def eval_ruler(cfg):
                 fout.write(json.dumps(sample) + "\n")
 
 
+@nested_dataclass(kw_only=True)
+class BFCLEvaluatorConfig:
+    timeout: int = 300
+    test_categories: str = "simple,parallel,multiple"
+    output_dir: str = ""
+
+
+def eval_bfcl(cfg):
+    """BFCL (Berkeley Function Calling Leaderboard) evaluation wrapper.
+    
+    This function wraps the external BFCL evaluation tool, converting between
+    NeMo-Skills format and BFCL format, then merging results back.
+    """
+    eval_config = BFCLEvaluatorConfig(**cfg.eval_config)
+    
+    for jsonl_file in unroll_files(cfg.input_files):
+        parent_dir = Path(jsonl_file).absolute().parent
+        
+        # Convert NeMo-Skills format to BFCL format
+        bfcl_input_file = _convert_to_bfcl_format(jsonl_file)
+        
+        try:
+            # Run BFCL evaluation using the CLI
+            cmd = (
+                f'bfcl evaluate --model-path {bfcl_input_file} '
+                f'--test-category {eval_config.test_categories}'
+            )
+            
+            if eval_config.output_dir:
+                cmd += f' --output-dir {eval_config.output_dir}'
+            else:
+                cmd += f' --output-dir {parent_dir}'
+            
+            LOG.info(f"Running BFCL evaluation: {cmd}")
+            subprocess.run(cmd, shell=True, check=True, timeout=eval_config.timeout)
+            
+            # Merge BFCL results back into original file
+            _merge_bfcl_results(jsonl_file, parent_dir, eval_config.test_categories)
+            
+        except subprocess.TimeoutExpired:
+            LOG.error(f"BFCL evaluation timed out after {eval_config.timeout} seconds")
+            raise
+        except subprocess.CalledProcessError as e:
+            LOG.error(f"BFCL evaluation failed with return code {e.returncode}")
+            raise
+        finally:
+            # Clean up temporary BFCL input file
+            if bfcl_input_file.exists():
+                bfcl_input_file.unlink()
+
+
+def _convert_to_bfcl_format(jsonl_file):
+    """Convert NeMo-Skills JSONL format to BFCL expected format."""
+    bfcl_file = Path(jsonl_file).with_suffix('.bfcl.jsonl')
+    
+    with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
+         open(bfcl_file, 'wt', encoding='utf-8') as fout:
+        
+        for line in fin:
+            sample = json.loads(line)
+            
+            # Convert to BFCL format - adjust based on actual BFCL input requirements
+            bfcl_sample = {
+                'id': sample.get('id', sample.get('problem_id', '')),
+                'question': sample.get('question', sample.get('problem', '')),
+                'response': sample.get('generation', ''),
+                'ground_truth': sample.get('expected_answer', sample.get('answer', '')),
+            }
+            
+            # Include any function definitions if present
+            if 'functions' in sample:
+                bfcl_sample['functions'] = sample['functions']
+            if 'tools' in sample:
+                bfcl_sample['tools'] = sample['tools']
+                
+            fout.write(json.dumps(bfcl_sample) + '\n')
+    
+    return bfcl_file
+
+
+def _merge_bfcl_results(jsonl_file, parent_dir, test_categories):
+    """Merge BFCL evaluation results back into the original NeMo-Skills file."""
+    # Read original data
+    with open(jsonl_file, 'rt', encoding='utf-8') as fin:
+        samples = [json.loads(line) for line in fin]
+    
+    # Find and read BFCL result files
+    categories = test_categories.split(',')
+    for category in categories:
+        result_file = parent_dir / f'BFCL_v3_{category.strip()}_score.json'
+        if result_file.exists():
+            with open(result_file, 'rt', encoding='utf-8') as fin:
+                bfcl_results = json.load(fin)
+            
+            # Merge results back into samples
+            for i, sample in enumerate(samples):
+                sample_id = sample.get('id', sample.get('problem_id', str(i)))
+                if sample_id in bfcl_results:
+                    sample[f'bfcl_{category}_result'] = bfcl_results[sample_id]
+                    # Add standardized correctness keys for metrics system
+                    if 'overall_accuracy' in bfcl_results[sample_id]:
+                        sample['is_correct'] = bfcl_results[sample_id]['overall_accuracy'] > 0
+            
+            # Clean up BFCL result file
+            result_file.unlink()
+    
+    # Write merged results back
+    with open(jsonl_file, 'wt', encoding='utf-8') as fout:
+        for sample in samples:
+            fout.write(json.dumps(sample) + '\n')
+
+
 EVALUATOR_MAP = {
     'math': eval_math,
     'code': eval_code,
@@ -487,6 +599,7 @@ EVALUATOR_MAP = {
     'multichoice': eval_mcq,
     'ruler': eval_ruler,
     'livecodebench': eval_livecodebench,
+    'bfcl': eval_bfcl,
 }
 
 
