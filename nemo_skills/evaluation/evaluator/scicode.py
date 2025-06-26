@@ -53,7 +53,7 @@ def test_code(eval_config, scicode_data):
             # step_id is always problem_id.subtask_step
             step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
             test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
-            code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})"
+            code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})\n"
             for idx in range(len(test_lst)):
                 code += f"target = targets[{idx}]\n\n"
                 for line in test_lst[idx].split('\n'):
