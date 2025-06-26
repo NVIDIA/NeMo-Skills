@@ -15,7 +15,7 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'eval/scicode/default'
 DATASET_GROUP = 'code'
-METRICS_TYPE = '...'
+METRICS_TYPE = 'scicode'
 EVAL_SPLIT = 'test'
 EVAL_ARGS = "++eval_type=scicode"
 GENERATION_ARGS = ""
