@@ -87,6 +87,10 @@ class SciCodeGenerationTask(GenerationTask):
                 previous_llm_code[cur_step] = prefilled_steps_code[problem_id, cur_step]
                 continue
 
+            if out_of_context:
+                task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                continue
+
             problem_steps_str, next_step_str, previous_code_str = process_problem_steps(
                 data_point, cur_step, previous_llm_code, self.cfg.with_background
             )
@@ -98,9 +102,6 @@ class SciCodeGenerationTask(GenerationTask):
                 'next_step_str': next_step_str,
                 'dependencies': dependencies,
             }
-            if out_of_context:
-                task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
-                continue
             try:
                 # we want a synchronous generation here, but it will run in a thread
                 llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
@@ -133,7 +134,7 @@ class SciCodeGenerationTask(GenerationTask):
     def llm_generate(self, data_points, data, is_async=False):
         futures = []
 
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
             for data_point in data_points:
                 future = executor.submit(self.generate_single_answer, data_point, data)
                 futures.append(future)
