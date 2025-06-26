@@ -45,27 +45,27 @@ def test_code(scicode_data):
     start_time = time.time()
 
     tmp_dir = Path(f'tmp_{start_time}')
-
     tmp_dir.mkdir(parents=True, exist_ok=True)
+    total_problems = len(scicode_data)
+    total_steps = 0
 
     for elem in scicode_data:
-        file_name = file_path.stem
-        file_id = file_name.split(".")[0]
-        file_step = file_name.split(".")[1]
-
-        code_content = file_path.read_text(encoding='utf-8')
-        json_content = scicode_data[json_idx[file_id]]
-        step_id = json_content["sub_steps"][int(file_step) - 1]["step_number"]
-        test_lst = json_content["sub_steps"][int(file_step) - 1]["test_cases"]
-        assert_file = Path(tmp_dir, f'{step_id}.py')
-        with open(assert_file, 'w', encoding='utf-8') as f:
-            f.write(code_content)
-            f.write(eval_prefix)
-            f.write(f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})" + '\n')
-            for idx in range(len(test_lst)):
-                f.write(f"target = targets[{idx}]\n\n")
-                for line in test_lst[idx].split('\n'):
-                    f.write(line + '\n')
+        for step_id, full_generation in elem['generation'].items():
+            problem_id, subtask_step = step_id.split('.')
+            total_steps += 1
+            code_content = file_path.read_text(encoding='utf-8')
+            json_content = scicode_data[json_idx[problem_id]]
+            step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
+            test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
+            assert_file = Path(tmp_dir, f'{step_id}.py')
+            with open(assert_file, 'w', encoding='utf-8') as f:
+                f.write(code_content)
+                f.write(eval_prefix)
+                f.write(f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})" + '\n')
+                for idx in range(len(test_lst)):
+                    f.write(f"target = targets[{idx}]\n\n")
+                    for line in test_lst[idx].split('\n'):
+                        f.write(line + '\n')
 
     def run_script(script_path):
         script_path = str(script_path)
@@ -88,13 +88,14 @@ def test_code(scicode_data):
     for i in range(PROB_NUM):
         correct_dict[f'{i+1}'] = []
 
+    log_dir = '/workspace/NeMo-Skills/tmp-scicode-logs'
     for file_path in tmp_dir.iterdir():
         if file_path.is_file():
             func_id = file_path.stem
             prob_id = func_id.split('.')[0]
             print(f'Testing function {func_id} ...')
             tot_prob[int(prob_id) - 1] += 1
-            logs_dir_ = Path(log_dir, model_name)
+            logs_dir_ = Path(log_dir)
             logs_dir_.mkdir(parents=True, exist_ok=True)
             logs_file = Path(logs_dir_, f'{file_path.stem}.txt')
             if logs_file.exists():
@@ -123,24 +124,12 @@ def test_code(scicode_data):
 
     correct_prob_num = sum(1 for i in range(PROB_NUM) if correct_prob[i] == tot_prob[i] and tot_prob[i] != 0)
 
+    split = 'test'
+    print(total_problems, total_steps)
     print(
         f'correct problems: {correct_prob_num}/{DEV_PROB_NUM if (split == "validation") else PROB_NUM - DEV_PROB_NUM}'
     )
     print(f'correct steps: {len(correct_step)}/{DEV_STEP_NUM if (split == "validation") else STEP_NUM}')
-
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    with open(f'{output_dir}/{model_name}.txt', 'w') as f:
-        f.write(
-            f'correct problems: {correct_prob_num}/{DEV_PROB_NUM if (split == "validation") else PROB_NUM - DEV_PROB_NUM}\n'
-        )
-        f.write(f'correct steps: {len(correct_step)}/{DEV_STEP_NUM if (split == "validation") else STEP_NUM}\n\n')
-        f.write(f'duration: {test_time} seconds\n')
-        f.write('\ncorrect problems: ')
-        f.write(f'\n\n{[i + 1 for i in range(PROB_NUM) if correct_prob[i] == tot_prob[i] and tot_prob[i] != 0]}\n')
-
-    with open(f'{output_dir}/{model_name}.json', 'w', encoding='utf-8') as f:
-        json.dump(correct_dict, f, indent=4)
 
     shutil.rmtree(tmp_dir)
 

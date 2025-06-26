@@ -86,9 +86,9 @@ class SciCodeGenerationTask(GenerationTask):
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns
-            task_solutions[(problem_id, cur_step)] = f'{previous_code}\n{extracted_python}'
+            task_solutions[f"{problem_id}.{cur_step}"] = f'{previous_code}\n{extracted_python}'
 
-        # generation is a dict[(problem_id, subtask_step): full_solution] here
+        # generation is a dict["problem_id.subtask_step": full_solution] here
         return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
 
     def llm_generate(self, data_points, data, is_async=False):
