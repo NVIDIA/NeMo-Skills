@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module
+from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
 
@@ -339,7 +341,6 @@ def eval(
             for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
                 job_benchmarks.add(benchmark)
-                import importlib
 
                 generation_task = importlib.import_module(generation_module)
                 if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
@@ -348,6 +349,14 @@ def eval(
                         "Please provide a valid generation module."
                     )
                 generation_task = generation_task.GENERATION_TASK_CLASS
+                if (
+                    generation_task.get_server_command_fn != GenerationTask.get_server_command_fn
+                    and num_jobs != total_evals
+                ):
+                    raise ValueError(
+                        f"Class {generation_task} overrides get_server_command_fn, "
+                        "which is not supported for evaluation when grouping jobs."
+                    )
 
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,
@@ -365,7 +374,16 @@ def eval(
 
                 if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
                     job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
-                    job_batches.append((job_cmds, job_needs_sandbox, job_server_config, job_server_address))
+                    job_batches.append(
+                        (
+                            job_cmds,
+                            job_needs_sandbox,
+                            job_server_config,
+                            job_server_address,
+                            # a check above guarantees that this is the same for all tasks in a job
+                            generation_task.get_server_command_fn(),
+                        )
+                    )
                     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
                         model=model,
                         server_type=server_type,
@@ -385,7 +403,8 @@ def eval(
 
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        for idx, (cmds, job_needs_sandbox, job_server_config, job_server_address) in enumerate(job_batches):
+        for idx, job_args in enumerate(job_batches):
+            cmds, job_needs_sandbox, job_server_config, job_server_address, job_server_command = job_args
             prev_tasks = None
 
             for _ in range(dependent_jobs + 1):
@@ -407,8 +426,7 @@ def eval(
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
                     task_dependencies=prev_tasks,
-                    # TODO: some kind of assert?
-                    # get_server_command=generation_task.get_server_command_fn(),
+                    get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 )
