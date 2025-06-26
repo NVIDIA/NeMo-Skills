@@ -54,6 +54,7 @@ def test_code(scicode_data):
             problem_id, subtask_step = step_id.split('.')
             total_steps += 1
             json_content = scicode_data[json_idx[problem_id]]
+            # step_id is always problem_id.subtask_step
             step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
             test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
             assert_file = Path(tmp_dir, f'{step_id}.py')
@@ -84,42 +85,26 @@ def test_code(scicode_data):
     correct_step = []
     correct_dict = {}
 
+    status_list = []
+
     for i in range(PROB_NUM):
         correct_dict[f'{i+1}'] = []
 
-    log_dir = './tmp-scicode-logs'
     for file_path in tmp_dir.iterdir():
         if file_path.is_file():
             func_id = file_path.stem
             prob_id = func_id.split('.')[0]
             print(f'Testing function {func_id} ...')
             tot_prob[int(prob_id) - 1] += 1
-            logs_dir_ = Path(log_dir)
-            logs_dir_.mkdir(parents=True, exist_ok=True)
-            logs_file = Path(logs_dir_, f'{file_path.stem}.txt')
-            if logs_file.exists():
-                with open(logs_file, 'r') as f:
-                    content = f.read().splitlines()
-                    if content[0] == 'pass':
-                        correct_prob[int(prob_id) - 1] += 1
-                        correct_step.append(func_id)
-                        correct_dict[prob_id].append(func_id)
-                continue
             ret = run_script(file_path)
             if ret == 0:
                 correct_prob[int(prob_id) - 1] += 1
                 correct_step.append(func_id)
                 correct_dict[str(prob_id)].append(func_id)
-                with open(logs_file, 'w') as f:
-                    f.write('pass')
             elif ret == 1:
-                with open(logs_file, 'w') as f:
-                    f.write('fail')
+                pass
             else:
-                with open(logs_file, 'w') as f:
-                    f.write('time out')
-
-    test_time = time.time() - start_time
+                pass
 
     correct_prob_num = sum(1 for i in range(PROB_NUM) if correct_prob[i] == tot_prob[i] and tot_prob[i] != 0)
 
@@ -134,6 +119,7 @@ def test_code(scicode_data):
 
 
 def eval_scicode(cfg):
+    subprocess.run(["pip install h5py scipy"], check=True, shell=True)
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
