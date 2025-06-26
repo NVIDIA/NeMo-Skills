@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
+import openai
 
 from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -79,7 +80,7 @@ class SciCodeGenerationTask(GenerationTask):
         previous_llm_code = [None] * total_steps
         task_solutions = {}
         total_generated_tokens = 0
-
+        out_of_context = False
         for cur_step in range(total_steps):
             # this comes from original implementation, not fully sure what's the reason for this if
             if (problem_id, cur_step) in prefilled_steps_code:
@@ -97,8 +98,26 @@ class SciCodeGenerationTask(GenerationTask):
                 'next_step_str': next_step_str,
                 'dependencies': dependencies,
             }
-            # we want a synchronous generation here, but it will run in a thread
-            llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
+            if out_of_context:
+                task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                continue
+            try:
+                # we want a synchronous generation here, but it will run in a thread
+                llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
+            # TODO: this is a hack (as not all servers return that),
+            # but eventually we should support handling errors like this globally for all generations
+            except openai.BadRequestError as e:
+                if 'Please reduce the length of the messages or completion' in str(e):
+                    LOG.warning(
+                        "SciCode generation failed due to running out of context. "
+                        "Failing for subsequent subtasks automatically.",
+                    )
+                    out_of_context = True
+                    task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                    continue
+                else:
+                    raise
+
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
             if self.cfg.thinking_separator in llm_output['generation']:
                 llm_output['generation'] = llm_output['generation'].split(self.cfg.thinking_separator)[-1].strip()
