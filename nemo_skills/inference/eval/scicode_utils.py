@@ -19,7 +19,6 @@ import logging
 import re
 from pathlib import Path
 
-from nemo_skills.inference.eval.scicode_data import function_code_map
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))

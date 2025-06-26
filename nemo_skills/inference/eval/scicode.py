@@ -40,6 +40,7 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/scicode/default"
+    # TODO: change default to with background to align with aa
     with_background: bool = False
 
 
@@ -78,10 +79,10 @@ class SciCodeGenerationTask(GenerationTask):
             prepare_data_point = {
                 'problem_steps_str': problem_steps_str,
                 'next_step_str': next_step_str,
-                'previous_code': previous_code_str,
+                'dependencies': dependencies,
             }
             # we want a synchronous generation here, but it will run in a thread
-            llm_output = self.llm_generate([prepare_data_point], data, is_async=False)[0]
+            llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
@@ -91,11 +92,12 @@ class SciCodeGenerationTask(GenerationTask):
         return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
 
     def llm_generate(self, data_points, data, is_async=False):
+        # TODO: add assert that only async loop is supported
         futures = []
 
         with ThreadPoolExecutor() as executor:
             for data_point in data_points:
-                future = executor.submit(self.generate_single_answer, data_point, data, is_async)
+                future = executor.submit(self.generate_single_answer, data_point, data)
                 futures.append(future)
 
         return futures
