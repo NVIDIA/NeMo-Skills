@@ -75,7 +75,7 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
     benchmark_gen_args = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
     requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
-    generation_module = getattr(benchmark_module, "GENERATION_MODULE")
+    generation_module = getattr(benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate")
 
     return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox, generation_module
 
