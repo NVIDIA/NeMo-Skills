@@ -14,14 +14,8 @@
 
 import json
 import logging
-import shutil
-import subprocess
-import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
-from pathlib import Path
-
-import numpy as np
-from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.eval.scicode_utils import eval_prefix
@@ -34,6 +28,26 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class ScicodeEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
     timeout: float = 30.0
+    num_parallel_requests: int = 20
+
+
+def _execute_single_test(args):
+    """Helper function to execute a single test case."""
+    eval_config, elem_idx, full_generation, json_content, subtask_step = args
+
+    # step_id is always problem_id.subtask_step
+    step_number = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
+    test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
+    code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_number}', {len(test_lst)})\n"
+    for idx in range(len(test_lst)):
+        code += f"target = targets[{idx}]\n\n"
+        for line in test_lst[idx].split('\n'):
+            code += line + '\n'
+
+    sandbox = get_sandbox(**eval_config.sandbox)
+    output_dict, _ = sandbox.execute_code(code, timeout=eval_config.timeout)
+
+    return elem_idx, output_dict
 
 
 def test_code(eval_config, scicode_data):
@@ -43,24 +57,24 @@ def test_code(eval_config, scicode_data):
     for prob_data in scicode_data:
         json_idx[prob_data['problem_id']] = scicode_data.index(prob_data)
 
-    status_lists = []
-
-    for elem in scicode_data:
-        status_lists.append([])
+    # Prepare all tasks for parallel execution
+    tasks = []
+    for elem_idx, elem in enumerate(scicode_data):
         for step_id, full_generation in elem['generation'].items():
             problem_id, subtask_step = step_id.split('.')
             json_content = scicode_data[json_idx[problem_id]]
-            # step_id is always problem_id.subtask_step
-            step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
-            test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
-            code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})\n"
-            for idx in range(len(test_lst)):
-                code += f"target = targets[{idx}]\n\n"
-                for line in test_lst[idx].split('\n'):
-                    code += line + '\n'
-            sandbox = get_sandbox(**eval_config.sandbox)
-            output_dict, _ = sandbox.execute_code(code, timeout=eval_config.timeout)
-            status_lists[-1].append(output_dict)
+            tasks.append((eval_config, elem_idx, full_generation, json_content, subtask_step))
+
+    # Initialize status_lists with correct structure
+    status_lists = [[] for _ in range(len(scicode_data))]
+
+    # Execute tasks in parallel
+    with ThreadPoolExecutor(max_workers=eval_config.num_parallel_requests) as executor:
+        results = list(executor.map(_execute_single_test, tasks))
+
+    # Organize results back into the original structure
+    for elem_idx, output_dict in results:
+        status_lists[elem_idx].append(output_dict)
 
     return status_lists
 

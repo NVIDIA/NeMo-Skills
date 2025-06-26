@@ -77,7 +77,7 @@ class SciCodeGenerationTask(GenerationTask):
             )
             dependencies = data_point["required_dependencies"]
             assert next_step_str
-            previous_code = (f'{dependencies}\n{previous_code_str}\n',)
+            previous_code = f'{dependencies}\n{previous_code_str}\n'
             prepare_data_point = {
                 'problem_steps_str': problem_steps_str,
                 'next_step_str': next_step_str,
