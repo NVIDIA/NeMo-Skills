@@ -62,6 +62,11 @@ class MegatronModel(OpenAIAPIModel):
             "stop": stop_phrases or None,
             "logprobs": top_logprobs,
             "stream": stream,
+            "echo": False,
+            "n": 1,
+            "logit_bias": None,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
             "timeout": timeout,
         }
 

@@ -44,7 +44,6 @@ class VLLMModel(OpenAIAPIModel):
     def _build_completion_request_params(
         self,
         prompt: str,
-        stream: bool,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -52,9 +51,10 @@ class VLLMModel(OpenAIAPIModel):
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-        timeout: int | None = None,
         top_logprobs: int | None = None,
+        timeout: int | None = None,
+        stop_phrases: list[str] | None = None,
+        stream: bool = False,
         reasoning_effort: str | None = None,
     ) -> dict:
         return {
@@ -67,6 +67,11 @@ class VLLMModel(OpenAIAPIModel):
             "stop": stop_phrases or None,
             "logprobs": top_logprobs,
             "stream": stream,
+            "echo": False,
+            "n": 1,
+            "logit_bias": None,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
@@ -97,6 +102,9 @@ class VLLMModel(OpenAIAPIModel):
             "stop": stop_phrases or None,
             "logprobs": top_logprobs is not None,
             "top_logprobs": top_logprobs,
+            "n": 1,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
             "stream": stream,
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
