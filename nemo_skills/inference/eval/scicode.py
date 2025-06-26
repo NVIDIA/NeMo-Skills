@@ -19,8 +19,7 @@ from dataclasses import field
 
 import hydra
 
-from nemo_skills.inference.eval.scicode_data import prefilled_steps_code
-from nemo_skills.inference.eval.scicode_utils import extract_python_script, process_problem_steps
+from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -61,7 +60,7 @@ class SciCodeGenerationTask(GenerationTask):
         problem_id = data_point['problem_id']
         total_steps = len(data_point['sub_steps'])
         previous_llm_code = [None] * total_steps
-        task_solutions = []
+        task_solutions = {}
         total_generated_tokens = 0
 
         for cur_step in range(total_steps):
@@ -86,9 +85,10 @@ class SciCodeGenerationTask(GenerationTask):
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
-            task_solutions.append(f'{previous_code}\n{extracted_python}')
+            # TODO: save those as separate entries so that we can preserve intermediate progress on reruns
+            task_solutions[(problem_id, cur_step)] = f'{previous_code}\n{extracted_python}'
 
-        # generation is a list[str] here
+        # generation is a dict[(problem_id, subtask_step): full_solution] here
         return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
 
     def llm_generate(self, data_points, data, is_async=False):

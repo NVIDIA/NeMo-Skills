@@ -14,52 +14,12 @@
 
 # adapted from https://github.com/scicode-bench/SciCode/blob/main/eval/scripts/gencode.py
 
-import ast
 import logging
 import re
-from pathlib import Path
 
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-def extract_function_name(function_header):
-    pattern = r'\bdef\s+(\w+)\s*\('
-    match = re.search(pattern, function_header)
-    if match:
-        return match.group(1)
-    else:
-        pattern = r'\bclass\s+(\w+)\s*\('
-        match = re.search(pattern, function_header)
-        if match:
-            return match.group(1)
-        else:
-            raise ValueError('Function name or class name not found.')
-
-
-def get_function_from_code(code_string, function_name):
-    """
-    Extracts and returns the source code of the specified function from a given source code string.
-
-    :param code_string: String containing Python source code
-    :param function_name: Name of the function to extract
-    :return: String containing the source code of the function, or None if the function is not found
-    """
-    if code_string is None:
-        return None
-    try:
-        # Parse the code into an AST
-        tree = ast.parse(code_string)
-        # Iterate through all nodes in the AST
-        for node in ast.walk(tree):
-            # Check if the node is a function definition
-            if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name == function_name:
-                # Convert the AST back to a string containing the Python code for the function
-                return ast.unparse(node)
-    except Exception as e:
-        LOG.info(f'{function_name} not found with error: {e}')
-        return code_string
 
 
 def process_problem_code(prob_data: dict, num_steps: int) -> str:
@@ -100,23 +60,6 @@ def process_problem_steps(problem_data: dict, num_steps: int, previous_llm_code,
     return output_str, next_step_str, previous_code_str
 
 
-def generate_prompt_with_steps(prob_data: dict, num_steps: int, prompt_template, previous_llm_code, with_background):
-    # parse the input file and extract the content
-    problem_steps_str, next_step_str, previous_code_str = process_problem_steps(
-        prob_data, num_steps, previous_llm_code, with_background
-    )
-    dependencies = prob_data["required_dependencies"]
-    assert next_step_str
-    return (
-        prompt_template.format(
-            problem_steps_str=problem_steps_str,
-            next_step_str=next_step_str,
-            dependencies=dependencies,
-        ),
-        f'{dependencies}\n{previous_code_str}\n',
-    )
-
-
 def extract_python_script(response: str):
     # We will extract the python script from the response
     if '```' in response:
@@ -132,44 +75,178 @@ def extract_python_script(response: str):
     return python_script
 
 
-def save_response_with_steps(prob_data: dict, response: str, previous_code: str, num_steps: int, output_dir) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prob_id = prob_data["problem_id"]
-    output_file_path = output_dir / f"{prob_id}.{num_steps}.py"
-    python_code = extract_python_script(response)
-    output_file_path.write_text(f'{previous_code}\n{python_code}', encoding="utf-8")
+# there is a weird if condition in scicode codebase that prefills
+# this code for those problems instead of generating with an llm
+# not fully sure what's the reason, but following the original implementation
+
+prefilled_steps_code = {
+    (
+        "13",
+        5,
+    ): '''
+def __init__(self, n_grid, x_out):
+    """Constructor sets up coordinates, memory for variables.
+        The variables:
+            mesh points:
+                x: the x coordinate for each mesh grid
+                y: the y coordinate for each mesh grid
+                z: the z coordinate for each mesh grid
+                t: the time coordinate of the simulation
+                r: the distance to the origin for each mesh grid
+            evolving fields:
+                E_x: the x component of the field E
+                E_y: the y componnet of the field E
+                E_z: the z component of the field E
+                A_x: the x component of the field A
+                A_y: the y component of the field A
+                A_z: the z component of the field A
+                phi: the scalar potential field phi values
+            monitor variables:
+                constraint: the current constraint violation value from the evolving fields.
+
+        """
+    self.n_grid = n_grid
+    self.n_vars = 7
+    self.delta = float(x_out) / (n_grid - 2.0)
+    delta = self.delta
+    self.x = np.linspace(-self.delta * 0.5, x_out + 0.5 * self.delta, self.n_grid)[:, None, None]
+    self.y = np.linspace(-self.delta * 0.5, x_out + 0.5 * self.delta, self.n_grid)[None, :, None]
+    self.z = np.linspace(-self.delta * 0.5, x_out + 0.5 * self.delta, self.n_grid)[None, None, :]
+    self.r = np.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+    self.E_x = zeros((n_grid, n_grid, n_grid))
+    self.E_y = zeros((n_grid, n_grid, n_grid))
+    self.E_z = zeros((n_grid, n_grid, n_grid))
+    self.A_x = zeros((n_grid, n_grid, n_grid))
+    self.A_y = zeros((n_grid, n_grid, n_grid))
+    self.A_z = zeros((n_grid, n_grid, n_grid))
+    self.phi = zeros((n_grid, n_grid, n_grid))
+    self.constraint = zeros((n_grid, n_grid, n_grid))
+    self.t = 0.0
+'''.strip(),
+    (
+        "62",
+        0,
+    ): '''
+def __init__(self, length, basis_size, operator_dict):
+    self.length = length
+    self.basis_size = basis_size
+    self.operator_dict = operator_dict
+'''.strip(),
+    (
+        "76",
+        2,
+    ): '''
+def generate_dna(N: int, PWM: dict) -> tuple:
+    """
+    Input:
+    N (int): Length of the resultant DNA sequence.
+    PWM matrix with keys 'A', 'C', 'G', 'T'
+
+    Output:
+    tuple: Insertion location (int), DNA sequence (str), DNA reverse complement (str)
+    """
+    p = random.randint(0, N - 1)
+    nucleotide = 'ACGT'
+    uni_weights = [0.25, 0.25, 0.25, 0.25]
+    dna_string = ''.join(random.choices(nucleotide, uni_weights, k=N))
+    spike_mat = load_motif_from_df(PWM)
+    spiked_seq = ''.join((random.choices(nucleotide, weights=[PWM[nuc][i] for nuc in nucleotide], k=1)[0] for i in range(len(PWM['A']))))
+    complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+    reversed_seq = dna_string[::-1]
+    reverse_complement = ''.join((complement[nuc] for nuc in reversed_seq if nuc in complement))
+    new_seq = dna_string[:p] + spiked_seq + dna_string[p:]
+    new_seq_rc = reverse_complement[:N - p] + spiked_seq + reverse_complement[N - p:]
+    return (p, new_seq, new_seq_rc)
+'''.strip(),
+}
 
 
-def generate_response_with_steps(
-    prob_data: dict, num_steps: int, tot_steps: int, prompt_template, previous_llm_code, with_background, generate_fn
-) -> None:
-    prob_id = prob_data["problem_id"]
-    for prev_step in range(num_steps - 1):
-        if previous_llm_code[prev_step] is None:
-            if (
-                (prob_id == "13" and prev_step == 5)
-                or (prob_id == "62" and prev_step == 0)
-                or (prob_id == "76" and prev_step == 2)
-            ):
-                # TODO
-                prev_file_path = Path("/workspace/SciCode/eval", "data", f"{prob_id}.{prev_step+1}.txt")
-            if prev_file_path.is_file():
-                prev_file_content = prev_file_path.read_text(encoding='utf-8')
-                func_name = extract_function_name(prob_data["sub_steps"][prev_step]["function_header"])
-                function_code = get_function_from_code(prev_file_content, func_name)
-                print(prev_file_path, function_code, function_code_map[prob_id, prev_step])
-                assert function_code == function_code_map[prob_id, prev_step]
-                previous_llm_code[prev_step] = function_code_map[prob_id, prev_step]
+eval_prefix = """
+import h5py
+import scipy
+H5PY_FILE = "/home/igitman/workspace/NeMo-Skills/test_data.h5"
+
+def process_hdf5_list(group):
+    lst = []
+    for key in group.keys():
+        lst.append(group[key][()])
+    return lst
+
+
+def process_hdf5_dict(group):
+    dict = {}
+    for key, obj in group.items():
+        if isinstance(obj, h5py.Group):
+            dict[key] = process_hdf5_sparse_matrix(obj['sparse_matrix'])
+        elif isinstance(obj[()], bytes):
+            dict[key] = obj[()].decode('utf-8', errors='strict')
+        else:
+            try:
+                tmp = float(key)
+                dict[tmp] = obj[()]
+            except ValueError:
+                dict[key] = obj[()]
+    return dict
+
+
+def process_hdf5_sparse_matrix(group):
+    data = group['data'][()]
+    shape = tuple(group['shape'][()])
+    if 'row' in group and 'col' in group:
+        row = group['row'][()]
+        col = group['col'][()]
+        return scipy.sparse.coo_matrix((data, (row, col)), shape=shape)
+    elif 'blocksize' in group:
+        indices = group['indices'][()]
+        indptr = group['indptr'][()]
+        blocksize = tuple(group['blocksize'][()])
+        return scipy.sparse.bsr_matrix((data, indices, indptr), shape=shape, blocksize=blocksize)
+    else:
+        indices = group['indices'][()]
+        indptr = group['indptr'][()]
+        return scipy.sparse.csr_matrix((data, indices, indptr), shape=shape)
+
+
+def process_hdf5_datagroup(group):
+    for key in group.keys():
+        if key == "list":
+            return process_hdf5_list(group[key])
+        if key == "sparse_matrix":
+            return process_hdf5_sparse_matrix(group[key])
+        else:
+            return process_hdf5_dict(group)
+
+
+def process_hdf5_to_tuple(step_id, test_num, h5py_file=H5PY_FILE):
+    data_lst = []
+    with h5py.File(h5py_file, 'r') as f:
+        for test_id in range(test_num):
+            group_path = f'{step_id}/test{test_id + 1}'
+            if isinstance(f[group_path], h5py.Group):
+                group = f[group_path]  # test1, test2, test3
+                num_keys = [key for key in group.keys()]
+                if len(num_keys) == 1:  # only 1 var in the test
+                    subgroup = group[num_keys[0]]
+                    if isinstance(subgroup, h5py.Dataset):
+                        if isinstance(subgroup[()], bytes):
+                            data_lst.append(subgroup[()].decode('utf-8', errors='strict'))
+                        else:
+                            data_lst.append(subgroup[()])
+                    elif isinstance(subgroup, h5py.Group):
+                        data_lst.append(process_hdf5_datagroup(subgroup))
+                else:
+                    var_lst = []
+                    for key in group.keys():  # var1, var2, var3
+                        subgroup = group[key]
+                        if isinstance(subgroup, h5py.Dataset):
+                            if isinstance(subgroup[()], bytes):
+                                var_lst.append(subgroup[()].decode('utf-8', errors='strict'))
+                            else:
+                                var_lst.append(subgroup[()])
+                        elif isinstance(subgroup, h5py.Group):
+                            var_lst.append(process_hdf5_datagroup(subgroup))
+                    data_lst.append(tuple(var_lst))
             else:
-                raise Exception(f'Generating {prob_id} step {num_steps} ahead of step {prev_step + 1}.')
-
-    prompt, previous_code = generate_prompt_with_steps(
-        prob_data, num_steps, prompt_template, previous_llm_code, with_background
-    )
-
-    response_from_llm = generate_fn(prompt)['generation']
-    previous_llm_code[num_steps - 1] = extract_python_script(response_from_llm)
-    save_response_with_steps(
-        prob_data, response_from_llm, previous_code, num_steps, Path('/workspace/NeMo-Skills/tmp-scicode-dir2')
-    )
-    return previous_llm_code
+                raise FileNotFoundError(f'Path {group_path} not found in the file.')
+    return data_lst
+"""
