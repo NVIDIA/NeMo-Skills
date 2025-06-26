@@ -164,7 +164,7 @@ def generate_dna(N: int, PWM: dict) -> tuple:
 eval_prefix = """
 import h5py
 import scipy
-H5PY_FILE = "/home/igitman/workspace/NeMo-Skills/test_data.h5"
+H5PY_FILE = "/data/test_data.h5"
 
 def process_hdf5_list(group):
     lst = []
