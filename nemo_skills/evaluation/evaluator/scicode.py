@@ -17,39 +17,36 @@ import logging
 import shutil
 import subprocess
 import time
+from dataclasses import field
 from pathlib import Path
 
 import numpy as np
 from tqdm import tqdm
 
-from nemo_skills.evaluation.math_grader import extract_answer
+from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.eval.scicode_utils import eval_prefix
-from nemo_skills.utils import get_logger_name, unroll_files
+from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-PROB_NUM = 80
-DEV_PROB_NUM = 15
-STEP_NUM = 288
-DEV_STEP_NUM = 50
+
+@nested_dataclass(kw_only=True)
+class ScicodeEvaluatorConfig:
+    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
+    timeout: float = 30.0
 
 
-def test_code(scicode_data):
+def test_code(eval_config, scicode_data):
     # adapted from https://github.com/scicode-bench/SciCode/blob/main/eval/scripts/test_generated_code.py
-    json_dct = {}
     json_idx = {}
 
     for prob_data in scicode_data:
-        json_dct[prob_data['problem_id']] = len(prob_data['sub_steps'])
         json_idx[prob_data['problem_id']] = scicode_data.index(prob_data)
-    start_time = time.time()
 
-    tmp_dir = Path(f'tmp_{start_time}')
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    total_problems = len(scicode_data)
-    total_steps = 0
+    status_lists = []
 
     for elem in scicode_data:
+        status_lists.append([])
         for step_id, full_generation in elem['generation'].items():
             problem_id, subtask_step = step_id.split('.')
             total_steps += 1
@@ -57,70 +54,26 @@ def test_code(scicode_data):
             # step_id is always problem_id.subtask_step
             step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
             test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
-            assert_file = Path(tmp_dir, f'{step_id}.py')
-            with open(assert_file, 'w', encoding='utf-8') as f:
-                f.write(full_generation)
-                f.write(eval_prefix)
-                f.write(f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})" + '\n')
-                for idx in range(len(test_lst)):
-                    f.write(f"target = targets[{idx}]\n\n")
-                    for line in test_lst[idx].split('\n'):
-                        f.write(line + '\n')
+            code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})"
+            for idx in range(len(test_lst)):
+                code += f"target = targets[{idx}]\n\n"
+                for line in test_lst[idx].split('\n'):
+                    code += line + '\n'
+            sandbox = get_sandbox(**eval_config.sandbox)
+            output_dict, _ = sandbox.execute_code(code, timeout=eval_config.timeout)
+            status_lists[-1].append(output_dict)
 
-    def run_script(script_path):
-        script_path = str(script_path)
-        try:
-            subprocess.run(['python', script_path], check=True, text=True, timeout=1800)
-            return 0
-        except subprocess.CalledProcessError as e:
-            print(f"Error running script {script_path}: {e}")
-            print(e)
-            return 1
-        except subprocess.TimeoutExpired as e:
-            print(f"Runtime error while running script {script_path}: {e}")
-            return 2
-
-    correct_prob = np.zeros(PROB_NUM)
-    tot_prob = np.zeros(PROB_NUM)
-    correct_step = []
-    correct_dict = {}
-
-    status_list = []
-
-    for i in range(PROB_NUM):
-        correct_dict[f'{i+1}'] = []
-
-    for file_path in tmp_dir.iterdir():
-        if file_path.is_file():
-            func_id = file_path.stem
-            prob_id = func_id.split('.')[0]
-            print(f'Testing function {func_id} ...')
-            tot_prob[int(prob_id) - 1] += 1
-            ret = run_script(file_path)
-            if ret == 0:
-                correct_prob[int(prob_id) - 1] += 1
-                correct_step.append(func_id)
-                correct_dict[str(prob_id)].append(func_id)
-            elif ret == 1:
-                pass
-            else:
-                pass
-
-    correct_prob_num = sum(1 for i in range(PROB_NUM) if correct_prob[i] == tot_prob[i] and tot_prob[i] != 0)
-
-    split = 'test'
-    print(total_problems, total_steps)
-    print(
-        f'correct problems: {correct_prob_num}/{DEV_PROB_NUM if (split == "validation") else PROB_NUM - DEV_PROB_NUM}'
-    )
-    print(f'correct steps: {len(correct_step)}/{DEV_STEP_NUM if (split == "validation") else STEP_NUM}')
-
-    shutil.rmtree(tmp_dir)
+    return status_lists
 
 
 def eval_scicode(cfg):
+    eval_config = ScicodeEvaluatorConfig(**cfg.eval_config)
     subprocess.run(["pip install h5py scipy"], check=True, shell=True)
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
-        test_code(data)
+        status_lists = test_code(eval_config, data)
+        with open(file, 'wt', encoding='utf-8') as fout:
+            for idx, elem in enumerate(data):
+                elem['eval_status'] = status_lists[idx]
+                fout.write(json.dumps(elem) + "\n")
