@@ -53,13 +53,12 @@ def test_code(scicode_data):
         for step_id, full_generation in elem['generation'].items():
             problem_id, subtask_step = step_id.split('.')
             total_steps += 1
-            code_content = file_path.read_text(encoding='utf-8')
             json_content = scicode_data[json_idx[problem_id]]
             step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
             test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
             assert_file = Path(tmp_dir, f'{step_id}.py')
             with open(assert_file, 'w', encoding='utf-8') as f:
-                f.write(code_content)
+                f.write(full_generation)
                 f.write(eval_prefix)
                 f.write(f"targets = process_hdf5_to_tuple('{step_id}', {len(test_lst)})" + '\n')
                 for idx in range(len(test_lst)):
@@ -88,7 +87,7 @@ def test_code(scicode_data):
     for i in range(PROB_NUM):
         correct_dict[f'{i+1}'] = []
 
-    log_dir = '/workspace/NeMo-Skills/tmp-scicode-logs'
+    log_dir = './tmp-scicode-logs'
     for file_path in tmp_dir.iterdir():
         if file_path.is_file():
             func_id = file_path.stem

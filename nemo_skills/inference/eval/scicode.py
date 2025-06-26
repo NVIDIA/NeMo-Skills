@@ -42,6 +42,9 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     # TODO: change default to with background to align with aa
     with_background: bool = False
 
+    thinking_separator = "</think>"
+    remove_thinking = True
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_scicode_generation_config", node=SciCodeGenerationConfig)
@@ -83,6 +86,9 @@ class SciCodeGenerationTask(GenerationTask):
             # we want a synchronous generation here, but it will run in a thread
             llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
+            if self.cfg.thinking_separator in llm_output['generation']:
+                llm_output['generation'] = llm_output['generation'].split(self.cfg.thinking_separator)[-1].strip()
+
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns
