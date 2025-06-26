@@ -16,7 +16,7 @@
 # this code for those problems instead of generating with an llm
 # not fully sure what's the reason, but following the original implementation
 
-function_code_map = {
+prefilled_steps_code = {
     (
         "13",
         5,
@@ -40,7 +40,7 @@ def __init__(self, n_grid, x_out):
                 phi: the scalar potential field phi values
             monitor variables:
                 constraint: the current constraint violation value from the evolving fields.
-                
+
         """
     self.n_grid = n_grid
     self.n_vars = 7

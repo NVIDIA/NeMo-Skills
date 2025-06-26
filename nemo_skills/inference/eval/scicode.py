@@ -15,18 +15,13 @@
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, field
-from functools import partial
+from dataclasses import field
 
 import hydra
 
-from nemo_skills.inference.eval.scicode_utils import generate_response_with_steps
-from nemo_skills.inference.generate import (
-    GenerateSolutionsConfig,
-    GenerationTask,
-    InferenceConfig,
-    combine_stop_phrases,
-)
+from nemo_skills.inference.eval.scicode_data import prefilled_steps_code
+from nemo_skills.inference.eval.scicode_utils import extract_python_script, process_problem_steps
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.server.code_execution_model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -45,6 +40,7 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/scicode/default"
+    with_background: bool = False
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -59,63 +55,40 @@ class SciCodeGenerationTask(GenerationTask):
         pass
         # TODO
 
-    def generate_single_answer(self, data_point, data, is_async):
+    def generate_single_answer(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         problem_id = data_point['problem_id']
         total_steps = len(data_point['sub_steps'])
         previous_llm_code = [None] * total_steps
+        task_solutions = []
+        total_generated_tokens = 0
 
-        prompt_template = """
-PROBLEM DESCRIPTION:
-You will be provided with the main description of the problem, previous steps, and the next step. Your task will be to generate the disciplinary knowledge necessary for solving the next step and then develop a Python solution focused on this step.
-
-PREVIOUS STEPS DESCRIPTION:
-{problem_steps_str}
-
-NEXT STEP - PROBLEM DESCRIPTION AND FUNCTION HEADER:
-This part will describe the next step in the problem-solving process. First, provide the necessary scientific background knowledge as a comment at the beginning of your response, starting with 'Background: '. Then, a function header will be provided, and your task is to develop the Python code for this next step based on the provided description and function header.
-
-{next_step_str}
-
-DEPENDENCIES:
-Use only the following dependencies in your solution. Do not include these dependencies at the beginning of your code.
-{dependencies}
-
-RESPONSE GUIDELINES:
-1. Start with the scientific background required for the next step, formatted as a comment.
-2. Then write the complete and executable Python program for the next step in a single block.
-3. Your response should focus exclusively on implementing the solution for the next step, adhering closely to the specified function header and the context provided by the initial steps.
-4. DO NOT include previous function code, example usage or test code in your response.
-5. Ensure your response is in the format of ```python``` and includes the necessary background as a comment at the top.
-
-Example:
-```python
-# Background: [Here, insert the necessary scientific knowledge required for the next step.]
-
-[Insert the Python code here based on the provided function header and dependencies.]
-```
-/no_think
-""".strip()
-        generation_params = {
-            "stop_phrases": combine_stop_phrases(
-                self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
-            ),
-            **asdict(self.cfg.inference),
-            **self.extra_generate_params,
-        }
-        for i in range(total_steps):
+        for cur_step in range(total_steps):
             # this comes from original implementation, not fully sure what's the reason for this if
-            if (problem_id == "13" and i == 5) or (problem_id == "62" and i == 0) or (problem_id == "76" and i == 2):
+            if (problem_id, cur_step) in prefilled_steps_code:
+                previous_llm_code[cur_step] = prefilled_steps_code[problem_id, cur_step]
                 continue
-            previous_llm_code, full_task_solution = generate_response_with_steps(
-                data_point,
-                i + 1,
-                total_steps,
-                prompt_template,
-                previous_llm_code,
-                False,
-                partial(self.llm._generate_single, **generation_params),
+
+            problem_steps_str, next_step_str, previous_code_str = process_problem_steps(
+                data_point, cur_step, previous_llm_code, self.cfg.with_background
             )
+            dependencies = data_point["required_dependencies"]
+            assert next_step_str
+            previous_code = (f'{dependencies}\n{previous_code_str}\n',)
+            prepare_data_point = {
+                'problem_steps_str': problem_steps_str,
+                'next_step_str': next_step_str,
+                'previous_code': previous_code_str,
+            }
+            # we want a synchronous generation here, but it will run in a thread
+            llm_output = self.llm_generate([prepare_data_point], data, is_async=False)[0]
+            total_generated_tokens += llm_output.get('num_generated_tokens', 0)
+            extracted_python = extract_python_script(llm_output['generation'])
+            previous_llm_code[cur_step] = extracted_python
+            task_solutions.append(f'{previous_code}\n{extracted_python}')
+
+        # generation is a list[str] here
+        return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
 
     def llm_generate(self, data_points, data, is_async=False):
         futures = []
@@ -130,8 +103,7 @@ Example:
     def get_llm_generations(self, requests_in_progress, generations):
         for dp_idx, future in requests_in_progress.items():
             if future.done():
-                future.result()
-                generations[dp_idx] = {'generation': 'tmp'}
+                generations[dp_idx] = future.result()
             else:
                 generations[dp_idx] = {'generation': None}
 

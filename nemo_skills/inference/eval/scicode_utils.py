@@ -133,6 +133,14 @@ def extract_python_script(response: str):
     return python_script
 
 
+def save_response_with_steps(prob_data: dict, response: str, previous_code: str, num_steps: int, output_dir) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    prob_id = prob_data["problem_id"]
+    output_file_path = output_dir / f"{prob_id}.{num_steps}.py"
+    python_code = extract_python_script(response)
+    output_file_path.write_text(f'{previous_code}\n{python_code}', encoding="utf-8")
+
+
 def generate_response_with_steps(
     prob_data: dict, num_steps: int, tot_steps: int, prompt_template, previous_llm_code, with_background, generate_fn
 ) -> None:
@@ -150,16 +158,7 @@ def generate_response_with_steps(
                 prev_file_content = prev_file_path.read_text(encoding='utf-8')
                 func_name = extract_function_name(prob_data["sub_steps"][prev_step]["function_header"])
                 function_code = get_function_from_code(prev_file_content, func_name)
-                s = ""
-                for c1, c2 in zip(function_code, function_code_map[prob_id, prev_step]):
-                    s += c1
-                    if c1 != c2:
-                        print(prev_file_path)
-                        print(function_code)
-                        print(function_code_map[prob_id, prev_step])
-                        print(s)
-                        LOG.info(f'Code mismatch at step {prev_step + 1} for problem {prob_id}: {c1} != {c2}')
-                        break
+                print(prev_file_path, function_code, function_code_map[prob_id, prev_step])
                 assert function_code == function_code_map[prob_id, prev_step]
                 previous_llm_code[prev_step] = function_code_map[prob_id, prev_step]
             else:
@@ -171,6 +170,7 @@ def generate_response_with_steps(
 
     response_from_llm = generate_fn(prompt)['generation']
     previous_llm_code[num_steps - 1] = extract_python_script(response_from_llm)
-    prob_id = prob_data["problem_id"]
-    full_task_solution = f'{previous_code}\n{previous_llm_code[num_steps - 1]}'
-    return previous_llm_code, full_task_solution
+    save_response_with_steps(
+        prob_data, response_from_llm, previous_code, num_steps, Path('/workspace/NeMo-Skills/tmp-scicode-dir2')
+    )
+    return previous_llm_code
