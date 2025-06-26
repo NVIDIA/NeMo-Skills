@@ -53,6 +53,21 @@ class SciCodeGenerationTask(GenerationTask):
     def __init__(self, cfg: SciCodeGenerationConfig):
         super().__init__(cfg)
 
+        if not self.use_async_loop:  # if it was True, this message is printed by base class
+            LOG.info(
+                "Async loop is maintaining %d generations in parallel. "
+                "Use max_concurrent_requests to control the number of concurrent requests.",
+                self.cfg.max_concurrent_requests,
+            )
+            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
+                LOG.warning(
+                    "NeMo/Megatron servers don't support inflight batching, "
+                    "but SciCode evaluation requires it for efficient inference. "
+                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
+                    "We highly recommend switching to a server that supports inflight batching."
+                )
+        self.use_async_loop = True  # SciCode is a multi-call benchmark, so we have to use async loop
+
     def log_example_prompt(self, data):
         """Scicode is multi-call benchmark, so we can't print a single prompt."""
         return
@@ -97,7 +112,6 @@ class SciCodeGenerationTask(GenerationTask):
         return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
 
     def llm_generate(self, data_points, data, is_async=False):
-        # TODO: add assert that only async loop is supported
         futures = []
 
         with ThreadPoolExecutor() as executor:
