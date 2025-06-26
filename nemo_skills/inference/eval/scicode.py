@@ -39,8 +39,7 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/scicode/default"
-    # TODO: change default to with background to align with aa
-    with_background: bool = False
+    with_background: bool = True
 
     thinking_separator = "</think>"
     remove_thinking = True
