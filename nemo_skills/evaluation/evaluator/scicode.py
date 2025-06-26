@@ -49,7 +49,6 @@ def test_code(eval_config, scicode_data):
         status_lists.append([])
         for step_id, full_generation in elem['generation'].items():
             problem_id, subtask_step = step_id.split('.')
-            total_steps += 1
             json_content = scicode_data[json_idx[problem_id]]
             # step_id is always problem_id.subtask_step
             step_id = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
@@ -68,7 +67,6 @@ def test_code(eval_config, scicode_data):
 
 def eval_scicode(cfg):
     eval_config = ScicodeEvaluatorConfig(**cfg.eval_config)
-    subprocess.run(["pip install h5py scipy"], check=True, shell=True)
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
             data = [json.loads(line) for line in fin]
