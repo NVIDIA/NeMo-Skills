@@ -20,3 +20,4 @@ EVAL_SPLIT = 'test'
 EVAL_ARGS = "++eval_type=scicode"
 GENERATION_ARGS = ""
 GENERATION_MODULE = "nemo_skills.inference.eval.scicode"
+REQUIRES_SANDBOX = True

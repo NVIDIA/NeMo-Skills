@@ -71,7 +71,7 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
 
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
     benchmark_gen_args = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
-    requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+    requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
     generation_module = getattr(benchmark_module, "GENERATION_MODULE")
 
