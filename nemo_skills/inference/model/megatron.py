@@ -117,12 +117,28 @@ class MegatronModel(OpenAIAPIModel):
     def parse_openai_response(
         cls, response: "openai.types.Completion", batch: bool = False, top_logprobs: int | None = None
     ) -> dict | list[dict]:
-        """A specific parser kept for the custom batch generate method."""
+        """Parse OpenAI response to extract the generated text and other metadata.
+
+        Args:
+            response: The response from OpenAI API
+            batch: Whether the response contains multiple generations (batch mode)
+
+        Returns:
+            A single dict with generation info or a list of dicts for batch mode
+        """
 
         def process_choice(choice, top_logprobs: int | None = None):
             output = choice.text
+            # adding back stop words - somehow sometimes it returns token ids, so we do not handle those for now
+            if choice.finish_reason == "stop":
+                if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                    output += choice.stop_reason
+                # sglang has a little different api here
+                if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                    output += choice.matched_stop
+
             result = {'generation': output, 'num_generated_tokens': -1}
-            if choice.logprobs and choice.logprobs.tokens:
+            if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
                 if top_logprobs is not None and top_logprobs != 0:
                     result['logprobs'] = choice.logprobs.token_logprobs
                     result['tokens'] = choice.logprobs.tokens
@@ -132,5 +148,7 @@ class MegatronModel(OpenAIAPIModel):
 
         if batch:
             return [process_choice(choice, top_logprobs) for choice in response.choices]
-
-        return process_choice(response.choices[0], top_logprobs)
+        else:
+            assert not isinstance(response, list)
+            assert len(response.choices) == 1
+            return process_choice(response.choices[0], top_logprobs)

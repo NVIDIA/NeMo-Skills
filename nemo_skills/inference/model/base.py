@@ -379,6 +379,15 @@ class OpenAIAPIModel(BaseModel):
     def _parse_completion_response(self, response: "openai.types.Completion") -> dict:
         choice = response.choices[0]
         output = choice.text
+
+        # In some cases, the stop reason is not included in the text, so we add it back
+        if choice.finish_reason == "stop":
+            if hasattr(choice, "stop_reason") and isinstance(choice.stop_reason, str):
+                output += choice.stop_reason
+            # sglang has a little different api here
+            if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
+                output += choice.matched_stop
+
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs:
             result['logprobs'] = choice.logprobs.token_logprobs
@@ -409,20 +418,44 @@ class OpenAIAPIModel(BaseModel):
         emitted_so_far = []
         for chunk in response:
             cur_delta = chunk.choices[0].text
-            emitted_so_far.append(cur_delta)
+            emitted_so_far += [cur_delta]
             if cur_delta:
                 yield {"generation": cur_delta}
+            # vllm variant
             stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            # sglang variant
+            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+            # vllm variant - emit stop_reason as is and finish
             if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}  # vllm variant
+                yield {"generation": stop_reason}
+            # sglang variant - emit only not-yet-sent part of matched_stop
+            if matched_stop and isinstance(matched_stop, str):
+                remaining = matched_stop
+                # find the longest prefix of matched_stop that is already at
+                # the end of what we've emitted.
+                emitted_str = "".join(emitted_so_far)
+                max_len = min(len(emitted_str), len(matched_stop))
+                for i in range(max_len, 0, -1):
+                    if emitted_str.endswith(matched_stop[:i]):
+                        remaining = matched_stop[i:]
+                        break
+                if remaining:
+                    yield {"generation": remaining}
 
     def _stream_chat_chunks(self, response):
         for chunk in response:
-            cur_delta = chunk.choices[0].delta.content or ""
+            if hasattr(chunk.choices[0], "delta"):
+                cur_delta = chunk.choices[0].delta.content
+            else:
+                cur_delta = chunk.choices[0].text
+
             finish_reason = getattr(chunk.choices[0], "finish_reason", None)
             result = {"generation": cur_delta}
             if finish_reason:
                 result["finish_reason"] = finish_reason
+                if not cur_delta:
+                    result["generation"] = ""
+
             yield result
 
 
