@@ -55,8 +55,8 @@ class SciCodeGenerationTask(GenerationTask):
         super().__init__(cfg)
 
     def log_example_prompt(self, data):
-        pass
-        # TODO
+        """Scicode is multi-call benchmark, so we can't print a single prompt."""
+        return
 
     def generate_single_answer(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
