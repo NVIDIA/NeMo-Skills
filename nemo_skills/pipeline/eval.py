@@ -322,7 +322,7 @@ def eval(
         )
         benchmark_required_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
-            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
+            LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
         if rs_num == 0:
             random_seeds = [None]
