@@ -20,7 +20,7 @@ from pathlib import Path
 from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.inference.model import get_model
 from nemo_skills.utils import get_logger_name, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
