@@ -42,11 +42,12 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     prompt_config: str = "eval/scicode/default"
     with_background: bool = True
 
-    thinking_separator = "</think>"
-    remove_thinking = True
+    thinking_separator: str = "</think>"
+    remove_thinking: bool = True
+
     # should generally be set to False for thinking models to avoid running
     # out of context because of unfinished thinking for subtasks
-    keep_thinking_if_unfinished = True
+    keep_thinking_if_unfinished: bool = True
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
