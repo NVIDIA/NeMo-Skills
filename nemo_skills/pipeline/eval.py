@@ -350,7 +350,7 @@ def eval(
                     )
                 generation_task = generation_task.GENERATION_TASK_CLASS
                 if (
-                    generation_task.get_server_command_fn != GenerationTask.get_server_command_fn
+                    generation_task.get_server_command_fn.__func__ != GenerationTask.get_server_command_fn.__func__
                     and num_jobs != total_evals
                 ):
                     raise ValueError(
@@ -372,7 +372,7 @@ def eval(
                 )
                 job_cmds.append(cmd)
 
-                if cur_job_idx != eval_to_job_map[cur_eval] or cur_eval == total_evals - 1:
+                if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
                     job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
                     job_batches.append(
                         (
