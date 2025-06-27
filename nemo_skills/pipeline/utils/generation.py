@@ -234,16 +234,16 @@ def get_generation_cmd(
     if eval_args:
         print("Evaluation args:")
         print(eval_args)
-        cmd = (
-            f" && python -m nemo_skills.evaluation.evaluate_results "
-            f"    ++input_files={output_file} "
-            f"    {eval_args} "
-        )
-        # cmd += (
+        # cmd = (
         #     f" && python -m nemo_skills.evaluation.evaluate_results "
         #     f"    ++input_files={output_file} "
         #     f"    {eval_args} "
         # )
+        cmd += (
+            f" && python -m nemo_skills.evaluation.evaluate_results "
+            f"    ++input_files={output_file} "
+            f"    {eval_args} "
+        )
 
     return wrap_cmd(
         cmd=cmd,

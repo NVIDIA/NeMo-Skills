@@ -26,7 +26,7 @@ SUBFOLDER_PATH = "berkeley-function-call-leaderboard/bfcl_eval/data"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
-PROMPT_CONFIG = "generic/default"
+PROMPT_CONFIG = "generic/bfcl"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"

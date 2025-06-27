@@ -15,11 +15,7 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'tool'
-METRICS_TYPE = "bfcl"
-EVAL_ARGS = "++eval_type=bfcl"
-GENERATION_ARGS = ""
 
 SPLITS = [
    "simple",  # Simple function calls
