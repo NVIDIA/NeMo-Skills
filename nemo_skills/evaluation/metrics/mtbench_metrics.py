@@ -19,7 +19,7 @@ from pathlib import Path
 
 from nemo_skills.evaluation.evaluator.arena import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.inference.model import get_model
 from nemo_skills.utils import unroll_files
 
 

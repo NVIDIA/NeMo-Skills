@@ -18,7 +18,7 @@ from nemo_skills.dataset.prepare import prepare_datasets
 from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
 
 
-def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
+def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, cpu_partition, wandb_params):
     # data preparation needs to run locally without container, so not wrapping with run_cmd
     prepare_datasets(["aime24", "aime25"])
 
@@ -39,6 +39,7 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         cluster=cluster,
         expname=f"{expname_prefix}-download-assets",
         log_dir=f"{workspace}/download-assets",
+        partition=cpu_partition if cpu_partition else None,
     )
     # convert QwQ trtllm format
     convert(
@@ -72,7 +73,7 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         )
 
 
-def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
+def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, cpu_partition, wandb_params):
     postprocess_cmd = (
         f"python {workspace}/postprocess_problem_extraction.py "
         f"    {workspace}/sdg/problems/output.jsonl "
@@ -118,7 +119,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
 
-def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
+def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix, cpu_partition, wandb_params):
     # convert the generated solutions to a format that can be used for training
     run_cmd(
         ctx=wrap_arguments(
@@ -136,6 +137,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
         expname=f"{expname_prefix}-prepare-training-data",
         run_after=f"{expname_prefix}-solution-generation",
         log_dir=f"{workspace}/prepare-training-data",
+        partition=cpu_partition if cpu_partition else None,
     )
 
     # train the model
@@ -187,7 +189,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
         raise ValueError(f"Unknown training backend: {training_backend}")
 
 
-def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
+def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, cpu_partition, wandb_params):
     if training_backend == 'nemo-aligner':
         # converting back to HF format
         convert(
@@ -228,10 +230,11 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
         expname=f"{expname_prefix}-final-eval-summarize-results",
         run_after=f"{expname_prefix}-final-eval",
         log_dir=f"{workspace}/summarize-results/after-training",
+        partition=cpu_partition if cpu_partition else None,
     )
 
 
-def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
+def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, cpu_partition, wandb_params):
     # launching evaluation
     eval(
         ctx=wrap_arguments(""),
@@ -258,6 +261,7 @@ def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix,
         expname=f"{expname_prefix}-baseline-summarize-results",
         run_after=f"{expname_prefix}-baseline-eval",
         log_dir=f"{workspace}/summarize-results/baseline",
+        partition=cpu_partition if cpu_partition else None,
     )
 
 
@@ -300,14 +304,29 @@ if __name__ == "__main__":
         default="nemo-skills",
         help="WandB project name for tracking experiments.",
     )
+    parser.add_argument(
+        "--cpu_partition",
+        type=str,
+        default=None,
+        help="Partition to use for CPU jobs (if applicable).",
+    )
     args = parser.parse_args()
 
     wandb_params = {
         "disable_wandb": args.disable_wandb,
         "wandb_project": args.wandb_project,
     }
-    prepare(args.workspace, args.cluster, args.num_gpus, args.training_backend, args.expname_prefix, wandb_params)
-    initial_eval(args.workspace, args.cluster, args.num_gpus, args.training_backend, args.expname_prefix, wandb_params)
-    run_sdg(args.workspace, args.cluster, args.num_gpus, args.training_backend, args.expname_prefix, wandb_params)
-    run_training(args.workspace, args.cluster, args.num_gpus, args.training_backend, args.expname_prefix, wandb_params)
-    final_eval(args.workspace, args.cluster, args.num_gpus, args.training_backend, args.expname_prefix, wandb_params)
+    args = (
+        args.workspace,
+        args.cluster,
+        args.num_gpus,
+        args.training_backend,
+        args.expname_prefix,
+        args.cpu_partition,
+        wandb_params,
+    )
+    prepare(*args)
+    initial_eval(*args)
+    run_sdg(*args)
+    run_training(*args)
+    final_eval(*args)

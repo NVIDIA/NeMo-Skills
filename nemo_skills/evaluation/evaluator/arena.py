@@ -27,7 +27,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.inference.model import get_model
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
