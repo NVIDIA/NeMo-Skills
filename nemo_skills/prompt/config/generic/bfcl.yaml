@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-system: >-
+system: |-
   You are an expert in composing functions. You are given a question and a set of possible functions. 
   Based on the question, you will need to make one or more function/tool calls to achieve the purpose.
   If none of the functions can be used, point it out. 
@@ -28,4 +28,4 @@ system: >-
 
 
 # TODO - Check if multi-turn function "missing_function" is needed.
-user: {question}
+user: "{question}"
