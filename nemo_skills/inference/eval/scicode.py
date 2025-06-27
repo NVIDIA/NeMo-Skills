@@ -39,8 +39,8 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
-    prompt_config: str = "eval/scicode/default"
-    with_background: bool = False
+    prompt_config: str = "eval/scicode/background"
+    with_background: bool = True
 
     thinking_separator: str = "</think>"
     remove_thinking: bool = True
