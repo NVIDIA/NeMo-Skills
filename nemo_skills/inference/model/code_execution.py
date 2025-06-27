@@ -15,7 +15,6 @@
 
 import copy
 import logging
-import re
 import time
 import uuid
 from collections.abc import Generator
@@ -23,8 +22,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.server.model import BaseModel, get_model, models, trim_after_stop_phrases
-from nemo_skills.utils import get_logger_name, nested_dataclass, python_doc_to_cmd_help
+from nemo_skills.utils import get_logger_name, nested_dataclass
+
+from .base import BaseModel
+from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -544,19 +545,3 @@ class CodeExecutionWrapper:
                     current_full_prompt += formatted_code_output
             else:
                 break
-
-
-def server_params():
-    """Returns server documentation (to include in cmd help)."""
-    # TODO: This needs a fix now
-    prefix = f'\n        server_type: str = MISSING - Choices: {list(models.keys())}'
-    return python_doc_to_cmd_help(BaseModel, docs_prefix=prefix, arg_prefix="server.")
-
-
-def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
-    """A helper function to make it easier to set server through cmd."""
-    model = get_model(server_type=server_type, **kwargs)
-    if code_execution is None:
-        code_execution = {}
-    code_execution_config = CodeExecutionConfig(**code_execution)
-    return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
