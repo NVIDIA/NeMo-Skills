@@ -112,7 +112,7 @@ class ArenaMetrics(BaseMetrics):
             ]
 
     def get_metrics(self):
-        from nemo_skills.evaluation.arena_utils import get_aggregate_score
+        from nemo_skills.evaluation.evaluator.arena import get_aggregate_score
 
         metrics = {'num_entries': self.total}
         metrics.update(get_aggregate_score(self.scores))
