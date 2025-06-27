@@ -205,11 +205,8 @@ def get_executor(
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
     ]
-    if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node:
+    if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
-    # a hacky special logic to support client-server workflows for partial node usage
-    if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node == 0:
-        srun_args.append("--gpus=0")
 
     dependency_type = cluster_config.get("dependency_type", "afterany")
 
@@ -376,7 +373,7 @@ def add_task(
                         container=cur_container,
                         num_nodes=num_nodes,
                         tasks_per_node=cur_tasks,
-                        gpus_per_node=num_gpus if server_config is None else 0,  # disabling gpus if there is a server
+                        gpus_per_node=num_gpus,
                         partition=partition,
                         time_min=time_min,
                         dependencies=dependencies,
@@ -411,7 +408,7 @@ def add_task(
                 container=cluster_config["containers"]["sandbox"],
                 num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                 tasks_per_node=1,
-                gpus_per_node=0,
+                gpus_per_node=num_gpus,
                 partition=partition,
                 time_min=time_min,
                 mounts=tuple(),  # we don't want to mount anything
