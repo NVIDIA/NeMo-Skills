@@ -478,8 +478,8 @@ def eval_ruler(cfg):
 @nested_dataclass(kw_only=True)
 class BFCLEvaluatorConfig:
     timeout: int = 300
-    test_categories: str = "simple,parallel,multiple"
     output_dir: str = ""
+    model_name: str = "qwen3-14b"
 
 
 def eval_bfcl(cfg):
@@ -492,14 +492,18 @@ def eval_bfcl(cfg):
     
     for jsonl_file in unroll_files(cfg.input_files):
         parent_dir = Path(jsonl_file).absolute().parent
+        # Test categories are labeled as bfcl.simple, bfcl.parallel, bfcl.multiple
+        test_category = Path(parent_dir).name.split(".")[1]
         
         # Convert NeMo-Skills format to BFCL format
-        bfcl_input_file = _convert_to_bfcl_format(jsonl_file)
-        
+        output_dir = os.path.join("/opt/gorilla/berkeley-function-call-leaderboard", f"result/{eval_config.model_name}")
+        bfcl_input_file = _convert_to_bfcl_format(jsonl_file, output_dir=output_dir, test_category=test_category)
+    
+
         try:
             # Run BFCL evaluation using the CLI
             cmd = (
-                f'bfcl evaluate --model-path {bfcl_input_file} '
+                f'bfcl evaluate --model {bfcl_input_file} '
                 f'--test-category {eval_config.test_categories}'
             )
             
@@ -526,9 +530,9 @@ def eval_bfcl(cfg):
                 bfcl_input_file.unlink()
 
 
-def _convert_to_bfcl_format(jsonl_file):
+def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     """Convert NeMo-Skills JSONL format to BFCL expected format."""
-    bfcl_file = Path(jsonl_file).with_suffix('.bfcl.jsonl')
+    bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
     
     with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
          open(bfcl_file, 'wt', encoding='utf-8') as fout:
@@ -539,17 +543,9 @@ def _convert_to_bfcl_format(jsonl_file):
             # Convert to BFCL format - adjust based on actual BFCL input requirements
             bfcl_sample = {
                 'id': sample.get('id', sample.get('problem_id', '')),
-                'question': sample.get('question', sample.get('problem', '')),
-                'response': sample.get('generation', ''),
-                'ground_truth': sample.get('expected_answer', sample.get('answer', '')),
+                'result': sample.get('generation', ''),
             }
-            
-            # Include any function definitions if present
-            if 'functions' in sample:
-                bfcl_sample['functions'] = sample['functions']
-            if 'tools' in sample:
-                bfcl_sample['tools'] = sample['tools']
-                
+                            
             fout.write(json.dumps(bfcl_sample) + '\n')
     
     return bfcl_file

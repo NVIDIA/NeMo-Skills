@@ -38,9 +38,11 @@ GENERATION_ARGS = ""
 def process_file(input_file, output_file):
     all_single = True
     with open(input_file, "r") as f, open(output_file, "w") as f_out:
-        for line in f:
+        for idx, line in enumerate(f):
             instance = json.loads(line)
             test_category = instance["id"].rsplit("_", 1)[0]
+            if idx == 0:
+                print(test_category)
             # instance["question"] = instance["q"]
             if len(instance["question"][0]) == 1:
                 # print(instance["question"][0])
@@ -103,6 +105,9 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
 
                 output_file = os.path.join(split_dirname, "test.jsonl")
                 process_file(input_file, output_file)
+
+                # Copy the original json file to the split directory
+                shutil.copy(input_file, os.path.join(split_dirname, filename))
                 processed_files += 1
             
             print(f"Successfully processed {processed_files} JSON files to {output_dir}")
