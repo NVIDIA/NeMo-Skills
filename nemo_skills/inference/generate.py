@@ -144,7 +144,7 @@ class GenerateSolutionsConfig:
                 "Until this is fixed, we highly recommend that you provide prompt template explicitly."
             )
 
-        if self.server["server_type"] == "openai" and self.prompt_template is not None:
+        if self.server["server_type"] in ["openai", "azureopenai"] and self.prompt_template is not None:
             raise ValueError("Prompt template is not supported for OpenAI server")
 
     def _post_init_validate_params(self):
@@ -243,12 +243,11 @@ class GenerationTask:
             )
 
     def setup_llm(self):
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] not in ["openai", "vllm", "sglang"]:
+        # TODO: DRY with the check in the validation config
+        if self.cfg.prompt_template is None and self.cfg.server["server_type"] in ["nemo", "megatron"]:
             with open_dict(self.cfg.server):
                 self.cfg.server["server_type"] = "openai"
                 self.cfg.server["model"] = "model"
-            if self.cfg.code_execution:
-                raise ValueError("Code execution is not supported for OpenAI server")
 
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
