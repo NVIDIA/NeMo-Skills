@@ -16,7 +16,7 @@ import json
 import re
 from pathlib import Path
 
-from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
+from nemo_skills.evaluation.evaluator.arena import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 from nemo_skills.inference.model import get_model
 from nemo_skills.utils import unroll_files
@@ -112,7 +112,7 @@ class ArenaMetrics(BaseMetrics):
             ]
 
     def get_metrics(self):
-        from nemo_skills.evaluation.arena_utils import get_aggregate_score
+        from nemo_skills.evaluation.evaluator.arena import get_aggregate_score
 
         metrics = {'num_entries': self.total}
         metrics.update(get_aggregate_score(self.scores))
