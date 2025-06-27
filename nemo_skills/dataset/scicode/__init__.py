@@ -17,7 +17,8 @@ PROMPT_CONFIG = 'eval/scicode/default'
 DATASET_GROUP = 'code'
 METRICS_TYPE = 'scicode'
 EVAL_SPLIT = 'test'
-EVAL_ARGS = "++eval_type=scicode"
+# generation is a dictionary instead of string and remove_thinking is done during inference
+EVAL_ARGS = "++eval_type=scicode ++remove_thinking=False"
 GENERATION_ARGS = ""
 GENERATION_MODULE = "nemo_skills.inference.eval.scicode"
 REQUIRES_SANDBOX = True

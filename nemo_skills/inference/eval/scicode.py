@@ -44,6 +44,9 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
 
     thinking_separator = "</think>"
     remove_thinking = True
+    # should generally be set to False for thinking models to avoid running
+    # out of context because of unfinished thinking for subtasks
+    keep_thinking_if_unfinished = True
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -122,7 +125,9 @@ class SciCodeGenerationTask(GenerationTask):
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
             if self.cfg.thinking_separator in llm_output['generation']:
                 llm_output['generation'] = llm_output['generation'].split(self.cfg.thinking_separator)[-1].strip()
-
+            elif not self.cfg.keep_thinking_if_unfinished:
+                # thinking part wasn't finished, so setting answer as empty
+                llm_output['generation'] = ''
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns
