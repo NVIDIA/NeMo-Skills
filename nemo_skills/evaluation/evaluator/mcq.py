@@ -15,6 +15,7 @@
 import json
 import logging
 
+import re
 from tqdm import tqdm
 
 from nemo_skills.evaluation.math_grader import extract_answer
@@ -32,26 +33,7 @@ def eval_mcq(cfg):
             if len(match) > 0:
                 parsed = match[-1].strip()
 
-        if parsed is not None:
-            return parsed
-
-        def format_func(s):
-            return (
-                s.replace("(", "")
-                .replace(")", "")
-                .replace(".", "")
-                .replace(":", "")
-                .replace("*", "")
-                .replace("{", "")
-                .replace("}", "")
-                .strip()
-            )
-
-        paren_pattern = r"[\(\s*]\w+[\).:*]?"
-        paren_matches = [format_func(p) for p in re.findall(paren_pattern, text)]
-        paren_matches = [p for p in paren_matches if p in "ABCDEFGHIJ"]
-        return paren_matches[-1] if paren_matches else None
-
+        return parsed
 
     for file in unroll_files(cfg.input_files):
         with open(file, 'rt', encoding='utf-8') as fin:
