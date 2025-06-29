@@ -33,6 +33,11 @@ def eval_mcq(cfg):
             if len(match) > 0:
                 parsed = match[-1].strip()
 
+        # adapted from https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+        if parsed is None:
+            matches = re.findall(r"(?i)[\*\_]{0,2}Answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
+            if matches:
+                parsed = match[-1].strip()
         return parsed
 
     for file in unroll_files(cfg.input_files):
