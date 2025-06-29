@@ -39,6 +39,7 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
     megatron = "megatron"
     openai = "openai"
+    azureopenai = "azureopenai"
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:

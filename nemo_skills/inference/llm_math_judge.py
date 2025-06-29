@@ -20,7 +20,7 @@ import hydra
 
 from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
+from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, prefill_judgement, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -58,7 +58,7 @@ class LLMMathJudgeTask(GenerationTask):
 
         return data
 
-    def _prefill_generation(self, data_point):
+    def prefill_generation(self, data_point):
         """Prefill judgement"""
         judgement = prefill_judgement(data_point)
         if judgement is None:

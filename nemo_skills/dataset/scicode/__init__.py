@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,11 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/math'
-DATASET_GROUP = 'math'
-METRICS_TYPE = "math"
-EVAL_ARGS = "++eval_type=math"
+PROMPT_CONFIG = 'eval/scicode/default'
+DATASET_GROUP = 'code'
+METRICS_TYPE = 'scicode'
+# generation is a dictionary instead of string and remove_thinking is done during inference
+EVAL_ARGS = "++eval_type=scicode ++remove_thinking=False"
 GENERATION_ARGS = ""
-EVAL_SPLIT = "text"
+GENERATION_MODULE = "nemo_skills.inference.eval.scicode"
+REQUIRES_SANDBOX = True

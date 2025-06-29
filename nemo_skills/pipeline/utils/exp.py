@@ -143,7 +143,8 @@ def get_executor(
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config)
 
-    mounts = mounts or config_mounts
+    if mounts is None:
+        mounts = config_mounts
     if extra_package_dirs is not None:
         extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
@@ -411,7 +412,7 @@ def add_task(
                 gpus_per_node=num_gpus,
                 partition=partition,
                 time_min=time_min,
-                mounts=tuple(),  # we don't want to mount anything
+                mounts=[],  # we don't want to mount anything
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,

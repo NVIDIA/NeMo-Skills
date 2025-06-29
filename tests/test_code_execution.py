@@ -110,7 +110,7 @@ def test_execution_error(sandbox_type):
     # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
     error = 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n'
     assert output == {
-        'process_status': 'completed',
+        'process_status': 'error',
         'stderr': '',
         'stdout': error,
     }
@@ -126,7 +126,7 @@ def test_syntax_error(sandbox_type):
     output, session_id = sandbox.execute_code(code)
     error = '    b = 3\n    ^\nIndentationError: unexpected indent\n'
     assert output == {
-        'process_status': 'completed',
+        'process_status': 'error',
         'stderr': '',
         'stdout': error,
     }
@@ -168,7 +168,7 @@ x
     )
     output, session_id = sandbox.execute_code(code)
     assert output == {
-        'process_status': 'completed',
+        'process_status': 'error',
         'stderr': '',
         'stdout': error,
     }
