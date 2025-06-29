@@ -60,29 +60,22 @@ def format_entry(entry):
     }
 
 
-def write_data_to_file(output_file, data, n_repeats=1):
+def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            for _ in range(n_repeats):
-                json.dump(format_entry(entry), fout)
-                fout.write("\n")
+            json.dump(format_entry(entry), fout)
+            fout.write("\n")
 
 
 def save_data(split, random_seed):
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
 
-    if split == "aai":
-        n_repeats = 4
-        output_file = data_dir / "diamond_aai.jsonl"
-        split = "diamond"
-    else:
-        output_file = data_dir / f"{split}.jsonl"
-        n_repeats = 1
+    output_file = data_dir / f"{split}.jsonl"
     random.seed(random_seed)
 
     dataset = load_dataset("Idavidrein/gpqa", f"gpqa_{split}")["train"]
-    write_data_to_file(output_file, dataset, n_repeats=n_repeats)
+    write_data_to_file(output_file, dataset)
 
 
 if __name__ == "__main__":
@@ -90,14 +83,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split",
         default="all",
-        choices=("all", "extended", "main", "diamond", "aai"),
+        choices=("all", "extended", "main", "diamond"),
         help="Dataset split to process.",
     )
     parser.add_argument("--random_seed", type=int, default=42)
     args = parser.parse_args()
 
     if args.split == "all":
-        for split in ["extended", "main", "diamond", "aai"]:
+        for split in ["extended", "main", "diamond"]:
             save_data(split, args.random_seed)
     else:
         save_data(args.split, args.random_seed)
