@@ -17,6 +17,7 @@ import os
 import glob
 import tempfile
 import json
+import shutil
 from utils import func_doc_language_specific_pre_processing
 
 
@@ -37,26 +38,48 @@ GENERATION_ARGS = ""
 
 def process_file(input_file, output_file):
     all_single = True
+    count_complex = 0
     with open(input_file, "r") as f, open(output_file, "w") as f_out:
         for idx, line in enumerate(f):
             instance = json.loads(line)
+            # Add a new field in the instance to store the additionalsystem content
+            instance["system_content"] = ""
             test_category = instance["id"].rsplit("_", 1)[0]
             if idx == 0:
-                print(test_category)
-            # instance["question"] = instance["q"]
-            if len(instance["question"][0]) == 1:
-                # print(instance["question"][0])
-                assert instance["question"][0][0]["role"] == "user"
-                instance["question"] = instance["question"][0][0]["content"]
+                print(test_category)            
+
+            if len(instance["question"]) == 1:
+                # Just a single user command
+                if len(instance["question"][0]) == 1:
+                    # print(instance["question"][0])
+                    assert instance["question"][0][0]["role"] == "user"
+                    instance["question"] = instance["question"][0][0]["content"]
+                elif len(instance["question"][0]) == 2:
+                    # Mostly this instance is a system command + user command
+                    if instance["question"][0][0]["role"] == "system" and instance["question"][0][1]["role"] == "user":
+                        # Process system content which will be added to the system prompt
+                        instance["system_content"] = instance["question"][0][0]["content"]
+                        instance["question"] = instance["question"][0][1]["content"]
+                    elif instance["question"][0][0]["role"] == "user" and instance["question"][0][1]["role"] == "user":
+                        # Concatenate the two user commands - only happens for one instance
+                        instance["question"] = (instance["question"][0][0]["content"] + instance["question"][0][1]["content"]).strip()
+                    else:
+                        raise ValueError(f"Unknown instance format: {json.dumps(instance, indent=4)}")
+                else:
+                    all_single = False
+                    count_complex += 1
             else:
                 all_single = False
+                count_complex += 1
 
+                
             if "function" in instance:
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
             f_out.write(json.dumps(instance) + "\n")
 
     if not all_single:
         print(f"Warning: {input_file} has multiple turns")
+    print(f"Count of complex: {count_complex}")
 
 
 def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_prefix="BFCL_v3"):

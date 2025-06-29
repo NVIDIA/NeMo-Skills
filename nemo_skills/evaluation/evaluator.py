@@ -496,15 +496,15 @@ def eval_bfcl(cfg):
         test_category = Path(parent_dir).name.split(".")[1]
         
         # Convert NeMo-Skills format to BFCL format
-        output_dir = os.path.join("/opt/gorilla/berkeley-function-call-leaderboard", f"result/{eval_config.model_name}")
+        output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{eval_config.model_name}"
         bfcl_input_file = _convert_to_bfcl_format(jsonl_file, output_dir=output_dir, test_category=test_category)
     
 
         try:
             # Run BFCL evaluation using the CLI
             cmd = (
-                f'bfcl evaluate --model {bfcl_input_file} '
-                f'--test-category {eval_config.test_categories}'
+                f'bfcl evaluate --model {eval_config.model_name} '
+                f'--test-category {test_category}'
             )
             
             if eval_config.output_dir:
