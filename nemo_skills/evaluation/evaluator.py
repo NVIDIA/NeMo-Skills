@@ -506,12 +506,7 @@ def eval_bfcl(cfg):
                 f'bfcl evaluate --model {eval_config.model_name} '
                 f'--test-category {test_category}'
             )
-            
-            if eval_config.output_dir:
-                cmd += f' --output-dir {eval_config.output_dir}'
-            else:
-                cmd += f' --output-dir {parent_dir}'
-            
+                    
             LOG.info(f"Running BFCL evaluation: {cmd}")
             subprocess.run(cmd, shell=True, check=True, timeout=eval_config.timeout)
             
