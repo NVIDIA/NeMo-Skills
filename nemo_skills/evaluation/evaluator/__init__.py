@@ -21,6 +21,7 @@ from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_s
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
+from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 
 
 def dummy_eval(cfg):
@@ -31,6 +32,7 @@ EVALUATOR_MAP = {
     'math': eval_math,
     'evalplus': eval_evalplus,
     'if': eval_if,
+    'bfcl': eval_bfcl,
     'arena': eval_arena,
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
