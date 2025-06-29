@@ -431,3 +431,4 @@ def eval_mtbench(cfg):
 
             # removing judgement file
             Path(output_file).unlink()
+            
