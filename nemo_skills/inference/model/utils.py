@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 
-JUDGE_SERVER = 'openai'
-JUDGE_MODEL = 'gpt-4-1106-preview'
+
+def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
+    """Removes everything after the last stop token."""
+    if not stop_phrases:
+        return text
+    # Escape all special characters in stop phrases
+    escaped_stop_phrases = [re.escape(sp) for sp in stop_phrases]
+    return re.split("|".join(escaped_stop_phrases), text, maxsplit=1)[0]
+
+
+class RequestException(RuntimeError):
+    pass

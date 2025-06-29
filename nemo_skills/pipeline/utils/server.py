@@ -39,6 +39,7 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
     megatron = "megatron"
     openai = "openai"
+    azureopenai = "azureopenai"
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
@@ -199,7 +200,7 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm;
     # vllm can also pass model name as "model_path" so we need special processing
-    if server_type not in ["vllm", "sglang"]:
+    if server_type not in ["vllm", "sglang", "trtllm-serve"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
@@ -253,7 +254,10 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        if num_nodes > 1:
+            server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        else:
+            server_start_cmd = start_vllm_cmd
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:

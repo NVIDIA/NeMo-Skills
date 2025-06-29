@@ -54,6 +54,7 @@ def test_error_on_extra_params():
         "    ++eval_type=math "
         "    ++eval_config.sandbox.sandbox_type=local "
         "    ++eval_config.sandbox.sandbox_host=123 "
+        "    ++remove_thinking=false "
     )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
