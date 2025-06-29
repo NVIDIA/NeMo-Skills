@@ -532,8 +532,11 @@ def eval_bfcl(cfg):
 
 def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     """Convert NeMo-Skills JSONL format to BFCL expected format."""
-    bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
+    if not Path(output_dir).exists():
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
     
+    bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
+
     with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
          open(bfcl_file, 'wt', encoding='utf-8') as fout:
         
