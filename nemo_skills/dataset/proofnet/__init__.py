@@ -18,3 +18,4 @@ DATASET_GROUP = 'lean4'
 METRICS_TYPE = "lean4-proof"
 EVAL_ARGS = "++eval_type=lean4-proof"
 GENERATION_ARGS = ""
+REQUIRES_SANDBOX = True

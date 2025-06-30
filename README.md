@@ -9,7 +9,7 @@ Here are some of the things we support.
 - [Model evaluation](https://nvidia.github.io/NeMo-Skills/pipelines/evaluation): Evaluate your models on many popular benchmarks
     - Math problem solving: math, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: livecodebench, human-eval, mbpp
+    - Coding skills: scicode, livecodebench, human-eval, mbpp
     - Chat/instruction following: ifeval, arena-hard, mt-bench
     - General knowledge: mmlu, mmlu-pro, gpqa
     - Long context: ruler
