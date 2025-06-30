@@ -295,6 +295,12 @@ def ppo_openrlhf(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -395,6 +401,7 @@ def ppo_openrlhf(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
+                installation_command=installation_command,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False)

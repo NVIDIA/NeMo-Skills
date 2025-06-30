@@ -199,6 +199,12 @@ def sft_nemo_rl(
     ),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Runs NeMo-RL SFT training.
 
@@ -273,6 +279,7 @@ def sft_nemo_rl(
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=False,
                 with_ray=True,
+                installation_command=installation_command,
             )
 
         add_task(
@@ -295,6 +302,7 @@ def sft_nemo_rl(
             reuse_code_exp=reuse_code_exp,
             task_dependencies=[prev_task] if prev_task is not None else None,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            installation_command=installation_command,
         )
 
         # explicitly setting sequential to False since we set dependencies directly

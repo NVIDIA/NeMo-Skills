@@ -184,6 +184,12 @@ def eval(
         'nemo-skills',
         help="Name of the wandb project to sync samples to.",
     ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -429,6 +435,7 @@ def eval(
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
         if has_tasks:
