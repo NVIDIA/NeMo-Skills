@@ -148,7 +148,6 @@ class PPOVerlTask:
 
         cmd = (
             f"export HYDRA_FULL_ERROR=1 && "
-            f"export VLLM_ATTENTION_BACKEND=XFORMERS && "
             f"export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True && "
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
             f"export ROCR_VISIBLE_DEVICES= && "
