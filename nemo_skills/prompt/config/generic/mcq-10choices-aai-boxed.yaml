@@ -1,0 +1,8 @@
+# Default prompt for multuple choice benchmarks with ten answer choices (e.g. MMLU-Pro). It's intended for models trained to follow \boxed{{}} format and for generaral instruction-following models.
+# Adapted from https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+system: ""
+
+user: |-
+  Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: \boxed{{A/B/C/D/E/F/G/H/I/J}}' (e.g. 'Answer: \boxed{{A}}'). 
+
+  {problem}
