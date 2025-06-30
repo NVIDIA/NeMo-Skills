@@ -298,7 +298,7 @@ def ppo_openrlhf(
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
-        "You can use an arbitrary command here and we will run them on a single rank for each node. "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
 ):
