@@ -290,11 +290,11 @@ def ppo_verl(
     script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
-    installation_commands: List[str] | None = typer.Option(
+    installation_command: str | None = typer.Option(
         None,
-        help="List of installation commands to run before main job. Only affects main task (not server or sandbox). "
-        "You can use arbitrary commands here and we will run them on a single rank for each node. "
-        "E.g. ['pip install my_package']",
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run them on a single rank for each node. "
+        "E.g. 'pip install my_package'",
     ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
@@ -409,7 +409,7 @@ def ppo_verl(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
-                installation_commands=installation_commands,
+                installation_command=installation_command,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False)

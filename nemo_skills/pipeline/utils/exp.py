@@ -241,11 +241,9 @@ def get_executor(
     )
 
 
-def install_packages_wrap(cmd, installation_commands: list[str] | None = None):
+def install_packages_wrap(cmd, installation_command: str | None = None):
     """Wraps the command to install packages if provided."""
-    if installation_commands:
-        install_cmd = ' '.join(installation_commands)
-
+    if installation_command:
         # Generate a unique ID for this job and set it as an environment variable
         # All processes in the same job will share this environment variable
         job_uuid = str(uuid.uuid4())
@@ -260,8 +258,8 @@ def install_packages_wrap(cmd, installation_commands: list[str] | None = None):
             f"if ! [ -f {lock_file} ]; then "
             f"echo 'Starting package installation with UUID: {job_uuid}'; "
             f"touch {lock_file}; "
-            f"echo 'Installing packages: {install_cmd}'; "
-            f"if {install_cmd}; then "
+            f"echo 'Installing packages: {installation_command}'; "
+            f"if {installation_command}; then "
             f"echo 'Package installation completed successfully'; "
             f"echo 'done' > {lock_file}; "
             f"else "
@@ -315,7 +313,7 @@ def add_task(
     slurm_kwargs: dict | None = None,
     heterogeneous: bool = False,
     with_ray: bool = False,
-    installation_commands: list[str] | None = None,
+    installation_command: str | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -338,7 +336,7 @@ def add_task(
     By default we will reuse the code of the first submitted experiment.
     If you want to avoid this, set `reuse_code=False`.
 
-    installation_commands argument only affects "main" task, not server or sandbox.
+    installation_command argument only affects "main" task, not server or sandbox.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, (str, run.Experiment)):
@@ -416,7 +414,7 @@ def add_task(
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
-                cur_cmd = install_packages_wrap(cur_cmd, installation_commands)
+                cur_cmd = install_packages_wrap(cur_cmd, installation_command)
                 commands.append(cur_cmd)
                 executors.append(
                     get_executor(
