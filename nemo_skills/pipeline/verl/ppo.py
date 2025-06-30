@@ -51,7 +51,11 @@ class PPOVerlTask:
         return cmd
 
     def format_train_args(self):
-        verl_config = '' if ((self.verl_config_dir is None) and (self.verl_config_name is None)) else f" --config-path {self.verl_config_dir} --config-name {self.verl_config_name} "
+        verl_config = (
+            ''
+            if ((self.verl_config_dir is None) and (self.verl_config_name is None))
+            else f" --config-path {self.verl_config_dir} --config-name {self.verl_config_name} "
+        )
         if verl_config == '':
             cmd = (
                 "   algorithm.adv_estimator=grpo "
@@ -283,17 +287,14 @@ def ppo_verl(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
-    script_module: str = typer.Option(
-        "verl.trainer.main_ppo",
-        help="The script module to run. "
-    ),
-    verl_config_dir: str = typer.Option(
+    script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
+    verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
+    verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
+    installation_commands: List[str] | None = typer.Option(
         None,
-        help="The directory containing the Verl config files. "
-    ),
-    verl_config_name: str = typer.Option(
-        None,
-        help="The name of the Verl config file to use. "
+        help="List of installation commands to run before main job. Only affects main task (not server or sandbox). "
+        "You can use arbitrary commands here and we will run them on a single rank for each node. "
+        "E.g. ['pip install my_package']",
     ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
@@ -408,6 +409,7 @@ def ppo_verl(
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
+                installation_commands=installation_commands,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False)

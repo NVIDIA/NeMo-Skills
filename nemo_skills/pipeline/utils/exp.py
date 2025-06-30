@@ -15,6 +15,7 @@
 import logging
 import os
 import shlex
+import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -240,6 +241,35 @@ def get_executor(
     )
 
 
+def install_packages_wrap(cmd, installation_commands: list[str] | None = None):
+    """Wraps the command to install packages if provided."""
+    if installation_commands:
+        install_cmd = ' '.join(installation_commands)
+
+        # Generate a unique ID for this job and set it as an environment variable
+        # All processes in the same job will share this environment variable
+        job_uuid = str(uuid.uuid4())
+        lock_file = f"/tmp/pip_install_{job_uuid}_lock"
+
+        # Use environment variable to share the UUID across processes
+        setup_env = f"export NEMO_SKILLS_JOB_UUID={job_uuid}"
+
+        # Simple installation guard - first process to create lock file installs packages
+        install_guard = (
+            f"{setup_env} && "
+            f"if ! [ -f {lock_file} ]; then "
+            f"touch {lock_file}; "
+            f"{install_cmd}; "
+            f"echo 'done' > {lock_file}; "
+            f"else "
+            f"while [ ! -f {lock_file} ] || [ \"$(cat {lock_file} 2>/dev/null)\" != \"done\" ]; do sleep 1; done; "
+            f"fi"
+        )
+
+        return f"{install_guard} && {cmd}"
+    return cmd
+
+
 # TODO: this function has become too cumbersome to use with all recently added support
 #       we should make it simpler by perhaps removing separate logic for server/sandbox
 #       and supporting them through a list of cmds directly
@@ -269,6 +299,7 @@ def add_task(
     slurm_kwargs: dict | None = None,
     heterogeneous: bool = False,
     with_ray: bool = False,
+    installation_commands: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -290,6 +321,8 @@ def add_task(
 
     By default we will reuse the code of the first submitted experiment.
     If you want to avoid this, set `reuse_code=False`.
+
+    installation_commands argument only affects "main" task, not server or sandbox.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, (str, run.Experiment)):
@@ -367,6 +400,7 @@ def add_task(
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+                cur_cmd = install_packages_wrap(cur_cmd, installation_commands)
                 commands.append(cur_cmd)
                 executors.append(
                     get_executor(
