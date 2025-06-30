@@ -108,6 +108,12 @@ def genselect(
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -218,6 +224,7 @@ def genselect(
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=prev_tasks,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
         if has_tasks:
