@@ -59,13 +59,12 @@ def eval_bfcl(cfg):
         
         # Convert NeMo-Skills format to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
+        score_file = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"score/{model_name}" / f"BFCL_v3_{test_category}_score.json"
+
         bfcl_input_file = _convert_to_bfcl_format(jsonl_file, output_dir=output_dir, test_category=test_category)
 
-        # Copy the bfcl_input_file to the output_dir
-        common_bfcl_output_dir = Path(parent_dir).parent / Path(model_name)
-        if not common_bfcl_output_dir.exists():
-            common_bfcl_output_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(bfcl_input_file, common_bfcl_output_dir / Path(bfcl_input_file).name)
+        # Merge the bfcl_input_file with the score_file, and write to the original file
+        _merge_bfcl_results(jsonl_file, bfcl_input_file, score_file)
 
         try:
             # Run BFCL evaluation using the CLI
@@ -109,33 +108,40 @@ def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     return bfcl_file
 
 
-def _merge_bfcl_results(jsonl_file, parent_dir, test_categories):
+def _merge_bfcl_results(generation_file, bfcl_fmted_file, score_file):
     """Merge BFCL evaluation results back into the original NeMo-Skills file."""
-    # Read original data
-    with open(jsonl_file, 'rt', encoding='utf-8') as fin:
-        samples = [json.loads(line) for line in fin]
     
-    # Find and read BFCL result files
-    categories = test_categories.split(',')
-    for category in categories:
-        result_file = parent_dir / f'BFCL_v3_{category.strip()}_score.json'
-        if result_file.exists():
-            with open(result_file, 'rt', encoding='utf-8') as fin:
-                bfcl_results = json.load(fin)
-            
-            # Merge results back into samples
-            for i, sample in enumerate(samples):
-                sample_id = sample.get('id', sample.get('problem_id', str(i)))
-                if sample_id in bfcl_results:
-                    sample[f'bfcl_{category}_result'] = bfcl_results[sample_id]
-                    # Add standardized correctness keys for metrics system
-                    if 'overall_accuracy' in bfcl_results[sample_id]:
-                        sample['is_correct'] = bfcl_results[sample_id]['overall_accuracy'] > 0
-            
-            # Clean up BFCL result file
-            result_file.unlink()
+    # Load the score file has the format that it stores the aggregate scores at the top, 
+    # and the wrong instances after that
+    wrong_instance_ids = set()
+    with open(score_file, 'rt', encoding='utf-8') as fin:
+        first_line = True
+        for line in fin:
+            if first_line:
+                first_line = False
+                continue
+            wrong_instance = json.loads(line)
+            wrong_instance_ids.add(wrong_instance['id'])
     
-    # Write merged results back
-    with open(jsonl_file, 'wt', encoding='utf-8') as fout:
-        for sample in samples:
-            fout.write(json.dumps(sample) + '\n')
+    # Write to a temporary file first, then move it to the original file
+    temp_file = Path(generation_file).with_suffix('.tmp')
+    if temp_file.exists():
+        temp_file.unlink()
+
+    with open(generation_file, 'rt', encoding='utf-8') as gen_f, \
+        open(bfcl_fmted_file, 'rt', encoding='utf-8') as bfcl_f, \
+        open(temp_file, 'wt', encoding='utf-8') as fout:        
+        for gen_line, bfcl_line in zip(gen_f, bfcl_f):
+            gen_instance = json.loads(gen_line)
+            # Add the bfcl result to the generation instance
+            gen_instance.update(json.loads(bfcl_line))
+
+            if gen_instance['id'] in wrong_instance_ids:
+                gen_instance['is_correct'] = False
+            else:
+                gen_instance['is_correct'] = True
+
+            fout.write(json.dumps(gen_instance) + '\n')
+
+    shutil.move(temp_file, generation_file)
+            
