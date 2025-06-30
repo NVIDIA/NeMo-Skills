@@ -1293,7 +1293,7 @@ open scoped BigOperators Topology
 
 
 def test_llm_as_judge_hle_original_prompt():
-    prompt = get_prompt('judge/hle-original', 'llama3-instruct')
+    prompt = get_prompt('judge/hle', 'llama3-instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>
 
