@@ -244,6 +244,12 @@ def sft_openrlhf(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -303,6 +309,7 @@ def sft_openrlhf(
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
             )
 
         run_exp(exp, cluster_config, sequential=False)
