@@ -1,0 +1,44 @@
+# an Artificial Analysis Intelligence Index evaluation group
+# should get results very close to what's reported in https://artificialanalysis.ai/
+# with the difference that for mcq questions we ask to put the answer in the \boxed{}
+
+benchmarks:
+  - name: mmlu_pro
+    repeats: 1
+    prompt_config: generic/mcq-10choice-aai-boxed
+    inference:
+      temperature: 0.0
+  - name: hle
+    repeats: 1
+    prompt_config: generic/hle
+    inference:
+      temperature: 0.0
+    # hle needs a separate judge step
+    # judge model configuration is specified by eval_group pipeline arguments
+    judge:
+      prompt_config: judge/hle
+  - name: gpqa
+    repeats: 5
+    prompt_config: generic/mcq-4choice-aai-boxed
+    inference:
+      temperature: 0.0
+  - name: math-500
+    repeats: 3
+    prompt_config: eval/aai/math
+    inference:
+      temperature: 0.0
+  - name: aime24
+    repeats: 10
+    prompt_config: eval/aai/math
+    inference:
+      temperature: 0.0
+  - name: scicode
+    repeats: 3
+    # scicode default prompt is same as aai prompt
+    inference:
+      temperature: 0.0
+  - name: livecodebench
+    repeats: 3
+    # TODO: add aai prompt here
+    inference:
+      temperature: 0.0
