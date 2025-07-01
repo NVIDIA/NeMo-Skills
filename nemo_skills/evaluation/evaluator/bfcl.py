@@ -39,7 +39,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class BFCLEvaluatorConfig:
-    model: str = "o3-mini-2025-01-31-FC"
+    model: str = "o3-mini-2025-01-31-FC"  # Uses the same eval as Llama-Nemotron
     timeout: int = 300
 
 
@@ -57,14 +57,11 @@ def eval_bfcl(cfg):
         # Test categories are labeled as bfcl.simple, bfcl.parallel, bfcl.multiple
         test_category = Path(parent_dir).name.split(".")[1]
         
-        # Convert NeMo-Skills format to BFCL format
+        # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
         score_file = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"score/{model_name}" / f"BFCL_v3_{test_category}_score.json"
 
         bfcl_input_file = _convert_to_bfcl_format(jsonl_file, output_dir=output_dir, test_category=test_category)
-
-        # Merge the bfcl_input_file with the score_file, and write to the original file
-        _merge_bfcl_results(jsonl_file, bfcl_input_file, score_file)
 
         try:
             # Run BFCL evaluation using the CLI
@@ -75,9 +72,9 @@ def eval_bfcl(cfg):
             
             LOG.info(f"Running BFCL evaluation: {cmd}")
             subprocess.run(cmd, shell=True, check=True, timeout=eval_config.timeout)
-            
-            # Merge BFCL results back into original file
-            # _merge_bfcl_results(jsonl_file, parent_dir, eval_config.test_categories)
+
+            # Merge the bfcl_input_file with the score_file, and write to the original file
+            _merge_bfcl_results(jsonl_file, bfcl_input_file, score_file)
             
         except subprocess.TimeoutExpired:
             LOG.error(f"BFCL evaluation timed out after {eval_config.timeout} seconds")
@@ -86,26 +83,30 @@ def eval_bfcl(cfg):
 
 def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     """Convert NeMo-Skills JSONL format to BFCL expected format."""
+
     if not Path(output_dir).exists():
         Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
+    shutil.copy(jsonl_file, bfcl_file)
 
-    with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
-         open(bfcl_file, 'wt', encoding='utf-8') as fout:
-        
-        for line in fin:
-            sample = json.loads(line)
-            
-            # Convert to BFCL format - adjust based on actual BFCL input requirements
-            bfcl_sample = {
-                'id': sample.get('id', sample.get('problem_id', '')),
-                'result': sample.get('generation', ''),
-            }
-                            
-            fout.write(json.dumps(bfcl_sample) + '\n')
-    
     return bfcl_file
+
+    # with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
+    #      open(bfcl_file, 'wt', encoding='utf-8') as fout:
+        
+    #     for line in fin:
+    #         sample = json.loads(line)
+            
+    #         # Convert to BFCL format - adjust based on actual BFCL input requirements
+    #         bfcl_sample = {
+    #             'id': sample.get('id', sample.get('problem_id', '')),
+    #             'result': sample.get('generation', ''),
+    #         }
+                            
+    #         fout.write(json.dumps(bfcl_sample) + '\n')
+    
+    # return bfcl_file
 
 
 def _merge_bfcl_results(generation_file, bfcl_fmted_file, score_file):

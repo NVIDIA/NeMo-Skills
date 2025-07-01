@@ -93,7 +93,7 @@ class BFCLGenerationTask(GenerationTask):
         temp_file = Path(self.cfg.output_file).with_suffix(".tmp")
 
         with open(self.cfg.output_file, "rt", encoding="utf-8") as fin, open(temp_file, "wt", encoding="utf-8") as fout:
-            for line in fin:
+            for idx, line in enumerate(fin):
                 instance = json.loads(line)
                 extracted_tool_response = extract_tool_response(
                     instance["generation"], self.cfg.tool_call_start_token, self.cfg.tool_call_regex)

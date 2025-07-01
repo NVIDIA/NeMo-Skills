@@ -18,7 +18,6 @@
 DATASET_GROUP = 'agent'
 
 # GENERATION_MODULE = "nemo_skills.inference.eval.bfcl"
-GENERATION_MODULE = "nemo_skills.inference.eval.bfcl"
 
 SPLITS = [
    "simple",  # Simple function calls

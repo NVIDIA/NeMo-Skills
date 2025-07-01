@@ -27,11 +27,12 @@ SUBFOLDER_PATH = "berkeley-function-call-leaderboard/bfcl_eval/data"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
-PROMPT_CONFIG = "generic/bfcl"
+PROMPT_CONFIG = "eval/bfcl/nemotron"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"
 GENERATION_ARGS = ""
+GENERATION_MODULE = "nemo_skills.inference.eval.bfcl"
 """
 
 
