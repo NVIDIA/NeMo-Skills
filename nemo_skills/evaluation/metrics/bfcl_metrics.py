@@ -18,6 +18,9 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 class BFCLMetrics(BaseMetrics):
     """Metrics for BFCL (Berkeley Function Calling Leaderboard) evaluation."""
 
+    # TODO: Ideally we should combine the accuracies across different subsets of the benchmark to
+    # report something similar to the final score in the BFCL leaderboard.
+    
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {"accuracy": prediction['is_correct']}
 

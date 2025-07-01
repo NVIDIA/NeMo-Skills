@@ -18,6 +18,7 @@ import glob
 import tempfile
 import json
 import shutil
+from copy import deepcopy
 from utils import func_doc_language_specific_pre_processing, convert_to_tool
 
 
@@ -67,48 +68,64 @@ def process_file(input_file, output_file):
             instance = json.loads(line)
             test_category = instance["id"].rsplit("_", 1)[0]
             if idx == 0:
-                if "multi_" in test_category or "live_" in test_category:
+                if not "live_" in test_category: #or "multi" in test_category:
                     break
                 # else:
                 print(test_category)            
 
-            # In this processing, we keep the chat mode format for the question
-            if len(instance["question"]) == 1:
+            # In this processing, we identify the system content and the user content
+            messages = deepcopy(instance["question"])
+            system_content = ""
+            if len(messages) == 1:
                 # Just a single user command
-                if len(instance["question"][0]) == 1:
-                    if instance["question"][0][0]["role"] == "user":
-                        instance["question"] = [
-                            {"role": "system", "content": ""}, 
-                            {"role": "user", "content": instance["question"][0][0]["content"]}
-                        ]
-                    elif instance["question"][0][0]["role"] == "system":
-                        instance["question"] = instance["question"][0]
-                    
-                    # The problem is the second message in the question
-                    instance["problem"] = instance["question"][1]["content"]
+                if len(messages[0]) == 1:
+                    assert messages[0][0]["role"] == "user"
+                    instance["problem"] = messages[0][0]["content"]
+
+                elif len(messages[0]) == 2:
+                    # First is system, second is user for all except one instance
+                    if messages[0][0]["role"] == "system":
+                        system_content = messages[0][0]["content"]
+                        instance["problem"] = messages[0][1]["content"]
+                    elif messages[0][0]["role"] == "user":
+                        instance["problem"] = messages[0][0]["content"] + " " + messages[0][1]["content"]
+                    else:
+                        raise ValueError(f"Unknown format of the question: {json.dumps(instance, indent=4)}")
+
                 else:
                     all_single = False
                     count_complex += 1
-                    continue
+                    break
+
+                    print("***" * 100)
+                    print(json.dumps(instance["question"], indent=4))
+                    print("***" * 100)
+                    print()
+                    print(len(instance["question"]), len(instance["question"][0]))
+                    print()
+                    # continue
             else:
-                # print(test_category)
-                if count_complex == 0:
-                    print(json.dumps(instance, indent=4))
+                # if count_complex == 0:
+                #     print("***" * 100)
+                #     print(json.dumps(instance["question"], indent=4))
+                #     print(len(instance["question"]), len(instance["question"][0]))
+                #     print("***" * 100)
+                #     print()
                 all_single = False
                 count_complex += 1
                 break
                 # continue
 
+
+            instance["system_content"] = system_content
                 
             if "function" in instance:
+                # Add the tools to the system prompt
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
                 instance["tools"] = convert_to_tool(instance["function"])
                 # Add tools to the system prompt
-                # print(json.dumps(instance["question"], indent=4))
                 instance["system_content"] = add_tools_to_system_prompt(
-                    instance["tools"], instance["question"][0]["content"])
-            else:
-                instance["system_content"] = ""
+                    instance["tools"], system_content)
                 
             f_out.write(json.dumps(instance) + "\n")
 
