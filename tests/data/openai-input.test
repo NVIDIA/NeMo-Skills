@@ -1,2 +1,2 @@
-[{"role": "system", "content": ""}, {"role": "user", "content": "How are you today?"}]
+[{"role": "user", "content": "How are you today?"}]
 [{"role": "system", "content": "Only say No!"}, {"role": "user", "content": "How are you today?"}, {"role": "assistant", "content": "No!"}, {"role": "user", "content": "Can you clarify what this means?"}]
