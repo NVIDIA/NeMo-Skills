@@ -140,6 +140,7 @@ def get_executor(
     het_group=None,
     total_het_groups=None,
     slurm_kwargs: dict | None = None,
+    overlap: bool = False,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config)
@@ -198,7 +199,6 @@ def get_executor(
         additional_parameters['mail_user'] = cluster_config['mail_user']
     srun_args = [
         "--no-container-mount-home",
-        "--overlap",
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
@@ -207,6 +207,8 @@ def get_executor(
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
     ]
+    if overlap:
+        srun_args.append("--overlap")
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
@@ -422,7 +424,7 @@ def add_task(
                         container=cur_container,
                         num_nodes=num_nodes,
                         tasks_per_node=cur_tasks,
-                        gpus_per_node=num_gpus,
+                        gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
                         time_min=time_min,
                         dependencies=dependencies,
@@ -434,6 +436,7 @@ def add_task(
                         heterogeneous=heterogeneous,
                         het_group=het_group,
                         total_het_groups=total_het_groups,
+                        overlap=server_config is not None,
                     )
                 )
                 het_group_indices.append(het_group)
@@ -457,7 +460,7 @@ def add_task(
                 container=cluster_config["containers"]["sandbox"],
                 num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                 tasks_per_node=1,
-                gpus_per_node=num_gpus,
+                gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
                 mounts=[],  # we don't want to mount anything
@@ -470,6 +473,7 @@ def add_task(
                 heterogeneous=heterogeneous,
                 het_group=het_group,
                 total_het_groups=total_het_groups,
+                overlap=server_config is not None,
             )
             executors.append(sandbox_executor)
             het_group_indices.append(het_group)
