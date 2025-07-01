@@ -109,7 +109,7 @@ def test_eval_mtbench_api(tmp_path):
     assert metrics['num_entries'] == 2
 
 
-def test_generate_openai_data(tmp_path):
+def test_generate_openai_format(tmp_path):
     if not os.getenv('NVIDIA_API_KEY'):
         pytest.skip("Define NVIDIA_API_KEY to run this test")
 
