@@ -39,7 +39,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class BFCLEvaluatorConfig:
-    model: str = "Qwen/Qwen3-4B"
+    model: str = "o3-mini-2025-01-31-FC"
     timeout: int = 300
 
 

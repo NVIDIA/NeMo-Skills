@@ -18,7 +18,7 @@ import glob
 import tempfile
 import json
 import shutil
-from utils import func_doc_language_specific_pre_processing
+from utils import func_doc_language_specific_pre_processing, convert_to_tool
 
 
 # Github paths for BFCL
@@ -35,6 +35,28 @@ GENERATION_ARGS = ""
 """
 
 
+def add_tools_to_system_prompt(tools, system_prompt):
+    system_prompt += ('You can use the following tools to assist the user if required:\n<AVAILABLE_TOOLS>[')
+    
+    for tool in tools:
+        # Handle both tool.function and direct tool formats
+        tool_def = tool.get('function', tool) if isinstance(tool, dict) and 'function' in tool else tool
+        system_prompt += json.dumps(tool_def)
+    
+    system_prompt += ']</AVAILABLE_TOOLS>\n\n'
+    
+    # Add tool usage instructions
+    system_prompt += (
+        'If you decide to call any tool(s), use the following format:\n'
+        '<TOOLCALL>[{"name": "tool_name1", "arguments": "tool_args1"}, '
+        '{"name": "tool_name2", "arguments": "tool_args2"}]</TOOLCALL>\n\n'
+        'Response from tool(s) will be returned in this format:\n'
+        '<TOOL_RESPONSE>[{"response": "tool_response1"}, {"response": "tool_response2"}]</TOOL_RESPONSE>\n\n'
+        'Based on the results returned by the tool(s), you can call additional tools if needed, '
+        'correct tool calls if any errors are found, or just respond with the answer to the user.'
+    )
+    return system_prompt
+
 
 def process_file(input_file, output_file):
     all_single = True
@@ -42,39 +64,51 @@ def process_file(input_file, output_file):
     with open(input_file, "r") as f, open(output_file, "w") as f_out:
         for idx, line in enumerate(f):
             instance = json.loads(line)
-            # Add a new field in the instance to store the additionalsystem content
-            instance["system_content"] = ""
             test_category = instance["id"].rsplit("_", 1)[0]
             if idx == 0:
+                if "multi_" in test_category or "live_" in test_category:
+                    break
+                # else:
                 print(test_category)            
 
+            # In this processing, we keep the chat mode format for the question
             if len(instance["question"]) == 1:
                 # Just a single user command
                 if len(instance["question"][0]) == 1:
-                    # print(instance["question"][0])
-                    assert instance["question"][0][0]["role"] == "user"
-                    instance["question"] = instance["question"][0][0]["content"]
-                elif len(instance["question"][0]) == 2:
-                    # Mostly this instance is a system command + user command
-                    if instance["question"][0][0]["role"] == "system" and instance["question"][0][1]["role"] == "user":
-                        # Process system content which will be added to the system prompt
-                        instance["system_content"] = instance["question"][0][0]["content"]
-                        instance["question"] = instance["question"][0][1]["content"]
-                    elif instance["question"][0][0]["role"] == "user" and instance["question"][0][1]["role"] == "user":
-                        # Concatenate the two user commands - only happens for one instance
-                        instance["question"] = (instance["question"][0][0]["content"] + instance["question"][0][1]["content"]).strip()
-                    else:
-                        raise ValueError(f"Unknown instance format: {json.dumps(instance, indent=4)}")
+                    if instance["question"][0][0]["role"] == "user":
+                        instance["question"] = [
+                            {"role": "system", "content": ""}, 
+                            {"role": "user", "content": instance["question"][0][0]["content"]}
+                        ]
+                    elif instance["question"][0][0]["role"] == "system":
+                        instance["question"] = instance["question"][0]
+                    
+                    # The problem is the second message in the question
+                    instance["problem"] = instance["question"][1]["content"]
                 else:
                     all_single = False
                     count_complex += 1
+                    continue
             else:
+                # print(test_category)
+                if count_complex == 0:
+                    print(json.dumps(instance, indent=4))
                 all_single = False
                 count_complex += 1
+                break
+                # continue
 
                 
             if "function" in instance:
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
+                instance["tools"] = convert_to_tool(instance["function"])
+                # Add tools to the system prompt
+                # print(json.dumps(instance["question"], indent=4))
+                instance["system_content"] = add_tools_to_system_prompt(
+                    instance["tools"], instance["question"][0]["content"])
+            else:
+                instance["system_content"] = ""
+                
             f_out.write(json.dumps(instance) + "\n")
 
     if not all_single:
@@ -138,8 +172,8 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
         except subprocess.CalledProcessError as e:
             print(f"Git command failed: {e}")
             print("Make sure git is installed and the repository URL is correct")
-        except Exception as e:
-            print(f"Error: {e.message}")
+        # except Exception as e:
+        #     print(f"Error: {e}")
 
 
 if __name__ == "__main__":
