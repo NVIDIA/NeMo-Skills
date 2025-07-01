@@ -18,9 +18,12 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
-import openai
+import json
+from pathlib import Path
+import re   
+import shutil
 
-from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
+from nemo_skills.inference.eval.bfcl_utils import extract_tool_response
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -30,9 +33,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class BFCLGenerationConfig(GenerateSolutionsConfig):
-    """SciCode benchmark generation. Will run queries multiple times including previously generated code.
-    For the full list of supported parameters, use 'python -m nemo_skills.inference.generate --help'
-    """
+    """BFCL benchmark generation."""
 
     # Inheritance was converting these dataclasses to dicts, so to be on the safe side we override them
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
@@ -45,6 +46,21 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
     remove_thinking: bool = True
+
+    tool_call_start_token = "<TOOLCALL>"
+    tool_call_end_token = "</TOOLCALL>"
+
+
+    @property
+    def tool_call_regex(self):
+        """Compiled regex pattern for extracting tool calls."""
+        return re.compile(
+            r"{}(.*?){}".format(
+                re.escape(self.tool_call_start_token), 
+                re.escape(self.tool_call_end_token)
+            ), 
+            re.DOTALL
+        )
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -71,7 +87,24 @@ class BFCLGenerationTask(GenerationTask):
         self.use_async_loop = True  # SciCode is a multi-call benchmark, so we have to use async loop
 
 
-    # def postprocess(self):
+    def postprocess(self):
+        # Extract the tool response from the generation
+        print("Postprocessing {}".format(self.cfg.output_file))
+        temp_file = Path(self.cfg.output_file).with_suffix(".tmp")
+
+        with open(self.cfg.output_file, "rt", encoding="utf-8") as fin, open(temp_file, "wt", encoding="utf-8") as fout:
+            for line in fin:
+                instance = json.loads(line)
+                extracted_tool_response = extract_tool_response(
+                    instance["generation"], self.cfg.tool_call_start_token, self.cfg.tool_call_regex)
+                instance["result"] = [
+                    {func_call.function.name: func_call.function.arguments}
+                    for func_call in extracted_tool_response["tool_calls"]
+                ]
+
+                fout.write(json.dumps(instance) + "\n")
+
+        shutil.move(temp_file, self.cfg.output_file)
 
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
