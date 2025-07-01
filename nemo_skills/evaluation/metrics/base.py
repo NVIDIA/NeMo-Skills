@@ -77,6 +77,31 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens = 0
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
+    @classmethod
+    def _get_incorrect_sample(cls, prediction, metric_type):
+        if metric_type in ['math', 'multichoice']:
+            if 'is_correct' in prediction:
+                prediction['is_correct'] = False
+            if 'judgement' in prediction:
+                prediction['judgement'] = "Reasoning: No answer was provided.\nJudgement: No"
+            prediction['predicted_answer'] = None
+        elif metric_type == 'code':
+            prediction['passing_base_tests'] = False
+            prediction['passing_plus_tests'] = False
+        elif metric_type in ['lean4-proof', 'lean4-statement']:
+            prediction['lean4_correct'] == False
+        elif metric_type == 'if':
+            prediction['prompt'] = False
+            prediction['instruction'] = 0
+        elif metric_type == 'ruler':
+            prediction['accuracy'] = False
+        elif metric_type == 'answer-judgement':
+            prediction['correct_judgements'] = False
+        else:
+            raise NotImplementedError(
+                f"We currently do not support the metric_type '{metric_type}' yet."
+            )
+
     def _update_score_metrics_for_majority(
         self,
         eval_dict: dict,

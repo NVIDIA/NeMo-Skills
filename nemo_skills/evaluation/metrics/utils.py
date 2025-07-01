@@ -16,19 +16,18 @@ import logging
 from typing import Union
 
 from nemo_skills.utils import get_logger_name
-
+from nemo_skills.evaluation.metrics.base import BaseMetrics
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def read_predictions(predictions, line_idx, file_handles, sequence_length = None):
+def read_predictions(predictions, line_idx, file_handles, sequence_length = None, metric_type = None):
     data = []
     for file_idx, prediction in enumerate(predictions):
         try:
             prediction_dict = json.loads(prediction)
             if sequence_length != None:
                 if int(prediction_dict['num_generated_tokens']) > sequence_length: 
-                    prediction_dict['is_correct'] = False
-                    prediction_dict['predicted_answer'] = None
+                    BaseMetrics._get_incorrect_sample(prediction_dict, metric_type)
         except Exception as e:
             LOG.error(f"\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
             raise
