@@ -84,7 +84,7 @@ def eval_group(
         "By default searching yaml files inside nemo_skills/evaluation/eval_group, "
         "but can provide an absolute path to a yaml file or a dict with the config directly.",
     ),
-    expname: str = typer.Option("eval", help="Name of the experiment"),
+    expname: str = typer.Option("eval_group", help="Name of the experiment"),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
     server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
@@ -190,10 +190,91 @@ def eval_group(
     LOG.info("Starting evaluation group job")
     LOG.info("Extra arguments that will be passed to the underlying scripts: %s", extra_arguments)
 
+    default_eval_args = {
+        'cluster': cluster,
+        'output_dir': output_dir,
+        'data_dir': data_dir,
+        'model': model,
+        'server_address': server_address,
+        'server_type': server_type,
+        'server_gpus': server_gpus,
+        'server_nodes': server_nodes,
+        'server_args': server_args,
+        'server_entrypoint': server_entrypoint,
+        'dependent_jobs': dependent_jobs,
+        'starting_seed': starting_seed,
+        'num_jobs': num_jobs,
+        'num_chunks': num_chunks,
+        'chunk_ids': chunk_ids,
+        'partition': partition,
+        'time_min': time_min,
+        'mount_paths': mount_paths,
+        'run_after': run_after,
+        'reuse_code_exp': reuse_code_exp,
+        'reuse_code': reuse_code,
+        'config_dir': config_dir,
+        'extra_datasets': extra_datasets,
+        'extra_datasets_type': extra_datasets_type,
+        'exclusive': exclusive,
+        'rerun_done': rerun_done,
+        'with_sandbox': with_sandbox,
+        'check_mounted_paths': check_mounted_paths,
+        'wandb_group': wandb_group,
+        'wandb_project': wandb_project,
+        'installation_command': installation_command,
+    }
+    default_judge_args = {
+        'cluster': cluster,
+        'output_dir': output_dir.rstrip('/') + '/judged-results',
+        'model': judge_model,
+        'server_address': judge_server_address,
+        'server_type': judge_server_type,
+        'server_gpus': judge_server_gpus,
+        'server_nodes': judge_server_nodes,
+        'server_args': judge_server_args,
+        'server_entrypoint': judge_server_entrypoint,
+        'partition': partition,
+        'time_min': time_min,
+        'mount_paths': mount_paths,
+        'reuse_code_exp': reuse_code_exp,
+        'reuse_code': reuse_code,
+        'config_dir': config_dir,
+        'exclusive': exclusive,
+        'rerun_done': rerun_done,
+        'check_mounted_paths': check_mounted_paths,
+        'installation_command': installation_command,
+    }
+
+    if log_dir is None:
+        log_dir = f"{output_dir}/eval-logs"
+
     eval_group = get_eval_group(eval_group)
-    for benchmark_config in eval_group['benchmarks']:
-        # using function here to ensure all fields are name-checked by python
-        benchmark, bench_ctx, judge_ctx = prepare_benchmark_args(ctx=ctx, **benchmark_config)
+    for job_idx, job_config in enumerate(eval_group['jobs']):
+        job_name = job_config.pop('name', str(job_idx))
+        job_extra_arguments = job_config.pop('wrap_arguments', None)
+        judge_config = job_config.pop('judge', None)
+
+        job_args = deepcopy(default_eval_args)
+        job_args['expname'] = f"{expname}-{job_name}"
+        job_args['log_dir'] = f"{log_dir}/{job_name}"
+        job_args['wandb_name'] = f"{wandb_name}-{job_name}"
+        job_args.update(job_config)
+        job_ctx = deepcopy(ctx)
+        if job_extra_arguments:
+            job_ctx.args.extend(job_extra_arguments.split(" "))
+        _eval(ctx=job_ctx, **job_args)
+        if judge_config:
+            judge_args = deepcopy(default_judge_args)
+            judge_args['expname'] = f"{expname}-{job_name}-judge"
+            judge_args['log_dir'] = f"{log_dir}/{job_name}-judge"
+            judge_extra_arguments = judge_config.pop('wrap_arguments', None)
+            judge_args.update(judge_config)
+            judge_ctx = typer.Context("")
+            if judge_extra_arguments:
+                judge_ctx.args.extend(judge_extra_arguments.split(" "))
+            _generate(ctx=judge_ctx, run_after=job_args['expname'], **judge_args)
+
+        # TODO summarize results and final aggregate metrics
 
 
 if __name__ == "__main__":

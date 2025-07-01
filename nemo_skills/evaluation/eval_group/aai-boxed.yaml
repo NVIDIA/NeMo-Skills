@@ -2,43 +2,49 @@
 # should get results very close to what's reported in https://artificialanalysis.ai/
 # with the difference that for mcq questions we ask to put the answer in the \boxed{}
 
-benchmarks:
-  - name: mmlu_pro
-    repeats: 1
-    prompt_config: generic/mcq-10choice-aai-boxed
-    inference:
-      temperature: 0.0
+# this file is meant to be changed frequently by users
+# to add other parameters like num_chunks, dependent_jobs, etc.
+
+# each element of jobs list is directly passed to the eval(**job_config)
+# with special handling for wrap_arguments and name fields,
+# as well as "judge" (that's directly passed to generate(**job_config.judge))
+# all arguments of ns eval_group pipeline can be thus overridden from this config
+# e.g. you can specify a custom judge model for a certain step which will
+# override ns eval_group's `judge_model` argument
+
+jobs:
+  - name: mmlu_pro  # used as part of expname, log_dir, wandb_name, etc.
+    benchmarks: mmlu_pro
+    wrap_arguments: "++prompt_config=generic/mcq-10choice-aai-boxed ++inference.temperature=0.0"
   - name: hle
-    repeats: 1
-    prompt_config: generic/hle
-    inference:
-      temperature: 0.0
+    benchmarks: hle
+    wrap_arguments: "++prompt_config=generic/hle ++inference.temperature=0.0"
     # hle needs a separate judge step
     # judge model configuration is specified by eval_group pipeline arguments
     judge:
-      prompt_config: judge/hle
-  - name: gpqa
-    repeats: 5
-    prompt_config: generic/mcq-4choice-aai-boxed
-    inference:
-      temperature: 0.0
-  - name: math-500
-    repeats: 3
-    prompt_config: eval/aai/math
-    inference:
-      temperature: 0.0
-  - name: aime24
-    repeats: 10
-    prompt_config: eval/aai/math
-    inference:
-      temperature: 0.0
-  - name: scicode
-    repeats: 3
-    # scicode default prompt is same as aai prompt
-    inference:
-      temperature: 0.0
-  - name: livecodebench
-    repeats: 3
-    # TODO: add aai prompt here
-    inference:
-      temperature: 0.0
+      wrap_arguments: "++prompt_config=judge/hle ++generation_key=judgement"
+  # - name: gpqa
+  #   repeats: 5
+  #   prompt_config: generic/mcq-4choice-aai-boxed
+  #   inference:
+  #     temperature: 0.0
+  # - name: math-500
+  #   repeats: 3
+  #   prompt_config: eval/aai/math
+  #   inference:
+  #     temperature: 0.0
+  # - name: aime24
+  #   repeats: 10
+  #   prompt_config: eval/aai/math
+  #   inference:
+  #     temperature: 0.0
+  # - name: scicode
+  #   repeats: 3
+  #   # scicode default prompt is same as aai prompt
+  #   inference:
+  #     temperature: 0.0
+  # - name: livecodebench
+  #   repeats: 3
+  #   # TODO: add aai prompt here
+  #   inference:
+  #     temperature: 0.0
