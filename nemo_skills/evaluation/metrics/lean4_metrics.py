@@ -39,6 +39,12 @@ class Lean4Metrics(BaseMetrics):
         eval_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
         eval_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
 
+    def _get_incorrect_sample(self, predictions, sequence_length):
+        for prediction in predictions:
+            if 'num_generated_tokens' in prediction and int(prediction['num_generated_tokens']) <= sequence_length: continue
+            prediction['lean4_correct'] == False
+    
+    
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
