@@ -16,7 +16,6 @@ import logging
 from typing import Union
 
 from nemo_skills.utils import get_logger_name
-from nemo_skills.evaluation.metrics.base import BaseMetrics
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
