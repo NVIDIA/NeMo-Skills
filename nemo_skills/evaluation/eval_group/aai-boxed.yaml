@@ -28,11 +28,9 @@ jobs:
   #   prompt_config: generic/mcq-4choice-aai-boxed
   #   inference:
   #     temperature: 0.0
-  # - name: math-500
-  #   repeats: 3
-  #   prompt_config: eval/aai/math
-  #   inference:
-  #     temperature: 0.0
+  - name: math-500
+    benchmarks: math-500:3
+    wrap_arguments: "++prompt_config=eval/aai/math ++inference.temperature=0.0"
   # - name: aime24
   #   repeats: 10
   #   prompt_config: eval/aai/math
