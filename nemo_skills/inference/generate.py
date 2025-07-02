@@ -405,7 +405,10 @@ class GenerationTask:
             continue_prefix_generation=self.cfg.continue_prefix_generation,
         )
         if self.cfg.prompt_suffix:
-            filled_prompt += self.cfg.prompt_suffix
+            if isinstance(filled_prompt, list):
+                filled_prompt[-1]['content'] += self.cfg.prompt_suffix
+            else:
+                filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
 
     def llm_generate(self, data_points, data, is_async=False):
