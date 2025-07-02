@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import json
 import os
 
 # running most things through subprocess since that's how it's usually used
@@ -106,3 +107,26 @@ def test_eval_mtbench_api(tmp_path):
     assert metrics['missing_rating_turn1'] < 2
     assert metrics['missing_rating_turn2'] < 2
     assert metrics['num_entries'] == 2
+
+
+def test_generate_openai_format(tmp_path):
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
+
+    cmd = (
+        f"ns generate "
+        f"    --server_type=openai "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
+        f"    --input_file=/nemo_run/code/tests/data/openai-input.test "
+        f"    --output_dir={tmp_path} "
+        f"    ++prompt_format=openai "
+    )
+    subprocess.run(cmd, shell=True, check=True)
+
+    # checking that output exists and has the expected format
+    with open(f"{tmp_path}/output.jsonl") as fin:
+        data = [json.loads(line) for line in fin.readlines()]
+    assert len(data) == 2
+    assert len(data[0]['generation']) > 0
+    assert len(data[1]['generation']) > 0
