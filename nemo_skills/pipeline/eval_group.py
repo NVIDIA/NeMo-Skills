@@ -66,7 +66,9 @@ def submit_jobs(
         if job_extra_arguments:
             job_ctx.args.extend(job_extra_arguments.split(" "))
         _eval(ctx=job_ctx, dry_run=dry_run, **job_args)
+        has_judge = False
         if judge_config:
+            has_judge = True
             if not dry_run:
                 LOG.info("Running judge for job %s with config: %s", job_name, judge_config)
             judge_args = deepcopy(default_judge_args)
@@ -104,7 +106,7 @@ def submit_jobs(
         sum_ctx = deepcopy(ctx)
         # removing any extra arguments here as they are assumed to be for the main job
         sum_ctx.args = []
-        output_dir = f"{output_dir}/eval-results" if not judge_config else f"{output_dir}/eval-results-judged"
+        output_dir = f"{output_dir}/eval-results" if not has_judge else f"{output_dir}/eval-results-judged"
         command = f"python -m nemo_skills.pipeline.summarize_results {output_dir}"
         if wandb_name:
             command += f" --wandb_name={wandb_name} "
@@ -121,7 +123,7 @@ def submit_jobs(
             cluster=cluster,
             log_dir=f"{output_dir}/summarized_results",
             expname=f"{expname}-{job_name}-summarize-results" + ('-dry-run' if dry_run else ''),
-            run_after=job_args['expname'] if not judge_config else judge_args['expname'],
+            run_after=job_args['expname'] if not has_judge else judge_args['expname'],
             dry_run=dry_run,
         )
 

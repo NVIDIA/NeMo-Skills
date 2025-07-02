@@ -15,7 +15,8 @@
 jobs:
   - name: mmlu-pro  # used as part of expname, log_dir, wandb_name, etc.
     benchmarks: mmlu-pro
-    wrap_arguments: "++prompt_config=eval/aai/mcq-10choice-boxed ++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=eval/aai/mcq-10choices-boxed ++inference.temperature=0.0"
+
   - name: hle
     benchmarks: hle
     wrap_arguments: "++prompt_config=generic/hle ++inference.temperature=0.0"
@@ -23,26 +24,24 @@ jobs:
     # judge model configuration is specified by eval_group pipeline arguments
     judge:
       wrap_arguments: "++prompt_config=judge/hle ++generation_key=judgement"
-  # - name: gpqa
-  #   repeats: 5
-  #   prompt_config: generic/mcq-4choice-aai-boxed
-  #   inference:
-  #     temperature: 0.0
+
+  - name: gpqa
+    benchmarks: gpqa
+    wrap_arguments: "++prompt_config=generic/mcq-4choices-boxed ++inference.temperature=0.0"
+
   - name: math-500
     benchmarks: math-500:3
     wrap_arguments: "++prompt_config=eval/aai/math ++inference.temperature=0.0"
-  # - name: aime24
-  #   repeats: 10
-  #   prompt_config: eval/aai/math
-  #   inference:
-  #     temperature: 0.0
-  # - name: scicode
-  #   repeats: 3
-  #   # scicode default prompt is same as aai prompt
-  #   inference:
-  #     temperature: 0.0
-  # - name: livecodebench
-  #   repeats: 3
-  #   # TODO: add aai prompt here
-  #   inference:
-  #     temperature: 0.0
+
+  - name: aime24
+    benchmarks: aime24:10
+    wrap_arguments: "++prompt_config=eval/aai/math ++inference.temperature=0.0"
+
+  - name: scicode
+    benchmarks: scicode:3
+    # scicode default prompt is same as aai prompt
+    wrap_arguments: "++inference.temperature=0.0"
+
+  - name: livecodebench
+    benchmarks: livecodebench:3
+    wrap_arguments: "++inference.temperature=0.0"
