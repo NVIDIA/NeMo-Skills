@@ -156,7 +156,6 @@ def run_cmd(
 
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
-            # Add the task to the experiment
             new_task = add_task(
                 exp,
                 cmd=cmd,

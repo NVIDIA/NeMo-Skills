@@ -56,7 +56,7 @@ def submit_jobs(
         judge_config = job_config.pop('judge', None)
 
         job_args = deepcopy(default_eval_args)
-        job_args['expname'] = f"{expname}-{job_name}"
+        job_args['expname'] = f"{expname}-{job_name}" + ('-dry-run' if dry_run else '')
         job_args['log_dir'] = f"{log_dir}/{job_name}"
         job_args['wandb_name'] = f"{wandb_name}-{job_name}"
         if 'output_dir' in job_config:
@@ -70,7 +70,7 @@ def submit_jobs(
             if not dry_run:
                 LOG.info("Running judge for job %s with config: %s", job_name, judge_config)
             judge_args = deepcopy(default_judge_args)
-            judge_args['expname'] = f"{expname}-{job_name}-judge"
+            judge_args['expname'] = f"{expname}-{job_name}-judge" + ('-dry-run' if dry_run else '')
             judge_args['log_dir'] = f"{log_dir}/{job_name}-judge"
             # setting input_file / directory to the output of the main job
             benchmarks = job_args['benchmarks']
@@ -120,7 +120,7 @@ def submit_jobs(
             command=command,
             cluster=cluster,
             log_dir=f"{output_dir}/summarized_results",
-            expname=f"{expname}-{job_name}-summarize-results",
+            expname=f"{expname}-{job_name}-summarize-results" + ('-dry-run' if dry_run else ''),
             run_after=job_args['expname'] if not judge_config else judge_args['expname'],
             dry_run=dry_run,
         )
