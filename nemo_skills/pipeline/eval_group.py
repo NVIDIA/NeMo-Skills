@@ -15,6 +15,7 @@ import importlib
 import logging
 import os
 from copy import deepcopy
+from pathlib import Path
 from typing import List
 
 import typer
@@ -32,35 +33,97 @@ from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def prepare_judge_args(prompt_config: str):
-    judge_ctx = typer.Context("")
-    judge_ctx.args = [f"++prompt_config={prompt_config}"]
-    return judge_ctx
-
-
-def prepare_benchmark_args(
-    ctx: typer.Context,
-    name: str,
-    repeats: int = 1,
-    prompt_config: str | None = None,
-    inference: dict | None = None,
-    judge: dict | None = None,
+def submit_jobs(
+    cluster,
+    eval_group,
+    default_eval_args,
+    default_judge_args,
+    ctx,
+    expname,
+    log_dir,
+    wandb_name,
+    wandb_project,
+    wandb_group,
+    output_dir,
+    dry_run=False,
 ):
-    benchmark = name
-    if repeats > 1:
-        benchmark = f"{name}:{repeats}"
-    ctx = deepcopy(ctx)
-    if prompt_config is not None:
-        ctx.args.append(f"++prompt_config={prompt_config}")
-    if inference is not None:
-        for key, value in inference.items():
-            ctx.args.append(f"++inference.{key}={value}")
+    eval_group = deepcopy(eval_group)
+    for job_idx, job_config in enumerate(eval_group['jobs']):
+        job_name = job_config.pop('name', str(job_idx))
+        if not dry_run:
+            LOG.info("Running job %s with config: %s", job_name, job_config)
+        job_extra_arguments = job_config.pop('wrap_arguments', None)
+        judge_config = job_config.pop('judge', None)
 
-    if judge is not None:
-        judge_ctx = prepare_judge_args(**judge)
-    else:
-        judge_ctx = typer.Context("")
-    return benchmark, ctx, judge_ctx
+        job_args = deepcopy(default_eval_args)
+        job_args['expname'] = f"{expname}-{job_name}"
+        job_args['log_dir'] = f"{log_dir}/{job_name}"
+        job_args['wandb_name'] = f"{wandb_name}-{job_name}"
+        if 'output_dir' in job_config:
+            raise ValueError("output_dir should not be specified in the job config, it is set by eval_group argument.")
+        job_args.update(job_config)
+        job_ctx = deepcopy(ctx)
+        if job_extra_arguments:
+            job_ctx.args.extend(job_extra_arguments.split(" "))
+        _eval(ctx=job_ctx, dry_run=dry_run, **job_args)
+        if judge_config:
+            if not dry_run:
+                LOG.info("Running judge for job %s with config: %s", job_name, judge_config)
+            judge_args = deepcopy(default_judge_args)
+            judge_args['expname'] = f"{expname}-{job_name}-judge"
+            judge_args['log_dir'] = f"{log_dir}/{job_name}-judge"
+            # setting input_file / directory to the output of the main job
+            benchmarks = job_args['benchmarks']
+            if ',' in benchmarks:
+                raise ValueError("Multiple benchmarks are not supported when using a judge.")
+            if ':' in benchmarks:
+                benchmark_name, benchmark_seeds = benchmarks.split(':')
+            else:
+                benchmark_name, benchmark_seeds = benchmarks, None
+            if benchmark_seeds is None or benchmark_seeds == '0':
+                judge_args['input_file'] = str(
+                    Path(job_args['output_dir']) / 'eval-results' / benchmark_name / 'output.jsonl'
+                )
+            else:
+                judge_args['input_dir'] = str(Path(job_args['output_dir']) / 'eval-results' / benchmark_name)
+                judge_args['num_random_seeds'] = int(benchmark_seeds)
+            judge_args['output_dir'] = str(Path(job_args['output_dir']) / 'eval-results-judged' / benchmark_name)
+            judge_extra_arguments = judge_config.pop('wrap_arguments', None)
+            if 'output_dir' in judge_config:
+                raise ValueError(
+                    "output_dir should not be specified in the judge config, it is set by eval_group argument."
+                )
+            judge_args.update(judge_config)
+            judge_ctx = deepcopy(ctx)
+            # removing any extra arguments here as they are assumed to be for the main job
+            judge_ctx.args = []
+            if judge_extra_arguments:
+                judge_ctx.args.extend(judge_extra_arguments.split(" "))
+            _generate(ctx=judge_ctx, dry_run=dry_run, run_after=job_args['expname'], **judge_args)
+
+        sum_ctx = deepcopy(ctx)
+        # removing any extra arguments here as they are assumed to be for the main job
+        sum_ctx.args = []
+        output_dir = f"{output_dir}/eval-results" if not judge_config else f"{output_dir}/eval-results-judged"
+        command = f"python -m nemo_skills.pipeline.summarize_results {output_dir}"
+        if wandb_name:
+            command += f" --wandb_name={wandb_name} "
+        if wandb_group:
+            command += f" --wandb_group={wandb_group} "
+        if wandb_project:
+            command += f" --wandb_project={wandb_project} "
+        benchmarks_split = job_args['benchmarks'].split(',')
+        benchmark_names = ",".join([b.split(':')[0] for b in benchmarks_split])
+        command += f" --benchmarks {benchmark_names} "
+        run_after = job_args['expname'] if not judge_config else judge_args['expname']
+        _run_cmd(
+            ctx=sum_ctx,
+            command=command,
+            cluster=cluster,
+            log_dir=f"{output_dir}/summarize_results",
+            expname=f"{expname}-{job_name}-summarize-results",
+            run_after=run_after,
+        )
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -98,7 +161,9 @@ def eval_group(
     ),
     judge_model: str = typer.Option(None, help="Path to the model to be used as a judge (if applicable)"),
     judge_server_address: str = typer.Option(None, help="Address of the server hosting the judge model"),
-    judge_server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use for the judge"),
+    judge_server_type: pipeline_utils.SupportedServers = typer.Option(
+        None, help="Type of server to use for the judge"
+    ),
     judge_server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the judge model"),
     judge_server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the judge model"),
     judge_server_args: str = typer.Option("", help="Additional arguments for the judge server"),
@@ -249,32 +314,37 @@ def eval_group(
         log_dir = f"{output_dir}/eval-logs"
 
     eval_group = get_eval_group(eval_config)
-    for job_idx, job_config in enumerate(eval_group['jobs']):
-        job_name = job_config.pop('name', str(job_idx))
-        job_extra_arguments = job_config.pop('wrap_arguments', None)
-        judge_config = job_config.pop('judge', None)
 
-        job_args = deepcopy(default_eval_args)
-        job_args['expname'] = f"{expname}-{job_name}"
-        job_args['log_dir'] = f"{log_dir}/{job_name}"
-        job_args['wandb_name'] = f"{wandb_name}-{job_name}"
-        job_args.update(job_config)
-        job_ctx = deepcopy(ctx)
-        if job_extra_arguments:
-            job_ctx.args.extend(job_extra_arguments.split(" "))
-        _eval(ctx=job_ctx, **job_args)
-        if judge_config:
-            judge_args = deepcopy(default_judge_args)
-            judge_args['expname'] = f"{expname}-{job_name}-judge"
-            judge_args['log_dir'] = f"{log_dir}/{job_name}-judge"
-            judge_extra_arguments = judge_config.pop('wrap_arguments', None)
-            judge_args.update(judge_config)
-            judge_ctx = typer.Context("")
-            if judge_extra_arguments:
-                judge_ctx.args.extend(judge_extra_arguments.split(" "))
-            _generate(ctx=judge_ctx, run_after=job_args['expname'], **judge_args)
+    # this validates all arguments that are checked at job submission time
+    submit_jobs(
+        eval_group,
+        default_eval_args,
+        default_judge_args,
+        ctx,
+        expname,
+        log_dir,
+        wandb_name,
+        wandb_group,
+        wandb_project,
+        output_dir,
+        dry_run=True,
+    )
+    # this submits the commands after validation is done
+    submit_jobs(
+        eval_group,
+        default_eval_args,
+        default_judge_args,
+        ctx,
+        expname,
+        log_dir,
+        wandb_name,
+        wandb_group,
+        wandb_project,
+        output_dir,
+        dry_run=False,
+    )
 
-        # TODO summarize results and final aggregate metrics
+    # TODO summarize results and final aggregate metrics
 
 
 if __name__ == "__main__":

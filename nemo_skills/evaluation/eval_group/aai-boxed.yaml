@@ -13,8 +13,8 @@
 # override ns eval_group's `judge_model` argument
 
 jobs:
-  - name: mmlu_pro  # used as part of expname, log_dir, wandb_name, etc.
-    benchmarks: mmlu_pro
+  - name: mmlu-pro  # used as part of expname, log_dir, wandb_name, etc.
+    benchmarks: mmlu-pro
     wrap_arguments: "++prompt_config=generic/mcq-10choice-aai-boxed ++inference.temperature=0.0"
   - name: hle
     benchmarks: hle

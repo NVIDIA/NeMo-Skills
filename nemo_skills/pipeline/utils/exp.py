@@ -186,7 +186,10 @@ def get_executor(
                 f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
             )
 
-    partition = partition or cluster_config.get("partition")
+    if gpus_per_node is not None and gpus_per_node > 0:
+        partition = partition or cluster_config.get("partition")
+    else:
+        partition = partition or cluster_config.get("cpu_partition") or cluster_config.get("partition")
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
     else:
@@ -316,6 +319,7 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
+    dry_run: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -538,11 +542,14 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=None):
+def run_exp(exp, cluster_config, sequential=None, dry_run=False):
     """If sequential is not specified, using True locally and False otherwise.
 
     If it is specified, it will be used as is.
     """
+    if dry_run:
+        LOG.info("Dry run mode is enabled, not running the experiment.")
+        return
     if cluster_config['executor'] != 'slurm':
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
