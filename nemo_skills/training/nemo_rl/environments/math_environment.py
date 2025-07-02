@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# copied from https://github.com/NVIDIA-NeMo/RL/blob/main/nemo_rl/environments/math_environment.py
+# with minor modifications
 
 import contextlib
 import io
@@ -62,18 +65,15 @@ class HFVerifyWorker:
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
             try:
+                # math_verify may raise a TimeoutException; handle it gracefully but
+                # surface any other unexpected error so that we don't silently assign zero reward
                 with _mute_output():
-                    try:
-                        ret_score = float(math_equal(ground_truth, extract_answer(response)))
-                    # It's possible to emit a TimeoutException and that wouldn't be caught since
-                    # it actually subclasses from BaseException and math-verify itself does not
-                    # to catch it.
-                    except (Exception, TimeoutException):
-                        ret_score = 0.0
+                    ret_score = float(math_equal(ground_truth, extract_answer(response)))
+            except TimeoutException:
+                logging.warning("math_verify timed out while checking response; assigning 0 reward")
+                ret_score = 0.0
 
-                results.append(float(ret_score))
-            except Exception:
-                results.append(0.0)
+            results.append(float(ret_score))
         return results
 
 
@@ -173,7 +173,6 @@ class MathEnvironment(EnvironmentInterface):
         Every rank will run this function, so you're free to use distributed
         calculations if you'd prefer for heavy metrics.
         """
-        batch["rewards"] = batch["rewards"] * batch["is_end"]  # set a reward of 0 for any incorrectly ended sequences
         if (batch["rewards"] == 1).float().sum() > 0:
             correct_solution_generation_lengths = (
                 (batch["generation_lengths"] - batch["prompt_lengths"])[batch["rewards"] == 1].float().mean().item()
@@ -185,8 +184,7 @@ class MathEnvironment(EnvironmentInterface):
             # "table": table, TODO @sahilj WIP
             "accuracy": batch["rewards"].mean().item(),
             "pass@samples_per_prompt": calculate_pass_rate_per_prompt(batch["text"], batch["rewards"]),
-            "fraction_of_samples_properly_ended": batch["is_end"].float().mean().item(),
-            "num_problems_in_batch": batch["is_end"].shape[0],
+            "num_problems_in_batch": batch["rewards"].shape[0],
             "generation_lengths": batch["generation_lengths"].float().mean().item(),
             "prompt_lengths": batch["prompt_lengths"].float().mean().item(),
             "correct_solution_generation_lengths": correct_solution_generation_lengths,
