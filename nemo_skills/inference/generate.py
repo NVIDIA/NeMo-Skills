@@ -367,7 +367,17 @@ class GenerationTask:
         for idx, dp in enumerate(data):
             if idx in filled_positions:
                 continue
-            dp[self.cfg.async_position_key] = idx
+            if self.cfg.prompt_format == "ns":
+                dp[self.cfg.async_position_key] = idx
+            elif self.cfg.prompt_format == "openai":
+                # openai format allows for a list to be top-level key, if that's the case, wrapping it in a messages key
+                if isinstance(dp, list):
+                    dp = {
+                        "messages": dp,
+                        self.cfg.async_position_key: idx,
+                    }
+            else:
+                raise ValueError(f"Unknown prompt format: {self.cfg.prompt_format}")
             remaining_data.append(dp)
 
         return remaining_data
