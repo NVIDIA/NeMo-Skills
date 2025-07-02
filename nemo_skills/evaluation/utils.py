@@ -45,8 +45,8 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
         return yaml.safe_load(fin)
 
 
-def get_eval_group(eval_group: str | dict, eval_group_dir: str | None = None) -> dict:
-    if isinstance(eval_group, dict):
-        return eval_group
+def get_eval_group(eval_config: str | dict, eval_group_dir: str | None = None) -> dict:
+    if isinstance(eval_config, dict):
+        return eval_config
 
-    return load_config(eval_group, eval_group_dir)
+    return load_config(eval_config, eval_group_dir)

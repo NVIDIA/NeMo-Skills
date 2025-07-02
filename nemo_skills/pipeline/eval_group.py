@@ -78,9 +78,9 @@ def eval_group(
         help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
         "Can also specify through NEMO_SKILLS_DATA_DIR environment variable.",
     ),
-    eval_group: str | dict = typer.Option(
+    eval_config: str = typer.Option(
         ...,
-        help="Name of the evaluation group to run. "
+        help="Config for the evaluation group to run. "
         "By default searching yaml files inside nemo_skills/evaluation/eval_group, "
         "but can provide an absolute path to a yaml file or a dict with the config directly.",
     ),
@@ -248,7 +248,7 @@ def eval_group(
     if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
 
-    eval_group = get_eval_group(eval_group)
+    eval_group = get_eval_group(eval_config)
     for job_idx, job_config in enumerate(eval_group['jobs']):
         job_name = job_config.pop('name', str(job_idx))
         job_extra_arguments = job_config.pop('wrap_arguments', None)
