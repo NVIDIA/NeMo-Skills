@@ -125,12 +125,12 @@ class CustomJobDetails(SlurmJobDetails):
 @dataclass(kw_only=True)
 class CustomJobDetailsRay(CustomJobDetails):
     # ray jobs have a custom logs structure
-    ray_log_prefix = "ray-%j-"
+    ray_log_prefix: str = "ray-%j-"
 
     @property
     def ls_term(self) -> str:
         assert self.folder
-        return os.path.join(self.folder, "ray-job*")
+        return os.path.join(self.folder, "ray-%j-*")
 
 
 def get_executor(
