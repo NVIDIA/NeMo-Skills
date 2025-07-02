@@ -368,6 +368,7 @@ def summarize_results(
 
     try:
         save_metrics_path = save_metrics_path or str(Path(results_dir) / 'metrics.json')
+        Path(save_metrics_path).parent.mkdir(parents=True, exist_ok=True)
         with open(save_metrics_path, 'wt', encoding='utf-8') as fout:
             json.dump(results, fout, indent=2)
         if upload_path is not None:
