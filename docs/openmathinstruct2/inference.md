@@ -252,6 +252,142 @@ ns start_server --model=./OpenMath-Nemotron-14B-kaggle-fp8-trtllm/ \
 
 ### 🏗️ LLM generate
 
+These are two utility functions to allow concurrent generation.
+```
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Generator, Union
+
+from nemo_skills.inference.model.code_execution import CodeExecutionWrapper
+from openai import Stream
+
+def consume_stream(stream: Union[Stream, Generator], thread_id=None):
+    """Process a single stream and return concatenated text with timing."""
+    start_time = time.time()
+    result = ""
+    try:
+        for chunk in stream:
+            if chunk['generation'] is not None:
+                result += chunk['generation']
+    except Exception as e:
+        # this is expected to happen when the stream is cancelled
+        pass
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    return {
+        'result': result,
+        'duration': duration,
+        'thread_id': thread_id
+    }
+
+def stream_generate(
+    code_exec_model: CodeExecutionWrapper,
+    prompts: list[str | dict],
+    code_begin: str | list[str],
+    code_end: str | list[str],
+    code_output_begin: str | list[str],
+    code_output_end: str | list[str],
+    code_output_format: str | list[str],
+    tokens_to_generate: int | list[int] = 512,
+    temperature: float | list[float] = 0.0,
+    top_p: float | list[float] = 0.95,
+    top_k: int | list[int] = 0,
+    min_p: float | list[float] = 0.0,
+    repetition_penalty: float | list[float] = 1.0,
+    random_seed: int | list[int] = 0,
+    stop_phrases: list[str] | list[list[str]] | None = None,
+    remove_stop_phrases: bool = True,
+    timeout: int | list[int] | None = None,
+    max_code_executions: int | list[int] | None = None,
+    stop_after_n_completed=None, 
+    stop_after_n_seconds=None,
+    stop_after_n_same_answer=None,
+    ) -> list[dict]:
+    """Process multiple streams concurrently and return results with durations."""
+
+    streams = code_exec_model.generate(
+        prompts=prompts,
+        code_begin=code_begin,
+        code_end=code_end,
+        code_output_begin=code_output_begin,
+        code_output_end=code_output_end,
+        code_output_format=code_output_format,
+        tokens_to_generate=tokens_to_generate,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        min_p=min_p,
+        repetition_penalty=repetition_penalty,
+        random_seed=random_seed,
+        stop_phrases=stop_phrases,
+        remove_stop_phrases=remove_stop_phrases,
+        timeout=timeout,
+        max_code_executions=max_code_executions,
+        stream=True,
+        )
+
+    with ThreadPoolExecutor() as executor:
+        # Submit all streams to thread pool with thread IDs
+        futures = [(i, executor.submit(consume_stream, stream, i)) for i, stream in enumerate(streams)]
+        
+        if stop_after_n_completed is not None:
+            stop_after_n_completed = min(stop_after_n_completed, len(streams))
+        
+        start_time = time.time()
+        current_answers = set() # set of answers that have been completed
+        completed_futures = []  # list of tuples (thread_id, result_data)
+
+        while futures:
+            
+            if stop_after_n_completed is not None and len(completed_futures) >= stop_after_n_completed:
+                print(f"Stopping after {stop_after_n_completed} completed threads...")
+                # This will asynchronously cancel all generations
+                # We don't break here because we want to collect results up to now
+                code_exec_model.model.cancel_all_generations()
+                print("Collecting results up to now...")
+                
+            elif stop_after_n_seconds is not None and time.time() - start_time >= stop_after_n_seconds:
+                print(f"Stopping after {stop_after_n_seconds} seconds...")
+                # This will asynchronously cancel all generations
+                # We don't break here because we want to collect results up to now
+                code_exec_model.model.cancel_all_generations()
+                print("Collecting results up to now...")
+            
+            elif stop_after_n_same_answer is not None:
+                # Check whether at least n elements in current_answers are the same
+                if len(completed_futures) - len(current_answers) >= stop_after_n_same_answer-1:
+                    print(f"Stopping after {stop_after_n_same_answer} same answers...")
+                    # This will asynchronously cancel all generations
+                    # We don't break here because we want to collect results up to now
+                    code_exec_model.model.cancel_all_generations()
+                    print("Collecting results up to now...")
+            
+            # TODO we can add other stopping conditions here 
+            
+            time.sleep(0.1)
+            
+            completed_in_this_iteration = []
+            for idx, future in futures:
+                if future.done():
+                    result_data = future.result()
+                    duration = result_data['duration']
+                    print(f"Thread {idx} completed in {duration:.2f} seconds!")
+                    completed_futures.append((idx, result_data))
+                    completed_in_this_iteration.append((idx, future))
+
+            
+            for item in completed_in_this_iteration:
+                futures.remove(item)
+                    
+            
+    
+    # Sort by original index and return results with durations
+    completed_futures.sort(key=lambda x: x[0])
+    return [result_data for _, result_data in completed_futures]
+```
+
 ```
 import copy
 from nemo_skills.code_execution.sandbox import get_sandbox
@@ -288,10 +424,12 @@ list_of_texts = [
     ]
 request["prompts"] = list_of_texts
 
-res = llm.stream_generate(
+res = stream_generate(
+    llm,
     **request,
     **prompt_template.get_code_execution_args(),
     stop_after_n_seconds=10,
     stop_after_n_completed=1,
+    stop_after_n_same_answer=None
     )
 ```
