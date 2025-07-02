@@ -72,9 +72,12 @@ class ComputeMetrics:
                 if idx == self.max_samples:
                     break
                 data = read_predictions(predictions, idx, file_handles)
-
                 if self.max_seq_len != None:
-                    self.calculators['all']._get_incorrect_sample(data, self.max_seq_len)
+                    # Mark prediction as incorrect if the number of generated tokens exceeds max_seq_len
+                    for prediction in data:
+                        if 'num_generated_tokens' in prediction and int(prediction['num_generated_tokens']) <= self.max_seq_len: continue
+                        updated_prediction = self.calculators['all']._get_incorrect_sample()
+                        prediction.update({k: v for k, v in updated_prediction.items() if k in prediction})
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:

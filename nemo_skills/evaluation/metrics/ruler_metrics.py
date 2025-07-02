@@ -23,7 +23,5 @@ class RulerMetrics(BaseMetrics):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
 
-    def _get_incorrect_sample(self, predictions, sequence_length):
-        for prediction in predictions:
-            if 'num_generated_tokens' in prediction and int(prediction['num_generated_tokens']) <= sequence_length: continue
-            prediction['accuracy'] = False
+    def _get_incorrect_sample(self):
+        return {"accuracy": False}

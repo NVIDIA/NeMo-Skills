@@ -77,14 +77,7 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens = 0
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
-    def _get_incorrect_sample(slef, ):
-    
-        """
-        Even if the response length is 32k or 64k, we can still compute metrics for shorter lengths (e.g., 8k or 16k).
-        If the response exceeds the target max_seq_len, we simply treat the example as incorrect,
-        so it can be included in the evaluation for that length.
-        """
-
+    def _get_incorrect_sample(self):
         raise NotImplementedError(
             f"We currently do not support the metric_type yet."
         )

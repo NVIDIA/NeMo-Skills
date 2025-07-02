@@ -73,16 +73,13 @@ class MathMetrics(BaseMetrics):
 
         return correctness_dict
 
-    def _get_incorrect_sample(self, predictions, sequence_length):
-        for prediction in predictions:
-            if 'num_generated_tokens' in prediction and int(prediction['num_generated_tokens']) <= sequence_length: continue
-            if 'is_correct' in prediction:
-                    prediction['is_correct'] = False
-            if 'judgement' in prediction:
-                    prediction['judgement'] = "Reasoning: No answer was provided.\nJudgement: No"
-            prediction['predicted_answer'] = None
-
-
+    def _get_incorrect_sample(self):
+        return {
+            "is_correct": False,
+            "predicted_answer": None,
+            "judgement": 'Reasoning: No answer was provided.\nJudgement: No',
+        }
+            
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

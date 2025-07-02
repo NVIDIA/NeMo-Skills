@@ -119,10 +119,8 @@ class AnswerJudgementMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
-    def _get_incorrect_sample(self, predictions, sequence_length):
-        for prediction in predictions:
-            if 'num_generated_tokens' in prediction and int(prediction['num_generated_tokens']) <= sequence_length: continue
-            prediction['correct_judgements'] = False
+    def _get_incorrect_sample(self):
+        return {"correct_judgements": False}
 
     def _compute_precision_recall_f1(self, datapoint_metrics):
         """Compute unbiased precision, recall, F1 by averaging over K samples."""
