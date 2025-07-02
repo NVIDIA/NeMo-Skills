@@ -224,6 +224,9 @@ def get_executor(
 
     dependency_type = cluster_config.get("dependency_type", "afterany")
     job_details_class = CustomJobDetailsRay if with_ray else CustomJobDetails
+    unmounted_log_dir = get_unmounted_path(cluster_config, log_dir)
+    if with_ray:
+        unmounted_log_dir = f"{unmounted_log_dir}/%j"
 
     return run.SlurmExecutor(
         account=cluster_config["account"],
@@ -240,7 +243,7 @@ def get_executor(
         srun_args=srun_args,
         job_details=job_details_class(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
-            folder=get_unmounted_path(cluster_config, log_dir),
+            folder=unmounted_log_dir,
             srun_prefix=log_prefix + '_' + job_name + '_',
             sbatch_prefix=job_name + '_',
         ),
