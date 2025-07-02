@@ -27,7 +27,7 @@ jobs:
 
   - name: gpqa
     benchmarks: gpqa
-    wrap_arguments: "++prompt_config=generic/mcq-4choices-boxed ++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=eval/aai/mcq-4choices-boxed ++inference.temperature=0.0"
 
   - name: math-500
     benchmarks: math-500:3

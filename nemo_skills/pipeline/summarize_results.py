@@ -170,6 +170,10 @@ def summarize_results(
         None,
         help="Specify metric type to use a specific metric calculator.",
     ),
+    save_metrics_path: Optional[str] = typer.Option(
+        None,
+        help="Path to save the metrics.json file. If not specified, will save to results_dir/metrics.json.",
+    ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync results to."),
@@ -363,20 +367,21 @@ def summarize_results(
         print('\n')
 
     try:
-        with open(Path(results_dir) / 'metrics.json', 'wt', encoding='utf-8') as fout:
+        save_metrics_path = save_metrics_path or str(Path(results_dir) / 'metrics.json')
+        with open(save_metrics_path, 'wt', encoding='utf-8') as fout:
             json.dump(results, fout, indent=2)
         if upload_path is not None:
             cluster_upload(
                 cluster_config,
-                Path(results_dir) / 'metrics.json',
+                save_metrics_path,
                 Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
                 verbose=verbose,
             )
             print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
         else:
-            print("Metrics are saved to", str(Path(results_dir) / 'metrics.json'))
+            print("Metrics are saved to", save_metrics_path)
     except PermissionError:
-        print(f"Could not save metrics.json to {Path(results_dir) / 'metrics.json'}. Please check the permissions.")
+        print(f"Could not save metrics.json to {save_metrics_path}. Please check the permissions.")
 
     # syncing to wandb if asked
     if wandb_name is not None:

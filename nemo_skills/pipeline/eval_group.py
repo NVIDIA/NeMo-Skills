@@ -106,8 +106,8 @@ def submit_jobs(
         sum_ctx = deepcopy(ctx)
         # removing any extra arguments here as they are assumed to be for the main job
         sum_ctx.args = []
-        output_dir = f"{output_dir}/eval-results" if not has_judge else f"{output_dir}/eval-results-judged"
-        command = f"python -m nemo_skills.pipeline.summarize_results {output_dir}"
+        summarize_dir = f"{output_dir}/eval-results" if not has_judge else f"{output_dir}/eval-results-judged"
+        command = f"python -m nemo_skills.pipeline.summarize_results {summarize_dir}"
         if wandb_name:
             command += f" --wandb_name={wandb_name} "
         if wandb_group:
@@ -117,6 +117,7 @@ def submit_jobs(
         benchmarks_split = job_args['benchmarks'].split(',')
         benchmark_names = ",".join([b.split(':')[0] for b in benchmarks_split])
         command += f" --benchmarks {benchmark_names} "
+        command += f" --save_metrics_path {output_dir}/summarized_results/{job_name}/metrics.json "
         _run_cmd(
             ctx=sum_ctx,
             command=command,
