@@ -101,6 +101,7 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -178,7 +179,7 @@ def run_cmd(
                 installation_command=installation_command,
             )
             prev_tasks = [new_task]
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
     return exp
 

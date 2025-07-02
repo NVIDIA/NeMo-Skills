@@ -276,6 +276,7 @@ def train(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -397,7 +398,7 @@ def train(
             )
 
         # explicitly setting sequential to False since we set dependencies directly
-        run_exp(exp, cluster_config, sequential=False)
+        run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
     return exp
 

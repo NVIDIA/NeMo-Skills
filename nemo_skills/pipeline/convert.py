@@ -267,6 +267,7 @@ def convert(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -373,7 +374,7 @@ def convert(
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
         )
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
     return exp
 

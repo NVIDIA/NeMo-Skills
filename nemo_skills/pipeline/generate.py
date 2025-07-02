@@ -156,10 +156,7 @@ def generate(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    dry_run: bool = typer.Option(
-        False,
-        help="If True, will not run the job, but will validate all arguments.",
-    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Generate LLM completions for a given input file.
 

@@ -190,10 +190,7 @@ def eval(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    dry_run: bool = typer.Option(
-        False,
-        help="If True, will not run the job, but will validate all arguments.",
-    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Evaluate a model on specified benchmarks.
 

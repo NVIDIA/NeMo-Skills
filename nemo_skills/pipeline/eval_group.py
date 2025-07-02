@@ -122,6 +122,7 @@ def submit_jobs(
             log_dir=f"{output_dir}/summarized_results",
             expname=f"{expname}-{job_name}-summarize-results",
             run_after=job_args['expname'] if not judge_config else judge_args['expname'],
+            dry_run=dry_run,
         )
 
 
@@ -243,6 +244,7 @@ def eval_group(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Evaluate a model using a benchmark group config.
 
@@ -283,6 +285,7 @@ def eval_group(
         'rerun_done': rerun_done,
         'with_sandbox': with_sandbox,
         'check_mounted_paths': check_mounted_paths,
+        'log_samples': log_samples,
         'wandb_group': wandb_group,
         'wandb_project': wandb_project,
         'installation_command': installation_command,
@@ -329,21 +332,22 @@ def eval_group(
         output_dir,
         dry_run=True,
     )
-    # this submits the commands after validation is done
-    submit_jobs(
-        cluster,
-        eval_group,
-        default_eval_args,
-        default_judge_args,
-        ctx,
-        expname,
-        log_dir,
-        wandb_name,
-        wandb_group,
-        wandb_project,
-        output_dir,
-        dry_run=False,
-    )
+    if not dry_run:
+        # this submits the commands after validation is done
+        submit_jobs(
+            cluster,
+            eval_group,
+            default_eval_args,
+            default_judge_args,
+            ctx,
+            expname,
+            log_dir,
+            wandb_name,
+            wandb_group,
+            wandb_project,
+            output_dir,
+            dry_run=False,
+        )
 
     # TODO final aggregate metrics
 
