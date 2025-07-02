@@ -361,7 +361,7 @@ def add_task(
         dependencies = None
 
     if num_gpus is None and cluster_config['executor'] == "slurm":
-        if not 'cpu' in (partition or cluster_config.get("partition", "")):
+        if not cluster_config.get('cpu_partition'):
             num_gpus = 1
 
     if sandbox_port is None:

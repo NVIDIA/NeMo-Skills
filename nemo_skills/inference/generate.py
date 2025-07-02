@@ -56,6 +56,7 @@ class GenerateSolutionsConfig:
     prompt_template: str | None = None  # not required for OpenAI server
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
+    prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
     system_message: str | None = None  # can override the default system message in the config
     code_tags: str | None = None  # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
@@ -386,6 +387,8 @@ class GenerationTask:
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         if self.cfg.prompt_format == "openai":
+            if self.cfg.prompt_suffix:
+                data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
@@ -395,12 +398,15 @@ class GenerationTask:
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
                 data_point['total_code_executions'] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
-        return self.prompt.fill(
+        filled_prompt = self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
             continue_prefix_generation=self.cfg.continue_prefix_generation,
         )
+        if self.cfg.prompt_suffix:
+            filled_prompt += self.cfg.prompt_suffix
+        return filled_prompt
 
     def llm_generate(self, data_points, data, is_async=False):
         generation_params = {

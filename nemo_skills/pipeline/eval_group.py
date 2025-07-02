@@ -115,14 +115,13 @@ def submit_jobs(
         benchmarks_split = job_args['benchmarks'].split(',')
         benchmark_names = ",".join([b.split(':')[0] for b in benchmarks_split])
         command += f" --benchmarks {benchmark_names} "
-        run_after = job_args['expname'] if not judge_config else judge_args['expname']
         _run_cmd(
             ctx=sum_ctx,
             command=command,
             cluster=cluster,
-            log_dir=f"{output_dir}/summarize_results",
+            log_dir=f"{output_dir}/summarized_results",
             expname=f"{expname}-{job_name}-summarize-results",
-            run_after=run_after,
+            run_after=job_args['expname'] if not judge_config else judge_args['expname'],
         )
 
 
@@ -317,6 +316,7 @@ def eval_group(
 
     # this validates all arguments that are checked at job submission time
     submit_jobs(
+        cluster,
         eval_group,
         default_eval_args,
         default_judge_args,
@@ -331,6 +331,7 @@ def eval_group(
     )
     # this submits the commands after validation is done
     submit_jobs(
+        cluster,
         eval_group,
         default_eval_args,
         default_judge_args,
@@ -344,7 +345,7 @@ def eval_group(
         dry_run=False,
     )
 
-    # TODO summarize results and final aggregate metrics
+    # TODO final aggregate metrics
 
 
 if __name__ == "__main__":
