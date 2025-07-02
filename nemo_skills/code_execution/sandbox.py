@@ -321,6 +321,8 @@ print(json.dumps(to_return))
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
             return "timeout"
+        if output['process_status'] == 'completed' and output['stdout'] != '':
+            return 'has_sorry'
         return output["process_status"]
 
     def batch_evaluate_results(
