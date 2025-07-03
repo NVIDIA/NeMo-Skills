@@ -82,3 +82,14 @@ class SciCodeMetrics(BaseMetrics):
     def reset(self):
         super().reset()
         self.subtasks_total = 0
+
+
+class BigCodeBenchMetrics(BaseMetrics):
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        return {
+            "accuracy": prediction['status'] == "pass",
+        }
+
+    def update(self, predictions):
+        super().update(predictions)
+        self._compute_pass_at_k(predictions=predictions)
