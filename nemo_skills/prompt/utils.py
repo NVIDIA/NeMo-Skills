@@ -351,6 +351,76 @@ class Prompt:
         return str(self.config)
 
 
+class StatefulMultiTurnPrompt(Prompt):
+    """Stateful multi-turn prompt that maintains conversation state and only appends new messages."""
+    
+    def __init__(self, config):
+        super().__init__(config)
+        self.has_template = bool(self.config.template)
+        
+        # Initialize empty conversation state
+        if self.has_template:
+            self._prompt_string = ""
+        else:
+            self._messages = []
+    
+    def add_message(self, message: Dict[str, str]) -> None:
+        """
+        Add any message (system, user, assistant, tool) to conversation state
+        
+        Args:
+            role: "system", "user", "assistant", or "tool"
+            content: Message content
+        """
+        role = message["role"]
+        content = message["content"]
+
+        if self.has_template:
+            if role == "system":
+                self._prompt_string += self.SYSTEM_FORMAT.format(
+                    system=content,
+                    **asdict(self.config.template)
+                )
+            elif role == "user":
+                self._prompt_string += self.TURN_BEGIN_FORMAT.format(
+                    user=content,
+                    **asdict(self.config.template)
+                )
+            elif role == "assistant":
+                self._prompt_string += self.TURN_END_FORMAT.format(
+                    assistant=content,
+                    **asdict(self.config.template)
+                )
+            elif role == "tool":
+                self._prompt_string += f"\nTool Result: {content}\n"
+        else:
+            self._messages.append(message)
+    
+    def get_current_prompt(self) -> str | List[Dict[str, str]]:
+        """
+        Returns the current prompt string or messages list.
+        """
+        if self.has_template:
+            return self._prompt_string
+        else:
+            return self._messages
+    
+    def prepare_for_generation(self) -> str | List[Dict[str, str]]:
+        """
+        Prepare prompt for generation (add assistant prefix if needed)
+        
+        Returns:
+            Prompt ready for model generation
+        """
+        if self.has_template:
+            assistant_prefix = getattr(self.config.template, 'assistant_begin', '')
+            return self._prompt_string + assistant_prefix
+        else:
+            return self.get_current_prompt()
+
+
+
+
 def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     Reads the prompt config/template from the yaml file.
@@ -387,6 +457,7 @@ def get_prompt(
     config_dir: str | None = None,
     template_dir: str | None = None,
     code_tags_dir: str | None = None,
+    is_stateful: bool = False,
 ) -> Prompt:
     if template_dir is None:
         template_dir = Path(__file__).parent.absolute() / 'template'
@@ -412,8 +483,12 @@ def get_prompt(
         else:
             code_tags_dict = code_tags
         code_tags_obj = CodeTags(**code_tags_dict)
-    
-    prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
+
+    config = PromptConfig(**config, template=template_obj, code_tags=code_tags_obj)
+    if not is_stateful:
+        prompt = Prompt(config)
+    else:
+        prompt = StatefulMultiTurnPrompt(config)
 
     if examples_type is not None:
         prompt.config.few_shot_examples.examples_type = examples_type

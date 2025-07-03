@@ -15,40 +15,29 @@
 
 # Derived from https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py
 
-
 import json
 import copy
 import re
+from constants import GORILLA_TO_OPENAPI
+
+def load_file(file_path, sort_by_id=False):
+    result = []
+    with open(file_path) as f:
+        file = f.readlines()
+        for line in file:
+            result.append(json.loads(line))
+
+    if sort_by_id:
+        result.sort(key="id")
+    return result
 
 
-GORILLA_TO_OPENAPI = {
-    "integer": "integer",
-    "number": "number",
-    "float": "number",
-    "string": "string",
-    "boolean": "boolean",
-    "bool": "boolean",
-    "array": "array",
-    "list": "array",
-    "dict": "object",
-    "object": "object",
-    "tuple": "array",
-    "any": "string",
-    "byte": "integer",
-    "short": "integer",
-    "long": "integer",
-    "double": "number",
-    "char": "string",
-    "ArrayList": "array",
-    "Array": "array",
-    "HashMap": "object",
-    "Hashtable": "object",
-    "Queue": "array",
-    "Stack": "array",
-    "Any": "string",
-    "String": "string",
-    "Bigint": "integer",
-}
+def is_multi_turn(instance_id):
+    if "multi_turn" in instance_id:
+        return True
+    else:
+        return False
+
 
 
 def _get_language_specific_hint(test_category):
