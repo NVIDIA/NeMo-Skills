@@ -47,4 +47,5 @@ jobs:
 
   - name: livecodebench
     benchmarks: livecodebench:3
+    split: test_v5_2407_2412
     wrap_arguments: "++inference.temperature=0.0"
