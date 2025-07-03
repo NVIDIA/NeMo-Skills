@@ -473,6 +473,8 @@ class OpenAIAPIModel(BaseModel):
     def _parse_completion_response(self, response: "openai.types.Completion") -> dict:
         choice = response.choices[0]
         output = choice.text
+        if output is None:
+            output = ""
 
         # In some cases, the stop reason is not included in the text, so we add it back
         if choice.finish_reason == "stop":
@@ -494,6 +496,8 @@ class OpenAIAPIModel(BaseModel):
     def _parse_chat_completion_response(self, response) -> dict:
         choice = response.choices[0]
         output = choice.message.content
+        if output is None:
+            output = ""
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
