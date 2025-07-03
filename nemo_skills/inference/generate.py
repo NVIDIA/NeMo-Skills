@@ -29,7 +29,14 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import chunk_data, get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import (
+    chunk_data,
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    remove_thinking,
+    setup_logging,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -115,6 +122,11 @@ class GenerateSolutionsConfig:
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
+
+    # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
+    remove_thinking: bool = False
+    thinking_begin: str = "<think>"
+    thinking_end: str = "</think>"
 
     def __post_init__(self):
         self._post_init_validate_data()
@@ -471,6 +483,8 @@ class GenerationTask:
             for key in output:
                 original_data_point.pop(key, None)
             output.update(original_data_point)
+            if self.cfg.remove_thinking:
+                remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
             fout.write(json.dumps(output) + "\n")
 
     def prefill_generation(self, data_point) -> dict | None:
