@@ -67,12 +67,6 @@ class IFMetrics(BaseMetrics):
 
         return metrics_dict
 
-    def _get_incorrect_sample(self):
-        return {
-            "prompt": 0.0,
-            "instruction": 0.0,
-        }
-
     def reset(self):
         super().reset()
         self.instruction_total = 0

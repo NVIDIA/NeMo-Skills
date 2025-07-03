@@ -132,9 +132,6 @@ class AnswerJudgementMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
-    def _get_incorrect_sample(self):
-        return {"correct_judgements": False}
-
     def _compute_precision_recall_f1(self, datapoint_metrics):
         """Compute unbiased precision, recall, F1 by averaging over K samples."""
         # Find the maximum number of samples K across all datapoints
