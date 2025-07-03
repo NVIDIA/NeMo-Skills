@@ -67,6 +67,10 @@ class ArenaMetrics(BaseMetrics):
         else:
             return None
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"judgement-gen-base": "B>>A", "judgement-base-gen": "A>>B"}
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

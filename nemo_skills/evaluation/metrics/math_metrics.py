@@ -73,13 +73,14 @@ class MathMetrics(BaseMetrics):
 
         return correctness_dict
 
-    def _get_incorrect_sample(self):
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
         return {
             "is_correct": False,
             "predicted_answer": None,
-            "judgement": 'Reasoning: No answer was provided.\nJudgement: No',
+            "judgement": 'Judgement: No',
         }
-            
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

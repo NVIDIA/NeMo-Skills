@@ -24,6 +24,10 @@ class Lean4Metrics(BaseMetrics):
     def _get_score_dict(self, prediction):
         return {"lean4_correct": prediction['proof_status'] == "completed"}
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"proof_status": "error"}
+
     def _update_score_metrics_for_pass(
         self,
         eval_dict: dict,
@@ -40,8 +44,8 @@ class Lean4Metrics(BaseMetrics):
         eval_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
 
     def _get_incorrect_sample(self):
-        return {"lean4_correct": False}    
-    
+        return {"lean4_correct": False}
+
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)

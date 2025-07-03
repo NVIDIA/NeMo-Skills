@@ -81,6 +81,13 @@ class MtBenchMetrics(BaseMetrics):
             category = predictions[0]['category']
             self.scores[category].append((rating1, rating2))
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {
+            "judgement-turn1": 'Rating: 1',
+            "judgement-turn2": 'Rating: 1',
+        }
+
     def get_metrics(self):
         metrics = {'num_entries': self.total}
         if self.avg_tokens > 0:

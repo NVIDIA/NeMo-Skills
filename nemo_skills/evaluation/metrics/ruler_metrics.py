@@ -24,4 +24,4 @@ class RulerMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions)
 
     def _get_incorrect_sample(self):
-        return {"accuracy": False}
+        return {"is_correct": False}

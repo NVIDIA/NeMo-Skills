@@ -77,10 +77,14 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens = 0
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
-    def _get_incorrect_sample(self):
-        raise NotImplementedError(
-            f"We currently do not support the metric_type yet."
-        )
+    @classmethod
+    def get_incorrect_sample(cls, predictions: list[dict]) -> list[dict]:
+        """Needs to replace predictions with something that evaluates as incorrect.
+
+        This is used in filtering based on length, where we want to automatically grade
+        all solutions longer than a specified threshold as incorrect.
+        """
+        raise NotImplementedError(f"Needs to be implemented in metrics class to support filtering on length.")
 
     def _update_score_metrics_for_majority(
         self,
