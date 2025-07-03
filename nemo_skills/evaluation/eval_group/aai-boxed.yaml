@@ -22,7 +22,7 @@ jobs:
 
   - name: hle
     benchmarks: hle
-    wrap_arguments: "++prompt_config=generic/hle ++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=generic/hle ++remove_thinking=True ++inference.temperature=0.0"
     # hle needs a separate judge step
     # judge model configuration is specified by eval_group pipeline arguments
     judge:
