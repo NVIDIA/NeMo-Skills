@@ -75,7 +75,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         chunk_str = "NONE" if chunk_id is None else str(chunk_id)
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
     # If random_seeds has more than N elements, split commands into groups of N
-    request_size = 16
+    request_size = len(check_commands[0]) // 10
     if len(random_seeds) > request_size:
         outputs = []
         for i in range(0, len(check_commands), request_size):
@@ -180,7 +180,8 @@ def get_generation_cmd(
         output_dir=output_dir,
         random_seed=random_seed,
     )
-    cmd = f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+    cmd = "export HYDRA_FULL_ERROR=1 && "
+    cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations

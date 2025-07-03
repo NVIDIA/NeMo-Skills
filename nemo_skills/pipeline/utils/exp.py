@@ -15,6 +15,7 @@
 import logging
 import os
 import shlex
+import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -121,6 +122,17 @@ class CustomJobDetails(SlurmJobDetails):
         return os.path.join(self.folder, "*%j_srun.log")
 
 
+@dataclass(kw_only=True)
+class CustomJobDetailsRay(CustomJobDetails):
+    # ray jobs have a custom logs structure
+    ray_log_prefix: str = "ray-%j-"
+
+    @property
+    def ls_term(self) -> str:
+        assert self.folder
+        return os.path.join(self.folder, "ray-%j-job*")
+
+
 def get_executor(
     cluster_config,
     container,
@@ -139,11 +151,14 @@ def get_executor(
     het_group=None,
     total_het_groups=None,
     slurm_kwargs: dict | None = None,
+    overlap: bool = False,
+    with_ray: bool = False,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config)
 
-    mounts = mounts or config_mounts
+    if mounts is None:
+        mounts = config_mounts
     if extra_package_dirs is not None:
         extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
@@ -196,7 +211,6 @@ def get_executor(
         additional_parameters['mail_user'] = cluster_config['mail_user']
     srun_args = [
         "--no-container-mount-home",
-        "--overlap",
         "--mpi=pmix",
         '--wait=10',
         # we need to be explicit about this in srun as commands might need to run in parallel
@@ -205,10 +219,13 @@ def get_executor(
         # NeMo-run should take care of this, but we'll put it here temporarily
         f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
     ]
+    if overlap:
+        srun_args.append("--overlap")
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
     dependency_type = cluster_config.get("dependency_type", "afterany")
+    job_details_class = CustomJobDetailsRay if with_ray else CustomJobDetails
 
     return run.SlurmExecutor(
         account=cluster_config["account"],
@@ -223,7 +240,7 @@ def get_executor(
         packager=packager,
         gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
         srun_args=srun_args,
-        job_details=CustomJobDetails(
+        job_details=job_details_class(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
             srun_prefix=log_prefix + '_' + job_name + '_',
@@ -237,6 +254,49 @@ def get_executor(
         env_vars=env_vars,
         **(slurm_kwargs or {}),
     )
+
+
+def install_packages_wrap(cmd, installation_command: str | None = None):
+    """Wraps the command to install packages if provided."""
+    if installation_command:
+        # Generate a unique ID for this job and set it as an environment variable
+        # All processes in the same job will share this environment variable
+        job_uuid = str(uuid.uuid4())
+        lock_file = f"/tmp/pip_install_{job_uuid}_lock"
+
+        # Use environment variable to share the UUID across processes
+        setup_env = f"export NEMO_SKILLS_JOB_UUID={job_uuid}"
+
+        # Simple installation guard - first process to create lock file installs packages
+        install_guard = (
+            f"{setup_env} && "
+            f"if ! [ -f {lock_file} ]; then "
+            f"echo 'Starting package installation with UUID: {job_uuid}'; "
+            f"touch {lock_file}; "
+            f"echo 'Installing packages: {installation_command}'; "
+            f"if {installation_command}; then "
+            f"echo 'Package installation completed successfully'; "
+            f"echo 'done' > {lock_file}; "
+            f"else "
+            f"echo 'Package installation failed'; "
+            f"echo 'failed' > {lock_file}; "
+            f"exit 1; "
+            f"fi; "
+            f"else "
+            f"echo 'Waiting for package installation to complete (UUID: {job_uuid})'; "
+            f"while [ ! -f {lock_file} ] || [ \"$(cat {lock_file} 2>/dev/null)\" != \"done\" ]; do "
+            f"if [ -f {lock_file} ] && [ \"$(cat {lock_file} 2>/dev/null)\" = \"failed\" ]; then "
+            f"echo 'Package installation failed in another process'; "
+            f"exit 1; "
+            f"fi; "
+            f"sleep 1; "
+            f"done; "
+            f"echo 'Package installation completed by another process'; "
+            f"fi"
+        )
+
+        return f"{install_guard} && {cmd}"
+    return cmd
 
 
 # TODO: this function has become too cumbersome to use with all recently added support
@@ -268,6 +328,7 @@ def add_task(
     slurm_kwargs: dict | None = None,
     heterogeneous: bool = False,
     with_ray: bool = False,
+    installation_command: str | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -289,6 +350,8 @@ def add_task(
 
     By default we will reuse the code of the first submitted experiment.
     If you want to avoid this, set `reuse_code=False`.
+
+    installation_command argument only affects "main" task, not server or sandbox.
     """
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, (str, run.Experiment)):
@@ -343,6 +406,7 @@ def add_task(
             heterogeneous=heterogeneous,
             het_group=het_group,
             total_het_groups=total_het_groups,
+            with_ray=with_ray,
         )
         if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -366,6 +430,7 @@ def add_task(
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
             with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+                cur_cmd = install_packages_wrap(cur_cmd, installation_command)
                 commands.append(cur_cmd)
                 executors.append(
                     get_executor(
@@ -373,7 +438,7 @@ def add_task(
                         container=cur_container,
                         num_nodes=num_nodes,
                         tasks_per_node=cur_tasks,
-                        gpus_per_node=num_gpus,
+                        gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
                         time_min=time_min,
                         dependencies=dependencies,
@@ -385,6 +450,8 @@ def add_task(
                         heterogeneous=heterogeneous,
                         het_group=het_group,
                         total_het_groups=total_het_groups,
+                        overlap=server_config is not None,
+                        with_ray=with_ray,
                     )
                 )
                 het_group_indices.append(het_group)
@@ -408,10 +475,10 @@ def add_task(
                 container=cluster_config["containers"]["sandbox"],
                 num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                 tasks_per_node=1,
-                gpus_per_node=num_gpus,
+                gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=tuple(),  # we don't want to mount anything
+                mounts=[],  # we don't want to mount anything
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,
@@ -421,6 +488,8 @@ def add_task(
                 heterogeneous=heterogeneous,
                 het_group=het_group,
                 total_het_groups=total_het_groups,
+                overlap=server_config is not None,
+                with_ray=with_ray,
             )
             executors.append(sandbox_executor)
             het_group_indices.append(het_group)
@@ -493,7 +562,21 @@ def run_exp(exp, cluster_config, sequential=None):
     if cluster_config['executor'] != 'slurm':
         exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
     else:
-        exp.run(detach=True, sequential=False if sequential is None else sequential)
+        try:
+            exp.run(detach=True, sequential=False if sequential is None else sequential)
+        except RuntimeError as e:
+            if 'Your repo has uncommitted changes.' in str(e):
+                raise RuntimeError(
+                    "You're running ns commands from a git repo - in this case we "
+                    "always try to package it and upload to the cluster "
+                    "(or store a copy in ~/.nemo_run if running locally).\n"
+                    "If you don't need it to be uploaded, cd away from a git repo and rerun the command.\n"
+                    "If you do want to upload the code, either commit the changes "
+                    "or set NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1 "
+                    "environment variable to skip the check (but not-committed code will not be packaged)."
+                )
+            else:
+                raise
 
         # caching the experiment code for reuse
         tunnel = get_tunnel(cluster_config)

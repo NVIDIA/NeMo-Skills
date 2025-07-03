@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
 import os
 from pathlib import Path
@@ -20,15 +21,14 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module
+from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def add_default_args(
-    cluster_config, benchmark, split, data_dir, extra_eval_args, extra_arguments, extra_datasets_type, extra_datasets
-):
+def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_type, extra_datasets):
     benchmark_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark,
         data_dir=data_dir,
@@ -71,14 +71,13 @@ def add_default_args(
                 "Did you forget to run prepare data commands?"
             )
 
-    extra_eval_args = f"{benchmark_module.EVAL_ARGS} {extra_eval_args}"
     prompt_config_arg = f"++prompt_config={benchmark_module.PROMPT_CONFIG}"
-    default_arguments = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
-    extra_arguments = f"{default_arguments} {extra_arguments}"
+    benchmark_gen_args = f"{prompt_config_arg} {benchmark_module.GENERATION_ARGS}"
+    requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
-    requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
+    generation_module = getattr(benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate")
 
-    return input_file, extra_arguments, extra_eval_args, requires_sandbox
+    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox, generation_module
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -164,11 +163,7 @@ def eval(
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -188,6 +183,12 @@ def eval(
     wandb_project: str = typer.Option(
         'nemo-skills',
         help="Name of the wandb project to sync samples to.",
+    ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
     ),
 ):
     """Evaluate a model on specified benchmarks.
@@ -251,9 +252,52 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    # TODO: random port will not really work here as we need to move this in the loop
+    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, 0) for b in benchmarks.split(",")]}
+    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
+
+    if num_jobs is None:
+        if cluster_config['executor'] == 'slurm':
+            num_jobs = -1  # -1 means run all benchmarks in parallel
+        else:
+            # for local executor, it makes no sense to use other values
+            num_jobs = 1
+
+    benchmark_remaining_jobs = {}
+    total_evals = 0
+    for benchmark, rs_num in benchmarks.items():
+        if rs_num == 0:
+            random_seeds = [None]
+        else:
+            random_seeds = list(range(starting_seed, starting_seed + rs_num))
+
+        benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
+        benchmark_remaining_jobs[benchmark] = pipeline_utils.get_remaining_jobs(
+            cluster_config=cluster_config,
+            output_dir=benchmark_output_dir,
+            random_seeds=random_seeds,
+            chunk_ids=chunk_ids,
+            rerun_done=rerun_done,
+        )
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
+            total_evals += len(benchmark_chunk_ids)
+
+    if num_jobs < 0:
+        # if num_jobs is -1, we run all benchmarks in parallel
+        num_jobs = total_evals
+
+    if num_jobs == 0:
+        return None
+
+    evals_per_job = total_evals // num_jobs if num_jobs > 0 else total_evals
+    remainder = total_evals % num_jobs
+    eval_to_job_map = []
+    for i in range(num_jobs):
+        count = evals_per_job + (1 if i < remainder else 0)
+        eval_to_job_map.extend([i] * count)
+
+    cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
-    server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         model=model,
         server_type=server_type,
         server_address=server_address,
@@ -265,27 +309,26 @@ def eval(
         get_random_port=get_random_port,
     )
 
-    benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
-    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-
-    eval_cmds = []
-    benchmark_requires_sandbox = {}
+    cur_eval = 0
+    job_batches = []
+    job_cmds = []
+    job_benchmarks = set()
     has_tasks = False
 
+    benchmark_required_sandbox = {}
+
     for benchmark, rs_num in benchmarks.items():
-        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox = add_default_args(
+        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox, generation_module = add_default_args(
             cluster_config,
             benchmark,
             split,
             data_dir,
-            extra_eval_args,
-            extra_arguments,
             extra_datasets_type,
             extra_datasets,
         )
-        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        benchmark_required_sandbox[benchmark] = requires_sandbox
         if requires_sandbox and not with_sandbox:
-            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
+            LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
         if rs_num == 0:
             random_seeds = [None]
@@ -293,14 +336,7 @@ def eval(
             random_seeds = list(range(starting_seed, starting_seed + rs_num))
 
         benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
-        remaining_jobs = pipeline_utils.get_remaining_jobs(
-            cluster_config=cluster_config,
-            output_dir=benchmark_output_dir,
-            random_seeds=random_seeds,
-            chunk_ids=chunk_ids,
-            rerun_done=rerun_done,
-        )
-        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(remaining_jobs.items()):
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
@@ -310,52 +346,78 @@ def eval(
                 )
             for chunk_id in benchmark_chunk_ids:
                 has_tasks = True
+                job_benchmarks.add(benchmark)
+
+                generation_task = importlib.import_module(generation_module)
+                if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+                    raise ValueError(
+                        f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+                        "Please provide a valid generation module."
+                    )
+                generation_task = generation_task.GENERATION_TASK_CLASS
+                if (
+                    generation_task.get_server_command_fn.__func__ != GenerationTask.get_server_command_fn.__func__
+                    and num_jobs != total_evals
+                ):
+                    raise ValueError(
+                        f"Class {generation_task} overrides get_server_command_fn, "
+                        "which is not supported for evaluation when grouping jobs."
+                    )
+
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=bench_input_file,
                     output_dir=benchmark_output_dir,
-                    extra_arguments=bench_gen_args,
+                    extra_arguments=f"{generation_task.get_generation_default_args()} {bench_gen_args} {job_extra_arguments}",
                     random_seed=seed,
-                    eval_args=bench_eval_args,
+                    eval_args=f"{bench_eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
+                    script=generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )
-                eval_cmds.append((cmd, benchmark))
+                job_cmds.append(cmd)
 
-    if num_jobs is None:
-        if cluster_config['executor'] == 'slurm':
-            num_jobs = len(eval_cmds)
-        else:
-            # for local executor, it makes no sense to use other values
-            num_jobs = 1
-    if num_jobs < 0:
-        num_jobs = len(eval_cmds)
+                if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
+                    job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
+                    job_batches.append(
+                        (
+                            job_cmds,
+                            job_needs_sandbox,
+                            job_server_config,
+                            job_server_address,
+                            # a check above guarantees that this is the same for all tasks in a job
+                            generation_task.get_server_command_fn(),
+                        )
+                    )
+                    job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
+                        model=model,
+                        server_type=server_type,
+                        server_address=server_address,
+                        server_gpus=server_gpus,
+                        server_nodes=server_nodes,
+                        server_args=server_args,
+                        server_entrypoint=server_entrypoint,
+                        extra_arguments=extra_arguments,
+                        get_random_port=get_random_port,
+                    )
+                    cur_job_idx += 1
+                    job_cmds = []
+                    job_benchmarks = set()
 
-    # Create job batches with benchmark info
-    job_batches = []
-    for i in range(num_jobs):
-        cmds = []
-        benchmarks_in_job = set()
-        for cmd, benchmark in eval_cmds[i::num_jobs]:
-            cmds.append(cmd)
-            benchmarks_in_job.add(benchmark)
-        job_batches.append((cmds, benchmarks_in_job))
+                cur_eval += 1
 
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
-            # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(
-                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
-            )
-
+        for idx, job_args in enumerate(job_batches):
+            cmds, job_needs_sandbox, job_server_config, job_server_address, job_server_command = job_args
             prev_tasks = None
+
             for _ in range(dependent_jobs + 1):
                 new_task = pipeline_utils.add_task(
                     exp,
                     cmd=pipeline_utils.wait_for_server(
-                        server_address=server_address, generation_commands=" && ".join(cmds)
+                        server_address=job_server_address, generation_commands=" && ".join(cmds)
                     ),
                     task_name=f'{expname}-{idx}',
                     log_dir=log_dir,
@@ -363,15 +425,17 @@ def eval(
                     cluster_config=cluster_config,
                     partition=partition,
                     time_min=time_min,
-                    server_config=server_config,
-                    with_sandbox=job_needs_sandbox,
+                    server_config=job_server_config,
+                    with_sandbox=job_needs_sandbox or with_sandbox,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
                     task_dependencies=prev_tasks,
+                    get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
         if has_tasks:

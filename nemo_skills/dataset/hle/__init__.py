@@ -18,3 +18,4 @@ DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
 EVAL_ARGS = "++eval_type=math"
 GENERATION_ARGS = ""
+EVAL_SPLIT = "text"

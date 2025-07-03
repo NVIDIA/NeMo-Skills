@@ -29,7 +29,7 @@ import typer
 from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
+from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -135,7 +135,7 @@ class GenSelectTask(GenerationTask):
                 output_instance = deepcopy(instance)
 
                 judgment = self._extract_judgment(instance['genselect_comparison'], max_idx=instance["max_idx"])
-                if judgment:
+                if judgment is not None:
                     output_instance["judgment_idx"] = judgment
                 else:
                     output_instance["judgment_idx"] = None

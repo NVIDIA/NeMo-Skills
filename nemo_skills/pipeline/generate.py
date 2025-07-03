@@ -129,11 +129,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -153,6 +149,12 @@ def generate(
     wandb_project: str = typer.Option(
         'nemo-skills',
         help="Name of the wandb project to sync samples to.",
+    ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
     ),
 ):
     """Generate LLM completions for a given input file.
@@ -298,6 +300,7 @@ def generate(
                         task_dependencies=prev_tasks,
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                        installation_command=installation_command,
                     )
                     prev_tasks = [new_task]
         if has_tasks:

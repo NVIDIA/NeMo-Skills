@@ -259,12 +259,14 @@ def convert(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -369,6 +371,7 @@ def convert(
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            installation_command=installation_command,
         )
         run_exp(exp, cluster_config)
 

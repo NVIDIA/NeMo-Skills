@@ -92,13 +92,15 @@ def run_cmd(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -120,6 +122,11 @@ def run_cmd(
     )
 
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
+
+    # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
+    # as cpu jobs almost always need more resources than automatically allocated by slurm
+    if exclusive is None and num_gpus is None:
+        exclusive = True
 
     with get_exp(expname, cluster_config) as exp:
         # Setup server config if model is provided
@@ -168,6 +175,7 @@ def run_cmd(
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config)
