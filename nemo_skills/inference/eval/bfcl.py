@@ -25,7 +25,7 @@ import shutil
 from dataclasses import asdict, field
 
 
-from nemo_skills.inference.eval.bfcl_utils import extract_tool_response
+from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, extract_tool_response, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.eval.scicode import SciCodeGenerationConfig, SciCodeGenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
@@ -46,7 +46,8 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/bfcl/nemotron"
-    prompt_template: str = "llama3-instruct"
+    prompt_template: str = "nemotron-tool"
+    code_tags: str = "nemotron-tool"
 
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
@@ -125,33 +126,53 @@ class BFCLGenerationTask(GenerationTask):
         inference_data: dict = {}
 
         # Initialize the stateful prompt 
-        prompt = get_prompt(self.cfg.prompt_config, self.cfg.prompt_template, is_stateful=True)
+        prompt = get_prompt(
+            prompt_config=self.cfg.prompt_config, 
+            prompt_template=self.cfg.prompt_template, 
+            code_tags=self.cfg.code_tags,  
+            is_stateful=True
+        )
+
+        if data_point.get("instruction", ""):
+            prompt.add_message({
+                "role": "system", 
+                "content": data_point["instruction"], 
+                "instruction": data_point["instruction"]
+            })
+
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_message: list[dict]
-            if turn_idx == 0:
-                if data_point.get("instruction", ""):
-                    prompt.add_message({
-                        "role": "system", 
-                        "content": data_point["instruction"], 
-                        "instruction": data_point["instruction"]
-                    })
-
+            # if turn_idx == 0:
+                
             for message in current_turn_message:
                 prompt.add_message(message)                
                 
-            print(prompt.get_current_prompt())
+            # print(prompt.get_current_prompt())
             # break
 
             current_turn_response = []
 
             count = 0
             while True:
-                print("-" * 100)
-                print(
-                    f"ID: {test_entry_id.replace('multi_turn_', '')}, Turn: {turn_idx}, Step: {count}"
-                )
+                # print("-" * 100)
+                # print(
+                #     f"ID: {test_entry_id.replace('multi_turn_', '')}, Turn: {turn_idx}, Step: {count}"
+                # )
+
+
+                # print("\n\n")
+
+                # print("-" * 100)
+
+                # print("Current prompt (first 300 chars): ")
+                # print(prompt.get_current_prompt()[:300])
+                # print("-" * 100)
+
+                # print("Current prompt (last 300 chars): ")
+                # print(prompt.get_current_prompt()[-300:])
+                # print("\n\n")
 
                 input_dict = {
                     "prompts": [prompt.get_current_prompt()],
@@ -161,46 +182,58 @@ class BFCLGenerationTask(GenerationTask):
                 }
 
                 output = self.llm.generate(**input_dict)[0]
-
-                print(output)
+                # print("Output: ", output["generation"])
 
                 # Try parsing the model response
-                model_response_data = self._process_tool_response(extract_tool_response(
+                model_response = extract_tool_response(
                     output["generation"], 
-                    self.cfg.tool_call_start_token, 
+                    self.cfg.tool_call_start_token,
+                    self.cfg.tool_call_end_token,
                     self.cfg.tool_call_regex
-                ))
-
-                print(model_response_data)
-
-                # model_responses = model_response_data["model_responses"]
-
-                # Add the assistant message to the chat history
-                prompt.add_message(
-                    {"role": "assistant", "content": model_response_data, "response": model_response_data}
                 )
 
-                current_turn_response.append(model_response_data)
+                # print("Tool calls: ", model_response["tool_calls"])
+
+                model_response_text = model_response["content"]
+                if model_response_text is None:
+                    model_response_text = ""
+                else:
+                    if self.cfg.remove_thinking:
+                        if self.cfg.thinking_end in model_response_text:
+                            model_response_text = model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
+                    else:
+                        # Thinking didn't finish, so we avoid the text response
+                        model_response_text = ""
+                
+                tool_calls = self._process_tool_response(model_response["tool_calls"])
+                # Add the assistant message to the chat history
+                prompt.add_message(
+                    {"role": "assistant", "content": model_response_text, "tool_calls": tool_calls}
+                )
+
+                current_turn_response.append(tool_calls)
 
                 # Try decoding the model response
                 try:
-                    decoded_model_responses = self.decode_execute(model_responses)
+                    decoded_model_responses = convert_to_function_call(tool_calls)
+                    # print("Decoded model responses: ", decoded_model_responses)
 
                     if is_empty_execute_response(decoded_model_responses):
-                        print("Empty response from the model. Proceed to next turn.")
+                        LOG.info("Empty response from the model. Proceed to next turn.")
                         break
 
                 except Exception as e:
-                    print("Failed to decode the model response. Proceed to next turn.")
+                    LOG.info("Failed to decode the model response. Proceed to next turn.")
                     break
 
                 # Obtain the execution results
+                # TODO: Move the execution to sandbox
                 execution_results, involved_instances = execute_multi_turn_func_call(
                     decoded_model_responses,
                     initial_config,
                     involved_classes,
-                    self.model_name_underline_replaced,
-                    test_entry_id,
+                    model_name="nemotron",  # Can be any placeholder
+                    test_entry_id=test_entry_id,
                     long_context=(
                         "long_context" in test_category or "composite" in test_category
                     ),
@@ -208,9 +241,14 @@ class BFCLGenerationTask(GenerationTask):
                 )
 
                 # Add the execution results to the chat history for the next turn
-                inference_data = self._add_execution_results_FC(
-                    inference_data, execution_results, model_response_data
+                # inference_data = self._add_execution_results_FC(
+                #     inference_data, execution_results, model_response_data
+                # )
+                prompt.add_message(
+                    {"role": "tool", "content": execution_results}
                 )
+
+                # break
 
                 count += 1
                 # Force quit after too many steps
@@ -225,8 +263,7 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit:
                 break
 
-        metadata = {}
-        return all_model_response, metadata
+        return {"generation": all_model_response,}
 
 
     def llm_generate(self, data_points, data, is_async=True):
@@ -261,19 +298,22 @@ class BFCLGenerationTask(GenerationTask):
         with open(self.cfg.output_file, "rt", encoding="utf-8") as fin, open(temp_file, "wt", encoding="utf-8") as fout:
             for idx, line in enumerate(fin):
                 instance = json.loads(line)
-                extracted_tool_response = extract_tool_response(
-                    instance["generation"], self.cfg.tool_call_start_token, self.cfg.tool_call_regex)
-                instance["result"] = self._process_tool_response(extracted_tool_response)
+                if instance["single_turn"]:
+                    extracted_tool_response = extract_tool_response(
+                        instance["generation"], self.cfg.tool_call_start_token, self.cfg.tool_call_regex)
+                    instance["result"] = self._process_tool_response(extracted_tool_response["tool_calls"])
+                else:
+                    instance["result"] = instance["generation"]
 
                 fout.write(json.dumps(instance) + "\n")
 
         shutil.move(temp_file, self.cfg.output_file)
 
-    def _process_tool_response(self, extracted_tool_response):
+    def _process_tool_response(self, tool_calls):
         """Process the tool response to get the result."""
         return [
             {func_call.function.name: func_call.function.arguments}
-            for func_call in extracted_tool_response["tool_calls"]
+            for func_call in tool_calls
         ]
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
