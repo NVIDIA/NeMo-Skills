@@ -70,7 +70,8 @@ def evaluate_results(cfg: EvaluateResultsConfig):
 
     if cfg.remove_thinking:
         LOG.info(
-            f'Removing the thinking part from the {cfg.generation_key} key (splitting on {cfg.thinking_separator}). '
+            f"Removing the thinking part from the {cfg.generation_key} key "
+            f"(using {cfg.thinking_begin} and {cfg.thinking_end} tokens). "
             'Original content will be stored in "_full_generation" key.'
         )
         for jsonl_file in unroll_files(cfg.input_files):
