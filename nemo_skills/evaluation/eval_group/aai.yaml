@@ -22,7 +22,8 @@ jobs:
 
   - name: hle
     benchmarks: hle
-    wrap_arguments: "++prompt_config=generic/hle ++remove_thinking=True ++inference.temperature=0.0"
+    # hle default prompt is same as aai prompt
+    wrap_arguments: "++remove_thinking=True ++inference.temperature=0.0"
     # hle needs a separate judge step
     # judge model configuration is specified by eval_group pipeline arguments
     judge:
@@ -48,4 +49,4 @@ jobs:
   - name: livecodebench
     benchmarks: livecodebench:3
     split: test_v5_2407_2412
-    wrap_arguments: "++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=eval/aai/livecodebench ++inference.temperature=0.0"
