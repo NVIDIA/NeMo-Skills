@@ -81,6 +81,13 @@ class MtBenchMetrics(BaseMetrics):
             category = predictions[0]['category']
             self.scores[category].append((rating1, rating2))
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction['judgement-turn1'] = 'Rating: [[1]]'
+        prediction['judgement-turn2'] = 'Rating: [[1]]'
+        return prediction
+
     def get_metrics(self):
         metrics = {'num_entries': self.total}
         if self.avg_tokens > 0:
@@ -111,7 +118,6 @@ class MtBenchMetrics(BaseMetrics):
             metrics[f'{category}_turn2'] = sum(ratings2) / len(ratings2)
         metrics["missing_rating_turn1"] = none_count_turn1
         metrics["missing_rating_turn2"] = none_count_turn2
-        print("Please see metrics.json for MT-bench per-category breakdown")
         return {self.agg_mode: metrics}
 
     def reset(self):

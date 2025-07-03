@@ -138,62 +138,62 @@
     "greedy": {
       "num_entries": 4,
       "avg_tokens": 4254,
-      "symbolic_correct": 75.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 25.0
     },
     "pass@1": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 75.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 25.0
     },
     "pass@1[1]": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 75.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 25.0
     },
     "pass@2": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 75.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 25.0
     },
     "pass@1[2]": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 62.5,
-      "no_answer": 0.0
+      "symbolic_correct": 37.5,
+      "no_answer": 37.5
     },
     "pass@3": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 75.0,
+      "symbolic_correct": 50.0,
       "no_answer": 0.0
     },
     "pass@1[3]": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 58.33333333333333,
-      "no_answer": 0.0
+      "symbolic_correct": 41.666666666666664,
+      "no_answer": 25.0
     },
     "pass@4": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 75.0,
+      "symbolic_correct": 50.0,
       "no_answer": 0.0
     },
     "pass@1[4]": {
       "num_entries": 4,
       "avg_tokens": 5363,
-      "symbolic_correct": 50.0,
-      "no_answer": 6.25
+      "symbolic_correct": 37.5,
+      "no_answer": 31.25
     },
     "majority@2": {
       "num_entries": 4,
       "avg_tokens": 5363,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 25.0
     },
     "majority@3": {
       "num_entries": 4,
@@ -211,25 +211,25 @@
   "human-eval": {
     "pass@1": {
       "num_entries": 4,
-      "avg_tokens": 3840,
+      "avg_tokens": 1792,
       "passing_base_tests": 75.0,
       "passing_plus_tests": 50.0
     },
     "pass@1[1]": {
       "num_entries": 4,
-      "avg_tokens": 3840,
+      "avg_tokens": 1792,
       "passing_base_tests": 75.0,
       "passing_plus_tests": 50.0
     },
     "pass@2": {
       "num_entries": 4,
-      "avg_tokens": 3840,
+      "avg_tokens": 1792,
       "passing_base_tests": 75.0,
       "passing_plus_tests": 75.0
     },
     "pass@1[2]": {
       "num_entries": 4,
-      "avg_tokens": 3840,
+      "avg_tokens": 1792,
       "passing_base_tests": 75.0,
       "passing_plus_tests": 62.5
     }
@@ -303,172 +303,172 @@
     "pass@1": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 42.857142857142854,
+      "no_answer": 57.142857142857146
     },
     "pass@1[1]": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 42.857142857142854,
+      "no_answer": 57.142857142857146
     },
     "pass@2": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 85.71428571428571,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "pass@1[2]": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 78.57142857142857,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 50.0
     },
     "pass@3": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 85.71428571428571,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "pass@1[3]": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 42.85714285714285,
+      "no_answer": 52.38095238095237
     },
     "majority@2": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "majority@3": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "rm_best@1": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 42.857142857142854,
+      "no_answer": 57.142857142857146
     },
     "rm_majority@1": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 42.857142857142854,
+      "no_answer": 57.142857142857146
     },
     "rm_best@2": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "rm_majority@2": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     },
     "rm_best@3": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 57.142857142857146,
-      "no_answer": 0.0
+      "symbolic_correct": 42.857142857142854,
+      "no_answer": 42.857142857142854
     },
     "rm_majority@3": {
       "num_entries": 7,
       "avg_tokens": 9574,
-      "symbolic_correct": 71.42857142857143,
-      "no_answer": 0.0
+      "symbolic_correct": 57.142857142857146,
+      "no_answer": 42.857142857142854
     }
   },
   "math-aime25": {
     "pass@1": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 40.0,
+      "no_answer": 60.0
     },
     "pass@1[1]": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 40.0,
+      "no_answer": 60.0
     },
     "pass@2": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "pass@1[2]": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 50.0
     },
     "pass@3": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "pass@1[3]": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 46.666666666666664,
+      "no_answer": 53.33333333333333
     },
     "majority@2": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "majority@3": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "rm_best@1": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 40.0,
+      "no_answer": 60.0
     },
     "rm_majority@1": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 40.0,
+      "no_answer": 60.0
     },
     "rm_best@2": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "rm_majority@2": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "rm_best@3": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     },
     "rm_majority@3": {
       "num_entries": 5,
       "avg_tokens": 9869,
-      "symbolic_correct": 80.0,
-      "no_answer": 0.0
+      "symbolic_correct": 60.0,
+      "no_answer": 40.0
     }
   },
   "math-aime24": {
@@ -476,85 +476,85 @@
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "pass@1[1]": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "pass@2": {
       "num_entries": 2,
       "avg_tokens": 8838,
-      "symbolic_correct": 100.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 50.0
     },
     "pass@1[2]": {
       "num_entries": 2,
       "avg_tokens": 8838,
-      "symbolic_correct": 75.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 50.0
     },
     "pass@3": {
       "num_entries": 2,
       "avg_tokens": 8838,
-      "symbolic_correct": 100.0,
-      "no_answer": 0.0
+      "symbolic_correct": 50.0,
+      "no_answer": 50.0
     },
     "pass@1[3]": {
       "num_entries": 2,
       "avg_tokens": 8838,
-      "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "symbolic_correct": 33.33333333333333,
+      "no_answer": 50.0
     },
     "majority@2": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "majority@3": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_best@1": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_majority@1": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_best@2": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_majority@2": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_best@3": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 0.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     },
     "rm_majority@3": {
       "num_entries": 2,
       "avg_tokens": 8838,
       "symbolic_correct": 50.0,
-      "no_answer": 0.0
+      "no_answer": 50.0
     }
   },
   "minif2f": {
@@ -617,13 +617,13 @@
     "greedy": {
       "num_entries": 2,
       "avg_tokens": 5050,
-      "average": 7.666666666666667,
-      "average_turn1": 8.0,
-      "average_turn2": 7.0,
-      "writing_turn1": 8.0,
-      "writing_turn2": 7.0,
+      "average": 4.25,
+      "average_turn1": 4.5,
+      "average_turn2": 4.0,
+      "writing_turn1": 4.5,
+      "writing_turn2": 4.0,
       "missing_rating_turn1": 0,
-      "missing_rating_turn2": 1
+      "missing_rating_turn2": 0
     }
   }
 }

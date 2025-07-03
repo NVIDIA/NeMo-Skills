@@ -27,6 +27,12 @@ class IFMetrics(BaseMetrics):
             'instruction': sum(prediction['follow_instruction_list']),
         }
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction['follow_all_instructions'] = [0 for _ in prediction['follow_all_instructions']]
+        return prediction
+
     def update(self, predictions):
         """Updating the evaluation results with the current element.
 

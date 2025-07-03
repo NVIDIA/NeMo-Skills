@@ -170,6 +170,10 @@ def summarize_results(
         None,
         help="Specify metric type to use a specific metric calculator.",
     ),
+    max_seq_len: Optional[int] = typer.Option(
+        None,
+        help="Specify max_seq_len for computing metrics. Will consider anything longer as incorrect.",
+    ),
     save_metrics_path: Optional[str] = typer.Option(
         None,
         help="Path to save the metrics.json file. If not specified, will save to results_dir/metrics.json.",
@@ -281,6 +285,7 @@ def summarize_results(
                     extra_datasets=extra_datasets,
                     extra_datasets_type=extra_datasets_type,
                     max_samples=max_samples,
+                    max_seq_len=max_seq_len,
                 )
 
             metrics = {}
@@ -325,6 +330,7 @@ def summarize_results(
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
 
+    printed_max_seq_len = False
     for benchmark, benchmark_results in results.items():
         if not benchmark_results:
             continue
@@ -350,6 +356,9 @@ def summarize_results(
             max_widths['evaluation_mode'] = max(max_widths['evaluation_mode'], len(eval_mode))
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
+        if max_seq_len is not None and not printed_max_seq_len:
+            print(f' Metrics for Max Sequence Length {max_seq_len} '.center(total_width, '-'))
+        printed_max_seq_len = True
         print(f' {benchmark} '.center(total_width, '-'))
         headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
         print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))

@@ -31,10 +31,11 @@ class ComputeMetrics:
         extra_datasets_type=None,
         max_samples=-1,
         metric_type=None,
+        max_seq_len=None,
     ):
         self.max_samples = max_samples
         self.metric_type = metric_type
-
+        self.max_seq_len = max_seq_len
         benchmark_module, _, _ = get_dataset_module(
             benchmark,
             data_dir=data_dir,
@@ -71,6 +72,12 @@ class ComputeMetrics:
                 if idx == self.max_samples:
                     break
                 data = read_predictions(predictions, idx, file_handles)
+                if self.max_seq_len is not None:
+                    # Mark prediction as incorrect if the number of generated tokens exceeds max_seq_len
+                    for i in range(len(data)):
+                        if int(data[i]['num_generated_tokens']) <= self.max_seq_len:
+                            continue
+                        data[i] = self.calculators['all'].get_incorrect_sample(data[i])
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:
