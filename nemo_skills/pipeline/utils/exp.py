@@ -122,6 +122,17 @@ class CustomJobDetails(SlurmJobDetails):
         return os.path.join(self.folder, "*%j_srun.log")
 
 
+@dataclass(kw_only=True)
+class CustomJobDetailsRay(CustomJobDetails):
+    # ray jobs have a custom logs structure
+    ray_log_prefix: str = "ray-%j-"
+
+    @property
+    def ls_term(self) -> str:
+        assert self.folder
+        return os.path.join(self.folder, "ray-%j-job*")
+
+
 def get_executor(
     cluster_config,
     container,
@@ -141,6 +152,7 @@ def get_executor(
     total_het_groups=None,
     slurm_kwargs: dict | None = None,
     overlap: bool = False,
+    with_ray: bool = False,
 ):
     env_vars = get_env_variables(cluster_config)
     config_mounts = get_mounts_from_config(cluster_config)
@@ -213,6 +225,7 @@ def get_executor(
         srun_args.append(f"--gpus-per-node={gpus_per_node}")
 
     dependency_type = cluster_config.get("dependency_type", "afterany")
+    job_details_class = CustomJobDetailsRay if with_ray else CustomJobDetails
 
     return run.SlurmExecutor(
         account=cluster_config["account"],
@@ -227,7 +240,7 @@ def get_executor(
         packager=packager,
         gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
         srun_args=srun_args,
-        job_details=CustomJobDetails(
+        job_details=job_details_class(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
             srun_prefix=log_prefix + '_' + job_name + '_',
@@ -393,6 +406,7 @@ def add_task(
             heterogeneous=heterogeneous,
             het_group=het_group,
             total_het_groups=total_het_groups,
+            with_ray=with_ray,
         )
         if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
             server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
@@ -437,6 +451,7 @@ def add_task(
                         het_group=het_group,
                         total_het_groups=total_het_groups,
                         overlap=server_config is not None,
+                        with_ray=with_ray,
                     )
                 )
                 het_group_indices.append(het_group)
@@ -474,6 +489,7 @@ def add_task(
                 het_group=het_group,
                 total_het_groups=total_het_groups,
                 overlap=server_config is not None,
+                with_ray=with_ray,
             )
             executors.append(sandbox_executor)
             het_group_indices.append(het_group)
