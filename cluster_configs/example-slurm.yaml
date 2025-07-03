@@ -43,6 +43,7 @@ job_name_prefix: "nemo_skills:"
 # define your account/partition here
 # account: <slurm account>
 # partition: <slurm partition>
+# cpu_partition: <if cluster has a dedicated cpu partition, you can define it here>
 
 
 # add required mounts for models/data here

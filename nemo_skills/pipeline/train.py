@@ -68,7 +68,6 @@ class TrainingParams:
 
 def get_cmd(params: TrainingParams) -> str:
     cmd = (
-        f"export WANDB_API_KEY={os.getenv('WANDB_API_KEY', '')} && "
         f"export HYDRA_FULL_ERROR=1 && "
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
@@ -277,6 +276,7 @@ def train(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -398,7 +398,7 @@ def train(
             )
 
         # explicitly setting sequential to False since we set dependencies directly
-        run_exp(exp, cluster_config, sequential=False)
+        run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
     return exp
 

@@ -16,6 +16,6 @@
 PROMPT_CONFIG = 'eval/livecodebench/python_codegen'
 DATASET_GROUP = 'code'
 METRICS_TYPE = 'livecodebench'
-EVAL_SPLIT = 'test_v5_2408_2502'
+EVAL_SPLIT = 'test_v6_2408_2505'
 EVAL_ARGS = "++eval_type=livecodebench ++eval_config.dataset=livecodebench"
 GENERATION_ARGS = ""
