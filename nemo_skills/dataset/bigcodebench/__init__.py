@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'eval/bigcodebench/python_codegen'
+PROMPT_CONFIG = 'eval/bigcodebench/codegen_reasoning'
 DATASET_GROUP = 'code'
 METRICS_TYPE = 'bigcodebench'
 EVAL_SPLIT = 'hard'
