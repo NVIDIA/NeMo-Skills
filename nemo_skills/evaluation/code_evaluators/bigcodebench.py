@@ -82,10 +82,10 @@ def eval_bigcodebench(cfg):
 
         # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
         evaluate("instruct", eval_config.subset, samples=jsonl_file, execution="local")  # subset [full, hard]
-        # if the input filename is "model-name--bigcodebench-instruct--sanitized.jsonl"
-        # then there will be two output files (generated) after evluation:
-        # "model-name--bigcodebench-instruct--sanitized_eval_results.json"
-        # "model-name--bigcodebench-instruct--sanitized_pass_at_k.json"
+        # if the input filename is "output-greedy.jsonl"
+        # then there will be two output files (generated) after evaluation:
+        # "output-greedy_eval_results-saved.json"
+        # "output-greedy_pass_at_k.json"
 
-        # moving eval file as otherwise bigcodebench does not want to recompute metrics if it's present..
+        # moving eval file to ensure metrics are recomputed
         shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
