@@ -408,7 +408,7 @@ class GenerationTask:
             if isinstance(total_code_executions_in_prompt, (list, tuple)):
                 min_val, max_val = total_code_executions_in_prompt
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
-                data_point['total_code_executions'] = total_code_executions_in_prompt
+            data_point['total_code_executions'] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
         filled_prompt = self.prompt.fill(
             data_point,

@@ -143,7 +143,8 @@ def submit_jobs(
         command=command,
         cluster=cluster,
         log_dir=f"{output_dir}/compute-score-logs",
-        expname=f"{expname}-compute-score" + ('-dry-run' if dry_run else ''),
+        # the last one has to be named expname to ensure run_after can be used correctly for subsequent jobs
+        expname=expname + ('-dry-run' if dry_run else ''),
         run_after=summarize_expnames,
         dry_run=dry_run,
     )
