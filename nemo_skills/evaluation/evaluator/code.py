@@ -224,7 +224,7 @@ def eval_bigcodebench(cfg):
         try:
             from bigcodebench.evaluate import evaluate
         except ImportError:
-            LOG.info("Failed to install 'bigcodebench'. Please install it manually.")
+            LOG.error("Failed to install 'bigcodebench'. Please install it manually.")
             raise
 
     eval_config = BigCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
@@ -236,17 +236,16 @@ def eval_bigcodebench(cfg):
                 generation_dict = preprocess_code(json.loads(line))
                 generation_dict["solution"] = generation_dict.pop("completion")
                 samples.append(generation_dict)
-        # all changes will be done with a new key "completion", so it's ok to write to the same file
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
 
         # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
         evaluate("instruct", eval_config.subset, samples=jsonl_file, execution="local")  # subset [full, hard]
-        # if the input filename is "output-greedy.jsonl"
+        # if the input filename is "output.jsonl"
         # then there will be two output files (generated) after evaluation:
-        # "output-greedy_eval_results-saved.json"
-        # "output-greedy_pass_at_k.json"
+        # "output_eval_results-saved.json"
+        # "output_pass_at_k.json"
 
         # moving eval file to ensure metrics are recomputed
         shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
