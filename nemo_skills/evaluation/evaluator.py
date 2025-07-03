@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.evaluation.code_evaluators.bigcodebench import eval_bigcodebench
 from nemo_skills.evaluation.code_evaluators.livecodebench import eval_livecodebench
 from nemo_skills.evaluation.constants import JUDGE_MODEL
 from nemo_skills.evaluation.math_grader import batch_evaluate_results, extract_answer
@@ -487,6 +488,7 @@ EVALUATOR_MAP = {
     'multichoice': eval_mcq,
     'ruler': eval_ruler,
     'livecodebench': eval_livecodebench,
+    'bigcodebench': eval_bigcodebench,
 }
 
 
