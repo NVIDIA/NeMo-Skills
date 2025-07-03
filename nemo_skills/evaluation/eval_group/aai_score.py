@@ -14,7 +14,7 @@
 
 
 def compute_score(metrics: dict):
-    mmlu_pro = metrics['mmlu']['greedy']
+    mmlu_pro = metrics['mmlu-pro']['greedy']
     hle = metrics['hle']['greedy']
     gpqa = metrics['gpqa']['greedy']
 
