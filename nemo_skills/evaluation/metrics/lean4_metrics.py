@@ -26,7 +26,9 @@ class Lean4Metrics(BaseMetrics):
 
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
-        return {"proof_status": "error"}
+        prediction = prediction.copy()
+        prediction['proof_status'] = "error"
+        return prediction
 
     def _update_score_metrics_for_pass(
         self,

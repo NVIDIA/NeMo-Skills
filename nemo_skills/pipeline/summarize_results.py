@@ -172,7 +172,7 @@ def summarize_results(
     ),
     max_seq_len: Optional[int] = typer.Option(
         None,
-        help="Specify max_seq_len for computing metrics.",
+        help="Specify max_seq_len for computing metrics. Will consider anything longer as incorrect.",
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),

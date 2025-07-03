@@ -17,8 +17,11 @@ import os
 import shutil
 import subprocess
 
+import pytest
 
-def test_metrics(tmp_path):
+
+@pytest.mark.parametrize("max_seq_len", [None, 8192, 32768])
+def test_metrics(tmp_path, max_seq_len):
     """Current test is very strict and expects the output to match exactly.
 
     Ideally we should relax that, but keeping like this for now.
@@ -45,7 +48,7 @@ def test_metrics(tmp_path):
 
     # 3. Run ns summarize_results {tmp_path}
     result = subprocess.run(
-        ["ns", "summarize_results", str(dst)],
+        ["ns", "summarize_results", str(dst)] + ([f"--max_seq_len={max_seq_len}"] if max_seq_len else []),
         capture_output=True,
         text=True,
     )

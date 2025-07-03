@@ -83,10 +83,10 @@ class MtBenchMetrics(BaseMetrics):
 
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
-        return {
-            "judgement-turn1": 'Rating: 1',
-            "judgement-turn2": 'Rating: 1',
-        }
+        prediction = prediction.copy()
+        prediction['judgement-turn1'] = 'Rating: [[1]]'
+        prediction['judgement-turn2'] = 'Rating: [[1]]'
+        return prediction
 
     def get_metrics(self):
         metrics = {'num_entries': self.total}
