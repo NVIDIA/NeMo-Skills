@@ -76,39 +76,8 @@ def process_multi_turn_test_case(instance, repo_root_dir):
     return instance
 
 
-def add_tools_to_system_prompt(tools, system_prompt, model_type="nemotron"):
-    """Add tools along with their descriptions to the system prompt"""
-
-    if "nemotron" in model_type:
-        system_prompt += ('You can use the following tools to assist the user if required:\n<AVAILABLE_TOOLS>[')
-        
-        for tool in tools:
-            # Handle both tool.function and direct tool formats
-            tool_def = tool.get('function', tool) if isinstance(tool, dict) and 'function' in tool else tool
-            system_prompt += json.dumps(tool_def)
-        
-        system_prompt += ']</AVAILABLE_TOOLS>\n\n'
-        
-        # TODO: Move this logic of conditional system prompt to a conditional yaml file (fc vs fc_with_tool)
-        # Add tool usage instructions
-        system_prompt += (
-            'If you decide to call any tool(s), use the following format:\n'
-            '<TOOLCALL>[{"name": "tool_name1", "arguments": "tool_args1"}, '
-            '{"name": "tool_name2", "arguments": "tool_args2"}]</TOOLCALL>\n\n'
-            'Response from tool(s) will be returned in this format:\n'
-            '<TOOL_RESPONSE>[{"response": "tool_response1"}, {"response": "tool_response2"}]</TOOL_RESPONSE>\n\n'
-            'Based on the results returned by the tool(s), you can call additional tools if needed, '
-            'correct tool calls if any errors are found, or just respond with the answer to the user.'
-        )
-        return system_prompt
-    else:
-         # TODO: Add support for Qwen and maybe other model types
-        raise ValueError(f"Model type {model_type} not supported")
-
-
-def process_file(repo_root_dir, input_file, output_file, model_type="nemotron"):
-    """Process a single BFCL file.
-    Mainly process the tools and functions and add them to the system prompt.
+def process_file(repo_root_dir, input_file, output_file):
+    """Preprocess the functions and convert them to tool format.
     Also mark whether the instance is single-turn or multi-turn which is used during inference.
     """
 
@@ -119,21 +88,6 @@ def process_file(repo_root_dir, input_file, output_file, model_type="nemotron"):
             if idx == 0:                # else:
                 print(test_category)            
             
-            # Process the data so that the data is amenable to prompt filling
-            instruction = ""
-            messages = instance["question"]
-            for turn in messages:
-                for message in turn:
-                    if message["role"] == "system":
-                        instruction += message["content"]
-                    elif message["role"] == "user":
-                        # Copying the message to another key to avoid problems with the prompt filling
-                        message["query"] = message["content"]
-                    elif message["role"] == "assistant":
-                        message["response"] = message["content"]
-
-            instance["instruction"] = instruction
-
             # Convert class-based method calls to function calls
             instance = process_multi_turn_test_case(instance, repo_root_dir)
             
@@ -142,9 +96,6 @@ def process_file(repo_root_dir, input_file, output_file, model_type="nemotron"):
                 # Add the tools to the system prompt
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
                 instance["tools"] = convert_to_tool(instance["function"])
-                # Add tools to the system prompt
-                instance["instruction"] = add_tools_to_system_prompt(
-                    instance["tools"], instance["instruction"], model_type=model_type)
                 
             f_out.write(json.dumps(instance) + "\n")
 

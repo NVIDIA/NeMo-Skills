@@ -92,7 +92,6 @@ class CodeTags:
 
     # used to post-process code output
     code_output_format: str = 'qwen'
-    
 
 
 @nested_dataclass(kw_only=True)
@@ -104,9 +103,6 @@ class PromptTemplate:
     user_end: str
     assistant_begin: str
     assistant_end: str
-
-    tool_begin: str = ""
-    tool_end: str = ""
 
     # TODO: should stop phrases not be here?
     stop_phrases: List[str]
@@ -355,105 +351,6 @@ class Prompt:
         return str(self.config)
 
 
-class StatefulMultiTurnPrompt(Prompt):
-    """Stateful multi-turn prompt that maintains conversation state and only appends new messages."""
-    # TURN_END_FORMAT = "{assistant}{assistant_end}"
-
-    def __init__(self, config):
-        super().__init__(config)
-
-        self.has_template = bool(self.config.template)
-        
-        # Initialize empty conversation state
-        self._messages = []
-        if self.has_template:
-            self._prompt_string = ""
-        
-    def add_message(self, message: Dict[str, str]) -> None:
-        """
-        Add any message (system, user, assistant, tool) to conversation state
-        
-        Args:
-            role: "system", "user", "assistant", or "tool"
-            content: Message content
-        """
-        role = message["role"]
-        content = message["content"]
-
-        self._messages.append(message)
-
-        if self.has_template:
-            # Format the prompt string
-            if role == "system":
-                self._prompt_string += self.SYSTEM_FORMAT.format(
-                    system=self.config.system.format(**message),
-                    **asdict(self.config.template)
-                )
-            elif role == "user":
-                self._prompt_string += self.TURN_BEGIN_FORMAT.format(
-                    user=content,
-                    **asdict(self.config.template)
-                )
-            elif role == "assistant":
-                if message["tool_calls"]:
-                    content += self._format_tool_calls(message["tool_calls"])
-                    # pass
-                # else:
-                fmted_text = self.TURN_END_FORMAT.format(
-                    assistant=content,
-                    **asdict(self.config.template)
-                )
-                self._prompt_string += fmted_text
-                # print("Current prompt (last 200 chars): ", self._prompt_string[-200:])
-                # print("Fmted text: ", fmted_text)
-                # print("-" * 100)
-                # print("Current prompt (last 200 chars): ", self._prompt_string[-200:])
-            elif role == "tool":
-                fmted_text = self._format_tool_response(message["content"])
-                self._prompt_string += fmted_text
-            else:
-                raise ValueError(f"Invalid role: {role}")
-            
-
-    def _format_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> str:
-        """Format tool calls section"""
-        
-        return f"{self.config.code_tags.code_begin}{str(tool_calls)}{self.config.code_tags.code_end}"
-    
-
-    def _format_tool_response(self, content: List) -> str:
-        """Format tool response section"""
-        result = self.config.template.tool_begin + str(content) + self.config.template.tool_end
-        # for i in range(len(content)):
-        #     if i == 0:
-        #         result += self.config.template.tool_begin  
-            
-        #     result += str(content[i])
-        #     # print("Current tool response: ", result)
-            
-        #     # Check if next message is also a tool message
-        #     is_last_tool = (i == len(content) - 1)
-        #     if not is_last_tool:
-        #         result += ', '
-            
-        #     if is_last_tool:
-        #         result += self.config.template.tool_end
-
-        # print("Formatted tool response: ", result)
-        return result
-    
-    def get_current_prompt(self) -> str | List[Dict[str, str]]:
-        """
-        Returns the current prompt string or messages list.
-        """
-        if self.has_template:
-            return self._prompt_string
-        else:
-            return self._messages
-
-
-
-
 def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     Reads the prompt config/template from the yaml file.
@@ -490,7 +387,6 @@ def get_prompt(
     config_dir: str | None = None,
     template_dir: str | None = None,
     code_tags_dir: str | None = None,
-    is_stateful: bool = False,
 ) -> Prompt:
     if template_dir is None:
         template_dir = Path(__file__).parent.absolute() / 'template'
@@ -516,12 +412,8 @@ def get_prompt(
         else:
             code_tags_dict = code_tags
         code_tags_obj = CodeTags(**code_tags_dict)
-
-    config = PromptConfig(**config, template=template_obj, code_tags=code_tags_obj)
-    if not is_stateful:
-        prompt = Prompt(config)
-    else:
-        prompt = StatefulMultiTurnPrompt(config)
+    
+    prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
 
     if examples_type is not None:
         prompt.config.few_shot_examples.examples_type = examples_type

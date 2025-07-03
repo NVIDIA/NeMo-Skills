@@ -127,6 +127,7 @@ class BaseModel(abc.ABC):
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -143,6 +144,9 @@ class BaseModel(abc.ABC):
             'stream': stream,
             'reasoning_effort': reasoning_effort,
         }
+        if tools is not None:
+            kwargs['tools'] = tools
+            
         for key, value in kwargs.items():
             is_list = False
             if key == 'stop_phrases' and (value and isinstance(value[0], list)):
@@ -210,6 +214,7 @@ class BaseModel(abc.ABC):
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -229,6 +234,7 @@ class BaseModel(abc.ABC):
             remove_stop_phrases=remove_stop_phrases,
             stream=stream,
             reasoning_effort=reasoning_effort,
+            tools=tools,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -400,7 +406,11 @@ class OpenAIAPIModel(BaseModel):
     def _parse_chat_completion_response(self, response) -> dict:
         choice = response.choices[0]
         output = choice.message.content
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        result = {'generation': output, 'message': choice.message, 'num_generated_tokens': response.usage.completion_tokens}
+        
+        if choice.message.tool_calls:
+            result['tool_calls'] = choice.message.tool_calls
+            
         if choice.logprobs and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
