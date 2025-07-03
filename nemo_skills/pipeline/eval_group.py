@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import importlib
 import logging
 import os
@@ -48,6 +49,8 @@ def submit_jobs(
     dry_run=False,
 ):
     eval_group = deepcopy(eval_group)
+    metric_files = []
+    summarize_expnames = []
     for job_idx, job_config in enumerate(eval_group['jobs']):
         job_name = job_config.pop('name', str(job_idx))
         if not dry_run:
@@ -117,16 +120,33 @@ def submit_jobs(
         benchmarks_split = job_args['benchmarks'].split(',')
         benchmark_names = ",".join([b.split(':')[0] for b in benchmarks_split])
         command += f" --benchmarks {benchmark_names} "
-        command += f" --save_metrics_path {output_dir}/summarized_results/{job_name}/metrics.json "
+        metric_file = f"{output_dir}/summarized_results/{job_name}/metrics.json"
+        command += f" --save_metrics_path {metric_file} "
+        summarize_expname = f"{expname}-{job_name}-summarize-results" + ('-dry-run' if dry_run else '')
         _run_cmd(
             ctx=sum_ctx,
             command=command,
             cluster=cluster,
-            log_dir=f"{output_dir}/summarized_results",
-            expname=f"{expname}-{job_name}-summarize-results" + ('-dry-run' if dry_run else ''),
+            log_dir=f"{output_dir}/summarized_results/logs",
+            expname=summarize_expname,
             run_after=job_args['expname'] if not has_judge else judge_args['expname'],
             dry_run=dry_run,
         )
+        summarize_expnames.append(summarize_expname)
+        metric_files.append(metric_file)
+
+    # final compute score job
+    command = f"python -m nemo_skills.evaluation.eval_group.compute_score {' '.join(metric_files)} "
+    command += f"--score_module {eval_group['score_module']} --save_metrics_file {output_dir}/metrics.json"
+    _run_cmd(
+        ctx=sum_ctx,
+        command=command,
+        cluster=cluster,
+        log_dir=f"{output_dir}/compute-score-logs",
+        expname=f"{expname}-compute-score" + ('-dry-run' if dry_run else ''),
+        run_after=summarize_expnames,
+        dry_run=dry_run,
+    )
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -351,8 +371,6 @@ def eval_group(
             output_dir,
             dry_run=False,
         )
-
-    # TODO final aggregate metrics
 
 
 if __name__ == "__main__":

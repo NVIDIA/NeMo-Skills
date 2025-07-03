@@ -12,6 +12,9 @@
 # e.g. you can specify a custom judge model for a certain step which will
 # override ns eval_group's `judge_model` argument
 
+# can also use full path like /nemo_run/code/<>.py
+score_module: nemo_skills.evaluation.eval_group.aai_score
+
 jobs:
   - name: mmlu-pro  # used as part of expname, log_dir, wandb_name, etc.
     benchmarks: mmlu-pro
