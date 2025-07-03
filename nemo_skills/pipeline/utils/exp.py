@@ -130,7 +130,7 @@ class CustomJobDetailsRay(CustomJobDetails):
     @property
     def ls_term(self) -> str:
         assert self.folder
-        return os.path.join(self.folder, "ray-%j-*")
+        return os.path.join(self.folder, "ray-%j-job*")
 
 
 def get_executor(
