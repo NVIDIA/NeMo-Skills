@@ -22,3 +22,8 @@ class RulerMetrics(BaseMetrics):
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
+
+    def get_incorrect_sample(self, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction['is_correct'] = False
+        return prediction
