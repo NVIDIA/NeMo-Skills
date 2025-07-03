@@ -77,7 +77,7 @@ class ComputeMetrics:
                     for i in range(len(data)):
                         if int(data[i]['num_generated_tokens']) <= self.max_seq_len:
                             continue
-                        data[i] = self.calculators['all'].get_incorrect_sample()
+                        data[i] = self.calculators['all'].get_incorrect_sample(data[i])
                 # checking if we need to create a new metrics calculator
                 data_subset = data[0].get('subset_for_metrics', 'all')
                 if data_subset not in self.calculators:

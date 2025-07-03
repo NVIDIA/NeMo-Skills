@@ -353,7 +353,7 @@ def summarize_results(
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         if max_seq_len is not None and not printed_max_seq_len:
-            print(f'Metrics for Max Sequence Length {max_seq_len} '.center(total_width, '-'))
+            print(f' Metrics for Max Sequence Length {max_seq_len} '.center(total_width, '-'))
         printed_max_seq_len = True
         print(f' {benchmark} '.center(total_width, '-'))
         headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
