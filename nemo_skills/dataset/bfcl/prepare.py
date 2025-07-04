@@ -30,7 +30,7 @@ REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
-PROMPT_CONFIG = "eval/bfcl/nemotron"
+PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"
@@ -76,7 +76,7 @@ def process_multi_turn_test_case(instance, repo_root_dir):
     return instance
 
 
-def process_file(repo_root_dir, input_file, output_file):
+def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemotron"):
     """Preprocess the functions and convert them to tool format.
     Also mark whether the instance is single-turn or multi-turn which is used during inference.
     """
@@ -92,6 +92,7 @@ def process_file(repo_root_dir, input_file, output_file):
             instance = process_multi_turn_test_case(instance, repo_root_dir)
             
             # Convert function calls to tools format and add them to the system prompt
+            # TODO: Current preprocessing can be model dependent. It can be moved to inference time as well
             if "function" in instance:
                 # Add the tools to the system prompt
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
@@ -169,7 +170,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, default="nemotron", choices=[
+    parser.add_argument("--model_type", type=str, default="llama-nemotron", choices=[
         "nemotron", "qwen", "llama-nemotron"])
     args = parser.parse_args()
     main(args)
