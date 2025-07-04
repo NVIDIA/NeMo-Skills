@@ -125,7 +125,6 @@ class BFCLGenerationTask(GenerationTask):
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
         model_response = self._generate_single_assistant_turn(state_dict)
-
         proc_model_response = self._process_model_response(model_response)
 
         return {"id": data_point["id"], "result": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
