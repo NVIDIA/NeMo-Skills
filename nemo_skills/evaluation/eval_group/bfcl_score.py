@@ -51,9 +51,10 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
     total_div_count = 0  # Denominator for combined accuracy
     total_accuracy = 0
     
-    for _, accuracy_dict in accuracy_dict_list.items():
+    for accuracy_dict in accuracy_dict_list:
+        print(accuracy_dict)
         accuracy = accuracy_dict["accuracy"]
-        count = accuracy_dict["total_count"]
+        count = accuracy_dict["num_entries"]
         
         total_count += count
 
@@ -66,17 +67,17 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
             total_accuracy += accuracy
 
     if total_count == 0:
-        return {"accuracy": 0, "total_count": 0}
+        return {"accuracy": 0, "num_entries": 0}
     else:
-        return {"accuracy": total_accuracy / total_div_count, "total_count": total_count}
+        return {"accuracy": total_accuracy / total_div_count, "num_entries": total_count}
 
 
 def get_accuracy_dict(metrics, category):
     category_dict = metrics[f"bfcl.{category}"]
     if "pass@1" in category_dict:
-        return {category: category_dict["pass@1"]}
+        return category_dict["pass@1"]
     else:
-        return {category: category_dict["greedy"]}
+        return category_dict["greedy"]
 
 
 def calculate_non_live_single_turn_accuracy(metrics):
@@ -86,7 +87,7 @@ def calculate_non_live_single_turn_accuracy(metrics):
         weighted=False
     )
 
-    non_live_ast_accuracy_list = [{"simple": simple_ast_accuracy_dict}]
+    non_live_ast_accuracy_list = [simple_ast_accuracy_dict]
     for category in OTHER_SINGLE_TURN_AST:
         non_live_ast_accuracy_list.append(get_accuracy_dict(metrics, category))
 
