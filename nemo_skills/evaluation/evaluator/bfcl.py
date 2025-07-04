@@ -92,22 +92,6 @@ def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
 
     return bfcl_file
 
-    # with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
-    #      open(bfcl_file, 'wt', encoding='utf-8') as fout:
-        
-    #     for line in fin:
-    #         sample = json.loads(line)
-            
-    #         # Convert to BFCL format - adjust based on actual BFCL input requirements
-    #         bfcl_sample = {
-    #             'id': sample.get('id', sample.get('problem_id', '')),
-    #             'result': sample.get('generation', ''),
-    #         }
-                            
-    #         fout.write(json.dumps(bfcl_sample) + '\n')
-    
-    # return bfcl_file
-
 
 def _merge_bfcl_results(generation_file, bfcl_fmted_file, score_file):
     """Merge BFCL evaluation results back into the original NeMo-Skills file."""

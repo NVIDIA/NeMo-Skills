@@ -45,7 +45,7 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "generic/default"
-    prompt_template: str = "generic/default-base"
+    prompt_template: str = "default-base"
 
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
