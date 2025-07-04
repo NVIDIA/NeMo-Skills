@@ -95,6 +95,13 @@ def run_cmd(
     exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -149,7 +156,6 @@ def run_cmd(
 
         prev_tasks = None
         for _ in range(dependent_jobs + 1):
-            # Add the task to the experiment
             new_task = add_task(
                 exp,
                 cmd=cmd,
@@ -169,9 +175,10 @@ def run_cmd(
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
             )
             prev_tasks = [new_task]
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
     return exp
 

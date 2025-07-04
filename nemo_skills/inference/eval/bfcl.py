@@ -179,8 +179,6 @@ class BFCLGenerationTask(GenerationTask):
                 state_dict["messages"].append(model_response["message"])
 
                 # Proccess the model response text
-                # model_response["generation"] = self._process_model_response_text(model_response["generation"])
-
                 proc_model_response = self._process_model_response(model_response)
                 # Add the processed model response to the current turn responses
                 current_turn_response.append(proc_model_response["generation"])

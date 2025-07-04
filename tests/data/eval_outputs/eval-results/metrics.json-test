@@ -616,6 +616,7 @@
   "mt-bench": {
     "greedy": {
       "num_entries": 2,
+      "avg_tokens": 5050,
       "average": 7.666666666666667,
       "average_turn1": 8.0,
       "average_turn2": 7.0,

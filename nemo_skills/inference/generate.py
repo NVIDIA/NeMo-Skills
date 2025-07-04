@@ -29,7 +29,14 @@ from tqdm import tqdm
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import chunk_data, get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import (
+    chunk_data,
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    remove_thinking,
+    setup_logging,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -56,6 +63,7 @@ class GenerateSolutionsConfig:
     prompt_template: str | None = None  # not required for OpenAI server
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
+    prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
     system_message: str | None = None  # can override the default system message in the config
     code_tags: str | None = None  # required when using code execution
     examples_type: str | None = None  # to be able to customize few-shot examples
@@ -114,6 +122,11 @@ class GenerateSolutionsConfig:
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
+
+    # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
+    remove_thinking: bool = False
+    thinking_begin: str = "<think>"
+    thinking_end: str = "</think>"
 
     def __post_init__(self):
         self._post_init_validate_data()
@@ -367,7 +380,17 @@ class GenerationTask:
         for idx, dp in enumerate(data):
             if idx in filled_positions:
                 continue
-            dp[self.cfg.async_position_key] = idx
+            if self.cfg.prompt_format == "ns":
+                dp[self.cfg.async_position_key] = idx
+            elif self.cfg.prompt_format == "openai":
+                # openai format allows for a list to be top-level key, if that's the case, wrapping it in a messages key
+                if isinstance(dp, list):
+                    dp = {
+                        "messages": dp,
+                        self.cfg.async_position_key: idx,
+                    }
+            else:
+                raise ValueError(f"Unknown prompt format: {self.cfg.prompt_format}")
             remaining_data.append(dp)
 
         return remaining_data
@@ -376,6 +399,8 @@ class GenerationTask:
     def fill_prompt(self, data_point, data):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         if self.cfg.prompt_format == "openai":
+            if self.cfg.prompt_suffix:
+                data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
@@ -385,12 +410,18 @@ class GenerationTask:
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
             data_point['total_code_executions'] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
-        return self.prompt.fill(
+        filled_prompt = self.prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
             continue_prefix_generation=self.cfg.continue_prefix_generation,
         )
+        if self.cfg.prompt_suffix:
+            if isinstance(filled_prompt, list):
+                filled_prompt[-1]['content'] += self.cfg.prompt_suffix
+            else:
+                filled_prompt += self.cfg.prompt_suffix
+        return filled_prompt
 
     def llm_generate(self, data_points, data, is_async=False):
         generation_params = {
@@ -452,6 +483,8 @@ class GenerationTask:
             for key in output:
                 original_data_point.pop(key, None)
             output.update(original_data_point)
+            if self.cfg.remove_thinking:
+                remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
             fout.write(json.dumps(output) + "\n")
 
     def prefill_generation(self, data_point) -> dict | None:

@@ -18,7 +18,7 @@
 import json
 import copy
 import re
-from constants import GORILLA_TO_OPENAPI
+from nemo_skills.dataset.bfcl.constants import GORILLA_TO_OPENAPI
 
 def load_file(file_path, sort_by_id=False):
     result = []
@@ -37,7 +37,6 @@ def is_multi_turn(instance_id):
         return True
     else:
         return False
-
 
 
 def _get_language_specific_hint(test_category):

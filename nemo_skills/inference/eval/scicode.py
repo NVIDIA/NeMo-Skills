@@ -23,7 +23,7 @@ import openai
 from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, remove_thinking, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -42,9 +42,7 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     prompt_config: str = "eval/scicode/background"
     with_background: bool = True
 
-    thinking_begin: str = "<think>"
-    thinking_end: str = "</think>"
-    remove_thinking: bool = True
+    remove_thinking: bool = True  # changing default
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -121,11 +119,8 @@ class SciCodeGenerationTask(GenerationTask):
                     raise
 
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
-            if self.cfg.thinking_end in llm_output['generation']:
-                llm_output['generation'] = llm_output['generation'].split(self.cfg.thinking_end)[-1].strip()
-            elif self.cfg.thinking_begin in llm_output['generation']:
-                # thinking part wasn't finished, so setting answer as empty to not blow away the context
-                llm_output['generation'] = ''
+            if self.cfg.remove_thinking:
+                remove_thinking(llm_output, 'generation', self.cfg.thinking_begin, self.cfg.thinking_end)
             extracted_python = extract_python_script(llm_output['generation'])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns

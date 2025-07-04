@@ -1,0 +1,52 @@
+# an Artificial Analysis Intelligence Index evaluation group
+# should get results very close to what's reported in https://artificialanalysis.ai/
+# with the difference that for mcq questions we ask to put the answer in the \boxed{}
+
+# this file is meant to be changed frequently by users
+# to add other parameters like num_chunks, dependent_jobs, etc.
+
+# each element of jobs list is directly passed to the eval(**job_config)
+# with special handling for wrap_arguments and name fields,
+# as well as "judge" (that's directly passed to generate(**job_config.judge))
+# all arguments of ns eval_group pipeline can be thus overridden from this config
+# e.g. you can specify a custom judge model for a certain step which will
+# override ns eval_group's `judge_model` argument
+
+# can also use full path like /nemo_run/code/<>.py
+score_module: nemo_skills.evaluation.eval_group.aai_score
+
+jobs:
+  - name: mmlu-pro  # used as part of expname, log_dir, wandb_name, etc.
+    benchmarks: mmlu-pro
+    wrap_arguments: "++prompt_config=eval/aai/mcq-10choices ++inference.temperature=0.0"
+
+  - name: hle
+    benchmarks: hle
+    # hle default prompt is same as aai prompt
+    wrap_arguments: "++remove_thinking=True ++inference.temperature=0.0"
+    # hle needs a separate judge step
+    # judge model configuration is specified by eval_group pipeline arguments
+    judge:
+      wrap_arguments: "++prompt_config=judge/hle ++generation_key=judgement"
+
+  - name: gpqa
+    benchmarks: gpqa
+    wrap_arguments: "++prompt_config=eval/aai/mcq-4choices ++inference.temperature=0.0"
+
+  - name: math-500
+    benchmarks: math-500:3
+    wrap_arguments: "++prompt_config=eval/aai/math ++inference.temperature=0.0"
+
+  - name: aime24
+    benchmarks: aime24:10
+    wrap_arguments: "++prompt_config=eval/aai/math ++inference.temperature=0.0"
+
+  - name: scicode
+    benchmarks: scicode:3
+    # scicode default prompt is same as aai prompt
+    wrap_arguments: "++inference.temperature=0.0"
+
+  - name: livecodebench
+    benchmarks: livecodebench:3
+    split: test_v5_2407_2412
+    wrap_arguments: "++prompt_config=eval/aai/livecodebench ++inference.temperature=0.0"

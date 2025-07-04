@@ -22,6 +22,10 @@ class CodeMetrics(BaseMetrics):
             "passing_plus_tests": prediction['is_correct-plus'],
         }
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"is_correct": False, "is_correct-plus": False}
+
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
@@ -32,6 +36,10 @@ class LiveCodeBenchMetrics(BaseMetrics):
         return {
             "accuracy": prediction['graded_list'][0],
         }
+
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"graded_list": [False]}
 
     def update(self, predictions):
         super().update(predictions)
@@ -46,6 +54,15 @@ class SciCodeMetrics(BaseMetrics):
             'problem_accuracy': correct_subtasks == len(subtask_status_list),
             'subtask_accuracy': correct_subtasks,
         }
+
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        subtask_status_list = prediction['eval_status']
+        for subtask in subtask_status_list:
+            subtask['process_status'] = 'error'
+        prediction['eval_status'] = subtask_status_list
+        return prediction
 
     def update(self, predictions):
         super().update(predictions)

@@ -19,6 +19,8 @@ import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, Union, Optional
+import threading
 
 import httpx
 import openai
@@ -262,7 +264,7 @@ class BaseModel(abc.ABC):
 class OpenAIAPIModel(BaseModel):
     """
     Base class for models using an OpenAI-compatible API.
-    Handles client setup, SSH tunneling, and a unified generation flow.
+    Handles client setup, SSH tunneling, and a unified generation flow with generation tracking.
     """
 
     def __init__(
@@ -278,6 +280,10 @@ class OpenAIAPIModel(BaseModel):
         super().__init__(**kwargs)
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay
+        
+        # Track active generations with thread-safe operations
+        self.active_generations: Dict[str, Dict[str, Any]] = {}
+        self._generations_lock = threading.Lock()
 
         self._tunnel = None
         if self.ssh_server and self.ssh_key_path:
@@ -319,6 +325,8 @@ class OpenAIAPIModel(BaseModel):
     def __del__(self):
         if self._tunnel:
             self._tunnel.stop()
+        # Clean up any remaining active generations
+        self.cancel_all_generations()
 
     def get_model_name_from_server(self):
         model_list = self.client.models.list()
@@ -326,12 +334,67 @@ class OpenAIAPIModel(BaseModel):
             raise ValueError("No models available on the server.")
         return model_list.data[0].id
 
-    def _make_api_call(self, api_func, params):
+    def _register_generation(self, gen_id: str, response: Any) -> None:
+        """Register a new generation with the tracker."""
+        with self._generations_lock:
+            self.active_generations[gen_id] = {
+                'response': response,
+                'created_at': time.time()
+            }
+
+    def _unregister_generation(self, gen_id: str) -> Optional[Dict[str, Any]]:
+        """Remove a generation from the tracker and return its info."""
+        with self._generations_lock:
+            return self.active_generations.pop(gen_id, None)
+
+    def cancel_generation(self, gen_id: str) -> bool:
+        """
+        Cancel a specific generation by ID.
+        Returns True if the generation was found and cancelled, False otherwise.
+        """
+        generation_info = self._unregister_generation(gen_id)
+        if generation_info is None:
+            return False
+
+        generation_info['response'].close() 
+        return True
+
+    def cancel_all_generations(self) -> int:
+        """
+        Cancel all active generations.
+        Returns the number of generations that were cancelled.
+        """
+        with self._generations_lock:
+            generation_ids = list(self.active_generations.keys())
+        
+        cancelled_count = 0
+        for gen_id in generation_ids:
+            if self.cancel_generation(gen_id):
+                cancelled_count += 1
+        
+        return cancelled_count
+
+    def get_active_generation_count(self) -> int:
+        """Return the number of currently active generations."""
+        with self._generations_lock:
+            return len(self.active_generations)
+
+    def get_active_generation_ids(self) -> list[str]:
+        """Return a list of all active generation IDs."""
+        with self._generations_lock:
+            return list(self.active_generations.keys())
+
+    def _make_api_call(self, api_func, params, gen_id: str):
         retry_count = 0
         retry_delay = self.initial_retry_delay
         while True:
             try:
-                return api_func(**params)
+                response = api_func(**params)
+                # Register the generation after successful API call, only for streaming responses
+                is_streaming = params.get('stream', False)
+                if is_streaming:
+                    self._register_generation(gen_id, response)
+                return response
             except openai.RateLimitError as e:
                 retry_count += 1
                 if retry_count > self.max_retries:
@@ -364,27 +427,60 @@ class OpenAIAPIModel(BaseModel):
         self,
         prompt: str | list,
         stream: bool = False,
+        generation_id: Optional[str] = None,
         **kwargs,
-    ) -> dict | Stream:
-        if isinstance(prompt, list):
-            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            response = self._make_api_call(self.client.chat.completions.create, request_params)
-            if stream:
-                return self._stream_chat_chunks(response)
-            return self._parse_chat_completion_response(response)
+    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+        """
+        Generate a single response with optional generation tracking.
+        
+        Args:
+            prompt: The input prompt (string or list of messages)
+            stream: Whether to stream the response
+            generation_id: Optional generation ID. If None, one will be generated.
+            **kwargs: Additional parameters for the API call
+            
+        Returns:
+            If generation_id is provided in kwargs, returns (gen_id, response)
+            Otherwise returns just the response for backward compatibility
+        """
+        # Generate a unique ID for this generation
+        gen_id = generation_id or str(uuid.uuid4())
+        return_gen_id = generation_id is not None or kwargs.get('return_generation_id', False)
+        
+        try:
+            if isinstance(prompt, list):
+                request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+                response = self._make_api_call(self.client.chat.completions.create, request_params, gen_id)
+                if stream:
+                    result = self._stream_chat_chunks(response, gen_id)
+                else:
+                    result = self._parse_chat_completion_response(response)
 
-        elif isinstance(prompt, str):
-            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-            response = self._make_api_call(self.client.completions.create, request_params)
-            if stream:
-                return self._stream_completion_chunks(response)
-            return self._parse_completion_response(response)
-
-        raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+            elif isinstance(prompt, str):
+                request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+                response = self._make_api_call(self.client.completions.create, request_params, gen_id)
+                if stream:
+                    result = self._stream_completion_chunks(response, gen_id)
+                else:
+                    result = self._parse_completion_response(response)
+            else:
+                raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+            
+            if return_gen_id:
+                return gen_id, result
+            else:
+                return result
+                
+        except Exception as e:
+            # Make sure to unregister the generation if an error occurs
+            self._unregister_generation(gen_id)
+            raise
 
     def _parse_completion_response(self, response: "openai.types.Completion") -> dict:
         choice = response.choices[0]
         output = choice.text
+        if output is None:
+            output = ""
 
         # In some cases, the stop reason is not included in the text, so we add it back
         if choice.finish_reason == "stop":
@@ -401,16 +497,17 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+        if choice.tool_calls:
+            result["tool_calls"] = choice.tool_calls
+        
         return result
 
     def _parse_chat_completion_response(self, response) -> dict:
         choice = response.choices[0]
         output = choice.message.content
-        result = {'generation': output, 'message': choice.message, 'num_generated_tokens': response.usage.completion_tokens}
-        
-        if choice.message.tool_calls:
-            result['tool_calls'] = choice.message.tool_calls
-            
+        if output is None:
+            output = ""
+        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
         if choice.logprobs and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
@@ -422,51 +519,65 @@ class OpenAIAPIModel(BaseModel):
                 result['top_logprobs'].append(logprob)
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+        if choice.message.tool_calls:
+            result["tool_calls"] = choice.message.tool_calls
+            result["message"] = choice.message
+
         return result
 
-    def _stream_completion_chunks(self, response):
-        emitted_so_far = []
-        for chunk in response:
-            cur_delta = chunk.choices[0].text
-            emitted_so_far += [cur_delta]
-            if cur_delta:
-                yield {"generation": cur_delta}
-            # vllm variant
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            # sglang variant
-            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
-            # vllm variant - emit stop_reason as is and finish
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
-            # sglang variant - emit only not-yet-sent part of matched_stop
-            if matched_stop and isinstance(matched_stop, str):
-                remaining = matched_stop
-                # find the longest prefix of matched_stop that is already at
-                # the end of what we've emitted.
-                emitted_str = "".join(emitted_so_far)
-                max_len = min(len(emitted_str), len(matched_stop))
-                for i in range(max_len, 0, -1):
-                    if emitted_str.endswith(matched_stop[:i]):
-                        remaining = matched_stop[i:]
-                        break
-                if remaining:
-                    yield {"generation": remaining}
-
-    def _stream_chat_chunks(self, response):
-        for chunk in response:
-            if hasattr(chunk.choices[0], "delta"):
-                cur_delta = chunk.choices[0].delta.content
-            else:
+    def _stream_completion_chunks(self, response, gen_id: str):
+        """Stream completion chunks and automatically unregister when done."""
+        try:
+            emitted_so_far = []
+            for chunk in response:
                 cur_delta = chunk.choices[0].text
+                emitted_so_far += [cur_delta]
+                if cur_delta:
+                    yield {"generation": cur_delta}
+                # vllm variant
+                stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+                # sglang variant
+                matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+                # vllm variant - emit stop_reason as is and finish
+                if stop_reason and isinstance(stop_reason, str):
+                    yield {"generation": stop_reason}
+                # sglang variant - emit only not-yet-sent part of matched_stop
+                if matched_stop and isinstance(matched_stop, str):
+                    remaining = matched_stop
+                    # find the longest prefix of matched_stop that is already at
+                    # the end of what we've emitted.
+                    emitted_str = "".join(emitted_so_far)
+                    max_len = min(len(emitted_str), len(matched_stop))
+                    for i in range(max_len, 0, -1):
+                        if emitted_str.endswith(matched_stop[:i]):
+                            remaining = matched_stop[i:]
+                            break
+                    if remaining:
+                        yield {"generation": remaining}
+        finally:
+            # Always unregister the generation when streaming is complete
+            self._unregister_generation(gen_id)
 
-            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-            result = {"generation": cur_delta}
-            if finish_reason:
-                result["finish_reason"] = finish_reason
-                if not cur_delta:
-                    result["generation"] = ""
+    def _stream_chat_chunks(self, response, gen_id: str):
+        """Stream chat chunks and automatically unregister when done."""
+        try:
+            for chunk in response:
+                if hasattr(chunk.choices[0], "delta"):
+                    cur_delta = chunk.choices[0].delta.content
+                else:
+                    cur_delta = chunk.choices[0].text
 
-            yield result
+                finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+                result = {"generation": cur_delta}
+                if finish_reason:
+                    result["finish_reason"] = finish_reason
+                    if not cur_delta:
+                        result["generation"] = ""
+
+                yield result
+        finally:
+            # Always unregister the generation when streaming is complete
+            self._unregister_generation(gen_id)
 
 
 class BaseRewardModel(abc.ABC):

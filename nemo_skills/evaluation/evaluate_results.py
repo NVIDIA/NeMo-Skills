@@ -21,7 +21,14 @@ from typing import Any
 import hydra
 
 from nemo_skills.evaluation.evaluator import evaluate
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging, unroll_files
+from nemo_skills.utils import (
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    remove_thinking,
+    setup_logging,
+    unroll_files,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -42,8 +49,8 @@ class EvaluateResultsConfig:
 
     # whether to remove the thinking part from the final output
     remove_thinking: bool = True
-    # thinking separator
-    thinking_separator: str = "</think>"
+    thinking_begin: str = "<think>"
+    thinking_end: str = "</think>"
     # generation key in the jsonl file
     generation_key: str = "generation"
 
@@ -63,7 +70,8 @@ def evaluate_results(cfg: EvaluateResultsConfig):
 
     if cfg.remove_thinking:
         LOG.info(
-            f'Removing the thinking part from the {cfg.generation_key} key (splitting on {cfg.thinking_separator}). '
+            f"Removing the thinking part from the {cfg.generation_key} key "
+            f"(using {cfg.thinking_begin} and {cfg.thinking_end} tokens). "
             'Original content will be stored in "_full_generation" key.'
         )
         for jsonl_file in unroll_files(cfg.input_files):
@@ -77,13 +85,7 @@ def evaluate_results(cfg: EvaluateResultsConfig):
                         )
             with open(jsonl_file, "wt", encoding="utf-8") as f:
                 for sample in samples:
-                    if cfg.thinking_separator in sample[cfg.generation_key]:
-                        sample["_full_generation"] = sample[cfg.generation_key]
-                        sample[cfg.generation_key] = (
-                            sample[cfg.generation_key].split(cfg.thinking_separator)[-1].strip()
-                        )
-                    sample["_has_think_tags"] = cfg.thinking_separator in sample[cfg.generation_key]
-
+                    remove_thinking(sample, cfg.generation_key, cfg.thinking_begin, cfg.thinking_end)
                     f.write(json.dumps(sample) + "\n")
 
     evaluate(cfg)
