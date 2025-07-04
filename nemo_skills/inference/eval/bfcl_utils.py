@@ -60,7 +60,7 @@ def convert_to_function_call(function_call_list):
 
     return execution_list
 
-
+# Copied from - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/eval_checker/multi_turn_eval/multi_turn_utils.py#L24
 def execute_multi_turn_func_call(
     func_call_list: list[str],  # a list of strings of func calls
     initial_config: dict,

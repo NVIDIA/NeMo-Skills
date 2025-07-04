@@ -18,11 +18,15 @@ import glob
 import tempfile
 import json
 import shutil
-from copy import deepcopy
-from utils import func_doc_language_specific_pre_processing, convert_to_tool, is_multi_turn, load_file
+from nemo_skills.dataset.bfcl.utils import func_doc_language_specific_pre_processing, convert_to_tool, is_multi_turn, load_file
 from pathlib import Path
-from constants import DATA_FOLDER_PATH, MULTI_TURN_FUNC_DOC_PATH, MULTI_TURN_FUNC_DOC_FILE_MAPPING
+from nemo_skills.dataset.bfcl.constants import DATA_FOLDER_PATH, MULTI_TURN_FUNC_DOC_PATH, MULTI_TURN_FUNC_DOC_FILE_MAPPING
 import argparse
+import logging
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
 
 # Github paths for BFCL
 REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
@@ -39,6 +43,7 @@ GENERATION_MODULE = "nemo_skills.inference.eval.bfcl"
 """
 
 
+# Adapted from - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/_llm_response_generation.py#L142
 def process_multi_turn_test_case(instance, repo_root_dir):
     """
     Multi-turn test cases don't have the function doc in the prompt. We need to add them here.
@@ -85,14 +90,14 @@ def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemot
         for idx, line in enumerate(f):
             instance = json.loads(line)
             test_category = instance["id"].rsplit("_", 1)[0]
-            if idx == 0:                # else:
-                print(test_category)            
+            if idx == 0:
+                LOG.info(f"Processing {test_category}")
             
+            # TODO: Current preprocessing can be model dependent. This could be moved to inference time as well
             # Convert class-based method calls to function calls
             instance = process_multi_turn_test_case(instance, repo_root_dir)
             
             # Convert function calls to tools format and add them to the system prompt
-            # TODO: Current preprocessing can be model dependent. It can be moved to inference time as well
             if "function" in instance:
                 # Add the tools to the system prompt
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
@@ -110,7 +115,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
         subfolder_path: Path to the data subfolder in case of BFCL
         output_dir: Directory to save the processed JSONL files
         file_prefix: Only process files starting with this prefix
-        model_type: Type of model to process the data for which influences things like system prompt format
+        model_type: Formatting of functions and tools can be model dependent. 
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
@@ -161,6 +166,8 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
 
 
 def main(args):
+    LOG.warning("Currently processing according to the OpenAI model style which works for most models, including Qwen/Llama-Nemotron/DeepSeek.")
+
     download_and_process_bfcl_data(
         REPO_URL, DATA_FOLDER_PATH, 
         output_dir=os.path.join(os.path.dirname(__file__)),
@@ -170,7 +177,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, default="llama-nemotron", choices=[
-        "nemotron", "qwen", "llama-nemotron"])
+    parser.add_argument("--model_type", type=str, default=None, required=False)
     args = parser.parse_args()
+
     main(args)
+    
+
+ 

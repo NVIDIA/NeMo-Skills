@@ -20,6 +20,7 @@ import copy
 import re
 from nemo_skills.dataset.bfcl.constants import GORILLA_TO_OPENAPI
 
+
 def load_file(file_path, sort_by_id=False):
     result = []
     with open(file_path) as f:
@@ -149,7 +150,6 @@ def _cast_to_openai_type(properties, mapping):
                         properties[key]["items"]["properties"], mapping
                     )
     return properties
-
 
 
 def convert_to_tool(functions):

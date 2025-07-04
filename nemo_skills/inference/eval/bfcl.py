@@ -18,12 +18,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
-import json
-from pathlib import Path
 import re   
-import shutil
 from dataclasses import asdict, field
-
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
