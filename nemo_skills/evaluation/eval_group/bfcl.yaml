@@ -1,0 +1,77 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# BFCLv3 evaluation group
+# Combines the single turn and multi turn ASTs - total of 17 subsets of BFCLv3
+
+score_module: nemo_skills.evaluation.eval_group.bfcl_score
+
+jobs:
+  # Simple AST
+  - name: bfcl.simple 
+    benchmarks: bfcl.simple
+
+  - name: bfcl.java
+    benchmarks: bfcl.java 
+
+  - name: bfcl.javascript
+    benchmarks: bfcl.javascript
+
+  # Other Single-turn Non-live AST
+  - name: bfcl.parallel
+    benchmarks: bfcl.parallel
+
+  - name: bfcl.multiple
+    benchmarks: bfcl.multiple
+
+  - name: bfcl.parallel_multiple
+    benchmarks: bfcl.parallel_multiple
+
+  # Single-turn Hallucination
+  - name: bfcl.irrelevance
+    benchmarks: bfcl.irrelevance
+
+  # Live Single-turn AST
+  - name: bfcl.live_simple
+    benchmarks: bfcl.live_simple
+
+  - name: bfcl.live_multiple
+    benchmarks: bfcl.live_multiple
+
+  - name: bfcl.live_parallel
+    benchmarks: bfcl.live_parallel
+
+  - name: bfcl.live_parallel_multiple
+    benchmarks: bfcl.live_parallel_multiple
+
+  # Live Single-turn Hallucination
+  - name: bfcl.live_relevance
+    benchmarks: bfcl.live_relevance
+
+  - name: bfcl.live_irrelevance
+    benchmarks: bfcl.live_irrelevance
+
+  # Multi-turn AST
+  - name: bfcl.multi_turn_base
+    benchmarks: bfcl.multi_turn_base
+
+  - name: bfcl.multi_turn_miss_func
+    benchmarks: bfcl.multi_turn_miss_func
+
+  - name: bfcl.multi_turn_miss_param
+    benchmarks: bfcl.multi_turn_miss_param
+
+  - name: bfcl.multi_turn_long_context
+    benchmarks: bfcl.multi_turn_long_context
