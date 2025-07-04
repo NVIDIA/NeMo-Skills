@@ -88,7 +88,15 @@ def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
-    shutil.copy(jsonl_file, bfcl_file)
+    with open(jsonl_file, 'rt', encoding='utf-8') as fin, \
+         open(bfcl_file, 'wt', encoding='utf-8') as fout:
+        for line in fin:
+            sample = json.loads(line)
+            if sample.get("result", None) is not None:
+                sample["result"] = sample["generation"]
+                del sample["generation"]
+
+            fout.write(json.dumps(sample) + '\n')
 
     return bfcl_file
 

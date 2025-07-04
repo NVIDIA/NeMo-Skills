@@ -128,7 +128,7 @@ class BFCLGenerationTask(GenerationTask):
 
         proc_model_response = self._process_model_response(model_response)
 
-        return {"id": data_point["id"], "generation": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
+        return {"id": data_point["id"], "result": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
 
 
     def generate_single_data_point_multi_turn(self, data_point):
