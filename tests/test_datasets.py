@@ -56,24 +56,6 @@ DATASETS = [
     ('gaokao2023en', ['test']),
     ('college_math', ['test']),
     ('comp-math-24-25', ['test']),
-    # BFCL splits
-    ('bfcl.simple', ['test']),
-    ('bfcl.parallel', ['test']),
-    ('bfcl.multiple', ['test']),
-    ('bfcl.parallel_multiple', ['test']),
-    ('bfcl.java', ['test']),
-    ('bfcl.javascript', ['test']),
-    ('bfcl.irrelevance', ['test']),
-    ('bfcl.live_simple', ['test']),
-    ('bfcl.live_multiple', ['test']),
-    ('bfcl.live_parallel', ['test']),
-    ('bfcl.live_parallel_multiple', ['test']),
-    ('bfcl.live_irrelevance', ['test']),
-    ('bfcl.live_relevance', ['test']),
-    ('bfcl.multi_turn_base', ['test']),
-    ('bfcl.multi_turn_miss_func', ['test']),
-    ('bfcl.multi_turn_miss_param', ['test']),
-    ('bfcl.multi_turn_long_context', ['test']),
 ]
 
 
