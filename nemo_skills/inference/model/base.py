@@ -521,6 +521,7 @@ class OpenAIAPIModel(BaseModel):
             result["finish_reason"] = choice.finish_reason
         if choice.message.tool_calls:
             result["tool_calls"] = choice.message.tool_calls
+        if choice.message is not None:
             result["message"] = choice.message
 
         return result
