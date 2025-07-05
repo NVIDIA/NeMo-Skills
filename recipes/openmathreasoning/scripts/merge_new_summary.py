@@ -20,11 +20,12 @@ import json
 import re
 import glob
 import argparse
+import os
 
 from typing import List, Dict, Optional
 from os import path
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.code_execution.math_grader import extract_answer
+from nemo_skills.evaluation.math_grader import extract_answer
 
 
 
@@ -59,23 +60,26 @@ def select_best_summary(valid_summaries):
     return max(valid_summaries, key=lambda x: len(x["generation"]))
 
 
-def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_end_tag=False):    
+def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_end_tag=False):
     """Trim the thinking part of the original reasoning generation till the step with the rightmost boxed entry"""
-    
-    # Find the start and end tags. If either is not found, return None
-    start_tag_position = reasoning_generation.find(start_tag)
-    if start_tag_position == -1:
-        return None
 
+    # Find the start and end tags. If either is not found, use the entire generation
+    start_tag_position = reasoning_generation.find(start_tag)
     end_tag_position = reasoning_generation.find(end_tag)
+
+    # Handle missing start tag
+    if start_tag_position == -1:
+        reasoning_trace = f"{start_tag}\n{reasoning_generation}"
+    else:
+        reasoning_trace = reasoning_generation
+
+    # Handle missing end tag
     if end_tag_position == -1:
         if strict_end_tag:
             return None
-        else:
-            reasoning_generation = reasoning_generation + end_tag
-            reasoning_trace = reasoning_generation
+        reasoning_trace += f"\n{end_tag}"
     else:
-        reasoning_trace = reasoning_generation[:end_tag_position + len(end_tag)]
+        reasoning_trace = reasoning_trace[:end_tag_position + len(end_tag)]
 
     # Extract the answer from the reasoning trace by searching for boxed entries
     answer_from_reasoning_trace = extract_answer(reasoning_trace)
@@ -90,18 +94,20 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_e
             rightmost_match = matches[-1]
             # Remove steps after the rightmost match
             reasoning_trace = (
-                reasoning_trace[:rightmost_match.end()] + 
-                reasoning_trace[rightmost_match.end():].split("\n\n")[0]
+                reasoning_trace[: rightmost_match.end()]
+                + reasoning_trace[rightmost_match.end() :].split("\n\n")[0]
             )
 
             # If the end tag is not present, add it
             if end_tag not in reasoning_trace:
-                reasoning_trace += end_tag
-                
+                reasoning_trace += "\n" + end_tag
+
     return reasoning_trace
 
 
-def format_reasoning_trace_with_summary(reasoning_file, summary_dir, start_tag, end_tag,  strict_end_tag=False):
+def format_reasoning_trace_with_summary(
+    reasoning_file, summary_dir, start_tag, end_tag, strict_end_tag=False, summary_separator="\\n\\nSummary:\\n"
+):
     """Format the reasoning trace with the best summary from the summary directory"""
     # Read the reasoning instances
     reasoning_instances = read_jsonl_file(reasoning_file)
@@ -139,9 +145,9 @@ def format_reasoning_trace_with_summary(reasoning_file, summary_dir, start_tag, 
             continue  # Can't format this instance with new summary. Skip it.
         else:
             # Select the best summary
-            best_summary = select_best_summary(valid_summaries)                
+            best_summary = select_best_summary(valid_summaries)
             # Combine the trimmed reasoning trace with the best summary
-            combined_generation = trimmed_reasoning_trace + best_summary["generation"]
+            combined_generation = trimmed_reasoning_trace + summary_separator + best_summary["generation"]
             # Update the reasoning instance
             reasoning_instance["generation"] = combined_generation
             # Add the instance to the list of formatted instances
@@ -159,10 +165,19 @@ def main():
     parser.add_argument("--start_tag", type=str, default="<think>", help="Start tag")
     parser.add_argument("--end_tag", type=str, default="</think>", help="End tag")
     parser.add_argument("--strict_end_tag", type=bool, default=False, help="Strict end tag")
+    parser.add_argument(
+        "--summary_separator", type=str, default="", help="Separator between reasoning and summary"
+    )
     args = parser.parse_args()
 
     formatted_instances = format_reasoning_trace_with_summary(
-        args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag, args.strict_end_tag)
+        args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag, args.strict_end_tag, args.summary_separator
+    )
+
+    # Create output directory if it doesn't exist
+    output_dir = os.path.dirname(args.output_file)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
     with open(args.output_file, "w") as f:
         for instance in formatted_instances:
