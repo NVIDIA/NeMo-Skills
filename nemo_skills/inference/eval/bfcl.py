@@ -74,20 +74,13 @@ class BFCLGenerationTask(GenerationTask):
         self.llm = self.setup_llm()
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
-        if not self.use_async_loop:  # if it was True, this message is printed by base class
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
-            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
-                LOG.warning(
-                    "NeMo/Megatron servers don't support inflight batching, "
-                    "but BFCL evaluation requires it for efficient inference. "
-                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
-                    "We highly recommend switching to a server that supports inflight batching."
-                )
-        self.use_async_loop = True
+        self.use_async_loop = True  # Set it to True as the default
+        LOG.info(
+            "Async loop is maintaining %d generations in parallel. "
+            "Use max_concurrent_requests to control the number of concurrent requests.",
+            self.cfg.max_concurrent_requests,
+        )
+
 
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
