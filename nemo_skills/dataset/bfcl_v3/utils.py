@@ -18,7 +18,7 @@
 import json
 import copy
 import re
-from nemo_skills.dataset.bfcl.constants import GORILLA_TO_OPENAPI
+from nemo_skills.dataset.bfcl_v3.constants import GORILLA_TO_OPENAPI
 
 
 def load_file(file_path, sort_by_id=False):

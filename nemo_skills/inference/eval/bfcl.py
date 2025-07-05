@@ -26,7 +26,7 @@ from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTa
 from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
-from nemo_skills.dataset.bfcl.utils import func_doc_language_specific_pre_processing, convert_to_tool
+from nemo_skills.dataset.bfcl_v3.utils import func_doc_language_specific_pre_processing, convert_to_tool
 
 LOG = logging.getLogger(get_logger_name(__file__))
 

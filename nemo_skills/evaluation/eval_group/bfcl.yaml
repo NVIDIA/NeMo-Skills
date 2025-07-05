@@ -21,4 +21,4 @@ score_module: nemo_skills.evaluation.eval_group.bfcl_score
 jobs:
   # Simple AST
   - name: bfcl
-    benchmarks: bfcl.simple,bfcl.java,bfcl.javascript,bfcl.parallel,bfcl.multiple,bfcl.parallel_multiple,bfcl.irrelevance,bfcl.live_simple,bfcl.live_multiple,bfcl.live_parallel,bfcl.live_parallel_multiple,bfcl.live_irrelevance,bfcl.live_relevance,bfcl.multi_turn_base,bfcl.multi_turn_miss_func,bfcl.multi_turn_miss_param,bfcl.multi_turn_long_context
+    benchmarks: bfcl-v3.simple,bfcl-v3.java,bfcl-v3.javascript,bfcl-v3.parallel,bfcl-v3.multiple,bfcl-v3.parallel_multiple,bfcl-v3.irrelevance,bfcl-v3.live_simple,bfcl-v3.live_multiple,bfcl-v3.live_parallel,bfcl-v3.live_parallel_multiple,bfcl-v3.live_irrelevance,bfcl-v3.live_relevance,bfcl-v3.multi_turn_base,bfcl-v3.multi_turn_miss_func,bfcl-v3.multi_turn_miss_param,bfcl-v3.multi_turn_long_context

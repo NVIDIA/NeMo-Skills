@@ -18,9 +18,9 @@ import glob
 import tempfile
 import json
 import shutil
-from nemo_skills.dataset.bfcl.utils import func_doc_language_specific_pre_processing, convert_to_tool, is_multi_turn, load_file
+from nemo_skills.dataset.bfcl_v3.utils import func_doc_language_specific_pre_processing, convert_to_tool, is_multi_turn, load_file
 from pathlib import Path
-from nemo_skills.dataset.bfcl.constants import DATA_FOLDER_PATH, MULTI_TURN_FUNC_DOC_PATH, MULTI_TURN_FUNC_DOC_FILE_MAPPING
+from nemo_skills.dataset.bfcl_v3.constants import DATA_FOLDER_PATH, MULTI_TURN_FUNC_DOC_PATH, MULTI_TURN_FUNC_DOC_FILE_MAPPING
 import argparse
 import logging
 from nemo_skills.utils import get_logger_name
@@ -34,6 +34,7 @@ REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
+PROMPT_CONFIG = None
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"
