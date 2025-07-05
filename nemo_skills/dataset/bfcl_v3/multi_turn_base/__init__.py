@@ -1,5 +1,5 @@
 
-PROMPT_CONFIG = None
+PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"
