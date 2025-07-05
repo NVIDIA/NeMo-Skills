@@ -70,4 +70,5 @@ def test_dataset_init_defaults():
             "chat",
             "multichoice",
             "long-context",
+            "tool",
         ], f"{dataset} has invalid DATASET_GROUP"

@@ -23,7 +23,7 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.server.code_execution_model import server_params
+from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -113,7 +113,7 @@ class CheckContaminationTask(GenerationTask):
 
         return query_data
 
-    def _prefill_generation(self, data_point):
+    def prefill_generation(self, data_point):
         """Prefill contamination if there is a string match between the problem and the similar items"""
         for similar_item in data_point['similar_items']:
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
@@ -155,7 +155,11 @@ class CheckContaminationTask(GenerationTask):
             return generation_ids
 
     def get_llm_generations(self, requests_in_progress, generations):
-        """Override the base class method to synchronize the N:1 mapping between contamination results and original data points. This is done by getting the LLM generations for all the queries for each data point and then processing the "generation" key.
+        """Override the base class method to synchronize the N:1 mapping between
+        contamination results and original data points.
+
+        This is done by getting the LLM generations for all the queries
+        for each data point and then processing the "generation" key.
 
         requests_in_progress: A dictionary of the form {original_data_point_idx: gen_id_list}
         generations: A dictionary of the form {original_data_point_idx: gen_dict}
@@ -163,7 +167,7 @@ class CheckContaminationTask(GenerationTask):
         for original_dp_idx, gen_id_list in requests_in_progress.items():
             # Get the LLM generations for all the queries remaining for this data point
             gen_dict_list = self.llm.get_generations(gen_id_list)
-            # List to track the generation IDs correponding to this data point that are not done yet
+            # List to track the generation IDs corresponding to this data point that are not done yet
             rem_gen_id_list = []
             for gen_id, gen_dict in zip(gen_id_list, gen_dict_list):
                 if gen_dict['generation'] is None:

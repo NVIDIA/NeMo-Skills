@@ -180,7 +180,8 @@ def get_generation_cmd(
         output_dir=output_dir,
         random_seed=random_seed,
     )
-    cmd = f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+    cmd = "export HYDRA_FULL_ERROR=1 && "
+    cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations

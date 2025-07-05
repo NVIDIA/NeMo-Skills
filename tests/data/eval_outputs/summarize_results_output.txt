@@ -1,4 +1,3 @@
-Please see metrics.json for MT-bench per-category breakdown
 -------------------------------------------------------------------- answer-judge --------------------------------------------------------------------
 evaluation_mode | num_entries | avg_tokens | correct_judgements | false_positives | false_negatives | invalid_judgements | precision | recall | f1    
 pass@1[4]       | 12          | 189        | 43.75%             | 18.75%          | 22.92%          | 14.58%             | 58.45%    | 42.86% | 48.32%
@@ -66,8 +65,8 @@ pass@1[4]       | 3           | 2455       | 33.33%        | 66.67%
 pass@4          | 3           | 2455       | 100.00%       | 0.00%        
 
 
-------------------------------- mt-bench ------------------------------
-evaluation_mode | num_entries | average | average_turn1 | average_turn2
-greedy          | 2           | 7.67    | 8.00          | 7.00         
+------------------------------------- mt-bench -------------------------------------
+evaluation_mode | num_entries | avg_tokens | average | average_turn1 | average_turn2
+greedy          | 2           | 5050       | 7.67    | 8.00          | 7.00         
 
 

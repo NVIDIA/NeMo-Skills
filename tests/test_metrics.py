@@ -17,8 +17,11 @@ import os
 import shutil
 import subprocess
 
+import pytest
 
-def test_metrics(tmp_path):
+
+@pytest.mark.parametrize("max_seq_len", [None, 8192, 32768])
+def test_metrics(tmp_path, max_seq_len):
     """Current test is very strict and expects the output to match exactly.
 
     Ideally we should relax that, but keeping like this for now.
@@ -45,25 +48,32 @@ def test_metrics(tmp_path):
 
     # 3. Run ns summarize_results {tmp_path}
     result = subprocess.run(
-        ["ns", "summarize_results", str(dst)],
+        ["ns", "summarize_results", str(dst)] + ([f"--max_seq_len={max_seq_len}"] if max_seq_len else []),
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0, f"ns summarize_results failed: {result.stderr}"
 
+    start_line = 0 if max_seq_len in [None, 8192] else 1
+    ref_suffix = "" if max_seq_len in [None, 32768] else f"-ms{max_seq_len}"
+
     # 4. Compare output (excluding last line) to expected output file
     output_lines = result.stdout.rstrip('\n').split('\n')
-    output_without_last = '\n'.join(output_lines[:-1]) + '\n' if len(output_lines) > 1 else ''
+    output_to_compare = '\n'.join(output_lines[start_line:-1]) + '\n' if len(output_lines) > 1 else ''
     with open(os.path.join(dst, "summarize_results_output.txt"), "w") as f:
-        f.write(output_without_last)
-    expected_path = os.path.join(os.path.dirname(__file__), "data/eval_outputs/summarize_results_output.txt")
+        f.write(output_to_compare)
+    expected_path = os.path.join(
+        os.path.dirname(__file__), f"data/eval_outputs/summarize_results_output{ref_suffix}.txt"
+    )
     with open(expected_path, "r") as f:
         expected = f.read()
-    assert output_without_last == expected, "summarize_results output does not match expected output"
+    assert output_to_compare == expected, "summarize_results output does not match expected output"
 
     # 5. Check that metrics.json matches metrics.json-test
     metrics_path = dst / "metrics.json"
-    metrics_ref_path = os.path.join(os.path.dirname(__file__), "data/eval_outputs/eval-results/metrics.json-test")
+    metrics_ref_path = os.path.join(
+        os.path.dirname(__file__), f"data/eval_outputs/eval-results/metrics{ref_suffix}.json-test"
+    )
     with open(metrics_path, "r") as f:
         metrics = json.load(f)
     with open(metrics_ref_path, "r") as f:

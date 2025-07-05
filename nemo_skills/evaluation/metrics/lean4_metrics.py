@@ -24,6 +24,12 @@ class Lean4Metrics(BaseMetrics):
     def _get_score_dict(self, prediction):
         return {"lean4_correct": prediction['proof_status'] == "completed"}
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction['proof_status'] = "error"
+        return prediction
+
     def _update_score_metrics_for_pass(
         self,
         eval_dict: dict,

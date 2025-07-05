@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict
-
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
@@ -23,6 +21,10 @@ class CodeMetrics(BaseMetrics):
             "passing_base_tests": prediction['is_correct'],
             "passing_plus_tests": prediction['is_correct-plus'],
         }
+
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"is_correct": False, "is_correct-plus": False}
 
     def update(self, predictions):
         super().update(predictions)
@@ -35,6 +37,48 @@ class LiveCodeBenchMetrics(BaseMetrics):
             "accuracy": prediction['graded_list'][0],
         }
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        return {"graded_list": [False]}
+
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
+
+
+class SciCodeMetrics(BaseMetrics):
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        subtask_status_list = prediction['eval_status']
+        correct_subtasks = sum(subtask['process_status'] == 'completed' for subtask in subtask_status_list)
+        return {
+            'problem_accuracy': correct_subtasks == len(subtask_status_list),
+            'subtask_accuracy': correct_subtasks,
+        }
+
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        subtask_status_list = prediction['eval_status']
+        for subtask in subtask_status_list:
+            subtask['process_status'] = 'error'
+        prediction['eval_status'] = subtask_status_list
+        return prediction
+
+    def update(self, predictions):
+        super().update(predictions)
+        self.subtasks_total += len(predictions[0]['eval_status'])
+        self._compute_pass_at_k(predictions)
+
+    def get_metrics(self):
+        metrics_dict = super().get_metrics()
+        for agg_mode in self.eval_dict.keys():
+            metrics_dict[agg_mode]["num_problems"] = metrics_dict[agg_mode].pop("num_entries")
+            metrics_dict[agg_mode]["num_subtasks"] = self.subtasks_total
+            # correcting subtask normalization
+            metrics_dict[agg_mode]["subtask_accuracy"] *= self.total / self.subtasks_total
+
+        return metrics_dict
+
+    def reset(self):
+        super().reset()
+        self.subtasks_total = 0
