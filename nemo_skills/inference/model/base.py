@@ -97,6 +97,7 @@ class BaseModel(abc.ABC):
         timeout: int | None = None,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        include_message: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -129,6 +130,8 @@ class BaseModel(abc.ABC):
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -144,7 +147,11 @@ class BaseModel(abc.ABC):
             'timeout': timeout,
             'stream': stream,
             'reasoning_effort': reasoning_effort,
+            'include_message': include_message,
         }
+        if tools is not None:
+            kwargs['tools'] = tools
+            
         for key, value in kwargs.items():
             is_list = False
             if key == 'stop_phrases' and (value and isinstance(value[0], list)):
@@ -212,6 +219,8 @@ class BaseModel(abc.ABC):
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -231,6 +240,8 @@ class BaseModel(abc.ABC):
             remove_stop_phrases=remove_stop_phrases,
             stream=stream,
             reasoning_effort=reasoning_effort,
+            tools=tools,
+            include_message=include_message,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -422,6 +433,7 @@ class OpenAIAPIModel(BaseModel):
         prompt: str | list,
         stream: bool = False,
         generation_id: Optional[str] = None,
+        include_message: bool = False,
         **kwargs,
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
         """
@@ -448,7 +460,7 @@ class OpenAIAPIModel(BaseModel):
                 if stream:
                     result = self._stream_chat_chunks(response, gen_id)
                 else:
-                    result = self._parse_chat_completion_response(response)
+                    result = self._parse_chat_completion_response(response, include_message=include_message)
 
             elif isinstance(prompt, str):
                 request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -491,9 +503,10 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+        
         return result
 
-    def _parse_chat_completion_response(self, response) -> dict:
+    def _parse_chat_completion_response(self, response, include_message: bool = False) -> dict:
         choice = response.choices[0]
         output = choice.message.content
         if output is None:
@@ -510,6 +523,11 @@ class OpenAIAPIModel(BaseModel):
                 result['top_logprobs'].append(logprob)
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+        if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
+            result["tool_calls"] = choice.message.tool_calls
+        if include_message and choice.message is not None:
+            result["message"] = choice.message
+
         return result
 
     def _stream_completion_chunks(self, response, gen_id: str):
