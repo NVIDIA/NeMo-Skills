@@ -41,6 +41,28 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
     remove_thinking: bool = True
 
+    
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values"""
+        if self.prompt_format not in ["ns", "openai"]:
+            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
+
+        if self.prompt_format == "openai":
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
+
+        for param, default_value in self._get_disallowed_params():
+            if getattr(self, param) != default_value:
+                raise ValueError(f"{param} must be {default_value}")
+
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("prompt_config", None),
+            ("prompt_template", None),
+        ]
+
+
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 
@@ -67,31 +89,9 @@ class BFCLGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True
 
-    def _post_init_validate_params(self):
-        """Validate that certain parameters are restricted to certain values"""
-        if self.prompt_format not in ["ns", "openai"]:
-            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
-
-        if self.prompt_format == "openai":
-            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
-
-        for param, default_value in self._get_disallowed_params():
-            if getattr(self, param) != default_value:
-                raise ValueError(f"{param} must be {default_value}")
-
-    def _get_disallowed_params(self):
-        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
-        return [
-            ("prompt_config", None),
-            ("prompt_template", None),
-        ]
-
-
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
-
 
     def _generate_single_assistant_turn(self, inference_state_dict):
         """Generate for a single assistant turn."""
@@ -114,7 +114,6 @@ class BFCLGenerationTask(GenerationTask):
             output["tool_calls"] = []
 
         return output
-
     
     def generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
@@ -124,7 +123,6 @@ class BFCLGenerationTask(GenerationTask):
         proc_model_response = self._process_model_response(model_response)
 
         return {"id": data_point["id"], "generation": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
-
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
