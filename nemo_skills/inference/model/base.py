@@ -503,8 +503,6 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-        if choice.tool_calls:
-            result["tool_calls"] = choice.tool_calls
         
         return result
 
@@ -525,7 +523,7 @@ class OpenAIAPIModel(BaseModel):
                 result['top_logprobs'].append(logprob)
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-        if choice.message.tool_calls:
+        if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
             result["tool_calls"] = choice.message.tool_calls
         if include_message and choice.message is not None:
             result["message"] = choice.message
