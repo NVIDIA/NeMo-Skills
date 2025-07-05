@@ -19,6 +19,7 @@ from dataclasses import field
 
 import hydra
 from dataclasses import asdict, field
+from omegaconf import OmegaConf
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -41,30 +42,20 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
     remove_thinking: bool = True
 
-cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
-
-
-class BFCLGenerationTask(GenerationTask):
-    def __init__(self, cfg: BFCLGenerationConfig):
-        super().__init__(cfg)
-
-        if not self.use_async_loop:  # if it was True, this message is printed by base class
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
-            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
-                LOG.warning(
-                    "NeMo/Megatron servers don't support inflight batching, "
-                    "but BFCL evaluation requires it for efficient inference. "
-                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
-                    "We highly recommend switching to a server that supports inflight batching."
-                )
-        self.use_async_loop = True
-
     
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values"""
+        if self.prompt_format not in ["ns", "openai"]:
+            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
+
+        if self.prompt_format == "openai":
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
+
+        for param, default_value in self._get_disallowed_params():
+            if getattr(self, param) != default_value:
+                raise ValueError(f"{param} must be {default_value}")
+
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
@@ -73,10 +64,30 @@ class BFCLGenerationTask(GenerationTask):
         ]
 
 
+cs = hydra.core.config_store.ConfigStore.instance()
+cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
+
+
+class BFCLGenerationTask(GenerationTask):
+    def __init__(self, cfg: BFCLGenerationConfig):
+        self.cfg = cfg
+        self.llm = self.setup_llm()
+        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
+
+        # TODO: Need a better way to handle this
+        self.extra_generate_params = {}
+
+        self.use_async_loop = True  # Set it to True as the default
+        LOG.info(
+            "Async loop is maintaining %d generations in parallel. "
+            "Use max_concurrent_requests to control the number of concurrent requests.",
+            self.cfg.max_concurrent_requests,
+        )
+
+
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
-
 
     def _generate_single_assistant_turn(self, inference_state_dict):
         """Generate for a single assistant turn."""
@@ -99,7 +110,6 @@ class BFCLGenerationTask(GenerationTask):
             output["tool_calls"] = []
 
         return output
-
     
     def generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
@@ -109,7 +119,6 @@ class BFCLGenerationTask(GenerationTask):
         proc_model_response = self._process_model_response(model_response)
 
         return {"id": data_point["id"], "generation": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
-
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
