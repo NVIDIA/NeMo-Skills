@@ -19,6 +19,7 @@ from dataclasses import field
 
 import hydra
 from dataclasses import asdict, field
+from omegaconf import OmegaConf
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -69,10 +70,9 @@ cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 
 class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
-        super().__init__(cfg)
-        self._post_init_validate_data()
-        self._post_init_validate_server()
-        self._post_init_validate_params()
+        self.cfg = cfg
+        self.llm = self.setup_llm()
+        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
         if not self.use_async_loop:  # if it was True, this message is printed by base class
             LOG.info(
