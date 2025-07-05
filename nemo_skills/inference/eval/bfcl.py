@@ -64,7 +64,19 @@ class BFCLGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True
 
-    
+    def _post_init_validate_params(self):
+        """Validate that certain parameters are restricted to certain values"""
+        if self.prompt_format not in ["ns", "openai"]:
+            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
+
+        if self.prompt_format == "openai":
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
+
+        for param, default_value in self._get_disallowed_params():
+            if getattr(self, param) != default_value:
+                raise ValueError(f"{param} must be {default_value}")
+
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
