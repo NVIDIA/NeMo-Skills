@@ -74,6 +74,9 @@ class BFCLGenerationTask(GenerationTask):
         self.llm = self.setup_llm()
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
+        # TODO: Need a better way to handle this
+        self.extra_generate_params = {}
+
         self.use_async_loop = True  # Set it to True as the default
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
