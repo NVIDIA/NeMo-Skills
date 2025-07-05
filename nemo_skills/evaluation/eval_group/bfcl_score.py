@@ -52,7 +52,6 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
     total_accuracy = 0
     
     for accuracy_dict in accuracy_dict_list:
-        print(accuracy_dict)
         accuracy = accuracy_dict["accuracy"]
         count = accuracy_dict["num_entries"]
         

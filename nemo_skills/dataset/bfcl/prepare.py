@@ -34,7 +34,6 @@ REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
-PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"

@@ -40,29 +40,7 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
-    prompt_config: str = "generic/default"
-    prompt_template: str = "default-base"
-
-    thinking_begin: str = "<think>"
-    thinking_end: str = "</think>"
     remove_thinking: bool = True
-
-    tool_call_start_token = "<TOOLCALL>"
-    tool_call_end_token = "</TOOLCALL>"
-
-    system_prompt: str = "detailed thinking on\n\n"
-
-    @property
-    def tool_call_regex(self):
-        """Compiled regex pattern for extracting tool calls."""
-        return re.compile(
-            r"{}(.*?){}".format(
-                re.escape(self.tool_call_start_token), 
-                re.escape(self.tool_call_end_token)
-            ), 
-            re.DOTALL
-        )
-
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
@@ -87,6 +65,15 @@ class BFCLGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True
 
+    
+    def _get_disallowed_params(self):
+        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
+        return [
+            ("prompt_config", None),
+            ("prompt_template", None),
+        ]
+
+
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
@@ -97,9 +84,8 @@ class BFCLGenerationTask(GenerationTask):
         messages = inference_state_dict["messages"]
         tools = inference_state_dict["tools"]
 
-        if self.cfg.system_prompt:
-            messages = [{"role": "system", "content": self.cfg.system_prompt}] + messages
-
+        if self.cfg.system_message:
+            messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
         input_dict = {
             "prompts": [messages],
