@@ -1,0 +1,24 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# BFCLv3 evaluation group
+# Combines the single turn and multi turn ASTs - total of 17 subsets of BFCLv3
+
+score_module: nemo_skills.evaluation.eval_group.bfcl_score
+
+jobs:
+  # Simple AST
+  - name: bfcl
+    benchmarks: bfcl_v3.simple,bfcl_v3.java,bfcl_v3.javascript,bfcl_v3.parallel,bfcl_v3.multiple,bfcl_v3.parallel_multiple,bfcl_v3.irrelevance,bfcl_v3.live_simple,bfcl_v3.live_multiple,bfcl_v3.live_parallel,bfcl_v3.live_parallel_multiple,bfcl_v3.live_irrelevance,bfcl_v3.live_relevance,bfcl_v3.multi_turn_base,bfcl_v3.multi_turn_miss_func,bfcl_v3.multi_turn_miss_param,bfcl_v3.multi_turn_long_context

@@ -15,3 +15,6 @@ RUN cd /opt/NeMo-Skills && pip install -e .[all]
 
 RUN pip install langdetect absl-py immutabledict nltk ipython && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
+
+RUN git clone https://github.com/ShishirPatil/gorilla.git /opt/gorilla --depth=1
+RUN cd /opt/gorilla/berkeley-function-call-leaderboard && pip install -e .

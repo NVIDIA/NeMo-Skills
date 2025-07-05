@@ -91,8 +91,9 @@ class VLLMModel(OpenAIAPIModel):
         timeout: int | None = None,
         top_logprobs: int | None = None,
         reasoning_effort: str | None = None,
+        tools: list[dict] | None = None,
     ) -> dict:
-        return {
+        request = {
             "model": self.model,
             "messages": messages,
             "max_tokens": tokens_to_generate,
@@ -109,6 +110,9 @@ class VLLMModel(OpenAIAPIModel):
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
         }
+        if tools is not None:
+            request["tools"] = tools
+        return request
 
 
 class VLLMRewardModel(BaseRewardModel):
