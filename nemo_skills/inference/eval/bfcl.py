@@ -48,6 +48,9 @@ cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
         super().__init__(cfg)
+        self._post_init_validate_data()
+        self._post_init_validate_server()
+        self._post_init_validate_params()
 
         if not self.use_async_loop:  # if it was True, this message is printed by base class
             LOG.info(
