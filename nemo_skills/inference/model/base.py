@@ -15,12 +15,12 @@
 import abc
 import logging
 import os
+import threading
 import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Union, Optional
-import threading
+from typing import Any, Dict, Optional, Union
 
 import httpx
 import openai
@@ -97,6 +97,7 @@ class BaseModel(abc.ABC):
         timeout: int | None = None,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
         include_message: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -151,7 +152,7 @@ class BaseModel(abc.ABC):
         }
         if tools is not None:
             kwargs['tools'] = tools
-            
+
         for key, value in kwargs.items():
             is_list = False
             if key == 'stop_phrases' and (value and isinstance(value[0], list)):
@@ -285,7 +286,7 @@ class OpenAIAPIModel(BaseModel):
         super().__init__(**kwargs)
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay
-        
+
         # Track active generations with thread-safe operations
         self.active_generations: Dict[str, Dict[str, Any]] = {}
         self._generations_lock = threading.Lock()
@@ -342,10 +343,7 @@ class OpenAIAPIModel(BaseModel):
     def _register_generation(self, gen_id: str, response: Any) -> None:
         """Register a new generation with the tracker."""
         with self._generations_lock:
-            self.active_generations[gen_id] = {
-                'response': response,
-                'created_at': time.time()
-            }
+            self.active_generations[gen_id] = {'response': response, 'created_at': time.time()}
 
     def _unregister_generation(self, gen_id: str) -> Optional[Dict[str, Any]]:
         """Remove a generation from the tracker and return its info."""
@@ -361,7 +359,7 @@ class OpenAIAPIModel(BaseModel):
         if generation_info is None:
             return False
 
-        generation_info['response'].close() 
+        generation_info['response'].close()
         return True
 
     def cancel_all_generations(self) -> int:
@@ -371,12 +369,12 @@ class OpenAIAPIModel(BaseModel):
         """
         with self._generations_lock:
             generation_ids = list(self.active_generations.keys())
-        
+
         cancelled_count = 0
         for gen_id in generation_ids:
             if self.cancel_generation(gen_id):
                 cancelled_count += 1
-        
+
         return cancelled_count
 
     def get_active_generation_count(self) -> int:
@@ -438,13 +436,13 @@ class OpenAIAPIModel(BaseModel):
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
         """
         Generate a single response with optional generation tracking.
-        
+
         Args:
             prompt: The input prompt (string or list of messages)
             stream: Whether to stream the response
             generation_id: Optional generation ID. If None, one will be generated.
             **kwargs: Additional parameters for the API call
-            
+
         Returns:
             If generation_id is provided in kwargs, returns (gen_id, response)
             Otherwise returns just the response for backward compatibility
@@ -452,7 +450,7 @@ class OpenAIAPIModel(BaseModel):
         # Generate a unique ID for this generation
         gen_id = generation_id or str(uuid.uuid4())
         return_gen_id = generation_id is not None or kwargs.get('return_generation_id', False)
-        
+
         try:
             if isinstance(prompt, list):
                 request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
@@ -471,12 +469,12 @@ class OpenAIAPIModel(BaseModel):
                     result = self._parse_completion_response(response)
             else:
                 raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-            
+
             if return_gen_id:
                 return gen_id, result
             else:
                 return result
-                
+
         except Exception as e:
             # Make sure to unregister the generation if an error occurs
             self._unregister_generation(gen_id)
@@ -503,7 +501,7 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-        
+
         return result
 
     def _parse_chat_completion_response(self, response, include_message: bool = False) -> dict:
