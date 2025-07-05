@@ -156,7 +156,7 @@ class BFCLGenerationTask(GenerationTask):
                 output_dict["log_dict_list"].append(model_response)
                 
                 if self.cfg.remove_thinking and (model_response["message"].content is not None):
-                    model_response["message"].content = self._process_model_response_text(model_response["message"]).content
+                    model_response["message"].content = self._process_model_response_text(model_response["message"].content)
                 
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
