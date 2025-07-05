@@ -18,13 +18,12 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
-import re   
 from dataclasses import asdict, field
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging, remove_thinking
 
 from nemo_skills.dataset.bfcl_v3.utils import func_doc_language_specific_pre_processing, convert_to_tool
 
@@ -156,10 +155,13 @@ class BFCLGenerationTask(GenerationTask):
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
                 
+                if self.cfg.remove_thinking and (model_response["message"].content is not None):
+                    model_response["message"].content = self._process_model_response_text(model_response["message"]).content
+                
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
 
-                # Proccess the model response text
+                # Process the model response text
                 proc_model_response = self._process_model_response(model_response)
                 # Add the processed model response to the current turn responses
                 current_turn_response.append(proc_model_response["generation"])
@@ -240,21 +242,7 @@ class BFCLGenerationTask(GenerationTask):
                 generations[dp_idx] = {'generation': None}
 
         return requests_in_progress, generations
-    
-    def _process_model_response_text(self, model_response_text):
-        """Process the model response text to remove the thinking text if needed."""
-        if model_response_text is None:
-            return ""
-        else:
-            if self.cfg.remove_thinking:
-                if self.cfg.thinking_end in model_response_text:
-                    return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
-            else:
-                # Thinking didn't finish
-                if self.cfg.remove_thinking:
-                    return ""
-                else:
-                    return model_response_text
+
     
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""
@@ -276,7 +264,14 @@ class BFCLGenerationTask(GenerationTask):
             # The original data structure is needed for the chat history
             "message": model_response["message"],
         }
-
+    
+    def _process_model_response_text(self, model_response_text):
+        if self.cfg.thinking_end in model_response_text:
+            return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
+        else:
+            # If the thinking didn't finish, we can keep it empty
+            return ""
+        
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
 

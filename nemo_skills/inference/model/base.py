@@ -131,6 +131,7 @@ class BaseModel(abc.ABC):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -146,6 +147,7 @@ class BaseModel(abc.ABC):
             'timeout': timeout,
             'stream': stream,
             'reasoning_effort': reasoning_effort,
+            'include_message': include_message,
         }
         if tools is not None:
             kwargs['tools'] = tools
@@ -218,6 +220,7 @@ class BaseModel(abc.ABC):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -238,6 +241,7 @@ class BaseModel(abc.ABC):
             stream=stream,
             reasoning_effort=reasoning_effort,
             tools=tools,
+            include_message=include_message,
         )
         all_generations = [None] * len(prompts)
         while True:
