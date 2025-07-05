@@ -90,6 +90,7 @@ class BFCLGenerationTask(GenerationTask):
         input_dict = {
             "prompts": [messages],
             "tools": [tools],
+            "include_message": True,
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
         }

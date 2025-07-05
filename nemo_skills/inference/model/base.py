@@ -97,6 +97,7 @@ class BaseModel(abc.ABC):
         timeout: int | None = None,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
+        include_message: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -428,6 +429,7 @@ class OpenAIAPIModel(BaseModel):
         prompt: str | list,
         stream: bool = False,
         generation_id: Optional[str] = None,
+        include_message: bool = False,
         **kwargs,
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
         """
@@ -454,7 +456,7 @@ class OpenAIAPIModel(BaseModel):
                 if stream:
                     result = self._stream_chat_chunks(response, gen_id)
                 else:
-                    result = self._parse_chat_completion_response(response)
+                    result = self._parse_chat_completion_response(response, include_message=include_message)
 
             elif isinstance(prompt, str):
                 request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -502,7 +504,7 @@ class OpenAIAPIModel(BaseModel):
         
         return result
 
-    def _parse_chat_completion_response(self, response) -> dict:
+    def _parse_chat_completion_response(self, response, include_message: bool = False) -> dict:
         choice = response.choices[0]
         output = choice.message.content
         if output is None:
@@ -521,7 +523,7 @@ class OpenAIAPIModel(BaseModel):
             result["finish_reason"] = choice.finish_reason
         if choice.message.tool_calls:
             result["tool_calls"] = choice.message.tool_calls
-        if choice.message is not None:
+        if include_message and choice.message is not None:
             result["message"] = choice.message
 
         return result
