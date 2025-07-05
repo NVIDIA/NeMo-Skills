@@ -34,7 +34,10 @@ class TRTLLMModel(BaseModel):
         stop_phrases: list[str] | None = None,
         generate_endpoint: str = "generate",
         stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,  # Ignored for TRTLLM
+        # Ignored for TRTLLM. TODO: disallow setting
+        reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
@@ -95,6 +98,10 @@ class TRTLLMModel(BaseModel):
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
+        # Ignored for TRTLLM. TODO: disallow setting
+        reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_message: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
