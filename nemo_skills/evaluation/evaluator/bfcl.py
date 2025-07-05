@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# adapted from https://github.com/lm-sys/arena-hard-auto/blob/main/show_result.py
 
 import inspect
 import json
