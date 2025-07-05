@@ -67,18 +67,19 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_e
     start_tag_position = reasoning_generation.find(start_tag)
     end_tag_position = reasoning_generation.find(end_tag)
 
+    # Handle missing start tag
     if start_tag_position == -1:
-        # If no start tag found, wrap the entire generation with tags
-        reasoning_trace = start_tag + "\n" + reasoning_generation
-        if end_tag_position == -1:
-            reasoning_trace += "\n" + end_tag
+        reasoning_trace = f"{start_tag}\n{reasoning_generation}"
     else:
-        if end_tag_position == -1:
-            if strict_end_tag:
-                return None
-            reasoning_trace = reasoning_generation + "\n" + end_tag
-        else:
-            reasoning_trace = reasoning_generation[: end_tag_position + len(end_tag)]
+        reasoning_trace = reasoning_generation
+
+    # Handle missing end tag
+    if end_tag_position == -1:
+        if strict_end_tag:
+            return None
+        reasoning_trace += f"\n{end_tag}"
+    else:
+        reasoning_trace = reasoning_trace[:end_tag_position + len(end_tag)]
 
     # Extract the answer from the reasoning trace by searching for boxed entries
     answer_from_reasoning_trace = extract_answer(reasoning_trace)
