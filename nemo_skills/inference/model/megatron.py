@@ -85,6 +85,7 @@ class MegatronModel(OpenAIAPIModel):
         timeout: int | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
+        enable_soft_fail: bool = False,
         **kwargs,
     ) -> dict | Stream:
         # Overriding generate to provide its own batching support, bypassing the parent's async logic.
@@ -104,12 +105,19 @@ class MegatronModel(OpenAIAPIModel):
         )
         params["prompt"] = prompts  # Replace single prompt with batch
 
-        response = self.client.completions.create(**params)
-        outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
+        try:
+            response = self.client.completions.create(**params)
+            outputs = self.parse_openai_response(response, batch=True, top_logprobs=top_logprobs)
 
-        if remove_stop_phrases:
-            for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases or [])
+            if remove_stop_phrases:
+                for output in outputs:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases or [])
+        except Exception as e:
+            if enable_soft_fail:
+                # We can't narrow down the error to a single prompt, so we return an empty generation for all the prompts
+                outputs = [{"generation": "", "inference_error": str(e)} for _ in prompts]
+            else:
+                raise e
 
         return outputs
 

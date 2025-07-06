@@ -181,7 +181,7 @@ class BaseModel(abc.ABC):
 
         return gen_ids
 
-    def get_generations(self, generation_ids: list[str]) -> list[dict]:
+    def get_generations(self, generation_ids: list[str], enable_soft_fail: bool = False) -> list[dict]:
         generations = []
         for generation_id in generation_ids:
             if generation_id not in self.gen_id_to_future:
@@ -192,7 +192,14 @@ class BaseModel(abc.ABC):
             if not future.done():
                 output = {'generation': None}
             else:
-                output = future.result()
+                try:    
+                    output = future.result()
+                except Exception as e:
+                    if enable_soft_fail:
+                        output = {"generation": "", "inference_error": str(e)}
+                    else:
+
+
                 del self.gen_id_to_future[generation_id]
                 del self.gen_id_to_params[generation_id]
 
@@ -219,6 +226,7 @@ class BaseModel(abc.ABC):
         timeout: int | list[int] | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
+        enable_soft_fail: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_message: bool = False,
@@ -252,7 +260,7 @@ class BaseModel(abc.ABC):
             remaining_positions = [
                 idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
             ]
-            generations = self.get_generations(remaining_ids)
+            generations = self.get_generations(remaining_ids, enable_soft_fail=enable_soft_fail)
             for gen_pos, gen_dict in zip(remaining_positions, generations):
                 if isinstance(gen_dict, Generator) or gen_dict['generation'] is not None:  # will be None until done
                     generation_ids[gen_pos] = None

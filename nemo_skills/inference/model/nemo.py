@@ -33,6 +33,7 @@ class NemoModel(BaseModel):
         timeout: int | None = None,
         stop_phrases: list[str] | list[list[str]] | None = None,
         stream: bool = False,
+        enable_soft_fail: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for Nemo
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
@@ -61,19 +62,26 @@ class NemoModel(BaseModel):
             "repetition_penalty": repetition_penalty,
             "end_strings": ["<|endoftext|>"] + stop_phrases,
         }
-        generations = self.requests_lib.put(
-            url="http://{}:{}/generate".format(self.server_host, self.server_port),
-            data=json.dumps(request),
-            headers={"Content-Type": "application/json"},
-        ).json()
-        # we need to remove the original prompt as nemo always returns it
-        output = generations['sentences'][0]
-        # when the prompt starts from special tokens like bos, nemo will remove them,
-        # so we need this hack to find where to start the cut
-        begin_idx = 0
-        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(output[:20]):
-            begin_idx += 1
-        output = {'generation': output[(len(prompt) - begin_idx) :]}
+        try:
+            generations = self.requests_lib.put(
+                url="http://{}:{}/generate".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            # we need to remove the original prompt as nemo always returns it
+            output = generations['sentences'][0]
+            # when the prompt starts from special tokens like bos, nemo will remove them,
+            # so we need this hack to find where to start the cut
+            begin_idx = 0
+            while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(output[:20]):
+                begin_idx += 1
+            output = {'generation': output[(len(prompt) - begin_idx) :]}
+        except Exception as e:
+            if enable_soft_fail:
+                output = {"generation": "", "inference_error": str(e)}
+            else:
+                raise e
+            
         return output
 
     def generate(
@@ -91,6 +99,7 @@ class NemoModel(BaseModel):
         timeout: int | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
+        enable_soft_fail: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for Nemo
     ) -> list[dict]:
         # we are overriding generate directly, since nemo doesn't support inflight batching
@@ -117,24 +126,31 @@ class NemoModel(BaseModel):
             "stream": stream,
         }
         self.preprocess_request(request)
-        generations = self.requests_lib.put(
-            url="http://{}:{}/generate".format(self.server_host, self.server_port),
-            data=json.dumps(request),
-            headers={"Content-Type": "application/json"},
-        ).json()
-        # we need to remove the original prompt as nemo always returns it
-        outputs = [None] * len(generations['sentences'])
-        for idx, generation in enumerate(generations['sentences']):
-            # when the prompt starts from special tokens like bos, nemo will remove them,
-            # so we need this hack to find where to start the cut
-            begin_idx = 0
-            while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
-                begin_idx += 1
-            outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
 
-        if remove_stop_phrases:
-            for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+        try:
+            generations = self.requests_lib.put(
+                url="http://{}:{}/generate".format(self.server_host, self.server_port),
+                data=json.dumps(request),
+                headers={"Content-Type": "application/json"},
+            ).json()
+            # we need to remove the original prompt as nemo always returns it
+            outputs = [None] * len(generations['sentences'])
+            for idx, generation in enumerate(generations['sentences']):
+                # when the prompt starts from special tokens like bos, nemo will remove them,
+                # so we need this hack to find where to start the cut
+                begin_idx = 0
+                while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
+                    begin_idx += 1
+                outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
+
+            if remove_stop_phrases:
+                for output in outputs:
+                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+        except Exception as e:
+            if enable_soft_fail:
+                outputs = [{"generation": "", "inference_error": str(e)} for _ in prompts]
+            else:
+                raise e
 
         # TODO: return num_generated_tokens as well
         return outputs

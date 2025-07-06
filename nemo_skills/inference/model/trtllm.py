@@ -13,9 +13,13 @@
 # limitations under the License.
 
 import json
+import logging
 
 from .base import BaseModel
 from .utils import trim_after_stop_phrases
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class TRTLLMModel(BaseModel):
@@ -98,6 +102,7 @@ class TRTLLMModel(BaseModel):
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
         stream: bool = False,
+        enable_soft_fail: bool = False,
         # Ignored for TRTLLM. TODO: disallow setting
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
@@ -139,7 +144,18 @@ class TRTLLMModel(BaseModel):
             request['prompt'] = prompts[request_idx]
             self.preprocess_request(request)
             futures.append(self.executor.submit(self._generate_single_async, **request))
-        outputs = [future.result() for future in futures]
+
+        outputs = []
+        for idx, future in enumerate(futures):
+            try:
+                outputs.append(future.result())
+            except Exception as e:
+                if enable_soft_fail:
+                    LOG.error(f"Error in generation {idx}, prompt {prompts[idx]}:\n\n{e}")
+                    output = {"generation": "", "inference_error": str(e)}
+                    outputs.append(output)
+                else:
+                    raise e
 
         new_gen_id_to_params = {
             gen_id: (req_stop_phrases, remove_stop_phrases)
