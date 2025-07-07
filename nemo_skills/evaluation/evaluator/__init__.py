@@ -15,13 +15,13 @@
 from typing import Any, Callable, Dict
 
 from nemo_skills.evaluation.evaluator.arena import eval_arena, eval_mtbench
+from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import eval_evalplus, eval_livecodebench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_statement, eval_math
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
-from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 
 
 def dummy_eval(cfg):
@@ -33,7 +33,7 @@ EVALUATOR_MAP = {
     'evalplus': eval_evalplus,
     'if': eval_if,
     'bfcl': eval_bfcl,
-    'arena': eval_arena,
+    'arena': dummy_eval,
     'mt-bench': eval_mtbench,
     'answer_judgement': dummy_eval,
     'lean4-proof': eval_lean4_proof,
