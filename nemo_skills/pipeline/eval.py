@@ -204,7 +204,7 @@ def eval(
         check_mounted_paths=check_mounted_paths,
     )
 
-    has_tasks, job_batches = prepare_eval_commands(
+    job_batches = prepare_eval_commands(
         cluster_config,
         benchmarks,
         split,
@@ -262,10 +262,10 @@ def eval(
                     installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
-        if has_tasks:
+        if job_batches:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if has_tasks:
+    if job_batches:
         return exp
     return None
 

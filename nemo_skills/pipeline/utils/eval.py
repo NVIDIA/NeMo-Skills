@@ -45,7 +45,7 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
         if pipeline_utils.is_mounted_filepath(cluster_config, data_path):
             input_file = f"{data_path}/{benchmark}/{split}.jsonl"
             unmounted_input_file = pipeline_utils.get_unmounted_path(cluster_config, input_file)
-            unmounted_path = str(Path(__file__).parents[2] / unmounted_input_file.replace('/nemo_run/code/', ''))
+            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace('/nemo_run/code/', ''))
         else:
             # will be copied over in this case as it must come from extra datasets
             input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark}/{split}.jsonl"
@@ -176,7 +176,6 @@ def prepare_eval_commands(
     job_batches = []
     job_cmds = []
     job_benchmarks = set()
-    has_tasks = False
 
     benchmark_required_sandbox = {}
 
@@ -208,7 +207,6 @@ def prepare_eval_commands(
                     chunk_id=None,
                 )
             for chunk_id in benchmark_chunk_ids:
-                has_tasks = True
                 job_benchmarks.add(benchmark)
 
                 generation_task = importlib.import_module(generation_module)
@@ -269,3 +267,5 @@ def prepare_eval_commands(
                     job_benchmarks = set()
 
                 cur_eval += 1
+
+    return job_batches
