@@ -13,12 +13,12 @@
 # override ns eval_group's `judge_model` argument
 
 # can also use full path like /nemo_run/code/<>.py
-score_module: nemo_skills.evaluation.eval_group.aai_score
+score_module: nemo_skills.dataset.aai.aai_score
 
 jobs:
   - name: mmlu-pro  # used as part of expname, log_dir, wandb_name, etc.
     benchmarks: mmlu-pro
-    wrap_arguments: "++prompt_config=eval/aai/mcq-10choices-boxed ++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=eval/aai/mcq-10choices ++inference.temperature=0.0"
 
   - name: hle
     benchmarks: hle
@@ -31,7 +31,7 @@ jobs:
 
   - name: gpqa
     benchmarks: gpqa
-    wrap_arguments: "++prompt_config=eval/aai/mcq-4choices-boxed ++inference.temperature=0.0"
+    wrap_arguments: "++prompt_config=eval/aai/mcq-4choices ++inference.temperature=0.0"
 
   - name: math-500
     benchmarks: math-500:3

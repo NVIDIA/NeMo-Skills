@@ -136,7 +136,7 @@ def submit_jobs(
         metric_files.append(metric_file)
 
     # final compute score job
-    command = f"python -m nemo_skills.evaluation.eval_group.compute_score {' '.join(metric_files)} "
+    command = f"python -m nemo_skills.evaluation.compute_group_score {' '.join(metric_files)} "
     command += f"--score_module {eval_group['score_module']} --save_metrics_file {output_dir}/metrics.json"
     _run_cmd(
         ctx=sum_ctx,
