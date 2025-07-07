@@ -109,7 +109,8 @@ def test_eval_mtbench_api(tmp_path):
     assert metrics['num_entries'] == 2
 
 
-def test_generate_openai_format(tmp_path):
+@pytest.mark.parametrize("format", ["list", "dict"])
+def test_generate_openai_format(tmp_path, format):
     if not os.getenv('NVIDIA_API_KEY'):
         pytest.skip("Define NVIDIA_API_KEY to run this test")
 
@@ -118,7 +119,7 @@ def test_generate_openai_format(tmp_path):
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
-        f"    --input_file=/nemo_run/code/tests/data/openai-input.test "
+        f"    --input_file=/nemo_run/code/tests/data/openai-input-{format}.test "
         f"    --output_dir={tmp_path} "
         f"    ++prompt_format=openai "
     )
