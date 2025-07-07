@@ -16,16 +16,13 @@ import importlib
 import logging
 import os
 from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
-from typing import List
-
-import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module
+from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.inference.generate import GenerationTask
-from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging
+from nemo_skills.utils import compute_chunk_ids, get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -78,8 +75,11 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
     requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
     generation_module = getattr(benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate")
-    judge_args = (getattr(benchmark_module, "JUDGE_PIPELINE_ARGS", {}), getattr(benchmark_module, "JUDGE_ARGS", ""))
-
+    # make a copy to avoid modifying the original
+    judge_args = (
+        deepcopy(getattr(benchmark_module, "JUDGE_PIPELINE_ARGS", {})),
+        getattr(benchmark_module, "JUDGE_ARGS", ""),
+    )
     return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, judge_args, requires_sandbox, generation_module
 
 

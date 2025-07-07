@@ -190,6 +190,15 @@ def eval(
         'server_args': server_args,
         'server_entrypoint': server_entrypoint,
     }
+    judge_server_parameters = {
+        'model': judge_model,
+        'server_type': judge_server_type,
+        'server_address': judge_server_address,
+        'server_gpus': judge_server_gpus,
+        'server_nodes': judge_server_nodes,
+        'server_args': judge_server_args,
+        'server_entrypoint': judge_server_entrypoint,
+    }
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -232,7 +241,6 @@ def eval(
         num_chunks,
         chunk_ids,
         rerun_done,
-        model,
         server_parameters,
         extra_arguments,
         data_dir,
@@ -302,6 +310,8 @@ def eval(
             judge_ctx.args = []
             if judge_wrap_args:
                 judge_ctx.args.extend(judge_wrap_args.split(" "))
+
+            judge_pipeline_args.update(judge_server_parameters)
 
             _generate(
                 ctx=judge_ctx,
