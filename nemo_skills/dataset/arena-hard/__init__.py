@@ -21,7 +21,7 @@ EVAL_ARGS = "++eval_type=arena"
 GENERATION_ARGS = ""
 
 JUDGE_PIPELINE_ARGS = {
-    "generation_module": "nemo_skills.inference.eval.arena",
+    "generation_module": "nemo_skills.inference.eval.arena_judge",
     "model": "gpt-4.1",
     "server_type": "openai",
     "server_address": "https://api.openai.com/v1",

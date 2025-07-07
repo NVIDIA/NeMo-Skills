@@ -14,7 +14,7 @@
 
 from typing import Any, Callable, Dict
 
-from nemo_skills.evaluation.evaluator.arena import eval_arena, eval_mtbench
+from nemo_skills.evaluation.evaluator.arena import eval_mtbench
 from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import eval_evalplus, eval_livecodebench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
