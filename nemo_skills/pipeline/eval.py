@@ -314,6 +314,7 @@ def eval(
                 if judge_server_value is not None:
                     judge_pipeline_args[judge_server_param] = judge_server_value
             print(judge_pipeline_args)
+            has_tasks = True
             _generate(
                 ctx=judge_ctx,
                 expname=f"{expname}-judge-{idx}",

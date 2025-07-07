@@ -15,6 +15,7 @@
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from dataclasses import field
 
 import hydra
@@ -65,6 +66,18 @@ class ArenaJudgeTask(GenerationTask):
                     "We highly recommend switching to a server that supports inflight batching."
                 )
         self.use_async_loop = True
+
+    def log_example_prompt(self, data):
+        data_point = deepcopy(data[0])
+
+        if self.cfg.prompt_format == "openai":
+            # print the prompt in openai format
+            LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
+            return
+
+        data_point['answer_1'] = data_point['generation']
+        data_point['answer_2'] = data_point['baseline_answer']
+        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data))
 
     def generate_single_answer(self, data_point, data):
         gen_base_data = data_point.copy()
