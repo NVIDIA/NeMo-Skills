@@ -308,7 +308,7 @@ def generate(
                         installation_command=installation_command,
                     )
                     prev_tasks = [new_task]
-        if has_tasks:
+        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if has_tasks:

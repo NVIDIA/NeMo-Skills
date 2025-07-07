@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import os
+from pathlib import Path
 from typing import List
 
 import typer
@@ -20,6 +21,7 @@ import typer
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.generate import generate as _generate
 from nemo_skills.pipeline.utils.eval import prepare_eval_commands
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -214,6 +216,11 @@ def eval(
         check_mounted_paths=check_mounted_paths,
     )
 
+    if " " in str(benchmarks):
+        raise ValueError("benchmarks should be separated with commas")
+
+    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, 0) for b in benchmarks.split(",")]}
+
     job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
         cluster_config,
         benchmarks,
@@ -237,12 +244,16 @@ def eval(
     )
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
+    has_tasks = False
+    job_id_to_tasks = {}
     with pipeline_utils.get_exp(expname, cluster_config) as exp:
+        # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
             cmds, job_needs_sandbox, job_server_config, job_server_address, job_server_command = job_args
             prev_tasks = None
 
             for _ in range(dependent_jobs + 1):
+                has_tasks = True
                 new_task = pipeline_utils.add_task(
                     exp,
                     cmd=pipeline_utils.wait_for_server(
@@ -267,10 +278,52 @@ def eval(
                     installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
-        if job_batches:
+                # only last dependent job will be here, which is what we want
+                job_id_to_tasks[idx] = prev_tasks
+        # scheduling judge jobs if needed
+        for idx, (benchmark, judge_args) in enumerate(benchmark_judge_args.items()):
+            dependent_job_ids = benchmark_to_job_ids[benchmark]
+            dependent_tasks = []
+            for job_id in dependent_job_ids:
+                dependent_tasks.extend(job_id_to_tasks[job_id])
+            judge_pipeline_args, judge_wrap_args = judge_args
+
+            benchmark_seeds = benchmarks[benchmark]
+            if benchmark_seeds == 0:
+                judge_pipeline_args['input_file'] = str(
+                    Path(job_args['output_dir']) / 'eval-results' / benchmark / 'output.jsonl'
+                )
+            else:
+                judge_pipeline_args['input_dir'] = str(Path(job_args['output_dir']) / 'eval-results' / benchmark)
+                judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
+            judge_pipeline_args['output_dir'] = str(Path(job_args['output_dir']) / 'eval-results-judged' / benchmark)
+            judge_ctx = ctx.copy()
+            # removing any extra arguments here as they are assumed to be for the main job
+            judge_ctx.args = []
+            if judge_wrap_args:
+                judge_ctx.args.extend(judge_wrap_args.split(" "))
+
+            _generate(
+                ctx=judge_ctx,
+                expname=f"{expname}-judge-{idx}",
+                log_dir=log_dir + '/judge',
+                cluster=cluster,
+                partition=partition,
+                time_min=time_min,
+                with_sandbox=with_sandbox,
+                run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
+                exclusive=exclusive,
+                installation_command=installation_command,
+                _reuse_exp=exp,
+                _task_dependencies=dependent_tasks,
+                **judge_pipeline_args,
+            )
+        if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if job_batches:
+    if has_tasks:
         return exp
     return None
 

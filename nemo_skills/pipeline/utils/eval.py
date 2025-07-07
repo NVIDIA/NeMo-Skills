@@ -78,7 +78,7 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
     requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
     generation_module = getattr(benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate")
-    judge_args = getattr(benchmark_module, "JUDGE_ARGS", "")
+    judge_args = (getattr(benchmark_module, "JUDGE_PIPELINE_ARGS", {}), getattr(benchmark_module, "JUDGE_ARGS", ""))
 
     return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, judge_args, requires_sandbox, generation_module
 
@@ -108,10 +108,6 @@ def prepare_eval_commands(
     if chunk_ids is None:
         chunk_ids = [None]
 
-    if " " in str(benchmarks):
-        raise ValueError("benchmarks should be separated with commas")
-
-    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, 0) for b in benchmarks.split(",")]}
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
     if num_jobs is None:
@@ -191,7 +187,8 @@ def prepare_eval_commands(
             generation_module,
         ) = default_args
         benchmark_requires_sandbox[benchmark] = requires_sandbox
-        benchmark_judge_args[benchmark] = judge_args
+        if judge_args[0]:  # first element is a required dict if judge is needed
+            benchmark_judge_args[benchmark] = judge_args
         if requires_sandbox and not with_sandbox:
             LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
