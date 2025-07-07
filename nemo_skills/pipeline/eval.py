@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import os
+from copy import deepcopy
 from pathlib import Path
 from typing import List
 
@@ -67,8 +68,8 @@ def eval(
         None, help="Type of server to use for the judge"
     ),
     judge_server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the judge model"),
-    judge_server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the judge model"),
-    judge_server_args: str = typer.Option("", help="Additional arguments for the judge server"),
+    judge_server_nodes: int = typer.Option(None, help="Number of nodes to use if hosting the judge model"),
+    judge_server_args: str = typer.Option(None, help="Additional arguments for the judge server"),
     judge_server_entrypoint: str = typer.Option(
         None,
         help="Path to the entrypoint of the judge server. "
@@ -298,21 +299,21 @@ def eval(
 
             benchmark_seeds = benchmarks[benchmark]
             if benchmark_seeds == 0:
-                judge_pipeline_args['input_file'] = str(
-                    Path(job_args['output_dir']) / 'eval-results' / benchmark / 'output.jsonl'
-                )
+                judge_pipeline_args['input_file'] = str(Path(output_dir) / 'eval-results' / benchmark / 'output.jsonl')
             else:
-                judge_pipeline_args['input_dir'] = str(Path(job_args['output_dir']) / 'eval-results' / benchmark)
+                judge_pipeline_args['input_dir'] = str(Path(output_dir) / 'eval-results' / benchmark)
                 judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
-            judge_pipeline_args['output_dir'] = str(Path(job_args['output_dir']) / 'eval-results-judged' / benchmark)
-            judge_ctx = ctx.copy()
+            judge_pipeline_args['output_dir'] = str(Path(output_dir) / 'eval-results-judged' / benchmark)
+            judge_ctx = deepcopy(ctx)
             # removing any extra arguments here as they are assumed to be for the main job
             judge_ctx.args = []
             if judge_wrap_args:
                 judge_ctx.args.extend(judge_wrap_args.split(" "))
 
-            judge_pipeline_args.update(judge_server_parameters)
-
+            for judge_server_param, judge_server_value in judge_server_parameters.items():
+                if judge_server_value is not None:
+                    judge_pipeline_args[judge_server_param] = judge_server_value
+            print(judge_pipeline_args)
             _generate(
                 ctx=judge_ctx,
                 expname=f"{expname}-judge-{idx}",

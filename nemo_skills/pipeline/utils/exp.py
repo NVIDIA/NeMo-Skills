@@ -559,7 +559,7 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=None, dry_run=False):
+def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     """If sequential is not specified, using True locally and False otherwise.
 
     If it is specified, it will be used as is.
@@ -568,10 +568,10 @@ def run_exp(exp, cluster_config, sequential=None, dry_run=False):
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
     if cluster_config['executor'] != 'slurm':
-        exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
+        exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
         try:
-            exp.run(detach=True, sequential=False if sequential is None else sequential)
+            exp.run(detach=True, sequential=sequential)
         except RuntimeError as e:
             if 'Your repo has uncommitted changes.' in str(e):
                 raise RuntimeError(
