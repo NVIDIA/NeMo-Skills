@@ -90,7 +90,11 @@ class ArenaJudgeTask(GenerationTask):
 
         llm_output = super().llm_generate([gen_base_data, base_gen_data], data, is_async=False)
 
-        return {'judgement-gen-base': llm_output[0]['generation'], 'judgement-base-gen': llm_output[1]['generation']}
+        return {
+            f'{self.cfg.generation_key}-gen-base': llm_output[0]['generation'],
+            f'{self.cfg.generation_key}-base-gen': llm_output[1]['generation'],
+            "generation": "",  # dummy key since the downstream code expects it # TODO: fix this
+        }
 
     # TODO: this is now replicated across 3 classes, need to unify
     def llm_generate(self, data_points, data, is_async=False):
