@@ -157,6 +157,10 @@ def generate(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -242,7 +246,7 @@ def generate(
     )
     has_tasks = False
 
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
@@ -278,7 +282,7 @@ def generate(
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     script=generation_module,
                 )
-                prev_tasks = None
+                prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:

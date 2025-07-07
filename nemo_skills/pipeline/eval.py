@@ -179,6 +179,16 @@ def eval(
     else:
         wandb_parameters = None
 
+    server_parameters = {
+        'model': model,
+        'server_type': server_type,
+        'server_address': server_address,
+        'server_gpus': server_gpus,
+        'server_nodes': server_nodes,
+        'server_args': server_args,
+        'server_entrypoint': server_entrypoint,
+    }
+
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
     cluster_config = pipeline_utils.resolve_mount_paths(
@@ -204,7 +214,7 @@ def eval(
         check_mounted_paths=check_mounted_paths,
     )
 
-    job_batches = prepare_eval_commands(
+    job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
         cluster_config,
         benchmarks,
         split,
@@ -216,12 +226,7 @@ def eval(
         chunk_ids,
         rerun_done,
         model,
-        server_type,
-        server_address,
-        server_gpus,
-        server_nodes,
-        server_args,
-        server_entrypoint,
+        server_parameters,
         extra_arguments,
         data_dir,
         extra_datasets_type,

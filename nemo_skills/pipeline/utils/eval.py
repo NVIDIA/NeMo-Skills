@@ -15,6 +15,7 @@
 import importlib
 import logging
 import os
+from collections import defaultdict
 from pathlib import Path
 from typing import List
 
@@ -77,8 +78,9 @@ def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_
     requires_sandbox = getattr(benchmark_module, "REQUIRES_SANDBOX", False)
 
     generation_module = getattr(benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate")
+    judge_args = getattr(benchmark_module, "JUDGE_ARGS", "")
 
-    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, requires_sandbox, generation_module
+    return input_file, benchmark_gen_args, benchmark_module.EVAL_ARGS, judge_args, requires_sandbox, generation_module
 
 
 def prepare_eval_commands(
@@ -92,13 +94,7 @@ def prepare_eval_commands(
     num_chunks,
     chunk_ids,
     rerun_done,
-    model,
-    server_type,
-    server_address,
-    server_gpus,
-    server_nodes,
-    server_args,
-    server_entrypoint,
+    server_parameters,
     extra_arguments,
     data_dir,
     extra_datasets_type,
@@ -159,15 +155,11 @@ def prepare_eval_commands(
         eval_to_job_map.extend([i] * count)
 
     cur_job_idx = 0
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+    get_random_port = pipeline_utils.should_get_random_port(
+        server_parameters['server_gpus'], exclusive, server_parameters['server_type']
+    )
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
-        model=model,
-        server_type=server_type,
-        server_address=server_address,
-        server_gpus=server_gpus,
-        server_nodes=server_nodes,
-        server_args=server_args,
-        server_entrypoint=server_entrypoint,
+        **server_parameters,
         extra_arguments=extra_arguments,
         get_random_port=get_random_port,
     )
@@ -177,10 +169,12 @@ def prepare_eval_commands(
     job_cmds = []
     job_benchmarks = set()
 
-    benchmark_required_sandbox = {}
+    benchmark_requires_sandbox = {}
+    benchmark_judge_args = {}
+    benchmark_to_job_ids = defaultdict(list)
 
     for benchmark, rs_num in benchmarks.items():
-        bench_input_file, bench_gen_args, bench_eval_args, requires_sandbox, generation_module = add_default_args(
+        default_args = add_default_args(
             cluster_config,
             benchmark,
             split,
@@ -188,7 +182,16 @@ def prepare_eval_commands(
             extra_datasets_type,
             extra_datasets,
         )
-        benchmark_required_sandbox[benchmark] = requires_sandbox
+        (
+            bench_input_file,
+            bench_gen_args,
+            bench_eval_args,
+            judge_args,
+            requires_sandbox,
+            generation_module,
+        ) = default_args
+        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        benchmark_judge_args[benchmark] = judge_args
         if requires_sandbox and not with_sandbox:
             LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
@@ -240,7 +243,7 @@ def prepare_eval_commands(
                 job_cmds.append(cmd)
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
-                    job_needs_sandbox = any(benchmark_required_sandbox[b] for b in job_benchmarks)
+                    job_needs_sandbox = any(benchmark_requires_sandbox[b] for b in job_benchmarks)
                     job_batches.append(
                         (
                             job_cmds,
@@ -252,20 +255,16 @@ def prepare_eval_commands(
                         )
                     )
                     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
-                        model=model,
-                        server_type=server_type,
-                        server_address=server_address,
-                        server_gpus=server_gpus,
-                        server_nodes=server_nodes,
-                        server_args=server_args,
-                        server_entrypoint=server_entrypoint,
+                        **server_parameters,
                         extra_arguments=extra_arguments,
                         get_random_port=get_random_port,
                     )
+                    for job_benchmark in job_benchmarks:
+                        benchmark_to_job_ids[job_benchmark].append(cur_job_idx)
                     cur_job_idx += 1
                     job_cmds = []
                     job_benchmarks = set()
 
                 cur_eval += 1
 
-    return job_batches
+    return job_batches, benchmark_judge_args, benchmark_to_job_ids

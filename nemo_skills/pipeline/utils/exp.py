@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import logging
 import os
 import shlex
@@ -593,7 +594,10 @@ def run_exp(exp, cluster_config, sequential=None, dry_run=False):
                 REUSE_CODE_EXP[ssh_hash] = exp
 
 
-def get_exp(expname, cluster_config):
+def get_exp(expname, cluster_config, _reuse_exp=None):
+    # Use existing experiment if provided, otherwise create a new one
+    if _reuse_exp:
+        return contextlib.nullcontext(_reuse_exp)
     # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
     remove_handlers()
     if cluster_config['executor'] == 'slurm':
