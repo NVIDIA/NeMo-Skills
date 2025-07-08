@@ -89,9 +89,7 @@ def install_from_git(git_url):
 # TODO: use sandbox
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
-    dataset: str = "livecodebench"
     language: str = "python"  # "cpp" is another option now
-    release_version: str = "v5"
     test_file: str = None
 
 
@@ -112,12 +110,20 @@ def eval_livecodebench(cfg):
     if eval_config.language == "cpp":
         assert eval_config.test_file is not None
 
+    release_version = None
     for jsonl_file in unroll_files(cfg.input_files):
         with open(jsonl_file) as f:
             samples = [preprocess_code(json.loads(line), eval_config.language) for line in f]
             for sample in samples:
                 sample["question_id"] = sample["task_id"]
                 sample["code_list"] = [sample["completion"]]
+                if release_version is None:
+                    release_version = sample["release_version"]
+                if release_version != sample["release_version"]:
+                    raise ValueError(
+                        f"All samples should have the same release version, "
+                        f"but got {release_version} and {sample['release_version']}"
+                    )
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
@@ -125,7 +131,7 @@ def eval_livecodebench(cfg):
         # https://github.com/wasiahmad/livecodebench/blob/main/livecodebench/evaluate.py#L10
         evaluate(
             custom_output_file=jsonl_file,
-            release_version=f"release_{eval_config.release_version}",
+            release_version=f"release_{release_version}",
             k_list=[1],
             language=eval_config.language,
             test_file=None if eval_config.language == "python" else eval_config.test_file,
