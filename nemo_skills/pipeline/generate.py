@@ -302,7 +302,7 @@ def generate(
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
-                        _task_dependencies=prev_tasks,
+                        task_dependencies=prev_tasks,
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                         installation_command=installation_command,
