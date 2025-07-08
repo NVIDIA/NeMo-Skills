@@ -16,40 +16,33 @@ IS_BENCHMARK_GROUP = True
 
 SCORE_MODULE = "nemo_skills.dataset.aai.aai_score"
 
-BENCHMARKS = [
-    {
-        "NAME": "mmlu-pro",
+BENCHMARKS = {
+    "mmlu-pro": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/mcq-10choices ++inference.temperature=0.0",
         # can add "NUM_CHUNKS": N to parallelize
     },
-    {
-        "NAME": "hle",
+    "hle": {
         "GENERATION_ARGS": "++remove_thinking=True ++inference.temperature=0.0",
         "JUDGE_ARGS": "++prompt_config=judge/hle ++generation_key=judgement",
     },
-    {
-        "NAME": "gpqa",
+    "gpqa": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/mcq-4choices ++inference.temperature=0.0",
     },
-    {
-        "NAME": "math-500",
+    "math-500": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/math ++inference.temperature=0.0",
         "NUM_SAMPLES": "3",
     },
-    {
-        "NAME": "aime24",
+    "aime24": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/math ++inference.temperature=0.0",
         "NUM_SAMPLES": "10",
     },
-    {
-        "NAME": "scicode",
+    "scicode": {
         "GENERATION_ARGS": "++inference.temperature=0.0",
         "NUM_SAMPLES": "3",
     },
-    {
-        "NAME": "livecodebench",
+    "livecodebench": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/livecodebench ++inference.temperature=0.0",
         "EVAL_SPLIT": "test_v5_2407_2412",
         "NUM_SAMPLES": "3",
     },
-]
+}

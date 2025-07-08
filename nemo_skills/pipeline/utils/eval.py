@@ -30,6 +30,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @dataclass
 class BenchmarkArgs:
+    name: str
     input_file: str
     generation_args: str
     eval_args: str
@@ -107,6 +108,7 @@ def get_benchmark_args_from_module(
     if num_chunks == 0:
         num_chunks = None
     return BenchmarkArgs(
+        name=benchmark,
         input_file=input_file,
         benchmark_gen_args=benchmark_gen_args,
         eval_args=eval_args,
@@ -119,32 +121,47 @@ def get_benchmark_args_from_module(
     )
 
 
-def add_default_args(cluster_config, benchmark, split, data_dir, extra_datasets_type, extra_datasets):
+def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets):
     benchmark_module, data_path, is_on_cluster = get_dataset_module(
-        dataset=benchmark,
+        dataset=benchmark_or_group,
         data_dir=data_dir,
         cluster_config=cluster_config,
         extra_datasets=extra_datasets,
         extra_datasets_type=extra_datasets_type,
     )
-    benchmark = benchmark.replace('.', '/')
 
-    # if getattr(benchmark_module, "IS_BENCHMARK_GROUP", False):
-    #     benchmark_group_config =
+    if getattr(benchmark_module, "IS_BENCHMARK_GROUP", False):
+        benchmarks_args = []
+        for benchmark, override_dict in benchmark_module.BENCHMARKS.items():
+            benchmark_args = get_benchmark_args_from_module(
+                benchmark_module=benchmark_module,
+                benchmark=benchmark,
+                split=split,
+                cluster_config=cluster_config,
+                data_path=data_path,
+                is_on_cluster=is_on_cluster,
+                override_dict=override_dict,
+            )
+            benchmarks_args.append(benchmark_args)
+        return benchmarks_args
 
-    return get_benchmark_args_from_module(
-        benchmark_module=benchmark_module,
-        benchmark=benchmark,
-        split=split,
-        cluster_config=cluster_config,
-        data_path=data_path,
-        is_on_cluster=is_on_cluster,
-    )
+    benchmark = benchmark_or_group.replace('.', '/')
+
+    return [
+        get_benchmark_args_from_module(
+            benchmark_module=benchmark_module,
+            benchmark=benchmark,
+            split=split,
+            cluster_config=cluster_config,
+            data_path=data_path,
+            is_on_cluster=is_on_cluster,
+        )
+    ]
 
 
 def prepare_eval_commands(
     cluster_config,
-    benchmarks,
+    benchmarks_or_groups,
     split,
     extra_datasets,
     num_jobs,
@@ -162,7 +179,9 @@ def prepare_eval_commands(
     wandb_parameters,
     extra_eval_args,
 ):
-    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, None) for b in benchmarks.split(",")]}
+    benchmarks_or_groups = {
+        k: int(v) for k, v in [b.split(":") if ":" in b else (b, None) for b in benchmarks_or_groups.split(",")]
+    }
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
@@ -179,31 +198,42 @@ def prepare_eval_commands(
     benchmark_default_args = {}
     benchmark_chunks = {}
 
-    # TODO: there is a bit too much code duplication here, should try to refactor
-    for benchmark, rs_num in benchmarks.items():
-        benchmark_default_args[benchmark] = add_default_args(
+    # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
+    benchmarks = {}  # benchmark name -> num_samples  # TODO: that's probably not a good structure anymore
+    for benchmark_or_group, rs_num in benchmarks_or_groups.items():
+        cur_benchmarks = add_default_args(
             cluster_config,
-            benchmark,
+            benchmark_or_group,
             split,
             data_dir,
             extra_datasets_type,
             extra_datasets,
         )
-        if rs_num is None:
-            benchmarks[benchmarks] = benchmark_default_args[benchmark].num_samples
-        if num_chunks is None:
-            # TODO: should we allow setting num chunks per benchmark when not using groups?
-            # Maybe benchmark:rs_num:num_chunks?
-            benchmark_chunks[benchmark] = benchmark_default_args[benchmark].num_chunks
+        for benchmark_args in cur_benchmarks:
+            benchmark = benchmark_args.name
+            benchmarks[benchmark] = benchmark_args.num_samples
+            if rs_num is None:
+                benchmarks[benchmark] = benchmark_default_args[benchmark].num_samples
+            else:
+                if len(cur_benchmarks) > 1 and rs_num is not None:
+                    raise ValueError(
+                        f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
+                        f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
+                    )
+                benchmarks[benchmark] = rs_num
+            if num_chunks is None:
+                # TODO: should we allow setting num chunks per benchmark when not using groups?
+                # Maybe benchmark:rs_num:num_chunks?
+                benchmark_chunks[benchmark] = benchmark_default_args[benchmark].num_chunks
 
-        benchmark_requires_sandbox[benchmark] = benchmark_default_args[benchmark].requires_sandbox
-        if benchmark_default_args[benchmark].judge_args:
-            benchmark_judge_args[benchmark] = (
-                benchmark_default_args[benchmark].judge_args,
-                benchmark_default_args[benchmark].judge_pipeline_args,
-            )
-        if benchmark_default_args[benchmark].requires_sandbox and not with_sandbox:
-            LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
+            benchmark_requires_sandbox[benchmark] = benchmark_default_args[benchmark].requires_sandbox
+            if benchmark_default_args[benchmark].judge_args:
+                benchmark_judge_args[benchmark] = (
+                    benchmark_default_args[benchmark].judge_args,
+                    benchmark_default_args[benchmark].judge_pipeline_args,
+                )
+            if benchmark_default_args[benchmark].requires_sandbox and not with_sandbox:
+                LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
     benchmark_remaining_jobs = {}
     total_evals = 0
