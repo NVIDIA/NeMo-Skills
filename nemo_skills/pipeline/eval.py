@@ -378,6 +378,14 @@ def eval(
             # TODO: add logic if metrics.json exists, we don't run this!
 
             has_tasks = True
+            if benchmark in benchmark_to_judge_tasks:
+                dependent_tasks = [benchmark_to_judge_tasks[benchmark]]
+            else:
+                dependent_job_ids = benchmark_to_job_ids[benchmark]
+                dependent_tasks = []
+                for job_id in dependent_job_ids:
+                    dependent_tasks.extend(job_id_to_tasks[job_id])
+
             pipeline_utils.add_task(
                 exp,
                 cmd=command,
@@ -388,7 +396,7 @@ def eval(
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                task_dependencies=benchmark_to_judge_tasks.get(benchmark),
+                task_dependencies=dependent_tasks,
                 installation_command=installation_command,
             )
 
