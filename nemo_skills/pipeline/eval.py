@@ -75,7 +75,12 @@ def eval(
         help="Path to the entrypoint of the judge server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
-    extra_judge_args: str = typer.Option("", help="Additional arguments for judge"),
+    extra_judge_args: str = typer.Option(
+        "", help="Additional arguments for judge (passed to generate script, so should start with ++)"
+    ),
+    extra_judge_pipeline_args: str = typer.Option(
+        None, help="Additional arguments for judge that configure the job. Should be a dictionary (used from Python)"
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
     split: str = typer.Option(
@@ -320,8 +325,9 @@ def eval(
             for judge_server_param, judge_server_value in judge_server_parameters.items():
                 if judge_server_value is not None:
                     judge_pipeline_args[judge_server_param] = judge_server_value
-
-            print(judge_pipeline_args)
+            # TODO: should we support parsing a string?
+            if extra_judge_pipeline_args is not None:
+                judge_pipeline_args.update(extra_judge_pipeline_args)
             has_tasks = True
             _generate(
                 ctx=judge_ctx,
