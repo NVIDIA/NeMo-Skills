@@ -245,7 +245,7 @@ def generate(
         rerun_done=rerun_done,
     )
     has_tasks = False
-
+    all_tasks = []
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
@@ -308,10 +308,13 @@ def generate(
                         installation_command=installation_command,
                     )
                     prev_tasks = [new_task]
+                    all_tasks.append(new_task)
         if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if has_tasks:
+        if _reuse_exp:
+            return all_tasks
         return exp
     return None
 

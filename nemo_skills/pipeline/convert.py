@@ -360,7 +360,7 @@ def convert(
     )
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=conversion_cmd,
             task_name=expname,
@@ -381,6 +381,8 @@ def convert(
         )
         run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

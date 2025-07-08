@@ -266,6 +266,7 @@ def eval(
     has_tasks = False
     job_id_to_tasks = {}
     benchmark_to_judge_tasks = {}
+    all_tasks = []
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
@@ -336,7 +337,7 @@ def eval(
             if extra_judge_pipeline_args is not None:
                 judge_pipeline_args.update(extra_judge_pipeline_args)
             has_tasks = True
-            judge_task = _generate(
+            judge_tasks = _generate(
                 ctx=judge_ctx,
                 expname=f"{expname}-judge-{idx}",
                 log_dir=log_dir + '/judge',
@@ -353,7 +354,7 @@ def eval(
                 _task_dependencies=dependent_tasks,
                 **judge_pipeline_args,
             )
-            benchmark_to_judge_tasks[benchmark] = judge_task
+            benchmark_to_judge_tasks[benchmark] = judge_tasks
 
         # setting summarize results tasks
         for benchmark in benchmarks:
@@ -379,14 +380,14 @@ def eval(
 
             has_tasks = True
             if benchmark in benchmark_to_judge_tasks:
-                dependent_tasks = [benchmark_to_judge_tasks[benchmark]]
+                dependent_tasks = benchmark_to_judge_tasks[benchmark]
             else:
                 dependent_job_ids = benchmark_to_job_ids[benchmark]
                 dependent_tasks = []
                 for job_id in dependent_job_ids:
                     dependent_tasks.extend(job_id_to_tasks[job_id])
 
-            pipeline_utils.add_task(
+            summarize_task = pipeline_utils.add_task(
                 exp,
                 cmd=command,
                 task_name=f'{benchmark}-summarize-results',
@@ -399,11 +400,14 @@ def eval(
                 task_dependencies=dependent_tasks,
                 installation_command=installation_command,
             )
+            all_tasks.append(summarize_task)
 
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if has_tasks:
+        if _reuse_exp:
+            return all_tasks
         return exp
     return None
 

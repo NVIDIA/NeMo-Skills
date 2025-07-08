@@ -237,6 +237,8 @@ def genselect(
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if has_tasks:
+        if _reuse_exp:
+            return prev_tasks
         return exp
     return None
 

@@ -411,6 +411,8 @@ def ppo_openrlhf(
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

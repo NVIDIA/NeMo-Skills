@@ -319,6 +319,8 @@ def sft_openrlhf(
 
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

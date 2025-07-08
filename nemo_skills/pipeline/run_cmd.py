@@ -184,6 +184,8 @@ def run_cmd(
             prev_tasks = [new_task]
         run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return prev_tasks
     return exp
 
 

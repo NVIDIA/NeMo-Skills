@@ -291,7 +291,7 @@ def grpo_nemo_rl(
                 installation_command=installation_command,
             )
 
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
@@ -318,6 +318,8 @@ def grpo_nemo_rl(
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 
