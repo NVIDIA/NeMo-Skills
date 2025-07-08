@@ -117,6 +117,35 @@ def prepare_eval_commands(
             # for local executor, it makes no sense to use other values
             num_jobs = 1
 
+    benchmark_requires_sandbox = {}
+    benchmark_judge_args = {}
+    benchmark_to_job_ids = defaultdict(list)
+    benchmark_default_args = {}
+
+    # TODO: there is a bit too much code duplication here, should try to refactor
+    for benchmark, rs_num in benchmarks.items():
+        benchmark_default_args[benchmark] = add_default_args(
+            cluster_config,
+            benchmark,
+            split,
+            data_dir,
+            extra_datasets_type,
+            extra_datasets,
+        )
+        (
+            bench_input_file,
+            bench_gen_args,
+            bench_eval_args,
+            judge_args,
+            requires_sandbox,
+            generation_module,
+        ) = benchmark_default_args[benchmark]
+        benchmark_requires_sandbox[benchmark] = requires_sandbox
+        if judge_args[0]:  # first element is a required dict if judge is needed
+            benchmark_judge_args[benchmark] = judge_args
+        if requires_sandbox and not with_sandbox:
+            LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
+
     benchmark_remaining_jobs = {}
     total_evals = 0
     for benchmark, rs_num in benchmarks.items():
@@ -125,7 +154,11 @@ def prepare_eval_commands(
         else:
             random_seeds = list(range(starting_seed, starting_seed + rs_num))
 
-        benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
+        if benchmark in benchmark_judge_args:
+            # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
+            benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
+        else:
+            benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
         benchmark_remaining_jobs[benchmark] = pipeline_utils.get_remaining_jobs(
             cluster_config=cluster_config,
             output_dir=benchmark_output_dir,
@@ -170,14 +203,6 @@ def prepare_eval_commands(
     benchmark_to_job_ids = defaultdict(list)
 
     for benchmark, rs_num in benchmarks.items():
-        default_args = add_default_args(
-            cluster_config,
-            benchmark,
-            split,
-            data_dir,
-            extra_datasets_type,
-            extra_datasets,
-        )
         (
             bench_input_file,
             bench_gen_args,
@@ -185,13 +210,7 @@ def prepare_eval_commands(
             judge_args,
             requires_sandbox,
             generation_module,
-        ) = default_args
-        benchmark_requires_sandbox[benchmark] = requires_sandbox
-        if judge_args[0]:  # first element is a required dict if judge is needed
-            benchmark_judge_args[benchmark] = judge_args
-        if requires_sandbox and not with_sandbox:
-            LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
-
+        ) = benchmark_default_args[benchmark]
         if rs_num == 0:
             random_seeds = [None]
         else:
