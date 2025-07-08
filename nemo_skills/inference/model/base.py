@@ -98,7 +98,7 @@ class BaseModel(abc.ABC):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
-        include_message: bool = False,
+        include_response: bool = False,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -132,7 +132,7 @@ class BaseModel(abc.ABC):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
-        include_message: bool = False,
+        include_response: bool = False,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -148,7 +148,7 @@ class BaseModel(abc.ABC):
             'timeout': timeout,
             'stream': stream,
             'reasoning_effort': reasoning_effort,
-            'include_message': include_message,
+            'include_response': include_response,
         }
         if tools is not None:
             kwargs['tools'] = tools
@@ -221,7 +221,7 @@ class BaseModel(abc.ABC):
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
-        include_message: bool = False,
+        include_response: bool = False,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -242,7 +242,7 @@ class BaseModel(abc.ABC):
             stream=stream,
             reasoning_effort=reasoning_effort,
             tools=tools,
-            include_message=include_message,
+            include_response=include_response,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -431,7 +431,7 @@ class OpenAIAPIModel(BaseModel):
         prompt: str | list,
         stream: bool = False,
         generation_id: Optional[str] = None,
-        include_message: bool = False,
+        include_response: bool = False,
         **kwargs,
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
         """
@@ -458,7 +458,7 @@ class OpenAIAPIModel(BaseModel):
                 if stream:
                     result = self._stream_chat_chunks(response, gen_id)
                 else:
-                    result = self._parse_chat_completion_response(response, include_message=include_message)
+                    result = self._parse_chat_completion_response(response, include_response=include_response)
 
             elif isinstance(prompt, str):
                 request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -466,7 +466,7 @@ class OpenAIAPIModel(BaseModel):
                 if stream:
                     result = self._stream_completion_chunks(response, gen_id)
                 else:
-                    result = self._parse_completion_response(response)
+                    result = self._parse_completion_response(response, include_response=include_response)
             else:
                 raise TypeError(f"Unsupported prompt type: {type(prompt)}")
 
@@ -480,7 +480,7 @@ class OpenAIAPIModel(BaseModel):
             self._unregister_generation(gen_id)
             raise
 
-    def _parse_completion_response(self, response: "openai.types.Completion") -> dict:
+    def _parse_completion_response(self, response: "openai.types.Completion", include_response: bool = False) -> dict:
         choice = response.choices[0]
         output = choice.text
         if output is None:
@@ -501,10 +501,13 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+        
+        if include_response:
+            result["response"] = response
 
         return result
 
-    def _parse_chat_completion_response(self, response, include_message: bool = False) -> dict:
+    def _parse_chat_completion_response(self, response, include_response: bool = False) -> dict:
         choice = response.choices[0]
         output = choice.message.content
         if output is None:
@@ -523,8 +526,8 @@ class OpenAIAPIModel(BaseModel):
             result["finish_reason"] = choice.finish_reason
         if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
             result["tool_calls"] = choice.message.tool_calls
-        if include_message and choice.message is not None:
-            result["message"] = choice.message
+        if include_response:
+            result["response"] = response
 
         return result
 

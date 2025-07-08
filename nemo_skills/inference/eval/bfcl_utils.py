@@ -70,16 +70,19 @@ def execute_multi_turn_func_call(
     func_call_list: list[str],  # a list of strings of func calls
     initial_config: dict,
     involved_classes: list,
-    model_name: str,
     test_entry_id: str,
     long_context: bool = False,
-    is_evaL_run: bool = False,
 ) -> tuple[list[str], dict]:
     """
-    TODO: Add docstring
+    Execute the function calls in the list.
+
+    Args:
+        func_call_list (list[str]): A list of strings of function calls.
+        initial_config (dict): A dictionary of initial configurations for the classes.
+        involved_classes (list): A list of class names that are involved in the function calls.
+        test_entry_id (str): The id of the test entry.
+        long_context (bool): Whether to use long context.
     """
-    if is_evaL_run:
-        model_name += "_eval"
 
     class_method_name_mapping = {}
     involved_instances = {}
