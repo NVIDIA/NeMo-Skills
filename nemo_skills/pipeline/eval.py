@@ -239,9 +239,7 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    benchmarks = {k: int(v) for k, v in [b.split(":") if ":" in b else (b, 0) for b in benchmarks.split(",")]}
-
-    job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
+    benchmarks, job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
         cluster_config,
         benchmarks,
         split,
