@@ -91,7 +91,7 @@ def get_benchmark_args_from_module(
             )
 
     prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", override_dict=override_dict)
-    benchmark_gen_args = f"++prompt_config={prompt_config} {benchmark_module.GENERATION_ARGS}"
+    generation_args = f"++prompt_config={prompt_config} {benchmark_module.GENERATION_ARGS}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
 
     generation_module = get_arg_from_module_or_dict(
@@ -110,7 +110,7 @@ def get_benchmark_args_from_module(
     return BenchmarkArgs(
         name=benchmark,
         input_file=input_file,
-        benchmark_gen_args=benchmark_gen_args,
+        generation_args=generation_args,
         eval_args=eval_args,
         judge_args=judge_args,
         judge_pipeline_args=judge_pipeline_args,
@@ -146,7 +146,6 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
         return benchmarks_args
 
     benchmark = benchmark_or_group.replace('.', '/')
-
     return [
         get_benchmark_args_from_module(
             benchmark_module=benchmark_module,
@@ -180,7 +179,7 @@ def prepare_eval_commands(
     extra_eval_args,
 ):
     benchmarks_or_groups = {
-        k: int(v) for k, v in [b.split(":") if ":" in b else (b, None) for b in benchmarks_or_groups.split(",")]
+        k: int(v) for k, v in [b.split(":") if ":" in b else (b, -1) for b in benchmarks_or_groups.split(",")]
     }
 
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
@@ -212,10 +211,11 @@ def prepare_eval_commands(
         for benchmark_args in cur_benchmarks:
             benchmark = benchmark_args.name
             benchmarks[benchmark] = benchmark_args.num_samples
-            if rs_num is None:
-                benchmarks[benchmark] = benchmark_default_args[benchmark].num_samples
+            benchmark_default_args[benchmark] = benchmark_args
+            if rs_num == -1:
+                benchmarks[benchmark] = benchmark_args.num_samples
             else:
-                if len(cur_benchmarks) > 1 and rs_num is not None:
+                if len(cur_benchmarks) > 1:
                     raise ValueError(
                         f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
                         f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
@@ -224,15 +224,15 @@ def prepare_eval_commands(
             if num_chunks is None:
                 # TODO: should we allow setting num chunks per benchmark when not using groups?
                 # Maybe benchmark:rs_num:num_chunks?
-                benchmark_chunks[benchmark] = benchmark_default_args[benchmark].num_chunks
+                benchmark_chunks[benchmark] = benchmark_args.num_chunks
 
-            benchmark_requires_sandbox[benchmark] = benchmark_default_args[benchmark].requires_sandbox
-            if benchmark_default_args[benchmark].judge_args:
+            benchmark_requires_sandbox[benchmark] = benchmark_args.requires_sandbox
+            if benchmark_args.judge_args or benchmark_args.judge_pipeline_args:
                 benchmark_judge_args[benchmark] = (
-                    benchmark_default_args[benchmark].judge_args,
-                    benchmark_default_args[benchmark].judge_pipeline_args,
+                    benchmark_args.judge_args,
+                    benchmark_args.judge_pipeline_args,
                 )
-            if benchmark_default_args[benchmark].requires_sandbox and not with_sandbox:
+            if benchmark_args.requires_sandbox and not with_sandbox:
                 LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
     benchmark_remaining_jobs = {}
@@ -293,10 +293,6 @@ def prepare_eval_commands(
     job_batches = []
     job_cmds = []
     job_benchmarks = set()
-
-    benchmark_requires_sandbox = {}
-    benchmark_judge_args = {}
-    benchmark_to_job_ids = defaultdict(list)
 
     for benchmark, rs_num in benchmarks.items():
         if rs_num == 0:
@@ -379,4 +375,4 @@ def prepare_eval_commands(
 
                 cur_eval += 1
 
-    return job_batches, benchmark_judge_args, benchmark_to_job_ids
+    return benchmarks, job_batches, benchmark_judge_args, benchmark_to_job_ids

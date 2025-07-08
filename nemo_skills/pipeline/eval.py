@@ -305,7 +305,7 @@ def eval(
             dependent_tasks = []
             for job_id in dependent_job_ids:
                 dependent_tasks.extend(job_id_to_tasks[job_id])
-            judge_pipeline_args, judge_wrap_args = judge_args
+            judge_wrap_args, judge_pipeline_args = judge_args
 
             benchmark_seeds = benchmarks[benchmark]
             if benchmark_seeds == 0:
