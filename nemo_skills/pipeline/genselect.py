@@ -115,6 +115,10 @@ def genselect(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -172,7 +176,7 @@ def genselect(
     has_tasks = False
     extra_arguments_original = extra_arguments
 
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
         preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
             preprocess_args if preprocess_args is not None else ""
@@ -186,6 +190,7 @@ def genselect(
             log_dir=f"{output_dir}/preprocess-logs",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
+            task_dependencies=_task_dependencies,
         )
         for seed in remaining_jobs.keys():
             has_tasks = True

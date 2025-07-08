@@ -296,6 +296,11 @@ def ppo_verl(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -378,8 +383,8 @@ def ppo_verl(
             f"REWARD_SERVER_ARGS='{json.dumps(client_server_args)}'"
         ]
 
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
-        prev_task = None
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
+        prev_task = _task_dependencies
         for job_id in range(num_training_jobs):
             if job_id == num_training_jobs - 1 and convert_last_ckpt_to_hf:
                 ckpt_dir = f"{output_dir}/checkpoints"
@@ -412,7 +417,7 @@ def ppo_verl(
                 installation_command=installation_command,
             )
         # explicitly setting sequential to False since we set dependencies directly
-        pipeline_utils.run_exp(exp, cluster_config, sequential=False)
+        pipeline_utils.run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
     return exp
 

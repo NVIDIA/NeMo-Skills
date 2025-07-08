@@ -277,6 +277,10 @@ def train(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Train (SFT or DPO) an LLM model.
 
@@ -345,8 +349,8 @@ def train(
     container = cluster_config["containers"]["nemo"]
     num_tasks = num_gpus if cluster_config["executor"] == "slurm" else 1
 
-    with get_exp(expname, cluster_config) as exp:
-        prev_task = None
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
+        prev_task = _task_dependencies
         for job_id in range(num_training_jobs):
             prev_task = add_task(
                 exp,

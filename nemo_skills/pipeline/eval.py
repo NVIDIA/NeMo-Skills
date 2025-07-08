@@ -159,6 +159,10 @@ def eval(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -261,11 +265,11 @@ def eval(
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     has_tasks = False
     job_id_to_tasks = {}
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
             cmds, job_needs_sandbox, job_server_config, job_server_address, job_server_command = job_args
-            prev_tasks = None
+            prev_tasks = _task_dependencies
 
             for _ in range(dependent_jobs + 1):
                 has_tasks = True
