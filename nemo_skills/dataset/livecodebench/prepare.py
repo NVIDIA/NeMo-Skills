@@ -121,6 +121,7 @@ def prepare(start_date, end_date, release_version, output_dir):
                         "question": problem["question"],
                         "difficulty": problem["difficulty"],
                         "subset_for_metrics": problem["difficulty"],
+                        "release_version": release_version,
                     },
                     f,
                 )
