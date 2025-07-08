@@ -42,7 +42,6 @@ def main():
         f'    --host="0.0.0.0" '
         f'    --port={args.port} '
         f'    --tensor-parallel-size={args.num_gpus} '
-        f'    --gpu-memory-utilization=0.9 '
         f'    {logging_args} '
         f'    {extra_arguments} ' + (' | grep -v "200 OK"' if args.no_verbose else "")
     )
