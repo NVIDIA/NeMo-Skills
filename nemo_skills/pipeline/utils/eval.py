@@ -197,7 +197,11 @@ def prepare_eval_commands(
         else:
             random_seeds = list(range(starting_seed, starting_seed + rs_num))
 
-        benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
+        if benchmark in benchmark_judge_args:
+            # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
+            benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
+        else:
+            benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging

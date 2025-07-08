@@ -265,6 +265,7 @@ def eval(
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     has_tasks = False
     job_id_to_tasks = {}
+    benchmark_to_judge_tasks = {}
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
@@ -309,11 +310,13 @@ def eval(
 
             benchmark_seeds = benchmarks[benchmark]
             if benchmark_seeds == 0:
-                judge_pipeline_args['input_file'] = str(Path(output_dir) / 'eval-results' / benchmark / 'output.jsonl')
+                judge_pipeline_args['input_file'] = str(
+                    Path(output_dir) / 'tmp-eval-results' / benchmark / 'output.jsonl'
+                )
             else:
-                judge_pipeline_args['input_dir'] = str(Path(output_dir) / 'eval-results' / benchmark)
+                judge_pipeline_args['input_dir'] = str(Path(output_dir) / 'tmp-eval-results' / benchmark)
                 judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
-            judge_pipeline_args['output_dir'] = str(Path(output_dir) / 'eval-results-judged' / benchmark)
+            judge_pipeline_args['output_dir'] = str(Path(output_dir) / 'eval-results' / benchmark)
             judge_ctx = deepcopy(ctx)
             # removing any extra arguments here as they are assumed to be for the main job
             judge_ctx.args = []
@@ -333,7 +336,7 @@ def eval(
             if extra_judge_pipeline_args is not None:
                 judge_pipeline_args.update(extra_judge_pipeline_args)
             has_tasks = True
-            _generate(
+            judge_task = _generate(
                 ctx=judge_ctx,
                 expname=f"{expname}-judge-{idx}",
                 log_dir=log_dir + '/judge',
@@ -350,6 +353,45 @@ def eval(
                 _task_dependencies=dependent_tasks,
                 **judge_pipeline_args,
             )
+            benchmark_to_judge_tasks[benchmark] = judge_task
+
+        # setting summarize results tasks
+        for benchmark in benchmarks:
+            eval_dir = f"{output_dir}/eval-results"
+            metric_file = f"{eval_dir}/{benchmark}/metrics.json"
+
+            # TODO: with this new usage summarize_results probably needs some refactoring
+            #       also maybe we should remove it from pipeline as it's not
+            #       really ever needed to be run directly anymore?
+            command = (
+                f"python -m nemo_skills.pipeline.summarize_results {eval_dir} "
+                f"    --benchmarks {benchmark} "
+                f"    --save_metrics_path {metric_file} "
+            )
+            if wandb_name:
+                command += f" --wandb_name={wandb_name} "
+            if wandb_group:
+                command += f" --wandb_group={wandb_group} "
+            if wandb_project:
+                command += f" --wandb_project={wandb_project} "
+
+            # TODO: add logic if metrics.json exists, we don't run this!
+
+            has_tasks = True
+            pipeline_utils.add_task(
+                exp,
+                cmd=command,
+                task_name=f'{benchmark}-summarize-results',
+                log_dir=f"{eval_dir}/{benchmark}/summarized_results",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
+                task_dependencies=benchmark_to_judge_tasks.get(benchmark),
+                installation_command=installation_command,
+            )
+
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 

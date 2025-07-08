@@ -537,6 +537,9 @@ def add_task(
     else:
         metadata = None
 
+    if not task_dependencies:  # empty list
+        task_dependencies = None
+
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
