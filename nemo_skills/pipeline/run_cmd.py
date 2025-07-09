@@ -102,6 +102,10 @@ def run_cmd(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -124,12 +128,7 @@ def run_cmd(
 
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
-    # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
-    # as cpu jobs almost always need more resources than automatically allocated by slurm
-    if exclusive is None and num_gpus is None:
-        exclusive = True
-
-    with get_exp(expname, cluster_config) as exp:
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Setup server config if model is provided
         if model is not None:
             server_config, server_address, extra_arguments = pipeline_utils.configure_client(
@@ -154,7 +153,7 @@ def run_cmd(
         if model is not None and server_config is not None:
             cmd = pipeline_utils.wait_for_server(server_address, cmd)
 
-        prev_tasks = None
+        prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
                 exp,
@@ -180,6 +179,8 @@ def run_cmd(
             prev_tasks = [new_task]
         run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return prev_tasks
     return exp
 
 

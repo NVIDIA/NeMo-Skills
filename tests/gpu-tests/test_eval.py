@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from nemo_skills.evaluation.metrics import ComputeMetrics
 from tests.conftest import docker_rm
 
 
@@ -41,7 +41,7 @@ def test_trtllm_eval():
         f"    --model {model_path} "
         f"    --server_type trtllm "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k:0 "
+        f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
@@ -49,10 +49,9 @@ def test_trtllm_eval():
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
+
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -95,10 +94,8 @@ def test_trtllm_code_execution_eval(server_type):
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 40
@@ -134,7 +131,7 @@ def test_hf_eval(server_type, server_args):
         f"    --model {model_path} "
         f"    --server_type {server_type} "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks algebra222:0,human-eval:0,ifeval:0,mmlu:0 "
+        f"    --benchmarks algebra222,human-eval,ifeval,mmlu "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
@@ -152,35 +149,30 @@ def test_hf_eval(server_type, server_args):
         check=True,
     )
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='algebra222').compute_metrics(
-        [f"{output_dir}/eval-results/algebra222/output.jsonl"],
-    )["all"]["greedy"]
+    with open(f"{output_dir}/eval-results/algebra222/metrics.json", 'r') as f:
+        metrics = json.load(f)["algebra222"]["greedy"]
 
     assert metrics['symbolic_correct'] >= 75
     assert metrics['num_entries'] == 164
 
-    metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
-        [f"{output_dir}/eval-results/human-eval/output.jsonl"],
-    )["all"]["greedy"]
+    with open(f"{output_dir}/eval-results/human-eval/metrics.json", 'r') as f:
+        metrics = json.load(f)["human-eval"]["greedy"]
+
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
-    metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
-        [f"{output_dir}/eval-results/ifeval/output.jsonl"],
-    )[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/ifeval/metrics.json", 'r') as f:
+        metrics = json.load(f)["ifeval"]["greedy"]
+
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
     assert metrics['prompt_loose_accuracy'] >= 60
     assert metrics['instruction_loose_accuracy'] >= 70
     assert metrics['num_prompts'] == 164
 
-    metrics = ComputeMetrics(benchmark='mmlu').compute_metrics([f"{output_dir}/eval-results/mmlu/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/mmlu/metrics.json", 'r') as f:
+        metrics = json.load(f)["mmlu-all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 164
 
@@ -213,9 +205,8 @@ def test_nemo_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -255,9 +246,8 @@ def test_megatron_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     # TODO: something is broken in megatron inference here as this should be 50!
     assert metrics['symbolic_correct'] >= 20

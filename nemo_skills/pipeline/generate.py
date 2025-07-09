@@ -157,6 +157,10 @@ def generate(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -241,8 +245,10 @@ def generate(
         rerun_done=rerun_done,
     )
     has_tasks = False
-
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+    all_tasks = []
+    if _task_dependencies is None:
+        _task_dependencies = []
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
@@ -278,7 +284,7 @@ def generate(
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     script=generation_module,
                 )
-                prev_tasks = None
+                prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:
@@ -298,16 +304,21 @@ def generate(
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
-                        task_dependencies=prev_tasks,
+                        task_dependencies=(
+                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                        ),
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                         installation_command=installation_command,
                     )
                     prev_tasks = [new_task]
-        if has_tasks:
+                    all_tasks.append(new_task)
+        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if has_tasks:
+        if _reuse_exp:
+            return all_tasks
         return exp
     return None
 

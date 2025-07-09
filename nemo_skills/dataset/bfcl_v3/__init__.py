@@ -12,28 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# settings that define how evaluation should be done by default (all can be changed from cmdline)
-
 DATASET_GROUP = 'tool'
 
 SPLITS = [
-   "simple",  # Simple function calls
-   "parallel",  # Multiple function calls in parallel
-   "multiple",  # Multiple function calls in sequence
-   "parallel_multiple",  # Multiple function calls in parallel and in sequence
-   "java",  # Java function calls
-   "javascript",  # JavaScript function calls
-   "irrelevance",  # Function calls with irrelevant function documentation
-   "live_simple",  # User-contributed simple function calls
-   "live_multiple",  # User-contributed multiple function calls in sequence
-   "live_parallel",  # User-contributed multiple function calls in parallel
-   "live_parallel_multiple",  # User-contributed multiple function calls in parallel and in sequence
-   "live_irrelevance",  # User-contributed function calls with irrelevant function documentation
-   "live_relevance",  # User-contributed function calls with relevant function documentation
-   "multi_turn_base",  # Base entries for multi-turn function calls
-   "multi_turn_miss_func",  # Multi-turn function calls with missing function
-   "multi_turn_miss_param",  # Multi-turn function calls with missing parameter
-   "multi_turn_long_context",  # Multi-turn function calls with long context
+    "simple",  # Simple function calls
+    "parallel",  # Multiple function calls in parallel
+    "multiple",  # Multiple function calls in sequence
+    "parallel_multiple",  # Multiple function calls in parallel and in sequence
+    "java",  # Java function calls
+    "javascript",  # JavaScript function calls
+    "irrelevance",  # Function calls with irrelevant function documentation
+    "live_simple",  # User-contributed simple function calls
+    "live_multiple",  # User-contributed multiple function calls in sequence
+    "live_parallel",  # User-contributed multiple function calls in parallel
+    "live_parallel_multiple",  # User-contributed multiple function calls in parallel and in sequence
+    "live_irrelevance",  # User-contributed function calls with irrelevant function documentation
+    "live_relevance",  # User-contributed function calls with relevant function documentation
+    "multi_turn_base",  # Base entries for multi-turn function calls
+    "multi_turn_miss_func",  # Multi-turn function calls with missing function
+    "multi_turn_miss_param",  # Multi-turn function calls with missing parameter
+    "multi_turn_long_context",  # Multi-turn function calls with long context
 ]
 
+IS_BENCHMARK_GROUP = True
+
+SCORE_MODULE = "nemo_skills.dataset.bfcl_v3.bfcl_score"
+
+BENCHMARKS = {f"bfcl_v3.{split}": {} for split in SPLITS}

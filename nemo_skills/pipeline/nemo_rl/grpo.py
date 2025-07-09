@@ -166,9 +166,7 @@ def grpo_nemo_rl(
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
-    conversion_step: int = typer.Option(
-        None, help="The step of checkpoint that needs to be converted"
-    ),
+    conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -210,6 +208,11 @@ def grpo_nemo_rl(
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
     ),
 ):
     """Runs NeMo-RL GRPO training.
@@ -262,8 +265,8 @@ def grpo_nemo_rl(
     )
 
     server_config = None
-    with get_exp(expname, cluster_config) as exp:
-        prev_task = None
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
+        prev_task = _task_dependencies
         for job_id in range(num_training_jobs):
             prev_task = add_task(
                 exp,
@@ -288,7 +291,7 @@ def grpo_nemo_rl(
                 installation_command=installation_command,
             )
 
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
@@ -313,8 +316,10 @@ def grpo_nemo_rl(
         )
 
         # explicitly setting sequential to False since we set dependencies directly
-        run_exp(exp, cluster_config, sequential=False)
+        run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

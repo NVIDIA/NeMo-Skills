@@ -50,11 +50,11 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
     total_count = 0
     total_div_count = 0  # Denominator for combined accuracy
     total_accuracy = 0
-    
+
     for accuracy_dict in accuracy_dict_list:
         accuracy = accuracy_dict["accuracy"]
         count = accuracy_dict["num_entries"]
-        
+
         total_count += count
 
         if weighted:
@@ -82,8 +82,7 @@ def get_accuracy_dict(metrics, category):
 def calculate_non_live_single_turn_accuracy(metrics):
     # First calculate simple ast unweighted accuracy
     simple_ast_accuracy_dict = calculate_combined_accuracy(
-        [get_accuracy_dict(metrics, category) for category in SIMPLE_AST], 
-        weighted=False
+        [get_accuracy_dict(metrics, category) for category in SIMPLE_AST], weighted=False
     )
 
     non_live_ast_accuracy_list = [simple_ast_accuracy_dict]
@@ -93,7 +92,7 @@ def calculate_non_live_single_turn_accuracy(metrics):
     non_live_ast_accuracy = calculate_combined_accuracy(non_live_ast_accuracy_list, weighted=False)
 
     non_live_irrelevance_accuracy = get_accuracy_dict(metrics, SINGLE_TURN_IRRELEVANCE)
-    
+
     overall_accuracy_non_live = calculate_combined_accuracy(
         non_live_ast_accuracy_list + [non_live_irrelevance_accuracy], weighted=False
     )
@@ -106,7 +105,7 @@ def calculate_non_live_single_turn_accuracy(metrics):
 
 
 def calculate_live_single_turn_accuracy(metrics):
-    live_ast_accuracy_list = [get_accuracy_dict(metrics, category) for category in LIVE_SINGLE_TURN_AST]    
+    live_ast_accuracy_list = [get_accuracy_dict(metrics, category) for category in LIVE_SINGLE_TURN_AST]
     live_ast_accuracy = calculate_combined_accuracy(live_ast_accuracy_list, weighted=True)
 
     live_irrelevance_accuracy = get_accuracy_dict(metrics, LIVE_SINGLE_TURN_IRRELEVANCE)
@@ -138,14 +137,13 @@ def compute_score(metrics: dict):
     live_single_turn_accuracy = calculate_live_single_turn_accuracy(metrics)
     multi_turn_accuracy = calculate_multi_turn_accuracy(metrics)
 
-    
     overall_accuracy = calculate_combined_accuracy(
         [
-            non_live_single_turn_accuracy["overall_non_live"], 
-            live_single_turn_accuracy["overall_live"], 
-            multi_turn_accuracy["overall_multi_turn"]
-        ], 
-        weighted=False
+            non_live_single_turn_accuracy["overall_non_live"],
+            live_single_turn_accuracy["overall_live"],
+            multi_turn_accuracy["overall_multi_turn"],
+        ],
+        weighted=False,
     )
 
     return {
@@ -154,5 +152,3 @@ def compute_score(metrics: dict):
         "live_single_turn": live_single_turn_accuracy,
         "multi_turn": multi_turn_accuracy,
     }
-
-
