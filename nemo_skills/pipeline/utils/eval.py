@@ -374,6 +374,7 @@ def prepare_eval_commands(
                     job_batches.append(
                         (
                             job_cmds,
+                            job_benchmarks,
                             job_needs_sandbox,
                             job_server_config,
                             job_server_address,

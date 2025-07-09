@@ -268,7 +268,9 @@ def eval(
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
-            cmds, job_needs_sandbox, job_server_config, job_server_address, job_server_command = job_args
+            cmds, job_benchmarks, job_needs_sandbox, job_server_config, job_server_address, job_server_command = (
+                job_args
+            )
             prev_tasks = _task_dependencies
 
             for _ in range(dependent_jobs + 1):
@@ -278,7 +280,7 @@ def eval(
                     cmd=pipeline_utils.wait_for_server(
                         server_address=job_server_address, generation_commands=" && ".join(cmds)
                     ),
-                    task_name=f'{expname}-{idx}',
+                    task_name=f'{expname}-{"-".join(job_benchmarks)}',
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
