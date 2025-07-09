@@ -20,10 +20,9 @@ from dataclasses import field
 
 import hydra
 
-from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, prefill_judgement, setup_logging
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -45,7 +44,7 @@ class ArenaJudgeConfig(GenerateSolutionsConfig):
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
-cs.store(name="base_llm_math_judge_config", node=ArenaJudgeConfig)
+cs.store(name="base_arena_judge_config", node=ArenaJudgeConfig)
 
 
 class ArenaJudgeTask(GenerationTask):

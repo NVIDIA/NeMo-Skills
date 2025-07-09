@@ -203,6 +203,17 @@ def get_aggregate_score(scores, weight=3):
     return metrics
 
 
+@nested_dataclass(kw_only=True)
+class LlmEvaluatorConfig:
+    batch_size: int = 100  # lower if running into rate limits
+    tokens_to_generate: int = 4096  # will auto-lower to max possible for NGC models
+    use_batch_api: bool = True  # only supported for OpenAI models!
+    base_url: str = "https://api.openai.com/v1"
+    judge_model: str = JUDGE_MODEL
+    # defaults to True to avoid regenerating judgements unless necessary
+    skip_filled: bool = True
+
+
 def eval_mtbench(cfg):
     eval_config = LlmEvaluatorConfig(**cfg.eval_config)
     assert eval_config.batch_size % 2 == 0  # required due to how everything is implemented, can fix later

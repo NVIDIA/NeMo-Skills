@@ -38,4 +38,4 @@ IS_BENCHMARK_GROUP = True
 
 SCORE_MODULE = "nemo_skills.dataset.bfcl_v3.bfcl_score"
 
-BENCHMARKS = {split: {} for split in SPLITS}
+BENCHMARKS = {f"bfcl_v3.{split}": {} for split in SPLITS}
