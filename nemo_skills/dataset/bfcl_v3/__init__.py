@@ -38,22 +38,4 @@ IS_BENCHMARK_GROUP = True
 
 SCORE_MODULE = "nemo_skills.dataset.bfcl_v3.bfcl_score"
 
-BENCHMARKS = {
-    "bfcl_v3.simple": {},
-    "bfcl_v3.parallel": {},
-    "bfcl_v3.multiple": {},
-    "bfcl_v3.parallel_multiple": {},
-    "bfcl_v3.java": {},
-    "bfcl_v3.javascript": {},
-    "bfcl_v3.irrelevance": {},
-    "bfcl_v3.live_simple": {},
-    "bfcl_v3.live_multiple": {},
-    "bfcl_v3.live_parallel": {},
-    "bfcl_v3.live_parallel_multiple": {},
-    "bfcl_v3.live_irrelevance": {},
-    "bfcl_v3.live_relevance": {},
-    "bfcl_v3.multi_turn_base": {},
-    "bfcl_v3.multi_turn_miss_func": {},
-    "bfcl_v3.multi_turn_miss_param": {},
-    "bfcl_v3.multi_turn_long_context": {},
-}
+BENCHMARKS = {split: {} for split in SPLITS}
