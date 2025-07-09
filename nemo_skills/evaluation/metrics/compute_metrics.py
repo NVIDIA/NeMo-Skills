@@ -36,14 +36,14 @@ class ComputeMetrics:
         self.max_samples = max_samples
         self.metric_type = metric_type
         self.max_seq_len = max_seq_len
-        benchmark_module, _, _ = get_dataset_module(
-            benchmark,
-            data_dir=data_dir,
-            cluster_config=cluster_config,
-            extra_datasets=extra_datasets,
-            extra_datasets_type=extra_datasets_type,
-        )
         if self.metric_type is None:
+            benchmark_module, _, _ = get_dataset_module(
+                benchmark,
+                data_dir=data_dir,
+                cluster_config=cluster_config,
+                extra_datasets=extra_datasets,
+                extra_datasets_type=extra_datasets_type,
+            )
             self.metric_type = benchmark_module.METRICS_TYPE
 
         # Dictionary to store metrics calculators for different subsets
