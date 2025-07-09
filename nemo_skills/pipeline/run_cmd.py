@@ -128,11 +128,6 @@ def run_cmd(
 
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
-    # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
-    # as cpu jobs almost always need more resources than automatically allocated by slurm
-    if exclusive is None and num_gpus is None:
-        exclusive = True
-
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Setup server config if model is provided
         if model is not None:

@@ -203,6 +203,13 @@ def get_executor(
         partition = partition or cluster_config.get("partition")
     else:
         partition = partition or cluster_config.get("cpu_partition") or cluster_config.get("partition")
+        if partition == cluster_config.get("cpu_partition"):
+            # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
+            # as cpu jobs almost always need more resources than automatically allocated by slurm
+            if slurm_kwargs is None:
+                slurm_kwargs = {}
+            slurm_kwargs["exclusive"] = True
+
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
     else:

@@ -292,7 +292,7 @@ def prepare_eval_commands(
         num_jobs = total_evals
 
     if num_jobs == 0:
-        return [], {}, {}
+        return benchmarks_dict, []
 
     evals_per_job = total_evals // num_jobs if num_jobs > 0 else total_evals
     remainder = total_evals % num_jobs
