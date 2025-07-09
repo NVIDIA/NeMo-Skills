@@ -120,7 +120,7 @@ GENERATION_TASK_CLASS = ArenaJudgeTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_llm_math_judge_config')
+@hydra.main(version_base=None, config_name='base_arena_judge_config')
 def generate(cfg: ArenaJudgeConfig):
     cfg = ArenaJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
