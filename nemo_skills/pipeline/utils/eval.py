@@ -41,6 +41,8 @@ class BenchmarkArgs:
     num_samples: int
     num_chunks: int | None
     eval_subfolder: str
+    benchmark_group: str | None = None
+    score_module: str | None = None
     job_ids: list[int] = field(default_factory=list)
     remaining_jobs: list[dict] = field(default_factory=list)
 
@@ -144,6 +146,7 @@ def get_benchmark_args_from_module(
         num_samples=num_samples,
         num_chunks=num_chunks,
         eval_subfolder=eval_subfolder,
+        benchmark_group=benchmark_group,
     )
 
 
@@ -169,12 +172,15 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
             benchmark_args = get_benchmark_args_from_module(
                 benchmark_module=benchmark_module,
                 benchmark=benchmark,
+                benchmark_group=benchmark_or_group,
                 split=split,
                 cluster_config=cluster_config,
                 data_path=data_path,
                 is_on_cluster=is_on_cluster,
                 override_dict=override_dict,
             )
+            # TODO: should it be optional?
+            benchmark_args.score_module = benchmark_or_group_module.SCORE_MODULE
             benchmarks_args.append(benchmark_args)
         return benchmarks_args
 

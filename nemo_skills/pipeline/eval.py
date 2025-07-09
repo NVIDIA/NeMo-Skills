@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import os
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
 from typing import List
@@ -264,7 +265,6 @@ def eval(
     has_tasks = False
     job_id_to_tasks = {}
     benchmark_to_judge_tasks = {}
-    all_tasks = []
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
@@ -359,10 +359,16 @@ def eval(
             )
             benchmark_to_judge_tasks[benchmark] = judge_tasks
 
+        all_tasks = []
+        group_metric_files = defaultdict(list)
+        group_tasks = defaultdict(list)
+        group_module = {}
+
         # setting summarize results tasks
         for benchmark, benchmark_args in benchmarks_dict.items():
+            # TODO: add logic if metrics.json exists, we don't run this!
+            has_tasks = True
             metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
-
             # TODO: with this new usage summarize_results probably needs some refactoring
             #       also maybe we should remove it from pipeline as it's not
             #       really ever needed to be run directly anymore?
@@ -379,9 +385,7 @@ def eval(
                 command += f" --wandb_project={wandb_project} "
             if data_dir:
                 command += f" --data_dir={data_dir} "
-            # TODO: add logic if metrics.json exists, we don't run this!
 
-            has_tasks = True
             if benchmark in benchmark_to_judge_tasks:
                 dependent_tasks = benchmark_to_judge_tasks[benchmark]
             else:
@@ -394,7 +398,7 @@ def eval(
                 exp,
                 cmd=command,
                 task_name=f'{benchmark}-summarize-results',
-                log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized_results",
+                log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 run_after=run_after,
@@ -404,6 +408,34 @@ def eval(
                 installation_command=installation_command,
             )
             all_tasks.append(summarize_task)
+            if benchmark_args.benchmark_group:
+                group_metric_files[benchmark_args.benchmark_group].append(metric_file)
+                group_tasks[benchmark_args.benchmark_group].append(summarize_task)
+                # it's always the same for all benchmarks in a group
+                group_module[benchmark_args.benchmark_group] = benchmark_args.score_module
+
+        # if we have any benchmark groups, submitting final aggregation for those
+        for group, metric_files in group_metric_files.items():
+            has_tasks = True
+            command = (
+                f"python -m nemo_skills.evaluation.compute_group_score {' '.join(metric_files)} "
+                f"    --score_module {group_module[group]} "
+                f"    --save_metrics_file {output_dir}/eval-results/{group}/metrics.json "
+            )
+            score_task = pipeline_utils.add_task(
+                exp,
+                cmd=command,
+                task_name=f'{group}-compute-score',
+                log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
+                task_dependencies=group_tasks[group],
+                installation_command=installation_command,
+            )
+            all_tasks.append(score_task)
 
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
