@@ -17,7 +17,7 @@ import logging
 import os
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
@@ -40,6 +40,12 @@ class BenchmarkArgs:
     generation_module: str
     num_samples: int
     num_chunks: int | None
+    job_ids: list[int] = field(default_factory=list)
+    remaining_jobs: list[dict] = field(default_factory=list)
+
+    @property
+    def requires_judge(self):
+        return bool(self.judge_args or self.judge_pipeline_args)
 
 
 def get_arg_from_module_or_dict(module, arg_name, default_value=None, override_dict=None):
@@ -122,7 +128,7 @@ def get_benchmark_args_from_module(
 
 
 def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets):
-    benchmark_module, data_path, is_on_cluster = get_dataset_module(
+    benchmark_or_group_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark_or_group,
         data_dir=data_dir,
         cluster_config=cluster_config,
@@ -130,9 +136,16 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
         extra_datasets_type=extra_datasets_type,
     )
 
-    if getattr(benchmark_module, "IS_BENCHMARK_GROUP", False):
+    if getattr(benchmark_or_group_module, "IS_BENCHMARK_GROUP", False):
         benchmarks_args = []
-        for benchmark, override_dict in benchmark_module.BENCHMARKS.items():
+        for benchmark, override_dict in benchmark_or_group_module.BENCHMARKS.items():
+            benchmark_module, data_path, is_on_cluster = get_dataset_module(
+                dataset=benchmark,
+                data_dir=data_dir,
+                cluster_config=cluster_config,
+                extra_datasets=extra_datasets,
+                extra_datasets_type=extra_datasets_type,
+            )
             benchmark_args = get_benchmark_args_from_module(
                 benchmark_module=benchmark_module,
                 benchmark=benchmark,
@@ -148,7 +161,7 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
     benchmark = benchmark_or_group.replace('.', '/')
     return [
         get_benchmark_args_from_module(
-            benchmark_module=benchmark_module,
+            benchmark_module=benchmark_or_group_module,
             benchmark=benchmark,
             split=split,
             cluster_config=cluster_config,
@@ -178,6 +191,10 @@ def prepare_eval_commands(
     wandb_parameters,
     extra_eval_args,
 ):
+    # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
+
+    # TODO: should we allow setting num chunks per benchmark when not using groups? Maybe benchmark:rs_num:num_chunks?
+
     benchmarks_or_groups = {
         k: int(v) for k, v in [b.split(":") if ":" in b else (b, -1) for b in benchmarks_or_groups.split(",")]
     }
@@ -191,14 +208,7 @@ def prepare_eval_commands(
             # for local executor, it makes no sense to use other values
             num_jobs = 1
 
-    benchmark_requires_sandbox = {}
-    benchmark_judge_args = {}
-    benchmark_to_job_ids = defaultdict(list)
-    benchmark_default_args = {}
-    benchmark_chunks = {}
-
-    # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
-    benchmarks = {}  # benchmark name -> num_samples  # TODO: that's probably not a good structure anymore
+    benchmarks_dict = {}  # benchmark_name -> benchmark_args
     for benchmark_or_group, rs_num in benchmarks_or_groups.items():
         cur_benchmarks = add_default_args(
             cluster_config,
@@ -210,59 +220,50 @@ def prepare_eval_commands(
         )
         for benchmark_args in cur_benchmarks:
             benchmark = benchmark_args.name
-            benchmarks[benchmark] = benchmark_args.num_samples
-            benchmark_default_args[benchmark] = benchmark_args
-            if rs_num == -1:
-                benchmarks[benchmark] = benchmark_args.num_samples
-            else:
+            if benchmark in benchmarks_dict:
+                raise ValueError(
+                    f"Benchmark {benchmark} is specified multiple times in the benchmarks list. "
+                    "Please ensure each benchmark is unique."
+                )
+            benchmarks_dict[benchmark] = benchmark_args
+            if rs_num != -1:
                 if len(cur_benchmarks) > 1:
                     raise ValueError(
                         f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
                         f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
                     )
-                benchmarks[benchmark] = rs_num
-            if num_chunks is None:
-                # TODO: should we allow setting num chunks per benchmark when not using groups?
-                # Maybe benchmark:rs_num:num_chunks?
-                benchmark_chunks[benchmark] = benchmark_args.num_chunks
+                benchmarks_dict[benchmark].num_samples = rs_num
 
-            benchmark_requires_sandbox[benchmark] = benchmark_args.requires_sandbox
-            if benchmark_args.judge_args or benchmark_args.judge_pipeline_args:
-                benchmark_judge_args[benchmark] = (
-                    benchmark_args.judge_args,
-                    benchmark_args.judge_pipeline_args,
-                )
             if benchmark_args.requires_sandbox and not with_sandbox:
                 LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
 
-    benchmark_remaining_jobs = {}
     total_evals = 0
-    for benchmark, rs_num in benchmarks.items():
-        if rs_num == 0:
+    for benchmark, benchmark_args in benchmarks_dict.items():
+        if benchmark_args.num_samples == 0:
             random_seeds = [None]
         else:
-            random_seeds = list(range(starting_seed, starting_seed + rs_num))
+            random_seeds = list(range(starting_seed, starting_seed + benchmark_args.num_samples))
 
         if num_chunks:
             chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-        elif benchmark_chunks.get(benchmark):
-            chunk_ids = compute_chunk_ids(chunk_ids, benchmark_chunks[benchmark])
+        elif benchmark_args.num_chunks is not None:
+            chunk_ids = compute_chunk_ids(chunk_ids, benchmark_args.num_chunks)
         if chunk_ids is None:
             chunk_ids = [None]
 
-        if benchmark in benchmark_judge_args:
+        if benchmark_args.requires_judge:
             # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
             benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
         else:
             benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
-        benchmark_remaining_jobs[benchmark] = pipeline_utils.get_remaining_jobs(
+        benchmark_args.remaining_jobs = pipeline_utils.get_remaining_jobs(
             cluster_config=cluster_config,
             output_dir=benchmark_output_dir,
             random_seeds=random_seeds,
             chunk_ids=chunk_ids,
             rerun_done=rerun_done,
         )
-        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             total_evals += len(benchmark_chunk_ids)
 
     if num_jobs < 0:
@@ -294,18 +295,18 @@ def prepare_eval_commands(
     job_cmds = []
     job_benchmarks = set()
 
-    for benchmark, rs_num in benchmarks.items():
-        if rs_num == 0:
+    for benchmark, benchmark_args in benchmarks_dict.items():
+        if benchmark_args.num_samples == 0:
             random_seeds = [None]
         else:
-            random_seeds = list(range(starting_seed, starting_seed + rs_num))
+            random_seeds = list(range(starting_seed, starting_seed + benchmark_args.num_samples))
 
-        if benchmark in benchmark_judge_args:
+        if benchmark_args.requires_judge:
             # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
             benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
         else:
             benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
-        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_remaining_jobs[benchmark].items()):
+        for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
@@ -316,10 +317,10 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                generation_task = importlib.import_module(benchmark_default_args[benchmark].generation_module)
+                generation_task = importlib.import_module(benchmark_args.generation_module)
                 if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
                     raise ValueError(
-                        f"Module {benchmark_default_args[benchmark].generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+                        f"Module {benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
                         "Please provide a valid generation module."
                     )
                 generation_task = generation_task.GENERATION_TASK_CLASS
@@ -333,25 +334,25 @@ def prepare_eval_commands(
                     )
                 full_extra_arguments = (
                     f"{generation_task.get_generation_default_args()} "
-                    f"{benchmark_default_args[benchmark].generation_args} "
+                    f"{benchmark_args.generation_args} "
                     f"{job_extra_arguments} "
                 )
                 cmd = pipeline_utils.get_generation_cmd(
-                    input_file=benchmark_default_args[benchmark].input_file,
+                    input_file=benchmark_args.input_file,
                     output_dir=benchmark_output_dir,
                     extra_arguments=full_extra_arguments,
                     random_seed=seed,
-                    eval_args=f"{benchmark_default_args[benchmark].eval_args} {extra_eval_args}",
+                    eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=num_chunks,
-                    script=benchmark_default_args[benchmark].generation_module,
+                    script=benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )
                 job_cmds.append(cmd)
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
-                    job_needs_sandbox = any(benchmark_requires_sandbox[b] for b in job_benchmarks)
+                    job_needs_sandbox = any(benchmarks_dict[b].requires_sandbox for b in job_benchmarks)
                     job_batches.append(
                         (
                             job_cmds,
@@ -368,11 +369,11 @@ def prepare_eval_commands(
                         get_random_port=get_random_port,
                     )
                     for job_benchmark in job_benchmarks:
-                        benchmark_to_job_ids[job_benchmark].append(cur_job_idx)
+                        benchmarks_dict[job_benchmark].job_ids.append(cur_job_idx)
                     cur_job_idx += 1
                     job_cmds = []
                     job_benchmarks = set()
 
                 cur_eval += 1
 
-    return benchmarks, job_batches, benchmark_judge_args, benchmark_to_job_ids
+    return benchmarks_dict, job_batches

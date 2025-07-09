@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: score module logic
+# TODO: put group benchmarks into subfolder
+
 IS_BENCHMARK_GROUP = True
 
 SCORE_MODULE = "nemo_skills.dataset.aai.aai_score"
@@ -30,19 +33,19 @@ BENCHMARKS = {
     },
     "math-500": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/math ++inference.temperature=0.0",
-        "NUM_SAMPLES": "3",
+        "NUM_SAMPLES": 3,
     },
     "aime24": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/math ++inference.temperature=0.0",
-        "NUM_SAMPLES": "10",
+        "NUM_SAMPLES": 10,
     },
     "scicode": {
         "GENERATION_ARGS": "++inference.temperature=0.0",
-        "NUM_SAMPLES": "3",
+        "NUM_SAMPLES": 3,
     },
     "livecodebench": {
         "GENERATION_ARGS": "++prompt_config=eval/aai/livecodebench ++inference.temperature=0.0",
         "EVAL_SPLIT": "test_v5_2407_2412",
-        "NUM_SAMPLES": "3",
+        "NUM_SAMPLES": 3,
     },
 }

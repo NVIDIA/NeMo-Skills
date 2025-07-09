@@ -239,7 +239,7 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    benchmarks, job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
+    benchmarks_dict, job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
         cluster_config,
         benchmarks,
         split,
@@ -307,7 +307,7 @@ def eval(
                 dependent_tasks.extend(job_id_to_tasks[job_id])
             judge_wrap_args, judge_pipeline_args = judge_args
 
-            benchmark_seeds = benchmarks[benchmark]
+            benchmark_seeds = benchmarks_dict[benchmark].num_samples
             if benchmark_seeds == 0:
                 judge_pipeline_args['input_file'] = str(
                     Path(output_dir) / 'tmp-eval-results' / benchmark / 'output.jsonl'
@@ -355,7 +355,7 @@ def eval(
             benchmark_to_judge_tasks[benchmark] = judge_tasks
 
         # setting summarize results tasks
-        for benchmark in benchmarks:
+        for benchmark in benchmarks_dict:
             eval_dir = f"{output_dir}/eval-results"
             metric_file = f"{eval_dir}/{benchmark}/metrics.json"
 
