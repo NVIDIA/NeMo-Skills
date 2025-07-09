@@ -107,7 +107,8 @@ def get_benchmark_args_from_module(
             )
 
     prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", override_dict=override_dict)
-    generation_args = f"++prompt_config={prompt_config} {benchmark_module.GENERATION_ARGS}"
+    generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
+    generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
 
     generation_module = get_arg_from_module_or_dict(
