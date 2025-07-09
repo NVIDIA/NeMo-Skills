@@ -28,6 +28,8 @@ build
 *.xml
 *.DS_Store
 .coverage
+.venv
+uv.lock
 
 __pycache__
 .ipynb_checkpoints
