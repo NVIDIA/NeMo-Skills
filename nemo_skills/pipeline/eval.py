@@ -372,8 +372,9 @@ def eval(
             # TODO: with this new usage summarize_results probably needs some refactoring
             #       also maybe we should remove it from pipeline as it's not
             #       really ever needed to be run directly anymore?
+            results_folder = f"{output_dir}/{Path(benchmark_args.eval_subfolder).parent}"
             command = (
-                f"python -m nemo_skills.pipeline.summarize_results {output_dir}/{Path(benchmark_args.eval_subfolder).parent} "
+                f"python -m nemo_skills.pipeline.summarize_results {results_folder} "
                 f"    --benchmarks {benchmark} "
                 f"    --save_metrics_path {metric_file} "
             )
