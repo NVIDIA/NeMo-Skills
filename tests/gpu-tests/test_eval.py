@@ -172,7 +172,7 @@ def test_hf_eval(server_type, server_args):
     assert metrics['num_prompts'] == 164
 
     with open(f"{output_dir}/eval-results/mmlu/metrics.json", 'r') as f:
-        metrics = json.load(f)["mmlu"]["greedy"]
+        metrics = json.load(f)["mmlu-all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 164
 
