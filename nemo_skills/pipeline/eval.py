@@ -301,6 +301,8 @@ def eval(
                 job_id_to_tasks[idx] = prev_tasks
         # scheduling judge jobs if needed
         for idx, (benchmark, benchmark_args) in enumerate(benchmarks_dict.items()):
+            if not benchmark_args.requires_judge:
+                continue
             dependent_job_ids = benchmark_args.job_ids
             dependent_tasks = []
             for job_id in dependent_job_ids:
@@ -317,8 +319,8 @@ def eval(
                 judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
             # subfolder always starts with tmp-* for judge and we want to remove tmp-
             assert benchmark_args.eval_subfolder.startswith("tmp-")
-            final_subfolder = benchmark_args.eval_subfolder[4:]
-            judge_pipeline_args['output_dir'] = str(Path(output_dir) / final_subfolder)
+            benchmark_args.eval_subfolder = benchmark_args.eval_subfolder[4:]
+            judge_pipeline_args['output_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
             judge_ctx = deepcopy(ctx)
             # removing any extra arguments here as they are assumed to be for the main job
             judge_ctx.args = []
@@ -359,14 +361,13 @@ def eval(
 
         # setting summarize results tasks
         for benchmark, benchmark_args in benchmarks_dict.items():
-            eval_dir = f"{output_dir}/eval-results"
-            metric_file = f"{eval_dir}/{benchmark}/metrics.json"
+            metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
 
             # TODO: with this new usage summarize_results probably needs some refactoring
             #       also maybe we should remove it from pipeline as it's not
             #       really ever needed to be run directly anymore?
             command = (
-                f"python -m nemo_skills.pipeline.summarize_results {eval_dir} "
+                f"python -m nemo_skills.pipeline.summarize_results {output_dir}/{Path(benchmark_args.eval_subfolder).parent} "
                 f"    --benchmarks {benchmark} "
                 f"    --save_metrics_path {metric_file} "
             )
@@ -393,7 +394,7 @@ def eval(
                 exp,
                 cmd=command,
                 task_name=f'{benchmark}-summarize-results',
-                log_dir=f"{eval_dir}/{benchmark}/summarized_results",
+                log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized_results",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
                 run_after=run_after,

@@ -124,13 +124,13 @@ def get_benchmark_args_from_module(
 
     if judge_args or judge_pipeline_args:
         # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
-        eval_subfolder = f"tmp-eval-results/"
+        eval_subfolder = "tmp-eval-results/"
     else:
-        eval_subfolder = f"eval-results/"
+        eval_subfolder = "eval-results/"
 
     if benchmark_group:
         eval_subfolder += f"{benchmark_group}/"
-    eval_subfolder += f"{benchmark}"
+    eval_subfolder += benchmark
 
     return BenchmarkArgs(
         name=benchmark,
