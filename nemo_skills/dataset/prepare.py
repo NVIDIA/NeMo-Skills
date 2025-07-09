@@ -34,7 +34,7 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False,
         target_datasets = []
         for dataset in datasets:
             dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-            if dataset_module.DATASET_GROUP in dataset_groups:
+            if getattr(dataset_module, "DATASET_GROUP") in dataset_groups:
                 target_datasets.append(dataset)
         datasets = target_datasets
 
@@ -44,7 +44,7 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False,
         subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'} {extra_args}", shell=True, check=True)
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
 
-        if dataset_module.DATASET_GROUP == "math":
+        if getattr(dataset_module, "DATASET_GROUP") == "math":
             if add_lean4_header:
                 jsonl_files = list(dataset_path.glob("*.jsonl"))
                 header = get_lean4_header()

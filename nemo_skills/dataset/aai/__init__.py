@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: score module logic
-# TODO: put group benchmarks into subfolder
-
 IS_BENCHMARK_GROUP = True
 
 SCORE_MODULE = "nemo_skills.dataset.aai.aai_score"
