@@ -152,11 +152,9 @@ def test_vllm_generate_seeds():
         assert os.path.exists(f"{output_dir}/output-rs{seed}.jsonl.done")
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
-        [f"{output_dir}/output-rs*.jsonl"],
-    )[
-        "all"
-    ]["majority@3"]
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/output-rs*.jsonl"])["all"][
+        "majority@3"
+    ]
     # rough check, since exact accuracy varies depending on gpu type
     assert metrics['symbolic_correct'] >= 50
     assert metrics['num_entries'] == 10

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import logging
 import os
 import shlex
@@ -202,6 +203,13 @@ def get_executor(
         partition = partition or cluster_config.get("partition")
     else:
         partition = partition or cluster_config.get("cpu_partition") or cluster_config.get("partition")
+        if partition == cluster_config.get("cpu_partition"):
+            # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
+            # as cpu jobs almost always need more resources than automatically allocated by slurm
+            if slurm_kwargs is None:
+                slurm_kwargs = {}
+            slurm_kwargs["exclusive"] = True
+
     if 'timeouts' not in cluster_config:
         timeout = "10000:00:00:00"
     else:
@@ -536,6 +544,9 @@ def add_task(
     else:
         metadata = None
 
+    if not task_dependencies:  # empty list
+        task_dependencies = None
+
     if len(commands) == 1:
         # to keep sbatch script simpler, we don't wrap in a list in this case
         return exp.add(
@@ -558,7 +569,7 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=None, dry_run=False):
+def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     """If sequential is not specified, using True locally and False otherwise.
 
     If it is specified, it will be used as is.
@@ -567,10 +578,10 @@ def run_exp(exp, cluster_config, sequential=None, dry_run=False):
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
     if cluster_config['executor'] != 'slurm':
-        exp.run(detach=False, tail_logs=True, sequential=True if sequential is None else sequential)
+        exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
         try:
-            exp.run(detach=True, sequential=False if sequential is None else sequential)
+            exp.run(detach=True, sequential=sequential)
         except RuntimeError as e:
             if 'Your repo has uncommitted changes.' in str(e):
                 raise RuntimeError(
@@ -593,7 +604,10 @@ def run_exp(exp, cluster_config, sequential=None, dry_run=False):
                 REUSE_CODE_EXP[ssh_hash] = exp
 
 
-def get_exp(expname, cluster_config):
+def get_exp(expname, cluster_config, _reuse_exp=None):
+    # Use existing experiment if provided, otherwise create a new one
+    if _reuse_exp:
+        return contextlib.nullcontext(_reuse_exp)
     # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
     remove_handlers()
     if cluster_config['executor'] == 'slurm':
