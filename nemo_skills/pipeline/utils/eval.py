@@ -40,6 +40,7 @@ class BenchmarkArgs:
     generation_module: str
     num_samples: int
     num_chunks: int | None
+    eval_subfolder: str
     job_ids: list[int] = field(default_factory=list)
     remaining_jobs: list[dict] = field(default_factory=list)
 
@@ -60,7 +61,14 @@ def get_arg_from_module_or_dict(module, arg_name, default_value=None, override_d
 
 
 def get_benchmark_args_from_module(
-    benchmark_module, benchmark, split, cluster_config, data_path, is_on_cluster, override_dict=None
+    benchmark_module,
+    benchmark,
+    split,
+    cluster_config,
+    data_path,
+    is_on_cluster,
+    benchmark_group=None,
+    override_dict=None,
 ):
     if split is None:
         split = get_arg_from_module_or_dict(benchmark_module, "EVAL_SPLIT", "test", override_dict)
@@ -113,6 +121,17 @@ def get_benchmark_args_from_module(
     num_chunks = get_arg_from_module_or_dict(benchmark_module, "NUM_CHUNKS", 0, override_dict)
     if num_chunks == 0:
         num_chunks = None
+
+    if judge_args or judge_pipeline_args:
+        # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
+        eval_subfolder = f"tmp-eval-results/"
+    else:
+        eval_subfolder = f"eval-results/"
+
+    if benchmark_group:
+        eval_subfolder += f"{benchmark_group}/"
+    eval_subfolder += f"{benchmark}"
+
     return BenchmarkArgs(
         name=benchmark,
         input_file=input_file,
@@ -124,6 +143,7 @@ def get_benchmark_args_from_module(
         generation_module=generation_module,
         num_samples=num_samples,
         num_chunks=num_chunks,
+        eval_subfolder=eval_subfolder,
     )
 
 
@@ -251,14 +271,9 @@ def prepare_eval_commands(
         if chunk_ids is None:
             chunk_ids = [None]
 
-        if benchmark_args.requires_judge:
-            # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
-            benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
-        else:
-            benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
         benchmark_args.remaining_jobs = pipeline_utils.get_remaining_jobs(
             cluster_config=cluster_config,
-            output_dir=benchmark_output_dir,
+            output_dir=f"{output_dir}/{benchmark_args.eval_subfolder}",
             random_seeds=random_seeds,
             chunk_ids=chunk_ids,
             rerun_done=rerun_done,
@@ -301,11 +316,7 @@ def prepare_eval_commands(
         else:
             random_seeds = list(range(starting_seed, starting_seed + benchmark_args.num_samples))
 
-        if benchmark_args.requires_judge:
-            # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
-            benchmark_output_dir = f"{output_dir}/tmp-eval-results/{benchmark}"
-        else:
-            benchmark_output_dir = f"{output_dir}/eval-results/{benchmark}"
+        benchmark_output_dir = f"{output_dir}/{benchmark_args.eval_subfolder}"
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging

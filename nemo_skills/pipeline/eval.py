@@ -239,7 +239,7 @@ def eval(
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    benchmarks_dict, job_batches, benchmark_judge_args, benchmark_to_job_ids = prepare_eval_commands(
+    benchmarks_dict, job_batches = prepare_eval_commands(
         cluster_config,
         benchmarks,
         split,
@@ -300,22 +300,25 @@ def eval(
                 # only last dependent job will be here, which is what we want
                 job_id_to_tasks[idx] = prev_tasks
         # scheduling judge jobs if needed
-        for idx, (benchmark, judge_args) in enumerate(benchmark_judge_args.items()):
-            dependent_job_ids = benchmark_to_job_ids[benchmark]
+        for idx, (benchmark, benchmark_args) in enumerate(benchmarks_dict.items()):
+            dependent_job_ids = benchmark_args.job_ids
             dependent_tasks = []
             for job_id in dependent_job_ids:
                 dependent_tasks.extend(job_id_to_tasks[job_id])
-            judge_wrap_args, judge_pipeline_args = judge_args
+            judge_wrap_args, judge_pipeline_args = benchmark_args.judge_args, benchmark_args.judge_pipeline_args
 
-            benchmark_seeds = benchmarks_dict[benchmark].num_samples
+            benchmark_seeds = benchmark_args.num_samples
             if benchmark_seeds == 0:
                 judge_pipeline_args['input_file'] = str(
-                    Path(output_dir) / 'tmp-eval-results' / benchmark / 'output.jsonl'
+                    Path(output_dir) / benchmark_args.eval_subfolder / 'output.jsonl'
                 )
             else:
-                judge_pipeline_args['input_dir'] = str(Path(output_dir) / 'tmp-eval-results' / benchmark)
+                judge_pipeline_args['input_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
                 judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
-            judge_pipeline_args['output_dir'] = str(Path(output_dir) / 'eval-results' / benchmark)
+            # subfolder always starts with tmp-* for judge and we want to remove tmp-
+            assert benchmark_args.eval_subfolder.startswith("tmp-")
+            final_subfolder = benchmark_args.eval_subfolder[4:]
+            judge_pipeline_args['output_dir'] = str(Path(output_dir) / final_subfolder)
             judge_ctx = deepcopy(ctx)
             # removing any extra arguments here as they are assumed to be for the main job
             judge_ctx.args = []
@@ -355,7 +358,7 @@ def eval(
             benchmark_to_judge_tasks[benchmark] = judge_tasks
 
         # setting summarize results tasks
-        for benchmark in benchmarks_dict:
+        for benchmark, benchmark_args in benchmarks_dict.items():
             eval_dir = f"{output_dir}/eval-results"
             metric_file = f"{eval_dir}/{benchmark}/metrics.json"
 
@@ -381,7 +384,7 @@ def eval(
             if benchmark in benchmark_to_judge_tasks:
                 dependent_tasks = benchmark_to_judge_tasks[benchmark]
             else:
-                dependent_job_ids = benchmark_to_job_ids[benchmark]
+                dependent_job_ids = benchmark_args.job_ids
                 dependent_tasks = []
                 for job_id in dependent_job_ids:
                     dependent_tasks.extend(job_id_to_tasks[job_id])
