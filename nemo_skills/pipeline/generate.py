@@ -246,6 +246,8 @@ def generate(
     )
     has_tasks = False
     all_tasks = []
+    if _task_dependencies is None:
+        _task_dependencies = []
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
@@ -302,7 +304,9 @@ def generate(
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
-                        task_dependencies=prev_tasks,
+                        task_dependencies=(
+                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                        ),
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                         installation_command=installation_command,

@@ -265,6 +265,9 @@ def eval(
     has_tasks = False
     job_id_to_tasks = {}
     benchmark_to_judge_tasks = {}
+    all_tasks = []
+    if _task_dependencies is None:
+        _task_dependencies = []
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
@@ -292,13 +295,16 @@ def eval(
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
-                    task_dependencies=prev_tasks,
+                    task_dependencies=(
+                        prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                    ),
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     installation_command=installation_command,
                 )
                 prev_tasks = [new_task]
+                all_tasks.append(new_task)
                 # only last dependent job will be here, which is what we want
                 job_id_to_tasks[idx] = prev_tasks
         # scheduling judge jobs if needed
@@ -356,12 +362,14 @@ def eval(
                 exclusive=exclusive,
                 installation_command=installation_command,
                 _reuse_exp=exp,
-                _task_dependencies=dependent_tasks,
+                _task_dependencies=(
+                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
                 **judge_pipeline_args,
             )
             benchmark_to_judge_tasks[benchmark] = judge_tasks
+            all_tasks.extend(judge_tasks)
 
-        all_tasks = []
         group_metric_files = defaultdict(list)
         group_tasks = defaultdict(list)
         group_module = {}
@@ -407,7 +415,9 @@ def eval(
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                task_dependencies=dependent_tasks,
+                task_dependencies=(
+                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
                 installation_command=installation_command,
             )
             all_tasks.append(summarize_task)
@@ -437,7 +447,9 @@ def eval(
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                task_dependencies=group_tasks[group],
+                task_dependencies=(
+                    group_tasks[group] if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
                 installation_command=installation_command,
             )
             all_tasks.append(score_task)
