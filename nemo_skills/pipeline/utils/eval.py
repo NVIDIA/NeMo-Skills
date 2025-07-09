@@ -271,18 +271,20 @@ def prepare_eval_commands(
         else:
             random_seeds = list(range(starting_seed, starting_seed + benchmark_args.num_samples))
 
+        benchmark_chunk_ids = None
         if num_chunks:
-            chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-        elif benchmark_args.num_chunks is not None:
-            chunk_ids = compute_chunk_ids(chunk_ids, benchmark_args.num_chunks)
-        if chunk_ids is None:
-            chunk_ids = [None]
+            benchmark_args.num_chunks = num_chunks
+        if benchmark_args.num_chunks is not None:
+            # TODO: currently using global chunk_ids but local num_chunks. That's not ideal
+            benchmark_chunk_ids = compute_chunk_ids(chunk_ids, benchmark_args.num_chunks)
+        if benchmark_chunk_ids is None:
+            benchmark_chunk_ids = [None]
 
         benchmark_args.remaining_jobs = pipeline_utils.get_remaining_jobs(
             cluster_config=cluster_config,
             output_dir=f"{output_dir}/{benchmark_args.eval_subfolder}",
             random_seeds=random_seeds,
-            chunk_ids=chunk_ids,
+            chunk_ids=benchmark_chunk_ids,
             rerun_done=rerun_done,
         )
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
@@ -362,7 +364,7 @@ def prepare_eval_commands(
                     random_seed=seed,
                     eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
-                    num_chunks=num_chunks,
+                    num_chunks=benchmark_args.num_chunks,
                     script=benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
