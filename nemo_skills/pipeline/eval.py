@@ -342,7 +342,7 @@ def eval(
             has_tasks = True
             judge_tasks = _generate(
                 ctx=judge_ctx,
-                expname=f"{expname}-judge-{idx}",
+                expname=f"{expname}-{benchmark}-judge",
                 log_dir=log_dir + '/judge',
                 cluster=cluster,
                 partition=partition,
@@ -398,7 +398,7 @@ def eval(
             summarize_task = pipeline_utils.add_task(
                 exp,
                 cmd=command,
-                task_name=f'{benchmark}-summarize-results',
+                task_name=f'{expname}-{benchmark}-summarize-results',
                 log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
@@ -416,6 +416,8 @@ def eval(
                 group_module[benchmark_args.benchmark_group] = benchmark_args.score_module
 
         # if we have any benchmark groups, submitting final aggregation for those
+        # TODO: this should be done by summarize_results directly and we just call it on a group
+        #       otherwise behavior is inconsistent when running summarize_results standalone, which isn't great
         for group, metric_files in group_metric_files.items():
             has_tasks = True
             command = (
@@ -426,7 +428,7 @@ def eval(
             score_task = pipeline_utils.add_task(
                 exp,
                 cmd=command,
-                task_name=f'{group}-compute-score',
+                task_name=f'{expname}-{group}-compute-score',
                 log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,

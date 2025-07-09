@@ -370,6 +370,7 @@ def prepare_eval_commands(
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
                     job_needs_sandbox = any(benchmarks_dict[b].requires_sandbox for b in job_benchmarks)
+                    # TODO: move to a dataclass
                     job_batches.append(
                         (
                             job_cmds,
