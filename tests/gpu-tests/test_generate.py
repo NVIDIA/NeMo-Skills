@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-from nemo_skills.evaluation.metrics import ComputeMetrics
 from tests.conftest import docker_rm
 
 # TODO: retrieval test
@@ -151,12 +150,9 @@ def test_vllm_generate_seeds():
             assert 'generation' in data
         assert os.path.exists(f"{output_dir}/output-rs{seed}.jsonl.done")
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
-        [f"{output_dir}/output-rs*.jsonl"],
-    )[
-        "all"
-    ]["majority@3"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["majority@3"]
+
     # rough check, since exact accuracy varies depending on gpu type
     assert metrics['symbolic_correct'] >= 50
     assert metrics['num_entries'] == 10
