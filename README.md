@@ -16,9 +16,11 @@ Here are some of the things we support.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models at speed-of-light using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
-To get started, follow this [tutorial](https://nvidia.github.io/NeMo-Skills/basics),
+To get started, follow these [steps](https://nvidia.github.io/NeMo-Skills/basics),
 browse available [pipelines](https://nvidia.github.io/NeMo-Skills/pipelines) or run `ns --help` to see all available
 commands and their options.
+
+You can find more examples of how to use NeMo-Skills in the [tutorials](https://nvidia.github.io/NeMo-Skills/tutorials) page.
 
 ## OpenMathReasoning Dataset
 

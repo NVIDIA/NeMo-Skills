@@ -2,6 +2,10 @@ site_name: NeMo-Skills
 site_url: https://nvidia.github.io/NeMo-Skills
 extra_css:
   - css/extra.css
+plugins:
+  - blog:
+      blog_dir: tutorials
+      post_dir: "{blog}/posts"
 theme:
   name: material
   logo: favicon.ico
@@ -61,6 +65,8 @@ nav:
     - Training (NeMo-Aligner): pipelines/training.md
     - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
     - Arbitrary commands: pipelines/run-cmd.md
+  - Tutorials:
+    - tutorials/index.md
   - OpenMathInstruct:
     - openmathinstruct2/index.md
     - Model evaluation: openmathinstruct2/evaluation.md
