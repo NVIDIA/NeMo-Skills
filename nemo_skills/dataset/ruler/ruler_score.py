@@ -31,10 +31,12 @@ def compute_score(metrics: dict):
         "qa_1",
         "qa_2",
     ]
-    metrics["ruler"] = {}
-    for aggregation in metrics["niah_single_1"]:
-        metrics["ruler"][aggregation] = {
-            "accuracy": sum(metrics[task][aggregation]["accuracy"] for task in tasks) / len(tasks)
+    setup = list(metrics.keys())[0].rsplit(".", 1)[0]
+    metrics[setup] = {}
+
+    for aggregation in metrics[f"{setup}.niah_single_1"]:
+        metrics[setup][aggregation] = {
+            "accuracy": sum(metrics[f"{setup}.{task}"][aggregation]["accuracy"] for task in tasks) / len(tasks)
         }
 
     return metrics
