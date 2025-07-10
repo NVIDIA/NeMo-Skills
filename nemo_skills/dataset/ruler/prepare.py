@@ -22,7 +22,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-# Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
 PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "long-context"
@@ -127,6 +126,12 @@ def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
         # resaving the data and creating __init__.py files
         for task in tasks:
             prepare_task_for_ns(task, Path(tmpdirname) / "ruler_data", setup)
+
+        with open(Path(__file__).parent / setup / "__init__.py", "w", encoding="utf-8") as init_file:
+            init_file.write("IS_BENCHMARK_GROUP = True\n")
+            init_file.write("SCORE_MODULE = 'nemo_skills.dataset.ruler.ruler_score'\n")
+            benchmarks = ", ".join(f"'ruler.{setup}.{task}': {{}}" for task in tasks)
+            init_file.write(f"BENCHMARKS = {{{benchmarks}}}\n")
 
     finally:
         if tmpdir_context is not None:

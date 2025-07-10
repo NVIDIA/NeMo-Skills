@@ -149,15 +149,7 @@ directly. You can also use `NEMO_SKILLS_DATA_DIR` environment variable instead o
 Here is an example evaluation command for ruler that uses data_dir parameter
 
 ```python
-from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
-
-tasks = [
-    "niah_single_1", "niah_single_2","niah_single_3",
-    "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
-    "niah_multivalue", "niah_multiquery",
-    "vt", "cwe", "fwe", "qa_1", "qa_2",
-]
-benchmarks = ",".join([f"ruler.llama_128k.{task}:0" for task in tasks])
+from nemo_skills.pipeline.cli import eval, wrap_arguments
 
 eval(
     # using a low number of concurrent requests since it's almost entirely prefill stage
@@ -167,24 +159,9 @@ eval(
     server_type="sglang",
     output_dir="/workspace/eval-ruler",
     data_dir="/workspace/ns-data",
-    benchmarks=benchmarks,
+    benchmarks="ruler.llama_128k",
     server_gpus=8,
     expname="eval-ruler",
-)
-
-# running summarize results on the cluster as well to avoid downloading the data
-# you can find results in /workspace/eval-ruler/eval-results/metrics.json
-# or add --wandb_name parameter to log to W&B
-cmd = (
-    "python -m nemo_skills.pipeline.summarize_results "
-    "    --data_dir /workspace/ns-data /workspace/eval-ruler/eval-results "
-)
-run_cmd(
-    ctx=wrap_arguments(cmd),
-    cluster="slurm",
-    log_dir="/workspace/eval-ruler/eval-results/summarize_results",
-    expname="summarize-results",
-    run_after="eval-ruler",
 )
 ```
 
