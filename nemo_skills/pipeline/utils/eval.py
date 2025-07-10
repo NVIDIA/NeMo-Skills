@@ -77,16 +77,16 @@ def get_benchmark_args_from_module(
 
     if not is_on_cluster:
         if pipeline_utils.is_mounted_filepath(cluster_config, data_path):
-            input_file = f"{data_path}/{benchmark}/{split}.jsonl"
+            input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
             unmounted_input_file = pipeline_utils.get_unmounted_path(cluster_config, input_file)
             unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace('/nemo_run/code/', ''))
         else:
             # will be copied over in this case as it must come from extra datasets
-            input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark}/{split}.jsonl"
-            unmounted_path = Path(data_path) / benchmark / f"{split}.jsonl"
+            input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark.replace('.', '/')}/{split}.jsonl"
+            unmounted_path = Path(data_path) / benchmark.replace('.', '/') / f"{split}.jsonl"
     else:
         # on cluster we will always use the mounted path
-        input_file = f"{data_path}/{benchmark}/{split}.jsonl"
+        input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
         unmounted_path = pipeline_utils.get_unmounted_path(cluster_config, input_file)
 
     unmounted_path = str(unmounted_path)
