@@ -76,22 +76,22 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
             LOG.info(f"Using client parsing for {self.model_name}")
 
             # There are two key functionalities that we need to support on the client side:
-            # 1. Format the prompt
-            # 2. Parse the response and extract the tool calls
+            # 1. Parse the response and extract the tool calls
+            # 2. Format the prompt
 
-            # 1. Initialize the prompt formatter
-            # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
-            # So we use the tokenizer to format the prompt instead which uses the chat template directly
-            from transformers import AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_handler.model_name_huggingface)
-            self.message_formatter = partial(self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
-            
-            # 2. Initialize the response parser
+            # 1. Initialize the response parser
             model_handler_class = local_inference_model_map[self.model_name].model_handler
             # Initialize the model handler - Temperature is not used but required by the model handler
             model_handler = model_handler_class(self.model_name, temperature=self.inference.temperature)
             # We only need the response parser from the model handler
             self.response_parser = model_handler._parse_query_response_prompting
+
+            # 2. Initialize the prompt formatter
+            # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
+            # So we use the tokenizer to format the prompt instead which uses the chat template directly
+            from transformers import AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
+            self.message_formatter = partial(self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
 
 
     def _get_disallowed_params(self):
