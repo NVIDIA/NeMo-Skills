@@ -13,24 +13,12 @@
 # limitations under the License.
 
 
-import inspect
 import json
 import logging
-import math
 import shutil
-from collections import defaultdict
-from copy import deepcopy
 from pathlib import Path
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
 
-import numpy as np
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from tqdm import tqdm
-
-from nemo_skills.inference.model import get_model
-from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -52,9 +40,8 @@ def eval_bfcl(cfg):
     model_name = eval_config.model.replace('/', '_')
     # model_name = eval_config.model.split("/")[-1]
     for jsonl_file in unroll_files(cfg.input_files):
-        parent_dir = Path(jsonl_file).absolute().parent
-        # Test categories are labeled as bfcl.simple, bfcl.parallel, bfcl.multiple
-        test_category = Path(parent_dir).name.split(".")[1]
+        # Output files are structures as bfcl_v3/TEST_CATEGORY/jsonl_file
+        test_category = Path(jsonl_file).absolute().parent.name
         
         # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
