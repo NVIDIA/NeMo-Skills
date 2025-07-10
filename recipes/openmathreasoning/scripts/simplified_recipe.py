@@ -314,8 +314,8 @@ if __name__ == "__main__":
         args.expname_prefix,
         wandb_params,
     )
-    # prepare(*args)
-    # initial_eval(*args)
-    # run_sdg(*args)
+    prepare(*args)
+    initial_eval(*args)
+    run_sdg(*args)
     run_training(*args)
     final_eval(*args)
