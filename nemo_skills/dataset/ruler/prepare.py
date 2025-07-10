@@ -130,7 +130,7 @@ def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
         with open(Path(__file__).parent / setup / "__init__.py", "w", encoding="utf-8") as init_file:
             init_file.write("IS_BENCHMARK_GROUP = True\n")
             init_file.write("SCORE_MODULE = 'nemo_skills.dataset.ruler.ruler_score'\n")
-            benchmarks = ", ".join(f"ruler.{setup}.{task}: {{}}" for task in tasks)
+            benchmarks = ", ".join(f"'ruler.{setup}.{task}': {{}}" for task in tasks)
             init_file.write(f"BENCHMARKS = {{{benchmarks}}}\n")
 
     finally:
