@@ -250,6 +250,11 @@ def sft_openrlhf(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -289,8 +294,8 @@ def sft_openrlhf(
         extra_arguments=extra_arguments,
     )
 
-    with get_exp(expname, cluster_config) as exp:
-        prev_task = None
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
+        prev_task = _task_dependencies
         for job_id in range(num_training_jobs):
             prev_task = add_task(
                 exp,
@@ -312,8 +317,10 @@ def sft_openrlhf(
                 installation_command=installation_command,
             )
 
-        run_exp(exp, cluster_config, sequential=False)
+        run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

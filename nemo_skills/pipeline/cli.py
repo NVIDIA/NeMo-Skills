@@ -23,7 +23,6 @@ from nemo_skills.pipeline.app import app
 # need the imports to make sure the commands are registered
 from nemo_skills.pipeline.convert import convert
 from nemo_skills.pipeline.eval import eval
-from nemo_skills.pipeline.eval_group import eval_group
 from nemo_skills.pipeline.generate import generate
 from nemo_skills.pipeline.genselect import genselect
 from nemo_skills.pipeline.nemo_rl.grpo import grpo_nemo_rl

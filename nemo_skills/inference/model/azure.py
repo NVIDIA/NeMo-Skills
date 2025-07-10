@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import threading
 
 from openai import AzureOpenAI
 
@@ -33,9 +34,14 @@ class AzureOpenAIModel(OpenAIModel):
         initial_retry_delay: float = 2.0,
         **kwargs,
     ):
+        # TODO: fix that by moving non-relevant logic into methods and overriding
         # Call BaseModel.__init__ directly to bypass OpenAIModel.__init__ logic
         BaseModel.__init__(self, host=host, port=port, **kwargs)
         self._tunnel = None
+
+        # Track active generations with thread-safe operations
+        self.active_generations = {}
+        self._generations_lock = threading.Lock()
 
         model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
         if model is None:

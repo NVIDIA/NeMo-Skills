@@ -49,7 +49,7 @@ def import_score_module(score_module: str):
 def main():
     parser = argparse.ArgumentParser(description='Compute scores from metric files')
     parser.add_argument('metric_files', nargs='+', help='List of metric.json files to combine')
-    parser.add_argument('--score_module', required=True, help='Score module name or path to compute_score function')
+    parser.add_argument('--score_module', required=True, help='Score module name or path to python file')
     parser.add_argument('--save_metrics_file', required=True, help='Output file to save final metrics')
 
     args = parser.parse_args()

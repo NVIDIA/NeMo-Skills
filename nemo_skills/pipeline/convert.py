@@ -268,6 +268,10 @@ def convert(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -354,9 +358,9 @@ def convert(
         num_nodes=num_nodes,
         extra_arguments=extra_arguments,
     )
-    with get_exp(expname, cluster_config) as exp:
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=conversion_cmd,
             task_name=expname,
@@ -373,9 +377,12 @@ def convert(
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
+            task_dependencies=_task_dependencies,
         )
         run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 
