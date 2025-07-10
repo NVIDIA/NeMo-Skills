@@ -20,6 +20,7 @@ import json
 import hydra
 from dataclasses import asdict, field
 from omegaconf import OmegaConf
+from functools import partial
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -76,6 +77,12 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
             model_handler = local_inference_model_map[self.model_name].model_handler
             # Initialize the model handler - Temperature is not used but required by the model handler
             self.model_handler = model_handler(self.model_name, temperature=self.inference.temperature)
+            self.response_parser = self.model_handler._parse_query_response_prompting
+
+            from transformers import AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_handler.model_name_huggingface)
+            self.message_formatter = partial(self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
+
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -119,7 +126,7 @@ class BFCLGenerationTask(GenerationTask):
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
         if self.cfg.use_client_parsing:
-            fmted_prompt = self.cfg.model_handler._format_prompt(messages, tools)
+            fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
                 "prompts": [fmted_prompt],
                 "include_response": True,
@@ -127,11 +134,19 @@ class BFCLGenerationTask(GenerationTask):
                 **self.extra_generate_params,
             }
             output = self.llm.generate(**input_dict)[0]
-            parsed_response = self.cfg.model_handler._parse_query_response_prompting(output["response"])["model_responses_message_for_chat_history"]
+            parsed_response = self.cfg.response_parser(output["response"])["model_responses_message_for_chat_history"]
+
+            model_response = {
+                "role": "assistant",
+                "content": parsed_response["content"],
+            }
+            if "tool_calls" in parsed_response:
+                model_response["tool_calls"] = parsed_response["tool_calls"]
+
 
             return {
-                # Message is a turn formatted in chat format
-                "message": {"role": "assistant", "content": parsed_response["content"]}, 
+                # Message is a turn formatted in chat format which gets appended to the chat history
+                "message": model_response, 
                 # Generation is either the text or is empty if there are tool calls
                 "generation": parsed_response["content"],
                 "tool_calls": parsed_response.get("tool_calls", []),
@@ -210,7 +225,7 @@ class BFCLGenerationTask(GenerationTask):
                     if self.cfg.use_client_parsing:
                         if model_response["message"]["content"] is not None:
                             trimmed_content = self._process_model_response_text(model_response["message"]["content"])
-                            model_response["message"] = {"role": "assistant", "content": trimmed_content}
+                            model_response["message"]["content"] = trimmed_content
                     else:
                         if model_response["message"].content is not None:
                             model_response["message"].content = self._process_model_response_text(model_response["message"].content)
@@ -274,15 +289,13 @@ class BFCLGenerationTask(GenerationTask):
     
     def llm_generate(self, data_points, data, is_async=True):
         """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
-
-        if data_points[0]["single_turn"]:
-            method = self.generate_single_data_point_single_turn
-        else:
-            method = self.generate_single_data_point_multi_turn
-
         futures = []
         with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
             for data_point in data_points:
+                if data_point["single_turn"]:
+                    method = self.generate_single_data_point_single_turn
+                else:
+                    method = self.generate_single_data_point_multi_turn
                 future = executor.submit(method, data_point)
                 futures.append(future)
 
