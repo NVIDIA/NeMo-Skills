@@ -64,8 +64,10 @@ def eval_bfcl(cfg):
 
         try:
             # Run BFCL evaluation using the CLI
+            # We need the OpenAI model class decoding functions for evaluation but not really the actual API key for evaluation
+            # So we set the API key to a dummy value
             cmd = (
-                f'bfcl evaluate --model {eval_config.model} '
+                f'OPENAI_API_KEY=dummy bfcl evaluate --model {eval_config.model} '
                 f'--test-category {test_category}'
             )
             
