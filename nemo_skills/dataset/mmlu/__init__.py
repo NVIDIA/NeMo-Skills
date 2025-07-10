@@ -14,7 +14,7 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = "generic/general-boxed"
+PROMPT_CONFIG = "eval/aai/mcq-4choices"
 DATASET_GROUP = "multichoice"
 METRICS_TYPE = "multichoice"
 EVAL_ARGS = "++eval_type=multichoice"
