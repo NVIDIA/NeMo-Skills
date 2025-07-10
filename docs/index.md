@@ -21,4 +21,6 @@ Here are some of the things we support.
 
 
 To get started, follow these [steps](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
-commands and their options. You can find more examples of how to use NeMo-Skills in the [tutorials](./tutorials) page.
+commands and their options.
+
+You can find more examples of how to use NeMo-Skills in the [tutorials](./tutorials/index.md) page.
