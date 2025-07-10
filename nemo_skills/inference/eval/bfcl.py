@@ -74,14 +74,24 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
                 raise ValueError(f"{self.model_name} is not supported by BFCL Eval")
             
             LOG.info(f"Using client parsing for {self.model_name}")
-            model_handler = local_inference_model_map[self.model_name].model_handler
-            # Initialize the model handler - Temperature is not used but required by the model handler
-            self.model_handler = model_handler(self.model_name, temperature=self.inference.temperature)
-            self.response_parser = self.model_handler._parse_query_response_prompting
 
+            # There are two key functionalities that we need to support on the client side:
+            # 1. Format the prompt
+            # 2. Parse the response and extract the tool calls
+
+            # 1. Initialize the prompt formatter
+            # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
+            # So we use the tokenizer to format the prompt instead which uses the chat template directly
             from transformers import AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_handler.model_name_huggingface)
             self.message_formatter = partial(self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
+            
+            # 2. Initialize the response parser
+            model_handler_class = local_inference_model_map[self.model_name].model_handler
+            # Initialize the model handler - Temperature is not used but required by the model handler
+            model_handler = model_handler_class(self.model_name, temperature=self.inference.temperature)
+            # We only need the response parser from the model handler
+            self.response_parser = model_handler._parse_query_response_prompting
 
 
     def _get_disallowed_params(self):
@@ -142,7 +152,6 @@ class BFCLGenerationTask(GenerationTask):
             }
             if "tool_calls" in parsed_response:
                 model_response["tool_calls"] = parsed_response["tool_calls"]
-
 
             return {
                 # Message is a turn formatted in chat format which gets appended to the chat history
