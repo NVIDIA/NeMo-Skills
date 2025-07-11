@@ -134,7 +134,7 @@ def filter_code_samples(
     output_filename: str = "filtered_data.json",
     keep_explanations: bool = True,
     do_ast_check: bool = True,
-    filter_reasoning: bool = False,
+    filter_reasoning: bool = True,
     reasoning_start_tag: str = "<think>",
     reasoning_end_tag: str = "</think>",
     num_chunks: int = None,
@@ -189,11 +189,6 @@ def filter_code_samples(
                 reasoning_end_idx = output.find(reasoning_end_tag)
                 if reasoning_start_idx != -1 and reasoning_end_idx != -1:
                     checked_output = output[reasoning_end_idx + len(reasoning_end_tag) :]
-
-                    # Do a check that no ``` tag exists inside the reasoning section, otherwise reject the sample
-                    # if "```" in checked_output:
-                    #     sample['is_valid_sample'] = False
-                    #     continue
 
                 elif reasoning_start_idx < 0 and reasoning_end_idx != -1:
                     checked_output = output[reasoning_end_idx + len(reasoning_end_tag) :]
