@@ -316,11 +316,12 @@ def generate(
         if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if has_tasks:
-        if _reuse_exp:
-            return all_tasks
-        return exp
-    return None
+    if _reuse_exp:
+        return all_tasks
+    else:
+        if has_tasks:
+            return exp
+        return None
 
 
 if __name__ == "__main__":

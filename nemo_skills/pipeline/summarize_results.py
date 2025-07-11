@@ -474,7 +474,10 @@ def summarize_results(
                     )
 
         # Log all plots
-        run.log({**plots})
+        try:
+            run.log({**plots})
+        except ValueError as e:
+            print("Couldn't upload plots to wandb due to error:", str(e))
         run.finish()
         print(
             f"Results are synced to wandb project {wandb_project} under the name {wandb_name} and group {wandb_group}"
