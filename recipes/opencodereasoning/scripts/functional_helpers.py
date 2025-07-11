@@ -42,6 +42,9 @@ def rename_files_to_json(data_path: str):
     if "*" in data_path:
         # Treat as glob pattern
         all_data_path = sorted(glob.glob(data_path))
+
+        # Filter the .done files if they exist
+        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
     else:
         all_data_path = [data_path]
 
@@ -76,6 +79,9 @@ def filter_invalid_samples(
     if "*" in data_path:
         # Treat as glob pattern
         all_data_path = sorted(glob.glob(data_path))
+
+        # Filter the .done files if they exist
+        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
 
         out_file, ext = os.path.splitext(output_filename)
         all_output_filenames = [
@@ -141,10 +147,14 @@ def filter_code_samples(
         # Treat as glob pattern
         all_data_path = sorted(glob.glob(data_path))
 
+        # Filter the .done files if they exist
+        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
+
         out_file, ext = os.path.splitext(output_filename)
         all_output_filenames = [
             f"{out_file}_{os.path.basename(input_path)}" for idx, input_path in enumerate(all_data_path)
         ]
+
 
     else:
         # Just get the chunked file name of input, no need to load the data
