@@ -37,7 +37,6 @@ def prepare_questions(cluster, expname, output_dir: str):
         log_dir=f"{output_dir}/logs",
         expname=expname,
         run_after=None,
-        check_mounted_paths=True,
     )
 
 
