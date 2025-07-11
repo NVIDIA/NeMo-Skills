@@ -107,7 +107,6 @@ run_cmd(
     num_nodes=2,
     container="sglang",
     log_dir="/hf_models/DeepSeek-R1-tp16",
-    partition="interactive",
 )
 ```
 
