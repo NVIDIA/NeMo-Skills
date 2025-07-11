@@ -29,7 +29,7 @@ from nemo_skills.utils import check_no_extra_args_fire, get_logger_name, setup_l
 
 from output_processing import post_process_generation
 
-logger = logging.getLogger(get_logger_name(__name__))
+logger = logging.getLogger('nemo_skills')
 
 
 def rename_files_to_json(data_path: str):

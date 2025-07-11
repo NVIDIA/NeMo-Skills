@@ -51,7 +51,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
 
-    filter_expname = f"{expname}-filter-solutions"
+    filter_expname = f"{expname}-filter"
 
     command = (
         f"cd /nemo_run/code/recipes/opencodereasoning/scripts && "
