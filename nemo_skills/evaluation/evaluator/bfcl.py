@@ -41,7 +41,7 @@ def eval_bfcl(cfg):
     # model_name = eval_config.model.split("/")[-1]
     for jsonl_file in unroll_files(cfg.input_files):
         # Output files are structures as bfcl_v3/TEST_CATEGORY/jsonl_file
-        test_category = Path(jsonl_file).absolute().parent.name
+        test_category = str(Path(jsonl_file).absolute().parent.name).lstrip("bfcl_v3.")
         
         # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
