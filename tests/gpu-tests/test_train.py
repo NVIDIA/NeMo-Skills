@@ -192,7 +192,6 @@ def test_sft_aligner():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
-        partition="interactive",
     )
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
@@ -255,7 +254,6 @@ def test_dpo_aligner():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
-        partition="interactive",
     )
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
@@ -337,7 +335,6 @@ def test_rm_aligner(test_mode):
         model=f"{output_dir}/model-averaged-nemo",
         server_gpus=1,
         server_nodes=1,
-        partition="interactive",
         num_random_seeds=None,
     )
 
@@ -359,7 +356,6 @@ def test_rm_aligner(test_mode):
             model=f"{output_dir}/model-averaged-nemo",
             server_gpus=1,
             server_nodes=1,
-            partition="interactive",
             num_random_seeds=3,
         )
 
