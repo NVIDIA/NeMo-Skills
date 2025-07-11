@@ -133,7 +133,6 @@ def filter_code_samples(
     output_filename: str = "filtered_data.json",
     keep_explanations: bool = True,
     do_ast_check: bool = True,
-    max_words: int = -1,
     filter_reasoning: bool = False,
     reasoning_start_tag: str = "<think>",
     reasoning_end_tag: str = "</think>",
@@ -218,14 +217,6 @@ def filter_code_samples(
             if new_instructions is None:
                 sample['is_valid_sample'] = False
                 continue
-
-            # If the output is empty, reject the sample
-            if int(max_words) > 0:
-                # Check the number of words in the output
-                num_words = len(output.split())
-                if num_words > int(max_words):
-                    sample['is_valid_sample'] = False
-                    continue
 
             sample['output'] = output
 
