@@ -185,7 +185,8 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
             benchmarks_args.append(benchmark_args)
         return benchmarks_args
 
-    benchmark = benchmark_or_group.replace('.', '/')
+    # Single benchmark
+    benchmark = benchmark_or_group
     return [
         get_benchmark_args_from_module(
             benchmark_module=benchmark_or_group_module,

@@ -16,10 +16,11 @@ import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
-
+import json
 import hydra
 from dataclasses import asdict, field
 from omegaconf import OmegaConf
+from functools import partial
 
 from nemo_skills.inference.eval.bfcl_utils import convert_to_function_call, execute_multi_turn_func_call, is_empty_execute_response, MAXIMUM_STEP_LIMIT, DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -27,6 +28,7 @@ from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 from nemo_skills.dataset.bfcl_v3.utils import func_doc_language_specific_pre_processing, convert_to_tool
+from bfcl_eval.constants.model_config import local_inference_model_map
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -41,8 +43,10 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     remove_thinking: bool = True
+    use_client_parsing: bool = False
+    model_name: str | None = None
 
-    
+
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
         if self.prompt_format not in ["ns", "openai"]:
@@ -55,6 +59,40 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
+        
+        if self.use_client_parsing:
+            if self.model_name is None:
+                raise ValueError("model_name is required when use_client_parsing is True")
+            
+            # Add FC by default
+            if "-FC" not in self.model_name[-3:]:
+                LOG.info(f"Assuming the function calling version of model is being used: {self.model_name}")
+                self.model_name += "-FC"
+
+            if self.model_name not in local_inference_model_map:
+                # TODO: We can present the user the nearest model name that is supported
+                raise ValueError(f"{self.model_name} is not supported by BFCL Eval")
+            
+            LOG.info(f"Using client parsing for {self.model_name}")
+
+            # There are two key functionalities that we need to support on the client side:
+            # 1. Parse the response and extract the tool calls
+            # 2. Format the prompt
+
+            # 1. Initialize the response parser
+            model_handler_class = local_inference_model_map[self.model_name].model_handler
+            # Initialize the model handler - Temperature is not used but required by the model handler
+            model_handler = model_handler_class(self.model_name, temperature=self.inference.temperature)
+            # We only need the response parser from the model handler
+            self.response_parser = model_handler._parse_query_response_prompting
+
+            # 2. Initialize the prompt formatter
+            # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
+            # So we use the tokenizer to format the prompt instead which uses the chat template directly
+            from transformers import AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
+            self.message_formatter = partial(self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
+
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -97,19 +135,47 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.system_message:
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
-        input_dict = {
-            "prompts": [messages],
-            "tools": [tools],
-            "include_message": True,
-            **asdict(self.cfg.inference),
-            **self.extra_generate_params,
-        }
+        if self.cfg.use_client_parsing:
+            fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
+            input_dict = {
+                "prompts": [fmted_prompt],
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
+            output = self.llm.generate(**input_dict)[0]
+            parsed_response = self.cfg.response_parser(output["response"])["model_responses_message_for_chat_history"]
 
-        output = self.llm.generate(**input_dict)[0]
-        if "tool_calls" not in output:
-            output["tool_calls"] = []
+            model_response = {
+                "role": "assistant",
+                "content": parsed_response["content"],
+            }
+            if "tool_calls" in parsed_response:
+                model_response["tool_calls"] = parsed_response["tool_calls"]
 
-        return output
+            return {
+                # Message is a turn formatted in chat format which gets appended to the chat history
+                "message": model_response, 
+                # Generation is either the text or is empty if there are tool calls
+                "generation": parsed_response["content"],
+                "tool_calls": parsed_response.get("tool_calls", []),
+                "num_generated_tokens": output["num_generated_tokens"],
+            }
+            
+        else:
+            input_dict = {
+                "prompts": [messages],
+                "tools": [tools],
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
+
+            output = self.llm.generate(**input_dict)[0]
+            if "tool_calls" not in output:
+                output["tool_calls"] = []
+            output["message"] = output["response"].choices[0].message
+            return output
     
     def generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
@@ -164,8 +230,14 @@ class BFCLGenerationTask(GenerationTask):
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
                 
-                if self.cfg.remove_thinking and (model_response["message"].content is not None):
-                    model_response["message"].content = self._process_model_response_text(model_response["message"].content)
+                if self.cfg.remove_thinking:
+                    if self.cfg.use_client_parsing:
+                        if model_response["message"]["content"] is not None:
+                            trimmed_content = self._process_model_response_text(model_response["message"]["content"])
+                            model_response["message"]["content"] = trimmed_content
+                    else:
+                        if model_response["message"].content is not None:
+                            model_response["message"].content = self._process_model_response_text(model_response["message"].content)
                 
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
@@ -192,12 +264,10 @@ class BFCLGenerationTask(GenerationTask):
                     decoded_model_responses,
                     initial_config,
                     involved_classes,
-                    model_name="nemotron",  # Can be any placeholder
                     test_entry_id=test_entry_id,
                     long_context=(
                         "long_context" in test_category or "composite" in test_category
                     ),
-                    is_evaL_run=False,
                 )
 
                 # Add the execution results to the chat history for the next turn
@@ -215,7 +285,7 @@ class BFCLGenerationTask(GenerationTask):
                 # Force quit after too many steps
                 if count > MAXIMUM_STEP_LIMIT:
                     force_quit = True
-                    print(f"Model has been forced to quit after {MAXIMUM_STEP_LIMIT} steps.")
+                    LOG.info(f"Model has been forced to quit after {MAXIMUM_STEP_LIMIT} steps.")
                     break
 
             # Add to the total list
@@ -228,15 +298,13 @@ class BFCLGenerationTask(GenerationTask):
     
     def llm_generate(self, data_points, data, is_async=True):
         """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
-
-        if data_points[0]["single_turn"]:
-            method = self.generate_single_data_point_single_turn
-        else:
-            method = self.generate_single_data_point_multi_turn
-
         futures = []
         with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
             for data_point in data_points:
+                if data_point["single_turn"]:
+                    method = self.generate_single_data_point_single_turn
+                else:
+                    method = self.generate_single_data_point_multi_turn
                 future = executor.submit(method, data_point)
                 futures.append(future)
 
@@ -256,13 +324,20 @@ class BFCLGenerationTask(GenerationTask):
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""
         try:
-            generation = [
-                {func_call.function.name: func_call.function.arguments}
-                for func_call in model_response["tool_calls"]
-            ]
-            tool_call_ids = [
-                func_call.id for func_call in model_response["tool_calls"]
-            ]
+            if self.cfg.use_client_parsing:
+                generation = [
+                    {func_call["name"]: json.dumps(func_call["arguments"])} 
+                    for func_call in model_response["tool_calls"]
+                ]
+                tool_call_ids = [idx for idx in range(len(generation))]
+            else:
+                generation = [
+                    {func_call.function.name: func_call.function.arguments}
+                    for func_call in model_response["tool_calls"]
+                ]
+                tool_call_ids = [
+                    func_call.id for func_call in model_response["tool_calls"]
+                ]
         except:
             generation = model_response["generation"]
             tool_call_ids = []
