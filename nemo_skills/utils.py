@@ -456,7 +456,7 @@ def prefill_judgement(data_point: dict) -> str | None:
     return None
 
 
-def check_no_extra_args_fire(error_out: bool = True):
+def check_no_extra_args_fire():
     """
     Check if there are any extra arguments passed to the function.
 
@@ -506,16 +506,10 @@ def check_no_extra_args_fire(error_out: bool = True):
 
     # Check for extra arguments that are not accepted by the function
     if remaining_args:
-        if error_out:
-            raise ValueError(
-                f"Extra arguments found that are not accepted by function `{function_name}`:\n"
-                f"Additional arguments: {' '.join(remaining_args)}"
-            )
-        else:
-            print(
-                f"\nWarning: Extra arguments found that are not accepted by function `{function_name}`:\n"
-                f"Additional arguments: {' '.join(remaining_args)}\n"
-            )
+        raise ValueError(
+            f"Extra arguments found that are not accepted by function `{function_name}`:\n"
+            f"Additional arguments: {' '.join(remaining_args)}"
+        )
 
 
 def resolve_python_module_from_file(py_filepath: str, root_module: str = 'nemo_skills'):

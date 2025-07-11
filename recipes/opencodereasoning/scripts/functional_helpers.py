@@ -195,7 +195,6 @@ def filter_code_samples(
 
                     # Inject the think tag at the beggining of the output
                     output = reasoning_start_tag + output
-                    print(f"Injected reasoning start tag at the beginning of the output for sample {sample_idx}")
 
                 else:
                     # If both reasoning tags are not found, reject the sample
@@ -228,5 +227,5 @@ def filter_code_samples(
 
 if __name__ == '__main__':
     setup_logging(disable_hydra_logs=False)
-    check_no_extra_args_fire(error_out=False)  # Warn extra args for Fire
+    check_no_extra_args_fire()  # Warn extra args for Fire
     Fire()
