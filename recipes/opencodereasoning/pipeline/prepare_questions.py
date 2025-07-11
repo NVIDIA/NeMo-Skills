@@ -26,11 +26,13 @@ def prepare_questions(cluster, expname, output_dir: str):
     Args:
         output_dir (str): Directory to save the prepared questions.
     """
-    command = ("python /nemo_run/code/recipes/opencodereasoning/scripts/prepare_questions.py "
-               f"   --output_dir {output_dir} && "
-               f" python /nemo_run/code/recipes/opencodereasoning/scripts/filter_questions.py "
-               f"   --input_file {output_dir}/open_code_reasoning_questions.jsonl "
-               f"   --output_file {output_dir}/open_code_reasoning_questions.jsonl")
+    command = (
+        "python /nemo_run/code/recipes/opencodereasoning/scripts/prepare_questions.py "
+        f"   --output_dir {output_dir} && "
+        "python /nemo_run/code/recipes/opencodereasoning/scripts/filter_questions.py "
+        f"   --input_file {output_dir}/open_code_reasoning_questions.jsonl "
+        f"   --output_file {output_dir}/open_code_reasoning_questions.jsonl"
+    )
 
     run_cmd(
         ctx=wrap_arguments(command),
@@ -44,11 +46,9 @@ def prepare_questions(cluster, expname, output_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare Open Code Reasoning questions")
 
-    parser.add_argument('--cluster', type=str, required=True,
-                        help="Cluster name to run the job on.")
+    parser.add_argument('--cluster', type=str, required=True, help="Cluster name to run the job on.")
 
-    parser.add_argument('--expname', type=str, required=True,
-                        help="Experiment name for the job.")
+    parser.add_argument('--expname', type=str, required=True, help="Experiment name for the job.")
 
     parser.add_argument(
         "--output_dir",
