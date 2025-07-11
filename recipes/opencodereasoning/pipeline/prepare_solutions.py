@@ -51,6 +51,9 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     input_dir = stage_config["input_dir"]
     output_dir = stage_config["output_dir"]
 
+    language = stage_config['language']
+    assert language in ["python", "cpp"], f"Unsupported language: {language}"
+
     filter_expname = f"{expname}-filter"
 
     command = (
@@ -58,7 +61,8 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
         f" python functional_helpers.py filter_code_samples "
         f"   --data_path='{input_dir}/*.json*' "
         f"   --output_dir={output_dir}/generation_filtered_temp "
-        f"   --output_filename='code' && "
+        f"   --output_filename='code' "
+        f"   --do_ast_check={True if language == 'python' else False} && "
         f" python functional_helpers.py filter_invalid_samples "
         f"   --data_path='{output_dir}/generation_filtered_temp/*.json*' "
         f"   --output_dir={output_dir}/generation_filtered "

@@ -46,5 +46,6 @@ stages:
   filter_solutions:
     output_dir: ${directories.step-2-filter-solutions}
     input_dir: ${directories.step-1-generate-solutions}
+    language: ${stages.generate_solutions.language}
     dependencies:
       - generate_solutions
