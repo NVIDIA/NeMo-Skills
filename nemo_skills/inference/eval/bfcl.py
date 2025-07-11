@@ -43,7 +43,7 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     remove_thinking: bool = True
-    use_client_parsing: bool = False
+    use_client_parsing: bool = True
     model_name: str | None = None
 
 
