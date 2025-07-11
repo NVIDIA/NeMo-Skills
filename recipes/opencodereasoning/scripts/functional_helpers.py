@@ -200,6 +200,7 @@ def filter_code_samples(
 
                     # Inject the think tag at the beggining of the output
                     output = reasoning_start_tag + output
+                    print(f"Injected reasoning start tag at the beginning of the output for sample {sample_idx}")
 
                 else:
                     # If both reasoning tags are not found, reject the sample
