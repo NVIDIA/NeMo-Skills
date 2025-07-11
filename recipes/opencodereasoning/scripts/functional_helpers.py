@@ -197,6 +197,7 @@ def filter_code_samples(
                 else:
                     # If both reasoning tags are not found, reject the sample
                     sample['is_valid_sample'] = False
+                    print(f"Sample {sample_idx} does not have valid reasoning tags, rejecting the sample")
                     continue
 
             else:
@@ -214,6 +215,7 @@ def filter_code_samples(
             # If after processing the output, the checks failed, reject the sample
             if new_instructions is None:
                 sample['is_valid_sample'] = False
+                print(f"Sample {sample_idx} failed the post-processing checks, rejecting the sample")
                 continue
 
             # If the output is empty, reject the sample
@@ -222,6 +224,7 @@ def filter_code_samples(
                 num_words = len(output.split())
                 if num_words > max_words:
                     sample['is_valid_sample'] = False
+                    print(f"Sample {sample_idx} has too many words ({num_words}), rejecting the sample")
                     continue
 
             sample['output'] = output
