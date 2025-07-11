@@ -25,7 +25,7 @@ from fire import Fire
 from nemo_skills import utils
 
 # Utility function that checks if there are any extra arguments passed to the function
-from nemo_skills.utils import check_no_extra_args_fire, get_logger_name, setup_logging
+from nemo_skills.utils import check_no_extra_args_fire, setup_logging
 
 from output_processing import post_process_generation
 
@@ -228,6 +228,6 @@ def filter_code_samples(
 
 
 if __name__ == '__main__':
-    setup_logging()
+    setup_logging(disable_hydra_logs=False)
     check_no_extra_args_fire(error_out=False)  # Warn extra args for Fire
     Fire()
