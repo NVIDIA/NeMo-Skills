@@ -457,11 +457,12 @@ def eval(
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if has_tasks:
-        if _reuse_exp:
-            return all_tasks
-        return exp
-    return None
+    if _reuse_exp:
+        return all_tasks
+    else:
+        if has_tasks:
+            return exp
+        return None
 
 
 if __name__ == "__main__":
