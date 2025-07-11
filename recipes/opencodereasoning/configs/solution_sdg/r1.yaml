@@ -1,14 +1,14 @@
-cluster: local
-base_output_dir: /workspace/recipes/opencodereasoning/data/  # Base output directory for all experiments
-expname: ocr-demo
-suffix: toy  # Suffix for experiment names
+cluster: slurm
+base_output_dir: /workspace/opencodereasoning/data
+expname: opencodereasoning
+suffix: r1  # Suffix for experiment names
 
 
 # Input file for the first stage (generate_solutions)
 # This should be the output of the problem_generation.py pipeline
 input_file: ${base_output_dir}/open_code_reasoning_questions.jsonl
 
-num_random_seeds_to_generate: 1
+num_random_seeds_to_generate: 32
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ${expname}-prepare-questions
 
@@ -28,13 +28,19 @@ stages:
     output_dir: ${directories.step-1-generate-solutions}
     input_file: ${input_file}
     # Arguments passed inside the generate context string (e.g., ++param=value)
-    inline_args: "++inference.tokens_to_generate=8192 ++generation_key='output' ++inference.temperature=0.6"
+    inline_args: "++inference.tokens_to_generate=28768 ++generation_key='output' ++inference.temperature=0.6"
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
-      model: deepseek-ai/deepseek-r1-distill-qwen-32b
-      server_type: openai
-      server_address: https://integrate.api.nvidia.com/v1
+      # assuming the model is in fp8 and running on H100 GPUs
+      model: /hf_models/DeepSeek-R1-tp16  # checkpoint is pre-sharded to tp16 for faster loading
+      server_type: sglang
+      server_gpus: 8
+      server_nodes: 2
+      server_args: "--load-format sharded_state --context-length 32768"
       num_random_seeds: ${num_random_seeds_to_generate}
+      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
+      # dependent_jobs: N
 
   filter_solutions:
     output_dir: ${directories.step-2-filter-solutions}
