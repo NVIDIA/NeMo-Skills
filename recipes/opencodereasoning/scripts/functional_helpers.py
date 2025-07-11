@@ -62,6 +62,7 @@ def filter_invalid_samples(
     output_filename: str = "filtered_data.json",
     num_chunks: int = None,
     chunk_id: int = None,
+    **kwargs,
 ):
     """
     Utility function to filter invalid samples from the given data file
@@ -138,6 +139,7 @@ def filter_code_samples(
     reasoning_end_tag: str = "</think>",
     num_chunks: int = None,
     chunk_id: int = None,
+    **kwargs,
 ):
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
