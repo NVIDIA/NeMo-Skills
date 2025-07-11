@@ -198,6 +198,9 @@ def filter_code_samples(
                 elif reasoning_start_idx < 0 and reasoning_end_idx != -1:
                     checked_output = output[reasoning_end_idx + len(reasoning_end_tag) :]
 
+                    # Inject the think tag at the beggining of the output
+                    output = reasoning_start_tag + output
+
                 else:
                     # If both reasoning tags are not found, reject the sample
                     sample['is_valid_sample'] = False
