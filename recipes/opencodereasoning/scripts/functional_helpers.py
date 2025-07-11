@@ -233,5 +233,5 @@ def filter_code_samples(
 
 if __name__ == '__main__':
     setup_logging()
-    check_no_extra_args_fire()
+    check_no_extra_args_fire(error_out=False)  # Warn extra args for Fire
     Fire()
