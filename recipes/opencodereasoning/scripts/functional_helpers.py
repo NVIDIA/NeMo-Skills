@@ -220,10 +220,10 @@ def filter_code_samples(
                 continue
 
             # If the output is empty, reject the sample
-            if max_words > 0:
+            if int(max_words) > 0:
                 # Check the number of words in the output
                 num_words = len(output.split())
-                if num_words > max_words:
+                if num_words > int(max_words):
                     sample['is_valid_sample'] = False
                     continue
 
