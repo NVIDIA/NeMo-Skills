@@ -376,8 +376,6 @@ def eval(
 
         # setting summarize results tasks
         for benchmark, benchmark_args in benchmarks_dict.items():
-            print("Benchmark: ", benchmark)
-            print("Benchmark args: ", benchmark_args)
             # TODO: add logic if metrics.json exists, we don't run this!
             has_tasks = True
             metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
