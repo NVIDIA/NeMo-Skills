@@ -6,6 +6,11 @@ plugins:
   - blog:
       blog_dir: tutorials
       post_dir: tutorials/posts
+  - redirects:
+      redirect_maps:
+        'old.md': 'new.md'
+        'old/file.md': 'new/file.md'
+        'some_file.md': 'http://external.url.com/foobar'
 theme:
   name: material
   logo: favicon.ico

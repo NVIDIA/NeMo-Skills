@@ -18,18 +18,6 @@ Here are some of the things we support.
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
-## Getting started
-
-To get started, follow these [steps](https://nvidia.github.io/NeMo-Skills/basics),
-browse available [pipelines](https://nvidia.github.io/NeMo-Skills/pipelines) or run `ns --help` to see all available
-commands and their options.
-
-You can find more examples of how to use NeMo-Skills in the [tutorials](https://nvidia.github.io/NeMo-Skills/tutorials) page.
-
-We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
-
-You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
-
 ## News
 
 * [04/23/2025]: We released [OpenMathReasoning](https://nvidia.github.io/NeMo-Skills/openmathreasoning1) dataset and models!
@@ -44,6 +32,18 @@ You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/
 
   * OpenMathInstruct-2 is a math instruction tuning dataset with 14M problem-solution pairs generated using the Llama3.1-405B-Instruct model.
   * OpenMath-2-Llama models show significant improvements compared to their Llama3.1-Instruct counterparts.
+
+## Getting started
+
+To get started, follow these [steps](https://nvidia.github.io/NeMo-Skills/basics),
+browse available [pipelines](https://nvidia.github.io/NeMo-Skills/pipelines) or run `ns --help` to see all available
+commands and their options.
+
+You can find more examples of how to use NeMo-Skills in the [tutorials](https://nvidia.github.io/NeMo-Skills/tutorials) page.
+
+We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
+
+You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
 
 
 Disclaimer: This project is strictly for research purposes, and not an official product from NVIDIA.
