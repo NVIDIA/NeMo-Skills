@@ -1,13 +1,13 @@
 # Dataset construction
 
 Here are the commands you can run to re-create [OpenMathInstruct-2 dataset](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2).
-We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are running
+We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are running
 all commands on a slurm cluster. Change the commands accordingly if running locally
 (but it's going to take a lot of time).
 We also assume you have the [Llama3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct)
 on that cluster inside `/trt_models/llama-3.1-405b-instruct` (should be mounted in your config)
-that's been [converted](../pipelines/checkpoint-conversion.md) to TensorRT-LLM format.
-See [generation docs](../pipelines/generation.md) for how you can change the below commands to instead
+that's been [converted](../../pipelines/checkpoint-conversion.md) to TensorRT-LLM format.
+See [generation docs](../../pipelines/generation.md) for how you can change the below commands to instead
 run inference through Nvidia NIM API.
 
 ## Prepare the seed data

@@ -1,6 +1,6 @@
 # Model training
 
-We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and
+We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and
 that data and models will be downloaded to that folder.
 
 ## Download data and convert to SFT format
@@ -210,7 +210,7 @@ For other models change the above parameters according to this table. Don't forg
 
 
 If you want to follow up with checkpoint conversion and evaluation, see
-[training docs](../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
+[training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
 through a convenient Python API.
 
 

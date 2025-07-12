@@ -329,8 +329,7 @@ pass@1[64]      | 30          | 52.45%           | 0.00%
 ```
 
 And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own
-[pipelines](../pipelines/index.md). You can see some examples from our previous releases such as
-[OpenMathInstruct-2](../openmathinstruct2/index.md).
+[pipelines](../pipelines/index.md). You can find more examples in our [tutorials](../tutorials/index.md) or [papers & releases](../releases/index.md).
 
 Please read the next section to recap all of the important concepts that we touched upon and learn some more details.
 
