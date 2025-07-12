@@ -8,9 +8,8 @@ plugins:
       post_dir: tutorials/posts
   - redirects:
       redirect_maps:
-        'old.md': 'new.md'
-        'old/file.md': 'new/file.md'
-        'some_file.md': 'http://external.url.com/foobar'
+        'openmathinstruct2/index.md': 'releases/openmathinstruct2/index.md'
+        'openmathreasoning1/index.md': 'releases/openmathreasoning/index.md'
 theme:
   name: material
   logo: favicon.ico
