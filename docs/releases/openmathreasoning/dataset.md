@@ -12,7 +12,7 @@ any other models supported in https://build.nvidia.com. Make sure to define `NVI
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
 Finally, please make sure to go through the
-[getting started documentation](../basics/index.md) to make sure you understand how the below commands
+[getting started documentation](../../basics/index.md) to make sure you understand how the below commands
 work and avoid running into errors.
 
 
@@ -128,7 +128,7 @@ consists of the following stages:
 4. [Convert proof questions](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/convert-proofs.yaml)
    to answer questions (`convert_proofs` stage).
 5. Remove all binary/multiple-choice/invalid problems and merge remaining problems with converted proofs (`merge_data` stage).
-6. [Decontaminate](../pipelines/decontamination.md) the resulting questions with popular math benchmarks (`decontaminate` stage).
+6. [Decontaminate](../../pipelines/decontamination.md) the resulting questions with popular math benchmarks (`decontaminate` stage).
 
 You can run the full pipeline with
 
@@ -146,12 +146,12 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 [Solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipeline/solution_generation.py)
 consists of the following stages:
 
-1. [Generate solutions](../pipelines/generation.md) for each of the prepared problems (`generate_solutions` stage).
+1. [Generate solutions](../../pipelines/generation.md) for each of the prepared problems (`generate_solutions` stage).
 2. [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
    for all problems where ground-truth answer is not known (`fill_majority_answer` stage).
-3. [Judge answers using an LLM](../pipelines/llm-as-a-judge.md). Only the final answer is compared to the ground-truth (or majority) answer, not the full solution (`judge_answers` stage).
-4. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
-5. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
+3. [Judge answers using an LLM](../../pipelines/llm-as-a-judge.md). Only the final answer is compared to the ground-truth (or majority) answer, not the full solution (`judge_answers` stage).
+4. [Optional] [Generate new summaries](../../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
+5. [Optional] [Judge new summaries](../../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
 6. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).
 7. Filter out all incorrect solutions and prepare the data for SFT (`prepare_for_sft` stage).
 
@@ -171,16 +171,16 @@ If you want to run using [Nvidia NIM models](https://build.nvidia.com/models) on
 [Tool-Integrated Reasoning (TIR) solution generation pipeline](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/pipeline/solution_generation.py)
 focuses on generating solutions that leverage external tools, more specifically, a Python interpreter. This pipeline consists of several stages, some of which are optional:
 
-1. [Generate solutions](../pipelines/generation.md) using a TIR-capable model (`generate_solutions` stage). These solutions interleave reasoning steps with executable code blocks.
+1. [Generate solutions](../../pipelines/generation.md) using a TIR-capable model (`generate_solutions` stage). These solutions interleave reasoning steps with executable code blocks.
 2. [Fill majority answer](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/evaluation/aggregate_answers.py)
     for problems without ground-truth answers (`fill_majority_answer` stage).
-3. [Judge answers using an LLM](../pipelines/llm-as-a-judge.md), comparing the final answer to the ground-truth or majority answer (`judge_answers` stage).
+3. [Judge answers using an LLM](../../pipelines/llm-as-a-judge.md), comparing the final answer to the ground-truth or majority answer (`judge_answers` stage).
 4. Postprocess generations, including filtering and potentially standardizing code block formats (`postprocess_tir_generations` stage).
 5. [Optional] Extract Python code fragments from solutions (`extract_python_fragments`).
 6. [Optional] Judge the [novelty](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml) and [significance](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/prompts/classify-tir-significance.yaml) of these fragments using an LLM (`judge_novelty`, `judge_significance`).
 7. [Optional] Filter fragments based on novelty/significance scores (`filter_fragments`).
-8. [Optional] [Generate new summaries](../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
-9. [Optional] [Judge new summaries](../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
+8. [Optional] [Generate new summaries](../../pipelines/generation.md) for reasoning solutions, as candidates for replacing the original summary (`generate_new_summaries` stage).
+9. [Optional] [Judge new summaries](../../pipelines/llm-as-a-judge.md) to judge the new summaries. This is required to make sure we're only replacing the original summaries with valid new summaries (`judge_new_summaries` stage).
 10. [Optional] [Merge new summaries](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/scripts/merge_new_summary.py) with the original reasoning solution (`merge_new_summaries` stage).
 11.  Prepare the final dataset for SFT (`prepare_for_sft` stage).
 

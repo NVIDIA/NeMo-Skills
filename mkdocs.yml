@@ -5,7 +5,7 @@ extra_css:
 plugins:
   - blog:
       blog_dir: tutorials
-      post_dir: "{blog}/posts"
+      post_dir: tutorials/posts
 theme:
   name: material
   logo: favicon.ico
@@ -67,13 +67,15 @@ nav:
     - Arbitrary commands: pipelines/run-cmd.md
   - Tutorials:
     - tutorials/index.md
-  - OpenMathInstruct:
-    - openmathinstruct2/index.md
-    - Model evaluation: openmathinstruct2/evaluation.md
-    - Dataset construction: openmathinstruct2/dataset.md
-    - Model training: openmathinstruct2/training.md
-  - OpenMathReasoning:
-    - openmathreasoning1/index.md
-    - Model evaluation: openmathreasoning1/evaluation.md
-    - Dataset construction: openmathreasoning1/dataset.md
-    - Model training: openmathreasoning1/training.md
+  - Papers & Releases:
+    - releases/index.md
+    - OpenMathReasoning:
+      - releases/openmathreasoning/index.md
+      - Model Evaluation: releases/openmathreasoning/evaluation.md
+      - Dataset construction: releases/openmathreasoning/dataset.md
+      - Model training: releases/openmathreasoning/training.md
+    - OpenMathInstruct-2:
+      - releases/openmathinstruct2/index.md
+      - Model Evaluation: releases/openmathinstruct2/evaluation.md
+      - Dataset construction: releases/openmathinstruct2/dataset.md
+      - Model training: releases/openmathinstruct2/training.md

@@ -80,4 +80,4 @@ After you get `/workspace/math-contamination-results/output.jsonl`,
 you can pass it into [prepare_data command](training.md#preparing-the-data)
 with `++contamination_file=...` option.
 
-See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../openmathinstruct2/dataset.md#decontamination).
+See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../releases/openmathinstruct2/dataset.md#decontamination).
