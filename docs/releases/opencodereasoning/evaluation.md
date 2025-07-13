@@ -2,7 +2,7 @@
 
 Here are the commands you can run to reproduce our evaluation numbers.
 The commands below are for [nvidia/OpenCodeReasoning-Nemotron-1.1-7B](https://huggingface.co/nvidia/OpenCodeReasoning-Nemotron-1.1-7B) model as an example.
-We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
+We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
@@ -18,7 +18,7 @@ huggingface-cli download nvidia/OpenCodeReasoning-Nemotron-1.1-7B --local-dir Op
 ## Prepare evaluation data
 
 ```bash
-ns prepare_data livecodebench 
+ns prepare_data livecodebench
 ```
 
 ## Run evaluation
@@ -32,13 +32,9 @@ ns eval \
     --benchmarks=livecodebench:8 \
     --split=test_v6_2408_2505 \
     --server_gpus=1 \
-    --num_jobs=1 \
     ++prompt_template=qwen-instruct \
     ++inference.tokens_to_generate=64000
 ```
-
-If running on slurm, you can set `--num_jobs` to a bigger number of -1 to run
-each benchmark in a separate node. 
 
 Finally, to print the metrics run
 
@@ -46,5 +42,4 @@ Finally, to print the metrics run
 ns summarize_results /workspace/OpenCodeReasoning-Nemotron-1.1-7B-eval/eval-results --cluster local
 ```
 
-This should print the metrics including both symbolic and judge evaluation. The judge is typically more accurate.
 The numbers may vary by 1-2% depending on the server type, number of GPUs and batch size used.
