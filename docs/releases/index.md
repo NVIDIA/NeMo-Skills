@@ -8,11 +8,15 @@ On this page you can find a list of papers, model and dataset releases that were
 
 ## Releases
 
+* [OpenCodeReasoning](opencodereasoning/index.md) dataset and models
+
 * [OpenMathReasoning](openmathreasoning/index.md) dataset and models
 
 * [OpenMathInstruct-2](openmathinstruct2/index.md) dataset and models
 
 ## Papers
+
+* [OpenCodeReasoning: Advancing Data Distillation for Competitive Coding](https://arxiv.org/abs/2504.01943) (2025)
 
 * [AIMO-2 Winning Solution: Building State-of-the-Art Mathematical Reasoning Models with OpenMathReasoning dataset](https://arxiv.org/abs/2504.16891) (2025)
 

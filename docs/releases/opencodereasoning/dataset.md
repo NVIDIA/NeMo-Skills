@@ -11,13 +11,13 @@ any other models supported in https://build.nvidia.com. Make sure to define `NVI
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
 Finally, please make sure to go through the
-[getting started documentation](../basics/index.md) to make sure you understand how the below commands
+[getting started documentation](../../basics/index.md) to make sure you understand how the below commands
 work and avoid running into errors.
 
 
 ## Data preparation (Question set)
 
-The question set is preprocessed as part of the [prepare_questions.py](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/opencodereasoning/pipeline/prepare_questions.py) script. This script will download the original datasets, extract just the questions and filter out super long instructions that may interfere with training. 
+The question set is preprocessed as part of the [prepare_questions.py](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/opencodereasoning/pipeline/prepare_questions.py) script. This script will download the original datasets, extract just the questions and filter out super long instructions that may interfere with training.
 
 **Note**: OCR-1 questions are a subset of OCR-2 questions, and it is recommended to generate data for OCR-2 directly.
 
@@ -51,7 +51,7 @@ consists of the following stages:
 You can run the full pipeline with
 
 ```
-python recipes/opencodereasoning/pipeline/prepare_solutions.py --mode r1 
+python recipes/opencodereasoning/pipeline/prepare_solutions.py --mode r1
 ```
 
 You can specify a subset of stages using `--stages` argument, e.g. `--stages generate_solutions` or `--stages generate_solutions,filter_solutions`.
