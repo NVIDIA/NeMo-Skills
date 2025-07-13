@@ -1,6 +1,6 @@
 # Model training
 
-We assume you have `/workspace` defined in your [cluster config](../basics/cluster-configs.md) and are
+We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
@@ -122,5 +122,5 @@ add `++exp_manager.max_time_per_run=00:03:20:00`
 
 
 If you want to follow up with checkpoint conversion and evaluation, see
-[training docs](../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
+[training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
 through a convenient Python API.
