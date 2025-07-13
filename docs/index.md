@@ -4,13 +4,14 @@ hide:
   - toc
 ---
 
-[NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) is a collection of pipelines to improve "skills" of large language models. You can use it to generate synthetic data, train/evaluate models, analyze model outputs and more!
-Here are some of the things we support.
+[NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
+
+Here are some of the features we support:
 
 - [Flexible LLM inference](basics/inference.md):
-    - Seamlessly switch between API providers, local server and large-scale slurm jobs for LLM inference.
+    - Seamlessly switch between API providers, local server and large-scale Slurm jobs for LLM inference.
     - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang), [Megatron](https://github.com/NVIDIA/Megatron-LM) or [NeMo](https://github.com/NVIDIA/NeMo).
-    - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a slurm cluster.
+    - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a Slurm cluster.
 - [Model evaluation](pipelines/evaluation.md):
     - Evaluate your models on many popular benchmarks.
         - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
@@ -19,7 +20,7 @@ Here are some of the things we support.
         - Chat/instruction following: ifeval, arena-hard, mt-bench
         - General knowledge: mmlu, mmlu-pro, gpqa
         - Long context: ruler
-    - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
+    - Easily parallelize each evaluation across many Slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](pipelines/training.md): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
 

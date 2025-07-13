@@ -1,7 +1,8 @@
 # NeMo Skills
 
-NeMo-Skills is a collection of pipelines to improve "skills" of large language models. You can use it to generate synthetic data, train/evaluate models, analyze model outputs and more!
-Here are some of the things we support.
+NeMo-Skills is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
+
+Here are some of the features we support:
 
 - [Flexible LLM inference](https://nvidia.github.io/NeMo-Skills/pipelines/generation/):
   - Seamlessly switch between API providers, local server and large-scale slurm jobs for LLM inference.
