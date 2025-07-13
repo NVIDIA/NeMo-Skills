@@ -1,0 +1,51 @@
+cluster: slurm
+base_output_dir: /workspace/opencodereasoning/data
+expname: opencodereasoning
+suffix: r1  # Suffix for experiment names
+
+
+# Input file for the first stage (generate_solutions)
+# This should be the output of the problem_generation.py pipeline
+input_file: ${base_output_dir}/open_code_reasoning_questions.jsonl
+
+num_random_seeds_to_generate: 32
+# Can define initial dependency for the `generate_solutions` stage to run after
+initial_dependency: ${expname}-prepare-questions
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - generate_solutions          # Generate initial solutions
+  - filter_solutions            # Filter solutions which dont follow format
+
+# Directory structure configuration
+directories:
+  step-1-generate-solutions: ${base_output_dir}/solution-sdg-${suffix}/generation
+  step-2-filter-solutions: ${base_output_dir}/solution-sdg-${suffix}/filtered
+
+# Stage-specific configurations
+stages:
+  generate_solutions:
+    output_dir: ${directories.step-1-generate-solutions}
+    input_file: ${input_file}
+    language: python  # Language of the solutions to generate
+    # Arguments passed inside the generate context string (e.g., ++param=value)
+    inline_args: "++prompt_template=deepseek-instruct ++inference.tokens_to_generate=28768 ++generation_key='output' ++inference.temperature=0.6"
+    # Arguments passed as kwargs to the pipeline function (e.g. generate())
+    stage_kwargs:
+      # assuming the model is in fp8 and running on H100 GPUs
+      model: /hf_models/DeepSeek-R1-tp16  # checkpoint is pre-sharded to tp16 for faster loading
+      server_type: sglang
+      server_gpus: 8
+      server_nodes: 2
+      server_args: "--load-format sharded_state --context-length 32768"
+      num_random_seeds: ${num_random_seeds_to_generate}
+      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
+      # dependent_jobs: N
+
+  filter_solutions:
+    output_dir: ${directories.step-2-filter-solutions}
+    input_dir: ${directories.step-1-generate-solutions}
+    language: ${stages.generate_solutions.language}
+    dependencies:
+      - generate_solutions
