@@ -73,6 +73,10 @@ nav:
     - tutorials/index.md
   - Papers & Releases:
     - releases/index.md
+    - OpenCodeReasoning:
+      - releases/opencodereasoning/index.md
+      - Model Evaluation: releases/opencodereasoning/evaluation.md
+      - Dataset construction: releases/opencodereasoning/dataset.md
     - OpenMathReasoning:
       - releases/openmathreasoning/index.md
       - Model Evaluation: releases/openmathreasoning/evaluation.md
