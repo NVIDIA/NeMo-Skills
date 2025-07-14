@@ -109,10 +109,8 @@ class GenSelectTask(GenerationTask):
         single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        if self.cfg.dataset is not None:
-            benchmark_dir = self.cfg.dataset
-        else:
-            benchmark_dir = "math"
+        # TODO: use last part of input_dir?
+        benchmark_dir = "math"
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
