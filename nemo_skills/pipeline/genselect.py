@@ -191,6 +191,11 @@ def genselect(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
             task_dependencies=_task_dependencies,
+            run_after=run_after,
+            reuse_code=reuse_code,
+            reuse_code_exp=reuse_code_exp,
+            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            installation_command=installation_command,
         )
         for seed in remaining_jobs.keys():
             has_tasks = True
