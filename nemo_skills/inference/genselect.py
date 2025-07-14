@@ -56,7 +56,8 @@ class GenSelectConfig(GenerateSolutionsConfig):
 
     sandbox: dict = field(default_factory=dict)
 
-    def __post_init__(self):
+    def _post_init_validate_data(self):
+        super()._post_init_validate_data()
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
         self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
@@ -65,18 +66,6 @@ class GenSelectConfig(GenerateSolutionsConfig):
         )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
-
-        if self.server["server_type"] != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
-
-        if self.server["server_type"] == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
-
-    def _get_disallowed_params(self):
-        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
-        return [
-            ("input_file", None),
-        ]
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
