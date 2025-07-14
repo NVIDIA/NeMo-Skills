@@ -42,8 +42,9 @@ class GenSelectConfig(GenerateSolutionsConfig):
     input_dir: str  # Directory where the original predictions are saved
     output_dir: str  # Where to save the intermediate outputs and final predictions
 
-    # Will be set in __post_init__ based on input_dir and random_seed
+    # Will be set in __post_init__ based on input_dir, output_dir and random_seed
     input_file: str | None = None
+    output_file: str | None = None
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
