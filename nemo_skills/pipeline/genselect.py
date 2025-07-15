@@ -186,7 +186,7 @@ def genselect(
         preprocess_task = pipeline_utils.add_task(
             exp,
             cmd=task_preprocess_cmd,
-            task_name="preprocess_genselect",
+            task_name=f"{expname}-preprocess_genselect",
             log_dir=f"{output_dir}/preprocess-logs",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
