@@ -41,11 +41,12 @@ class OpenAIModel(OpenAIAPIModel):
         if api_key is None:
             if 'api.nvidia.com' in base_url:
                 api_key = os.getenv("NVIDIA_API_KEY")
+                if not api_key:
+                    raise ValueError("NVIDIA_API_KEY is required for NVIDIA models and could not be found.")
             elif 'api.openai.com' in base_url:
                 api_key = os.getenv("OPENAI_API_KEY")
-
-        if not api_key:
-            raise ValueError("API key is required for OpenAI/NVIDIA models and could not be found.")
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
 
         super().__init__(
             model=model,
