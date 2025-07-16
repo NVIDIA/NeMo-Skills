@@ -16,6 +16,8 @@ On this page you can find a list of papers, model and dataset releases that were
 
 ## Papers
 
+* [Is Human-Written Data Enough? The Challenge of Teaching Reasoning to LLMs Without RL or Distillation](https://arxiv.org/abs/2507.09850) (2025)
+
 * [OpenCodeReasoning: Advancing Data Distillation for Competitive Coding](https://arxiv.org/abs/2504.01943) (2025)
 
 * [AIMO-2 Winning Solution: Building State-of-the-Art Mathematical Reasoning Models with OpenMathReasoning dataset](https://arxiv.org/abs/2504.16891) (2025)
