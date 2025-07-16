@@ -33,6 +33,10 @@ def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
     instances = [json.loads(line) for line in open(file_path, "r")]
     for instance in instances:
+        if "problem" not in instance:
+            if "question" in instance:
+                instance["problem"] = instance["question"]
+
         if "is_correct" not in instance:
             if "graded_list" in instance:
                 instance["is_correct"] = instance["graded_list"][0]
