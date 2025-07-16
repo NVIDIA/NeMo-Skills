@@ -78,7 +78,7 @@ def read_files(file_paths, single_answer_instances_path):
     return problem_to_clustered_instances
 
 
-def extract_summary(solution, max_length=5000):
+def extract_summary(solution, max_length=10000):
     """Extract the summary from the solution."""
     if solution.count("</think>") == 0:
         if len(solution) < max_length:
