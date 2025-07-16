@@ -180,7 +180,8 @@ def create_comparison_instance(clustered_instances, problem, max_soln_samples=8,
         if "graded_list" in instance:
             comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
 
-    comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+    if "expected_answer" in clustered_instances[0][1][0]:
+        comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
 
     return comparison_instance
 
