@@ -110,7 +110,8 @@ class GenSelectTask(GenerationTask):
 
         input_file = self.cfg.output_file
         # TODO: use last part of input_dir?
-        benchmark_dir = "math"
+        benchmark_dir = Path(self.cfg.input_dir).name
+        # "math"
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
