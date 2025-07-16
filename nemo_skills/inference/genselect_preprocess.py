@@ -32,6 +32,17 @@ LOG = logging.getLogger(get_logger_name(__file__))
 def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
     instances = [json.loads(line) for line in open(file_path, "r")]
+    for instance in instances:
+        if "is_correct" not in instance:
+            if "graded_list" in instance:
+                instance["is_correct"] = instance["graded_list"][0]
+            if "judgement" in instance:
+                instance["is_correct"] = is_correct_judgement(instance["judgement"])
+
+        if "predicted_answer" not in instance:
+            if "completion" in instance:
+                instance["predicted_answer"] = instance["completion"]
+
     problem_to_instance = {instance["problem"]: instance for instance in instances}
     return problem_to_instance
 
@@ -162,6 +173,8 @@ def create_comparison_instance(clustered_instances, problem, max_soln_samples=8,
             comparison_instance[f"judgement_{i}"] = instance["judgement"]
         if "is_correct" in instance:
             comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
+        if "graded_list" in instance:
+            comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
 
     comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
 
