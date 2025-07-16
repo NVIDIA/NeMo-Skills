@@ -28,7 +28,7 @@ import hydra
 import typer
 from tqdm import tqdm
 
-from nemo_skills.inference.generate import GenerationTask, InferenceConfig
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -36,14 +36,15 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
-class GenSelectConfig:
+class GenSelectConfig(GenerateSolutionsConfig):
     """Genselect parameters."""
 
     input_dir: str  # Directory where the original predictions are saved
     output_dir: str  # Where to save the intermediate outputs and final predictions
 
-    # Will be set in __post_init__ based on input_dir and random_seed
+    # Will be set in __post_init__ based on input_dir, output_dir and random_seed
     input_file: str | None = None
+    output_file: str | None = None
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
@@ -55,7 +56,8 @@ class GenSelectConfig:
 
     sandbox: dict = field(default_factory=dict)
 
-    def __post_init__(self):
+    def _post_init_validate_data(self):
+        super()._post_init_validate_data()
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
         self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
@@ -64,18 +66,6 @@ class GenSelectConfig:
         )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
-
-        if self.server["server_type"] != "openai" and self.prompt_template is None:
-            raise ValueError("Prompt template is required for non-OpenAI servers")
-
-        if self.server["server_type"] == "openai" and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
-
-    def _get_disallowed_params(self):
-        """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
-        return [
-            ("input_file", None),
-        ]
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -119,10 +109,8 @@ class GenSelectTask(GenerationTask):
         single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        if self.cfg.dataset is not None:
-            benchmark_dir = self.cfg.dataset
-        else:
-            benchmark_dir = "math"
+        # TODO: use last part of input_dir?
+        benchmark_dir = "math"
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
