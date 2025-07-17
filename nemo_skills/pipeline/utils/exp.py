@@ -612,7 +612,12 @@ def get_exp(expname, cluster_config, _reuse_exp=None):
     # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
     remove_handlers()
     if cluster_config["executor"] == "slurm":
-        return run.Experiment(expname, skip_status_at_exit=True, serialize_metadata_for_scripts=False)
+        return run.Experiment(
+            expname,
+            skip_status_at_exit=True,
+            serialize_metadata_for_scripts=False,
+            threadpool_workers=cluster_config.get("num_workers", 4),
+        )
     # hiding all nemo-run logs otherwise as they are not useful locally
     if cluster_config["executor"] == "local":
         return run.Experiment(expname, clean_mode=True)
