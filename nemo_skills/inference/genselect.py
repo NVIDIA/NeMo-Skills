@@ -110,6 +110,7 @@ class GenSelectTask(GenerationTask):
 
         input_file = self.cfg.output_file
         # TODO: use last part of input_dir?
+        benchmark_dir = "math"
         benchmark_dir = Path(self.cfg.input_dir).name
         # "math"
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
@@ -136,6 +137,8 @@ class GenSelectTask(GenerationTask):
                     output_instance["is_correct"] = instance[f'is_correct_{judgment}']
                 if f"judgement_{judgment}" in instance:
                     output_instance["judgement"] = instance[f'judgement_{judgment}']
+                if f"graded_list_{judgment}" in instance:
+                    output_instance["graded_list"] = instance[f'graded_list_{judgment}']
 
                 fout.write(json.dumps(output_instance) + '\n')
 
