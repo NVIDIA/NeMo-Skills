@@ -29,7 +29,7 @@ dynamic = [
 name = "nemo_skills"
 description = "NeMo Skills - a project to improve skills of LLMs"
 readme = "README.md"
-license-files = ["LICENSE"]
+# license-files = ["LICENSE"]  # causing problems in nemo-aligner container
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
