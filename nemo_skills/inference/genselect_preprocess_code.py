@@ -29,47 +29,151 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def format_solutions(code_list, is_correct_list):
-    consolidated_solutions = ""
-    random.shuffle(list(zip(code_list, is_correct_list)))
-    is_correct_dict = {}
-    for idx, (solution, is_correct) in enumerate(zip(code_list, is_correct_list)):
-        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
-        if is_correct:
-            is_correct_dict[f"is_correct_{idx}"] = True
-        else:
-            is_correct_dict[f"is_correct_{idx}"] = False
-
-    return consolidated_solutions, is_correct_dict
-
-
-def read_file(file_path, output_dir):
-    single_answer_instances_path = os.path.join(output_dir, "single_answer_instances.jsonl")
-
+def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
-    processed_instances = []
+    instances = [json.loads(line) for line in open(file_path, "r")]
+    for instance in instances:
+        if "problem" not in instance:
+            if "question" in instance:
+                instance["problem"] = instance["question"]
+
+        # Overwrite is_correct if graded_list or judgement is present
+        if "graded_list" in instance:
+            instance["is_correct"] = instance["graded_list"][0]
+        if "judgement" in instance:
+            instance["is_correct"] = is_correct_judgement(instance["judgement"])
+
+        if "predicted_answer" not in instance:
+            if "completion" in instance:
+                instance["predicted_answer"] = instance["completion"]
+
+    problem_to_instance = {instance["problem"]: instance for instance in instances}
+    return problem_to_instance
+
+
+def read_files(file_paths, single_answer_instances_path):
+    problem_to_instances = defaultdict(list)
+    for file_path in file_paths:
+        problem_to_instance = read_file(file_path)
+        for problem, instance in problem_to_instance.items():
+            problem_to_instances[problem].append(instance)
+
+    LOG.info(f"Number of problems: {len(problem_to_instances)}")
+
     with open(single_answer_instances_path, "w") as f:
-        instances = [json.loads(line) for line in open(file_path, "r")]
-        for instance in instances:
-            # All are true or all are false
-            if all(instance["graded_list"]) or (not any(instance["graded_list"])):
-                instance["is_correct"] = instance["graded_list"][0]
-                f.write(json.dumps(instance) + "\n")
-                continue
+        problem_to_clustered_instances = {}
+        single_answer_instance_count = 0
+        for problem, instance_list in problem_to_instances.items():
+            # If all the answers are correct or incorrect, we can just use the first answer
+            if all(instance["is_correct"] for instance in instance_list):
+                instance = instance_list[0]
+                single_answer_instance = deepcopy(instance)
+                single_answer_instance["is_correct"] = True
+                f.write(json.dumps(single_answer_instance) + "\n")
+                single_answer_instance_count += 1
+            elif all(not instance["is_correct"] for instance in instance_list):
+                instance = instance_list[0]
+                single_answer_instance = deepcopy(instance)
+                single_answer_instance["is_correct"] = False
+                f.write(json.dumps(single_answer_instance) + "\n")
+                single_answer_instance_count += 1
             else:
-                instance["question"] = instance["question_content"]
-                instance["max_idx"] = len(instance["code_list"]) - 1 
-                instance["num_solutions"] = len(instance["code_list"])
-                instance["is_correct_list"] = instance["graded_list"]
+                answer_clusters = defaultdict(list)
+                for instance in instance_list:
+                    answer = instance["predicted_answer"]
+                    answer_clusters[answer].append(instance)
+                    
+                problem_to_clustered_instances[problem] = [
+                    (answer, instances) for answer, instances in answer_clusters.items()
+                ]
 
-                instance["solution_list"] = instance["code_list"]
-                instance["pass_rate"] = sum(instance["graded_list"]) / len(instance["graded_list"])
-                processed_instances.append(instance)
-
-    return processed_instances
+    LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
+    LOG.info(f"Number of single answer instances: {single_answer_instance_count}")
+    return problem_to_clustered_instances
 
 
-def preprocess(input_file, output_dir, num_random_seeds=8):
+def extract_summary(solution, max_length=10000):
+    """Extract the summary from the solution."""
+    return solution
+ 
+
+def probabilistic_ceil(n: float) -> int:
+    decimal_part = n - math.floor(n)
+    if random.random() < decimal_part:
+        return math.ceil(n)
+    else:
+        return math.floor(n)
+
+
+def sample_instances(clustered_instances, max_soln_samples=8, sampling_strategy="linear", bayesian_constant=1.0):
+    random.shuffle(clustered_instances)
+
+    answer_counts = []
+    for _, same_answer_instances in clustered_instances:
+        answer_counts.append(len(same_answer_instances))
+
+    total_samples = sum(answer_counts)
+
+    if sampling_strategy == "sqrt":
+        unnormalized_sampling_probs = [(answer_count / total_samples) ** 0.5 for answer_count in answer_counts]
+        sampling_probs = [
+            sampling_prob / sum(unnormalized_sampling_probs) for sampling_prob in unnormalized_sampling_probs
+        ]
+
+    elif sampling_strategy == "bayesian":
+        pseudo_answer_counts = [(answer_count + bayesian_constant) for answer_count in answer_counts]
+        sampling_probs = [
+            pseudo_answer_count / sum(pseudo_answer_counts) for pseudo_answer_count in pseudo_answer_counts
+        ]
+    else:
+        sampling_probs = [answer_count / total_samples for answer_count in answer_counts]
+
+    # Sample instances from each cluster using the sampling probabilities
+    sampled_instances = []
+    num_samples = min(max_soln_samples, total_samples)
+    for i, (_, same_answer_instances) in enumerate(clustered_instances):
+        cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
+        cur_num_samples = min(max(1, cur_num_samples), len(same_answer_instances))
+        # if cur_num_samples > 0:
+        sampled_instances.extend(random.sample(same_answer_instances, cur_num_samples))
+
+    return sampled_instances[:max_soln_samples]
+
+
+def create_comparison_instance(clustered_instances, problem, max_soln_samples=8, sampling_strategy="linear"):
+    # Create a consolidated instance
+    sampled_instances = sample_instances(
+        clustered_instances, max_soln_samples=max_soln_samples, sampling_strategy=sampling_strategy
+    )
+    sampled_solutions = [extract_summary(instance["completion"]) for instance in sampled_instances]
+    consolidated_solutions = ""
+    for idx, solution in enumerate(sampled_solutions):
+        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+
+    comparison_instance = deepcopy(sampled_instances[0])
+    comparison_instance["solutions"] = consolidated_solutions
+    comparison_instance["max_idx"] = len(sampled_solutions) - 1
+    comparison_instance["num_solutions"] = len(sampled_instances)
+
+    for i, instance in enumerate(sampled_instances):
+        comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
+        if "judgement" in instance:
+            comparison_instance[f"judgement_{i}"] = instance["judgement"]
+        if "is_correct" in instance:
+            comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
+        if "graded_list" in instance:
+            comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
+            comparison_instance[f"graded_list_{i}"] = instance["graded_list"]
+
+    if "expected_answer" in clustered_instances[0][1][0]:
+        comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+
+    return comparison_instance
+
+
+def preprocess(
+    input_dir, output_dir, max_soln_samples=8, sampling_strategy="linear", num_random_seeds=8, num_input_samples=8
+):
     if output_dir is None:
         raise ValueError("Output directory is required")
 
@@ -80,24 +184,33 @@ def preprocess(input_file, output_dir, num_random_seeds=8):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    input_instances = read_file(input_file, output_dir)
+    input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")))
+    if num_input_samples is not None:
+        input_files = input_files[:num_input_samples]
+        print(f"Using {num_input_samples} / {len(input_files)} input files")
+    problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
 
     for random_seed in range(num_random_seeds):
         # random.seed(random_seed)
         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-            for instance in input_instances:
-                output_instance = deepcopy(instance)
-                solutions, is_correct_dict = format_solutions(output_instance["solution_list"], output_instance["is_correct_list"])
-                output_instance["solutions"] = solutions
-                output_instance.update(is_correct_dict)
-                f.write(json.dumps(output_instance) + "\n")
+            for problem, clustered_instances in problem_to_clustered_instances.items():
+                comparison_instance = create_comparison_instance(
+                    clustered_instances,
+                    problem,
+                    max_soln_samples=max_soln_samples,
+                    sampling_strategy=sampling_strategy,
+                )
+                f.write(json.dumps(comparison_instance) + "\n")
 
 
 @nested_dataclass(kw_only=True)
 class GenSelectPreprocessConfig:
-    input_file: str
+    input_dir: str
     output_dir: str
+    max_soln_samples: int = 16
+    sampling_strategy: str = "linear"
     num_random_seeds: int | None = None
+    num_input_samples: int | None = None
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -109,12 +222,14 @@ cs.store(name="base_genselect_preprocess_config", node=GenSelectPreprocessConfig
 def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
     cfg = GenSelectPreprocessConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
-    random.seed(10)
 
     preprocess(
-        input_file=cfg.input_file,
+        input_dir=cfg.input_dir,
         output_dir=cfg.output_dir,
+        max_soln_samples=cfg.max_soln_samples,
+        sampling_strategy=cfg.sampling_strategy,
         num_random_seeds=cfg.num_random_seeds,
+        num_input_samples=cfg.num_input_samples,
     )
 
 
