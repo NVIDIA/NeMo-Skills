@@ -37,11 +37,11 @@ def read_file(file_path):
             if "question" in instance:
                 instance["problem"] = instance["question"]
 
-        if "is_correct" not in instance:
-            if "graded_list" in instance:
-                instance["is_correct"] = instance["graded_list"][0]
-            if "judgement" in instance:
-                instance["is_correct"] = is_correct_judgement(instance["judgement"])
+        # Overwrite is_correct if graded_list or judgement is present
+        if "graded_list" in instance:
+            instance["is_correct"] = instance["graded_list"][0]
+        if "judgement" in instance:
+            instance["is_correct"] = is_correct_judgement(instance["judgement"])
 
         if "predicted_answer" not in instance:
             if "completion" in instance:
@@ -63,6 +63,17 @@ def read_files(file_paths, single_answer_instances_path):
     with open(single_answer_instances_path, "w") as f:
         problem_to_clustered_instances = {}
         for problem, instance_list in problem_to_instances.items():
+            # If all the answers are correct or incorrect, we can just use the first answer
+            if all(instance["is_correct"] for instance in instance_list):
+                instance = instance_list[0]
+                single_answer_instance = deepcopy(instance)
+                single_answer_instance["is_correct"] = True
+                f.write(json.dumps(single_answer_instance) + "\n")
+            elif all(not instance["is_correct"] for instance in instance_list):
+                instance = instance_list[0]
+                single_answer_instance = deepcopy(instance)
+                single_answer_instance["is_correct"] = False
+            
             answer_clusters = defaultdict(list)
             for instance in instance_list:
                 answer = instance["predicted_answer"]
@@ -77,11 +88,7 @@ def read_files(file_paths, single_answer_instances_path):
                     # The only predicted answer across seeds is None
                     single_answer_instance["is_correct"] = False
                 else:
-                    single_answer_instance["is_correct"] = (
-                        is_correct_judgement(instance["judgement"])
-                        if "judgement" in instance
-                        else instance["is_correct"]
-                    )
+                    single_answer_instance["is_correct"] = instance["is_correct"]
 
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
