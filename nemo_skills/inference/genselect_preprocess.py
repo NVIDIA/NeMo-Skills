@@ -62,6 +62,7 @@ def read_files(file_paths, single_answer_instances_path):
 
     with open(single_answer_instances_path, "w") as f:
         problem_to_clustered_instances = {}
+        single_answer_instance_count = 0
         for problem, instance_list in problem_to_instances.items():
             # If all the answers are correct or incorrect, we can just use the first answer
             if all(instance["is_correct"] for instance in instance_list):
@@ -69,37 +70,25 @@ def read_files(file_paths, single_answer_instances_path):
                 single_answer_instance = deepcopy(instance)
                 single_answer_instance["is_correct"] = True
                 f.write(json.dumps(single_answer_instance) + "\n")
-
+                single_answer_instance_count += 1
             elif all(not instance["is_correct"] for instance in instance_list):
                 instance = instance_list[0]
                 single_answer_instance = deepcopy(instance)
                 single_answer_instance["is_correct"] = False
                 f.write(json.dumps(single_answer_instance) + "\n")
-            
+                single_answer_instance_count += 1
             else:
                 answer_clusters = defaultdict(list)
                 for instance in instance_list:
                     answer = instance["predicted_answer"]
                     answer_clusters[answer].append(instance)
                     
-                if len(answer_clusters) == 1:
-                    # Single answer or no answer
-                    _, single_answer_instance_list = list(answer_clusters.items())[0]
-                    instance = single_answer_instance_list[0]
-                    single_answer_instance = deepcopy(instance)
-                    if single_answer_instance["predicted_answer"] is None:
-                        # The only predicted answer across seeds is None
-                        single_answer_instance["is_correct"] = False
-                    else:
-                        single_answer_instance["is_correct"] = instance["is_correct"]
-
-                    f.write(json.dumps(single_answer_instance) + "\n")
-                else:
-                    problem_to_clustered_instances[problem] = [
-                        (answer, instances) for answer, instances in answer_clusters.items()
+                problem_to_clustered_instances[problem] = [
+                    (answer, instances) for answer, instances in answer_clusters.items()
                 ]
 
     LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
+    LOG.info(f"Number of single answer instances: {single_answer_instance_count}")
     return problem_to_clustered_instances
 
 
