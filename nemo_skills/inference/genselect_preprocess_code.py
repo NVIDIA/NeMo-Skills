@@ -29,13 +29,18 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def format_solutions(code_list):
+def format_solutions(code_list, is_correct_list):
     consolidated_solutions = ""
-    random.shuffle(code_list)
-    for idx, solution in enumerate(code_list):
+    random.shuffle(list(zip(code_list, is_correct_list)))
+    is_correct_dict = {}
+    for idx, (solution, is_correct) in enumerate(zip(code_list, is_correct_list)):
         consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+        if is_correct:
+            is_correct_dict[idx] = True
+        else:
+            is_correct_dict[idx] = False
 
-    return consolidated_solutions
+    return consolidated_solutions, is_correct_dict
 
 
 def read_file(file_path, output_dir):
@@ -55,6 +60,7 @@ def read_file(file_path, output_dir):
                 instance["question"] = instance["question_content"]
                 instance["max_idx"] = len(instance["code_list"]) - 1 
                 instance["num_solutions"] = len(instance["code_list"])
+                instance["is_correct_list"] = instance["graded_list"]
 
                 instance["solution_list"] = instance["code_list"]
                 instance["pass_rate"] = sum(instance["graded_list"]) / len(instance["graded_list"])
@@ -81,7 +87,9 @@ def preprocess(input_file, output_dir, num_random_seeds=8):
         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
             for instance in input_instances:
                 output_instance = deepcopy(instance)
-                output_instance["solutions"] = format_solutions(output_instance["solution_list"])
+                solutions, is_correct_dict = format_solutions(output_instance["solution_list"], output_instance["is_correct_list"])
+                output_instance["solutions"] = solutions
+                output_instance.update(is_correct_dict)
                 f.write(json.dumps(output_instance) + "\n")
 
 
