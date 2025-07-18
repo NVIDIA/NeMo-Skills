@@ -21,7 +21,7 @@ Here are some of the features we support:
 
 ## News
 
-* [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/openreasoning) models! SOTA scores on math, coding and science benchmarks.
+* [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/) models! SOTA scores on math, coding and science benchmarks.
 
 ![Evaluation Results with pass@1](docs/releases/openreasoning/pass-1.png)
 
