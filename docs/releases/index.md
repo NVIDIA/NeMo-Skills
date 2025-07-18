@@ -8,6 +8,8 @@ On this page you can find a list of papers, model and dataset releases that were
 
 ## Releases
 
+* [OpenReasoning](openreasoning/index.md) models
+
 * [OpenCodeReasoning](opencodereasoning/index.md) dataset and models
 
 * [OpenMathReasoning](openmathreasoning/index.md) dataset and models
