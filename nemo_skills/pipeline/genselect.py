@@ -95,6 +95,7 @@ def genselect(
         "the last submitted experiment in the current Python session, so set to False to disable "
         "(or provide reuse_code_exp to override).",
     ),
+    is_code_task: bool = typer.Option(False, help="If True, will run the code task"),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -181,7 +182,11 @@ def genselect(
         preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
             preprocess_args if preprocess_args is not None else ""
         )
-        task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
+        if is_code_task:
+            LOG.info("RUNNING CODE TASK")
+            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess_code {preprocess_args}"
+        else:
+            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
         preprocess_task = pipeline_utils.add_task(
             exp,

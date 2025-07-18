@@ -53,6 +53,7 @@ class GenSelectConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
     generation_key: str = "genselect_comparison"
+    dataset: str = "math"
 
     sandbox: dict = field(default_factory=dict)
 
@@ -110,8 +111,8 @@ class GenSelectTask(GenerationTask):
 
         input_file = self.cfg.output_file
         # TODO: use last part of input_dir?
-        benchmark_dir = "math"
-        benchmark_dir = Path(self.cfg.input_dir).name
+        benchmark_dir = self.cfg.dataset
+        # benchmark_dir = Path(self.cfg.input_dir).name
         # "math"
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
