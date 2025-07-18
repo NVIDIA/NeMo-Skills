@@ -44,7 +44,6 @@ def eval_math(model_size):
         "aime24",
         "aime25",
         "hmmt_feb25",
-        "brumo25",
     ]
     eval(
         ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
