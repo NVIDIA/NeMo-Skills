@@ -77,12 +77,12 @@ num_solutions = 16
 # You can select a subset of data to run on if you want to test things
 generate(
     ctx=wrap_arguments(
-        f"++input_file=/workspace/open-reasoning/sdg/math-problems.jsonl "
         f"++prompt_config=generic/math "
         f"++inference.temperature=0.6 "
         f"++inference.tokens_to_generate={tokens_to_generate} "
     ),
     cluster=cluster,
+    input_file="/workspace/open-reasoning/sdg/math-problems.jsonl",
     output_dir="/workspace/open-reasoning/sdg/solutions",
     expname="r1-0528-math-solutions",
     model="/workspace/DeepSeek-R1-0528-tp16",
