@@ -132,7 +132,7 @@ class GenSelectTask(GenerationTask):
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
 
-                output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
+                #output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
 
                 if f"is_correct_{judgment}" in instance:
                     output_instance["is_correct"] = instance[f'is_correct_{judgment}']

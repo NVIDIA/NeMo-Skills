@@ -36,9 +36,9 @@ def format_solutions(code_list, is_correct_list):
     for idx, (solution, is_correct) in enumerate(zip(code_list, is_correct_list)):
         consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
         if is_correct:
-            is_correct_dict[idx] = True
+            is_correct_dict[f"is_correct_{idx}"] = True
         else:
-            is_correct_dict[idx] = False
+            is_correct_dict[f"is_correct_{idx}"] = False
 
     return consolidated_solutions, is_correct_dict
 
