@@ -29,31 +29,38 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+def format_solutions(code_list):
+    consolidated_solutions = ""
+    random.shuffle(code_list)
+    for idx, solution in enumerate(code_list):
+        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+
+    return consolidated_solutions
+
+
 def read_file(file_path, output_dir):
     single_answer_instances_path = os.path.join(output_dir, "single_answer_instances.jsonl")
 
     LOG.info(f"Reading file: {file_path}")
-    instances = [json.loads(line) for line in open(file_path, "r")]
-    for instance in instances:
-        instance["problem"] = instance["question_content"]
-        instance["max_idx"] = len(instance["code_list"])
+    processed_instances = []
+    with open(single_answer_instances_path, "w") as f:
+        instances = [json.loads(line) for line in open(file_path, "r")]
+        for instance in instances:
+            # All are true or all are false
+            if all(instance["graded_list"]) or (not any(instance["graded_list"])):
+                instance["is_correct"] = instance["graded_list"][0]
+                f.write(json.dumps(instance) + "\n")
+                continue
+            else:
+                instance["question"] = instance["question_content"]
+                instance["max_idx"] = len(instance["code_list"]) - 1 
+                instance["num_solutions"] = len(instance["code_list"])
 
-        instance["is_correct"]
+                instance["solution_list"] = instance["code_list"]
+                instance["pass_rate"] = sum(instance["graded_list"]) / len(instance["graded_list"])
+                processed_instances.append(instance)
 
-        # if "is_correct" not in instance:
-        #     if "graded_list" in instance:
-        #         instance["is_correct"] = instance["graded_list"][0]
-        #     if "judgement" in instance:
-        #         instance["is_correct"] = is_correct_judgement(instance["judgement"])
-
-        # if "predicted_answer" not in instance:
-        #     if "completion" in instance:
-        #         instance["predicted_answer"] = instance["completion"]
-
-    problem_to_instance = {instance["problem"]: instance for instance in instances}
-    return problem_to_instance
-
-
+    return processed_instances
 
 
 def preprocess(input_file, output_dir, num_random_seeds=8):
@@ -72,14 +79,10 @@ def preprocess(input_file, output_dir, num_random_seeds=8):
     for random_seed in range(num_random_seeds):
         # random.seed(random_seed)
         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-            for problem, clustered_instances in problem_to_clustered_instances.items():
-                comparison_instance = create_comparison_instance(
-                    clustered_instances,
-                    problem,
-                    max_soln_samples=max_soln_samples,
-                    sampling_strategy=sampling_strategy,
-                )
-                f.write(json.dumps(comparison_instance) + "\n")
+            for instance in input_instances:
+                output_instance = deepcopy(instance)
+                output_instance["solutions"] = format_solutions(output_instance["solution_list"])
+                f.write(json.dumps(output_instance) + "\n")
 
 
 @nested_dataclass(kw_only=True)
@@ -98,6 +101,7 @@ cs.store(name="base_genselect_preprocess_config", node=GenSelectPreprocessConfig
 def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
     cfg = GenSelectPreprocessConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
+    random.seed(10)
 
     preprocess(
         input_file=cfg.input_file,
