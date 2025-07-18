@@ -160,7 +160,7 @@ def run_cmd(
                 cmd=cmd,
                 task_name=expname,
                 log_dir=log_dir,
-                container=cluster_config["containers"][container],
+                container=cluster_config["containers"].get(container, container),
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
