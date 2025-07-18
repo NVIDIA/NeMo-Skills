@@ -94,22 +94,23 @@ def read_files(file_paths, single_answer_instances_path):
 
 def extract_summary(solution, max_length=10000):
     """Extract the summary from the solution."""
-    if solution.count("</think>") == 0:
-        if len(solution) < max_length:
-            # Probably the solution is a summary itself
-            summary = solution
-        else:
-            # Take the last 10 steps
-            summary = "\n\n".join(solution.split("\n\n")[-10:])[-max_length:]
-    else:
-        # There's a clear demarcation between the thinking step and the summary
-        summary = solution.rsplit("</think>", 1)[1]
+    return solution
+    # if solution.count("</think>") == 0:
+    #     if len(solution) < max_length:
+    #         # Probably the solution is a summary itself
+    #         summary = solution
+    #     else:
+    #         # Take the last 10 steps
+    #         summary = "\n\n".join(solution.split("\n\n")[-10:])[-max_length:]
+    # else:
+    #     # There's a clear demarcation between the thinking step and the summary
+    #     summary = solution.rsplit("</think>", 1)[1]
 
-    summary = summary.replace("<think>", "")
+    # summary = summary.replace("<think>", "")
 
-    if len(summary) > max_length:
-        summary = summary[-max_length:]
-    return summary
+    # if len(summary) > max_length:
+    #     summary = summary[-max_length:]
+    # return summary
 
 
 def probabilistic_ceil(n: float) -> int:
