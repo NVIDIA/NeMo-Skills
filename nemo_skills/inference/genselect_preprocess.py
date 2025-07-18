@@ -69,31 +69,34 @@ def read_files(file_paths, single_answer_instances_path):
                 single_answer_instance = deepcopy(instance)
                 single_answer_instance["is_correct"] = True
                 f.write(json.dumps(single_answer_instance) + "\n")
+
             elif all(not instance["is_correct"] for instance in instance_list):
                 instance = instance_list[0]
                 single_answer_instance = deepcopy(instance)
                 single_answer_instance["is_correct"] = False
-            
-            answer_clusters = defaultdict(list)
-            for instance in instance_list:
-                answer = instance["predicted_answer"]
-                answer_clusters[answer].append(instance)
-
-            if len(answer_clusters) == 1:
-                # Single answer or no answer
-                _, single_answer_instance_list = list(answer_clusters.items())[0]
-                instance = single_answer_instance_list[0]
-                single_answer_instance = deepcopy(instance)
-                if single_answer_instance["predicted_answer"] is None:
-                    # The only predicted answer across seeds is None
-                    single_answer_instance["is_correct"] = False
-                else:
-                    single_answer_instance["is_correct"] = instance["is_correct"]
-
                 f.write(json.dumps(single_answer_instance) + "\n")
+            
             else:
-                problem_to_clustered_instances[problem] = [
-                    (answer, instances) for answer, instances in answer_clusters.items()
+                answer_clusters = defaultdict(list)
+                for instance in instance_list:
+                    answer = instance["predicted_answer"]
+                    answer_clusters[answer].append(instance)
+                    
+                if len(answer_clusters) == 1:
+                    # Single answer or no answer
+                    _, single_answer_instance_list = list(answer_clusters.items())[0]
+                    instance = single_answer_instance_list[0]
+                    single_answer_instance = deepcopy(instance)
+                    if single_answer_instance["predicted_answer"] is None:
+                        # The only predicted answer across seeds is None
+                        single_answer_instance["is_correct"] = False
+                    else:
+                        single_answer_instance["is_correct"] = instance["is_correct"]
+
+                    f.write(json.dumps(single_answer_instance) + "\n")
+                else:
+                    problem_to_clustered_instances[problem] = [
+                        (answer, instances) for answer, instances in answer_clusters.items()
                 ]
 
     LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
