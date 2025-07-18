@@ -74,7 +74,7 @@ def preprocess(input_file, output_dir, num_random_seeds=8):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    input_instances = read_file(input_file)
+    input_instances = read_file(input_file, output_dir)
 
     for random_seed in range(num_random_seeds):
         # random.seed(random_seed)
