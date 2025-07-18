@@ -6,241 +6,369 @@ Focuses on:
 - Clear distinction between proofs with sorry vs complete proofs
 - User-managed proof state with backtracking support
 - Mathlib and aesop imports via TempRequireProject
+- ProofStep execution for granular tactic application
+- Command execution for standalone operations
+- Incremental proof building with tactic manipulation
 """
 
-from typing import Dict, List, Optional, Tuple
+from lean_interact import AutoLeanServer, LeanREPLConfig, Command, ProofStep, TempRequireProject
+from lean_interact.interface import CommandResponse, ProofStepResponse, LeanError
+from dataclasses import dataclass
+from typing import List, Optional, Union, Dict, Any, Tuple
 import re
 import logging
-from dataclasses import dataclass
-from lean_interact import AutoLeanServer, LeanREPLConfig, TempRequireProject, Command, ProofStep
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ProofResult:
-    """Result of executing a proof step."""
+    """Result of a proof execution."""
     success: bool
-    goals: List[str]
     proof_complete: bool
     has_sorry: bool
-    response_text: str
-    error_message: Optional[str] = None
+    response: str
+    error: Optional[str] = None
+    proof_state: Optional[int] = None
+    goals: Optional[List[str]] = None
 
+@dataclass
+class ProofInProgress:
+    """Represents a proof that is being built incrementally."""
+    name: str
+    statement: str
+    initial_proof_state: int
+    current_proof_state: int
+    tactic_history: List[Tuple[int, str]]  # (from_state, tactic)
+    goals: List[str]
+    completed: bool = False
 
 class LeanProver:
-    """Simple Lean 4 prover with mathlib support."""
+    """A simple but minimally sufficient Lean 4 prover interface."""
 
-    def __init__(self, use_mathlib: bool = True):
-        """Initialize the prover with optional mathlib support."""
-        self.use_mathlib = use_mathlib
-        self.server = None
-        self.project = None
-        self._initialize_server()
+    def __init__(self, mathlib_enabled: bool = True):
+        """Initialize the Lean prover with mathlib support."""
+        self.mathlib_enabled = mathlib_enabled
+        self.current_env = None
+        self.proofs_in_progress: Dict[str, ProofInProgress] = {}
 
-    def _initialize_server(self):
-        """Initialize the Lean server with mathlib if requested."""
-        if self.use_mathlib:
-            self.project = TempRequireProject(require="mathlib")
-            config = LeanREPLConfig(project=self.project)
-            self.server = AutoLeanServer(config)
+        # Configure the server with mathlib and aesop
+        if mathlib_enabled:
+            config = LeanREPLConfig(
+                project=TempRequireProject(
+                    require="mathlib",
+                )
+            )
         else:
             config = LeanREPLConfig()
-            self.server = AutoLeanServer(config)
 
-        # Add standard imports
-        if self.use_mathlib:
-            imports = [
-                "import Mathlib",
-                "import Aesop",
-                "import Mathlib.Data.Real.Basic",
-                "import Mathlib.Tactic",
-                "import Mathlib.Data.Nat.Basic"
-            ]
-            for imp in imports:
-                self.server.run(Command(cmd=imp))
+        self.server = AutoLeanServer(config)
 
-    def run_proof_step(self, theorem_statement: str, tactic: str) -> ProofResult:
-        """
-        Execute a single proof step.
-
-        Args:
-            theorem_statement: The theorem to prove (e.g., "theorem test : 1 + 1 = 2")
-            tactic: The tactic to apply (e.g., "norm_num")
-
-        Returns:
-            ProofResult with success status, goals, and completion info
-        """
+    def run(self, lean_code: str) -> ProofResult:
+        """Execute Lean code and return the result."""
         try:
-            # Format as a complete theorem with proof
-            full_statement = f"{theorem_statement} := by {tactic}"
+            response = self.server.run(Command(cmd=lean_code, env=self.current_env))
 
-            # Execute the command
-            response = self.server.run(Command(cmd=full_statement))
+            if isinstance(response, LeanError):
+                return ProofResult(
+                    success=False,
+                    proof_complete=False,
+                    has_sorry=False,
+                    response=str(response.message),
+                    error=str(response.message)
+                )
 
-            # Parse the response
-            return self._parse_response(response)
+            # Update environment
+            self.current_env = response.env
 
-        except Exception as e:
-            logger.error(f"Error executing proof step: {e}")
-            return ProofResult(
-                success=False,
-                goals=[],
-                proof_complete=False,
-                has_sorry=False,
-                response_text=str(e),
-                error_message=str(e)
-            )
+            # Check for sorries
+            has_sorry = len(response.sorries) > 0
 
-    def run_tactic_sequence(self, theorem_statement: str, tactics: List[str]) -> ProofResult:
-        """
-        Execute a sequence of tactics.
+            # Check if proof is complete (no errors and no sorries)
+            proof_complete = not response.has_errors and not has_sorry
 
-        Args:
-            theorem_statement: The theorem to prove
-            tactics: List of tactics to apply in order
+            # Get proof state from sorry if available
+            proof_state = None
+            if response.sorries:
+                proof_state = response.sorries[0].proof_state
 
-        Returns:
-            ProofResult for the final state
-        """
-        try:
-            # Format tactics with proper indentation
-            tactic_sequence = "\n  ".join(tactics)
-            full_statement = f"{theorem_statement} := by\n  {tactic_sequence}"
-
-            response = self.server.run(Command(cmd=full_statement))
-            return self._parse_response(response)
-
-        except Exception as e:
-            logger.error(f"Error executing tactic sequence: {e}")
-            return ProofResult(
-                success=False,
-                goals=[],
-                proof_complete=False,
-                has_sorry=False,
-                response_text=str(e),
-                error_message=str(e)
-            )
-
-    def check_proof_with_sorry(self, theorem_statement: str, proof_outline: str) -> ProofResult:
-        """
-        Check a proof that may contain 'sorry' placeholders.
-
-        Args:
-            theorem_statement: The theorem to prove
-            proof_outline: Proof text that may contain sorry
-
-        Returns:
-            ProofResult indicating if proof structure is valid (even with sorry)
-        """
-        try:
-            # Format as complete statement
-            if proof_outline.startswith("by"):
-                full_statement = f"{theorem_statement} := {proof_outline}"
+            # Format response
+            if response.messages:
+                formatted_messages = []
+                for msg in response.messages:
+                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
+                response_text = "\n".join(formatted_messages)
             else:
-                full_statement = f"{theorem_statement} := by {proof_outline}"
+                response_text = "Success"
 
-            response = self.server.run(Command(cmd=full_statement))
-            return self._parse_response(response)
+            return ProofResult(
+                success=not response.has_errors,
+                proof_complete=proof_complete,
+                has_sorry=has_sorry,
+                response=response_text,
+                proof_state=proof_state
+            )
 
         except Exception as e:
-            logger.error(f"Error checking proof with sorry: {e}")
             return ProofResult(
                 success=False,
-                goals=[],
-                proof_complete=False,
-                has_sorry=True,
-                response_text=str(e),
-                error_message=str(e)
-            )
-
-    def _parse_response(self, response) -> ProofResult:
-        """Parse the Lean server response into a ProofResult."""
-        if not response:
-            return ProofResult(
-                success=False,
-                goals=[],
                 proof_complete=False,
                 has_sorry=False,
-                response_text="No response from server",
-                error_message="No response from server"
+                response=str(e),
+                error=str(e)
             )
 
-        # Empty message list means success (no errors)
-        if not response.messages:
+    def run_command(self, command: str, env: Optional[int] = None) -> ProofResult:
+        """Execute a standalone Lean command."""
+        try:
+            response = self.server.run(Command(cmd=command, env=env or self.current_env))
+
+            if isinstance(response, LeanError):
+                return ProofResult(
+                    success=False,
+                    proof_complete=False,
+                    has_sorry=False,
+                    response=str(response.message),
+                    error=str(response.message)
+                )
+
+            # Update environment
+            self.current_env = response.env
+
+            # Check for sorries
+            has_sorry = len(response.sorries) > 0
+
+            # Check if proof is complete (no errors and no sorries)
+            proof_complete = not response.has_errors and not has_sorry
+
+            # Get proof state from sorry if available
+            proof_state = None
+            if response.sorries:
+                proof_state = response.sorries[0].proof_state
+
+            # Format response
+            if response.messages:
+                formatted_messages = []
+                for msg in response.messages:
+                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
+                response_text = "\n".join(formatted_messages)
+            else:
+                response_text = "Success"
+
+            return ProofResult(
+                success=not response.has_errors,
+                proof_complete=proof_complete,
+                has_sorry=has_sorry,
+                response=response_text,
+                proof_state=proof_state
+            )
+
+        except Exception as e:
+            return ProofResult(
+                success=False,
+                proof_complete=False,
+                has_sorry=False,
+                response=str(e),
+                error=str(e)
+            )
+
+    def run_proof_step(self, proof_state: int, tactic: str) -> ProofResult:
+        """Execute a proof step on a given proof state."""
+        try:
+            response = self.server.run(ProofStep(proof_state=proof_state, tactic=tactic))
+
+            if isinstance(response, LeanError):
+                return ProofResult(
+                    success=False,
+                    proof_complete=False,
+                    has_sorry=False,
+                    response=str(response.message),
+                    error=str(response.message)
+                )
+
+            # Check if proof is complete
+            proof_complete = response.proof_status == "Complete"
+
+            # Get new proof state and goals
+            new_proof_state = response.proof_state
+            goals = response.goals if hasattr(response, 'goals') else []
+
             return ProofResult(
                 success=True,
-                goals=[],
-                proof_complete=True,
+                proof_complete=proof_complete,
                 has_sorry=False,
-                response_text="",
-                error_message=None
+                response=response.proof_status,
+                proof_state=new_proof_state,
+                goals=goals
             )
 
-        response_text = ""
-        has_errors = False
-        has_sorry = False
-        goals = []
+        except Exception as e:
+            return ProofResult(
+                success=False,
+                proof_complete=False,
+                has_sorry=False,
+                response=str(e),
+                error=str(e)
+            )
 
-        for msg in response.messages:
-            response_text += f"{msg.severity}: {msg.data}\n"
+    def start_proof(self, name: str, statement: str) -> ProofResult:
+        """Start a new proof with 'by sorry' to get the initial proof state."""
+        full_theorem = f"theorem {name} {statement} := by sorry"
 
-            # Check for sorry
-            if "sorry" in msg.data.lower() or "declaration uses 'sorry'" in msg.data:
-                has_sorry = True
+        result = self.run_command(full_theorem)
 
-            # Handle different types of messages
-            if msg.severity == "error":
-                # "unsolved goals" is not a real error - it's partial success
-                if "unsolved goals" in msg.data:
-                    # Extract goals from the message
-                    goal_matches = re.findall(r'⊢\s*(.+)', msg.data)
-                    goals.extend([goal.strip() for goal in goal_matches])
+        # Check if we have a proof state, even if there are warnings
+        if result.proof_state is not None:
+            # Get the initial goals by running a skip tactic
+            initial_step = self.run_proof_step(result.proof_state, "skip")
+
+            if initial_step.success:
+                self.proofs_in_progress[name] = ProofInProgress(
+                    name=name,
+                    statement=statement,
+                    initial_proof_state=result.proof_state,
+                    current_proof_state=result.proof_state,
+                    tactic_history=[],
+                    goals=initial_step.goals or []
+                )
+
+                return ProofResult(
+                    success=True,
+                    proof_complete=False,
+                    has_sorry=True,
+                    response=f"Started proof '{name}' with initial state {result.proof_state}",
+                    proof_state=result.proof_state,
+                    goals=initial_step.goals
+                )
+
+        return result
+
+    def apply_tactic_to_proof(self, proof_name: str, tactic: str) -> ProofResult:
+        """Apply a tactic to a proof in progress."""
+        if proof_name not in self.proofs_in_progress:
+            return ProofResult(
+                success=False,
+                proof_complete=False,
+                has_sorry=False,
+                response=f"No proof named '{proof_name}' in progress",
+                error=f"No proof named '{proof_name}' in progress"
+            )
+
+        proof = self.proofs_in_progress[proof_name]
+
+        if proof.completed:
+            return ProofResult(
+                success=False,
+                proof_complete=True,
+                has_sorry=False,
+                response=f"Proof '{proof_name}' is already completed",
+                error=f"Proof '{proof_name}' is already completed"
+            )
+
+        # Apply the tactic
+        result = self.run_proof_step(proof.current_proof_state, tactic)
+
+        if result.success:
+            # Update the proof state
+            proof.tactic_history.append((proof.current_proof_state, tactic))
+            proof.current_proof_state = result.proof_state
+            proof.goals = result.goals or []
+
+            if result.proof_complete:
+                proof.completed = True
+
+        return result
+
+    def get_proof_state(self, proof_name: str) -> Optional[ProofInProgress]:
+        """Get the current state of a proof in progress."""
+        return self.proofs_in_progress.get(proof_name)
+
+    def backtrack_proof(self, proof_name: str, steps: int = 1) -> ProofResult:
+        """Backtrack a proof by removing the last n steps."""
+        if proof_name not in self.proofs_in_progress:
+            return ProofResult(
+                success=False,
+                proof_complete=False,
+                has_sorry=False,
+                response=f"No proof named '{proof_name}' in progress",
+                error=f"No proof named '{proof_name}' in progress"
+            )
+
+        proof = self.proofs_in_progress[proof_name]
+
+        if len(proof.tactic_history) < steps:
+            return ProofResult(
+                success=False,
+                proof_complete=False,
+                has_sorry=False,
+                response=f"Cannot backtrack {steps} steps, only {len(proof.tactic_history)} steps in history",
+                error=f"Cannot backtrack {steps} steps, only {len(proof.tactic_history)} steps in history"
+            )
+
+        # Remove the last steps
+        for _ in range(steps):
+            proof.tactic_history.pop()
+
+        # Rebuild the proof state by replaying tactics
+        if proof.tactic_history:
+            current_state = proof.initial_proof_state
+            for from_state, tactic in proof.tactic_history:
+                step_result = self.run_proof_step(current_state, tactic)
+                if step_result.success:
+                    current_state = step_result.proof_state
                 else:
-                    # This is a real error
-                    has_errors = True
+                    return ProofResult(
+                        success=False,
+                        proof_complete=False,
+                        has_sorry=False,
+                        response=f"Failed to replay tactic: {step_result.error}",
+                        error=f"Failed to replay tactic: {step_result.error}"
+                    )
 
-            # Also check for goals in info messages
-            elif msg.severity == "info" and "goals" in msg.data:
-                goal_matches = re.findall(r'⊢\s*(.+)', msg.data)
-                goals.extend([goal.strip() for goal in goal_matches])
+            proof.current_proof_state = current_state
+            # Get current goals
+            current_step = self.run_proof_step(current_state, "skip")
+            if current_step.success:
+                proof.goals = current_step.goals or []
+        else:
+            # Back to initial state
+            proof.current_proof_state = proof.initial_proof_state
+            initial_step = self.run_proof_step(proof.initial_proof_state, "skip")
+            if initial_step.success:
+                proof.goals = initial_step.goals or []
 
-        # Determine success and completion
-        success = not has_errors
-        proof_complete = success and not goals and not has_sorry
+        proof.completed = False
 
         return ProofResult(
-            success=success,
-            goals=goals,
-            proof_complete=proof_complete,
-            has_sorry=has_sorry,
-            response_text=response_text.strip(),
-            error_message=None if success else response_text.strip()
+            success=True,
+            proof_complete=False,
+            has_sorry=True,
+            response=f"Backtracked {steps} steps",
+            proof_state=proof.current_proof_state,
+            goals=proof.goals
         )
 
-    def close(self):
-        """Clean up resources."""
-        if self.server:
-            self.server.kill()
-        if self.project:
-            # TempRequireProject doesn't have a close method, cleanup is automatic
-            pass
+    def get_current_env(self) -> Optional[int]:
+        """Get the current environment ID."""
+        return self.current_env
 
-    def __enter__(self):
-        return self
+    def set_current_env(self, env: int):
+        """Set the current environment ID."""
+        self.current_env = env
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+    def run_multi_step(self, proof_state: int, tactics: List[str]) -> List[ProofResult]:
+        """Run multiple proof steps in sequence."""
+        results = []
+        current_state = proof_state
 
+        for tactic in tactics:
+            result = self.run_proof_step(current_state, tactic)
+            results.append(result)
 
-# Convenience functions
-def quick_prove(theorem_statement: str, tactic: str, use_mathlib: bool = True) -> ProofResult:
-    """Quick proof attempt with a single tactic."""
-    with LeanProver(use_mathlib=use_mathlib) as prover:
-        return prover.run_proof_step(theorem_statement, tactic)
+            if result.success and result.proof_state is not None:
+                current_state = result.proof_state
+            else:
+                # Stop on first failure
+                break
 
-
-def quick_prove_sequence(theorem_statement: str, tactics: List[str], use_mathlib: bool = True) -> ProofResult:
-    """Quick proof attempt with a sequence of tactics."""
-    with LeanProver(use_mathlib=use_mathlib) as prover:
-        return prover.run_tactic_sequence(theorem_statement, tactics)
+        return results
