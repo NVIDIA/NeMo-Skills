@@ -1,3 +1,3 @@
 # Model training
 
-Coming soon!
+We use the same training commands as for [OpenMathReasoning models](../openmathreasoning/)

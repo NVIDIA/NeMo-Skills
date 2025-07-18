@@ -1,4 +1,4 @@
-from nemo_skills.pipeline.cli import eval, wrap_arguments
+from nemo_skills.pipeline.cli import eval, genselect, wrap_arguments
 
 size_to_eval_gpus = {
     '1.5b': 1,
@@ -12,6 +12,8 @@ eval_tokens = 65536
 math_seeds = 64
 code_seeds = 64
 science_seeds = 64
+
+run_genselect = True
 
 cluster = "slurm"
 
@@ -55,6 +57,21 @@ def eval_math(model_size):
         benchmarks=','.join([f"{bench}:{math_seeds}" for bench in math_benchmarks]),
         num_jobs=64,
     )
+
+    if run_genselect:
+        for bench in math_benchmarks:
+            genselect(
+                ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
+                cluster=cluster,
+                expname=f"genselect-{bench}-{model_size}",
+                run_after=f"eval-math-{model_size}",
+                output_dir=f"{output_dir}/{model_size}-genselect/{bench}",
+                model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
+                server_type="sglang",
+                server_gpus=size_to_eval_gpus[model_size],
+                preprocess_args=f"++input_dir={output_dir}/{model_size}/eval-results/{bench}",
+                num_random_seeds=math_seeds,
+            )
 
 
 def eval_code(model_size):

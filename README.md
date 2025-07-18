@@ -21,6 +21,13 @@ Here are some of the features we support:
 
 ## News
 
+* [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/openreasoning) models! SOTA scores on math, coding and science benchmarks.
+
+<p float="middle">
+  <img src="docs/releases/openreasoning/pass-1.png" width="48%" />
+  <img src="docs/releases/openreasoning/genselect.png" width="43.5%" />
+</p>
+
 * [04/23/2025]: We released [OpenMathReasoning](https://nvidia.github.io/NeMo-Skills/openmathreasoning1) dataset and models!
 
   * OpenMathReasoning dataset has 306K unique mathematical problems sourced from [AoPS forums](https://artofproblemsolving.com/community) with:
