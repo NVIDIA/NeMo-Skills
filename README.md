@@ -25,7 +25,7 @@ Here are some of the features we support:
 
 <p float="middle">
   <img src="docs/releases/openreasoning/pass-1.png" width="48%" />
-  <img src="docs/releases/openreasoning/genselect.png" width="43.5%" />
+  <img src="docs/releases/openreasoning/genselect.png" width="45.8%" />
 </p>
 
 * [04/23/2025]: We released [OpenMathReasoning](https://nvidia.github.io/NeMo-Skills/openmathreasoning1) dataset and models!
