@@ -28,6 +28,10 @@ class BaseMetrics(abc.ABC):
             metrics_dict[agg_mode] = {"num_entries": self.total}
             if self.avg_tokens > 0:
                 metrics_dict[agg_mode]['avg_tokens'] = int(self.avg_tokens / self.total)
+            if self.avg_generation_time > 0:
+                metrics_dict[agg_mode]['total_generation_time'] = self.max_end_time - self.min_start_time
+            if self.avg_tokens > 0 and self.avg_generation_time > 0:
+                metrics_dict[agg_mode]['avg_tokens_per_second'] = self.avg_tokens / self.avg_generation_time
             for metric_key, metric_value in agg_metric_dict.items():
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
@@ -70,11 +74,25 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens += sum(
             pred['num_generated_tokens'] for pred in predictions if 'num_generated_tokens' in pred
         ) / len(predictions)
+        self.avg_generation_time += sum(
+            pred['generation_time'] for pred in predictions if 'generation_time' in pred
+        ) / len(predictions)
+        self.min_start_time = min(
+            self.min_start_time,
+            min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
+        )
+        self.max_end_time = max(
+            self.max_end_time,
+            max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
+        )
 
     def reset(self):
         self.total = 0
         self.max_k = 0
         self.avg_tokens = 0
+        self.avg_generation_time = 0
+        self.min_start_time = float('inf')
+        self.max_end_time = float('-inf')
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
     @classmethod

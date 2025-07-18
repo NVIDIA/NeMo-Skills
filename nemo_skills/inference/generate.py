@@ -482,7 +482,10 @@ class GenerationTask:
             for data_point in data_points:
                 # calculating total generation time
                 if self.cfg.add_generation_stats:
-                    data_point['generation_time'] = time.time() - data_point.pop('generation_start_time')
+                    data_point['generation_end_time'] = time.time()
+                    data_point['generation_time'] = (
+                        data_point['generation_end_time'] - data_point['generation_start_time']
+                    )
                 else:
                     data_point.pop('num_generated_tokens', None)
 
