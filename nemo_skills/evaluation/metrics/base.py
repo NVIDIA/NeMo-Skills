@@ -22,17 +22,20 @@ class BaseMetrics(abc.ABC):
     def __init__(self):
         self.reset()
 
+    def update_common_metrics(self, agg_dict):
+        agg_dict = {"num_entries": self.total}
+        if self.avg_tokens > 0:
+            agg_dict['avg_tokens'] = int(self.avg_tokens / self.total)
+        if self.avg_generation_time > 0:
+            agg_dict['total_generation_seconds'] = int(self.max_end_time - self.min_start_time)
+        if self.avg_tokens > 0 and self.avg_generation_time > 0:
+            agg_dict['avg_tokens_per_second'] = int(self.avg_tokens / self.avg_generation_time)
+
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.eval_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total}
-            if self.avg_tokens > 0:
-                metrics_dict[agg_mode]['avg_tokens'] = int(self.avg_tokens / self.total)
-            if self.avg_generation_time > 0:
-                metrics_dict[agg_mode]['total_generation_time'] = self.max_end_time - self.min_start_time
-            if self.avg_tokens > 0 and self.avg_generation_time > 0:
-                metrics_dict[agg_mode]['avg_tokens_per_second'] = self.avg_tokens / self.avg_generation_time
             for metric_key, metric_value in agg_metric_dict.items():
+                self.update_common_metrics(metrics_dict[agg_mode])
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
