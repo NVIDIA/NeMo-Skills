@@ -132,6 +132,7 @@ class MtBenchMetrics(BaseMetrics):
         return {
             'num_entries': as_int,
             'avg_tokens': as_int,
+            'gen_seconds': as_int,
             'average': as_float,
             'average_turn1': as_float,
             'average_turn2': as_float,
