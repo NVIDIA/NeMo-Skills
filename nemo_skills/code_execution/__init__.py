@@ -26,4 +26,13 @@ from nemo_skills.code_execution.lean4 import (
     ProofGoal,
     EditableClause,
     demo_interactive_agent,
+    # LLM tool for agents like Qwen3
+    LeanLLMTool,
+    ToolCapabilities,
+    ToolResult,
+    OperationType,
+    create_basic_tool,
+    create_interactive_tool,
+    create_validation_tool,
+    get_qwen3_tool_config,
 )

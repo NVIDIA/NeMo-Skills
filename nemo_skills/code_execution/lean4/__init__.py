@@ -43,6 +43,17 @@ from .interactive_agent import (
     demo_interactive_agent,
 )
 
+from .llm_tool import (
+    LeanLLMTool,
+    ToolCapabilities,
+    ToolResult,
+    OperationType,
+    create_basic_tool,
+    create_interactive_tool,
+    create_validation_tool,
+    get_qwen3_tool_config,
+)
+
 __all__ = [
     # Core prover
     'LeanProver',
@@ -56,6 +67,16 @@ __all__ = [
     'ProofGoal',
     'EditableClause',
     'demo_interactive_agent',
+
+    # LLM tool for agents like Qwen3
+    'LeanLLMTool',
+    'ToolCapabilities',
+    'ToolResult',
+    'OperationType',
+    'create_basic_tool',
+    'create_interactive_tool',
+    'create_validation_tool',
+    'get_qwen3_tool_config',
 ]
 
 # Version info
