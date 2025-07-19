@@ -84,29 +84,36 @@ class LeanProver:
             # Check for sorries
             has_sorry = len(response.sorries) > 0
 
+            # Format response and determine if there are actual errors (not just warnings)
+            has_actual_errors = False
+            if response.messages:
+                formatted_messages = []
+                for msg in response.messages:
+                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
+                    if msg.severity == 'error':
+                        has_actual_errors = True
+                response_text = "\n".join(formatted_messages)
+            else:
+                response_text = "Success"
+
+            # Success means no actual errors (warnings are OK)
+            success = not has_actual_errors
+
             # Check if proof is complete (no errors and no sorries)
-            proof_complete = not response.has_errors and not has_sorry
+            proof_complete = success and not has_sorry
 
             # Get proof state from sorry if available
             proof_state = None
             if response.sorries:
                 proof_state = response.sorries[0].proof_state
 
-            # Format response
-            if response.messages:
-                formatted_messages = []
-                for msg in response.messages:
-                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
-                response_text = "\n".join(formatted_messages)
-            else:
-                response_text = "Success"
-
             return ProofResult(
-                success=not response.has_errors,
+                success=success,
                 proof_complete=proof_complete,
                 has_sorry=has_sorry,
                 response=response_text,
-                proof_state=proof_state
+                proof_state=proof_state,
+                error=response_text if has_actual_errors else None
             )
 
         except Exception as e:
@@ -138,29 +145,36 @@ class LeanProver:
             # Check for sorries
             has_sorry = len(response.sorries) > 0
 
+            # Format response and determine if there are actual errors (not just warnings)
+            has_actual_errors = False
+            if response.messages:
+                formatted_messages = []
+                for msg in response.messages:
+                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
+                    if msg.severity == 'error':
+                        has_actual_errors = True
+                response_text = "\n".join(formatted_messages)
+            else:
+                response_text = "Success"
+
+            # Success means no actual errors (warnings are OK)
+            success = not has_actual_errors
+
             # Check if proof is complete (no errors and no sorries)
-            proof_complete = not response.has_errors and not has_sorry
+            proof_complete = success and not has_sorry
 
             # Get proof state from sorry if available
             proof_state = None
             if response.sorries:
                 proof_state = response.sorries[0].proof_state
 
-            # Format response
-            if response.messages:
-                formatted_messages = []
-                for msg in response.messages:
-                    formatted_messages.append(f"[{msg.severity}] {msg.data}")
-                response_text = "\n".join(formatted_messages)
-            else:
-                response_text = "Success"
-
             return ProofResult(
-                success=not response.has_errors,
+                success=success,
                 proof_complete=proof_complete,
                 has_sorry=has_sorry,
                 response=response_text,
-                proof_state=proof_state
+                proof_state=proof_state,
+                error=response_text if has_actual_errors else None
             )
 
         except Exception as e:
