@@ -296,30 +296,32 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8, use_dive
     # )
 
     for minibatch_instances in all_minibatch_instances:
+        consolidated_solutions = ""
+        solution_list = [instance["generation"] for instance in minibatch_instances]
+        for idx, solution in enumerate(solution_list):
+            consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
 
-    consolidated_solutions = ""
-    for idx, solution in enumerate(sampled_solutions):
-        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+        comparison_instance = deepcopy(minibatch_instances[0])
+        comparison_instance["solutions"] = consolidated_solutions
+        comparison_instance["max_idx"] = len(solution_list) - 1
+        comparison_instance["num_solutions"] = len(solution_list)
 
-    comparison_instance = deepcopy(sampled_instances[0])
-    comparison_instance["solutions"] = consolidated_solutions
-    comparison_instance["max_idx"] = len(sampled_solutions) - 1
-    comparison_instance["num_solutions"] = len(sampled_instances)
+        for i, instance in enumerate(solution_list):
+            comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
+            if "judgement" in instance:
+                comparison_instance[f"judgement_{i}"] = instance["judgement"]
+            if "is_correct" in instance:
+                comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
+            if "graded_list" in instance:
+                comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
+                comparison_instance[f"graded_list_{i}"] = instance["graded_list"]
 
-    for i, instance in enumerate(sampled_instances):
-        comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
-        if "judgement" in instance:
-            comparison_instance[f"judgement_{i}"] = instance["judgement"]
-        if "is_correct" in instance:
-            comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
-        if "graded_list" in instance:
-            comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
-            comparison_instance[f"graded_list_{i}"] = instance["graded_list"]
+        if "expected_answer" in clustered_instances[0][1][0]:
+            comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
 
-    if "expected_answer" in clustered_instances[0][1][0]:
-        comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+        comparison_instances.append(comparison_instance)
 
-    return comparison_instance
+    return comparison_instances
 
 
 
