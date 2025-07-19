@@ -188,7 +188,7 @@ def genselect(
             task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess_code {preprocess_args}"
         elif is_competition_task:
             LOG.info("RUNNING COMPETITION TASK")
-            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess_competition {preprocess_args}"
+            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_competition_preprocess {preprocess_args}"
         else:
             task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
