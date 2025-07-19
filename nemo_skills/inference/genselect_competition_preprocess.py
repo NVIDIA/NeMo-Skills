@@ -286,45 +286,6 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8, use_dive
     return comparison_instances
 
 
-def create_comparison_instance(clustered_instances, max_soln_samples=8, use_diversity=False):
-    # Create a consolidated instance
-    all_minibatch_instances = minibatchify_instances(clustered_instances, max_soln_samples, use_diversity)
-    comparison_instances = []
-
-    # sampled_instances = sample_instances(
-    #     clustered_instances, max_soln_samples=max_soln_samples, sampling_strategy=sampling_strategy
-    # )
-
-    for minibatch_instances in all_minibatch_instances:
-        consolidated_solutions = ""
-        solution_list = [instance["generation"] for instance in minibatch_instances]
-        for idx, solution in enumerate(solution_list):
-            consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
-
-        comparison_instance = deepcopy(minibatch_instances[0])
-        comparison_instance["solutions"] = consolidated_solutions
-        comparison_instance["max_idx"] = len(solution_list) - 1
-        comparison_instance["num_solutions"] = len(solution_list)
-
-        for i, instance in enumerate(solution_list):
-            comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
-            if "judgement" in instance:
-                comparison_instance[f"judgement_{i}"] = instance["judgement"]
-            if "is_correct" in instance:
-                comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
-            if "graded_list" in instance:
-                comparison_instance[f"is_correct_{i}"] = instance["graded_list"][0]
-                comparison_instance[f"graded_list_{i}"] = instance["graded_list"]
-
-        if "expected_answer" in clustered_instances[0][1][0]:
-            comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
-
-        comparison_instances.append(comparison_instance)
-
-    return comparison_instances
-
-
-
 def process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity):
     for random_seed, input_file in enumerate(input_files):
         if random_seed == 0:
