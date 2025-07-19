@@ -33,6 +33,7 @@ def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
     instances = [json.loads(line) for line in open(file_path, "r")]
     for instance in instances:
+        del instance["_full_generation"]
         if "problem" not in instance:
             if "question" in instance:
                 instance["problem"] = instance["question"]
@@ -314,7 +315,7 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8, use_dive
             if "is_correct" in instance:
                 comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
 
-        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct", "solutions"]:
+        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct", "graded_list"]:
             if key in comparison_instance:
                 del comparison_instance[key]
         
