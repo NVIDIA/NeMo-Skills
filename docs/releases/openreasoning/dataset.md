@@ -166,7 +166,7 @@ run_cmd(
     cluster=cluster,
     log_dir="/workspace/open-reasoning/sft-data-math-logs",
     expname='prepare-for-sft-math',
-    run_after="change-to-majority-if-no-correct",
+    run_after="r1-0528-math-solutions-judge-after-majority",
 )
 ```
 
