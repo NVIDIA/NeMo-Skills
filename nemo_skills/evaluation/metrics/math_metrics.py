@@ -129,6 +129,7 @@ class MathMetrics(BaseMetrics):
         return {
             'num_entries': as_int,
             'avg_tokens': as_int,
+            'gen_seconds': as_int,
             'judge_correct': as_percentage,
             'symbolic_correct': as_percentage,
             'no_answer': as_percentage,

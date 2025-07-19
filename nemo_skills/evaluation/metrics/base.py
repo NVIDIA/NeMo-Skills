@@ -22,19 +22,24 @@ class BaseMetrics(abc.ABC):
     def __init__(self):
         self.reset()
 
+    def update_common_metrics(self, agg_dict):
+        agg_dict["num_entries"] = self.total
+        if self.avg_tokens > 0:
+            agg_dict['avg_tokens'] = int(self.avg_tokens / self.total)
+        if self.max_end_time > float('-inf') and self.min_start_time < float('inf'):
+            agg_dict['gen_seconds'] = int(self.max_end_time - self.min_start_time)
+
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.eval_dict.items():
-            metrics_dict[agg_mode] = {"num_entries": self.total}
-            if self.avg_tokens > 0:
-                metrics_dict[agg_mode]['avg_tokens'] = int(self.avg_tokens / self.total)
+            metrics_dict[agg_mode] = {}
+            self.update_common_metrics(metrics_dict[agg_mode])
             for metric_key, metric_value in agg_metric_dict.items():
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
                 else:
                     metrics_dict[agg_mode][metric_key] = metric_value
-
         return metrics_dict
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
@@ -70,11 +75,24 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens += sum(
             pred['num_generated_tokens'] for pred in predictions if 'num_generated_tokens' in pred
         ) / len(predictions)
+        try:
+            self.min_start_time = min(
+                self.min_start_time,
+                min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
+            )
+            self.max_end_time = max(
+                self.max_end_time,
+                max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
+            )
+        except ValueError:  # min of empty sequence
+            pass
 
     def reset(self):
         self.total = 0
         self.max_k = 0
         self.avg_tokens = 0
+        self.min_start_time = float('inf')
+        self.max_end_time = float('-inf')
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
     @classmethod

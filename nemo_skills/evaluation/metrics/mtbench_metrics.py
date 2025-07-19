@@ -118,7 +118,9 @@ class MtBenchMetrics(BaseMetrics):
             metrics[f'{category}_turn2'] = sum(ratings2) / len(ratings2)
         metrics["missing_rating_turn1"] = none_count_turn1
         metrics["missing_rating_turn2"] = none_count_turn2
-        return {self.agg_mode: metrics}
+        metrics_dict = {self.agg_mode: metrics}
+        self.update_common_metrics(metrics_dict[self.agg_mode])
+        return metrics_dict
 
     def reset(self):
         super().reset()
@@ -130,6 +132,7 @@ class MtBenchMetrics(BaseMetrics):
         return {
             'num_entries': as_int,
             'avg_tokens': as_int,
+            'gen_seconds': as_int,
             'average': as_float,
             'average_turn1': as_float,
             'average_turn2': as_float,
