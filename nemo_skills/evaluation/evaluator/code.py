@@ -124,6 +124,7 @@ def eval_livecodebench(cfg):
                         f"All samples should have the same release version, "
                         f"but got {release_version} and {sample['release_version']}"
                     )
+
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
@@ -149,6 +150,20 @@ def eval_livecodebench(cfg):
 
         # moving eval file to ensure metrics are recomputed
         shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+
+
+def eval_livecodebench_pro(cfg):
+    for jsonl_file in unroll_files(cfg.input_files):
+        with open(jsonl_file) as f:
+            samples = [preprocess_code(json.loads(line), "python") for line in f]
+            for sample in samples:
+                sample["problem_id"] = sample.pop("task_id")
+                sample["text_response"] = sample.pop("completion")
+                sample["response_meta"] = None
+
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                f.write(json.dumps(sample) + "\n")
 
 
 def eval_evalplus(cfg):
