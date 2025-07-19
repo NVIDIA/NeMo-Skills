@@ -78,6 +78,27 @@ def check_if_all_incorrect(answer_clusters):
         return None
 
 
+def check_if_all_correct(answer_clusters):
+    # Check if all answers are correct
+    all_correct = True
+    for answer, instances in answer_clusters.items():
+        if answer is None:
+            continue
+        else:
+            instance = instances[0]
+            if not instance["is_correct"]:
+                all_correct = False
+                break
+
+    # If all answers are incorrect, just choose the most common answer
+    if all_correct:
+        # Choose the most common answer
+        most_common_answer = max(answer_clusters, key=lambda x: len(answer_clusters[x]))
+        return answer_clusters[most_common_answer][0]
+    else:
+        return None
+
+
 def check_for_single_viable_answer(answer_clusters):
     if len(answer_clusters) == 1:
         # Single answer or no answer
@@ -140,6 +161,13 @@ def read_files(file_paths, single_answer_instances_path):
                 if instance is not None:
                     LOG.warning(f"All incorrect answer instance found for problem {problem}")
                     f.write(json.dumps(instance) + "\n")
+
+                # Check if all answers are correct
+                instance = check_if_all_correct(answer_clusters)
+                if instance is not None:
+                    LOG.warning(f"All correct answer instance found for problem {problem}")
+                    f.write(json.dumps(instance) + "\n")
+
                 else:
                     # Write down the instances for problems with multiple answers
                     problem_to_clustered_instances[problem] = [
