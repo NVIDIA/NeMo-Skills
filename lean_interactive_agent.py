@@ -398,6 +398,58 @@ class InteractiveLeanAgent:
             "edit_successful": True
         }
 
+    def add_proof_structure(self, structure_lines: List[str]) -> Dict[str, Any]:
+        """
+        Helper method to add proof structure (like have clauses) to a simple theorem.
+
+        Args:
+            structure_lines: List of proof lines to add (e.g., ["have h1 : ... := by sorry", "intro x", "exact h1 x"])
+
+        Returns:
+            Edit result with updated editable clauses
+        """
+        # Join the structure lines with proper indentation
+        indented_lines = []
+        for line in structure_lines:
+            if line.strip():  # Skip empty lines
+                # Add consistent indentation
+                if not line.startswith('  '):
+                    indented_lines.append('  ' + line.strip())
+                else:
+                    indented_lines.append(line.rstrip())
+
+        # Create multi-line proof structure
+        new_structure = '\n'.join(indented_lines)
+
+        # Find the main proof clause to edit
+        main_proof_clauses = [cid for cid in self.editable_clauses.keys()
+                             if cid.startswith('main_proof_') or cid.startswith('sorry_')]
+
+        if not main_proof_clauses:
+            return {"error": "No main proof clause found to add structure to"}
+
+        # Edit the first available main proof clause
+        clause_id = main_proof_clauses[0]
+        return self.edit_clause(clause_id, new_structure)
+
+    def get_proof_structure_suggestions(self) -> List[str]:
+        """
+        Suggest common proof structure patterns based on the theorem type.
+        """
+        suggestions = [
+            "# Common patterns you can add:",
+            "",
+            "# For implications (P → Q):",
+            ["have h1 : P := by sorry", "have h2 : P → Q := by sorry", "exact h2 h1"],
+            "",
+            "# For conjunctions (P ∧ Q):",
+            ["have h1 : P := by sorry", "have h2 : Q := by sorry", "exact ⟨h1, h2⟩"],
+            "",
+            "# For complex proofs:",
+            ["have lemma1 : ... := by sorry", "have lemma2 : ... := by sorry", "-- main proof steps", "exact lemma1"],
+        ]
+        return suggestions
+
     def get_interactive_panel(self) -> Dict[str, Any]:
         """
         Get the current state of the 'interactive panel' - like VS Code's side panel.
