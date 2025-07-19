@@ -142,6 +142,8 @@ def read_files(file_paths, single_answer_instances_path):
             problem_to_instances[problem].append(instance)
 
     LOG.info(f"Number of problems: {len(problem_to_instances)}")
+    num_single_answer_instances = 0
+    num_multiple_answer_instances = 0
 
     with open(single_answer_instances_path, "w") as f:
         problem_to_clustered_instances = {}
@@ -153,26 +155,34 @@ def read_files(file_paths, single_answer_instances_path):
 
             single_answer_instance = check_for_single_viable_answer(answer_clusters)
             if single_answer_instance is not None:
-                LOG.warning(f"Single answer instance found for problem {problem}")
+                # LOG.warning(f"Single answer instance found for problem {problem}")
+                num_single_answer_instances += 1
                 f.write(json.dumps(single_answer_instance) + "\n")
             else:
                 # Check if all answers are incorrect
                 instance = check_if_all_incorrect(answer_clusters)
                 if instance is not None:
-                    LOG.warning(f"All incorrect answer instance found for problem {problem}")
+                    # LOG.warning(f"All incorrect answer instance found for problem {problem}")
+                    num_single_answer_instances += 1
                     f.write(json.dumps(instance) + "\n")
+                    continue
 
                 # Check if all answers are correct
                 instance = check_if_all_correct(answer_clusters)
                 if instance is not None:
-                    LOG.warning(f"All correct answer instance found for problem {problem}")
+                    num_single_answer_instances += 1
                     f.write(json.dumps(instance) + "\n")
+                    continue
 
                 else:
                     # Write down the instances for problems with multiple answers
                     problem_to_clustered_instances[problem] = [
                         (answer, instances) for answer, instances in answer_clusters.items()
                     ]
+                    num_multiple_answer_instances += 1
+
+    LOG.warning(f"Number of single answer instances: {num_single_answer_instances}")
+    LOG.warning(f"Number of multiple answer instances: {num_multiple_answer_instances}")
 
     return problem_to_clustered_instances
 
