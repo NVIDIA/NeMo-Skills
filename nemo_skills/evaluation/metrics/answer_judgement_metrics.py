@@ -191,5 +191,4 @@ class AnswerJudgementMetrics(BaseMetrics):
         for agg_key, datapoint_metrics in self.individual_metrics.items():
             if agg_key in metrics_dict:
                 metrics_dict[agg_key].update(self._compute_precision_recall_f1(datapoint_metrics))
-
         return metrics_dict

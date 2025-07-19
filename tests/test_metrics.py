@@ -67,6 +67,8 @@ def test_metrics(tmp_path, max_seq_len):
     )
     with open(expected_path, "r") as f:
         expected = f.read()
+    print(output_to_compare)
+    print(expected)
     assert output_to_compare == expected, "summarize_results output does not match expected output"
 
     # 5. Check that metrics.json matches metrics.json-test

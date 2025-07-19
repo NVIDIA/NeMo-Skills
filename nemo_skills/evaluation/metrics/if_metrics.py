@@ -64,6 +64,7 @@ class IFMetrics(BaseMetrics):
                 "prompt_loose_accuracy": prompt_loose,
                 "instruction_loose_accuracy": inst_loose,
             }
+            self.update_common_metrics(metrics_dict[agg_mode])
 
         return metrics_dict
 

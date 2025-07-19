@@ -89,6 +89,10 @@ class GenerateSolutionsConfig:
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
 
+    # if False, will not add num_generated_tokens and generation_time values.
+    # Useful when running judge jobs to keep the original generation statistics
+    add_generation_stats: bool = True
+
     generation_key: str = "generation"
     # if specified, we will have a loop over that key in the data file and
     # treat each element as a new turn of conversation
@@ -432,6 +436,7 @@ class GenerationTask:
                 generation_params['max_code_executions'] = max_code_executions_values
 
         generate_method = self.llm.generate_async if is_async else self.llm.generate
+
         return generate_method(**generation_params)
 
     # TODO: rewrite mtbench to have turns separated in data file and remove this method
@@ -473,6 +478,17 @@ class GenerationTask:
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
             # all of the ground-truth data to the output file alongside the generated solutions
             output[self.cfg.generation_key] = output.pop("generation")
+
+            for data_point in data_points:
+                # calculating total generation time
+                if self.cfg.add_generation_stats:
+                    data_point['generation_end_time'] = time.time()
+                    data_point['generation_time'] = (
+                        data_point['generation_end_time'] - data_point['generation_start_time']
+                    )
+                else:
+                    data_point.pop('num_generated_tokens', None)
+
             for key in output:
                 original_data_point.pop(key, None)
             output.update(original_data_point)
@@ -497,6 +513,11 @@ class GenerationTask:
                     data_points_batch.append(data_point)
 
                 if len(data_points_batch) == self.cfg.max_concurrent_requests or idx == len(data) - 1:
+
+                    for data_point in data_points_batch:
+                        # registering current time to calculate total generation time
+                        data_point['generation_start_time'] = time.time()
+
                     if self.cfg.multi_turn_key is None:
                         outputs = self.llm_generate(data_points_batch, data)
                     else:
@@ -542,13 +563,12 @@ class GenerationTask:
             while last_submitted_idx < len(remaining_data_points) or len(requests_in_progress) > 0:
                 num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
                 if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
-                    # The full data is passed to the llm_generate function
-                    # since few-shot examples can come from the entire dataset
-                    generation_ids = self.llm_generate(
-                        remaining_data_points[last_submitted_idx : last_submitted_idx + num_to_submit],
-                        data,
-                        is_async=True,
-                    )
+                    current_data_batch = remaining_data_points[last_submitted_idx : last_submitted_idx + num_to_submit]
+                    for data_point in current_data_batch:
+                        # registering current time to calculate total generation time
+                        data_point['generation_start_time'] = time.time()
+
+                    generation_ids = self.llm_generate(current_data_batch, data, is_async=True)
 
                     for idx, gen_id in enumerate(generation_ids):
                         requests_in_progress[last_submitted_idx + idx] = gen_id
