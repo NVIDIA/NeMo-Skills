@@ -19,8 +19,6 @@ import subprocess
 
 import pytest
 
-# TODO: update test values so that gen_seconds can be calculated
-
 
 @pytest.mark.parametrize("max_seq_len", [None, 8192, 32768])
 def test_metrics(tmp_path, max_seq_len):
