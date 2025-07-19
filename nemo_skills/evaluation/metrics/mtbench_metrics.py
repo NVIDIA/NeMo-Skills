@@ -120,7 +120,7 @@ class MtBenchMetrics(BaseMetrics):
         metrics["missing_rating_turn2"] = none_count_turn2
         metrics_dict = {self.agg_mode: metrics}
         self.update_common_metrics(metrics_dict[self.agg_mode])
-        return
+        return metrics_dict
 
     def reset(self):
         super().reset()

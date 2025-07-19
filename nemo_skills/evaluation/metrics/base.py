@@ -32,15 +32,14 @@ class BaseMetrics(abc.ABC):
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode, agg_metric_dict in self.eval_dict.items():
+            metrics_dict[agg_mode] = {}
+            self.update_common_metrics(metrics_dict[agg_mode])
             for metric_key, metric_value in agg_metric_dict.items():
-                metrics_dict[agg_mode] = {}
-                self.update_common_metrics(metrics_dict[agg_mode])
                 if isinstance(metric_value, float):
                     # by default we will return all float metrics as percentages
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
                 else:
                     metrics_dict[agg_mode][metric_key] = metric_value
-
         return metrics_dict
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
