@@ -76,14 +76,17 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens += sum(
             pred['num_generated_tokens'] for pred in predictions if 'num_generated_tokens' in pred
         ) / len(predictions)
-        self.min_start_time = min(
-            self.min_start_time,
-            min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
-        )
-        self.max_end_time = max(
-            self.max_end_time,
-            max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
-        )
+        try:
+            self.min_start_time = min(
+                self.min_start_time,
+                min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
+            )
+            self.max_end_time = max(
+                self.max_end_time,
+                max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
+            )
+        except ValueError:  # min of empty sequence
+            pass
 
     def reset(self):
         self.total = 0
