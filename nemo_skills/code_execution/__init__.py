@@ -14,3 +14,16 @@
 
 from nemo_skills.code_execution.utils import extract_code_output, extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.lean_interact_session import LeanInteractSession, create_lean_interact_session
+
+# Lean 4 theorem proving utilities
+from nemo_skills.code_execution.lean4 import (
+    LeanProver,
+    ProofResult,
+    ProofInProgress,
+    InteractiveLeanAgent,
+    Position,
+    LeanMessage,
+    ProofGoal,
+    EditableClause,
+    demo_interactive_agent,
+)

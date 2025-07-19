@@ -6,7 +6,7 @@ This demonstrates the enhanced workflow for adding have clauses
 and building proof structures dynamically with the InteractiveLeanAgent.
 """
 
-from lean_interactive_agent import InteractiveLeanAgent
+from nemo_skills.code_execution.lean4 import InteractiveLeanAgent
 
 def demo_dynamic_structure_building():
     """Demonstrate the complete workflow for dynamic structure building."""

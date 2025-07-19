@@ -14,7 +14,7 @@ Mimics how Terence Tao and other mathematicians work with Lean 4.
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any, NamedTuple
-from nemo_skills.code_execution.lean_prover import LeanProver
+from .prover import LeanProver
 
 
 class Position(NamedTuple):
