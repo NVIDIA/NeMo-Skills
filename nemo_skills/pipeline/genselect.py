@@ -96,6 +96,7 @@ def genselect(
         "(or provide reuse_code_exp to override).",
     ),
     is_code_task: bool = typer.Option(False, help="If True, will run the code task"),
+    is_competition_task: bool = typer.Option(False, help="If True, will run the competition task"),
     reuse_code_exp: str = typer.Option(
         None,
         help="If specified, will reuse the code from this experiment. "
@@ -185,6 +186,9 @@ def genselect(
         if is_code_task:
             LOG.info("RUNNING CODE TASK")
             task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess_code {preprocess_args}"
+        elif is_competition_task:
+            LOG.info("RUNNING COMPETITION TASK")
+            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess_competition {preprocess_args}"
         else:
             task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 

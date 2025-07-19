@@ -146,7 +146,6 @@ def read_files(file_paths, single_answer_instances_path):
                         (answer, instances) for answer, instances in answer_clusters.items()
                     ]
 
-
     return problem_to_clustered_instances
 
 
@@ -166,8 +165,8 @@ def read_file_competition(file_path, single_answer_instances_path=None):
         instance = json.loads(line)
         
         if "judgment_idx" in instance:
-            new_instance = {"problem": instance["problem"], "expected_answer": instance["expected_answer"]}
-            for key in ["problem", "expected_answer", "id", "subset_for_metrics", "reference_solution"]:
+            new_instance = {"problem": instance["problem"]}
+            for key in ["problem", "id", "subset_for_metrics"]:
                 if key in instance:
                     new_instance[key] = instance[key]
 
@@ -177,7 +176,6 @@ def read_file_competition(file_path, single_answer_instances_path=None):
                 judgment_idx = random.randint(0, instance["max_idx"])
 
             new_instance["generation"] = instance[f"solution_{judgment_idx}"]
-            new_instance["summary"] = instance[f"solution_{judgment_idx}"]
             new_instance["is_correct"] = instance[f"is_correct_{judgment_idx}"]
             new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
             new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
@@ -278,7 +276,7 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8, use_dive
             if "is_correct" in instance:
                 comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
 
-        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct"]:
+        for key in ["generation", "judgement", "tokens", "logprobs", "generation_time", "stopped_on_repetition", "is_new_summary_longer", "is_correct", "solutions"]:
             if key in comparison_instance:
                 del comparison_instance[key]
         
