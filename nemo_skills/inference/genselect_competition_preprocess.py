@@ -280,7 +280,8 @@ def create_comparison_instance(clustered_instances, max_soln_samples=8, use_dive
             if key in comparison_instance:
                 del comparison_instance[key]
         
-        comparison_instance["expected_answer"] = minibatch_instances[0]["expected_answer"]
+        if "expected_answer" in minibatch_instances[0]:
+            comparison_instance["expected_answer"] = minibatch_instances[0]["expected_answer"]
         comparison_instances.append(comparison_instance)
 
     return comparison_instances
