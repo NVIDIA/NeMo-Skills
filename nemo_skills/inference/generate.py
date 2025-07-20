@@ -484,7 +484,12 @@ class GenerationTask:
                 output['generation_end_time'] = time.time()
                 output['generation_time'] = output['generation_end_time'] - output['generation_start_time']
             else:
-                output.pop('generation_start_time', None)
+                # generation_start_time was overriden, so restoring it from end and total
+                # TODO: this is a bit hacky, need a rewrite
+                if 'generation_end_time' in original_data_point and 'generation_time' in original_data_point:
+                    output['generation_start_time'] = (
+                        original_data_point['generation_end_time'] - original_data_point['generation_time']
+                    )
                 output.pop('num_generated_tokens', None)
 
             for key in output:
