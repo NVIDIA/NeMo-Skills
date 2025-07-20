@@ -205,6 +205,8 @@ def read_file_competition(file_path, single_answer_instances_path=None):
     instances = []
     for line in open(file_path, "r"):
         instance = json.loads(line)
+        if "question" not in instance:
+            instance["question"] = instance["problem"]
         
         if "judgment_idx" in instance:
             new_instance = {"problem": instance["problem"]}
