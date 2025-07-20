@@ -479,16 +479,13 @@ class GenerationTask:
             # all of the ground-truth data to the output file alongside the generated solutions
             output[self.cfg.generation_key] = output.pop("generation")
 
-            for data_point in data_points:
-                # calculating total generation time
-                if self.cfg.add_generation_stats:
-                    data_point['generation_end_time'] = time.time()
-                    data_point['generation_time'] = (
-                        data_point['generation_end_time'] - data_point['generation_start_time']
-                    )
-                else:
-                    data_point.pop('generation_start_time', None)
-                    data_point.pop('num_generated_tokens', None)
+            # calculating total generation time
+            if self.cfg.add_generation_stats:
+                output['generation_end_time'] = time.time()
+                output['generation_time'] = output['generation_end_time'] - output['generation_start_time']
+            else:
+                output.pop('generation_start_time', None)
+                output.pop('num_generated_tokens', None)
 
             for key in output:
                 original_data_point.pop(key, None)
