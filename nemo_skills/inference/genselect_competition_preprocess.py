@@ -217,7 +217,8 @@ def read_file_competition(file_path, single_answer_instances_path=None):
             new_instance["generation"] = instance[f"solution_{judgment_idx}"]
             new_instance["is_correct"] = instance[f"is_correct_{judgment_idx}"]
             new_instance["predicted_answer"] = instance[f"predicted_answer_{judgment_idx}"]
-            new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
+            if f"judgement_{judgment_idx}" in instance:
+                new_instance["judgement"] = instance[f"judgement_{judgment_idx}"]
 
             instances.append(new_instance)
         else:
