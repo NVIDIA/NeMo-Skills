@@ -299,6 +299,8 @@ def _get_tunnel_cached(
 
 
 def tunnel_hash(tunnel):
+    if isinstance(tunnel, run.LocalTunnel):
+        return "local"
     return f"{tunnel.job_dir}:{tunnel.host}:{tunnel.user}:{tunnel.identity}:{tunnel.shell}:{tunnel.pre_command}"
 
 
