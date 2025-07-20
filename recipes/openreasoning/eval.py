@@ -105,7 +105,7 @@ def eval_science(model_size):
     eval(
         ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
         cluster=cluster,
-        expname=f"eval-science-{model_size}",
+        expname=f"eval-gpqa-{model_size}",
         output_dir=f"{output_dir}/{model_size}",
         model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
         server_type="sglang",
@@ -115,7 +115,7 @@ def eval_science(model_size):
     eval(
         ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
         cluster=cluster,
-        expname=f"eval-science-{model_size}",
+        expname=f"eval-mmlu-pro-{model_size}",
         output_dir=f"{output_dir}/{model_size}",
         model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
         server_type="sglang",
@@ -126,7 +126,7 @@ def eval_science(model_size):
     eval(
         ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
         cluster=cluster,
-        expname=f"eval-science-{model_size}",
+        expname=f"eval-hle-{model_size}",
         output_dir=f"{output_dir}/{model_size}",
         model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
         server_type="sglang",
