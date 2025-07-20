@@ -482,7 +482,10 @@ class GenerationTask:
             # calculating total generation time
             if self.cfg.add_generation_stats:
                 output['generation_end_time'] = time.time()
-                output['generation_time'] = output['generation_end_time'] - output['generation_start_time']
+                # TODO: start time is saved in data_point, not output, need to fix that
+                output['generation_time'] = (
+                    output['generation_end_time'] - original_data_point['generation_start_time']
+                )
             else:
                 # generation_start_time was overriden, so restoring it from end and total
                 # TODO: this is a bit hacky, need a rewrite
