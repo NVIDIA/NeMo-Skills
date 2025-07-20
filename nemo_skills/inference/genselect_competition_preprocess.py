@@ -38,6 +38,9 @@ def read_file(file_path):
             if "question" in instance:
                 instance["problem"] = instance["question"]
 
+        if "question" not in instance:
+            instance["question"] = instance["problem"]
+
         # Overwrite is_correct if graded_list or judgement is present
         if "graded_list" in instance:
             instance["is_correct"] = instance["graded_list"][0]
