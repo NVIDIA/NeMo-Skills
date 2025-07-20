@@ -490,6 +490,8 @@ class GenerationTask:
                     output['generation_start_time'] = (
                         original_data_point['generation_end_time'] - original_data_point['generation_time']
                     )
+                else:
+                    output.pop('generation_start_time', None)
                 output.pop('num_generated_tokens', None)
 
             for key in output:
