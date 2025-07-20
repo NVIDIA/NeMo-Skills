@@ -516,9 +516,9 @@ def add_task(
         het_group += 1
         LOG.info("Sandbox command: %s", commands[-1])
 
-    if cluster_config["executor"] != "local":
+    if cluster_config["executor"] != "none":
         tunnel = get_tunnel(cluster_config)
-        if isinstance(tunnel, run.SSHTunnel) and reuse_code:
+        if reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
                 if isinstance(reuse_code_exp, str):
@@ -539,7 +539,7 @@ def add_task(
                 else:
                     LOG.warning("Relevant packaging job not found for experiment %s", reuse_code_exp._title)
         # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
-        elif isinstance(tunnel, run.SSHTunnel):
+        else:
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     # no mounting here, so assuming /nemo_run/code can be replaced with the current dir
@@ -606,10 +606,9 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
 
         # caching the experiment code for reuse
         tunnel = get_tunnel(cluster_config)
-        if isinstance(tunnel, run.SSHTunnel):
-            ssh_hash = tunnel_hash(tunnel)
-            if ssh_hash not in REUSE_CODE_EXP:
-                REUSE_CODE_EXP[ssh_hash] = exp
+        cur_tunnel_hash = tunnel_hash(tunnel)
+        if cur_tunnel_hash not in REUSE_CODE_EXP:
+            REUSE_CODE_EXP[cur_tunnel_hash] = exp
 
 
 def get_exp(expname, cluster_config, _reuse_exp=None):
