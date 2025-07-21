@@ -76,7 +76,10 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
             if self.model_name not in local_inference_model_map:
                 # TODO: We can present the user the nearest model name that is supported
-                raise ValueError(f"{self.model_name} is not supported by BFCL Eval")
+                raise ValueError(
+                    f"{self.model_name} is not supported by BFCL Eval. "
+                    f"Supported models: {list(local_inference_model_map.keys())}"
+                )
 
             LOG.info(f"Using client parsing for {self.model_name}")
 
