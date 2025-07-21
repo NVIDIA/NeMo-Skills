@@ -142,7 +142,6 @@ def eval_livecodebench(cfg):
 
         with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
             eval_grades = json.load(fin)
-        # adding is_correct key to allow compute_metrics to work
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 sample['graded_list'] = eval_grades['eval'][sample['task_id']]['graded_list']

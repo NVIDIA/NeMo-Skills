@@ -60,12 +60,12 @@ def read_files(file_paths, single_answer_instances_path):
                 single_answer_instance = deepcopy(instance)
                 if single_answer_instance["predicted_answer"] is None:
                     # The only predicted answer across seeds is None
-                    single_answer_instance["is_correct"] = False
+                    single_answer_instance["symbolic_correct"] = False
                 else:
-                    single_answer_instance["is_correct"] = (
+                    single_answer_instance["symbolic_correct"] = (
                         is_correct_judgement(instance["judgement"])
                         if "judgement" in instance
-                        else instance["is_correct"]
+                        else instance["symbolic_correct"]
                     )
 
                 f.write(json.dumps(single_answer_instance) + "\n")
@@ -160,8 +160,8 @@ def create_comparison_instance(clustered_instances, problem, max_soln_samples=8,
         comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
         if "judgement" in instance:
             comparison_instance[f"judgement_{i}"] = instance["judgement"]
-        if "is_correct" in instance:
-            comparison_instance[f"is_correct_{i}"] = instance["is_correct"]
+        if "symbolic_correct" in instance:
+            comparison_instance[f"symbolic_correct_{i}"] = instance["symbolic_correct"]
 
     comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
 

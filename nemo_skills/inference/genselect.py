@@ -131,8 +131,8 @@ class GenSelectTask(GenerationTask):
 
                 output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
 
-                if f"is_correct_{judgment}" in instance:
-                    output_instance["is_correct"] = instance[f'is_correct_{judgment}']
+                if f"symbolic_correct_{judgment}" in instance:
+                    output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
                 if f"judgement_{judgment}" in instance:
                     output_instance["judgement"] = instance[f'judgement_{judgment}']
 

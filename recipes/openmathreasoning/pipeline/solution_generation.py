@@ -51,7 +51,7 @@ def fill_majority_answer(cluster, expname, run_after, stage_config, **kwargs):
         f'    ++output_dir={output_dir} '
         f'    ++input_files="output-rs*.jsonl" '
         f'    ++mode=fill '
-        f'    ++fill_is_correct=False '
+        f'    ++fill_symbolic_correct=False '
         f'    ++ignore_if_not_none=True '
     )
     run_cmd(

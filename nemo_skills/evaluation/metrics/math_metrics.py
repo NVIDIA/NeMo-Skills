@@ -61,8 +61,8 @@ class MathMetrics(BaseMetrics):
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         correctness_dict = {}
-        if 'is_correct' in prediction:
-            correctness_dict["symbolic_correct"] = prediction['is_correct']
+        if 'symbolic_correct' in prediction:
+            correctness_dict["symbolic_correct"] = prediction['symbolic_correct']
         if 'judgement' in prediction:
             correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
         if 'judge_correct' in correctness_dict and 'symbolic_correct' in correctness_dict:
@@ -76,8 +76,8 @@ class MathMetrics(BaseMetrics):
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
         prediction = prediction.copy()
-        if 'is_correct' in prediction:
-            prediction['is_correct'] = False
+        if 'symbolic_correct' in prediction:
+            prediction['symbolic_correct'] = False
         if 'judgement' in prediction:
             prediction['judgement'] = 'Judgement: No'
         prediction['predicted_answer'] = None
