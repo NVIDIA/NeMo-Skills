@@ -226,7 +226,6 @@ def summarize_results(
         data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
     else:
         cluster_config = None
-    # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
 
     # Check for all possible directory structures
     # 1. {results_dir}/eval-results/{benchmark}/output*jsonl

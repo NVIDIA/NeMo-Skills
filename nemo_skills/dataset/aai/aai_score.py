@@ -14,9 +14,9 @@
 
 
 def compute_score(metrics: dict):
-    mmlu_pro = metrics['mmlu-pro']['greedy']['symbolic_correct']
-    hle = metrics['hle']['greedy']['judge_correct']
-    gpqa = metrics['gpqa']['greedy']['symbolic_correct']
+    mmlu_pro = metrics['mmlu-pro']['pass@1']['symbolic_correct']
+    hle = metrics['hle']['pass@1']['judge_correct']
+    gpqa = metrics['gpqa']['pass@1']['symbolic_correct']
 
     aime24 = metrics['aime24']['pass@1[avg-of-10]']['symbolic_correct']
     math500 = metrics['math-500']['pass@1[avg-of-3]']['symbolic_correct']

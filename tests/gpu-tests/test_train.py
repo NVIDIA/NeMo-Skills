@@ -75,7 +75,7 @@ def test_sft_nemo_rl():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["all"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -136,7 +136,7 @@ def test_grpo_nemo_rl():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["all"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -196,7 +196,7 @@ def test_sft_aligner():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["all"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -258,7 +258,7 @@ def test_dpo_aligner():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["all"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 

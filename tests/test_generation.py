@@ -96,7 +96,7 @@ def test_eval_mtbench_api(tmp_path):
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
         [f"{tmp_path}/eval-results/mt-bench/output.jsonl"],
-    )["all"]["greedy"]
+    )["all"]["pass@1"]
 
     # not having other categories since we just ran with 2 samples
     assert metrics['average'] >= 6
