@@ -280,59 +280,50 @@ def summarize_results(
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
             continue
-        try:
-            if metric_type is not None:
-                metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
-            else:
-                metrics_calculator = ComputeMetrics(
-                    benchmark,
-                    data_dir=data_dir,
-                    cluster_config=cluster_config,
-                    extra_datasets=extra_datasets,
-                    extra_datasets_type=extra_datasets_type,
-                    max_samples=max_samples,
-                    max_seq_len=max_seq_len,
-                )
 
-            metrics = {}
-            # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
-            #       an extra aggregation to print
-            has_greedy = False
+        if metric_type is not None:
+            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+        else:
+            metrics_calculator = ComputeMetrics(
+                benchmark,
+                data_dir=data_dir,
+                cluster_config=cluster_config,
+                extra_datasets=extra_datasets,
+                extra_datasets_type=extra_datasets_type,
+                max_samples=max_samples,
+                max_seq_len=max_seq_len,
+            )
 
-            if Path(f'{benchmark_path}/output.jsonl').exists():
-                has_greedy = True
-                metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[get_subset_name(benchmark, subset)].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['_all_'])
+        metrics = {}
 
-            sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
-            if len(sampling_outputs) > 0:
-                metrics = metrics_calculator.compute_metrics(input_files=sampling_outputs)
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[get_subset_name(benchmark, subset)].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['_all_'])
+        has_greedy = Path(f'{benchmark_path}/output.jsonl').exists()
+        input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
+        has_sampling = len(input_files) > 0
 
-            if len(metrics) > 1:
-                for subset, subset_metrics in metrics.items():
-                    metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
-                    evaluations_to_print[get_subset_name(benchmark, subset)] = (
-                        metrics_calculator.evaluations_to_print()
-                    )
-                    if evaluations_to_print[get_subset_name(benchmark, subset)] is not None and has_greedy:
-                        evaluations_to_print[get_subset_name(benchmark, subset)].insert(0, 'greedy')
-            else:
-                metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
-                evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
-                if evaluations_to_print[benchmark] is not None and has_greedy:
-                    evaluations_to_print[benchmark].insert(0, 'greedy')
+        if has_greedy and has_sampling:
+            raise ValueError(
+                f"Both output.jsonl and output-rs*.jsonl found for benchmark {benchmark}. "
+                "This indicates that the evaluation was done multiple times with different sampling parameters. "
+                "It's not clear how to process this! Please remove output.jsonl or output-rs*.jsonl files and rerun."
+            )
 
-        except Exception as e:
-            LOG.exception(f"Error computing metrics for {benchmark}: {e}")
+        if has_greedy:
+            input_files = [f'{benchmark_path}/output.jsonl']
+
+        metrics = metrics_calculator.compute_metrics(input_files=input_files)
+        if len(metrics) > 1:  # has subsets
+            for subset, subset_metrics in metrics.items():
+                results[get_subset_name(benchmark, subset)].update(subset_metrics)
+        else:
+            results[benchmark].update(metrics['_all_'])
+
+        if len(metrics) > 1:
+            for subset, subset_metrics in metrics.items():
+                metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
+                evaluations_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.evaluations_to_print()
+        else:
+            metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
+            evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
 
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
