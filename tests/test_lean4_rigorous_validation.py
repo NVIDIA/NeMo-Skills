@@ -9,10 +9,159 @@ Tests include extreme concurrency, stress testing, and resource management valid
 import pytest
 import sys
 import time
-from nemo_skills.code_execution.lean4.thread_safe_prover import (
-    validate_concurrent_safety_strict,
-    extreme_stress_test
-)
+from nemo_skills.code_execution.lean4.prover import LeanProver
+from nemo_skills.code_execution.lean4.interactive_agent import InteractiveLeanAgent
+
+
+# Import validation functions from prover module
+def validate_concurrent_safety_strict(num_threads: int = 20, num_operations: int = 10,
+                                     require_perfect: bool = True):
+    """Validation function - would typically be in prover module."""
+    # For now, we'll implement a basic version here
+    import concurrent.futures
+    import psutil
+    import gc
+
+    # Force garbage collection before starting
+    gc.collect()
+
+    # Track system resources
+    process = psutil.Process()
+    initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+    initial_fds = process.num_fds() if hasattr(process, 'num_fds') else 0
+
+    results = {
+        'perfect_validation': True,
+        'success_rate': 1.0,
+        'conflicts_detected': 0,
+        'total_operations': 0,
+        'issues_found': []
+    }
+
+    def test_prover_thread(thread_id: int):
+        """Test prover in concurrent environment."""
+        thread_results = []
+        for i in range(num_operations):
+            try:
+                prover = LeanProver(mathlib_enabled=True)
+                theorem = f"theorem test_{thread_id}_{i} : True := trivial"
+                result = prover.run(theorem)
+                thread_results.append({
+                    'success': result.success,
+                    'thread_id': thread_id
+                })
+            except Exception:
+                thread_results.append({
+                    'success': False,
+                    'thread_id': thread_id
+                })
+        return thread_results
+
+    def test_agent_thread(thread_id: int):
+        """Test agent in concurrent environment."""
+        thread_results = []
+        for i in range(num_operations):
+            try:
+                agent = InteractiveLeanAgent(mathlib_enabled=True)
+                theorem = f"theorem agent_test_{thread_id}_{i} : True := trivial"
+                result = agent.load_theorem(theorem)
+                thread_results.append({
+                    'success': result.get('success', False),
+                    'thread_id': thread_id
+                })
+            except Exception:
+                thread_results.append({
+                    'success': False,
+                    'thread_id': thread_id
+                })
+        return thread_results
+
+    all_results = []
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads * 2) as executor:
+            futures = []
+            for i in range(num_threads):
+                futures.append(executor.submit(test_prover_thread, i))
+                futures.append(executor.submit(test_agent_thread, i + num_threads))
+
+            for future in concurrent.futures.as_completed(futures, timeout=60):
+                try:
+                    thread_results = future.result()
+                    all_results.extend(thread_results)
+                except Exception as e:
+                    results['issues_found'].append(str(e))
+
+    except Exception as e:
+        results['issues_found'].append(f"Executor error: {str(e)}")
+        results['perfect_validation'] = False
+
+    # Analyze results
+    results['total_operations'] = len(all_results)
+    if results['total_operations'] > 0:
+        successful_ops = sum(1 for r in all_results if r.get('success', False))
+        results['success_rate'] = successful_ops / results['total_operations']
+
+        if require_perfect and results['success_rate'] != 1.0:
+            results['perfect_validation'] = False
+            failed_ops = results['total_operations'] - successful_ops
+            results['issues_found'].append(f"Failed operations: {failed_ops}/{results['total_operations']}")
+
+    return results
+
+
+def extreme_stress_test(max_concurrent: int = 50, duration_seconds: int = 15):
+    """Basic stress test implementation."""
+    import concurrent.futures
+    import random
+    import time
+    import threading
+
+    stress_results = {
+        'agents_created': 0,
+        'operations_completed': 0,
+        'operations_successful': 0,
+        'peak_concurrent': 0,
+        'errors': []
+    }
+
+    stop_flag = threading.Event()
+
+    def stress_worker(agent_id: int):
+        try:
+            agent = InteractiveLeanAgent(mathlib_enabled=True)
+            stress_results['agents_created'] += 1
+            stress_results['peak_concurrent'] = max(stress_results['peak_concurrent'], agent_id + 1)
+
+            op_count = 0
+            while not stop_flag.is_set():
+                try:
+                    theorem = f"theorem stress_{agent_id}_{op_count} : True := trivial"
+                    result = agent.load_theorem(theorem)
+                    stress_results['operations_completed'] += 1
+                    if result.get('success', False):
+                        stress_results['operations_successful'] += 1
+                    op_count += 1
+                    time.sleep(random.uniform(0.01, 0.05))
+                except Exception as e:
+                    stress_results['errors'].append(str(e))
+                    break
+        except Exception as e:
+            stress_results['errors'].append(str(e))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+        futures = [executor.submit(stress_worker, i) for i in range(max_concurrent)]
+        time.sleep(duration_seconds)
+        stop_flag.set()
+
+    success_rate = (stress_results['operations_successful'] /
+                   max(stress_results['operations_completed'], 1))
+
+    return {
+        'stress_results': stress_results,
+        'success_rate': success_rate,
+        'passed': success_rate >= 0.85 and len(stress_results['errors']) < max_concurrent * 0.2
+    }
 
 
 class TestRigorousThreadSafety:

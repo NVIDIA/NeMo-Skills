@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-Interactive Lean 4 Development Agent
+Thread-Safe Interactive Lean 4 Development Agent
 
-This recreates the VS Code Lean 4 extension experience programmatically:
+This recreates the VS Code Lean 4 extension experience programmatically with thread safety:
 - Real-time compiler feedback and messages
 - Position-aware editing with goal state tracking
 - Targeted updates with immediate validation
 - Interactive development workflow for LLM agents
+- Thread-safe concurrent usage
 
-Mimics how Terence Tao and other mathematicians work with Lean 4.
+Mimics how mathematicians work with Lean 4 while ensuring multiple agents don't interfere.
 """
 
 import re
+import threading
+import uuid
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any, NamedTuple
+
 from .prover import LeanProver
 
 
@@ -61,7 +65,7 @@ class EditableClause:
 
 class InteractiveLeanAgent:
     """
-    Interactive Lean 4 development agent that mimics VS Code extension.
+    Thread-safe Interactive Lean 4 development agent that mimics VS Code extension.
 
     Features:
     - Real-time compilation and feedback
@@ -69,36 +73,117 @@ class InteractiveLeanAgent:
     - Goal state tracking
     - Targeted clause updates
     - Incremental development workflow
+    - Thread-safe concurrent usage
     """
 
     def __init__(self, mathlib_enabled: bool = True):
-        self.prover = LeanProver(mathlib_enabled=mathlib_enabled)
-        self.current_code = ""
-        self.current_messages: List[LeanMessage] = []
-        self.current_goals: List[ProofGoal] = []
-        self.editable_clauses: Dict[str, EditableClause] = {}
-        self.compilation_id = 0
+        """Initialize thread-safe interactive agent."""
+        self._mathlib_enabled = mathlib_enabled
+        self._lock = threading.RLock()
+        self._thread_local = threading.local()
+
+        # Instance ID for debugging
+        self._instance_id = str(uuid.uuid4())[:8]
+
+    def _get_agent_state(self):
+        """Get or create thread-local agent state."""
+        if not hasattr(self._thread_local, 'prover'):
+            # Each thread gets its own state
+            self._thread_local.prover = LeanProver(mathlib_enabled=self._mathlib_enabled)
+            self._thread_local.current_code = ""
+            self._thread_local.current_messages = []
+            self._thread_local.current_goals = []
+            self._thread_local.editable_clauses = {}
+            self._thread_local.compilation_id = 0
+            self._thread_local.thread_id = threading.get_ident()
+            self._thread_local.session_id = str(uuid.uuid4())[:8]
+
+        return self._thread_local
+
+    @property
+    def prover(self) -> LeanProver:
+        """Get thread-local prover."""
+        state = self._get_agent_state()
+        return state.prover
+
+    @property
+    def current_code(self) -> str:
+        """Get current code for this thread."""
+        state = self._get_agent_state()
+        return state.current_code
+
+    @property
+    def current_messages(self) -> List[LeanMessage]:
+        """Get current messages for this thread."""
+        state = self._get_agent_state()
+        return state.current_messages
+
+    @property
+    def current_goals(self) -> List[ProofGoal]:
+        """Get current goals for this thread."""
+        state = self._get_agent_state()
+        return state.current_goals
+
+    @property
+    def editable_clauses(self) -> Dict[str, EditableClause]:
+        """Get editable clauses for this thread."""
+        state = self._get_agent_state()
+        return state.editable_clauses
+
+    @property
+    def compilation_id(self) -> int:
+        """Get compilation ID for this thread."""
+        state = self._get_agent_state()
+        return state.compilation_id
 
     def load_theorem(self, theorem_code: str) -> Dict[str, Any]:
         """
-        Load a theorem and get initial compilation feedback.
+        Thread-safe theorem loading and compilation.
         Returns compilation results with messages and goals.
         """
-        self.current_code = theorem_code
+        state = self._get_agent_state()
+        state.current_code = theorem_code
+
+        # Add thread-specific markers to avoid naming conflicts
+        thread_id = threading.get_ident()
+        session_id = state.session_id
+
+        # Modify theorem code to be thread-unique
+        modified_code = self._make_thread_unique_code(theorem_code, thread_id, session_id)
 
         # Compile and get feedback
-        return self._compile_and_analyze()
+        result = self._compile_and_analyze(modified_code)
 
-    def _compile_and_analyze(self) -> Dict[str, Any]:
+        # Add thread info to result
+        result['thread_info'] = {
+            'thread_id': thread_id,
+            'session_id': session_id,
+            'instance_id': self._instance_id
+        }
+
+        return result
+
+    def _make_thread_unique_code(self, code: str, thread_id: int, session_id: str) -> str:
+        """Make theorem code unique per thread to avoid conflicts."""
+        # Find theorem names and make them unique
+        def replace_theorem_name(match):
+            original_name = match.group(1)
+            unique_name = f"{original_name}_t{thread_id % 10000}_s{session_id}"
+            return f"theorem {unique_name}"
+
+        # Replace theorem declarations
+        unique_code = re.sub(r'theorem\s+(\w+)', replace_theorem_name, code)
+        return unique_code
+
+    def _compile_and_analyze(self, unique_code: str) -> Dict[str, Any]:
         """Compile current code and analyze results."""
-        # Increment compilation ID for each compilation
-        self.compilation_id += 1
+        state = self._get_agent_state()
 
-        # Add unique suffix to avoid name conflicts
-        unique_code = self._make_unique_code()
+        # Increment compilation ID for each compilation
+        state.compilation_id += 1
 
         # Compile with lean-interact
-        result = self.prover.run_command(unique_code)
+        result = state.prover.run_command(unique_code)
 
         # Parse messages and goals
         self._parse_messages(result)
@@ -106,35 +191,26 @@ class InteractiveLeanAgent:
         self._identify_editable_clauses()
 
         # Better success detection - check if we have actual errors vs just warnings
-        has_errors = any(msg.severity == 'error' for msg in self.current_messages)
+        has_errors = any(msg.severity == 'error' for msg in state.current_messages)
         compilation_success = not has_errors  # Success means no errors (warnings are OK)
 
         return {
             "success": compilation_success,
             "has_errors": has_errors,
-            "has_warnings": any(msg.severity == 'warning' for msg in self.current_messages),
+            "has_warnings": any(msg.severity == 'warning' for msg in state.current_messages),
             "has_sorry": result.has_sorry,
-            "messages": self.current_messages,
-            "goals": self.current_goals,
-            "editable_clauses": list(self.editable_clauses.keys()),
+            "messages": state.current_messages,
+            "goals": state.current_goals,
+            "editable_clauses": list(state.editable_clauses.keys()),
             "proof_state": result.proof_state,
-            "compilation_id": self.compilation_id,
+            "compilation_id": state.compilation_id,
             "raw_response": result.response
         }
 
-    def _make_unique_code(self) -> str:
-        """Add unique suffix to theorem name to avoid conflicts."""
-        # Extract theorem name and add unique suffix
-        theorem_match = re.search(r'theorem\s+(\w+)', self.current_code)
-        if theorem_match:
-            original_name = theorem_match.group(1)
-            unique_name = f"{original_name}_v{self.compilation_id}"
-            return self.current_code.replace(f"theorem {original_name}", f"theorem {unique_name}")
-        return self.current_code
-
     def _parse_messages(self, result):
         """Parse compiler messages from lean-interact result."""
-        self.current_messages = []
+        state = self._get_agent_state()
+        state.current_messages = []
 
         if hasattr(result, 'response') and result.response:
             response = result.response
@@ -145,7 +221,7 @@ class InteractiveLeanAgent:
                 error_match = re.search(r'\[error\]\s*(.*?)(?=\n\n|\n\[|$)', response, re.DOTALL)
                 if error_match:
                     error_text = error_match.group(1).strip()
-                    self.current_messages.append(LeanMessage(
+                    state.current_messages.append(LeanMessage(
                         severity='error',
                         message=error_text,
                         start_pos=Position(0, 0),
@@ -157,7 +233,7 @@ class InteractiveLeanAgent:
                 warning_match = re.search(r'\[warning\]\s*(.*?)(?=\n\n|\n\[|$)', response, re.DOTALL)
                 if warning_match:
                     warning_text = warning_match.group(1).strip()
-                    self.current_messages.append(LeanMessage(
+                    state.current_messages.append(LeanMessage(
                         severity='warning',
                         message=warning_text,
                         start_pos=Position(0, 0),
@@ -169,7 +245,7 @@ class InteractiveLeanAgent:
                 info_match = re.search(r'\[info\]\s*(.*?)(?=\n\n|\n\[|$)', response, re.DOTALL)
                 if info_match:
                     info_text = info_match.group(1).strip()
-                    self.current_messages.append(LeanMessage(
+                    state.current_messages.append(LeanMessage(
                         severity='info',
                         message=info_text,
                         start_pos=Position(0, 0),
@@ -178,7 +254,7 @@ class InteractiveLeanAgent:
 
         # If response is just "Success", add success message
         if hasattr(result, 'response') and result.response and result.response.strip() == "Success":
-            self.current_messages.append(LeanMessage(
+            state.current_messages.append(LeanMessage(
                 severity='info',
                 message='Compilation successful',
                 start_pos=Position(0, 0),
@@ -186,8 +262,8 @@ class InteractiveLeanAgent:
             ))
 
         # If no messages but the command succeeded, add a success note
-        elif not self.current_messages and hasattr(result, 'response'):
-            self.current_messages.append(LeanMessage(
+        elif not state.current_messages and hasattr(result, 'response'):
+            state.current_messages.append(LeanMessage(
                 severity='info',
                 message='Compilation completed',
                 start_pos=Position(0, 0),
@@ -196,14 +272,15 @@ class InteractiveLeanAgent:
 
     def _parse_goals(self, result):
         """Parse proof goals from lean-interact result."""
-        self.current_goals = []
+        state = self._get_agent_state()
+        state.current_goals = []
 
         if hasattr(result, 'response') and result.response:
             # Look for goal patterns in response
-            lines = self.current_code.split('\n')
+            lines = state.current_code.split('\n')
             for i, line in enumerate(lines):
                 if 'sorry' in line:
-                    self.current_goals.append(ProofGoal(
+                    state.current_goals.append(ProofGoal(
                         goal_text=f"Goal at sorry on line {i+1}",
                         position=Position(i, line.find('sorry')),
                         proof_state_id=result.proof_state
@@ -211,8 +288,9 @@ class InteractiveLeanAgent:
 
     def _identify_editable_clauses(self):
         """Identify editable clauses in the current code."""
-        self.editable_clauses = {}
-        lines = self.current_code.split('\n')
+        state = self._get_agent_state()
+        state.editable_clauses = {}
+        lines = state.current_code.split('\n')
 
         clause_id = 0
         main_proof_started = False
@@ -232,7 +310,7 @@ class InteractiveLeanAgent:
                     by_part = stripped.split(':= by', 1)[1].strip()
                     if by_part:
                         # Main proof content on same line as theorem declaration
-                        self.editable_clauses[f"main_proof_{clause_id}"] = EditableClause(
+                        state.editable_clauses[f"main_proof_{clause_id}"] = EditableClause(
                             clause_id=f"main_proof_{clause_id}",
                             start_pos=Position(i, stripped.find(':= by') + 5),
                             end_pos=Position(i, len(line)),
@@ -254,7 +332,7 @@ class InteractiveLeanAgent:
                         var_name = have_match.group(1)
                         proof_content = have_match.group(2).strip()
 
-                        self.editable_clauses[f"have_{var_name}"] = EditableClause(
+                        state.editable_clauses[f"have_{var_name}"] = EditableClause(
                             clause_id=f"have_{var_name}",
                             start_pos=Position(i, line.find('by') + 3),
                             end_pos=Position(i, len(line)),
@@ -266,7 +344,7 @@ class InteractiveLeanAgent:
                 elif 'sorry' in stripped:
                     # Sorry clause - can be standalone or inline
                     sorry_pos = line.find('sorry')
-                    self.editable_clauses[f"sorry_{clause_id}"] = EditableClause(
+                    state.editable_clauses[f"sorry_{clause_id}"] = EditableClause(
                         clause_id=f"sorry_{clause_id}",
                         start_pos=Position(i, sorry_pos),
                         end_pos=Position(i, sorry_pos + 5),
@@ -278,7 +356,7 @@ class InteractiveLeanAgent:
                 elif stripped.startswith('by '):
                     # Standalone "by" with tactics
                     tactic_content = stripped[3:].strip()  # Remove "by "
-                    self.editable_clauses[f"tactic_block_{clause_id}"] = EditableClause(
+                    state.editable_clauses[f"tactic_block_{clause_id}"] = EditableClause(
                         clause_id=f"tactic_block_{clause_id}",
                         start_pos=Position(i, line.find('by') + 3),
                         end_pos=Position(i, len(line)),
@@ -293,7 +371,7 @@ class InteractiveLeanAgent:
                     'left', 'right', 'split', 'exfalso', 'contradiction'
                 ]):
                     # Individual tactic lines
-                    self.editable_clauses[f"tactic_{clause_id}"] = EditableClause(
+                    state.editable_clauses[f"tactic_{clause_id}"] = EditableClause(
                         clause_id=f"tactic_{clause_id}",
                         start_pos=Position(i, 0),
                         end_pos=Position(i, len(line)),
@@ -304,7 +382,7 @@ class InteractiveLeanAgent:
 
                 elif stripped and not stripped.startswith('theorem'):
                     # Any other non-empty line in proof context - make it editable
-                    self.editable_clauses[f"proof_line_{clause_id}"] = EditableClause(
+                    state.editable_clauses[f"proof_line_{clause_id}"] = EditableClause(
                         clause_id=f"proof_line_{clause_id}",
                         start_pos=Position(i, 0),
                         end_pos=Position(i, len(line)),
@@ -333,13 +411,21 @@ class InteractiveLeanAgent:
         Edit a specific clause and get immediate feedback.
         This is the core interactive editing function.
         """
-        if clause_id not in self.editable_clauses:
-            return {"error": f"Clause '{clause_id}' not found"}
+        state = self._get_agent_state()
 
-        clause = self.editable_clauses[clause_id]
+        if clause_id not in state.editable_clauses:
+            result = {"error": f"Clause '{clause_id}' not found"}
+            result['thread_info'] = {
+                'thread_id': threading.get_ident(),
+                'session_id': getattr(state, 'session_id', 'unknown'),
+                'instance_id': self._instance_id
+            }
+            return result
+
+        clause = state.editable_clauses[clause_id]
 
         # Apply the edit
-        lines = self.current_code.split('\n')
+        lines = state.current_code.split('\n')
         line_idx = clause.start_pos.line
         line = lines[line_idx]
 
@@ -383,24 +469,38 @@ class InteractiveLeanAgent:
             new_line = line[:start_col] + new_content
 
         lines[line_idx] = new_line
-        self.current_code = '\n'.join(lines)
+        state.current_code = '\n'.join(lines)
 
         # Recompile and get feedback
-        compile_result = self._compile_and_analyze()
+        modified_code = self._make_thread_unique_code(
+            state.current_code,
+            state.thread_id,
+            state.session_id
+        )
+        compile_result = self._compile_and_analyze(modified_code)
 
-        return {
+        result = {
             "clause_id": clause_id,
             "clause_type": clause.clause_type,
             "old_content": clause.content,
             "new_content": new_content,
             "compilation_result": compile_result,
-            "updated_code": self.current_code,
+            "updated_code": state.current_code,
             "edit_successful": True
         }
 
+        # Add thread info
+        result['thread_info'] = {
+            'thread_id': threading.get_ident(),
+            'session_id': getattr(state, 'session_id', 'unknown'),
+            'instance_id': self._instance_id
+        }
+
+        return result
+
     def add_proof_structure(self, structure_lines: List[str]) -> Dict[str, Any]:
         """
-        Helper method to add proof structure (like have clauses) to a simple theorem.
+        Thread-safe helper method to add proof structure (like have clauses) to a simple theorem.
 
         Args:
             structure_lines: List of proof lines to add (e.g., ["have h1 : ... := by sorry", "intro x", "exact h1 x"])
@@ -422,11 +522,18 @@ class InteractiveLeanAgent:
         new_structure = '\n'.join(indented_lines)
 
         # Find the main proof clause to edit
-        main_proof_clauses = [cid for cid in self.editable_clauses.keys()
+        state = self._get_agent_state()
+        main_proof_clauses = [cid for cid in state.editable_clauses.keys()
                              if cid.startswith('main_proof_') or cid.startswith('sorry_')]
 
         if not main_proof_clauses:
-            return {"error": "No main proof clause found to add structure to"}
+            result = {"error": "No main proof clause found to add structure to"}
+            result['thread_info'] = {
+                'thread_id': threading.get_ident(),
+                'session_id': getattr(state, 'session_id', 'unknown'),
+                'instance_id': self._instance_id
+            }
+            return result
 
         # Edit the first available main proof clause
         clause_id = main_proof_clauses[0]
@@ -454,36 +561,48 @@ class InteractiveLeanAgent:
         """
         Get the current state of the 'interactive panel' - like VS Code's side panel.
         """
-        return {
-            "current_code": self.current_code,
-            "messages": [str(msg) for msg in self.current_messages],
-            "goals": [str(goal) for goal in self.current_goals],
+        state = self._get_agent_state()
+
+        panel = {
+            "current_code": state.current_code,
+            "messages": [str(msg) for msg in state.current_messages],
+            "goals": [str(goal) for goal in state.current_goals],
             "editable_clauses": {
                 cid: f"{clause.clause_type}: {clause.content}"
-                for cid, clause in self.editable_clauses.items()
+                for cid, clause in state.editable_clauses.items()
             },
-            "compilation_id": self.compilation_id
+            "compilation_id": state.compilation_id
         }
+
+        # Add thread-specific info
+        panel['thread_info'] = {
+            'thread_id': threading.get_ident(),
+            'session_id': getattr(state, 'session_id', 'unknown'),
+            'instance_id': self._instance_id
+        }
+
+        return panel
 
     def suggest_next_actions(self) -> List[str]:
         """
-        Suggest next actions based on current state - like an LLM assistant.
+        Thread-safe action suggestions based on current state.
         """
+        state = self._get_agent_state()
         suggestions = []
 
         # If there are errors, suggest fixing them
-        error_messages = [msg for msg in self.current_messages if msg.severity == 'error']
+        error_messages = [msg for msg in state.current_messages if msg.severity == 'error']
         if error_messages:
             suggestions.append("Fix compilation errors first")
 
         # If there are sorries, suggest working on them
-        sorry_clauses = [cid for cid, clause in self.editable_clauses.items()
+        sorry_clauses = [cid for cid, clause in state.editable_clauses.items()
                         if clause.clause_type == 'sorry']
         if sorry_clauses:
             suggestions.append(f"Work on sorry clauses: {', '.join(sorry_clauses)}")
 
         # If there are warnings, suggest addressing them
-        warning_messages = [msg for msg in self.current_messages if msg.severity == 'warning']
+        warning_messages = [msg for msg in state.current_messages if msg.severity == 'warning']
         if warning_messages:
             suggestions.append("Address compiler warnings")
 
@@ -492,7 +611,29 @@ class InteractiveLeanAgent:
 
         return suggestions
 
+    def get_thread_info(self) -> Dict[str, Any]:
+        """Get debugging info about current thread's agent state."""
+        if not hasattr(self._thread_local, 'prover'):
+            return {
+                'instance_id': self._instance_id,
+                'thread_id': threading.get_ident(),
+                'status': 'no_agent_initialized'
+            }
 
+        state = self._get_agent_state()
+        return {
+            'instance_id': self._instance_id,
+            'thread_id': threading.get_ident(),
+            'session_id': getattr(state, 'session_id', 'unknown'),
+            'compilation_id': state.compilation_id,
+            'current_code_length': len(state.current_code),
+            'active_messages': len(state.current_messages),
+            'active_goals': len(state.current_goals),
+            'editable_clauses': len(state.editable_clauses)
+        }
+
+
+# Demo function remains for backward compatibility
 def demo_interactive_agent():
     """Demonstrate the interactive Lean 4 development experience."""
     print("=" * 80)
@@ -605,10 +746,11 @@ if __name__ == "__main__":
     print("• suggest_next_actions(): AI-driven development suggestions")
     print()
     print("✅ PERFECT FOR LLM AGENTS:")
-    print("• Mirrors how Terence Tao works with Lean 4")
+    print("• Mirrors how mathematicians work with Lean 4")
     print("• Provides immediate feedback after each edit")
     print("• Enables iterative proof development")
     print("• Supports complex proof construction workflows")
+    print("• Thread-safe for concurrent usage")
     print()
     print("🎉 Ready for LLM-driven interactive theorem proving!")
     print("=" * 80)
