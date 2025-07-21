@@ -61,8 +61,8 @@ class MathMetrics(BaseMetrics):
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         correctness_dict = {}
-        if 'symbolic_correct' in prediction:
-            correctness_dict["symbolic_correct"] = prediction['symbolic_correct']
+        if 'is_correct' in prediction:
+            correctness_dict["symbolic_correct"] = prediction['is_correct']
         if 'judgement' in prediction:
             correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
         if 'judge_correct' in correctness_dict and 'symbolic_correct' in correctness_dict:

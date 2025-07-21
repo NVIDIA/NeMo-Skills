@@ -49,9 +49,9 @@ which should print the following scores. Here `majority@64` is the number we are
 Note that this is majority across GenSelect runs, not original generations.
 
 ```bash
----------------------------------- math ---------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[avg-of-64]      | 30          | 16066      | 85.78%           | 0.21%
-majority@64     | 30          | 16066      | 93.33%           | 0.00%
-pass@64         | 30          | 16066      | 96.67%           | 0.00%
+----------------------------------- math ----------------------------------
+evaluation_mode   | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[avg-of-64] | 30          | 16066      | 85.78%           | 0.21%
+majority@64       | 30          | 16066      | 93.33%           | 0.00%
+pass@64           | 30          | 16066      | 96.67%           | 0.00%     
 ```
