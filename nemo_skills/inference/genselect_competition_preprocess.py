@@ -210,6 +210,7 @@ def read_file_competition(file_path, single_answer_instances_path=None):
         
         if "judgment_idx" in instance:
             new_instance = {"problem": instance["problem"]}
+            new_instance["question"] = new_instance["problem"]
             for key in ["problem", "id", "subset_for_metrics"]:
                 if key in instance:
                     new_instance[key] = instance[key]
