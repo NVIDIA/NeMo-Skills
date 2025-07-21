@@ -100,7 +100,7 @@ ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/eval-results/com
 ```
 
 ```
-------------------- comp-math-24-25-all --------------------
+------------------- comp-math-24-25 --------------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
 majority@64     | 256         | 58.20%           | 0.00%
 pass@64         | 256         | 75.39%           | 0.00%

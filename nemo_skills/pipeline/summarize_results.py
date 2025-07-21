@@ -41,6 +41,13 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+def get_subset_name(benchmark: str, subset: str) -> str:
+    """Construct a subset name based on the benchmark and subset."""
+    if subset == '_all_':
+        return benchmark
+    return f"{benchmark}-{subset}"
+
+
 def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
     # Average results for benchmarks with dot notation (e.g., ruler.niah_single_1, ruler.niah_single_2)
     benchmark_groups = defaultdict(list)
@@ -298,25 +305,27 @@ def summarize_results(
                 metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
                 if len(metrics) > 1:  # has subsets
                     for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
+                        results[get_subset_name(benchmark, subset)].update(subset_metrics)
                 else:
-                    results[benchmark].update(metrics['all'])
+                    results[benchmark].update(metrics['_all_'])
 
             sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
             if len(sampling_outputs) > 0:
                 metrics = metrics_calculator.compute_metrics(input_files=sampling_outputs)
                 if len(metrics) > 1:  # has subsets
                     for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
+                        results[get_subset_name(benchmark, subset)].update(subset_metrics)
                 else:
-                    results[benchmark].update(metrics['all'])
+                    results[benchmark].update(metrics['_all_'])
 
             if len(metrics) > 1:
                 for subset, subset_metrics in metrics.items():
-                    metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.metrics_to_print()
-                    evaluations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.evaluations_to_print()
-                    if evaluations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
-                        evaluations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
+                    metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
+                    evaluations_to_print[get_subset_name(benchmark, subset)] = (
+                        metrics_calculator.evaluations_to_print()
+                    )
+                    if evaluations_to_print[get_subset_name(benchmark, subset)] is not None and has_greedy:
+                        evaluations_to_print[get_subset_name(benchmark, subset)].insert(0, 'greedy')
             else:
                 metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
                 evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()

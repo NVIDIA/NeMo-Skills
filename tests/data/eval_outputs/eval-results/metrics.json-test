@@ -313,7 +313,7 @@
       "avg_tokens": 2597
     }
   },
-  "math-all": {
+  "math": {
     "pass@1": {
       "num_entries": 7,
       "avg_tokens": 9574,
