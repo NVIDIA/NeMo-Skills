@@ -116,8 +116,8 @@ class AnswerJudgementMetrics(BaseMetrics):
         for sample_idx, pred in enumerate(predictions[:k]):
             gt_judgement = is_correct_judgement_or_none(pred['expected_judgement'])
             pred_judgement = is_correct_judgement_or_none(pred['judgement'])
-            self._update_fp_fn(eval_dict[f"pass@1[{k}]"], pred_judgement, gt_judgement, divide_by=k)
-            self._store_individual_metrics(f"pass@1[{k}]", pred_judgement, gt_judgement, sample_idx)
+            self._update_fp_fn(eval_dict[f"pass@1[avg-of-{k}]"], pred_judgement, gt_judgement, divide_by=k)
+            self._store_individual_metrics(f"pass@1[avg-of-{k}]", pred_judgement, gt_judgement, sample_idx)
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.

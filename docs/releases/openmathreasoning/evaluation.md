@@ -104,28 +104,28 @@ ns summarize_results /workspace/openmath-nemotron-1.5b-eval-cot/eval-results/com
 evaluation_mode | num_entries | symbolic_correct | no_answer
 majority@64     | 256         | 58.20%           | 0.00%
 pass@64         | 256         | 75.39%           | 0.00%
-pass@1[64]      | 256         | 44.59%           | 0.00%
+pass@1[avg-of-64]      | 256         | 44.59%           | 0.00%
 
 
 ------------------ comp-math-24-25-aime25 ------------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
 majority@64     | 30          | 66.67%           | 0.00%
 pass@64         | 30          | 83.33%           | 0.00%
-pass@1[64]      | 30          | 50.52%           | 0.00%
+pass@1[avg-of-64]      | 30          | 50.52%           | 0.00%
 
 
 ------------------ comp-math-24-25-aime24 ------------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
 majority@64     | 30          | 80.00%           | 0.00%
 pass@64         | 30          | 80.00%           | 0.00%
-pass@1[64]      | 30          | 62.60%           | 0.00%
+pass@1[avg-of-64]      | 30          | 62.60%           | 0.00%
 
 
 ---------------- comp-math-24-25-hmmt-24-25 ----------------
 evaluation_mode | num_entries | symbolic_correct | no_answer
 majority@64     | 196         | 53.57%           | 0.00%
 pass@64         | 196         | 73.47%           | 0.00%
-pass@1[64]      | 196         | 40.92%           | 0.00%
+pass@1[avg-of-64]      | 196         | 40.92%           | 0.00%
 ```
 
 For hle-math it's necessary to run LLM-as-a-judge step to get accurate evaluation results.
@@ -171,7 +171,7 @@ This should print the metrics including both symbolic and judge evaluation.
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
 majority@64     | 975         | 0.82%            | 5.41%         | 0.72%        | 5.41%       | 0.00%
 pass@64         | 975         | 14.05%           | 38.36%        | 13.85%       | 38.56%      | 0.00%
-pass@1[64]      | 975         | 1.18%            | 5.41%         | 3.06%        | 3.53%       | 0.00%
+pass@1[avg-of-64]      | 975         | 1.18%            | 5.41%         | 3.06%        | 3.53%       | 0.00%
 ```
 
 ## Run TIR evaluations

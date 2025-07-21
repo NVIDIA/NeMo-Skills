@@ -18,11 +18,11 @@ def compute_score(metrics: dict):
     hle = metrics['hle']['greedy']['judge_correct']
     gpqa = metrics['gpqa']['greedy']['symbolic_correct']
 
-    aime24 = metrics['aime24']['pass@1[10]']['symbolic_correct']
-    math500 = metrics['math-500']['pass@1[3]']['symbolic_correct']
+    aime24 = metrics['aime24']['pass@1[avg-of-10]']['symbolic_correct']
+    math500 = metrics['math-500']['pass@1[avg-of-3]']['symbolic_correct']
 
-    scicode = metrics['scicode']['pass@1[3]']['subtask_accuracy']
-    livecodebench = metrics['livecodebench']['pass@1[3]']['accuracy']
+    scicode = metrics['scicode']['pass@1[avg-of-3]']['subtask_accuracy']
+    livecodebench = metrics['livecodebench']['pass@1[avg-of-3]']['accuracy']
 
     math_score = (aime24 + math500) / 2
     code_score = (scicode + livecodebench) / 2

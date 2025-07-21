@@ -74,14 +74,14 @@ The `ns eval` command will run eight generations for each sample in aime24/25 be
 ```
 --------------------------------- aime24 --------------------------------
 evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 829        | 11.67%           | 0.00%
+pass@1[avg-of-8]       | 30          | 829        | 11.67%           | 0.00%
 majority@8      | 30          | 829        | 13.33%           | 0.00%
 pass@8          | 30          | 829        | 33.33%           | 0.00%
 
 
 --------------------------------- aime25 --------------------------------
 evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 834        | 11.67%           | 0.42%
+pass@1[avg-of-8]       | 30          | 834        | 11.67%           | 0.42%
 majority@8      | 30          | 834        | 20.00%           | 0.00%
 pass@8          | 30          | 834        | 26.67%           | 0.00%
 ```
@@ -319,14 +319,14 @@ This evaluation should show good improvements for both benchmarks.
 ```
 --------------------------------- aime24 --------------------------------
 evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 13362      | 27.92%           | 55.83%
+pass@1[avg-of-8]       | 30          | 13362      | 27.92%           | 55.83%
 majority@8      | 30          | 13362      | 40.00%           | 16.67%
 pass@8          | 30          | 13362      | 50.00%           | 16.67%
 
 
 --------------------------------- aime25 --------------------------------
 evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 13445      | 17.92%           | 53.33%
+pass@1[avg-of-8]       | 30          | 13445      | 17.92%           | 53.33%
 majority@8      | 30          | 13445      | 26.67%           | 10.00%
 pass@8          | 30          | 13445      | 36.67%           | 10.00%
 ```

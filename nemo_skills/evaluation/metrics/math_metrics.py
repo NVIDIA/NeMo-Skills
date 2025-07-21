@@ -116,9 +116,9 @@ class MathMetrics(BaseMetrics):
                 )
 
     def evaluations_to_print(self):
-        """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
+        """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
         return [
-            f'pass@1[{self.max_k}]',
+            f'pass@1[avg-of-{self.max_k}]',
             f'majority@{self.max_k}',
             f'rm_best@{self.max_k}',
             f'rm_majority@{self.max_k}',

@@ -118,14 +118,14 @@ you will see the following output after summarizing results
 ```
 --------------------------------- gsm8k ---------------------------------
 evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[4]       | 1319        | 161        | 78.96%           | 6.01%
+pass@1[avg-of-4]       | 1319        | 161        | 78.96%           | 6.01%
 majority@4      | 1319        | 161        | 88.10%           | 0.08%
 pass@4          | 1319        | 161        | 93.25%           | 0.08%
 
 
 ------------------------------------ human-eval ------------------------------------
 evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
-pass@1[4]       | 164         | 251        | 64.18%             | 59.30%
+pass@1[avg-of-4]       | 164         | 251        | 64.18%             | 59.30%
 pass@4          | 164         | 251        | 82.32%             | 78.05%
 ```
 

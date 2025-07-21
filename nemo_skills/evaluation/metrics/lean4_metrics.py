@@ -43,7 +43,7 @@ class Lean4Metrics(BaseMetrics):
         assert score_method == 'lean4_correct'
         timeout_errors = [pred['proof_status'] == "timeout" for pred in predictions[:k]]
         eval_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
-        eval_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
+        eval_dict[f'pass@1[avg-of-{k}]']['timeout_error'] += sum(timeout_errors) / k
 
     def update(self, predictions):
         super().update(predictions)
