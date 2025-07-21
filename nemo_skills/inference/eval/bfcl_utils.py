@@ -24,12 +24,13 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-# Copied from: 
-# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/eval_checker/multi_turn_eval/multi_turn_utils.py 
-# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py 
+# Copied from:
+# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/eval_checker/multi_turn_eval/multi_turn_utils.py
+# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py
 
 
-CLASS_FILE_PATH_MAPPING = {
+# Base/built-in tool classes (from original BFCL)
+_BASE_CLASS_FILE_PATH_MAPPING = {
     "GorillaFileSystem": "bfcl_eval.eval_checker.multi_turn_eval.func_source_code.gorilla_file_system",
     "MathAPI": "bfcl_eval.eval_checker.multi_turn_eval.func_source_code.math_api",
     "MessageAPI": "bfcl_eval.eval_checker.multi_turn_eval.func_source_code.message_api",
@@ -40,10 +41,41 @@ CLASS_FILE_PATH_MAPPING = {
     "VehicleControlAPI": "bfcl_eval.eval_checker.multi_turn_eval.func_source_code.vehicle_control",
 }
 
-# These classes are stateless and do not require any initial configuration
-STATELESS_CLASSES = [
+# Base stateless classes (from original BFCL)
+_BASE_STATELESS_CLASSES = [
     "MathAPI",
 ]
+
+def _get_combined_class_mapping():
+    """Get the combined class mapping including custom registered tools."""
+    try:
+        from nemo_skills.inference.eval.bfcl_registry import get_custom_tool_mapping
+        custom_mapping = get_custom_tool_mapping()
+
+        # Combine base and custom mappings
+        combined = _BASE_CLASS_FILE_PATH_MAPPING.copy()
+        combined.update(custom_mapping)
+        return combined
+    except ImportError:
+        LOG.warning("BFCL registry not available, using base tools only")
+        return _BASE_CLASS_FILE_PATH_MAPPING
+
+def _get_combined_stateless_classes():
+    """Get the combined stateless classes including custom registered ones."""
+    try:
+        from nemo_skills.inference.eval.bfcl_registry import get_custom_stateless_classes
+        custom_stateless = get_custom_stateless_classes()
+
+        # Combine base and custom stateless classes
+        combined = _BASE_STATELESS_CLASSES.copy()
+        combined.extend(custom_stateless)
+        return combined
+    except ImportError:
+        return _BASE_STATELESS_CLASSES
+
+# Dynamic mappings that include registered custom tools
+CLASS_FILE_PATH_MAPPING = _get_combined_class_mapping()
+STATELESS_CLASSES = _get_combined_stateless_classes()
 
 MAXIMUM_STEP_LIMIT = 20
 
@@ -125,7 +157,7 @@ def execute_multi_turn_func_call(
 
         # Evaluate the function call
         try:
-            # We need to make a copy here because otherwise the `eval(func_call)` would error. 
+            # We need to make a copy here because otherwise the `eval(func_call)` would error.
             func_call_copy = func_call
             # Before calling `eval`, we need to make sure that the function call is safe
             # We do so by checking if the function is `kill` or `exit`, etc.
