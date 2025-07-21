@@ -11,6 +11,7 @@ Features:
 - Comprehensive JSON schema validation
 - Support for all lean4 module functionality
 - Designed for LLM agent workflows
+- Thread-safe for concurrent LLM agent usage
 
 Operations supported:
 1. execute: Run Lean code or theorems
@@ -21,6 +22,8 @@ Operations supported:
 """
 
 import json
+import threading
+import uuid
 from typing import Dict, List, Optional, Any, Set, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -41,11 +44,11 @@ class OperationType(Enum):
 @dataclass
 class ToolCapabilities:
     """Configuration for which tool capabilities are enabled."""
-    execute: bool = True           # Basic theorem execution
-    edit_clause: bool = True       # Interactive clause editing
-    add_structure: bool = True     # Adding new proof structure
-    validate: bool = True          # Validation commands (#check, etc.)
-    retrieve: bool = True          # Code retrieval and inspection
+    execute: bool = True
+    edit_clause: bool = True
+    add_structure: bool = True
+    validate: bool = True
+    retrieve: bool = True
 
 
 @dataclass
@@ -60,15 +63,18 @@ class ToolResult:
 
 class LeanLLMTool:
     """
-    Comprehensive LLM tool for Lean 4 interactive development.
+    Thread-safe comprehensive LLM tool for Lean 4 interactive development.
 
     Designed to be used by LLM agents like Qwen3 with a single tool call interface
     that handles multiple operation types through JSON schema validation.
+
+    Each thread (LLM agent) gets its own isolated session state while sharing
+    the same tool instance safely.
     """
 
     def __init__(self, capabilities: ToolCapabilities = None, mathlib_enabled: bool = True):
         """
-        Initialize the Lean LLM tool.
+        Initialize the thread-safe Lean LLM tool.
 
         Args:
             capabilities: Which tool capabilities to enable (default: all enabled)
@@ -77,13 +83,56 @@ class LeanLLMTool:
         self.capabilities = capabilities or ToolCapabilities()
         self.mathlib_enabled = mathlib_enabled
 
-        # Initialize backend systems
-        self.prover = LeanProver(mathlib_enabled=mathlib_enabled)
-        self.agent = InteractiveLeanAgent(mathlib_enabled=mathlib_enabled)
+        # Thread-local storage for per-agent state
+        self._thread_local = threading.local()
+        self._lock = threading.RLock()
 
-        # State tracking
-        self.current_session = None
-        self.session_history: List[Dict[str, Any]] = []
+        # Instance ID for debugging
+        self._instance_id = str(uuid.uuid4())[:8]
+
+    def _get_session_state(self):
+        """Get or create thread-local session state."""
+        if not hasattr(self._thread_local, 'initialized'):
+            # Each thread (LLM agent) gets its own state
+            self._thread_local.prover = LeanProver(mathlib_enabled=self.mathlib_enabled)
+            self._thread_local.agent = InteractiveLeanAgent(mathlib_enabled=self.mathlib_enabled)
+            self._thread_local.current_session = None
+            self._thread_local.session_history = []
+            self._thread_local.thread_id = threading.get_ident()
+            self._thread_local.session_id = str(uuid.uuid4())[:8]
+            self._thread_local.initialized = True
+
+        return self._thread_local
+
+    @property
+    def prover(self) -> LeanProver:
+        """Get thread-local prover instance."""
+        session = self._get_session_state()
+        return session.prover
+
+    @property
+    def agent(self) -> InteractiveLeanAgent:
+        """Get thread-local agent instance."""
+        session = self._get_session_state()
+        return session.agent
+
+    @property
+    def current_session(self):
+        """Get thread-local current session."""
+        session = self._get_session_state()
+        return session.current_session
+
+    @current_session.setter
+    def current_session(self, value):
+        """Set thread-local current session."""
+        session = self._get_session_state()
+        session.current_session = value
+
+    @property
+    def session_history(self) -> List[Dict[str, Any]]:
+        """Get thread-local session history."""
+        session = self._get_session_state()
+        return session.session_history
 
     def get_tool_schema(self) -> Dict[str, Any]:
         """
@@ -135,19 +184,19 @@ class LeanLLMTool:
         if self.capabilities.edit_clause:
             operations.append("edit_clause")
             operation_schemas["edit_clause"] = {
-                "description": "Edit specific clauses in an interactive theorem (like VS Code Lean extension)",
+                "description": "Edit specific clauses in interactive theorem development",
                 "properties": {
                     "theorem_code": {
                         "type": "string",
-                        "description": "The theorem code to load for editing (only needed on first edit)"
+                        "description": "Full theorem code to load (if starting new session)"
                     },
                     "clause_id": {
                         "type": "string",
-                        "description": "ID of the clause to edit (e.g., 'have_h1', 'sorry_0')"
+                        "description": "ID of the clause to edit (e.g., 'sorry_0', 'have_h1')"
                     },
                     "new_content": {
                         "type": "string",
-                        "description": "New content for the clause"
+                        "description": "New content to replace the clause"
                     }
                 },
                 "required": ["clause_id", "new_content"]
@@ -156,16 +205,16 @@ class LeanLLMTool:
         if self.capabilities.add_structure:
             operations.append("add_structure")
             operation_schemas["add_structure"] = {
-                "description": "Add new proof structure (have clauses, tactics) to a theorem",
+                "description": "Add new proof structure to theorem",
                 "properties": {
                     "theorem_code": {
                         "type": "string",
-                        "description": "The theorem code to add structure to (only needed if not already loaded)"
+                        "description": "Full theorem code to load (if starting new session)"
                     },
                     "structure_lines": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of new proof lines to add (e.g., 'have h1 : ... := by sorry')"
+                        "description": "Lines of proof structure to add"
                     }
                 },
                 "required": ["structure_lines"]
@@ -217,34 +266,31 @@ class LeanLLMTool:
         return schema
 
     def get_tool_description(self) -> str:
-        """
-        Generate a dynamic description based on enabled capabilities.
-
-        Returns:
-            Human-readable description of the tool's capabilities
-        """
-        base_desc = "Lean 4 theorem prover tool for mathematical reasoning and proof development."
-
+        """Generate a dynamic tool description based on enabled capabilities."""
         capabilities = []
         if self.capabilities.execute:
-            capabilities.append("execute theorems and Lean code")
+            capabilities.append("execute Lean code and theorems")
         if self.capabilities.edit_clause:
-            capabilities.append("interactively edit proof clauses (VS Code-like experience)")
+            capabilities.append("edit theorem clauses interactively")
         if self.capabilities.add_structure:
-            capabilities.append("add new proof structure and helper lemmas")
+            capabilities.append("add proof structure")
         if self.capabilities.validate:
-            capabilities.append("validate with #check and #eval commands")
+            capabilities.append("validate code with #check/#eval")
         if self.capabilities.retrieve:
-            capabilities.append("retrieve current development state and suggestions")
+            capabilities.append("retrieve development state")
 
-        if capabilities:
-            return f"{base_desc} Capabilities: {', '.join(capabilities)}."
-        else:
-            return base_desc
+        cap_text = ", ".join(capabilities) if capabilities else "no operations"
+
+        return (
+            f"Lean 4 theorem prover tool with capabilities: {cap_text}. "
+            f"Supports mathlib: {'yes' if self.mathlib_enabled else 'no'}. "
+            "Use for mathematical reasoning, theorem proving, and proof development."
+        )
 
     def __call__(self, operation: str, **kwargs) -> ToolResult:
         """
         Main tool interface - handle all operations through single call.
+        Thread-safe: each LLM agent gets isolated session state.
 
         Args:
             operation: The operation type to perform
@@ -311,7 +357,7 @@ class LeanLLMTool:
         else:
             result = self.prover.run(code)
 
-        # Store in session history
+        # Store in thread-local session history
         self.session_history.append({
             "operation": "execute",
             "code": code,
@@ -361,7 +407,7 @@ class LeanLLMTool:
         if edit_result.get("edit_successful"):
             self.current_session["code"] = edit_result["updated_code"]
 
-        # Store in history
+        # Store in thread-local history
         self.session_history.append({
             "operation": "edit_clause",
             "clause_id": clause_id,
@@ -415,7 +461,7 @@ class LeanLLMTool:
             panel = self.agent.get_interactive_panel()
             self.current_session["code"] = panel["current_code"]
 
-        # Store in history
+        # Store in thread-local history
         self.session_history.append({
             "operation": "add_structure",
             "structure_lines": structure_lines,
@@ -430,7 +476,7 @@ class LeanLLMTool:
             operation="add_structure",
             result={
                 "edit_successful": structure_result.get("edit_successful", False),
-                "updated_code": self.current_session.get("code"),
+                "updated_code": structure_result.get("updated_code"),
                 "compilation_success": compilation_result.get("success", False),
                 "has_errors": compilation_result.get("has_errors", False),
                 "messages": compilation_result.get("messages", []),
@@ -440,11 +486,11 @@ class LeanLLMTool:
         )
 
     def _handle_validate(self, command: str) -> ToolResult:
-        """Handle validation commands like #check, #eval."""
-        # Use command mode for validation
+        """Handle validation commands."""
+        # Validation commands should work with the prover directly
         result = self.prover.run_command(command)
 
-        # Store in history
+        # Store in thread-local history
         self.session_history.append({
             "operation": "validate",
             "command": command,
@@ -470,7 +516,12 @@ class LeanLLMTool:
             result_data = {
                 "session_active": False,
                 "session_history_length": len(self.session_history),
-                "capabilities": asdict(self.capabilities)
+                "capabilities": asdict(self.capabilities),
+                "thread_info": {
+                    "thread_id": getattr(self._get_session_state(), 'thread_id', None),
+                    "session_id": getattr(self._get_session_state(), 'session_id', None),
+                    "instance_id": self._instance_id
+                }
             }
 
             return ToolResult(
@@ -514,41 +565,57 @@ class LeanLLMTool:
             message=f"Retrieved {info_type} information"
         )
 
+    def _safe_result_to_dict(self, result) -> Dict[str, Any]:
+        """Safely convert a result object to a dictionary."""
+        try:
+            if hasattr(result, '__dict__'):
+                return {
+                    key: str(value) if not isinstance(value, (str, int, float, bool, type(None))) else value
+                    for key, value in result.__dict__.items()
+                }
+            else:
+                return {"result": str(result)}
+        except:
+            return {"result": "Failed to serialize result"}
+
     def _get_timestamp(self) -> str:
-        """Get current timestamp for history tracking."""
+        """Get current timestamp."""
         import datetime
         return datetime.datetime.now().isoformat()
 
-    def _safe_result_to_dict(self, result) -> Dict[str, Any]:
-        """Safely convert result to dictionary, handling both dataclasses and mock objects."""
-        try:
-            # Try to use asdict if it's a dataclass
-            return asdict(result)
-        except (TypeError, AttributeError):
-            # Fallback for mock objects or other types
-            return {
-                "success": getattr(result, 'success', None),
-                "proof_complete": getattr(result, 'proof_complete', None),
-                "has_sorry": getattr(result, 'has_sorry', None),
-                "response": getattr(result, 'response', None),
-                "error": getattr(result, 'error', None),
-                "proof_state": getattr(result, 'proof_state', None),
-                "goals": getattr(result, 'goals', None),
-            }
-
     def reset_session(self):
-        """Reset the current session and clear history."""
-        self.current_session = None
-        self.session_history.clear()
+        """Reset the current thread's session and clear history."""
+        session_state = self._get_session_state()
+        session_state.current_session = None
+        session_state.session_history = []
 
     def get_session_summary(self) -> Dict[str, Any]:
-        """Get a summary of the current session."""
+        """Get summary of current thread's session state."""
+        session_state = self._get_session_state()
         return {
+            "capabilities": asdict(self.capabilities),
+            "mathlib_enabled": self.mathlib_enabled,
             "session_active": self.current_session is not None,
             "session_type": self.current_session.get("type") if self.current_session else None,
             "history_length": len(self.session_history),
-            "capabilities": asdict(self.capabilities),
-            "mathlib_enabled": self.mathlib_enabled
+            "thread_info": {
+                "thread_id": getattr(session_state, 'thread_id', None),
+                "session_id": getattr(session_state, 'session_id', None),
+                "instance_id": self._instance_id
+            }
+        }
+
+    def get_thread_info(self) -> Dict[str, Any]:
+        """Get debugging info about current thread's state."""
+        session_state = self._get_session_state()
+        return {
+            "instance_id": self._instance_id,
+            "thread_id": getattr(session_state, 'thread_id', None),
+            "session_id": getattr(session_state, 'session_id', None),
+            "prover_thread_info": self.prover.get_thread_info(),
+            "agent_thread_info": self.agent.get_thread_info(),
+            "session_active": self.current_session is not None,
+            "history_length": len(self.session_history)
         }
 
 
