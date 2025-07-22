@@ -19,19 +19,7 @@ import os
 from collections import Counter
 from typing import Union
 
-
-def is_correct_judgement(judgement, return_none=False) -> Union[bool, None]:
-    if 'Judgement:' in judgement:
-        verdict = judgement.split('Judgement:')[-1].strip()
-        if verdict.lower().startswith('yes'):
-            return True
-        elif verdict.lower().startswith('no'):
-            return False
-
-    if return_none:
-        return None
-    else:
-        return False  # improper judgement format, so have to judge as false
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 def process_files(input_folder: str, output_folder: str) -> None:
