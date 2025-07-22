@@ -41,6 +41,13 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+def get_subset_name(benchmark: str, subset: str) -> str:
+    """Construct a subset name based on the benchmark and subset."""
+    if subset == '_all_':
+        return benchmark
+    return f"{benchmark}-{subset}"
+
+
 def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
     # Average results for benchmarks with dot notation (e.g., ruler.niah_single_1, ruler.niah_single_2)
     benchmark_groups = defaultdict(list)
@@ -219,7 +226,6 @@ def summarize_results(
         data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
     else:
         cluster_config = None
-    # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
 
     # Check for all possible directory structures
     # 1. {results_dir}/eval-results/{benchmark}/output*jsonl
@@ -274,57 +280,50 @@ def summarize_results(
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
             continue
-        try:
-            if metric_type is not None:
-                metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
-            else:
-                metrics_calculator = ComputeMetrics(
-                    benchmark,
-                    data_dir=data_dir,
-                    cluster_config=cluster_config,
-                    extra_datasets=extra_datasets,
-                    extra_datasets_type=extra_datasets_type,
-                    max_samples=max_samples,
-                    max_seq_len=max_seq_len,
-                )
 
-            metrics = {}
-            # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
-            #       an extra aggregation to print
-            has_greedy = False
+        if metric_type is not None:
+            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+        else:
+            metrics_calculator = ComputeMetrics(
+                benchmark,
+                data_dir=data_dir,
+                cluster_config=cluster_config,
+                extra_datasets=extra_datasets,
+                extra_datasets_type=extra_datasets_type,
+                max_samples=max_samples,
+                max_seq_len=max_seq_len,
+            )
 
-            if Path(f'{benchmark_path}/output.jsonl').exists():
-                has_greedy = True
-                metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['all'])
+        metrics = {}
 
-            sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
-            if len(sampling_outputs) > 0:
-                metrics = metrics_calculator.compute_metrics(input_files=sampling_outputs)
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['all'])
+        has_greedy = Path(f'{benchmark_path}/output.jsonl').exists()
+        input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
+        has_sampling = len(input_files) > 0
 
-            if len(metrics) > 1:
-                for subset, subset_metrics in metrics.items():
-                    metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.metrics_to_print()
-                    evaluations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.evaluations_to_print()
-                    if evaluations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
-                        evaluations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
-            else:
-                metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
-                evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
-                if evaluations_to_print[benchmark] is not None and has_greedy:
-                    evaluations_to_print[benchmark].insert(0, 'greedy')
+        if has_greedy and has_sampling:
+            raise ValueError(
+                f"Both output.jsonl and output-rs*.jsonl found for benchmark {benchmark}. "
+                "This indicates that the evaluation was done multiple times with different sampling parameters. "
+                "It's not clear how to process this! Please remove output.jsonl or output-rs*.jsonl files and rerun."
+            )
 
-        except Exception as e:
-            LOG.exception(f"Error computing metrics for {benchmark}: {e}")
+        if has_greedy:
+            input_files = [f'{benchmark_path}/output.jsonl']
+
+        metrics = metrics_calculator.compute_metrics(input_files=input_files)
+        if len(metrics) > 1:  # has subsets
+            for subset, subset_metrics in metrics.items():
+                results[get_subset_name(benchmark, subset)].update(subset_metrics)
+        else:
+            results[benchmark].update(metrics['_all_'])
+
+        if len(metrics) > 1:
+            for subset, subset_metrics in metrics.items():
+                metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
+                evaluations_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.evaluations_to_print()
+        else:
+            metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
+            evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
 
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers

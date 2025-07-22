@@ -53,7 +53,7 @@ def test_multiple_files():
         ),
     )
 
-    expected_md5 = "30afe5057c4e416d4bfce4c2ad783d4f"
+    expected_md5 = "7c3129affcf6f31a68775fae6f8c1742"
     output_md5 = compute_md5(output_file)
 
     assert (
@@ -171,7 +171,7 @@ def test_aggregate_answers_fill():
 
     # Check md5 of one of the output files
     output_file = f"{output_dir}/output-rs0.test"
-    expected_md5 = "c27bfd72287c45ad7e1fd9cd7e5cc159"
+    expected_md5 = "20cd998b090603b2049f27a321cc9e27"
     output_md5 = compute_md5(output_file)
 
     assert (
@@ -196,7 +196,7 @@ def test_aggregate_answers_extract():
 
     # Check md5 of one of the output files
     output_file = Path(output_dir) / "output-agg.jsonl"
-    expected_md5 = "2eef6876070871c8ab83d166b8a2f9b6"
+    expected_md5 = "5f2cdfde69f5eed82c2eb9515c9e07ea"
     output_md5 = compute_md5(output_file)
 
     print(f"output_md5: {output_md5}")

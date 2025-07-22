@@ -72,18 +72,18 @@ ns summarize_results --cluster=local /workspace/evals/baseline --wandb_name=base
 The `ns eval` command will run eight generations for each sample in aime24/25 benchmarks and `summarize_results` will report an average pass@1, pass@8, and majority@8 metrics.
 
 ```
---------------------------------- aime24 --------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 829        | 11.67%           | 0.00%
-majority@8      | 30          | 829        | 13.33%           | 0.00%
-pass@8          | 30          | 829        | 33.33%           | 0.00%
+--------------------------------- aime24 ---------------------------------
+evaluation_mode  | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[avg-of-8] | 30          | 865        | 15.83%           | 1.67%
+majority@8       | 30          | 865        | 20.00%           | 0.00%
+pass@8           | 30          | 865        | 36.67%           | 0.00%
 
 
---------------------------------- aime25 --------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 834        | 11.67%           | 0.42%
-majority@8      | 30          | 834        | 20.00%           | 0.00%
-pass@8          | 30          | 834        | 26.67%           | 0.00%
+--------------------------------- aime25 ---------------------------------
+evaluation_mode  | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[avg-of-8] | 30          | 871        | 12.50%           | 0.42%
+majority@8       | 30          | 871        | 20.00%           | 0.00%
+pass@8           | 30          | 871        | 33.33%           | 0.00%
 ```
 
 Note that you might not get exactly the same numbers because of the stochastic nature of LLM generations. You can read more about `ns eval` pipeline options in the [evaluation](https://nvidia.github.io/NeMo-Skills/pipelines/evaluation/) documentation.
@@ -317,18 +317,18 @@ ns summarize_results --cluster=local /workspace/evals/after-training --wandb_nam
 This evaluation should show good improvements for both benchmarks.
 
 ```
---------------------------------- aime24 --------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 13362      | 27.92%           | 55.83%
-majority@8      | 30          | 13362      | 40.00%           | 16.67%
-pass@8          | 30          | 13362      | 50.00%           | 16.67%
+--------------------------------- aime24 ---------------------------------
+evaluation_mode  | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[avg-of-8] | 30          | 13262      | 23.33%           | 60.42%
+majority@8       | 30          | 13262      | 36.67%           | 23.33%
+pass@8           | 30          | 13262      | 50.00%           | 23.33%
 
 
---------------------------------- aime25 --------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[8]       | 30          | 13445      | 17.92%           | 53.33%
-majority@8      | 30          | 13445      | 26.67%           | 10.00%
-pass@8          | 30          | 13445      | 36.67%           | 10.00%
+--------------------------------- aime25 ---------------------------------
+evaluation_mode  | num_entries | avg_tokens | symbolic_correct | no_answer
+pass@1[avg-of-8] | 30          | 13244      | 16.25%           | 65.42%
+majority@8       | 30          | 13244      | 20.00%           | 30.00%
+pass@8           | 30          | 13244      | 30.00%           | 30.00%
 ```
 
 You can also see it in the W&B dashboard. Switch to the Runs panel and click on Columns to customize the displayed metrics.

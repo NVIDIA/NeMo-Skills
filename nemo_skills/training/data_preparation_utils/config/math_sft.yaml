@@ -13,8 +13,8 @@ metadata: null  # can provide additional metadata to store (e.g. dataset or gene
 skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
-add_unlabeled: false  # if True, saves unlabeled solutions (no is_correct field)
-use_judgement: false  # if True, uses judgement instead of is_correct field
+add_unlabeled: false  # if True, saves unlabeled solutions (no symbolic_correct field)
+use_judgement: false  # if True, uses judgement instead of symbolic_correct field
 # if True, adds a new field with max allowed code executions to each sample
 # exclude_optional_keys must be set to false in this case
 add_code_execution_counts: false
@@ -82,7 +82,7 @@ processors:
     add_unlabeled: ${add_unlabeled}
     use_judgement: ${use_judgement}
     deduplicate: ${deduplicate}
-    keys_to_keep:  # input/output/is_correct/judgement are automatically added
+    keys_to_keep:  # input/output/symbolic_correct/judgement are automatically added
       - "total_votes"
       - "majority_votes"
       - "expected_answer"

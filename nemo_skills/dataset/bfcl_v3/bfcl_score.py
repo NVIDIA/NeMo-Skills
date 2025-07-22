@@ -73,10 +73,7 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
 
 def get_accuracy_dict(metrics, category):
     category_dict = metrics[f"bfcl_v3.{category}"]
-    if "pass@1" in category_dict:
-        return category_dict["pass@1"]
-    else:
-        return category_dict["greedy"]
+    return category_dict["pass@1"]
 
 
 def calculate_non_live_single_turn_accuracy(metrics):

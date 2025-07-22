@@ -140,7 +140,7 @@ def batch_evaluate_results(
                 gt_answer = line_dict["expected_answer"]
                 predicted_answer = line_dict["predicted_answer"]
 
-                line_dict["is_correct"] = math_equal(
+                line_dict["symbolic_correct"] = math_equal(
                     gt_answer,
                     predicted_answer,
                     take_modulo=take_modulo,

@@ -49,7 +49,7 @@ ns eval \
     --model=/workspace/openmath2-llama3.1-8b-trtllm \
     --server_type=trtllm \
     --output_dir=/workspace/openmath2-llama3.1-8b-eval \
-    --benchmarks=aime24:0,amc23:0,math:0,gsm8k:0,omni-math:0 \
+    --benchmarks=aime24,amc23,math,gsm8k,omni-math \
     --server_gpus=1 \
     --num_jobs=1 \
     ++prompt_template=llama3-instruct \
@@ -88,27 +88,27 @@ This should print the metrics including both symbolic and judge evaluation. The 
 ```
 ------------------------------------------------- aime24 ------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 30          | 10.00            | 10.00         | 10.00        | 10.00       | 6.67
+pass@1          | 30          | 10.00            | 10.00         | 10.00        | 10.00       | 6.67
 
 
 ------------------------------------------------- gsm8k -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 1319        | 90.75            | 91.70         | 90.75        | 91.70       | 0.00
+pass@1          | 1319        | 90.75            | 91.70         | 90.75        | 91.70       | 0.00
 
 
 ----------------------------------------------- omni-math -----------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 4428        | 18.97            | 22.22         | 18.11        | 23.08       | 2.55
+pass@1          | 4428        | 18.97            | 22.22         | 18.11        | 23.08       | 2.55
 
 
 -------------------------------------------------- math -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 5000        | 67.70            | 68.10         | 67.50        | 68.30       | 1.36
+pass@1          | 5000        | 67.70            | 68.10         | 67.50        | 68.30       | 1.36
 
 
 ------------------------------------------------- amc23 -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 40          | 32.50            | 40.00         | 32.50        | 40.00       | 0.00
+pass@1          | 40          | 32.50            | 40.00         | 32.50        | 40.00       | 0.00
 ```
 
 The numbers may vary by 1-2% depending on the server type, number of GPUs and batch size used.

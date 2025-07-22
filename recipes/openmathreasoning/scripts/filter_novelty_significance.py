@@ -281,7 +281,7 @@ def process_single_index(
     original_entry['moderate_novel_ratio'] = moderate_novel_count / total_fragments if total_fragments > 0 else 0
 
     # Mark as correct
-    original_entry['is_correct'] = True
+    original_entry['symbolic_correct'] = True
 
     return original_entry
 

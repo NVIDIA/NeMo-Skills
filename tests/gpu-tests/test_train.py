@@ -67,7 +67,7 @@ def test_sft_nemo_rl():
         model=f"{output_dir}/final_hf_model",
         server_type="vllm",
         output_dir=f"{output_dir}/evaluation",
-        benchmarks="gsm8k:0",
+        benchmarks="gsm8k",
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
@@ -75,7 +75,7 @@ def test_sft_nemo_rl():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["_all_"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -128,7 +128,7 @@ def test_grpo_nemo_rl():
         model=f"{output_dir}/final_hf_model",
         server_type="vllm",
         output_dir=f"{output_dir}/evaluation",
-        benchmarks="gsm8k:0",
+        benchmarks="gsm8k",
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
@@ -136,7 +136,7 @@ def test_grpo_nemo_rl():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["_all_"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -188,7 +188,7 @@ def test_sft_aligner():
         model=f"{output_dir}/model-averaged-nemo",
         server_type="nemo",
         output_dir=f"{output_dir}/evaluation",
-        benchmarks="gsm8k:0",
+        benchmarks="gsm8k",
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
@@ -196,7 +196,7 @@ def test_sft_aligner():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["_all_"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 
@@ -250,7 +250,7 @@ def test_dpo_aligner():
         model=f"{output_dir}/model-averaged-nemo",
         server_type="nemo",
         output_dir=f"{output_dir}/evaluation",
-        benchmarks="gsm8k:0",
+        benchmarks="gsm8k",
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
@@ -258,7 +258,7 @@ def test_dpo_aligner():
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
         [f"{output_dir}/evaluation/eval-results/gsm8k/output.jsonl"],
-    )["all"]["greedy"]
+    )["_all_"]["pass@1"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
 

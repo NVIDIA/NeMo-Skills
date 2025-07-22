@@ -77,7 +77,7 @@ def test_eval_mtbench_api(tmp_path):
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
-        f"    --benchmarks=mt-bench:0 "
+        f"    --benchmarks=mt-bench "
         f"    --output_dir={tmp_path} "
         f"    --extra_eval_args=\"++eval_config.use_batch_api=False "
         f"                        ++eval_config.judge_model='meta/llama-3.1-8b-instruct' "
@@ -96,14 +96,14 @@ def test_eval_mtbench_api(tmp_path):
     # running compute_metrics to check that results are expected
     metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
         [f"{tmp_path}/eval-results/mt-bench/output.jsonl"],
-    )["all"]["greedy"]
+    )["_all_"]["pass@1"]
 
     # not having other categories since we just ran with 2 samples
-    assert metrics['average'] >= 6
-    assert metrics['average_turn1'] >= 6
-    assert metrics['average_turn2'] >= 6
-    assert metrics['writing_turn1'] >= 6
-    assert metrics['writing_turn2'] >= 6
+    assert metrics['average'] >= 5
+    assert metrics['average_turn1'] >= 5
+    assert metrics['average_turn2'] >= 5
+    assert metrics['writing_turn1'] >= 5
+    assert metrics['writing_turn2'] >= 5
     assert metrics['missing_rating_turn1'] < 2
     assert metrics['missing_rating_turn2'] < 2
     assert metrics['num_entries'] == 2

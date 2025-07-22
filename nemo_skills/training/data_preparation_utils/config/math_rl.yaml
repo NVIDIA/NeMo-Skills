@@ -49,7 +49,7 @@ processors:
     input_key: ${input_key}
     skip_first: ${skip_first}
     deduplicate: ${deduplicate}
-    keys_to_keep:  # input/output/is_correct/judgement are automatically added
+    keys_to_keep:  # input/output/symbolic_correct/judgement are automatically added
       - "expected_answer"
       - "total_votes"
       - "majority_votes"

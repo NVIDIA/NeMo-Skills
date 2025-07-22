@@ -57,8 +57,8 @@ class ProcessTopAnswerConfig:
     # if True, will not change the fill_key if it's already filled with not None
     ignore_if_not_none: bool = False
 
-    # if True, will use string match to fill is_correct key
-    fill_is_correct: bool = True
+    # if True, will use string match to fill symbolic_correct key
+    fill_symbolic_correct: bool = True
 
     # if True, use the highest scoring answer from the RM as the majority answer
     use_highest_rm_score: bool = False
@@ -204,7 +204,7 @@ class TopAnswerProcessor:
                     elem['predicted_answer'] = extract_answer(elem['generation'])
                 if elem['predicted_answer'] is not None:
                     answer_to_metadata[elem['predicted_answer']] = [
-                        elem.get('is_correct', None),
+                        elem.get('symbolic_correct', None),
                         elem.get('judgement', None),
                     ]
 
@@ -280,12 +280,12 @@ class TopAnswerProcessor:
                 else:
                     predictions[fidx]["majority_votes"], predictions[fidx]["total_votes"] = new_answers[idx][1]
 
-                if cfg.fill_is_correct:
-                    predictions[fidx]["is_correct"] = (
+                if cfg.fill_symbolic_correct:
+                    predictions[fidx]["symbolic_correct"] = (
                         predictions[fidx]["predicted_answer"] == predictions[fidx]["expected_answer"]
                     )
                 else:
-                    predictions[fidx].pop("is_correct", None)
+                    predictions[fidx].pop("symbolic_correct", None)
 
                 handle.write(json.dumps(predictions[fidx]) + "\n")
 
@@ -309,7 +309,7 @@ class TopAnswerProcessor:
 
                 data["predicted_answer"] = new_answers[idx][0]
                 if new_answers[idx][2] is not None:
-                    data["is_correct"] = new_answers[idx][2]
+                    data["symbolic_correct"] = new_answers[idx][2]
                 if new_answers[idx][3] is not None:
                     data["judgement"] = new_answers[idx][3]
                 best_answer_file_handle.write(json.dumps(data) + "\n")

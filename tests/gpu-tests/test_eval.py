@@ -50,7 +50,7 @@ def test_trtllm_eval():
     subprocess.run(cmd, shell=True, check=True)
 
     with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
-        metrics = json.load(f)["gsm8k"]["greedy"]
+        metrics = json.load(f)["gsm8k"]["pass@1"]
 
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
@@ -82,7 +82,7 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --model {model_path} "
         f"    --server_type {server_type} "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k:0 "
+        f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --with_sandbox "
@@ -95,7 +95,7 @@ def test_trtllm_code_execution_eval(server_type):
     subprocess.run(cmd, shell=True, check=True)
 
     with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
-        metrics = json.load(f)["gsm8k"]["greedy"]
+        metrics = json.load(f)["gsm8k"]["pass@1"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 40
@@ -150,20 +150,20 @@ def test_hf_eval(server_type, server_args):
     )
 
     with open(f"{output_dir}/eval-results/algebra222/metrics.json", 'r') as f:
-        metrics = json.load(f)["algebra222"]["greedy"]
+        metrics = json.load(f)["algebra222"]["pass@1"]
 
     assert metrics['symbolic_correct'] >= 75
     assert metrics['num_entries'] == 164
 
     with open(f"{output_dir}/eval-results/human-eval/metrics.json", 'r') as f:
-        metrics = json.load(f)["human-eval"]["greedy"]
+        metrics = json.load(f)["human-eval"]["pass@1"]
 
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
     with open(f"{output_dir}/eval-results/ifeval/metrics.json", 'r') as f:
-        metrics = json.load(f)["ifeval"]["greedy"]
+        metrics = json.load(f)["ifeval"]["pass@1"]
 
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
@@ -172,7 +172,7 @@ def test_hf_eval(server_type, server_args):
     assert metrics['num_prompts'] == 164
 
     with open(f"{output_dir}/eval-results/mmlu/metrics.json", 'r') as f:
-        metrics = json.load(f)["mmlu-all"]["greedy"]
+        metrics = json.load(f)["mmlu"]["pass@1"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 164
 
@@ -196,7 +196,7 @@ def test_nemo_eval():
         f"    --model {model_path} "
         f"    --server_type nemo "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k:0 "
+        f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
@@ -206,7 +206,7 @@ def test_nemo_eval():
 
     # running compute_metrics to check that results are expected
     with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
-        metrics = json.load(f)["gsm8k"]["greedy"]
+        metrics = json.load(f)["gsm8k"]["pass@1"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -236,7 +236,7 @@ def test_megatron_eval():
         f"    --model {model_path} "
         f"    --server_type megatron "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k:0 "
+        f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
@@ -247,7 +247,7 @@ def test_megatron_eval():
 
     # running compute_metrics to check that results are expected
     with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
-        metrics = json.load(f)["gsm8k"]["greedy"]
+        metrics = json.load(f)["gsm8k"]["pass@1"]
     # rough check, since exact accuracy varies depending on gpu type
     # TODO: something is broken in megatron inference here as this should be 50!
     assert metrics['symbolic_correct'] >= 20

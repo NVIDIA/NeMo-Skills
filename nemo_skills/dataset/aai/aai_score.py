@@ -14,15 +14,15 @@
 
 
 def compute_score(metrics: dict):
-    mmlu_pro = metrics['mmlu-pro-all']['greedy']['symbolic_correct']
-    hle = metrics['hle-all']['greedy']['judge_correct']
-    gpqa = metrics['gpqa-all']['greedy']['symbolic_correct']
+    mmlu_pro = metrics['mmlu-pro']['pass@1']['symbolic_correct']
+    hle = metrics['hle']['pass@1']['judge_correct']
+    gpqa = metrics['gpqa']['pass@1']['symbolic_correct']
 
-    aime24 = metrics['aime24']['pass@1[10]']['symbolic_correct']
-    math500 = metrics['math-500']['pass@1[3]']['symbolic_correct']
+    aime24 = metrics['aime24']['pass@1[avg-of-10]']['symbolic_correct']
+    math500 = metrics['math-500']['pass@1[avg-of-3]']['symbolic_correct']
 
-    scicode = metrics['scicode']['pass@1[3]']['subtask_accuracy']
-    livecodebench = metrics['livecodebench-all']['pass@1[3]']['accuracy']
+    scicode = metrics['scicode']['pass@1[avg-of-3]']['subtask_accuracy']
+    livecodebench = metrics['livecodebench']['pass@1[avg-of-3]']['accuracy']
 
     math_score = (aime24 + math500) / 2
     code_score = (scicode + livecodebench) / 2
