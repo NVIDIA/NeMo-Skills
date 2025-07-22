@@ -59,11 +59,11 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
-        
+
         if self.use_client_parsing:
             if self.model_name is None:
                 raise ValueError("model_name is required when use_client_parsing is True")
-            
+
             # Add FC by default
             if "-FC" not in self.model_name[-3:]:
                 LOG.info(f"Assuming the function calling version of model is being used: {self.model_name}")
@@ -72,7 +72,7 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
             if self.model_name not in local_inference_model_map:
                 # TODO: We can present the user the nearest model name that is supported
                 raise ValueError(f"{self.model_name} is not supported by BFCL Eval")
-            
+
             LOG.info(f"Using client parsing for {self.model_name}")
 
             # There are two key functionalities that we need to support on the client side:
@@ -155,13 +155,15 @@ class BFCLGenerationTask(GenerationTask):
 
             return {
                 # Message is a turn formatted in chat format which gets appended to the chat history
-                "message": model_response, 
+                "message": model_response,
                 # Generation is either the text or is empty if there are tool calls
                 "generation": parsed_response["content"],
                 "tool_calls": parsed_response.get("tool_calls", []),
                 "num_generated_tokens": output["num_generated_tokens"],
+                # Preserve the original raw response for llm_text extraction
+                "original_response": output["response"],
             }
-            
+
         else:
             input_dict = {
                 "prompts": [messages],
@@ -176,7 +178,7 @@ class BFCLGenerationTask(GenerationTask):
                 output["tool_calls"] = []
             output["message"] = output["response"].choices[0].message
             return output
-    
+
     def generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
@@ -184,7 +186,12 @@ class BFCLGenerationTask(GenerationTask):
         model_response = self._generate_single_assistant_turn(state_dict)
         proc_model_response = self._process_model_response(model_response)
 
-        return {"id": data_point["id"], "generation": proc_model_response["generation"], "num_generated_tokens": model_response.get("num_generated_tokens", 0)}
+        return {
+            "id": data_point["id"],
+            "generation": proc_model_response["generation"],
+            "llm_text": proc_model_response["llm_text"],
+            "num_generated_tokens": model_response.get("num_generated_tokens", 0)
+        }
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
@@ -196,6 +203,7 @@ class BFCLGenerationTask(GenerationTask):
         holdout_function: dict[int, list] = data_point.get("missed_function", {})
 
         all_model_response: list[list] = []  # The model response that will be used for later evaluation
+        all_llm_text_response: list[list] = []  # The original LLM text for each turn
         force_quit = False  # Whether the model has been forced to quit. If True, this whole entry will be failed
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
@@ -204,8 +212,9 @@ class BFCLGenerationTask(GenerationTask):
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_response = []
+            current_turn_llm_text = []
             count = 0
-            
+
             if str(turn_idx) in holdout_function:
                 data_point["function"].extend(holdout_function[str(turn_idx)])
                 # Need to recompile the tools
@@ -222,14 +231,14 @@ class BFCLGenerationTask(GenerationTask):
                         "content": DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC,
                     }
                 ]
-            
+
             state_dict["messages"].extend(current_turn_message)
 
             while True:
                 model_response = self._generate_single_assistant_turn(state_dict)
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
-                
+
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
                         if model_response["message"]["content"] is not None:
@@ -238,7 +247,7 @@ class BFCLGenerationTask(GenerationTask):
                     else:
                         if model_response["message"].content is not None:
                             model_response["message"].content = self._process_model_response_text(model_response["message"].content)
-                
+
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
 
@@ -246,6 +255,8 @@ class BFCLGenerationTask(GenerationTask):
                 proc_model_response = self._process_model_response(model_response)
                 # Add the processed model response to the current turn responses
                 current_turn_response.append(proc_model_response["generation"])
+                # Also collect the original LLM text
+                current_turn_llm_text.append(proc_model_response["llm_text"])
 
                 # Try decoding the model response
                 try:
@@ -290,12 +301,17 @@ class BFCLGenerationTask(GenerationTask):
 
             # Add to the total list
             all_model_response.append(current_turn_response)
+            all_llm_text_response.append(current_turn_llm_text)
 
             if force_quit:
                 break
 
-        return {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
-    
+        return {
+            "generation": all_model_response,
+            "llm_text": all_llm_text_response,
+            "num_generated_tokens": output_dict["num_generated_tokens"]
+        }
+
     def llm_generate(self, data_points, data, is_async=True):
         """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
         futures = []
@@ -320,13 +336,21 @@ class BFCLGenerationTask(GenerationTask):
 
         return requests_in_progress, generations
 
-    
+
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""
+        # Preserve the original text generated by the LLM
+        if "original_response" in model_response:
+            # When client parsing is used, get the original raw response
+            original_text = model_response["original_response"]
+        else:
+            # When client parsing is not used, get from generation
+            original_text = model_response.get("generation", "")
+
         try:
             if self.cfg.use_client_parsing:
                 generation = [
-                    {func_call["name"]: json.dumps(func_call["arguments"])} 
+                    {func_call["name"]: json.dumps(func_call["arguments"])}
                     for func_call in model_response["tool_calls"]
                 ]
                 tool_call_ids = [idx for idx in range(len(generation))]
@@ -347,15 +371,17 @@ class BFCLGenerationTask(GenerationTask):
             "tool_call_ids": tool_call_ids,
             # The original data structure is needed for the chat history
             "message": model_response["message"],
+            # Preserve the original LLM text output
+            "llm_text": original_text,
         }
-    
+
     def _process_model_response_text(self, model_response_text):
         if self.cfg.thinking_end in model_response_text:
             return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
         else:
             # If the thinking didn't finish, we can keep it empty
             return ""
-        
+
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
 

@@ -478,7 +478,38 @@ class GenerationTask:
             output.update(original_data_point)
             if self.cfg.remove_thinking:
                 remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
-            fout.write(json.dumps(output) + "\n")
+
+            # Clean output for JSON serialization by removing non-serializable objects
+            serializable_output = self._make_json_serializable(output)
+            fout.write(json.dumps(serializable_output) + "\n")
+
+    def _make_json_serializable(self, obj):
+        """
+        Recursively clean an object to make it JSON serializable.
+        Removes or converts objects that can't be serialized by json.dumps().
+        """
+        if isinstance(obj, dict):
+            cleaned = {}
+            for key, value in obj.items():
+                # Skip known non-serializable objects from client parsing
+                if key in ['original_response', 'response'] and hasattr(value, '__class__'):
+                    # Check if it's likely an OpenAI Completion object or similar
+                    if 'completion' in value.__class__.__name__.lower() or 'response' in value.__class__.__name__.lower():
+                        continue  # Skip this key-value pair
+                cleaned[key] = self._make_json_serializable(value)
+            return cleaned
+        elif isinstance(obj, (list, tuple)):
+            return [self._make_json_serializable(item) for item in obj]
+        elif hasattr(obj, '__dict__'):
+            # For objects with attributes, try to convert to dict
+            try:
+                return self._make_json_serializable(obj.__dict__)
+            except:
+                # If that fails, convert to string
+                return str(obj)
+        else:
+            # For primitive types, return as-is
+            return obj
 
     def prefill_generation(self, data_point) -> dict | None:
         """Prefill generation in case LLM is not required."""
