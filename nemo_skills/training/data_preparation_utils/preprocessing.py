@@ -64,7 +64,7 @@ class ReadData(BaseProcessor):
             self.keys_to_keep.add(self.input_key)
             if self.output_key is not None:
                 self.keys_to_keep.add(self.output_key)
-                self.keys_to_keep.add("is_correct")
+                self.keys_to_keep.add("symbolic_correct")
                 self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
@@ -121,14 +121,14 @@ class ReadData(BaseProcessor):
 
             if self.output_key is not None and not self.add_unlabeled:
                 if not self.use_judgement:
-                    if "is_correct" not in line_dict:
-                        LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
+                    if "symbolic_correct" not in line_dict:
+                        LOG.warning("Found incomplete generations (symbolic_correct field is missing) - skipping")
                         continue
 
-                    if not self.add_correct and line_dict["is_correct"]:
+                    if not self.add_correct and line_dict["symbolic_correct"]:
                         continue
 
-                    if not self.add_incorrect and not line_dict["is_correct"]:
+                    if not self.add_incorrect and not line_dict["symbolic_correct"]:
                         continue
                 else:
                     if "judgement" not in line_dict:

@@ -296,7 +296,7 @@ Base prime representation of a natural number is defined using the exponents of 
 
 After the jobs are finished, you will see `/workspace/synthetic-math-solutions/generation/output-rsX.jsonl`
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
-key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
+key (extracted answer from `\boxed{}` field) and `symbolic_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
 [symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py).
 

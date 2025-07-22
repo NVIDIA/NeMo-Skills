@@ -54,13 +54,13 @@ def test_vllm_generate_greedy():
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # no evaluation by default - checking just the number of lines and that there is no is_correct key
+    # no evaluation by default - checking just the number of lines and that there is no symbolic_correct key
     with open(f"{output_dir}/output.jsonl") as fin:
         lines = fin.readlines()
     assert len(lines) == 10
     for line in lines:
         data = json.loads(line)
-        assert 'is_correct' not in data
+        assert 'symbolic_correct' not in data
         assert 'generation' in data
     assert os.path.exists(f"{output_dir}/output.jsonl.done")
 
@@ -95,13 +95,13 @@ def test_vllm_generate_greedy_chunked():
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # no evaluation by default - checking just the number of lines and that there is no is_correct key
+    # no evaluation by default - checking just the number of lines and that there is no symbolic_correct key
     with open(f"{output_dir}/output.jsonl") as fin:
         lines = fin.readlines()
     assert len(lines) == 20  # because max_samples is the number of samples per chunk
     for line in lines:
         data = json.loads(line)
-        assert 'is_correct' not in data
+        assert 'symbolic_correct' not in data
         assert 'generation' in data
     assert os.path.exists(f"{output_dir}/output.jsonl.done")
 
@@ -147,12 +147,12 @@ def test_vllm_generate_seeds():
         assert len(lines) == 10
         for line in lines:
             data = json.loads(line)
-            assert 'is_correct' in data
+            assert 'symbolic_correct' in data
             assert 'generation' in data
         assert os.path.exists(f"{output_dir}/output-rs{seed}.jsonl.done")
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/output-rs*.jsonl"])["all"][
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/output-rs*.jsonl"])["_all_"][
         "majority@3"
     ]
     # rough check, since exact accuracy varies depending on gpu type

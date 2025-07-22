@@ -309,23 +309,21 @@ with the following command
 ns summarize_results --cluster=slurm /workspace/qwq-32b-test/results
 ```
 
-which will output the following (`pass@1[64]` is an average accuracy across all 64 generations)
+which will output the following (`pass@1[avg-of-64]` is an average accuracy across all 64 generations)
 
 ```bash
--------------------------- aime24 --------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 30          | 66.67%           | 23.33%
-majority@64     | 30          | 86.67%           | 0.00%
-pass@64         | 30          | 93.33%           | 0.00%
-pass@1[64]      | 30          | 66.41%           | 0.00%
+----------------------------------------- aime24 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-64] | 30          | 10790      | 3952        | 65.16%           | 32.24%
+majority@64       | 30          | 10790      | 3952        | 86.67%           | 3.33%
+pass@64           | 30          | 10790      | 3952        | 86.67%           | 3.33%
 
 
--------------------------- aime25 --------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 30          | 43.33%           | 50.00%
-majority@64     | 30          | 80.00%           | 0.00%
-pass@64         | 30          | 80.00%           | 0.00%
-pass@1[64]      | 30          | 52.45%           | 0.00%
+----------------------------------------- aime25 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-64] | 30          | 12076      | 4061        | 48.80%           | 45.78%
+majority@64       | 30          | 12076      | 4061        | 70.00%           | 13.33%
+pass@64           | 30          | 12076      | 4061        | 76.67%           | 13.33%
 ```
 
 And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own

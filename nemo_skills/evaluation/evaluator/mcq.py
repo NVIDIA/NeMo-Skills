@@ -14,8 +14,8 @@
 
 import json
 import logging
-
 import re
+
 from tqdm import tqdm
 
 from nemo_skills.evaluation.math_grader import extract_answer
@@ -46,6 +46,5 @@ def eval_mcq(cfg):
         with open(file, 'wt', encoding='utf-8') as fout:
             for sample in tqdm(data):
                 sample['predicted_answer'] = extract_letter(sample["generation"])
-                sample['is_correct'] = sample['predicted_answer'] == sample['expected_answer']
+                sample['symbolic_correct'] = sample['predicted_answer'] == sample['expected_answer']
                 fout.write(json.dumps(sample) + "\n")
-                
