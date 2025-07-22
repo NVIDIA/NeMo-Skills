@@ -183,6 +183,7 @@ def run_cmd(
                 task_dependencies=prev_tasks,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
+                num_tasks=[1] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
             )
