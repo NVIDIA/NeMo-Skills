@@ -249,11 +249,18 @@ class BFCLGenerationTask(GenerationTask):
                         if model_response["message"].content is not None:
                             model_response["message"].content = self._process_model_response_text(model_response["message"].content)
 
-                # Add the message to the state dict for chat history
-                state_dict["messages"].append(model_response["message"])
-
-                # Process the model response text
+                # Process the model response text first to get original LLM text
                 proc_model_response = self._process_model_response(model_response)
+
+                                # Create an enhanced message that includes both original LLM text and tool calls
+                enhanced_message = dict(model_response["message"])
+
+                # Put the original LLM text directly in the content field for conversation history
+                enhanced_message["content"] = proc_model_response["llm_text"]
+
+                # Add the enhanced message to the state dict for chat history
+                state_dict["messages"].append(enhanced_message)
+
                 # Add the processed model response to the current turn responses
                 current_turn_response.append(proc_model_response["generation"])
                 # Also collect the original LLM text
@@ -319,6 +326,7 @@ class BFCLGenerationTask(GenerationTask):
                     "role": msg.role,
                     "content": msg.content if hasattr(msg, 'content') else str(msg)
                 }
+
                 if hasattr(msg, 'tool_calls') and msg.tool_calls:
                     conv_msg["tool_calls"] = [
                         {
