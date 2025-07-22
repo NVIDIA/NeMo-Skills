@@ -356,6 +356,10 @@ def process_non_competition_files(input_files, output_dir, max_soln_samples, num
 
     for random_seed in range(num_random_seeds):
         # random.seed(random_seed)
+        # Avoid writing if the file already exists
+        if os.path.exists(os.path.join(output_dir, f"output-rs{random_seed}.jsonl")):
+            continue
+        
         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
             for _, clustered_instances in problem_to_clustered_instances.items():
                 comparison_instances = create_comparison_instance(
@@ -393,6 +397,26 @@ def preprocess(
 
     in_competition = test_if_in_competition(input_files[0])
     
+    # Test if the output files already exist
+    single_answer_instances_path = os.path.join(output_dir, "single_answer_instances.jsonl")
+    if os.path.exists(single_answer_instances_path):
+        LOG.info("Single answer instances file already exists, skipping preprocess")
+    
+    output_files_exist = True
+    for random_seed in range(num_random_seeds):
+        if os.path.exists(os.path.join(output_dir, f"output-rs{random_seed}.jsonl")):
+            continue
+        else:
+            output_files_exist = False
+            break
+
+    if output_files_exist:
+        LOG.info("Output files already exist, skipping preprocess")
+        return
+
+    # Set the random seed before running the preprocess
+    random.seed(10)
+
     if in_competition:
         process_competition_files(input_files, output_dir, max_soln_samples, num_random_seeds, use_diversity)
     else:
