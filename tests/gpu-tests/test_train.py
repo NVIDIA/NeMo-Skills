@@ -188,7 +188,7 @@ def test_sft_aligner():
         model=f"{output_dir}/model-averaged-nemo",
         server_type="nemo",
         output_dir=f"{output_dir}/evaluation",
-        benchmarks="gsm8",
+        benchmarks="gsm8k",
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
