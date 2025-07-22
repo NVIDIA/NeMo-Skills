@@ -190,6 +190,7 @@ class BFCLGenerationTask(GenerationTask):
             "id": data_point["id"],
             "generation": proc_model_response["generation"],
             "llm_text": proc_model_response["llm_text"],
+            "conversation_history": [],  # Single-turn has no conversation history
             "num_generated_tokens": model_response.get("num_generated_tokens", 0)
         }
 
@@ -281,7 +282,7 @@ class BFCLGenerationTask(GenerationTask):
                     ),
                 )
 
-                # Add the execution results to the chat history for the next turn
+                                                # Add the execution results to the chat history for the next turn
                 for execution_result, tool_call_id in zip(
                     execution_results, proc_model_response["tool_call_ids"]
                 ):
@@ -291,6 +292,9 @@ class BFCLGenerationTask(GenerationTask):
                         "tool_call_id": tool_call_id,
                     }
                     state_dict["messages"].append(tool_message)
+
+                                                # Store the conversation history as structured data for better analysis
+                # We'll add this to the output dict later as a separate field
 
                 count += 1
                 # Force quit after too many steps
@@ -306,9 +310,32 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit:
                 break
 
+        # Convert conversation messages to serializable format for structured analysis
+        conversation_history = []
+        for msg in state_dict["messages"]:
+            if hasattr(msg, 'role'):
+                # Handle OpenAI-style message objects
+                conv_msg = {
+                    "role": msg.role,
+                    "content": msg.content if hasattr(msg, 'content') else str(msg)
+                }
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    conv_msg["tool_calls"] = [
+                        {
+                            "name": tc.function.name if hasattr(tc, 'function') else tc.get('name', 'unknown'),
+                            "arguments": tc.function.arguments if hasattr(tc, 'function') else tc.get('arguments', {}),
+                            "id": tc.id if hasattr(tc, 'id') else tc.get('id', str(i))
+                        } for i, tc in enumerate(msg.tool_calls)
+                    ]
+            else:
+                # Handle dict-style messages - just copy the dict
+                conv_msg = dict(msg)
+            conversation_history.append(conv_msg)
+
         return {
             "generation": all_model_response,
             "llm_text": all_llm_text_response,
+            "conversation_history": conversation_history,
             "num_generated_tokens": output_dict["num_generated_tokens"]
         }
 
