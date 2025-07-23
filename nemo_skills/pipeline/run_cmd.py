@@ -83,8 +83,6 @@ def run_cmd(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
-    preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
-    postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     log_dir: str = typer.Option(
@@ -126,6 +124,22 @@ def run_cmd(
         cluster_config, mount_paths, create_remote_dir=check_mounted_paths
     )
 
+    # we support running multiple commands in their own containers inside a job
+    commands = command
+    containers = container
+    if not isinstance(commands, list):
+        commands = [commands]
+    if not isinstance(containers, list):
+        containers = [containers]
+
+    commands = [get_cmd(cmd) for cmd in commands]
+    containers = [cluster_config["containers"].get(container, container) for container in containers]
+
+    if len(commands) != len(containers):
+        raise ValueError(
+            "If you provide multiple commands, you must also provide the same number of containers to run them in."
+        )
+
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
@@ -145,22 +159,18 @@ def run_cmd(
         else:
             server_config = None
 
-        # Prepare command
-        cmd = get_cmd(command=command)
-        cmd = pipeline_utils.wrap_cmd(cmd, preprocess_cmd, postprocess_cmd)
-
         # Wrap command with generation command if model is provided
         if model is not None and server_config is not None:
-            cmd = pipeline_utils.wait_for_server(server_address, cmd)
+            commands = [pipeline_utils.wait_for_server(server_address, cmd) for cmd in commands]
 
         prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
                 exp,
-                cmd=cmd,
+                cmd=commands,
                 task_name=expname,
                 log_dir=log_dir,
-                container=cluster_config["containers"].get(container, container),
+                container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
@@ -173,6 +183,7 @@ def run_cmd(
                 task_dependencies=prev_tasks,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
+                num_tasks=[1] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
             )

@@ -389,7 +389,7 @@ def add_task(
     else:
         dependencies = None
 
-    if num_gpus is None and cluster_config['executor'] == "slurm":
+    if server_config is None and num_gpus is None and cluster_config['executor'] == "slurm":
         if not cluster_config.get('cpu_partition'):
             num_gpus = 1
 
