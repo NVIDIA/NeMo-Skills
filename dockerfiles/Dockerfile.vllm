@@ -1,0 +1,4 @@
+FROM vllm/vllm-openai:v0.9.1
+
+# adding editable vllm installation to allow overriding python code with a custom mount
+RUN cd /opt && git clone https://github.com/vllm-project/vllm.git && cd vllm && git checkout v0.9.1 && VLLM_USE_PRECOMPILED=1 pip install -e .

@@ -71,7 +71,7 @@ def get_hf_to_trtllm_cmd(
         "fp8": "fp8",
     }[dtype]
 
-    tmp_engine_dir = f"{output_model}-tmp"
+    tmp_engine_dir = f"{output_model}-tmp-ckpt"
 
     setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 
@@ -259,12 +259,19 @@ def convert(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Convert a checkpoint from one format to another.
 
@@ -351,9 +358,9 @@ def convert(
         num_nodes=num_nodes,
         extra_arguments=extra_arguments,
     )
-    with get_exp(expname, cluster_config) as exp:
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=conversion_cmd,
             task_name=expname,
@@ -369,9 +376,13 @@ def convert(
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            installation_command=installation_command,
+            task_dependencies=_task_dependencies,
         )
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

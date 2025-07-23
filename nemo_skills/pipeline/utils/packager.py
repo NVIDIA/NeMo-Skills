@@ -119,7 +119,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         include_patterns = []
         include_pattern_relative_paths = []
 
-    check_uncommited_changes = not bool(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0))
+    check_uncommited_changes = not bool(int(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0)))
 
     # are we in a git repo? If yes, we are uploading the current code
     repo_path = get_git_repo_path(path=None)  # check if we are in a git repo in pwd
@@ -127,7 +127,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
         if not (Path(repo_path) / 'nemo_skills').is_dir():
-            logging.info(
+            LOG.info(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
                 str(nemo_skills_dir / '*'),
@@ -136,6 +136,11 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         else:
             # picking up local dataset files if we are in the right repo
             include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
+            subfolder_datasets = ["ruler", "bfcl_v3"]  # TODO: read this from init.py in a dataset folder
+            # special logic for any dataset that creates subfolders
+            for subfolder_dataset in subfolder_datasets:
+                include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
+                include_patterns.append(str(nemo_skills_dir / f"dataset/{subfolder_dataset}/*"))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
         root_package = run.GitArchivePackager(
@@ -144,7 +149,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
             check_uncommitted_changes=check_uncommited_changes,
         )
     else:
-        logging.info(
+        LOG.info(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
             str(nemo_skills_dir / '*'),
         )

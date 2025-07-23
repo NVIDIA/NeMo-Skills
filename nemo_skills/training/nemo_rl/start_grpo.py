@@ -15,34 +15,28 @@
 # copied and edited from https://github.com/NVIDIA/NeMo-RL/blob/ab1b638a499308caea022648daaf6994d390cbde/examples/run_grpo_math.py
 
 import argparse
+import copy
+import importlib
+import json
 import os
 import pprint
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any, Optional
-
-from omegaconf import OmegaConf
-from transformers import PreTrainedTokenizerBase
 
 from nemo_rl.algorithms.grpo import MasterConfig, grpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset
-from nemo_rl.data.interfaces import (
-    DatumSpec,
-    LLMMessageLogType,
-    TaskDataProcessFnCallable,
-    TaskDataSpec,
-)
-from nemo_rl.distributed.ray_actor_environment_registry import (
-    get_actor_python_env,
-)
-from nemo_rl.distributed.virtual_cluster import init_ray
+from nemo_rl.data.interfaces import DatumSpec, LLMMessageLogType, TaskDataProcessFnCallable, TaskDataSpec
+from nemo_rl.distributed.ray_actor_environment_registry import ACTOR_ENVIRONMENT_REGISTRY, get_actor_python_env
+from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES, init_ray
 from nemo_rl.environments.interfaces import EnvironmentInterface
-from nemo_rl.environments.math_environment import MathEnvironment
 from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
+from omegaconf import OmegaConf
+from transformers import PreTrainedTokenizerBase
 
 from nemo_skills.prompt.utils import get_prompt
 
@@ -52,9 +46,7 @@ OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run GRPO training with configuration")
-    parser.add_argument(
-        "--config", type=str, default=None, help="Path to YAML config file"
-    )
+    parser.add_argument("--config", type=str, default=None, help="Path to YAML config file")
 
     # Parse known args for the script
     args, overrides = parser.parse_known_args()
@@ -66,40 +58,60 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 #                             Custom Math Dataset (@nemo-skills)
 # ===============================================================================
 
-from datasets import load_dataset
-
+from datasets import Dataset, load_dataset
 from nemo_rl.data.interfaces import TaskDataSpec
 
-def extract_dataset(split, output_key, dataset_path):
+
+def load_jsonl_as_dataset(
+    filepath: str,
+    force_string: bool = False,
+    keep_fields: Optional[list[str]] = None,
+) -> Dataset:
+    """
+    Load a JSONL file and convert it to a Hugging Face Dataset.
+
+    Args:
+        filepath (str): Path to the .jsonl file.
+
+    Returns:
+        Dataset: Hugging Face Dataset object.
+    """
+    records: list[dict[str, Any]] = []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            records.append(obj)
+
+    return Dataset.from_list(records)
+
+
+def extract_dataset(split, dataset_path):
     if not dataset_path.startswith('/'):
         original_ds = load_dataset(dataset_path, split=split)
     else:
-        import pandas as pd
-        from datasets import Dataset
-        df = pd.read_json(dataset_path, lines=True, dtype={output_key: str})
-        df = df[['problem', output_key]]
-        original_ds = Dataset.from_pandas(df)
+        original_ds = load_jsonl_as_dataset(dataset_path)
     return original_ds
 
-def format_math(data, output_key: str = "expected_answer"):
+
+def format_passthrough(data):
     return {
-        "problem": data["problem"],
-        "expected_answer": data[output_key],
+        **data,
         # For v0.1 release, nemo rl datasets require a task_name key such that user can map a task processor per unique task.
         "task_name": "math",
     }
 
-def prepare_math_dataset(split_ds, output_key):
-            # Format the examples, removing original columns
+
+def prepare_math_dataset(split_ds):
+    # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(
-        format_math,
-        remove_columns=split_ds["train"].column_names,
-        fn_kwargs={"output_key": output_key},
+        format_passthrough,
     )
     val_formatted = split_ds["validation"].map(
-        format_math,
-        remove_columns=split_ds["validation"].column_names,
-        fn_kwargs={"output_key": output_key},
+        format_passthrough,
     )
 
     return {
@@ -107,19 +119,22 @@ def prepare_math_dataset(split_ds, output_key):
         "validation": val_formatted,
     }
 
+
 class NeMoSkillsDataset:
     """Custom dataset class for NeMo Skills Math Environment."""
 
-    def __init__(self, training_data, validation_data, output_key="expected_answer"):
+    def __init__(self, training_data, validation_data):
         """Initialize the dataset with training and validation data."""
         self.training_data = training_data
         self.validation_data = validation_data
 
         # Load the datasets
-        self.formatted_ds = prepare_math_dataset({
-            "train": extract_dataset("train", "expected_answer", training_data),
-            "validation": extract_dataset("validation", "expected_answer", validation_data),
-        }, output_key=output_key)
+        self.formatted_ds = prepare_math_dataset(
+            {
+                "train": extract_dataset("train", training_data),
+                "validation": extract_dataset("validation", validation_data),
+            }
+        )
 
 
 # ===============================================================================
@@ -132,25 +147,10 @@ TokenizerType = PreTrainedTokenizerBase
 class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any] | None = None
 
-    def copy_defaults(self, from_spec):
-        super().copy_defaults(from_spec)
-        default_attrs = {
-            "prompt_spec": {
-                "prompt_config": 'qwen/math-cot',
-                "prompt_template": 'qwen-instruct',
-                "examples_type": None,
-                "config_dir": None,
-                "template_dir": None,
 
-            }
-        }
+def apply_ns_chat_template(prompt, datum_dict) -> str:
+    return prompt.fill(datum_dict, return_templated_dict=True)
 
-        for attr_name, default_value in default_attrs.items():
-            if getattr(self, attr_name) is None:
-                setattr(self, attr_name, default_value)
-
-def apply_ns_chat_template(prompt, problem: str) -> str:
-    return prompt.fill({'problem': problem}, return_templated_dict=True)
 
 # TaskDataProcessFnCallable
 def ns_data_processor(
@@ -160,9 +160,8 @@ def ns_data_processor(
     max_seq_length: int,
     idx: int,
 ) -> DatumSpec:
-    problem = datum_dict["problem"]
     prompt_spec = task_data_spec.prompt_spec
-    extra_env_info = {"ground_truth": datum_dict["expected_answer"]}
+    extra_env_info = copy.deepcopy(datum_dict)
 
     message_log: LLMMessageLogType = []
 
@@ -172,8 +171,8 @@ def ns_data_processor(
         examples_type=prompt_spec["examples_type"],
         config_dir=prompt_spec["config_dir"],
         template_dir=prompt_spec["template_dir"],
-        )
-    message_log = apply_ns_chat_template(prompt, problem)
+    )
+    message_log = apply_ns_chat_template(prompt, datum_dict)
 
     for message in message_log:
         message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
@@ -184,9 +183,7 @@ def ns_data_processor(
     if length > max_seq_length:
         # make smaller and mask out
         for chat_message in message_log:
-            chat_message["token_ids"] = chat_message["token_ids"][
-                : min(4, max_seq_length // len(message_log))
-            ]
+            chat_message["token_ids"] = chat_message["token_ids"][: min(4, max_seq_length // len(message_log))]
         loss_multiplier = 0.0
 
     output: DatumSpec = {
@@ -222,17 +219,31 @@ def setup_data(
         data_config["val_data_path"],
     )
 
-    task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = (
-        defaultdict(lambda: (math_task_spec, ns_data_processor))
+    task_data_processors: dict[str, tuple[TaskDataSpec, TaskDataProcessFnCallable]] = defaultdict(
+        lambda: (math_task_spec, ns_data_processor)
     )
     task_data_processors["math"] = (math_task_spec, ns_data_processor)
 
-    math_env = MathEnvironment.options(  # type: ignore # it's wrapped with ray.remote
+    # Allow overriding the environment class via the Hydra/YAML config.
+    # If `env_cls` is provided inside env_configs["math"], we dynamically
+    # import and instantiate that environment instead of the default
+    # `MathEnvironment`.  This lets users plug in custom reward functions
+    # without modifying the rest of the code.
+
+    env_cls_path = env_configs["math"].get(
+        "env_cls",
+        "nemo_skills.training.nemo_rl.environments.math_environment.MathEnvironment",
+    )
+    ACTOR_ENVIRONMENT_REGISTRY[env_cls_path] = PY_EXECUTABLES.SYSTEM
+
+    module_name, class_name = env_cls_path.rsplit(".", 1)
+    env_module = importlib.import_module(module_name)
+    env_cls = getattr(env_module, class_name)
+
+    math_env = env_cls.options(  # type: ignore  # ray.remote wrapper
         runtime_env={
-            "py_executable": get_actor_python_env(
-                "nemo_rl.environments.math_environment.MathEnvironment"
-            ),
-            "env_vars": dict(os.environ),  # Pass thru all user environment variables
+            "py_executable": get_actor_python_env(env_cls_path),
+            "env_vars": dict(os.environ),  # Pass through all env vars
         }
     ).remote(env_configs["math"])
     dataset = AllTaskProcessedDataset(
@@ -266,9 +277,7 @@ def main() -> None:
     args, overrides = parse_args()
 
     if not args.config:
-        args.config = os.path.join(
-            os.path.dirname(__file__), "configs", "grpo.yaml"
-        )
+        args.config = os.path.join(os.path.dirname(__file__), "configs", "grpo.yaml")
 
     config = load_config(args.config)
     print(f"Loaded configuration from: {args.config}")
@@ -288,20 +297,14 @@ def main() -> None:
     config["logger"]["log_dir"] = get_next_experiment_dir(config["logger"]["log_dir"])
     print(f"📊 Using log directory: {config['logger']['log_dir']}")
     if config["checkpointing"]["enabled"]:
-        print(
-            f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}"
-        )
+        print(f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}")
 
     init_ray()
 
     # setup tokenizer
     tokenizer = get_tokenizer(config["policy"]["tokenizer"])
-    assert config["policy"]["generation"] is not None, (
-        "A generation config is required for GRPO"
-    )
-    config["policy"]["generation"] = configure_generation_config(
-        config["policy"]["generation"], tokenizer
-    )
+    assert config["policy"]["generation"] is not None, "A generation config is required for GRPO"
+    config["policy"]["generation"] = configure_generation_config(config["policy"]["generation"], tokenizer)
 
     # setup data
     (

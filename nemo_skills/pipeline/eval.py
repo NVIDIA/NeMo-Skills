@@ -13,100 +13,21 @@
 # limitations under the License.
 import logging
 import os
-from enum import Enum
+from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
 from typing import List
 
 import typer
 
-from nemo_skills.dataset.utils import get_dataset_module
+import nemo_skills.pipeline.utils as pipeline_utils
+from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.pipeline.utils import (
-    SupportedServers,
-    add_task,
-    check_mounts,
-    get_cluster_config,
-    get_exp,
-    get_free_port,
-    get_generation_command,
-    get_server_command,
-    resolve_mount_paths,
-    run_exp,
-)
-from nemo_skills.utils import compute_chunk_ids, get_chunked_filename, get_logger_name, setup_logging
+from nemo_skills.pipeline.generate import generate as _generate
+from nemo_skills.pipeline.utils.eval import prepare_eval_commands
+from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-class ExtraDatasetType(str, Enum):
-    copy = "copy"
-    mount = "mount"
-
-
-def get_greedy_cmd(
-    benchmark,
-    split,
-    output_dir,
-    output_name='output.jsonl',
-    extra_eval_args="",
-    extra_arguments="",
-    extra_datasets=None,
-    num_chunks=None,
-    chunk_ids=None,
-):
-    benchmark_module, found_in_extra = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-    if found_in_extra:
-        data_parameters = f"++input_file=/nemo_run/code/{Path(extra_datasets).name}/{benchmark}/{split}.jsonl"
-    else:
-        data_parameters = f"++dataset={benchmark} ++split={split}"
-
-    extra_eval_args = f"{benchmark_module.DEFAULT_EVAL_ARGS} {extra_eval_args}"
-    extra_arguments = f"{benchmark_module.DEFAULT_GENERATION_ARGS} {extra_arguments}"
-
-    cmds = []
-    if num_chunks is None or chunk_ids is None:
-        chunk_params = ["++chunk_id=null ++num_chunks=null"]
-        chunked_output_names = [output_name]
-    else:
-        chunk_params = [f"++chunk_id={chunk_id} ++num_chunks={num_chunks}" for chunk_id in chunk_ids]
-        chunked_output_names = [get_chunked_filename(chunk_id, output_name) for chunk_id in chunk_ids]
-    for chunk_param, chunked_output_name in zip(chunk_params, chunked_output_names):
-        cmds.append(
-            f'echo "Evaluating benchmark {benchmark}" && '
-            f'python -m nemo_skills.inference.generate '
-            f'    ++output_file={output_dir}/eval-results/{benchmark}/{output_name} '
-            f'    {data_parameters} '
-            f'    {chunk_param} '
-            f'    {extra_arguments} && '
-            f'python -m nemo_skills.evaluation.evaluate_results '
-            f'    ++input_files={output_dir}/eval-results/{benchmark}/{chunked_output_name} {extra_eval_args}'
-        )
-    return cmds
-
-
-def get_sampling_cmd(
-    benchmark,
-    split,
-    output_dir,
-    random_seed,
-    extra_eval_args="",
-    extra_arguments="",
-    extra_datasets=None,
-    num_chunks=None,
-    chunk_ids=None,
-):
-    extra_arguments = f" inference.random_seed={random_seed} inference.temperature=0.7 {extra_arguments}"
-    return get_greedy_cmd(
-        benchmark=benchmark,
-        split=split,
-        output_dir=output_dir,
-        output_name=f"output-rs{random_seed}.jsonl",
-        extra_eval_args=extra_eval_args,
-        extra_arguments=extra_arguments,
-        extra_datasets=extra_datasets,
-        num_chunks=num_chunks,
-        chunk_ids=chunk_ids,
-    )
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -119,6 +40,11 @@ def eval(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to store evaluation results"),
+    data_dir: str = typer.Option(
+        None,
+        help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
+        "Can also specify through NEMO_SKILLS_DATA_DIR environment variable.",
+    ),
     benchmarks: str = typer.Option(
         ...,
         help="Need to be in a format <benchmark>:<num samples for majority voting>. "
@@ -128,7 +54,7 @@ def eval(
     expname: str = typer.Option("eval", help="Name of the experiment"),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
-    server_type: SupportedServers = typer.Option(..., help="Type of server to use"),
+    server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
     server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
     server_nodes: int = typer.Option(1, help="Number of nodes to use if hosting the model"),
     server_args: str = typer.Option("", help="Additional arguments for the server"),
@@ -137,9 +63,34 @@ def eval(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    judge_model: str = typer.Option(None, help="Path to the model to be used as a judge (if applicable)"),
+    judge_server_address: str = typer.Option(None, help="Address of the server hosting the judge model"),
+    judge_server_type: pipeline_utils.SupportedServers = typer.Option(
+        None, help="Type of server to use for the judge"
+    ),
+    judge_server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the judge model"),
+    judge_server_nodes: int = typer.Option(None, help="Number of nodes to use if hosting the judge model"),
+    judge_server_args: str = typer.Option(None, help="Additional arguments for the judge server"),
+    judge_server_entrypoint: str = typer.Option(
+        None,
+        help="Path to the entrypoint of the judge server. "
+        "If not specified, will use the default entrypoint for the server type.",
+    ),
+    extra_judge_args: str = typer.Option(
+        "", help="Additional arguments for judge (passed to generate script, so should start with ++)"
+    ),
+    extra_judge_pipeline_args: str = typer.Option(
+        None, help="Additional arguments for judge that configure the job. Should be a dictionary (used from Python)"
+    ),
+    dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
-    split: str = typer.Option('test', help="Data split to use for evaluation"),
-    num_jobs: int = typer.Option(-1, help="Number of jobs to split the evaluation into"),
+    split: str = typer.Option(
+        None,
+        help="Data split to use for evaluation. Will use benchmark-specific default or 'test' if it's not defined.",
+    ),
+    num_jobs: int = typer.Option(
+        None, help="Number of jobs to split the evaluation into. By default will run all benchmarks/seeds in parallel."
+    ),
     num_chunks: int = typer.Option(
         None,
         help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
@@ -153,10 +104,6 @@ def eval(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
-    add_greedy: bool = typer.Option(
-        False,
-        help="Whether to add greedy evaluation. Only applicable if num_samples > 0, otherwise greedy is default.",
-    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -179,14 +126,44 @@ def eval(
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
     ),
-    # extra_datasets_type: ExtraDatasetType = typer.Option(ExtraDatasetType.copy, help="How to handle extra datasets"),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
+    extra_datasets_type: ExtraDatasetType = typer.Option(
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
+        help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
+    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    rerun_done: bool = typer.Option(
+        False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    log_samples: bool = typer.Option(
+        False,
+        help="If True, will log random samples from the output files to wandb. "
+        "Requires WANDB_API_KEY to be set in the environment. "
+        "Use wandb_name/wandb_group/wandb_project to specify where to log.",
+    ),
+    wandb_name: str = typer.Option(
+        None,
+        help="Name of the wandb group to sync samples to. If not specified, but log_samples=True, will use expname.",
+    ),
+    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
+    wandb_project: str = typer.Option(
+        'nemo-skills',
+        help="Name of the wandb project to sync samples to.",
+    ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Evaluate a model on specified benchmarks.
 
@@ -202,150 +179,290 @@ def eval(
         server_type = server_type.value
     except AttributeError:
         pass
+    try:
+        extra_datasets_type = extra_datasets_type.value
+    except AttributeError:
+        pass
 
-    cluster_config = get_cluster_config(cluster, config_dir)
-    cluster_config = resolve_mount_paths(cluster_config, mount_paths)
+    if log_samples:
+        wandb_parameters = {
+            'name': wandb_name or expname,
+            'project': wandb_project,
+            'group': wandb_group,
+        }
+    else:
+        wandb_parameters = None
+
+    server_parameters = {
+        'model': model,
+        'server_type': server_type,
+        'server_address': server_address,
+        'server_gpus': server_gpus,
+        'server_nodes': server_nodes,
+        'server_args': server_args,
+        'server_entrypoint': server_entrypoint,
+    }
+    judge_server_parameters = {
+        'model': judge_model,
+        'server_type': judge_server_type,
+        'server_address': judge_server_address,
+        'server_gpus': judge_server_gpus,
+        'server_nodes': judge_server_nodes,
+        'server_args': judge_server_args,
+        'server_entrypoint': judge_server_entrypoint,
+    }
+
+    # Prepare cluster config and mount paths
+    cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
+    cluster_config = pipeline_utils.resolve_mount_paths(
+        cluster_config, mount_paths, create_remote_dir=check_mounted_paths
+    )
+
+    env_vars = pipeline_utils.get_env_variables(cluster_config)
+    data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
+
+    if extra_datasets_type == ExtraDatasetType.cluster and cluster_config['executor'] != 'slurm':
+        raise ValueError(
+            "Extra datasets type is set to 'cluster', but the executor is not 'slurm'. "
+            "Please use 'local' or change the cluster config."
+        )
 
     if log_dir is None:
         log_dir = f"{output_dir}/eval-logs"
 
-    output_dir, log_dir = check_mounts(
+    output_dir, data_dir, log_dir = pipeline_utils.check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={output_dir: None},
+        mount_map={output_dir: None, data_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
-
-    if num_chunks:
-        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-    should_chunk_dataset = num_chunks is not None and chunk_ids is not None
-    num_runs = len(chunk_ids) if should_chunk_dataset else 1
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
-    get_random_port = server_gpus != 8 and not exclusive
-
-    if server_address is None:  # we need to host the model
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_port = get_free_port(strategy="random") if get_random_port else 5000
-        server_address = f"localhost:{server_port}"
-
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-            "server_entrypoint": server_entrypoint,
-            "server_port": server_port,
-        }
-        # += is okay here because the args have already been copied in this context
-        extra_arguments += f" ++server.server_type={server_type} "
-        extra_arguments += f" ++server.host=localhost "
-        extra_arguments += f" ++server.port={server_port} "
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments += (
-            f" ++server.server_type={server_type} ++server.base_url={server_address} ++server.model={model} "
-        )
-
-    benchmarks = {k: int(v) for k, v in [b.split(":") for b in benchmarks.split(",")]}
-
-    extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
-    # TODO(@titu1994): add support for extra_datasets_type in future pr
-    # try:
-    #     extra_datasets_type = extra_datasets_type.value
-    # except AttributeError:
-    #     pass
-
-    # Check which benchmarks require sandbox
-    benchmark_requires_sandbox = {}
-    for benchmark in benchmarks.keys():
-        benchmark_module, _ = get_dataset_module(benchmark, extra_datasets=extra_datasets)
-        requires_sandbox = hasattr(benchmark_module, "DATASET_GROUP") and benchmark_module.DATASET_GROUP == "lean4"
-        benchmark_requires_sandbox[benchmark] = requires_sandbox
-        if requires_sandbox and not with_sandbox:
-            LOG.warning("Found benchmark (%s) which requires sandbox mode, enabled sandbox for it.", benchmark)
-
-    # Create evaluation commands as before
-    eval_cmds = [
-        (cmd, benchmark)
-        for benchmark, rs_num in benchmarks.items()
-        for cmd in get_greedy_cmd(
-            benchmark,
-            split,
-            output_dir,
-            extra_eval_args=extra_eval_args,
-            extra_arguments=extra_arguments,
-            extra_datasets=extra_datasets,
-            num_chunks=num_chunks,
-            chunk_ids=chunk_ids,
-        )
-        if add_greedy or rs_num == 0
-    ]
-    eval_cmds += [
-        (cmd, benchmark)
-        for benchmark, rs_num in benchmarks.items()
-        for rs in range(starting_seed, starting_seed + rs_num)
-        for cmd in get_sampling_cmd(
-            benchmark,
-            split,
-            output_dir,
-            rs,
-            extra_eval_args=extra_eval_args,
-            extra_arguments=extra_arguments,
-            extra_datasets=extra_datasets,
-            num_chunks=num_chunks,
-            chunk_ids=chunk_ids,
-        )
-    ]
-    if num_jobs == -1:
-        num_jobs = len(eval_cmds)
-    else:
-        # TODO: should we keep num_jobs as the total max?
-        num_jobs *= num_runs
-
-    # Create job batches with benchmark info
-    job_batches = []
-    for i in range(num_jobs):
-        cmds = []
-        benchmarks_in_job = set()
-        for cmd, benchmark in eval_cmds[i::num_jobs]:
-            cmds.append(cmd)
-            benchmarks_in_job.add(benchmark)
-        job_batches.append((cmds, benchmarks_in_job))
-
-    with get_exp(expname, cluster_config) as exp:
-        for idx, (cmds, benchmarks_in_job) in enumerate(job_batches):
-            # Check if any benchmark in this job requires sandbox
-            job_needs_sandbox = with_sandbox or any(
-                benchmark_requires_sandbox.get(b, False) for b in benchmarks_in_job
+    benchmarks_dict, job_batches = prepare_eval_commands(
+        cluster_config,
+        benchmarks,
+        split,
+        extra_datasets,
+        num_jobs,
+        starting_seed,
+        output_dir,
+        num_chunks,
+        chunk_ids,
+        rerun_done,
+        server_parameters,
+        extra_arguments,
+        data_dir,
+        extra_datasets_type,
+        exclusive,
+        with_sandbox,
+        wandb_parameters,
+        extra_eval_args,
+    )
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+    should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
+    has_tasks = False
+    job_id_to_tasks = {}
+    benchmark_to_judge_tasks = {}
+    all_tasks = []
+    if _task_dependencies is None:
+        _task_dependencies = []
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
+        # scheduling main eval jobs
+        for idx, job_args in enumerate(job_batches):
+            cmds, job_benchmarks, job_needs_sandbox, job_server_config, job_server_address, job_server_command = (
+                job_args
             )
+            prev_tasks = _task_dependencies
 
-            LOG.info("Launching task with command %s", " && ".join(cmds))
-            add_task(
-                exp,
-                cmd=get_generation_command(server_address=server_address, generation_commands=" && ".join(cmds)),
-                task_name=f'{expname}-{idx}',
-                log_dir=log_dir,
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
+            for _ in range(dependent_jobs + 1):
+                has_tasks = True
+                new_task = pipeline_utils.add_task(
+                    exp,
+                    cmd=pipeline_utils.wait_for_server(
+                        server_address=job_server_address, generation_commands=" && ".join(cmds)
+                    ),
+                    task_name=f'{expname}-{"-".join(job_benchmarks)}',
+                    log_dir=log_dir,
+                    container=cluster_config["containers"]["nemo-skills"],
+                    cluster_config=cluster_config,
+                    partition=partition,
+                    time_min=time_min,
+                    server_config=job_server_config,
+                    with_sandbox=job_needs_sandbox or with_sandbox,
+                    sandbox_port=None if get_random_port else 6000,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    task_dependencies=(
+                        prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                    ),
+                    get_server_command=job_server_command,
+                    extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
+                )
+                prev_tasks = [new_task]
+                all_tasks.append(new_task)
+                # only last dependent job will be here, which is what we want
+                job_id_to_tasks[idx] = prev_tasks
+        # scheduling judge jobs if needed
+        for idx, (benchmark, benchmark_args) in enumerate(benchmarks_dict.items()):
+            if not benchmark_args.requires_judge:
+                continue
+            dependent_job_ids = benchmark_args.job_ids
+            dependent_tasks = []
+            for job_id in dependent_job_ids:
+                dependent_tasks.extend(job_id_to_tasks[job_id])
+            judge_wrap_args, judge_pipeline_args = benchmark_args.judge_args, benchmark_args.judge_pipeline_args
+
+            benchmark_seeds = benchmark_args.num_samples
+            if benchmark_seeds == 0:
+                judge_pipeline_args['input_file'] = str(
+                    Path(output_dir) / benchmark_args.eval_subfolder / 'output.jsonl'
+                )
+            else:
+                judge_pipeline_args['input_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
+                judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
+            # subfolder always starts with tmp-* for judge and we want to remove tmp-
+            assert benchmark_args.eval_subfolder.startswith("tmp-")
+            benchmark_args.eval_subfolder = benchmark_args.eval_subfolder[4:]
+            judge_pipeline_args['output_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
+            judge_ctx = deepcopy(ctx)
+            # removing any extra arguments here as they are assumed to be for the main job
+            judge_ctx.args = []
+            if judge_wrap_args:
+                judge_ctx.args.extend(judge_wrap_args.split(" "))
+            if extra_judge_args:
+                judge_ctx.args.extend(extra_judge_args.split(" "))
+
+            # the default parameters always have server_address, but it needs to be removed if model is self-hosted
+            if judge_server_gpus is not None:
+                judge_pipeline_args['server_address'] = None
+
+            for judge_server_param, judge_server_value in judge_server_parameters.items():
+                if judge_server_value is not None:
+                    judge_pipeline_args[judge_server_param] = judge_server_value
+            # TODO: should we support parsing a string?
+            if extra_judge_pipeline_args is not None:
+                judge_pipeline_args.update(extra_judge_pipeline_args)
+            has_tasks = True
+            judge_tasks = _generate(
+                ctx=judge_ctx,
+                expname=f"{expname}-{benchmark}-judge",
+                log_dir=log_dir + '/judge',
+                cluster=cluster,
                 partition=partition,
                 time_min=time_min,
-                server_config=server_config,
-                with_sandbox=job_needs_sandbox,
+                with_sandbox=with_sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
-                extra_package_dirs=[extra_datasets] if extra_datasets else None,
-                get_server_command=get_server_command,
-                sandbox_port=None if get_random_port else 6000,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                exclusive=exclusive,
+                installation_command=installation_command,
+                _reuse_exp=exp,
+                _task_dependencies=(
+                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
+                **judge_pipeline_args,
             )
-        run_exp(exp, cluster_config)
+            benchmark_to_judge_tasks[benchmark] = judge_tasks
+            all_tasks.extend(judge_tasks)
 
-    return exp
+        group_metric_files = defaultdict(list)
+        group_tasks = defaultdict(list)
+        group_module = {}
+
+        # setting summarize results tasks
+        for benchmark, benchmark_args in benchmarks_dict.items():
+            # TODO: add logic if metrics.json exists, we don't run this!
+            has_tasks = True
+            metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
+            # TODO: with this new usage summarize_results probably needs some refactoring
+            #       also maybe we should remove it from pipeline as it's not
+            #       really ever needed to be run directly anymore?
+            results_folder = f"{output_dir}/{Path(benchmark_args.eval_subfolder).parent}"
+            command = (
+                f"python -m nemo_skills.pipeline.summarize_results {results_folder} "
+                f"    --benchmarks {benchmark} "
+                f"    --save_metrics_path {metric_file} "
+            )
+            if wandb_name:
+                command += f" --wandb_name={wandb_name} "
+            if wandb_group:
+                command += f" --wandb_group={wandb_group} "
+            if wandb_project:
+                command += f" --wandb_project={wandb_project} "
+            if data_dir:
+                command += f" --data_dir={data_dir} "
+
+            if benchmark in benchmark_to_judge_tasks:
+                dependent_tasks = benchmark_to_judge_tasks[benchmark]
+            else:
+                dependent_job_ids = benchmark_args.job_ids
+                dependent_tasks = []
+                for job_id in dependent_job_ids:
+                    dependent_tasks.extend(job_id_to_tasks[job_id])
+
+            summarize_task = pipeline_utils.add_task(
+                exp,
+                cmd=command,
+                task_name=f'{expname}-{benchmark}-summarize-results',
+                log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
+                task_dependencies=(
+                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
+                installation_command=installation_command,
+            )
+            all_tasks.append(summarize_task)
+            if benchmark_args.benchmark_group:
+                group_metric_files[benchmark_args.benchmark_group].append(metric_file)
+                group_tasks[benchmark_args.benchmark_group].append(summarize_task)
+                # it's always the same for all benchmarks in a group
+                group_module[benchmark_args.benchmark_group] = benchmark_args.score_module
+
+        # if we have any benchmark groups, submitting final aggregation for those
+        # TODO: this should be done by summarize_results directly and we just call it on a group
+        #       otherwise behavior is inconsistent when running summarize_results standalone, which isn't great
+        for group, metric_files in group_metric_files.items():
+            has_tasks = True
+            command = (
+                f"python -m nemo_skills.evaluation.compute_group_score {' '.join(metric_files)} "
+                f"    --score_module {group_module[group]} "
+                f"    --save_metrics_file {output_dir}/eval-results/{group}/metrics.json "
+            )
+            score_task = pipeline_utils.add_task(
+                exp,
+                cmd=command,
+                task_name=f'{expname}-{group}-compute-score',
+                log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                run_after=run_after,
+                reuse_code_exp=reuse_code_exp,
+                reuse_code=reuse_code,
+                task_dependencies=(
+                    group_tasks[group] if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
+                installation_command=installation_command,
+            )
+            all_tasks.append(score_task)
+
+        if has_tasks:
+            pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
+
+    if _reuse_exp:
+        return all_tasks
+    else:
+        if has_tasks:
+            return exp
+        return None
 
 
 if __name__ == "__main__":

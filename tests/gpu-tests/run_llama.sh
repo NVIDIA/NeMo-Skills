@@ -24,13 +24,11 @@ pytest tests/gpu-tests/test_logprobs.py -s -x
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
+pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x
+pytest tests/gpu-tests/test_contamination.py -s -x
 
 # for sft we are using the tiny random model to run much faster
-docker run --rm \
-    -e HF_TOKEN=$HF_TOKEN \
-    -v /tmp:/tmp \
-    -v `pwd`:/nemo_run/code \
-    igitman/nemo-skills-nemo:0.6.0 \
+ns run_cmd --cluster test-local --config_dir tests/gpu-tests --container nemo \
     python /nemo_run/code/tests/gpu-tests/make_tiny_llm.py --model_type $NEMO_SKILLS_TEST_MODEL_TYPE
 
 # converting the model through test

@@ -46,7 +46,7 @@ def test_vllm_generate_greedy():
         f"    --output_dir {output_dir} "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
+        f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
@@ -87,7 +87,7 @@ def test_vllm_generate_greedy_chunked():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_chunks 2 "
-        f"    ++input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
+        f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
         f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
@@ -132,10 +132,9 @@ def test_vllm_generate_seeds():
         f"    --num_random_seeds {num_seeds} "
         f"    --eval_args='++eval_type=math' "
         f"    --with_sandbox "
-        f"    ++dataset=gsm8k "
-        f"    ++split=test "
+        f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
+        f"    ++prompt_config=generic/math "
         f"    ++prompt_template=llama3-instruct "
-        f"    ++split=test "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -153,11 +152,9 @@ def test_vllm_generate_seeds():
         assert os.path.exists(f"{output_dir}/output-rs{seed}.jsonl.done")
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
-        [f"{output_dir}/output-rs*.jsonl"],
-    )[
-        "all"
-    ]["majority@3"]
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/output-rs*.jsonl"])["all"][
+        "majority@3"
+    ]
     # rough check, since exact accuracy varies depending on gpu type
     assert metrics['symbolic_correct'] >= 50
     assert metrics['num_entries'] == 10

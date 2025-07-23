@@ -244,6 +244,17 @@ def sft_openrlhf(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    installation_command: str | None = typer.Option(
+        None,
+        help="An installation command to run before main job. Only affects main task (not server or sandbox). "
+        "You can use an arbitrary command here and we will run it on a single rank for each node. "
+        "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -283,8 +294,8 @@ def sft_openrlhf(
         extra_arguments=extra_arguments,
     )
 
-    with get_exp(expname, cluster_config) as exp:
-        prev_task = None
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
+        prev_task = _task_dependencies
         for job_id in range(num_training_jobs):
             prev_task = add_task(
                 exp,
@@ -303,10 +314,13 @@ def sft_openrlhf(
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
             )
 
-        run_exp(exp, cluster_config, sequential=False)
+        run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

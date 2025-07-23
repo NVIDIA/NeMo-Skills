@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from nemo_skills.evaluation.metrics import ComputeMetrics
 from tests.conftest import docker_rm
 
 
@@ -41,19 +41,17 @@ def test_trtllm_eval():
         f"    --model {model_path} "
         f"    --server_type trtllm "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k:0 "
+        f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
+
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -73,6 +71,7 @@ def test_trtllm_code_execution_eval(server_type):
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for llama to make it follow few-shots
     prompt_template = 'llama3-base' if model_type == 'llama' else 'qwen-instruct'
+    code_tags = 'nemotron' if model_type == 'llama' else 'qwen'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -88,17 +87,15 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_nodes 1 "
         f"    --with_sandbox "
         f"    ++prompt_template={prompt_template} "
+        f"    ++code_tags={code_tags} "
         f"    ++examples_type=gsm8k_text_with_code "
-        f"    ++split=test "
         f"    ++max_samples=20 "
         f"    ++code_execution=True "
     )
     subprocess.run(cmd, shell=True, check=True)
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 40
@@ -134,13 +131,12 @@ def test_hf_eval(server_type, server_args):
         f"    --model {model_path} "
         f"    --server_type {server_type} "
         f"    --output_dir {output_dir} "
-        f"    --benchmarks algebra222:0,human-eval:0,ifeval:0,mmlu:0 "
+        f"    --benchmarks algebra222,human-eval,ifeval,mmlu "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
         f"    --server_args='{server_args}' "
         f"    ++prompt_template=llama3-instruct "
-        f"    ++split=test "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
     )
@@ -153,35 +149,30 @@ def test_hf_eval(server_type, server_args):
         check=True,
     )
 
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='algebra222').compute_metrics(
-        [f"{output_dir}/eval-results/algebra222/output.jsonl"],
-    )["all"]["greedy"]
+    with open(f"{output_dir}/eval-results/algebra222/metrics.json", 'r') as f:
+        metrics = json.load(f)["algebra222"]["greedy"]
 
     assert metrics['symbolic_correct'] >= 75
     assert metrics['num_entries'] == 164
 
-    metrics = ComputeMetrics(benchmark='human-eval').compute_metrics(
-        [f"{output_dir}/eval-results/human-eval/output.jsonl"],
-    )["all"]["greedy"]
+    with open(f"{output_dir}/eval-results/human-eval/metrics.json", 'r') as f:
+        metrics = json.load(f)["human-eval"]["greedy"]
+
     assert metrics['passing_base_tests'] >= 50
     assert metrics['passing_plus_tests'] >= 50
     assert metrics['num_entries'] == 164
 
-    metrics = ComputeMetrics(benchmark='ifeval').compute_metrics(
-        [f"{output_dir}/eval-results/ifeval/output.jsonl"],
-    )[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/ifeval/metrics.json", 'r') as f:
+        metrics = json.load(f)["ifeval"]["greedy"]
+
     assert metrics['prompt_strict_accuracy'] >= 60
     assert metrics['instruction_strict_accuracy'] >= 70
     assert metrics['prompt_loose_accuracy'] >= 60
     assert metrics['instruction_loose_accuracy'] >= 70
     assert metrics['num_prompts'] == 164
 
-    metrics = ComputeMetrics(benchmark='mmlu').compute_metrics([f"{output_dir}/eval-results/mmlu/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/mmlu/metrics.json", 'r') as f:
+        metrics = json.load(f)["mmlu-all"]["greedy"]
     assert metrics['symbolic_correct'] >= 60
     assert metrics['num_entries'] == 164
 
@@ -209,15 +200,13 @@ def test_nemo_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     if model_type == 'llama':
         assert metrics['symbolic_correct'] >= 50
@@ -251,16 +240,14 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++split=test "
         f"    ++max_samples=20 "
         f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics([f"{output_dir}/eval-results/gsm8k/output.jsonl"])[
-        "all"
-    ]["greedy"]
+    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
+        metrics = json.load(f)["gsm8k"]["greedy"]
     # rough check, since exact accuracy varies depending on gpu type
     # TODO: something is broken in megatron inference here as this should be 50!
     assert metrics['symbolic_correct'] >= 20

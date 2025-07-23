@@ -21,8 +21,8 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_free_port,
-    get_generation_command,
     resolve_mount_paths,
+    wait_for_server,
 )
 from nemo_skills.utils import setup_logging
 
@@ -71,11 +71,7 @@ def start_server(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(
-        True,
-        "--not_exclusive",
-        help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
-    ),
+    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
 ):
@@ -106,7 +102,7 @@ def start_server(
         cmd = ""
         if launch_chat_interface:
             server_address = f"localhost:{server_config['server_port']}"
-            cmd = get_generation_command(server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args))
+            cmd = wait_for_server(server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args))
         add_task(
             exp,
             cmd=cmd,

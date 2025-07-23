@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline.cli import eval, generate, sft_nemo_rl, grpo_nemo_rl, train, wrap_arguments
+from nemo_skills.pipeline.cli import eval, generate, grpo_nemo_rl, sft_nemo_rl, train, wrap_arguments
 from tests.conftest import docker_rm
 
 
@@ -57,14 +57,11 @@ def test_sft_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-sft-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(
-            f"++prompt_template={prompt_template} ++split=test ++max_samples=10 ++inference.tokens_to_generate=10"
-        ),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10 ++inference.tokens_to_generate=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/final_hf_model",
@@ -81,6 +78,7 @@ def test_sft_nemo_rl():
     )["all"]["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
+
 
 @pytest.mark.gpu
 def test_grpo_nemo_rl():
@@ -99,6 +97,8 @@ def test_grpo_nemo_rl():
 
     grpo_nemo_rl(
         ctx=wrap_arguments(
+            '++data.prompt.prompt_config=qwen/math-cot '
+            '++data.prompt.prompt_template=qwen-instruct '
             '++grpo.max_num_steps=5 '
             '++grpo.num_prompts_per_step=2 '
             '++policy.max_total_sequence_length=256 '
@@ -118,14 +118,11 @@ def test_grpo_nemo_rl():
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-grpo-data.test",
         disable_wandb=True,
-        cache_dir="/tmp/nemo-skills-tests/nemo-rl-cache",
     )
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(
-            f"++prompt_template={prompt_template} ++split=test ++max_samples=10 ++inference.tokens_to_generate=10"
-        ),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10 ++inference.tokens_to_generate=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/final_hf_model",
@@ -142,7 +139,6 @@ def test_grpo_nemo_rl():
     )["all"]["greedy"]
     # only checking the total, since model is tiny
     assert metrics['num_entries'] == 10
-
 
 
 @pytest.mark.gpu
@@ -186,7 +182,7 @@ def test_sft_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
@@ -196,7 +192,6 @@ def test_sft_aligner():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
-        partition="interactive",
     )
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
@@ -249,7 +244,7 @@ def test_dpo_aligner():
 
     # checking that the final model can be used for evaluation
     eval(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++split=test ++batch_size=8 ++max_samples=10"),
+        ctx=wrap_arguments(f"++prompt_template={prompt_template} ++max_samples=10"),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         model=f"{output_dir}/model-averaged-nemo",
@@ -259,7 +254,6 @@ def test_dpo_aligner():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
-        partition="interactive",
     )
 
     metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
@@ -330,14 +324,10 @@ def test_rm_aligner(test_mode):
     assert os.path.exists(f"{output_dir}/model-averaged-nemo")
 
     generate(
-        ctx=wrap_arguments(
-            f"++batch_size=2 "
-            f"++input_dir={input_dir_greedy} "
-            f"++prompt_config=generic/math-base "
-            f"++prompt_template=llama3-base "
-        ),
+        ctx=wrap_arguments("++prompt_config=generic/math-base ++prompt_template=llama3-base "),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
+        input_file=f"{input_dir_greedy}/output.jsonl",
         output_dir=f"{output_dir}/score",
         server_type="nemo",
         generation_type="reward",
@@ -345,7 +335,6 @@ def test_rm_aligner(test_mode):
         model=f"{output_dir}/model-averaged-nemo",
         server_gpus=1,
         server_nodes=1,
-        partition="interactive",
         num_random_seeds=None,
     )
 
@@ -356,14 +345,10 @@ def test_rm_aligner(test_mode):
 
     if model_type in seeds_supported_models:
         generate(
-            ctx=wrap_arguments(
-                f"++batch_size=2 "
-                f"++input_dir={input_dir_seeds} "
-                f"++prompt_config=generic/math-base "
-                f"++prompt_template=llama3-base "
-            ),
+            ctx=wrap_arguments(f"++prompt_config=generic/math-base " f"++prompt_template=llama3-base "),
             cluster="test-local",
             config_dir=Path(__file__).absolute().parent,
+            input_dir=input_dir_seeds,
             output_dir=f"{output_dir}/score",
             server_type="nemo",
             generation_type="reward",
@@ -371,7 +356,6 @@ def test_rm_aligner(test_mode):
             model=f"{output_dir}/model-averaged-nemo",
             server_gpus=1,
             server_nodes=1,
-            partition="interactive",
             num_random_seeds=3,
         )
 

@@ -39,28 +39,7 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
     megatron = "megatron"
     openai = "openai"
-
-
-def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_parameters=None):
-    if preprocess_cmd:
-        if random_seed is not None:
-            preprocess_cmd = preprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {preprocess_cmd} && {cmd} "
-    if postprocess_cmd:
-        if random_seed is not None:
-            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
-        cmd = f" {cmd} && {postprocess_cmd} "
-    if wandb_parameters:
-        log_wandb_cmd = (
-            f"python -m nemo_skills.inference.log_samples_wandb "
-            f"    {wandb_parameters['samples_file']} "
-            f"    --name={wandb_parameters['name']} "
-            f"    --project={wandb_parameters['project']} "
-        )
-        if wandb_parameters['group'] is not None:
-            log_wandb_cmd += f" --group={wandb_parameters['group']} "
-        cmd = f"{cmd} && {log_wandb_cmd} "
-    return cmd
+    azureopenai = "azureopenai"
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
@@ -82,7 +61,11 @@ def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) 
         raise ValueError(f"Strategy {strategy} not supported.")
 
 
-def get_generation_command(server_address, generation_commands):
+def should_get_random_port(server_gpus, exclusive, server_type):
+    return server_gpus != 8 and not exclusive and server_type != "megatron"
+
+
+def wait_for_server(server_address, generation_commands):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"cd /nemo_run/code && "
@@ -217,7 +200,7 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm;
     # vllm can also pass model name as "model_path" so we need special processing
-    if server_type not in ["vllm", "sglang"]:
+    if server_type not in ["vllm", "sglang", "trtllm-serve"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
@@ -271,7 +254,10 @@ def get_server_command(
             f"    --port {server_port} "
             f"    {server_args} "
         )
-        server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        if num_nodes > 1:
+            server_start_cmd = get_ray_server_cmd(start_vllm_cmd)
+        else:
+            server_start_cmd = start_vllm_cmd
         num_tasks = 1
     elif server_type == 'sglang':
         if num_nodes > 1:
@@ -323,65 +309,3 @@ def get_server_command(
         f"{server_start_cmd} "
     )
     return server_cmd, num_tasks
-
-
-# TODO: Unify the signature of generate.py to use this
-def configure_client(
-    *,  # Force keyword arguments
-    model: str,
-    server_type: str,
-    server_gpus: int,
-    server_nodes: int,
-    server_address: str,
-    server_port: Optional[int],
-    server_args: str,
-    extra_arguments: str,
-    get_random_port: bool,
-):
-    """
-    Utility function to configure a client for the model inference server.
-
-    Args:
-        model: Mounted Path to the model to evaluate.
-        server_type: String name of the server type.
-        server_address: URL of the server hosting the model.
-        server_gpus: Number of GPUs to use for the server.
-        server_nodes: Number of nodes to use for the server.
-        server_port: Port number for the server.
-        server_args: Additional arguments for the server.
-        extra_arguments: Extra arguments to pass to the command.
-        get_random_port: Whether to get a random port for the server.
-
-    Returns:
-        A tuple containing:
-            - server_config: Configuration for the server.
-            - extra_arguments: Updated extra arguments for the command.
-            - server_address: Address of the server.
-            - server_port: Port number for the server.
-    """
-    if server_address is None:  # we need to host the model
-        if server_port is None:  # if not specified, we will use a random port or 5000 depending get_random_port
-            server_port = get_free_port(strategy="random") if not get_random_port else 5000
-        assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
-        server_address = f"localhost:{server_port}"
-
-        server_config = {
-            "model_path": model,
-            "server_type": server_type,
-            "num_gpus": server_gpus,
-            "num_nodes": server_nodes,
-            "server_args": server_args,
-            "server_port": server_port,
-        }
-        extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.host=localhost ++server.port={server_port} "
-        )
-    else:  # model is hosted elsewhere
-        server_config = None
-        extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.base_url={server_address} ++server.model={model} "
-        )
-        server_port = None
-    return server_config, extra_arguments, server_address, server_port
