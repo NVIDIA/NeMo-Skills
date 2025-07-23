@@ -47,9 +47,11 @@ def eval(
     ),
     benchmarks: str = typer.Option(
         ...,
-        help="Need to be in a format <benchmark>:<num samples for majority voting>. "
-        "Use <benchmark>:0 to only run greedy decoding. Has to be comma-separated "
-        "if providing multiple benchmarks. E.g. gsm8k:4,human-eval:0",
+        help="Need to be in a format <benchmark>:<number of repeats (to average scores or compute majority voting)>. "
+        "Using <benchmark> or <benchmark>:0 will default to greedy decoding "
+        "(can override with ++inference.temperature=X), but otherwise is equivalent to "
+        "<benchmark>:1 (which defaults to T=0.7). "
+        "If you want to use multiple benchmarks, separate them with comma. E.g. gsm8k:4,human-eval",
     ),
     expname: str = typer.Option("eval", help="Name of the experiment"),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
