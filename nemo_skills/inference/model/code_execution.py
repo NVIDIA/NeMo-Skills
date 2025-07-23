@@ -84,6 +84,8 @@ class CodeExecutionWrapper:
         else:
             self._can_cancel_generations = False
 
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model.model)
+
     def _is_generation_cancelled(self, gen_id):
         """Check if a generation has been requested to be cancelled."""
         return gen_id in self.cancelled_gen_ids
@@ -210,29 +212,14 @@ class CodeExecutionWrapper:
             else:
                 if request['tokens_to_generate'] <= 0:
                     break
-                # print(f"Request: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                 try:
                     old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
                     MAX_TRIES = 1
                     for i in range(MAX_TRIES):
                         output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
-                        print(f"Request retried: prompt len {len(tokenizer.encode(request['prompt'], add_special_tokens=True))}, requested tokens {request['tokens_to_generate']}")
                         output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
-                        # generated_code = code_begin + output_dict['generation']
-                        # code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, generated_code, session_id)
-                        # remaining_code_executions = None
-                        # code_output = format_code_output(
-                        #     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                        # )
-                        # fails_checks = self.check_for_failures(code_output)
-                        # if not fails_checks:
-                        #     print(f'Successful Generation! on Iteration: {i}')
-                        #     break
-                        # else:
-                        #     print(f"Unexpected token in generated code {i} out of {MAX_TRIES}: \n{code_output}.\nRetrying generation...\n")
-                    #     print(f"We have generated the code {generated_code} with the following output {code_output}")
                     output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
-                    output_dict['num_generated_tokens'] = len(tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
+                    output_dict['num_generated_tokens'] = len(self.tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
                 except BadRequestError as e:
                     print(f"Error generating code: {e}")
                     break
@@ -271,7 +258,6 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                print('Executing code!!!.')
                 code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, output, session_id)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -281,7 +267,7 @@ class CodeExecutionWrapper:
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
                 # TODO: this  is not quite correct as I think max_tokens will be total tokens rather than new tokens
-                request['tokens_to_generate'] = max_new_tokens - len(tokenizer.encode(request['prompt'], add_special_tokens=True))
+                request['tokens_to_generate'] = max_new_tokens - len(self.tokenizer.encode(request['prompt'], add_special_tokens=True))
 
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
