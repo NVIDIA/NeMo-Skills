@@ -391,11 +391,9 @@ def main():
 
     # Main content
     if st.session_state.agent.current_code:
-        # Create tabs for different editing views
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "✏️ Edit",
-            "🤖 AI Assist",
-            "🔧 Auto-Fix",
+        # Create tabs for different editing views - simplified since main functions are in Edit tab
+        tab1, tab2, tab3 = st.tabs([
+            "✏️ Edit & Tools",
             "📜 History",
             "🔍 Analysis"
         ])
@@ -405,10 +403,195 @@ def main():
             st.subheader("📝 Current Theorem")
             st.code(st.session_state.agent.current_code, language="lean")
 
-            # Edit interface
-            display_edit_interface()
+            # All agentic editing functions consolidated here
+            st.subheader("🔧 Agentic Editing Tools")
+
+            # Sub-tabs for all agentic functions within the main tab
+            edit_subtab1, edit_subtab2, edit_subtab3 = st.tabs([
+                "✏️ Edit Clauses", "🏗️ Structure", "📍 Position & AI"
+            ])
+
+            with edit_subtab1:
+                # Main editing interface
+                display_edit_interface()
+
+            with edit_subtab2:
+                st.write("**➕ Add Proof Structure:**")
+
+                # Structure templates (simplified for the edit tab)
+                structure_templates = {
+                    "Basic Have": ["have h1 : P := by sorry"],
+                    "Conjunction": [
+                        "have h1 : P := by sorry",
+                        "have h2 : Q := by sorry",
+                        "exact ⟨h1, h2⟩"
+                    ],
+                    "Implication": [
+                        "have step1 : P → Q := by sorry",
+                        "intro h",
+                        "exact step1 h"
+                    ]
+                }
+
+                selected_template = st.selectbox(
+                    "Structure template:",
+                    ["Custom"] + list(structure_templates.keys()),
+                    key="edit_structure_template"
+                )
+
+                if selected_template == "Custom":
+                    structure_input = st.text_area(
+                        "Proof structure (one line per element):",
+                        height=80,
+                        placeholder="have h1 : P := by sorry",
+                        key="edit_custom_structure"
+                    )
+                    structure_lines = [line.strip() for line in structure_input.split('\n') if line.strip()]
+                else:
+                    structure_lines = structure_templates[selected_template]
+                    st.code('\n'.join(structure_lines), language="lean")
+
+                if st.button("➕ Add Structure", key="edit_add_structure"):
+                    if structure_lines:
+                        with st.spinner("Adding structure..."):
+                            try:
+                                result = st.session_state.agent.add_proof_structure(structure_lines)
+
+                                # Record in history
+                                st.session_state.edit_history.append({
+                                    'clause_id': 'proof_structure',
+                                    'old_content': 'N/A',
+                                    'new_content': '\n'.join(structure_lines),
+                                    'timestamp': time.time(),
+                                    'success': result['compilation_result']['success'],
+                                    'structure_add': True
+                                })
+
+                                if result['compilation_result']['success']:
+                                    st.success("✅ Structure added!")
+                                else:
+                                    st.error("❌ Structure added but compilation failed")
+
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"❌ Failed: {e}")
+                    else:
+                        st.error("Please enter structure lines.")
+
+            with edit_subtab3:
+                # Position-aware tools
+                st.write("**📍 Position-Aware Tools:**")
+
+                max_lines = len(st.session_state.agent.current_code.split('\n'))
+                line_number = st.number_input(
+                    "Line number:",
+                    min_value=1,
+                    max_value=max_lines,
+                    value=1,
+                    key="edit_position_line"
+                )
+
+                pos_col1, pos_col2 = st.columns(2)
+
+                with pos_col1:
+                    if st.button("🎯 Get Goal", key="edit_get_goal"):
+                        try:
+                            goal = st.session_state.agent.get_goal_at_position(line_number - 1, 0)
+                            if goal:
+                                st.success(f"**Goal at line {line_number}:**")
+                                st.code(goal.goal_text, language="lean")
+                            else:
+                                st.info(f"No goal at line {line_number}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+                with pos_col2:
+                    if st.button("💬 Get Messages", key="edit_get_messages"):
+                        try:
+                            messages = st.session_state.agent.get_messages_at_position(line_number - 1, 0)
+                            if messages:
+                                st.success(f"**Messages at line {line_number}:**")
+                                for msg in messages:
+                                    if msg.severity == 'error':
+                                        st.error(f"❌ {msg.message}")
+                                    elif msg.severity == 'warning':
+                                        st.warning(f"⚠️ {msg.message}")
+                                    else:
+                                        st.info(f"ℹ️ {msg.message}")
+                            else:
+                                st.info(f"No messages at line {line_number}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+                st.divider()
+
+                # AI Suggestions & Auto-fix
+                st.write("**🤖 AI Suggestions:**")
+                suggestions = st.session_state.agent.suggest_next_actions()
+
+                for i, suggestion in enumerate(suggestions, 1):
+                    st.write(f"{i}. {suggestion}")
+
+                st.divider()
+                st.write("**🔧 Auto-Fix:**")
+
+                # Auto-fix functionality
+                fixes = []
+                for clause_id, clause in st.session_state.agent.editable_clauses.items():
+                    if clause.clause_type == 'sorry':
+                        if 'left' in clause_id or 'h1' in clause_id:
+                            fixes.append({
+                                'clause_id': clause_id,
+                                'suggestion': 'intro h; exact h.left',
+                                'reason': 'Left projection'
+                            })
+                        elif 'right' in clause_id or 'h2' in clause_id:
+                            fixes.append({
+                                'clause_id': clause_id,
+                                'suggestion': 'intro h; exact h.right',
+                                'reason': 'Right projection'
+                            })
+
+                if not fixes:
+                    st.info("No obvious auto-fixes available.")
+                else:
+                    for i, fix in enumerate(fixes):
+                        fix_col1, fix_col2, fix_col3 = st.columns([2, 2, 1])
+
+                        with fix_col1:
+                            st.write(f"**{fix['clause_id']}**")
+                            st.caption(fix['reason'])
+
+                        with fix_col2:
+                            st.code(fix['suggestion'], language="lean")
+
+                        with fix_col3:
+                            if st.button("Apply", key=f"edit_autofix_{i}"):
+                                with st.spinner("Applying..."):
+                                    edit_result = st.session_state.agent.edit_clause(
+                                        fix['clause_id'],
+                                        fix['suggestion']
+                                    )
+
+                                    st.session_state.edit_history.append({
+                                        'clause_id': fix['clause_id'],
+                                        'old_content': 'sorry',
+                                        'new_content': fix['suggestion'],
+                                        'timestamp': time.time(),
+                                        'success': edit_result['compilation_result']['success'],
+                                        'auto_fix': True
+                                    })
+
+                                if edit_result['compilation_result']['success']:
+                                    st.success(f"✅ Fixed {fix['clause_id']}")
+                                else:
+                                    st.error(f"❌ Fix failed for {fix['clause_id']}")
+
+                                st.rerun()
 
             # Real-time compilation feedback
+            st.divider()
             st.subheader("📊 Compilation Feedback")
             messages = st.session_state.agent.current_messages
 
@@ -424,15 +607,9 @@ def main():
                 st.success("✅ No compilation messages")
 
         with tab2:
-            display_ai_suggestions()
-
-        with tab3:
-            display_auto_fix()
-
-        with tab4:
             display_edit_history()
 
-        with tab5:
+        with tab3:
             display_proof_analysis()
 
             # Show editable clauses

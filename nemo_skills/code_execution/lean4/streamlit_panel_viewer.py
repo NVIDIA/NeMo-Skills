@@ -280,12 +280,13 @@ def main():
         st.divider()
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📊 Overview",
             "💬 Messages",
             "🎯 Goals",
             "✏️ Clauses",
-            "📝 Code"
+            "📝 Code",
+            "🔧 Tools"
         ])
 
         with tab1:
@@ -332,6 +333,118 @@ def main():
 
         with tab5:
             display_code_with_annotations()
+
+        with tab6:
+            st.subheader("🔧 Agentic Tools")
+            st.write("*Additional tools for interactive proof development*")
+
+            # Split into columns for different tool categories
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write("**🏗️ Proof Structure**")
+
+                # Proof structure suggestions
+                try:
+                    suggestions = st.session_state.agent.get_proof_structure_suggestions()
+                    with st.expander("📋 Proof Patterns", expanded=False):
+                        for suggestion in suggestions:
+                            if isinstance(suggestion, list):
+                                st.code('\n'.join(suggestion), language="lean")
+                            else:
+                                st.write(suggestion)
+                except AttributeError:
+                    st.info("Pattern suggestions not available.")
+
+                # Add structure interface
+                st.write("**➕ Add Structure:**")
+                structure_options = {
+                    "Basic Have": ["have h1 : P := by sorry"],
+                    "Conjunction": ["have h1 : P := by sorry", "have h2 : Q := by sorry", "exact ⟨h1, h2⟩"],
+                    "Custom": []
+                }
+
+                selected_structure = st.selectbox(
+                    "Choose structure:",
+                    list(structure_options.keys()),
+                    key="panel_structure"
+                )
+
+                if selected_structure == "Custom":
+                    custom_structure = st.text_area(
+                        "Enter structure lines:",
+                        height=60,
+                        key="panel_custom_structure"
+                    )
+                    structure_lines = [line.strip() for line in custom_structure.split('\n') if line.strip()]
+                else:
+                    structure_lines = structure_options[selected_structure]
+                    if structure_lines:
+                        st.code('\n'.join(structure_lines), language="lean")
+
+                if st.button("➕ Add to Proof", key="panel_add_structure"):
+                    if structure_lines:
+                        with st.spinner("Adding structure..."):
+                            try:
+                                result = st.session_state.agent.add_proof_structure(structure_lines)
+                                if result['compilation_result']['success']:
+                                    st.success("✅ Structure added!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Structure added but compilation failed")
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+
+            with col2:
+                st.write("**📍 Position Tools**")
+
+                # Position-aware queries
+                max_lines = len(st.session_state.agent.current_code.split('\n')) if st.session_state.agent.current_code else 1
+                line_num = st.number_input(
+                    "Line number:",
+                    min_value=1,
+                    max_value=max_lines,
+                    value=1,
+                    key="panel_line_num"
+                )
+
+                query_col1, query_col2 = st.columns(2)
+
+                with query_col1:
+                    if st.button("🎯 Get Goal", key="panel_get_goal"):
+                        try:
+                            goal = st.session_state.agent.get_goal_at_position(line_num - 1, 0)
+                            if goal:
+                                st.success(f"**Goal at line {line_num}:**")
+                                st.code(goal.goal_text, language="lean")
+                            else:
+                                st.info(f"No goal at line {line_num}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+                with query_col2:
+                    if st.button("💬 Get Messages", key="panel_get_messages"):
+                        try:
+                            messages = st.session_state.agent.get_messages_at_position(line_num - 1, 0)
+                            if messages:
+                                st.success(f"**Messages at line {line_num}:**")
+                                for msg in messages:
+                                    if msg.severity == 'error':
+                                        st.error(f"❌ {msg.message}")
+                                    elif msg.severity == 'warning':
+                                        st.warning(f"⚠️ {msg.message}")
+                                    else:
+                                        st.info(f"ℹ️ {msg.message}")
+                            else:
+                                st.info(f"No messages at line {line_num}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+                # AI suggestions (enhanced)
+                st.write("**🤖 AI Suggestions:**")
+                suggestions = st.session_state.agent.suggest_next_actions()
+                for i, suggestion in enumerate(suggestions, 1):
+                    st.write(f"{i}. {suggestion}")
 
     else:
         # Welcome screen
