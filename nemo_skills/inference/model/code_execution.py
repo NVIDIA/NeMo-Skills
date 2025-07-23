@@ -94,7 +94,6 @@ class CodeExecutionWrapper:
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
-
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
 
@@ -166,7 +165,7 @@ class CodeExecutionWrapper:
             if gen_id is not None and self._is_generation_cancelled(gen_id):
                 break
 
-            if False: #self._can_cancel_generations:
+            if self._can_cancel_generations:
                 # Wait for generation to finish while periodically checking for cancellation
                 # TODO: clean up the interface to always use public method, not just in this case
                 request["prompts"] = [request.pop("prompt")]
@@ -187,13 +186,6 @@ class CodeExecutionWrapper:
                 request["prompt"] = request.pop("prompts")[0]
             else:
                 output_dict = self.model._generate_single(**request)
-                # if request['tokens_to_generate'] <= 0:
-                #     break
-                # old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
-                # output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
-                # output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
-                # output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
-                # output_dict['num_generated_tokens'] = len(self.tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
@@ -234,7 +226,6 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
-                # TODO: this  is not quite correct as I think max_tokens will be total tokens rather than new tokens
                 request['tokens_to_generate'] = max_new_tokens - len(self.tokenizer.encode(request['prompt'], add_special_tokens=True))
 
                 if is_openai_format:
@@ -252,7 +243,6 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt):]
-
         return {
             'generation': generation,
             'code_rounds_executed': code_rounds_executed,
