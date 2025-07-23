@@ -186,22 +186,14 @@ class CodeExecutionWrapper:
                     break
                 request["prompt"] = request.pop("prompts")[0]
             else:
-                if request['tokens_to_generate'] <= 0:
-                    break
-                try:
-                    old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
-                    MAX_TRIES = 1
-                    for i in range(MAX_TRIES):
-                        output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
-                        output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
-                    output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
-                    output_dict['num_generated_tokens'] = len(self.tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
-                except BadRequestError as e:
-                    print(f"Error generating code: {e}")
-                    break
-
-                # print('Okay now doing ground up generation...')
-                # output_dict = self.model._generate_single(**request)
+                output_dict = self.model._generate_single(**request)
+                # if request['tokens_to_generate'] <= 0:
+                #     break
+                # old_output_dict = output_dict = self.model._generate_single(**{**request, 'stop_phrases': stop_phrases + [code_begin]})
+                # output, num_generated_tokens = old_output_dict['generation'], old_output_dict.get('num_generated_tokens', 0)
+                # output_dict = self.model._generate_single(**{**request, 'prompt': request['prompt'] + output, 'tokens_to_generate': request['tokens_to_generate'] - num_generated_tokens})
+                # output_dict['generation'] = old_output_dict['generation'] + output_dict['generation']
+                # output_dict['num_generated_tokens'] = len(self.tokenizer.encode(output_dict['generation'], add_special_tokens=False)) #num_generated_tokens + old_output_dict.get('num_generated_tokens', 0)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
