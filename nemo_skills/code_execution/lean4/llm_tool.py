@@ -130,6 +130,10 @@ class LeanLLMTool:
     def execute_lean_code(self, code: str, mode: str = "proof") -> ToolResult:
         """Execute Lean 4 code such as theorems, definitions, or commands."""
         try:
+            # Log session info for the first call in this thread (for debugging isolation)
+            if len(self.session_history) == 0:
+                self.log_session_start(f"execute_lean_code_first_call")
+
             if mode == "command":
                 result = self.prover.run_command(code)
             else:
@@ -141,7 +145,8 @@ class LeanLLMTool:
                 "code": code,
                 "mode": mode,
                 "result": self._safe_result_to_dict(result),
-                "timestamp": self._get_timestamp()
+                "timestamp": self._get_timestamp(),
+                "thread_info": self.get_thread_info()  # Add thread info for debugging
             })
 
             return ToolResult(
@@ -153,7 +158,8 @@ class LeanLLMTool:
                     "has_sorry": result.has_sorry,
                     "response": result.response,
                     "error": result.error,
-                    "proof_state": result.proof_state
+                    "proof_state": result.proof_state,
+                    "thread_debug_info": self.get_thread_info()  # Include thread info in result
                 },
                 message=f"Execution {'successful' if result.success else 'failed'}: {result.response[:100]}..."
             )
@@ -184,7 +190,7 @@ class LeanLLMTool:
                 success=result.get("success", True),
                 function_name="start_interactive_theorem",
                 result=result,
-                message=f"Interactive theorem loaded with {len(result.get('editable_clauses', {}))} editable clauses"
+                message=f"Interactive theorem loaded with {len(result.get('editable_clauses', {}))} editable clauses. Proof complete: {result.get('proof_complete', False)}"
             )
 
         except Exception as e:
@@ -218,11 +224,24 @@ class LeanLLMTool:
                 "timestamp": self._get_timestamp()
             })
 
+            # Extract detailed information from compilation result
+            compilation_result = result.get("compilation_result", {})
+            has_errors = compilation_result.get("has_errors", False)
+            proof_complete = compilation_result.get("proof_complete", False)
+
+            # Provide detailed feedback
+            if has_errors:
+                status_msg = f"Clause '{clause_id}' edited but has compilation errors"
+            elif proof_complete:
+                status_msg = f"Clause '{clause_id}' edited successfully. Proof is now complete!"
+            else:
+                status_msg = f"Clause '{clause_id}' edited successfully but proof still incomplete"
+
             return ToolResult(
-                success=result.get("success", True),
+                success=result.get("edit_successful", True),
                 function_name="edit_proof_clause",
                 result=result,
-                message=f"Clause '{clause_id}' edited successfully" if result.get("success") else f"Failed to edit clause '{clause_id}'"
+                message=status_msg
             )
 
         except Exception as e:
@@ -255,11 +274,24 @@ class LeanLLMTool:
                 "timestamp": self._get_timestamp()
             })
 
+            # Extract detailed information from compilation result
+            compilation_result = result.get("compilation_result", {})
+            has_errors = compilation_result.get("has_errors", False)
+            proof_complete = compilation_result.get("proof_complete", False)
+
+            # Provide detailed feedback
+            if has_errors:
+                status_msg = f"Added {len(structure_lines)} structure lines but introduced compilation errors"
+            elif proof_complete:
+                status_msg = f"Added {len(structure_lines)} structure lines. Proof is now complete!"
+            else:
+                status_msg = f"Added {len(structure_lines)} structure lines to proof (still incomplete)"
+
             return ToolResult(
-                success=result.get("success", True),
+                success=result.get("edit_successful", True),
                 function_name="add_proof_structure",
                 result=result,
-                message=f"Added {len(structure_lines)} structure lines to proof"
+                message=status_msg
             )
 
         except Exception as e:
@@ -522,6 +554,38 @@ class LeanLLMTool:
             "agent_thread_info": self.agent.get_thread_info(),
             "session_active": self.current_session is not None,
             "history_length": len(self.session_history)
+        }
+
+    def log_session_start(self, problem_id: str = "unknown"):
+        """Log when a new session starts for debugging isolation."""
+        import logging
+        thread_info = self.get_thread_info()
+        LOG = logging.getLogger(__name__)
+        LOG.info(
+            f"SESSION_START: problem_id={problem_id}, "
+            f"thread_id={thread_info['thread_id']}, "
+            f"session_id={thread_info['session_id']}, "
+            f"instance_id={thread_info['instance_id']}"
+        )
+
+    def verify_isolation_marker(self, marker_name: str) -> Dict[str, Any]:
+        """Add a marker to verify this thread's isolation from others."""
+        # Ensure session state is initialized
+        session_state = self._get_session_state()
+
+        if not hasattr(session_state, 'isolation_markers'):
+            session_state.isolation_markers = {}
+
+        import time
+        timestamp = time.time()
+        session_state.isolation_markers[marker_name] = timestamp
+
+        return {
+            "thread_id": session_state.thread_id,
+            "session_id": session_state.session_id,
+            "marker_name": marker_name,
+            "timestamp": timestamp,
+            "all_markers": dict(session_state.isolation_markers)
         }
 
 
