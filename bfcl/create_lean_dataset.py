@@ -11,107 +11,7 @@ import os
 from typing import Dict, Any, List
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
-
-# Function schemas for Lean 4 operations
-LEAN_FUNCTIONS = [
-    {
-        "name": "execute_lean_code",
-        "description": "Execute Lean 4 code such as theorems, definitions, or commands. This is the main function for proving theorems and running Lean code.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "description": "The Lean 4 code to execute. This can be a theorem to prove, a definition, or any other Lean command."
-                },
-                "mode": {
-                    "type": "string",
-                    "enum": ["proof", "command"],
-                    "description": "Execution mode: 'proof' for theorems and proofs, 'command' for other Lean commands like #check or #eval",
-                    "default": "proof"
-                }
-            },
-            "required": ["code"]
-        }
-    },
-    {
-        "name": "start_interactive_theorem",
-        "description": "Load a theorem for interactive development. This allows you to work on a theorem step by step, editing specific parts.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "theorem_code": {
-                    "type": "string",
-                    "description": "The complete theorem code to load for interactive editing. Should include theorem declaration and initial proof structure."
-                }
-            },
-            "required": ["theorem_code"]
-        }
-    },
-    {
-        "name": "edit_proof_clause",
-        "description": "Edit a specific clause or part of an interactive theorem proof. Use this to refine specific parts of a proof.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "clause_id": {
-                    "type": "string",
-                    "description": "ID of the clause to edit (e.g., 'sorry_0', 'have_h1', 'main_proof_0')"
-                },
-                "new_content": {
-                    "type": "string",
-                    "description": "New content to replace the clause with"
-                }
-            },
-            "required": ["clause_id", "new_content"]
-        }
-    },
-    {
-        "name": "add_proof_structure",
-        "description": "Add new proof structure lines to an interactive theorem. Use this to add 'have' statements or other proof structure.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "structure_lines": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of proof structure lines to add (e.g., ['have h1 : P := by sorry', 'exact h1'])"
-                }
-            },
-            "required": ["structure_lines"]
-        }
-    },
-    {
-        "name": "validate_lean",
-        "description": "Run Lean validation commands like #check, #eval, or #print to verify types, evaluate expressions, or inspect definitions.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": "Validation command to run (e.g., '#check Nat.add_comm', '#eval 2 + 2', '#print List')"
-                }
-            },
-            "required": ["command"]
-        }
-    },
-    {
-        "name": "get_proof_state",
-        "description": "Get the current state of an interactive proof session including code, messages, goals, and available clauses to edit.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "info_type": {
-                    "type": "string",
-                    "enum": ["full_panel", "current_code", "messages", "editable_clauses", "suggestions"],
-                    "description": "Type of information to retrieve about the current proof state",
-                    "default": "full_panel"
-                }
-            },
-            "required": []
-        }
-    }
-]
+from nemo_skills.code_execution.lean4 import create_interactive_tool
 
 
 def create_lean_theorem_problem(
@@ -128,13 +28,16 @@ def create_lean_theorem_problem(
         theorem_statement: The theorem to prove in Lean syntax
         user_query: Natural language description of what to prove
         expected_approach: Optional hint about expected approach
-        single_turn: Whether this is a single-turn or multi-turn problem
 
     Returns:
         BFCL-compatible problem dictionary
     """
-    # Process functions for BFCL
-    functions = func_doc_language_specific_pre_processing(LEAN_FUNCTIONS, "python")
+    # Create the interactive Lean tool and get BFCL-compatible functions
+    lean_tool = create_interactive_tool(mathlib_enabled=True)
+    functions = lean_tool.get_bfcl_functions()
+
+    # Process functions for BFCL (add language hints, format for OpenAI)
+    functions = func_doc_language_specific_pre_processing(functions, "python")
     tools = convert_to_tool(functions)
 
     # Create the problem structure
@@ -150,15 +53,14 @@ def create_lean_theorem_problem(
                     )
                 }
             ],
-            # # Turn 2: Work on the proof
+            # Turn 2: Work on the proof
             [
                 {
                     "role": "user",
-                    "content":
-                        (
-                            "Now work on proving this theorem step by step. Add the necessary proof structure and fill in the details. "
-                            "At the end, return the complete proof following a **Final Answer** tag."
-                        ),
+                    "content": (
+                        "Now work on proving this theorem step by step. "
+                        "At the end, return the complete proof following a **Final Answer** tag. Make sure to check the whole proof before finalizing it."
+                    ),
                 }
             ],
         ],

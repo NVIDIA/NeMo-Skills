@@ -15,6 +15,12 @@ This submodule provides comprehensive Lean 4 theorem proving capabilities:
    - Targeted updates with immediate validation
    - Interactive development workflow for LLM agents
 
+3. LeanLLMTool: Comprehensive tool for LLM integration
+   - Single tool interface with multiple operation modes
+   - Dynamic capability configuration
+   - BFCL-compatible function generation
+   - Thread-safe for concurrent usage
+
 Usage:
     from nemo_skills.code_execution.lean4 import LeanProver, InteractiveLeanAgent
 
@@ -26,6 +32,11 @@ Usage:
     agent = InteractiveLeanAgent(mathlib_enabled=True)
     result = agent.load_theorem("theorem demo : True := by sorry")
     agent.edit_clause("sorry_0", "trivial")
+
+    # BFCL integration
+    from nemo_skills.code_execution.lean4 import create_interactive_tool
+    lean_tool = create_interactive_tool(mathlib_enabled=True)
+    bfcl_functions = lean_tool.get_bfcl_functions()  # For BFCL evaluation
 """
 
 from .prover import (
@@ -47,7 +58,6 @@ from .llm_tool import (
     LeanLLMTool,
     ToolCapabilities,
     ToolResult,
-    OperationType,
     create_basic_tool,
     create_interactive_tool,
     create_validation_tool,
@@ -72,7 +82,6 @@ __all__ = [
     'LeanLLMTool',
     'ToolCapabilities',
     'ToolResult',
-    'OperationType',
     'create_basic_tool',
     'create_interactive_tool',
     'create_validation_tool',
