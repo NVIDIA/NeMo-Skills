@@ -17,6 +17,7 @@ import copy
 import logging
 import time
 import uuid
+import re
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from openai import BadRequestError
@@ -46,13 +47,7 @@ class CodeExecutionConfig:
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
-    normalizer_host: str = 'localhost'
-    normalizer_port: str = '5000'
-    normalizer_server: bool = False
 
-def extract_code_from_normalizer(response) -> str:
-    raise ValueError(f'Response from normalizer! {response}')
-    # return text
 
 def extract_last_incomplete_theorem(md_text: str) -> str | None:
     # Find all ```lean4 code blocks
@@ -89,20 +84,11 @@ class CodeExecutionWrapper:
         else:
             self._can_cancel_generations = False
 
-        from nemo_skills.inference.server.model import TRTLLMModel
-        self.normalizer_model = TRTLLMModel(
-            host=config.normalizer_host,
-            port=config.normalizer_port,
-        )
-
     def _is_generation_cancelled(self, gen_id):
         """Check if a generation has been requested to be cancelled."""
         return gen_id in self.cancelled_gen_ids
 
     def check_for_failures(self, code_output: str) -> bool:
-        # filters =[
-        #     lambda x: re.search(r'unexpected token', x, re.IGNORECASE),
-        # ]
         filters = []
         return any(f(code_output) for f in filters)
 
@@ -337,34 +323,7 @@ class CodeExecutionWrapper:
                     "",
                 ])
         code_block = extract_code_to_execute(output, code_begin, code_end)
-        if self.config.normalizer_server:
-            data = {
-                "formal_statement": extract_last_incomplete_theorem(input_prompt),
-                "header": header,
-                "code": code_block,
-            }
-            print('Filling prompt')
-            prompt = get_prompt(prompt_config='/nemo_run/code/lean-tir/prompts/code-execution-normalization-v01', prompt_template='qwen-instruct-lean4')
-            prompt_text = prompt.fill(data)
-            print(prompt_text)
-
-            request = {
-                "prompt": prompt_text,
-                "tokens_to_generate": 7 * 1024,
-                "temperature": 0.0,
-                "top_k": 0,
-                "top_p": 0.95,
-                "min_p": 0.0,
-                "random_seed": 0,
-                "repetition_penalty": 1.0,
-                "stop_phrases": prompt.stop_phrases,
-                "timeout": 300,
-            }
-            session_id = None
-            normalized_response = self.normalizer_model._generate_single(**request)
-            extracted_code = extract_code_from_normalizer(normalized_response)
-        else:
-            extracted_code = f'{header}{code_block}'
+        extracted_code = f'{header}{code_block}'
         execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extracted_code,
                     language=self.config.code_execution_language,
