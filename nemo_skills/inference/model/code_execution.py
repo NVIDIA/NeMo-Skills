@@ -31,6 +31,7 @@ from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
 from .utils import trim_after_stop_phrases
+from transformers import AutoTokenizer
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -44,24 +45,6 @@ class CodeExecutionConfig:
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
-
-
-def extract_last_incomplete_theorem(md_text: str) -> str | None:
-    # Find all ```lean4 code blocks
-    code_blocks = re.findall(r"```lean4\s+(.*?)```", md_text, flags=re.DOTALL)
-
-    last_match = None
-    for block in code_blocks:
-        # Match a theorem ending with "by" on its own line (possibly with a comment)
-        theorems = re.findall(
-            r"(theorem\s+\w+\s*.*?:=.*?by(?:\s*--.*)?\s*$)",
-            block,
-            flags=re.DOTALL | re.MULTILINE
-        )
-        if theorems:
-            last_match = theorems[-1]
-
-    return last_match
 
 
 class CodeExecutionWrapper:
@@ -86,10 +69,6 @@ class CodeExecutionWrapper:
     def _is_generation_cancelled(self, gen_id):
         """Check if a generation has been requested to be cancelled."""
         return gen_id in self.cancelled_gen_ids
-
-    def check_for_failures(self, code_output: str) -> bool:
-        filters = []
-        return any(f(code_output) for f in filters)
 
     def _generate_single(
         self,
@@ -293,18 +272,21 @@ class CodeExecutionWrapper:
 
     def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
-        header = '\n'.join([
-                    "import Aesop",
-                    "import Mathlib",
-                    "",
-                    "set_option maxHeartbeats 0",
-                    "",
-                    "open BigOperators",
-                    "open Real",
-                    "open Nat",
-                    "open Topology",
-                    "",
-                ])
+        if self.config.code_execution_language == 'lean4':
+            header = '\n'.join([
+                        "import Aesop",
+                        "import Mathlib",
+                        "",
+                        "set_option maxHeartbeats 0",
+                        "",
+                        "open BigOperators",
+                        "open Real",
+                        "open Nat",
+                        "open Topology",
+                        "",
+                    ])
+        else:
+            header = ""
         code_block = extract_code_to_execute(output, code_begin, code_end)
         extracted_code = f'{header}{code_block}'
         execution_dict, session_id = self.sandbox.execute_code(
