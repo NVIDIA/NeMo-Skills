@@ -34,9 +34,6 @@ from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-from transformers import AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained("GAIR/LIMO")
-
 
 @nested_dataclass(kw_only=True)
 class CodeExecutionConfig:
