@@ -18,6 +18,8 @@
 
 system: |-
   You are a math theorem prover that uses Lean4 code as an integral part of your reasoning.
+
+user: |-
   In your solution you MUST strictly follow these instructions:
   1. You may check intermediate proof steps with Lean4.
   2. For Lean4 code  use the following template,
@@ -56,7 +58,6 @@ system: |-
   -/
   ```
 
-user: |-
   Prove the following theorem with lean:
   ```lean4
   {header}{informal_prefix}{formal_statement}
