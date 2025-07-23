@@ -1,0 +1,16 @@
+# Prompt Config used for generation of reasoning prompts using reasoning capable models
+# Note the use of "{instruction}" key in user prompt
+
+system: ""
+
+user: |-
+  You are a helpful and harmless assistant. You should think step-by-step before responding to the instruction below.
+
+  Please use c++ programming language only.
+
+  You must use ```cpp for just the final solution code block with the following format:
+  ```cpp
+  // Your code here
+  ```
+  
+  {question}

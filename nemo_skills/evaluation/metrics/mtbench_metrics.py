@@ -17,16 +17,13 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from nemo_skills.evaluation.constants import JUDGE_MODEL, JUDGE_SERVER
-from nemo_skills.evaluation.metrics.base import BaseMetrics
-from nemo_skills.inference.server.model import get_model
+from nemo_skills.evaluation.evaluator.arena import JUDGE_MODEL, JUDGE_SERVER
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
+from nemo_skills.inference.model import get_model
 from nemo_skills.utils import unroll_files
 
 
 class MtBenchMetrics(BaseMetrics):
-    def __init__(self):
-        self.reset()
-
     def setup(self, input_files):
         # checking if judgements are ready and fusing them with predictions
         # might get permission errors when running locally, since original file
@@ -57,20 +54,12 @@ class MtBenchMetrics(BaseMetrics):
                 Path(jsonl_file + '-batch-request-id').unlink()
 
     def update(self, predictions):
-        """Updating the evaluation results with the current element.
+        super().update(predictions)
 
-        Args:
-            predictions (list[dict]): aggregated predictions across all generations.
-                The content of the file is benchmark specific.
-        """
-        # this shouldn't do any heavy calculation, but just read the metric from existing json entry
-        # all the heavy lifting should be done in the evaluation script
-        self.total += 1
-
+        self.agg_mode = f"pass@{len(predictions)}"
         if len(predictions) > 1:
             # TODO: might all have missing judgement?
             # If multiple predictions, set it to "best" aggregation mode
-            self.agg_mode = "best"
 
             rating1 = max(
                 int(re.search(r'Rating: \[\[(\d+)\]\]', elem['judgement-turn1']).group(1))
@@ -85,9 +74,6 @@ class MtBenchMetrics(BaseMetrics):
             category = predictions[0]['category']
             self.scores[category].append((rating1, rating2))
         else:
-            # If single prediction, set it to greedy aggregation mode
-            self.agg_mode = "greedy"
-
             rating1_match = re.search(r'Rating: \[\[(\d+)\]\]', predictions[0]['judgement-turn1'])
             rating1 = int(rating1_match.group(1)) if rating1_match else None
             rating2_match = re.search(r'Rating: \[\[(\d+)\]\]', predictions[0]['judgement-turn2'])
@@ -95,9 +81,17 @@ class MtBenchMetrics(BaseMetrics):
             category = predictions[0]['category']
             self.scores[category].append((rating1, rating2))
 
+    @classmethod
+    def get_incorrect_sample(cls, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction['judgement-turn1'] = 'Rating: [[1]]'
+        prediction['judgement-turn2'] = 'Rating: [[1]]'
+        return prediction
+
     def get_metrics(self):
         metrics = {'num_entries': self.total}
-
+        if self.avg_tokens > 0:
+            metrics['avg_tokens'] = int(self.avg_tokens / self.total)
         # Calculate average scores across all categories for each turn
         all_ratings1 = [r1 for scores in self.scores.values() for r1, _ in scores if r1 is not None]
         all_ratings2 = [r2 for scores in self.scores.values() for _, r2 in scores if r2 is not None]
@@ -124,14 +118,22 @@ class MtBenchMetrics(BaseMetrics):
             metrics[f'{category}_turn2'] = sum(ratings2) / len(ratings2)
         metrics["missing_rating_turn1"] = none_count_turn1
         metrics["missing_rating_turn2"] = none_count_turn2
-        print("Please see metrics.json for MT-bench per-category breakdown")
-        return {self.agg_mode: metrics}
+        metrics_dict = {self.agg_mode: metrics}
+        self.update_common_metrics(metrics_dict[self.agg_mode])
+        return metrics_dict
 
     def reset(self):
+        super().reset()
         self.scores = defaultdict(list)
-        self.total = 0
-        self.agg_mode = "greedy"
+        self.agg_mode = "pass@1"
 
-    def max_metrics_to_print(self):
+    def metrics_to_print(self):
         """We are only printing the averages, but all other metrics can still be found in metrics.json"""
-        return 4
+        return {
+            'num_entries': as_int,
+            'avg_tokens': as_int,
+            'gen_seconds': as_int,
+            'average': as_float,
+            'average_turn1': as_float,
+            'average_turn2': as_float,
+        }

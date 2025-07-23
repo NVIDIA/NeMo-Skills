@@ -17,5 +17,6 @@
 PROMPT_CONFIG = 'lean4/formal-proof'
 DATASET_GROUP = 'lean4'
 METRICS_TYPE = "lean4-proof"
-DEFAULT_EVAL_ARGS = "++eval_type=lean4-proof"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=lean4-proof"
+GENERATION_ARGS = ""
+REQUIRES_SANDBOX = True

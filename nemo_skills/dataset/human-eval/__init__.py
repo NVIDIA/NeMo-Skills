@@ -16,5 +16,5 @@
 PROMPT_CONFIG = 'generic/codegen'
 DATASET_GROUP = 'code'
 METRICS_TYPE = "code"
-DEFAULT_EVAL_ARGS = "++eval_type=code ++eval_config.dataset=humaneval"
-DEFAULT_GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=evalplus ++eval_config.dataset=humaneval"
+GENERATION_ARGS = ""

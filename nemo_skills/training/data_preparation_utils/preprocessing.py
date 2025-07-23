@@ -64,7 +64,7 @@ class ReadData(BaseProcessor):
             self.keys_to_keep.add(self.input_key)
             if self.output_key is not None:
                 self.keys_to_keep.add(self.output_key)
-                self.keys_to_keep.add("is_correct")
+                self.keys_to_keep.add("symbolic_correct")
                 self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
@@ -121,14 +121,14 @@ class ReadData(BaseProcessor):
 
             if self.output_key is not None and not self.add_unlabeled:
                 if not self.use_judgement:
-                    if "is_correct" not in line_dict:
-                        LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
+                    if "symbolic_correct" not in line_dict:
+                        LOG.warning("Found incomplete generations (symbolic_correct field is missing) - skipping")
                         continue
 
-                    if not self.add_correct and line_dict["is_correct"]:
+                    if not self.add_correct and line_dict["symbolic_correct"]:
                         continue
 
-                    if not self.add_incorrect and not line_dict["is_correct"]:
+                    if not self.add_incorrect and not line_dict["symbolic_correct"]:
                         continue
                 else:
                     if "judgement" not in line_dict:
@@ -310,6 +310,7 @@ class WriteFinalSftManifest(BaseProcessor):
         self,
         prompt_config: str,
         prompt_template: str,
+        code_tags: str,
         chat_format: str | None = None,  # nemotron/llama/None
         input_key: str = "input",
         output_key: str = "output",
@@ -328,14 +329,14 @@ class WriteFinalSftManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template)
+            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
         else:
             if prompt_template:
                 LOG.warning(
                     "Prompt template is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template)
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template, code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
@@ -367,7 +368,10 @@ class WriteFinalSftManifest(BaseProcessor):
                     generation = elem.pop(self.output_key)
                     if self.prompt:
                         output_sample["input"] = self.prompt.fill(input_dict=elem)
-                        output_sample["output"] = generation + self.prompt.config.template.assistant_end
+                        output_sample["output"] = generation
+                        # not adding end-of-turn for incomplete generations
+                        if output_sample.get("finish_reason", "stop") == "stop":
+                            output_sample["output"] += self.prompt.config.template.assistant_end
                     else:
                         output_sample["input"] = elem[self.input_key]
                         output_sample["output"] = generation
@@ -412,6 +416,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self,
         prompt_config: str,
         prompt_template: str,
+        code_tags: str,
         task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
@@ -430,7 +435,7 @@ class WriteFinalRLManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template)
+            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
         else:
             LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 

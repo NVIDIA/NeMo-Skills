@@ -14,9 +14,11 @@
 
 import argparse
 from pathlib import Path
+
 from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
+
 
 def get_stage_expname(base_expname, stage_name, suffix):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
@@ -43,20 +45,18 @@ def prepare_labeling_data(cluster, expname, run_after, stage_config, **kwargs):
         log_dir=f"{output_dir}/logs",
         **stage_config.get('stage_kwargs', {}),
     )
-    
+
+
 def label_data(cluster, expname, run_after, stage_config, **kwargs):
     """Labels the data for the GenSelect pipeline."""
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
     output_file = f"{output_dir}/output.jsonl"
-    
+
     generate(
-        ctx=wrap_arguments(
-            f"++input_file={input_file} "
-            f"++output_file={output_file} "
-            f"{stage_config.get('inline_args', '')} "
-        ),
+        ctx=wrap_arguments(f"++output_file={output_file} " f"{stage_config.get('inline_args', '')} "),
         cluster=cluster,
+        input_file=input_file,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -92,11 +92,9 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config["input_file"]
 
     generate(
-        ctx=wrap_arguments(
-            f"++input_file={input_file} "
-            f"{stage_config.get('inline_args', '')} "
-        ),
+        ctx=wrap_arguments(f"{stage_config.get('inline_args', '')} "),
         cluster=cluster,
+        input_file=input_file,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
@@ -129,20 +127,19 @@ def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
-
 def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
     output_file = f"{output_dir}/sft-data.jsonl"
-    
+
     prompt_config = stage_config.get("prompt_config")
     if not prompt_config:
         raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
-    
+
     prompt_template = stage_config.get("prompt_template")
     if not prompt_template:
         raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
-    
+
     contamination_file = stage_config.get('contamination_file')
     if not contamination_file:
         raise ValueError("`contamination_file` is not defined in `prepare_for_sft` stage config")
@@ -173,7 +170,6 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     )
 
 
-
 stages_map = {
     'prepare_labeling_data': prepare_labeling_data,
     'label_data': label_data,
@@ -197,7 +193,7 @@ def get_available_configs(config_dir):
 if __name__ == '__main__':
     config_dir = Path(__file__).parents[1] / "configs" / "genselect_sdg"
     available_configs = get_available_configs(config_dir)
-    
+
     parser = argparse.ArgumentParser(description='OpenMathReasoning-1 GenSelect instance generation pipeline')
     parser.add_argument(
         '--mode',
@@ -207,19 +203,21 @@ if __name__ == '__main__':
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
-        '--stages', type=str, default=None,
+        '--stages',
+        type=str,
+        default=None,
         help='Comma-separated list of stages to run. If not specified, runs all stages from the config.',
     )
-    
+
     args = parser.parse_args()
-    
+
     config_path = config_dir / f"{args.mode}.yaml"
     config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
-    
+
     if 'pipeline_stages' not in config or not config['pipeline_stages']:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
     full_stage_sequence = config['pipeline_stages']
-    
+
     if args.stages:
         # Stages specified via command line
         stages_to_run = args.stages.split(',')
@@ -228,7 +226,7 @@ if __name__ == '__main__':
         # No command line override, run all stages from config
         stages_to_run = full_stage_sequence
         print(f"Running all stages defined in config for mode '{args.mode}': {stages_to_run}")
-    
+
     for stage in stages_to_run:
         if stage not in stages_map:
             raise ValueError(f"Unknown stage specified: '{stage}'. Available stages: {list(stages_map.keys())}")
@@ -237,39 +235,36 @@ if __name__ == '__main__':
                 f"Stage '{stage}' requested but not part of the defined sequence for mode '{args.mode}' in {config_path}. "
                 f"Specify one of {full_stage_sequence} or select an appropriate mode."
             )
-    
+
     # --- Common parameters ---
     base_output_dir = config['base_output_dir']
     suffix = config.get('suffix', args.mode)
     cluster = config['cluster']
     expname_base = config['expname']
-    
+
     # --- Run selected stages ---
     for stage in stages_to_run:
         print(f"\n--- Running stage: {stage} ---")
         stage_func = stages_map[stage]
         stage_config = config.get('stages', {}).get(stage, {})
-        
+
         current_expname = get_stage_expname(expname_base, stage, suffix)
-        
+
         dep_stages = stage_config.get('dependencies', None)
         dependencies = None
         if dep_stages is not None:
-            dependencies = [
-                get_stage_expname(expname_base, dep_stage, suffix)
-                for dep_stage in dep_stages
-            ]
-        
+            dependencies = [get_stage_expname(expname_base, dep_stage, suffix) for dep_stage in dep_stages]
+
         print(f"Dependency for '{stage}': {dependencies}")
-        
+
         stage_args = {
             'cluster': cluster,
             'expname': current_expname,
             'run_after': dependencies,
             'stage_config': stage_config,
         }
-        
+
         # Call the stage function
         stage_func(**stage_args)
-    
+
     print("\n--- Selected pipeline stages finished. ---")

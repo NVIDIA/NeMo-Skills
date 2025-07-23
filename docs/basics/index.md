@@ -54,7 +54,7 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
         --model=meta/llama-3.1-8b-instruct \
         --server_address=https://integrate.api.nvidia.com/v1 \
         --output_dir=./generation \
-        ++input_file=./input.jsonl \
+        --input_file=./input.jsonl \
         ++prompt_config=./prompt.yaml
     ```
 
@@ -67,7 +67,7 @@ You can either use [OpenAI models](https://platform.openai.com/docs/overview) or
         --model=gpt-4o-mini \
         --server_address=https://api.openai.com/v1 \
         --output_dir=./generation \
-        ++input_file=./input.jsonl \
+        --input_file=./input.jsonl \
         ++prompt_config=./prompt.yaml
     ```
 
@@ -98,9 +98,9 @@ config might look like
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.5.0
-  vllm: igitman/nemo-skills-vllm:0.5.3
-  nemo: igitman/nemo-skills-nemo:0.5.3
+  trtllm: igitman/nemo-skills-trtllm:0.6.1
+  vllm: igitman/nemo-skills-vllm:0.6.1
+  nemo: igitman/nemo-skills-nemo:0.6.1
   # ... there are some more containers defined here
 
 env_vars:
@@ -144,7 +144,7 @@ ns generate \
     --model=Qwen/Qwen2.5-1.5B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/generation-local \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml
 ```
 
@@ -176,7 +176,7 @@ ns generate \
     --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
     --server_gpus=1 \
     --output_dir=/workspace/generation-local-trtllm \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
     ++prompt_template=qwen-instruct # (3)!
 ```
@@ -215,7 +215,7 @@ ns generate \
     --server_type=vllm \
     --model=Qwen/Qwen2.5-1.5B-Instruct \
     --server_gpus=1 \
-    ++input_file=/nemo_run/code/input.jsonl \
+    --input_file=/nemo_run/code/input.jsonl \
     ++prompt_config=/nemo_run/code/prompt.yaml \
     --output_dir=/workspace/generation # (2)!
 ```
@@ -238,7 +238,7 @@ model for a total of 64 samples)
 First prepare evaluation data
 
 ```bash
-python -m nemo_skills.dataset.prepare aime24 aime25
+ns prepare_data aime24 aime25
 ```
 
 Then run the following Python script
@@ -309,28 +309,25 @@ with the following command
 ns summarize_results --cluster=slurm /workspace/qwq-32b-test/results
 ```
 
-which will output the following (`pass@1[64]` is an average accuracy across all 64 generations)
+which will output the following (`pass@1[avg-of-64]` is an average accuracy across all 64 generations)
 
 ```bash
--------------------------- aime24 --------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 30          | 66.67%           | 23.33%
-majority@64     | 30          | 86.67%           | 0.00%
-pass@64         | 30          | 93.33%           | 0.00%
-pass@1[64]      | 30          | 66.41%           | 0.00%
+----------------------------------------- aime24 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-64] | 30          | 10790      | 3952        | 65.16%           | 32.24%
+majority@64       | 30          | 10790      | 3952        | 86.67%           | 3.33%
+pass@64           | 30          | 10790      | 3952        | 86.67%           | 3.33%
 
 
--------------------------- aime25 --------------------------
-evaluation_mode | num_entries | symbolic_correct | no_answer
-greedy          | 30          | 43.33%           | 50.00%
-majority@64     | 30          | 80.00%           | 0.00%
-pass@64         | 30          | 80.00%           | 0.00%
-pass@1[64]      | 30          | 52.45%           | 0.00%
+----------------------------------------- aime25 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-64] | 30          | 12076      | 4061        | 48.80%           | 45.78%
+majority@64       | 30          | 12076      | 4061        | 70.00%           | 13.33%
+pass@64           | 30          | 12076      | 4061        | 76.67%           | 13.33%
 ```
 
 And that's it! Now you know the basics of how to work with nemo-skills and are ready to build your own
-[pipelines](../pipelines/index.md). You can see some examples from our previous releases such as
-[OpenMathInstruct-2](../openmathinstruct2/index.md).
+[pipelines](../pipelines/index.md). You can find more examples in our [tutorials](../tutorials/index.md) or [papers & releases](../releases/index.md).
 
 Please read the next section to recap all of the important concepts that we touched upon and learn some more details.
 

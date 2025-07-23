@@ -16,14 +16,14 @@ executor: slurm
 
 containers:
   trtllm: igitman/nemo-skills-trtllm:0.6.1
-  vllm: vllm/vllm-openai:v0.9.0
+  vllm: igitman/nemo-skills-vllm:0.6.1
   sglang: igitman/nemo-skills-sglang:0.6.1
-  nemo: igitman/nemo-skills-nemo:0.6.0
-  megatron: igitman/nemo-skills-megatron:0.6.0
+  nemo: igitman/nemo-skills-nemo:0.6.1
+  megatron: igitman/nemo-skills-megatron:0.6.1
   sandbox: igitman/nemo-skills-sandbox:0.6.1
-  nemo-skills: igitman/nemo-skills:0.6.0
-  verl: igitman/nemo-skills-verl:0.6.0
-  nemo-rl: igitman/nemo-skills-nemo-rl:0.6.0
+  nemo-skills: igitman/nemo-skills:0.6.1
+  verl: igitman/nemo-skills-verl:0.6.1
+  nemo-rl: igitman/nemo-skills-nemo-rl:0.6.1
 
 job_name_prefix: "nemo_skills:"
 
@@ -43,6 +43,7 @@ job_name_prefix: "nemo_skills:"
 # define your account/partition here
 # account: <slurm account>
 # partition: <slurm partition>
+# cpu_partition: <if cluster has a dedicated cpu partition, you can define it here>
 
 
 # add required mounts for models/data here

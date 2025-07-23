@@ -3,6 +3,7 @@ processors_to_run: all
 output_path: ???
 prompt_config: null
 prompt_template: null
+code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
 input_files: null  # can specify datasets from HF instead of prediction_jsonl_files
@@ -12,8 +13,8 @@ metadata: null  # can provide additional metadata to store (e.g. dataset or gene
 skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
 add_correct: true  # can set to False if only want to export incorrect solutions
 add_incorrect: false  # if True, saves only incorrect solutions instead of correct
-add_unlabeled: false  # if True, saves unlabeled solutions (no is_correct field)
-use_judgement: false  # if True, uses judgement instead of is_correct field
+add_unlabeled: false  # if True, saves unlabeled solutions (no symbolic_correct field)
+use_judgement: false  # if True, uses judgement instead of symbolic_correct field
 # if True, adds a new field with max allowed code executions to each sample
 # exclude_optional_keys must be set to false in this case
 add_code_execution_counts: false
@@ -81,15 +82,15 @@ processors:
     add_unlabeled: ${add_unlabeled}
     use_judgement: ${use_judgement}
     deduplicate: ${deduplicate}
-    keys_to_keep:  # input/output/is_correct/judgement are automatically added
-      # - "total_votes"
-      # - "majority_votes"
-      # - "expected_answer"
-      # - "predicted_answer"
-      # - "answer_rm_score"
-      # - "solutions"   # GenSelect keys
-      # - "num_solutions"
-      # - "max_idx"
+    keys_to_keep:  # input/output/symbolic_correct/judgement are automatically added
+      - "total_votes"
+      - "majority_votes"
+      - "expected_answer"
+      - "predicted_answer"
+      - "answer_rm_score"
+      - "solutions"   # GenSelect keys
+      - "num_solutions"
+      - "max_idx"
 
   # this will optimize processors inside to avoid serializing data to disk
   - _target_: nemo_skills.training.data_preparation_utils.merge_processor.MergeProcessor
@@ -238,7 +239,7 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.filters.CodeTextFilter
     should_run: ${filters.code_text_filter}
     filter_type: ${filters.code_text_filter}
-    prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     solution_key: ${output_key}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
@@ -251,6 +252,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     prompt_template: ${prompt_template}
+    code_tags: ${code_tags}
     input_key: ${input_key}
     output_key: ${output_key}
     chat_format: ${chat_format}

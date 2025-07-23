@@ -57,7 +57,7 @@ ns generate \
     --model=meta/llama-3.1-8b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1 \
     --output_dir=/workspace/test-generate \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml
 ```
 
@@ -70,7 +70,7 @@ ns generate \
     --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/test-generate \
-    ++input_file=/workspace/input.jsonl \
+    --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
     ++prompt_template=llama3-instruct \
     ++skip_filled=False
@@ -112,7 +112,7 @@ as an example.
 First, let's prepare the data if you have not done so yet.
 
 ```bash
-python -m nemo_skills.dataset.prepare math
+ns prepare_data math
 ```
 
 Then we can run the generation
@@ -127,8 +127,7 @@ ns generate \
        --num_random_seeds=32 \
        --output_dir=/workspace/synthetic-math-solutions \
        --eval_args="++eval_type=math" \
-       ++dataset=math \
-       ++split=train_full \
+       --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++prompt_template=llama3-base
@@ -139,8 +138,7 @@ in the TensorRT-LLM format (highly recommended for large-scale inference).
 See [checkpoint conversion](../pipelines/checkpoint-conversion.md) to learn more about how to convert
 models to different formats.
 
-Note that in this case we do not pass an input file, but instead specify a dataset and
-a split, which will pick a prepared input from `nemo_skills/dataset/math/train_full.jsonl`.
+Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
 and a [template for the base model](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
 (we found Llama 3.1 follows few-shots much better without chat tokens).
@@ -298,7 +296,7 @@ Base prime representation of a natural number is defined using the exponents of 
 
 After the jobs are finished, you will see `/workspace/synthetic-math-solutions/generation/output-rsX.jsonl`
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
-key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
+key (extracted answer from `\boxed{}` field) and `symbolic_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
 [symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py).
 
@@ -322,12 +320,13 @@ Here are some suggestions on how to make your generation jobs more efficient
    random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
    logic on each output file, e.g.
 
-        ```python
-        generate(
-            # ...
-            postprocess_cmd="python /nemo_run/code/my_script.py --input <output_dir>/output-{random_seed}.jsonl"
-        )
-        ```
+    ```python
+    cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
+    generate(
+        # ...
+        postprocess_cmd=cmd
+    )
+    ```
 
     If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
     a dependent [run_cmd command](./run-cmd.md).

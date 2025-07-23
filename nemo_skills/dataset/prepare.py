@@ -20,7 +20,7 @@ from pathlib import Path
 from nemo_skills.dataset.utils import add_header_to_jsonl_inplace, get_lean4_header
 
 
-def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False):
+def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False, extra_args=""):
     if datasets and dataset_groups:
         raise ValueError("Cannot specify both datasets and dataset_groups")
 
@@ -34,17 +34,17 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False)
         target_datasets = []
         for dataset in datasets:
             dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-            if dataset_module.DATASET_GROUP in dataset_groups:
+            if getattr(dataset_module, "DATASET_GROUP", None) in dataset_groups:
                 target_datasets.append(dataset)
         datasets = target_datasets
 
     for dataset in datasets:
         print(f"Preparing {dataset}")
         dataset_path = datasets_dir / dataset
-        subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'}", shell=True, check=True)
+        subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'} {extra_args}", shell=True, check=True)
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
 
-        if dataset_module.DATASET_GROUP == "math":
+        if getattr(dataset_module, "DATASET_GROUP", None) == "math":
             if add_lean4_header:
                 jsonl_files = list(dataset_path.glob("*.jsonl"))
                 header = get_lean4_header()
@@ -62,12 +62,13 @@ if __name__ == '__main__':
         '--dataset_groups',
         default=[],
         nargs="*",
-        choices=["math", "code", "chat", "multichoice"],
+        choices=["math", "code", "chat", "multichoice", "long-context", "tool"],
         help='Can specify a dataset groups here',
     )
     parser.add_argument(
         '--add_lean4_header', action='store_true', help='Add Lean4 header to JSONL files during preparation'
     )
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    extra_args = " ".join(unknown)
 
-    prepare_datasets(args.datasets, args.dataset_groups, args.add_lean4_header)
+    prepare_datasets(args.datasets, args.dataset_groups, args.add_lean4_header, extra_args=extra_args)

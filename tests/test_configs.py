@@ -22,9 +22,9 @@ def test_error_on_extra_params():
     # test is not supported
     cmd = (
         "python nemo_skills/inference/generate.py "
+        "    ++prompt_config=generic/math "
         "    ++output_file=./test-results/gsm8k/output.jsonl "
-        "    ++dataset=gsm8k "
-        "    ++split=test "
+        "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "
         "    ++server.server_type=nemo "
         "    ++test=1"
     )
@@ -36,10 +36,10 @@ def test_error_on_extra_params():
     # inside nested dataclass
     cmd = (
         "python nemo_skills/inference/generate.py "
+        "    ++prompt_config=generic/math "
         "    ++output_file=./test-results/gsm8k/output.jsonl "
         "    ++inference.num_few_shots=0 "
-        "    ++dataset=gsm8k "
-        "    ++split=test "
+        "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "
         "    ++server.server_type=nemo "
     )
     try:
@@ -54,6 +54,7 @@ def test_error_on_extra_params():
         "    ++eval_type=math "
         "    ++eval_config.sandbox.sandbox_type=local "
         "    ++eval_config.sandbox.sandbox_host=123 "
+        "    ++remove_thinking=false "
     )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)

@@ -28,9 +28,16 @@ build
 *.xml
 *.DS_Store
 .coverage
+.venv
+*.lock
 
 __pycache__
 .ipynb_checkpoints
 
 cluster_configs/*
 !cluster_configs/example-*.yaml
+
+nemo_skills/dataset/ruler/*/
+nemo_skills/dataset/bfcl_v3/*/
+.idea/
+.idea/*

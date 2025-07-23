@@ -2,6 +2,14 @@ site_name: NeMo-Skills
 site_url: https://nvidia.github.io/NeMo-Skills
 extra_css:
   - css/extra.css
+plugins:
+  - blog:
+      blog_dir: tutorials
+      post_dir: tutorials/posts
+  - redirects:
+      redirect_maps:
+        'openmathinstruct2/index.md': 'releases/openmathinstruct2/index.md'
+        'openmathreasoning1/index.md': 'releases/openmathreasoning/index.md'
 theme:
   name: material
   logo: favicon.ico
@@ -61,13 +69,26 @@ nav:
     - Training (NeMo-Aligner): pipelines/training.md
     - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
     - Arbitrary commands: pipelines/run-cmd.md
-  - OpenMathInstruct:
-    - openmathinstruct2/index.md
-    - Model evaluation: openmathinstruct2/evaluation.md
-    - Dataset construction: openmathinstruct2/dataset.md
-    - Model training: openmathinstruct2/training.md
-  - OpenMathReasoning:
-    - openmathreasoning1/index.md
-    - Model evaluation: openmathreasoning1/evaluation.md
-    - Dataset construction: openmathreasoning1/dataset.md
-    - Model training: openmathreasoning1/training.md
+  - Tutorials:
+    - tutorials/index.md
+  - Papers & Releases:
+    - releases/index.md
+    - OpenReasoning:
+      - releases/openreasoning/index.md
+      - Model Evaluation: releases/openreasoning/evaluation.md
+      - Dataset construction: releases/openreasoning/dataset.md
+      - Model training: releases/openreasoning/training.md
+    - OpenCodeReasoning:
+      - releases/opencodereasoning/index.md
+      - Model Evaluation: releases/opencodereasoning/evaluation.md
+      - Dataset construction: releases/opencodereasoning/dataset.md
+    - OpenMathReasoning:
+      - releases/openmathreasoning/index.md
+      - Model Evaluation: releases/openmathreasoning/evaluation.md
+      - Dataset construction: releases/openmathreasoning/dataset.md
+      - Model training: releases/openmathreasoning/training.md
+    - OpenMathInstruct-2:
+      - releases/openmathinstruct2/index.md
+      - Model Evaluation: releases/openmathinstruct2/evaluation.md
+      - Dataset construction: releases/openmathinstruct2/dataset.md
+      - Model training: releases/openmathinstruct2/training.md

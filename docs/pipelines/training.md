@@ -95,7 +95,7 @@ ns eval \
     --model=/workspace/my-training-job/checkpoints/model-averaged-nemo \
     --server_type=nemo \
     --output_dir=/workspace/my-training-job/results/ \
-    --benchmarks gsm8k:0,math:0 \
+    --benchmarks gsm8k,math \
     --server_gpus=8 \
     --run_after=my-training-job \
     ++prompt_template=llama3-instruct
@@ -160,7 +160,7 @@ eval(
     model=f"{output_dir}/model-averaged-trtllm",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
-    benchmarks="gsm8k:0,math:0",
+    benchmarks="gsm8k,math",
     server_gpus=8,
     run_after=f"{expname}-to-trtllm",
 )

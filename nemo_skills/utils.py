@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
 import inspect
 import io
 import logging
@@ -41,6 +40,18 @@ from nemo_skills.file_utils import (
 )  # noqa # pylint: disable=unused-import
 
 # isort: on
+
+
+def remove_thinking(
+    sample: dict, generation_key: str = "generation", thinking_begin: str = '<think>', thinking_end: str = '</think>'
+):
+    sample["_has_think_tags"] = thinking_begin in sample[generation_key]
+    if thinking_end in sample[generation_key]:
+        sample["_full_generation"] = sample[generation_key]
+        sample[generation_key] = sample[generation_key].split(thinking_end)[-1].strip()
+    elif thinking_begin in sample[generation_key]:
+        sample["_full_generation"] = sample[generation_key]
+        sample[generation_key] = ""  # no end tag, so setting the generation to empty
 
 
 def nested_dataclass(*args, **kwargs):
@@ -86,8 +97,15 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     if use_rich:
         handler = RichHandler(
             rich_tracebacks=True,
-            show_path=False,
-            show_time=False,
+            show_time=True,
+            show_level=True,
+            show_path=True,
+        )
+        handler.setFormatter(
+            logging.Formatter(
+                "%(message)s",
+                datefmt="[%X]",
+            )
         )
         for hdlr in logger.handlers[:]:
             logger.removeHandler(hdlr)
@@ -105,6 +123,13 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
         )
 
     return logger
+
+
+def remove_handlers():
+    """Can be used to remove all nemo-skills log handlers."""
+    logger = logging.getLogger('nemo_skills')
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
 
 
 def get_logger_name(file):
@@ -288,7 +313,7 @@ Below are the available configuration options and their default values:
     docstring = re.sub(r'{([^}]+(?=\s)[^}]*)}', r'{{\1}}', docstring)
     # Might need to add some other edge-case handling
     # here, so that formatting does not complain
-    docstring = dataclass_obj.__doc__ + "\n\n" +  docstring.format(**kwargs)
+    docstring = dataclass_obj.__doc__ + "\n\n" + docstring.format(**kwargs)
 
     full_help = f"{heading}\n{'-' * 75}\n{docstring}"
     if help_message:

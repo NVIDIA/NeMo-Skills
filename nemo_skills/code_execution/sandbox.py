@@ -283,7 +283,9 @@ try:
         if '{traceback_verbosity}' in ['Minimal', 'Plain']:
             stderr = simplify_errors(stderr)
         stderr += "\\n"
-    to_return = {{"process_status": "completed", "stdout": stdout, "stderr": stderr}}
+    has_error = exec_result.error_before_exec or exec_result.error_in_exec
+    to_return = {{"process_status": "error" if has_error else "completed", "stdout": stdout, "stderr": stderr}}
+
 except Exception:
     # removing useless prefix from traceback
     to_return = {{
