@@ -608,7 +608,7 @@ class CodeExecutionWrapper:
             ) > current_output_segment.rfind(code_end, 0, -1):
                 execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
-                    language=self.config.conde_execution_language,
+                    language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
