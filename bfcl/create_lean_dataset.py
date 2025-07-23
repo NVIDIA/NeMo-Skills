@@ -49,20 +49,25 @@ def create_lean_theorem_problem(
                 {
                     "role": "user",
                     "content": (
-                        f"{user_query}\n\nTheorem to prove:\n```lean\n{theorem_statement}\n```\n\nStart by setting up the interactive theorem. "
+                        # f"{user_query}\n\nTheorem to prove:\n```lean\n{theorem_statement}\n```\n\nStart by setting up the interactive theorem. "
+                        f"Prove the following theorem in Lean 4. Feel free to use the tools provided to you and reason about the proof. "
+                        f"You are a theorem prover. You are given a theorem to prove. "
+                        f"Theorem to prove:\n```lean\n{theorem_statement}\n```\n\nStart by setting up the interactive theorem. "
+                        "Then work on proving this theorem step by step. "
+                        "At the end, return the complete proof following a **Final Answer** tag. Make sure to check the whole proof before finalizing it."
                     )
                 }
             ],
             # Turn 2: Work on the proof
-            [
-                {
-                    "role": "user",
-                    "content": (
-                        "Now work on proving this theorem step by step. "
-                        "At the end, return the complete proof following a **Final Answer** tag. Make sure to check the whole proof before finalizing it."
-                    ),
-                }
-            ],
+            # [
+            #     {
+            #         "role": "user",
+            #         "content": (
+            #             "Now work on proving this theorem step by step. "
+            #             "At the end, return the complete proof following a **Final Answer** tag. Make sure to check the whole proof before finalizing it."
+            #         ),
+            #     }
+            # ],
         ],
         "function": functions,
         "tools": tools,
