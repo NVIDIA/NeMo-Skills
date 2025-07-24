@@ -159,3 +159,5 @@ logger:
 cluster:
   gpus_per_node: 1
   num_nodes: 1
+
+timeout: '00:00:20:00'
