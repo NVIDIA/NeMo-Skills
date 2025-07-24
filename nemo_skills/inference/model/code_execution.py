@@ -17,10 +17,8 @@ import copy
 import logging
 import time
 import uuid
-import re
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
-from openai import BadRequestError
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
@@ -31,7 +29,6 @@ from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
 from .utils import trim_after_stop_phrases
-from transformers import AutoTokenizer
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -63,8 +60,6 @@ class CodeExecutionWrapper:
             self._can_cancel_generations = True
         else:
             self._can_cancel_generations = False
-
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model.model)
 
     def _is_generation_cancelled(self, gen_id):
         """Check if a generation has been requested to be cancelled."""
@@ -144,7 +139,6 @@ class CodeExecutionWrapper:
             "timeout": timeout,
         }
         session_id = None
-        max_new_tokens = tokens_to_generate
         code_rounds_executed = 0
         total_num_generated_tokens = 0
         generation_time = 0
@@ -226,13 +220,10 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
-                request['tokens_to_generate'] = max_new_tokens - len(self.tokenizer.encode(request['prompt'], add_special_tokens=True))
-
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
                 else:
                     request['prompt'] += code_output
-
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
@@ -243,6 +234,7 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt):]
+
         return {
             'generation': generation,
             'code_rounds_executed': code_rounds_executed,
