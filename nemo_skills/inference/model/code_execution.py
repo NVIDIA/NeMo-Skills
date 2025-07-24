@@ -19,12 +19,12 @@ import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.inference.model.base import BaseModel
-from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
@@ -38,7 +38,7 @@ class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
     code_execution_language: str = 'python'  # could be python, lean4
-    code_execution_header: str = ''
+    code_execution_headers: list[str] = field(default_factory=lambda: [])
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
@@ -246,21 +246,7 @@ class CodeExecutionWrapper:
 
     def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
-        if self.config.code_execution_language == 'lean4':
-            header = '\n'.join([
-                        "import Aesop",
-                        "import Mathlib",
-                        "",
-                        "set_option maxHeartbeats 0",
-                        "",
-                        "open BigOperators",
-                        "open Real",
-                        "open Nat",
-                        "open Topology",
-                        "",
-                    ])
-        else:
-            header = ""
+        header = '\n'.join(self.config.code_execution_headers)
         code_block = extract_code_to_execute(output, code_begin, code_end)
         extracted_code = f'{header}{code_block}'
         execution_dict, session_id = self.sandbox.execute_code(
