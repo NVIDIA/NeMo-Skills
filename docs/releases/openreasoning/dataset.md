@@ -184,7 +184,8 @@ Coming soon!
 
 ## Code data
 
-Coming soon!
+The code data was creating with exactly the same pipeline as used for [OpenCodeReasoning dataset](../opencodereasoning/dataset.md),
+except the solutions are generated with [DeepSeek-R1-0528](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528).
 
 ## Science data
 
