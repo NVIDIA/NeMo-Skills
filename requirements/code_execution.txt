@@ -21,3 +21,4 @@ numpy
 pandas
 scipy
 sympy
+tqdm
