@@ -85,21 +85,18 @@ def preprocess_code(generation_dict: dict, language="python"):
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
     language: str = "python"  # "cpp" is another option now
-    test_file: str = None
     timeout: float = 30.0
 
 
 def eval_livecodebench(cfg):
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
-    assert eval_config.language in ["python", "cpp"]
-    assert eval_config.test_file is not None
+    assert eval_config.language in ["python"]  # cpp language support is pending
 
     release_version = None
     for jsonl_file in unroll_files(cfg.input_files):
         with open(jsonl_file) as f:
             samples = [preprocess_code(json.loads(line), eval_config.language) for line in f]
             for sample in samples:
-                sample["question_id"] = sample["task_id"]
                 sample["code_list"] = [sample["completion"]]
                 if release_version is None:
                     release_version = sample["release_version"]
@@ -131,7 +128,7 @@ command = [
     '--language',
     '{eval_config.language}',
     '--test_file',
-    '{eval_config.test_file}',
+    '{jsonl_file}',
     '--num_process_evaluate',
     '12',
      '--timeout',
