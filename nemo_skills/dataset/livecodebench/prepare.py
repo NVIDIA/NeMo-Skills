@@ -18,7 +18,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from datasets import load_dataset
+from datasets import Value, load_dataset
 from dateutil.relativedelta import relativedelta
 
 
@@ -79,6 +79,8 @@ def clean_data(dataset):
         data['question'] = question.replace('    ', '\t')
         return data
 
+    dataset = dataset.cast_column("public_test_cases", Value("large_string"))
+    dataset = dataset.cast_column("private_test_cases", Value("large_string"))
     # remove_columns = [
     #     'question_title',
     #     'contest_id',
