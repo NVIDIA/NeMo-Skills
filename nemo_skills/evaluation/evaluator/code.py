@@ -81,14 +81,6 @@ def preprocess_code(generation_dict: dict, language="python"):
     return generation_dict
 
 
-def install_from_git(git_url):
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", git_url])
-        print("Package installed successfully!")
-    except subprocess.CalledProcessError as e:
-        print(f"Error during installation: {e}")
-
-
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
@@ -98,17 +90,6 @@ class LiveCodeBenchEvaluatorConfig:
 
 
 def eval_livecodebench(cfg):
-    # try:
-    #     from livecodebench.evaluate import evaluate
-    # except ImportError:
-    #     LOG.info("Package 'livecodebench' not found. Attempting to install...")
-    #     install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
-    #     try:
-    #         from livecodebench.evaluate import evaluate
-    #     except ImportError:
-    #         LOG.info("Failed to install 'livecodebench'. Please install it manually.")
-    #         raise
-
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
     assert eval_config.language in ["python", "cpp"]
     assert eval_config.test_file is not None
