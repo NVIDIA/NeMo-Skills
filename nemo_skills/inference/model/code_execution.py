@@ -280,7 +280,7 @@ class CodeExecutionWrapper:
                     traceback_verbosity=self.config.sandbox_traceback_verbosity,
                 )
 
-        return code_execution_time_start,execution_dict
+        return code_execution_time_start, execution_dict
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(

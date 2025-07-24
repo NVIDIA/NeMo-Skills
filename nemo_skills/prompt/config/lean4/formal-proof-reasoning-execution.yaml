@@ -27,7 +27,6 @@ user: |-
     /-- Lean4 code --/
     ```
   3. The final proof's theorem MUST match the theorem in the prompt.
-  4. Put your final proof within **FINAL ANSWER**```lean4 ```
 
   Please reason step by step, and put your final answer within **FINAL ANSWER**\n```lean4 ```.
   DO NOT include any header or reference of the theorem in the final answer.
