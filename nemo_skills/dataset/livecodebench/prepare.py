@@ -76,21 +76,21 @@ def clean_data(dataset):
             question += f"{PromptConstants.FORMATTING_WITHOUT_STARTER_CODE}\n\n"
             question += f"```python\n# YOUR CODE HERE\n```\n\n"
 
-        data["task_id"] = data["question_id"]
         data['question'] = question.replace('    ', '\t')
         return data
 
-    remove_columns = [
-        'question_title',
-        'contest_id',
-        'public_test_cases',
-        'private_test_cases',
-        'metadata',
-        'question_content',
-        'platform',
-        'question_id',
-        'starter_code',
-    ]
+    # remove_columns = [
+    #     'question_title',
+    #     'contest_id',
+    #     'public_test_cases',
+    #     'private_test_cases',
+    #     'metadata',
+    #     'question_content',
+    #     'platform',
+    #     'question_id',
+    #     'starter_code',
+    # ]
+    remove_columns = []
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
 
@@ -115,16 +115,9 @@ def prepare(start_date, end_date, release_version, output_dir):
         for problem in data:
             input_date = datetime.strptime(problem['contest_date'], '%Y-%m-%dT%H:%M:%S').date()
             if start_date <= input_date <= end_date:
-                json.dump(
-                    {
-                        "task_id": problem["task_id"],
-                        "question": problem["question"],
-                        "difficulty": problem["difficulty"],
-                        "subset_for_metrics": problem["difficulty"],
-                        "release_version": release_version,
-                    },
-                    f,
-                )
+                problem["subset_for_metrics"] = problem["difficulty"]
+                problem["release_version"] = release_version
+                json.dump(problem, f)
                 f.write('\n')
 
 
@@ -133,7 +126,6 @@ DEFAULT_SPLITS = [
     ('v5', '2024-07', '2024-12'),  # aai split
     ('v6', '2024-08', '2025-05'),  # current default in lb
 ]
-
 
 if __name__ == '__main__':
     # Write an argparse to a json file, read it in and parse it
