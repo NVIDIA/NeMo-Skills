@@ -17,7 +17,8 @@
 # NOTE: needs to run from the root of the repo!
 
 SANDBOX_NAME=${1:-'local-sandbox'}
+SANDBOX_MEMORY_LIMIT=${2:-'16g'}
 
 docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((`nproc --all` * 10))" --build-arg="UWSGI_CHEAPER=`nproc --all`" -f dockerfiles/Dockerfile.sandbox .
 
-docker run --network=host --rm --name=local-sandbox ${SANDBOX_NAME}
+docker run --network=host --rm --memory=${SANDBOX_MEMORY_LIMIT} --restart unless-stopped --name=local-sandbox ${SANDBOX_NAME}
