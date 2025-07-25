@@ -290,7 +290,7 @@ def eval(
             )
             prev_tasks = _task_dependencies
 
-            swebench_containers = get_swebench_containers(Path(__file__).parents[2] / "dataset/swe-bench/test.jsonl")
+            swebench_containers = get_swebench_containers(Path(__file__).parents[1] / "dataset/swe-bench/test.jsonl")
 
             for _ in range(dependent_jobs + 1):
                 has_tasks = True
@@ -306,9 +306,9 @@ def eval(
                     partition=partition,
                     time_min=time_min,
                     server_config=job_server_config,
-                    sandbox_containers=swebench_containers,
+                    # sandbox_containers=swebench_containers,
                     # with_sandbox=job_needs_sandbox or with_sandbox,
-                    sandbox_port=None if get_random_port else 6000,
+                    # sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,

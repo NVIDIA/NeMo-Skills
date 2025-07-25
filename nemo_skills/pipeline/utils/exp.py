@@ -94,6 +94,16 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
 
 
 def get_sandbox_command(cluster_config):
+    cmd = (
+        "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+        "source /root/.local/bin/env && "
+        # install SWE-agent
+        "cd /root && "
+        "uv venv --python 3.12 venv && "
+        "source venv/bin/activate && "
+        "uv pip install -e ."
+    )
+
     if cluster_config['executor'] == 'none':
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
@@ -187,6 +197,7 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
+            privileged=True,  # TODO
             # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
             num_gpus=-1 if gpus_per_node is not None else None,
             network="host",

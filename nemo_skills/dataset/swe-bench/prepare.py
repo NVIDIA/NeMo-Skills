@@ -20,9 +20,10 @@ if __name__ == "__main__":
     # TODO: support these with options
     dataset = "princeton-nlp/SWE-bench_Verified"
     split = "test"
-    container_formatter = (
-        "/lustre/fsw/portfolios/llmservice/users/snarenthiran/swe-bench/containers/sweb.eval.x86_64.{instance_id}.sqsh"
-    )
+    # container_formatter = (
+    #     "/lustre/fsw/portfolios/llmservice/users/snarenthiran/swe-bench/containers/sweb.eval.x86_64.{instance_id}.sqsh"
+    # )
+    container_formatter = "swebench/sweb.eval.x86_64.{instance_id}"
     dataset = datasets.load_dataset(path=dataset, split=split)
     output_file = Path(__file__).parent / "test.jsonl"
     dataset = dataset.map(lambda example: {**example, "container_formatter": container_formatter})

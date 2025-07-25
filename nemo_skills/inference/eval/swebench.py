@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import shlex
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
@@ -66,8 +67,8 @@ class SweBenchGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True  # SweBench is a multi-call benchmark, so we have to use async loop
 
-        self.container_ports = os.environ["NEMO_SKILLS_SANDBOX_PORTS"].split(',')
-        self.sandboxes = [Sandbox(port=port) for port in self.container_ports]
+        # self.container_ports = os.environ["NEMO_SKILLS_SANDBOX_PORTS"].split(',')
+        # self.sandboxes = [Sandbox(port=port) for port in self.container_ports]
 
     def log_example_prompt(self, data):
         """SweBench is multi-call benchmark, so we can't print a single prompt."""
@@ -91,8 +92,8 @@ class SweBenchGenerationTask(GenerationTask):
             "uv pip install -e . && "
             # then running the agent
             "/root/SWE-agent/venv/bin/python -m sweagent run "
-            f"   --config {self.cfg.prompt_config} "
-            f"   --agent.model.name hosted_vllm/{self.cfg.server['model']} "
+            f"   --config /nemo_run/code/nemo_skills/prompt/config/{self.cfg.prompt_config}.yaml "  # TODO: handle absolute path!
+            f"   --agent.model.name hosted_vllm//hf_models/Meta-Llama-3.1-8B-Instruct "  # TODO
             "    --agent.model.api_base http://127.0.0.1:5000/v1 "
             "    --env.deployment.type local "
             "    --env.repo.type preexisting "
@@ -104,11 +105,23 @@ class SweBenchGenerationTask(GenerationTask):
             f"cat trajectories/*/*{data_point['instance_id']}/{data_point['instance_id']}/{data_point['instance_id']}.pred"
         )
 
-        output_dict, _ = self.sandboxes[data_point['container_id']].execute(
-            swe_agent_cmd,
-            timeout=100000,  # no timeout, can work as long as needed
+        container_name = data_point["container_formatter"].format(
+            instance_id=data_point['instance_id'].replace('__', '_1776_')
         )
-        trajectory_json = output_dict['stdout'].strip().split()[-1]
+
+        # Launch Apptainer container and execute the command
+        apptainer_cmd = f"apptainer exec docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+        LOG.info("Running Apptainer command: %s", apptainer_cmd)
+        # try:
+        result = subprocess.run(
+            apptainer_cmd, shell=True, text=True, timeout=100000
+        )  # no timeout, can work as long as needed
+        trajectory_json = result.stdout.strip().split('\n')[-1] if result.stdout.strip() else ""
+        # except subprocess.TimeoutExpired:
+        #     trajectory_json = ""
+        # except Exception as e:
+        #     LOG.error(f"Error running Apptainer container: {e}")
+        #     trajectory_json = ""
 
         return {'generation': trajectory_json}
 
