@@ -13,8 +13,9 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-# PROMPT_CONFIG = 'generic/math'
+PROMPT_CONFIG = 'eval/swe-bench/swe-agent'  # not managed by nemo-skills, in swe-agent format
 DATASET_GROUP = 'code'
 METRICS_TYPE = "swe-bench"
 EVAL_ARGS = "++eval_type=swe-bench"
 GENERATION_ARGS = ""
+GENERATION_MODULE = "nemo_skills.inference.eval.swebench"

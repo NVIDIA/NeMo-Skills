@@ -79,6 +79,36 @@ def execute_lean4(generated_code, timeout):
             os.remove(temp_file_name)
 
 
+def execute_shell(generated_code, timeout):
+    try:
+        result = subprocess.run(
+            generated_code,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            process_status = "completed"
+        else:
+            process_status = "failed"
+
+        # TODO: what if there is too much output to handle through http?
+        return {
+            "process_status": process_status,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {"process_status": "error", "stdout": "", "stderr": str(e) + "\n"}
+
+
 # need to memory-limit to avoid common errors of allocating too much
 # but this has to be done in a subprocess to not crush server itself
 def execute_code_subprocess(generated_code, queue):
@@ -107,6 +137,10 @@ def execute():
         return execute_python(generated_code, timeout)
     elif language == 'lean4':
         return execute_lean4(generated_code, timeout)
+    elif language == "shell":
+        return execute_shell(generated_code, timeout)
+    else:
+        raise ValueError(f"Unsupported language: {language}.")
 
 
 if __name__ == '__main__':

@@ -20,7 +20,11 @@ if __name__ == "__main__":
     # TODO: support these with options
     dataset = "princeton-nlp/SWE-bench_Verified"
     split = "test"
+    container_formatter = (
+        "/lustre/fsw/portfolios/llmservice/users/snarenthiran/swe-bench/containers/sweb.eval.x86_64.{instance_id}.sqsh"
+    )
     dataset = datasets.load_dataset(path=dataset, split=split)
     output_file = Path(__file__).parent / "test.jsonl"
-    # Convert the dataset to JSONL format
+    dataset = dataset.map(lambda example: {**example, "container_formatter": container_formatter})
+    dataset = dataset.add_column("container_id", list(range(len(dataset))))
     dataset.to_json(output_file, orient="records", lines=True)

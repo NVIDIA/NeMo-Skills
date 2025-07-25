@@ -175,7 +175,7 @@ def run_cmd(
                 partition=partition,
                 time_min=time_min,
                 server_config=server_config,
-                with_sandbox=with_sandbox,
+                sandbox_containers=[cluster_config['sandbox']] if with_sandbox else None,
                 sandbox_port=None if get_random_port else 6000,
                 run_after=run_after,
                 reuse_code=reuse_code,
