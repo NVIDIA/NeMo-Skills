@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import json
 import logging
 import os
 import shlex
 import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
@@ -39,6 +41,7 @@ class SweBenchGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/swe-bench/swe-agent"
+    trajectories_dir: str = "/tmp/swe_trajectories"
 
     # TODO: disallow most parameters?
     # TODO: can we support our model interface?
@@ -80,6 +83,9 @@ class SweBenchGenerationTask(GenerationTask):
     def generate_single_answer(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
 
+        # Create temporary directory for trajectories
+        os.makedirs(self.cfg.trajectories_dir, exist_ok=True)
+
         swe_agent_cmd = (
             # first installing swe-agent repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
@@ -101,8 +107,8 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --env.repo.base_commit {data_point['base_commit']} "
             f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
             f"    --problem_statement.id {data_point['instance_id']} && "
-            # add printing the output so that sandbox can capture it
-            f"cat trajectories/*/*{data_point['instance_id']}/{data_point['instance_id']}/{data_point['instance_id']}.pred"
+            # move trajectories to the mounted directory
+            f"mv trajectories/* /trajectories_mount/"
         )
 
         container_name = data_point["container_formatter"].format(
@@ -110,18 +116,29 @@ class SweBenchGenerationTask(GenerationTask):
         )
 
         # Launch Apptainer container and execute the command
-        apptainer_cmd = f"apptainer exec docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+        apptainer_cmd = (
+            f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
+            f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
+            f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
+            f" docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+        )
         LOG.info("Running Apptainer command: %s", apptainer_cmd)
-        # try:
-        result = subprocess.run(
-            apptainer_cmd, shell=True, text=True, timeout=100000
-        )  # no timeout, can work as long as needed
-        trajectory_json = result.stdout.strip().split('\n')[-1] if result.stdout.strip() else ""
-        # except subprocess.TimeoutExpired:
-        #     trajectory_json = ""
-        # except Exception as e:
-        #     LOG.error(f"Error running Apptainer container: {e}")
-        #     trajectory_json = ""
+
+        # no timeout, can work as long as needed
+        subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
+
+        # Read the .pred file from the trajectories directory
+        trajectory_json = ""
+
+        # Look for the pred file in the temp directory
+        pred_files = glob.glob(
+            os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred"), recursive=True
+        )
+
+        if pred_files:
+            assert len(pred_files) == 1, f"Expected exactly one .pred file, found {len(pred_files)}"
+            with open(pred_files[0], 'r') as f:
+                trajectory_json = f.read().strip()
 
         return {'generation': trajectory_json}
 
