@@ -108,7 +108,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
             f"    --problem_statement.id {data_point['instance_id']} && "
             # move trajectories to the mounted directory
-            f"mv trajectories/* /trajectories_mount/"
+            f"cp -r trajectories/* /trajectories_mount/"
         )
 
         container_name = data_point["container_formatter"].format(
@@ -126,15 +126,21 @@ class SweBenchGenerationTask(GenerationTask):
         LOG.info("Running command: %s", apptainer_cmd)
 
         # no timeout, can work as long as needed
-        subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
+        result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
         # Look for the pred file in the temp directory
         search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
         pred_files = glob.glob(search_path, recursive=True)
 
         if len(pred_files) != 1:
+            LOG.error("Apptainer command failed. Full logs:")
+            LOG.error("STDOUT:")
+            LOG.error(result.stdout)
+            LOG.error("STDERR:")
+            LOG.error(result.stderr)
+            LOG.error("Return code: %d", result.returncode)
             raise ValueError(
-                f"Expected exactly one .pred file for {data_point['instance_id']}, "
+                f"Job logs: Expected exactly one .pred file for {data_point['instance_id']}, "
                 f"found {len(pred_files)}. Searched in {search_path}"
             )
         with open(pred_files[0], 'r') as f:
