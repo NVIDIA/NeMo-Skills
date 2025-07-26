@@ -122,10 +122,9 @@ class SweBenchGenerationTask(GenerationTask):
             f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
             f" docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
         )
-        LOG.info("Running Apptainer command: %s", apptainer_cmd)
 
         # no timeout, can work as long as needed
-        subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
+        subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
         # Read the .pred file from the trajectories directory
         trajectory_json = ""
@@ -135,10 +134,9 @@ class SweBenchGenerationTask(GenerationTask):
             os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred"), recursive=True
         )
 
-        if pred_files:
-            assert len(pred_files) == 1, f"Expected exactly one .pred file, found {len(pred_files)}"
-            with open(pred_files[0], 'r') as f:
-                trajectory_json = f.read().strip()
+        assert len(pred_files) == 1, f"Expected exactly one .pred file, found {len(pred_files)}"
+        with open(pred_files[0], 'r') as f:
+            trajectory_json = f.read().strip()
 
         return {'generation': trajectory_json}
 
