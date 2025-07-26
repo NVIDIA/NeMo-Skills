@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import logging
 import os
 from collections import defaultdict
@@ -29,17 +28,6 @@ from nemo_skills.pipeline.utils.eval import prepare_eval_commands
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-def get_swebench_containers(data_file):
-    containers = []
-    with open(data_file, 'r') as fin:
-        for line in fin:
-            data = json.loads(line)
-            containers.append(
-                data["container_formatter"].format(instance_id=data['instance_id'].replace('__', '_1776_'))
-            )
-    return containers
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -290,8 +278,6 @@ def eval(
             )
             prev_tasks = _task_dependencies
 
-            swebench_containers = get_swebench_containers(Path(__file__).parents[1] / "dataset/swe-bench/test.jsonl")
-
             for _ in range(dependent_jobs + 1):
                 has_tasks = True
                 new_task = pipeline_utils.add_task(
@@ -306,9 +292,8 @@ def eval(
                     partition=partition,
                     time_min=time_min,
                     server_config=job_server_config,
-                    # sandbox_containers=swebench_containers,
-                    # with_sandbox=job_needs_sandbox or with_sandbox,
-                    # sandbox_port=None if get_random_port else 6000,
+                    with_sandbox=job_needs_sandbox or with_sandbox,
+                    sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,

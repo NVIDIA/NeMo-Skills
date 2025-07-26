@@ -246,12 +246,6 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language == "shell":
-            TO_EXECUTE = generated_code
-            if session_id is not None:
-                raise RuntimeError(
-                    f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
-                )
         elif language == 'lean4':
             if session_id is not None:
                 raise RuntimeError(

@@ -94,16 +94,6 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
 
 
 def get_sandbox_command(cluster_config):
-    cmd = (
-        "curl -LsSf https://astral.sh/uv/install.sh | sh && "
-        "source /root/.local/bin/env && "
-        # install SWE-agent
-        "cd /root && "
-        "uv venv --python 3.12 venv && "
-        "source venv/bin/activate && "
-        "uv pip install -e ."
-    )
-
     if cluster_config['executor'] == 'none':
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
     return "/entrypoint.sh && /start.sh"
@@ -346,7 +336,7 @@ def add_task(
     log_dir=None,
     partition=None,
     time_min=None,
-    sandbox_containers: list[str] | None = None,
+    with_sandbox=False,
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
@@ -404,24 +394,12 @@ def add_task(
         if not cluster_config.get('cpu_partition'):
             num_gpus = 1
 
-    # Handle multiple sandbox ports
-    sandbox_ports = []
-    if sandbox_containers is not None:
-        if sandbox_port is not None:
-            if len(sandbox_containers) > 1:
-                raise ValueError("Cannot specify sandbox_port when multiple sandbox_containers are provided.")
-            sandbox_ports = [sandbox_port]
-        else:
-            # Generate unique ports for all containers
-            exclude_ports = []
-            for _ in range(len(sandbox_containers)):
-                new_port = get_free_port(strategy="random", exclude=exclude_ports)
-                sandbox_ports.append(new_port)
-                exclude_ports.append(new_port)
+    if sandbox_port is None:
+        sandbox_port = get_free_port(strategy="random")
 
     het_group = 0
     het_group_indices = []
-    total_het_groups = (server_config is not None) + bool(cmd) + (sandbox_containers is not None)
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
 
     LOG.info("Adding a task with commands:")
 
@@ -472,15 +450,7 @@ def add_task(
         for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
-
-            # Set up environment variables for sandbox ports
-            env_updates = {}
-            if sandbox_containers is not None:
-                env_updates["NEMO_SKILLS_SANDBOX_PORTS"] = ",".join(map(str, sandbox_ports))
-                if len(sandbox_containers) == 1:
-                    env_updates["NEMO_SKILLS_SANDBOX_PORT"] = sandbox_ports[0]
-
-            with temporary_env_update(cluster_config, env_updates):
+            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
                 cur_cmd = install_packages_wrap(cur_cmd, installation_command)
                 commands.append(cur_cmd)
                 executors.append(
@@ -510,43 +480,42 @@ def add_task(
         LOG.info("Main command(s): %s", ", ".join(cmd))
 
     # finally a sandbox if needed
-    if sandbox_containers is not None:
-        for idx, sandbox_container in enumerate(sandbox_containers):
-            sandbox_env_updates = {"LISTEN_PORT": sandbox_ports[idx]}
-            current_env_vars = cluster_config.get("env_vars", []).copy()
-            for override in current_env_vars:
-                if "PYTHONPATH" in override:
-                    if override.startswith("PYTHONPATH="):
-                        override = override[11:]
-                    sandbox_env_updates["PYTHONPATH"] = override + ":/app"
+    if with_sandbox:
+        sandbox_env_updates = {"LISTEN_PORT": sandbox_port}
+        current_env_vars = cluster_config.get("env_vars", []).copy()
+        for override in current_env_vars:
+            if "PYTHONPATH" in override:
+                if override.startswith("PYTHONPATH="):
+                    override = override[11:]
+                sandbox_env_updates["PYTHONPATH"] = override + ":/app"
 
-            with temporary_env_update(cluster_config, sandbox_env_updates):
-                commands.append(get_sandbox_command(cluster_config))
-                sandbox_executor = get_executor(
-                    cluster_config=cluster_config,
-                    container=sandbox_container,
-                    num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
-                    tasks_per_node=1,
-                    gpus_per_node=0,
-                    partition=partition,
-                    time_min=time_min,
-                    mounts=[],  # we don't want to mount anything except code
-                    dependencies=dependencies,
-                    job_name=task_name,
-                    log_dir=log_dir,
-                    log_prefix=f"sandbox_{idx}" if len(sandbox_containers) > 1 else "sandbox",
-                    extra_package_dirs=extra_package_dirs,
-                    slurm_kwargs=slurm_kwargs,
-                    heterogeneous=heterogeneous,
-                    het_group=het_group,
-                    total_het_groups=total_het_groups,
-                    overlap=server_config is not None,
-                    with_ray=with_ray,
-                )
-                executors.append(sandbox_executor)
-                het_group_indices.append(het_group)
-            het_group += 1
-        LOG.info("Sandbox command(s): %s", ", ".join(commands[-len(sandbox_containers) :]))
+        with temporary_env_update(cluster_config, sandbox_env_updates):
+            commands.append(get_sandbox_command(cluster_config))
+            sandbox_executor = get_executor(
+                cluster_config=cluster_config,
+                container=cluster_config["containers"]["sandbox"],
+                num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
+                tasks_per_node=1,
+                gpus_per_node=0,
+                partition=partition,
+                time_min=time_min,
+                mounts=[],  # we don't want to mount anything
+                dependencies=dependencies,
+                job_name=task_name,
+                log_dir=log_dir,
+                log_prefix="sandbox",
+                extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
+                overlap=server_config is not None,
+                with_ray=with_ray,
+            )
+            executors.append(sandbox_executor)
+            het_group_indices.append(het_group)
+        het_group += 1
+        LOG.info("Sandbox command: %s", commands[-1])
 
     if cluster_config["executor"] != "none":
         tunnel = get_tunnel(cluster_config)
