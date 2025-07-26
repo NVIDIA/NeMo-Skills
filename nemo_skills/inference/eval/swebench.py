@@ -97,13 +97,13 @@ class SweBenchGenerationTask(GenerationTask):
             "source venv/bin/activate && "
             "uv pip install -e . && "
             # then running the agent
-            "/root/SWE-agent/venv/bin/python -m sweagent run "
-            f"   --config /nemo_run/code/nemo_skills/prompt/config/{self.cfg.prompt_config}.yaml "  # TODO: handle absolute path!
-            f"   --agent.model.name hosted_vllm//hf_models/Meta-Llama-3.1-8B-Instruct "  # TODO
-            "    --agent.model.api_base http://127.0.0.1:5000/v1 "
-            "    --env.deployment.type local "
-            "    --env.repo.type preexisting "
-            "    --env.repo.repo_name testbed "
+            f"/root/SWE-agent/venv/bin/python -m sweagent run "
+            f"    --config /nemo_run/code/nemo_skills/prompt/config/{self.cfg.prompt_config}.yaml "  # TODO: handle absolute path!
+            f"    --agent.model.name self_hosted_model "
+            f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
+            f"    --env.deployment.type local "
+            f"    --env.repo.type preexisting "
+            f"    --env.repo.repo_name testbed "
             f"    --env.repo.base_commit {data_point['base_commit']} "
             f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
             f"    --problem_statement.id {data_point['instance_id']} && "
@@ -123,18 +123,20 @@ class SweBenchGenerationTask(GenerationTask):
             f" docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
         )
 
+        LOG.info("Running command: %s", apptainer_cmd)
+
         # no timeout, can work as long as needed
         subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
-        # Read the .pred file from the trajectories directory
-        trajectory_json = ""
-
         # Look for the pred file in the temp directory
-        pred_files = glob.glob(
-            os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred"), recursive=True
-        )
+        search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
+        pred_files = glob.glob(search_path, recursive=True)
 
-        assert len(pred_files) == 1, f"Expected exactly one .pred file, found {len(pred_files)}"
+        if len(pred_files) != 1:
+            raise ValueError(
+                f"Expected exactly one .pred file for {data_point['instance_id']}, "
+                f"found {len(pred_files)}. Searched in {search_path}"
+            )
         with open(pred_files[0], 'r') as f:
             trajectory_json = f.read().strip()
 
