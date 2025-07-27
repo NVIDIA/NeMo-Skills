@@ -120,7 +120,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
             f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
-            f" docker://{container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+            f" {container_name} bash -c {shlex.quote(swe_agent_cmd)}"
         )
 
         LOG.info("Running command: %s", apptainer_cmd)
