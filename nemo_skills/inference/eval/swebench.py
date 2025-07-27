@@ -99,7 +99,7 @@ class SweBenchGenerationTask(GenerationTask):
             # then running the agent
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config /nemo_run/code/nemo_skills/prompt/config/{self.cfg.prompt_config}.yaml "  # TODO: handle absolute path!
-            f"    --agent.model.name self_hosted_model "
+            f"    --agent.model.name hosted_vllm/SWE-bench/SWE-agent-LM-32B "
             f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
             f"    --env.deployment.type local "
             f"    --env.repo.type preexisting "
