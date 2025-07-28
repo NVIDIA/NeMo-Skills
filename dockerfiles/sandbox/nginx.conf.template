@@ -60,11 +60,7 @@ ${UPSTREAM_SERVERS}
             proxy_buffering off;
         }
 
-        # Debug endpoint to check session_id extraction
-        location /debug/nginx {
-            add_header Content-Type application/json;
-            return 200 '{"extracted_from_body":"$extracted_session_id","from_header":"$http_x_session_id","routing_value":"$session_id_for_routing","request_body":"$request_body"}';
-        }
+
 
         # Nginx status for monitoring
         location /nginx-status {

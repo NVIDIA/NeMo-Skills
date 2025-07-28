@@ -28,29 +28,7 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/debug/worker", methods=["GET", "POST"])
-def debug_worker():
-    """Debug endpoint to see which worker is handling the request"""
-    import os
 
-    # Check if this is a POST request with session_id
-    session_from_json = None
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json(silent=True)
-        session_from_json = data.get('session_id') if data else None
-
-    worker_info = {
-        "worker_port": os.environ.get('LISTEN_PORT', 'unknown'),
-        "worker_num": os.environ.get('WORKER_NUM', 'unknown'),
-        "process_id": os.getpid(),
-        "request_method": request.method,
-        "session_id_from_json": session_from_json,
-        "session_id_from_header": request.headers.get('X-Session-ID', 'none'),
-        "nginx_extracted_session": request.headers.get('X-Session-ID', 'none'),
-        "original_session_header": request.headers.get('X-Original-Session-Header', 'none'),
-        "session_backend": "ipython"
-    }
-    return worker_info
 
 # ============================================================================
 # IPYTHON SESSION BACKEND
