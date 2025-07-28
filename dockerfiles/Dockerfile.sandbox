@@ -51,8 +51,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN mkdir /data && pip install gdown && \
     python -c "import gdown; url = f'https://drive.google.com/uc?id=17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW'; gdown.download(url, '/data/test_data.h5', quiet=False)"
 
-# Install and register the Python kernel for Jupyter
-RUN python -m ipykernel install --user --name python3 --display-name "Python 3"
+# IPython is installed via requirements.txt
 
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 
