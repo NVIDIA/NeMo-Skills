@@ -85,7 +85,7 @@ fi
 mkdir -p /var/log/nginx
 
 # Start workers as background processes
-echo "Starting $NUM_WORKERS workers..."
+echo "Starting $NUM_WORKERS workers in parallel..."
 WORKER_PIDS=()
 
 # Function to cleanup on exit
@@ -102,6 +102,7 @@ cleanup() {
 
 trap cleanup SIGTERM SIGINT
 
+# Start all workers simultaneously
 for i in $(seq 1 $NUM_WORKERS); do
     PORT=$((BASE_PORT + i - 1))
 
@@ -126,23 +127,25 @@ EOF
 
     echo "Created custom uwsgi config for worker $i (HTTP port $PORT)"
 
-    # Start worker with custom config, working directory, and environment variables
+    # Start worker with custom config - NO DELAY between workers
     cd /app && env LISTEN_PORT=$PORT WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini > /var/log/worker${i}.log 2>&1 &
 
     WORKER_PID=$!
     WORKER_PIDS+=($WORKER_PID)
 
     echo "Worker $i started with PID $WORKER_PID on port $PORT"
-
-    # Small delay between workers
-    sleep 3
 done
+
+echo "All $NUM_WORKERS workers started simultaneously - waiting for readiness..."
 
 # Wait for workers to be ready
 echo "Waiting for workers to start..."
 READY_WORKERS=0
 TIMEOUT=180  # Increased timeout since uwsgi takes time to start
 START_TIME=$(date +%s)
+
+# Track which workers are ready to avoid redundant checks
+declare -A WORKER_READY
 
 while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
     CURRENT_TIME=$(date +%s)
@@ -179,35 +182,29 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
 
     READY_WORKERS=0
     for i in $(seq 1 $NUM_WORKERS); do
+        # Skip workers that are already ready
+        if [ "${WORKER_READY[$i]}" = "1" ]; then
+            READY_WORKERS=$((READY_WORKERS + 1))
+            continue
+        fi
+
         PORT=$((BASE_PORT + i - 1))
 
         # Try the health check
-        if curl -s -f --connect-timeout 5 --max-time 10 http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
+        if curl -s -f --connect-timeout 2 --max-time 5 http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
             READY_WORKERS=$((READY_WORKERS + 1))
-            echo "  Worker $i (port $PORT): Health check OK"
-        else
-            # Debug why health check failed
-            echo "  Worker $i (port $PORT): Health check failed"
-
-            # Check if port is listening (use netstat instead of ss)
-            if netstat -tlnp 2>/dev/null | grep ":$PORT " > /dev/null; then
-                echo "    Port is bound, checking HTTP response..."
-                # Try to get actual response
-                curl -v --connect-timeout 5 --max-time 10 http://127.0.0.1:$PORT/health || true
-            else
-                echo "    Port $PORT not listening yet"
-                # Show what's in the worker log to debug startup issues
-                echo "    Worker log (last 10 lines):"
-                tail -10 /var/log/worker${i}.log 2>/dev/null | sed 's/^/      /' || echo "      No log found"
-            fi
+            WORKER_READY[$i]=1
+            echo "  ✅ Worker $i (port $PORT): Ready! ($READY_WORKERS/$NUM_WORKERS)"
         fi
     done
 
-    echo "Workers ready: $READY_WORKERS/$NUM_WORKERS ($(date))"
-
-    if [ $READY_WORKERS -lt $NUM_WORKERS ]; then
-        sleep 10  # Increased sleep time
+    # Show progress every 10 seconds
+    if [ $((CURRENT_TIME % 10)) -eq 0 ] && [ $READY_WORKERS -lt $NUM_WORKERS ]; then
+        echo "  ⏳ Progress: $READY_WORKERS/$NUM_WORKERS workers ready (${CURRENT_TIME}s elapsed)"
     fi
+
+    # Check less frequently to reduce CPU usage and log spam
+    sleep 2
 done
 
 echo "All workers are ready!"
