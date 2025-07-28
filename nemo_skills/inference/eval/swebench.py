@@ -163,11 +163,11 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
 
-        # need to rename .pred to .json
+        # need to rename .pred to .jsonl
         pred_mounted_path = (
-            pred_files[0].replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.json')
+            pred_files[0].replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.jsonl')
         )
-        with open(pred_files[0].replace('.pred', '.json'), 'w') as f:
+        with open(pred_files[0].replace('.pred', '.jsonl'), 'w') as f:
             f.write(json.dumps(trajectory_dict))
 
         swe_bench_cmd = (
