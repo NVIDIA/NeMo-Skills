@@ -189,7 +189,7 @@ except the solutions are generated with [DeepSeek-R1-0528](https://huggingface.c
 
 ## Science data
 
-We generate science problems using [PLACEHOLDER] LLM with the prompt below, using few-shot examples to demonstrate the format.
+We generate science problems using Qwen2.5-32B-Instruct and Qwen3-235B-A22B LLMs with the prompt below, using few-shot examples to demonstrate the format.
 Questions are generated based on difficulty level, topic, and subtopic.
 ```yaml
 system: ""
@@ -204,6 +204,8 @@ user: |-
   For questions marked "borderline unsolvable", the question should challenge even experts, involving exceptionally intricate or unconventional problem structures. It should combine deep abstraction, subtle constraints, and highly interconnected concepts. While solutions exist, they often require extensive expertise and innovative approaches. Avoid speculative or unsolvable topics (e.g., "Does God exist?" or "How can time travel be achieved?").
   Ensure that one of the four choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
 ```
+Full dataset used for this effort is available at [HuggingFace](https://huggingface.co/datasets/nvidia/OpenScience).
+Note: HuggingFace version includes questions generated with Qwen2.5-72B-Instruct, which are not used for OpenReasoning.
 
 The next step is to augment these problems using the prompt below, with few-shot examples to demonstrate the format of the output.
 ```yaml
@@ -222,6 +224,6 @@ user: |-
 ```
 
 Next, we generate solutions for these problems.
-We use DeepSeek-R1 with [PARAMETERS PLACEHOLDER] to generate solutions.
+We use DeepSeek-R1-0528 to generate solutions with parameters as described in the math section above.
 
 The final step is to apply majority voting over the solutions generated in the previous step to obtain the final dataset.
