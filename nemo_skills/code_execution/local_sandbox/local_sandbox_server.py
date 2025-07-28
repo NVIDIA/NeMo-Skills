@@ -147,10 +147,6 @@ def execute_python_session(generated_code, session_id, timeout=30):
     except Exception as e:
         return {"process_status": "error", "stdout": "", "stderr": f"Session error: {e}\n"}
 
-# ============================================================================
-# ORIGINAL NON-SESSION EXECUTION
-# ============================================================================
-
 def execute_python(generated_code, timeout):
     # running in a separate process to ensure any kind of crashes are properly handled
     queue = multiprocessing.Queue()
@@ -214,7 +210,7 @@ def execute_code_subprocess(generated_code, queue):
     sys.stdout = StringIO()
     try:
         exec(generated_code, {})
-        queue.put({"process_status": "completed", "stdout": sys.stdout.getvalue(), "stderr": ""})
+        queue.put(sys.stdout.getvalue())
     except Exception as e:
         print(f"Error: {str(e)}")
         queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
@@ -270,28 +266,6 @@ def delete_session(session_id):
         else:
             return {"error": f"IPython session {session_id} not found"}, 404
 
-
-# ============================================================================
-# AUTOMATIC BACKGROUND CLEANUP
-# ============================================================================
-
-def background_cleanup():
-    """Background thread that cleans up expired sessions every 5 minutes"""
-    import time
-    while True:
-        try:
-            time.sleep(300)  # 5 minutes
-            print("Running background session cleanup...")
-            cleanup_expired_sessions()
-        except Exception as e:
-            print(f"Error in background cleanup: {e}")
-
-# Start background cleanup thread
-cleanup_thread = threading.Thread(target=background_cleanup, daemon=True)
-cleanup_thread.start()
-print("Started background cleanup thread for IPython sessions")
-
-
 @app.route("/health", methods=["GET"])
 def health():
     """Health check endpoint for load balancer"""
@@ -299,19 +273,8 @@ def health():
 
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Local sandbox server')
-    parser.add_argument('--port', type=int, default=6000, help='Port to run server on')
-    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
-
-    args = parser.parse_args()
-
-    # Also check environment variable (used by load balancer)
-    port = int(os.environ.get('FLASK_PORT', args.port))
-
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.WARNING)
 
     print(f"Starting sandbox server on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=args.debug)
+    app.run(port=6000)
