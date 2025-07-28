@@ -13,9 +13,8 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'judge/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "answer-judgement"
 # using judgement directly in metrics, no need for special evaluation
 EVAL_ARGS = "++eval_type=no-op ++generation_key=judgement"
-GENERATION_ARGS = "++generation_key=judgement"
+GENERATION_ARGS = "++prompt_config=judge/math ++generation_key=judgement"
