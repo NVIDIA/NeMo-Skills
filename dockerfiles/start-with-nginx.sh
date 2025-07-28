@@ -120,16 +120,12 @@ die-on-term = true
 memory-report = true
 
 # Connection and request limits to prevent overload
-max-requests = 1000
-max-requests-delta = 50
 listen = 100
 http-timeout = 300
 socket-timeout = 300
 
-# Memory limits and worker stability
-reload-on-rss = 1024
-reload-mercy = 60
-worker-reload-mercy = 60
+# NO auto-restart settings to preserve session persistence
+# max-requests and reload-on-rss would kill Jupyter kernels
 
 # Logging for debugging 502 errors
 disable-logging = false
