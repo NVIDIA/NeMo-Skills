@@ -196,6 +196,10 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_file.replace('.pred', '.jsonl'), 'w') as f:
             f.write(json.dumps(trajectory_dict))
 
+        # TODO: get num_generated_tokens and other stats from .traj file
+        # looks like data['info']['model_stats']
+        # {'instance_cost': 0, 'tokens_sent': 40858, 'tokens_received': 1775, 'api_calls': 9}
+
         swe_bench_cmd = (
             # first installing SWE-bench repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
@@ -211,8 +215,8 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --predictions_path {pred_mounted_path} "
             f"    --instance_ids {data_point['instance_id']} "
             f"    --run_id eval-outputs "
-            f"    --dataset_name princeton-nlp/SWE-bench_Verified "  # TODO
-            f"    --split test 2>&1) && "  # TODO (write to file)
+            f"    --dataset_name {data_point['dataset_name']} "
+            f"    --split {data_point['split']} 2>&1) && "
             # check if empty patches and handle accordingly
             f"if echo \"$eval_output\" | grep -q \"Instances with empty patches: 1\"; then "
             f"    mkdir -p /trajectories_mount/eval-outputs/{data_point['instance_id']} && "

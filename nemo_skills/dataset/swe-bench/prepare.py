@@ -18,18 +18,17 @@ import datasets
 
 if __name__ == "__main__":
     # TODO: support these with options
-    dataset = "princeton-nlp/SWE-bench_Verified"
+    dataset_name = "princeton-nlp/SWE-bench_Verified"
     split = "test"
-    # container_formatter = (
-    #     "/lustre/fsw/portfolios/llmservice/users/snarenthiran/swe-bench/containers/sweb.eval.x86_64.{instance_id}.sqsh"
-    # )
-    # container_formatter = "swebench/sweb.eval.x86_64.{instance_id}"
+    # container_formatter = "docker://swebench/sweb.eval.x86_64.{instance_id}"
     container_formatter = (
         "/lustre/fsw/portfolios/llmservice/users/igitman/swe-bench-images/"
         "swebench_sweb.eval.x86_64.{instance_id}.sif"
     )
-    dataset = datasets.load_dataset(path=dataset, split=split)
+    dataset = datasets.load_dataset(path=dataset_name, split=split)
     output_file = Path(__file__).parent / "test.jsonl"
     dataset = dataset.map(lambda example: {**example, "container_formatter": container_formatter})
     dataset = dataset.add_column("container_id", list(range(len(dataset))))
+    dataset = dataset.add_column("dataset_name", [dataset_name] * len(dataset))
+    dataset = dataset.add_column("split", [split] * len(dataset))
     dataset.to_json(output_file, orient="records", lines=True)
