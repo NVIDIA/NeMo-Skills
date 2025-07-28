@@ -78,23 +78,8 @@ cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 
 class SweBenchGenerationTask(GenerationTask):
     def __init__(self, cfg: SweBenchGenerationConfig):
-        super().__init__(cfg)
-
-        if not self.use_async_loop:  # if it was True, this message is printed by base class
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
-            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
-                LOG.warning(
-                    "NeMo/Megatron servers don't support inflight batching, "
-                    "but SweBench evaluation requires it for efficient inference. "
-                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
-                    "We highly recommend switching to a server that supports inflight batching."
-                )
+        # not calling parent init on purpose
         self.use_async_loop = True  # SweBench is a multi-call benchmark, so we have to use async loop
-
         self.output_dir = Path(self.cfg.output_file).parent
 
     def log_example_prompt(self, data):
@@ -159,6 +144,12 @@ class SweBenchGenerationTask(GenerationTask):
     def generate_single_answer(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
 
+        # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
+        # TODO: use self.cfg.server.model, self.cfg.server.server_host, self.cfg.server.server_port, etc. Can we pass in API key?
+        # TODO: we should disallow any non-supported parameters (e.g. top-k or min-p) by checking against defaults
+        # TODO: how should we handle tokens_to_generate?
+        # TODO: is random_seed different on different reruns? Can we force it to?
+
         swe_agent_cmd = (
             # first installing swe-agent repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
@@ -172,8 +163,10 @@ class SweBenchGenerationTask(GenerationTask):
             # then running the agent
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.sweagent_config)} "
-            f"    --agent.model.name hosted_vllm/model "  # TODO
+            f"    --agent.model.name hosted_vllm/model "
             f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
+            f"    --agent.model.temperature {self.cfg.inference.temperature} "
+            f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --env.deployment.type local "
             f"    --env.repo.type preexisting "
             f"    --env.repo.repo_name testbed "
