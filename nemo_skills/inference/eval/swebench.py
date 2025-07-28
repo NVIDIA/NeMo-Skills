@@ -93,7 +93,7 @@ class SweBenchGenerationTask(GenerationTask):
             # then running the agent
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config /nemo_run/code/nemo_skills/prompt/config/{self.cfg.prompt_config}.yaml "  # TODO: handle absolute path!
-            f"    --agent.model.name hosted_vllm/SWE-bench/SWE-agent-LM-32B "  # TODO
+            f"    --agent.model.name hosted_vllm/model "  # TODO
             f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
             f"    --env.deployment.type local "
             f"    --env.repo.type preexisting "
@@ -178,15 +178,22 @@ class SweBenchGenerationTask(GenerationTask):
             "uv venv --python 3.12 venv && "
             "source venv/bin/activate && "
             "uv pip install -e . && "
-            # then running the evaluation
-            f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
+            # then running the evaluation and capturing output
+            f"eval_output=$(/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
             f"    --predictions_path {pred_mounted_path} "
             f"    --instance_ids {data_point['instance_id']} "
             f"    --run_id eval-outputs "
             f"    --dataset_name princeton-nlp/SWE-bench_Verified "  # TODO
-            f"    --split test"  # TODO (write to file)
-            # move outputs
-            f" && cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
+            f"    --split test 2>&1) && "  # TODO (write to file)
+            # check if empty patches and handle accordingly
+            f"if echo \"$eval_output\" | grep -q \"Instances with empty patches: 1\"; then "
+            f"    mkdir -p /trajectories_mount/eval-outputs/{data_point['instance_id']} && "
+            f"    echo '{{\""
+            + data_point['instance_id']
+            + "\": {{\"issues_resolved\": false, \"no_patch\": true, \"patch_cant_apply\": true}}}}' > /trajectories_mount/eval-outputs/{data_point['instance_id']}/report.json; "
+            f"else "
+            f"    cp -r logs/run_evaluation/eval-outputs /trajectories_mount/; "
+            f"fi"
         )
 
         container_name = data_point["container_formatter"].format(
