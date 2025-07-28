@@ -146,6 +146,7 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.system_message:
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
+        # Step 1: Construct the prompt 
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
@@ -163,6 +164,8 @@ class BFCLGenerationTask(GenerationTask):
                 **self.extra_generate_params,
             }
 
+
+        # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
         try:
             output = self.llm.generate(**input_dict)[0]
@@ -174,7 +177,7 @@ class BFCLGenerationTask(GenerationTask):
             else:
                 raise
 
-        
+        # Step 3: Parse the generated output. In case of server side parsing, merely getting the response message
         if self.cfg.use_client_parsing:
             parsed_response = self.cfg.response_parser(output["response"])["model_responses_message_for_chat_history"]
 
