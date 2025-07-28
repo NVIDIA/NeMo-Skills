@@ -34,8 +34,10 @@ running commands from it.
     ```
     RuntimeError: Your repo has uncommitted changes. Please commit your changes or set check_uncommitted_changes to False to proceed with packaging.
     ```
-    This error can be avoided by either taking care of the uncommited changes (via commit/revert), or setting the environment variable 
-    ```export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1```
+    This error can be avoided by either taking care of the uncommited changes (via commit/revert), or setting the environment variable: 
+    ```bash
+    export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1
+    ```
 
 
 Finally, it's important to keep in mind that whenever you submit a new experiment, NeMo-Run will create a copy of your
