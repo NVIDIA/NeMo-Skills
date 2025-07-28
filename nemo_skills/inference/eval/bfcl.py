@@ -20,6 +20,8 @@ from dataclasses import asdict, field
 from functools import partial
 
 import hydra
+import openai
+
 from omegaconf import OmegaConf
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
@@ -152,7 +154,26 @@ class BFCLGenerationTask(GenerationTask):
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             }
+        else:
+            input_dict = {
+                "prompts": [messages],
+                "tools": [tools],
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
+
+        try:
             output = self.llm.generate(**input_dict)[0]
+        except openai.BadRequestError as e:
+            if 'Please reduce the length of the messages or completion' in str(e):
+                LOG.warning("BFCL generation failed due to running out of context. ")
+                return {"message": None, "generation": "_ran_out_of_context_"}
+            else:
+                raise
+
+        
+        if self.cfg.use_client_parsing:
             parsed_response = self.cfg.response_parser(output["response"])["model_responses_message_for_chat_history"]
 
             model_response = {
@@ -170,17 +191,7 @@ class BFCLGenerationTask(GenerationTask):
                 "tool_calls": parsed_response.get("tool_calls", []),
                 "num_generated_tokens": output["num_generated_tokens"],
             }
-
-        else:
-            input_dict = {
-                "prompts": [messages],
-                "tools": [tools],
-                "include_response": True,
-                **asdict(self.cfg.inference),
-                **self.extra_generate_params,
-            }
-
-            output = self.llm.generate(**input_dict)[0]
+        else:   
             if "tool_calls" not in output:
                 output["tool_calls"] = []
             output["message"] = output["response"].choices[0].message
@@ -191,13 +202,15 @@ class BFCLGenerationTask(GenerationTask):
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
         model_response = self._generate_single_assistant_turn(state_dict)
-        proc_model_response = self._process_model_response(model_response)
-
-        return {
-            "id": data_point["id"],
-            "generation": proc_model_response["generation"],
-            "num_generated_tokens": model_response.get("num_generated_tokens", 0),
-        }
+        if model_response["message"] is None:
+            # Ran out of context
+            return {"generation": "_ran_out_of_context_", "num_generated_tokens": 0}
+        else:
+            proc_model_response = self._process_model_response(model_response)
+            return {
+                "generation": proc_model_response["generation"],
+                "num_generated_tokens": model_response.get("num_generated_tokens", 0),
+            }
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
@@ -238,8 +251,12 @@ class BFCLGenerationTask(GenerationTask):
 
             while True:
                 model_response = self._generate_single_assistant_turn(state_dict)
+                if model_response["message"] is None:
+                    # Ran out of context
+                    break
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
+            
 
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
