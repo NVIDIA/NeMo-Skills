@@ -169,6 +169,85 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
 
+        pred_mounted_path = pred_files[0].replace(self.cfg.trajectories_dir, "/trajectories_mount")
+
+        swe_bench_cmd = (
+            # first installing SWE-bench repo
+            "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+            "source /root/.local/bin/env && "
+            "cd /root && "
+            "git clone https://github.com/Kipok/SWE-bench.git && "
+            "cd SWE-bench && "
+            "uv venv --python 3.12 venv && "
+            "source venv/bin/activate && "
+            "uv pip install -e . && "
+            # then running the evaluation
+            f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
+            f"    --predictions_path {pred_mounted_path} "
+            f"    --instance_ids {data_point['instance_id']} "
+            f"    --run_id swe-bench-eval "
+            f"    --dataset_name princeton-nlp/SWE-bench_Verified "  # TODO
+            f"    --split test"  # TODO (write to file)
+        )
+
+        container_name = data_point["container_formatter"].format(
+            instance_id=data_point['instance_id'].replace('__', '_1776_')
+        )
+
+        # Launch Apptainer container and execute the command
+        apptainer_cmd = (
+            f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
+            f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
+            f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
+            f" {container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+        )
+
+        LOG.info("Running command: %s", apptainer_cmd)
+
+        # Retry apptainer command up to 3 times
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # no timeout, can work as long as needed
+                result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
+
+                # Look for the pred file in the temp directory
+                search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
+                pred_files = glob.glob(search_path, recursive=True)
+
+                if len(pred_files) == 1:
+                    # Success, break out of retry loop
+                    break
+                else:
+                    raise ValueError(
+                        f"Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"found {len(pred_files)}. Searched in {search_path}"
+                    )
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    LOG.warning(
+                        "Attempt %d failed for instance %s: %s. Retrying...",
+                        attempt + 1,
+                        data_point['instance_id'],
+                        str(e),
+                    )
+                    continue
+                else:
+                    LOG.error("All %d attempts failed for instance %s", max_retries, data_point['instance_id'])
+                    LOG.error("Apptainer command failed. Full logs:")
+                    LOG.error("STDOUT:")
+                    LOG.error(result.stdout if 'result' in locals() else "No output captured")
+                    LOG.error("STDERR:")
+                    LOG.error(result.stderr if 'result' in locals() else "No error output captured")
+                    LOG.error("Return code: %d", result.returncode if 'result' in locals() else "Unknown")
+                    raise ValueError(
+                        f"Job logs: Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}. Searched in {search_path}"
+                    )
+
+        with open(pred_files[0], 'r') as f:
+            trajectory_dict = json.loads(f.read().strip())
+
         trajectory_dict["generation"] = ""  # required TODO?
 
         return trajectory_dict
