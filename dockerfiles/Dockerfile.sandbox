@@ -56,8 +56,8 @@ RUN mkdir /data && pip install gdown && \
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 
 # Copy nginx configuration template and startup scripts
-COPY dockerfiles/nginx.conf.template /etc/nginx/nginx.conf.template
-COPY dockerfiles/start-with-nginx.sh /start-with-nginx.sh
+COPY dockerfiles/sandbox/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY dockerfiles/sandbox/start-with-nginx.sh /start-with-nginx.sh
 
 # Make scripts executable
 RUN chmod +x /start-with-nginx.sh
