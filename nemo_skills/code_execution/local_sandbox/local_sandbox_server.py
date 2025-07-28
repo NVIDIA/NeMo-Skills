@@ -30,6 +30,29 @@ import queue
 
 app = Flask(__name__)
 
+@app.route("/debug/worker", methods=["GET", "POST"])
+def debug_worker():
+    """Debug endpoint to see which worker is handling the request"""
+    import os
+
+    # Check if this is a POST request with session_id
+    session_from_json = None
+    if request.method == 'POST' and request.is_json:
+        data = request.get_json(silent=True)
+        session_from_json = data.get('session_id') if data else None
+
+    worker_info = {
+        "worker_port": os.environ.get('LISTEN_PORT', 'unknown'),
+        "worker_num": os.environ.get('WORKER_NUM', 'unknown'),
+        "process_id": os.getpid(),
+        "request_method": request.method,
+        "session_id_from_json": session_from_json,
+        "session_id_from_header": request.headers.get('X-Session-ID', 'none'),
+        "nginx_extracted_session": request.headers.get('X-Session-ID', 'none'),
+        "original_session_header": request.headers.get('X-Original-Session-Header', 'none')
+    }
+    return worker_info
+
 # Global dictionary to store Jupyter kernels by session_id
 kernels = {}
 kernel_lock = threading.Lock()
@@ -243,7 +266,9 @@ def execute():
     generated_code = request.json['generated_code']
     timeout = request.json['timeout']
     language = request.json.get('language', 'python')
-    session_id = request.json.get('session_id')
+
+    # Get session_id from JSON body first, then from header (for nginx compatibility)
+    session_id = request.json.get('session_id') or request.headers.get('X-Session-ID')
 
     if language == 'python':
         if session_id:
@@ -284,7 +309,26 @@ def delete_session(session_id):
             return {"error": f"Session {session_id} not found"}, 404
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint for load balancer"""
+    return {"status": "healthy", "port": os.environ.get('FLASK_PORT', '6000')}
+
+
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Local sandbox server')
+    parser.add_argument('--port', type=int, default=6000, help='Port to run server on')
+    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+
+    args = parser.parse_args()
+
+    # Also check environment variable (used by load balancer)
+    port = int(os.environ.get('FLASK_PORT', args.port))
+
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.WARNING)
-    app.run(port=6000)
+
+    print(f"Starting sandbox server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=args.debug)
