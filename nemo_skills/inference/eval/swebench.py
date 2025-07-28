@@ -185,9 +185,11 @@ class SweBenchGenerationTask(GenerationTask):
             f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
             f"    --predictions_path {pred_mounted_path} "
             f"    --instance_ids {data_point['instance_id']} "
-            f"    --run_id swe-bench-eval "
+            f"    --run_id eval-outputs "
             f"    --dataset_name princeton-nlp/SWE-bench_Verified "  # TODO
             f"    --split test"  # TODO (write to file)
+            # move outputs
+            f" && cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
         )
 
         container_name = data_point["container_formatter"].format(
@@ -199,7 +201,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
             f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
-            f" {container_name} bash -c {shlex.quote(swe_agent_cmd)}"
+            f" {container_name} bash -c {shlex.quote(swe_bench_cmd)}"
         )
 
         LOG.info("Running command: %s", apptainer_cmd)
@@ -212,7 +214,9 @@ class SweBenchGenerationTask(GenerationTask):
                 result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
                 # Look for the pred file in the temp directory
-                search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
+                search_path = os.path.join(
+                    self.cfg.trajectories_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
+                )
                 pred_files = glob.glob(search_path, recursive=True)
 
                 if len(pred_files) == 1:
@@ -220,7 +224,7 @@ class SweBenchGenerationTask(GenerationTask):
                     break
                 else:
                     raise ValueError(
-                        f"Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"Expected exactly one report.json file for {data_point['instance_id']}, "
                         f"found {len(pred_files)}. Searched in {search_path}"
                     )
             except Exception as e:
@@ -246,7 +250,9 @@ class SweBenchGenerationTask(GenerationTask):
                     )
 
         with open(pred_files[0], 'r') as f:
-            trajectory_dict = json.loads(f.read().strip())
+            report_json = json.loads(f.read().strip())
+
+        trajectory_dict["eval-metrics"] = report_json
 
         trajectory_dict["generation"] = ""  # required TODO?
 
