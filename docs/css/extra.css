@@ -1,7 +1,7 @@
 /* Target only inline code */
 p code, li code, td code {
-  word-break: break-word;
-  white-space: pre-wrap;
+  word-break: keep-all;
+  white-space: nowrap;
 }
 
 /* Preserve formatting for multi-line code blocks */
