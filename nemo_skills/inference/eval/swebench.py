@@ -163,7 +163,7 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
 
-        pred_mounted_path = pred_files[0].replace(self.output_dir, "/trajectories_mount")
+        pred_mounted_path = pred_files[0].replace(str(self.output_dir), "/trajectories_mount")
 
         swe_bench_cmd = (
             # first installing SWE-bench repo
