@@ -168,7 +168,7 @@ class BFCLGenerationTask(GenerationTask):
             output = self.llm.generate(**input_dict)[0]
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
-            if 'Please reduce the length of the messages or completion' in str(e):
+            if "Requested token count exceeds the model's maximum context length" in str(e):
                 LOG.warning("BFCL generation failed due to running out of context. ")
                 return {"message": None, "generation": "_ran_out_of_context_"}
             else:
