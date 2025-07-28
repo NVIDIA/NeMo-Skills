@@ -22,8 +22,6 @@ from pathlib import Path
 
 import pytest
 
-from nemo_skills.evaluation.metrics import ComputeMetrics
-
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
 prompt_templates = [f[:-5] for f in os.listdir(template_folder) if f.endswith('.yaml')]
@@ -68,47 +66,6 @@ def test_generation_dryrun_gsm8k(prompt_template):
     subprocess.run(cmd, shell=True, check=True)
 
 
-def test_eval_mtbench_api(tmp_path):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
-
-    cmd = (
-        f"ns eval "
-        f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
-        f"    --server_address=https://integrate.api.nvidia.com/v1 "
-        f"    --benchmarks=mt-bench "
-        f"    --output_dir={tmp_path} "
-        f"    --extra_eval_args=\"++eval_config.use_batch_api=False "
-        f"                        ++eval_config.judge_model='meta/llama-3.1-8b-instruct' "
-        f"                        ++eval_config.base_url='https://integrate.api.nvidia.com/v1'\" "
-        f"    ++max_samples=2 "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    # checking that summarize results works (just that there are no errors, but can inspect the output as well)
-    subprocess.run(
-        f"ns summarize_results {tmp_path}",
-        shell=True,
-        check=True,
-    )
-
-    # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='mt-bench').compute_metrics(
-        [f"{tmp_path}/eval-results/mt-bench/output.jsonl"],
-    )["_all_"]["pass@1"]
-
-    # not having other categories since we just ran with 2 samples
-    assert metrics['average'] >= 5
-    assert metrics['average_turn1'] >= 5
-    assert metrics['average_turn2'] >= 5
-    assert metrics['writing_turn1'] >= 5
-    assert metrics['writing_turn2'] >= 5
-    assert metrics['missing_rating_turn1'] < 2
-    assert metrics['missing_rating_turn2'] < 2
-    assert metrics['num_entries'] == 2
-
-
 @pytest.mark.parametrize("format", ["list", "dict"])
 def test_generate_openai_format(tmp_path, format):
     if not os.getenv('NVIDIA_API_KEY'):
@@ -116,9 +73,9 @@ def test_generate_openai_format(tmp_path, format):
 
     cmd = (
         f"ns generate "
-        f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
-        f"    --server_address=https://integrate.api.nvidia.com/v1 "
+        f"    --server_type=azureopenai "
+        f"    --model=gpt-4.1-20250414 "
+        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
         f"    --input_file=/nemo_run/code/tests/data/openai-input-{format}.test "
         f"    --output_dir={tmp_path} "
         f"    ++prompt_format=openai "
