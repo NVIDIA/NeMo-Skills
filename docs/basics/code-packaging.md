@@ -31,9 +31,11 @@ running commands from it.
 !!! note
     
     When you run commands from a git repo with uncommited changes, NeMo-Run throws the following error
-    `RuntimeError: Your repo has uncommitted changes. Please commit your changes or set check_uncommitted_changes to False to proceed with packaging.`. 
+    ```
+    RuntimeError: Your repo has uncommitted changes. Please commit your changes or set check_uncommitted_changes to False to proceed with packaging.
+    ```
     This error can be avoided by either taking care of the uncommited changes (via commit/revert), or setting the environment variable 
-    `export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=0`
+    `export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1`
 
 
 Finally, it's important to keep in mind that whenever you submit a new experiment, NeMo-Run will create a copy of your
