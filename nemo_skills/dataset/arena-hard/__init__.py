@@ -17,7 +17,7 @@
 PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'chat'
 METRICS_TYPE = "arena"
-EVAL_ARGS = "++eval_type=arena"
+EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
 GENERATION_ARGS = ""
 
 JUDGE_PIPELINE_ARGS = {

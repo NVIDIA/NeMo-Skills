@@ -16,5 +16,6 @@
 PROMPT_CONFIG = 'judge/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "answer-judgement"
-EVAL_ARGS = "++eval_type=answer_judgement ++generation_key=judgement"
+# using judgement directly in metrics, no need for special evaluation
+EVAL_ARGS = "++eval_type=no-op ++generation_key=judgement"
 GENERATION_ARGS = "++generation_key=judgement"

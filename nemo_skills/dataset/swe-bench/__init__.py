@@ -16,6 +16,6 @@
 PROMPT_CONFIG = 'eval/swe-bench/swe-agent'  # not managed by nemo-skills, in swe-agent format
 DATASET_GROUP = 'code'
 METRICS_TYPE = "swe-bench"
-EVAL_ARGS = "++eval_type=swe-bench"
+EVAL_ARGS = "++eval_type=no-op"  # evaluation is fused with generation for efficiency
 GENERATION_ARGS = ""
 GENERATION_MODULE = "nemo_skills.inference.eval.swebench"
