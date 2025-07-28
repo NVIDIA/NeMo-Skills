@@ -38,6 +38,7 @@ running commands from it.
     ```bash
     export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1
     ```
+    In all cases, uncommitted code will not be used. 
 
 
 Finally, it's important to keep in mind that whenever you submit a new experiment, NeMo-Run will create a copy of your
