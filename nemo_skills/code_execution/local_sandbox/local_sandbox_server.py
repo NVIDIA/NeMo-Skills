@@ -84,14 +84,20 @@ def get_or_create_kernel(session_id):
     current_time = time.time()
     with kernel_lock:
         if session_id not in kernels:
+            # Add small random delay to reduce thundering herd when many sessions start simultaneously
+            import random
+            startup_delay = random.uniform(0.1, 0.5)
+            time.sleep(startup_delay)
+
             # Try to create kernel with retries
             for attempt in range(KERNEL_STARTUP_RETRIES):
                 try:
                     print(f"Creating kernel for session {session_id} (attempt {attempt + 1}/{KERNEL_STARTUP_RETRIES})")
 
-                    # Add small delay between retries to avoid thundering herd
+                    # Add delay between retries to avoid thundering herd
                     if attempt > 0:
-                        time.sleep(1)
+                        retry_delay = 1 + random.uniform(0, 1)  # 1-2 seconds
+                        time.sleep(retry_delay)
 
                     # Create a new kernel manager and start the kernel
                     kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
