@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from nemo_skills.evaluation.metrics import ComputeMetrics
+
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
 prompt_templates = [f[:-5] for f in os.listdir(template_folder) if f.endswith('.yaml')]
@@ -64,6 +66,38 @@ def test_generation_dryrun_gsm8k(prompt_template):
         f"    ++dry_run=True "
     )
     subprocess.run(cmd, shell=True, check=True)
+
+
+def test_eval_mtbench_api(tmp_path):
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
+
+    cmd = (
+        f"ns eval "
+        f"    --server_type=azureopenai "
+        f"    --model=gpt-4.1-20250414 "
+        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --benchmarks=gsm8k "
+        f"    --output_dir={tmp_path} "
+        f"    ++max_samples=2 "
+    )
+    subprocess.run(cmd, shell=True, check=True)
+
+    # checking that summarize results works (just that there are no errors, but can inspect the output as well)
+    subprocess.run(
+        f"ns summarize_results {tmp_path}",
+        shell=True,
+        check=True,
+    )
+
+    # running compute_metrics to check that results are expected
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"{tmp_path}/eval-results/gsm8k/output.jsonl"],
+    )[
+        "_all_"
+    ]["pass@1"]
+
+    assert metrics['symbolic_correct'] >= 80
 
 
 @pytest.mark.parametrize("format", ["list", "dict"])
