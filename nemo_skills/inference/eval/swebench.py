@@ -19,13 +19,12 @@ import os
 import shlex
 import subprocess
 import sys
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
+from pathlib import Path
 
 import hydra
 
-from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -41,7 +40,6 @@ class SweBenchGenerationConfig(GenerateSolutionsConfig):
     server: dict = field(default_factory=dict)
 
     prompt_config: str = "eval/swe-bench/swe-agent"
-    trajectories_dir: str = "/tmp/swe_trajectories"
 
     # TODO: disallow most parameters?
     # TODO: can we support our model interface?
@@ -70,8 +68,7 @@ class SweBenchGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True  # SweBench is a multi-call benchmark, so we have to use async loop
 
-        # self.container_ports = os.environ["NEMO_SKILLS_SANDBOX_PORTS"].split(',')
-        # self.sandboxes = [Sandbox(port=port) for port in self.container_ports]
+        self.output_dir = Path(self.cfg.output_file).parent
 
     def log_example_prompt(self, data):
         """SweBench is multi-call benchmark, so we can't print a single prompt."""
@@ -82,9 +79,6 @@ class SweBenchGenerationTask(GenerationTask):
 
     def generate_single_answer(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
-
-        # Create temporary directory for trajectories
-        os.makedirs(self.cfg.trajectories_dir, exist_ok=True)
 
         swe_agent_cmd = (
             # first installing swe-agent repo
@@ -108,7 +102,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
             f"    --problem_statement.id {data_point['instance_id']} && "
             # move trajectories to the mounted directory
-            f"cp -r trajectories/* /trajectories_mount/"
+            f"cp -r trajectories /trajectories_mount/"
         )
 
         container_name = data_point["container_formatter"].format(
@@ -119,7 +113,7 @@ class SweBenchGenerationTask(GenerationTask):
         apptainer_cmd = (
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
-            f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
+            f"--mount type=bind,src={self.output_dir},dst=/trajectories_mount "
             f" {container_name} bash -c {shlex.quote(swe_agent_cmd)}"
         )
 
@@ -133,7 +127,7 @@ class SweBenchGenerationTask(GenerationTask):
                 result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
                 # Look for the pred file in the temp directory
-                search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
+                search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
                 pred_files = glob.glob(search_path, recursive=True)
 
                 if len(pred_files) == 1:
@@ -169,7 +163,7 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
 
-        pred_mounted_path = pred_files[0].replace(self.cfg.trajectories_dir, "/trajectories_mount")
+        pred_mounted_path = pred_files[0].replace(self.output_dir, "/trajectories_mount")
 
         swe_bench_cmd = (
             # first installing SWE-bench repo
@@ -200,7 +194,7 @@ class SweBenchGenerationTask(GenerationTask):
         apptainer_cmd = (
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
-            f"--mount type=bind,src={self.cfg.trajectories_dir},dst=/trajectories_mount "
+            f"--mount type=bind,src={self.output_dir},dst=/trajectories_mount "
             f" {container_name} bash -c {shlex.quote(swe_bench_cmd)}"
         )
 
@@ -211,11 +205,11 @@ class SweBenchGenerationTask(GenerationTask):
         for attempt in range(max_retries):
             try:
                 # no timeout, can work as long as needed
-                result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
+                result = subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
 
                 # Look for the pred file in the temp directory
                 search_path = os.path.join(
-                    self.cfg.trajectories_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
+                    self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
                 )
                 pred_files = glob.glob(search_path, recursive=True)
 
