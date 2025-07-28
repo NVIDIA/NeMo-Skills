@@ -70,7 +70,7 @@ awk -v upstream_file="$UPSTREAM_FILE" '
 ' /tmp/nginx_temp.conf > /etc/nginx/nginx.conf
 
 echo "Generated nginx config with upstream servers:"
-echo "✅ Nginx configuration created successfully"
+echo "Nginx configuration created successfully"
 
 # Test nginx configuration
 echo "Testing nginx configuration..."
@@ -207,13 +207,13 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
         if curl -s -f --connect-timeout 2 --max-time 5 http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
             READY_WORKERS=$((READY_WORKERS + 1))
             WORKER_READY[$i]=1
-            echo "  ✅ Worker $i (port $PORT): Ready! ($READY_WORKERS/$NUM_WORKERS)"
+            echo "  Worker $i (port $PORT): Ready! ($READY_WORKERS/$NUM_WORKERS)"
         fi
     done
 
     # Show progress every 10 seconds
     if [ $((CURRENT_TIME % 10)) -eq 0 ] && [ $READY_WORKERS -lt $NUM_WORKERS ]; then
-        echo "  ⏳ Progress: $READY_WORKERS/$NUM_WORKERS workers ready (${CURRENT_TIME}s elapsed)"
+        echo "  Progress: $READY_WORKERS/$NUM_WORKERS workers ready (${CURRENT_TIME}s elapsed)"
     fi
 
     # Check less frequently to reduce CPU usage and log spam
@@ -227,19 +227,19 @@ echo "Starting nginx on port $NGINX_PORT..."
 nginx
 
 echo "=== Multi-worker deployment ready ==="
-echo "🚀 Nginx load balancer: http://localhost:$NGINX_PORT"
-echo "📊 Session affinity: enabled (based on X-Session-ID header or JSON session_id)"
-echo "⚙️  Workers: $NUM_WORKERS (ports $BASE_PORT-$((BASE_PORT + NUM_WORKERS - 1)))"
-echo "📈 Nginx status: http://localhost:$NGINX_PORT/nginx-status"
-echo "📊 UWSGI processes per worker: $UWSGI_PROCESSES"
+echo "Nginx load balancer: http://localhost:$NGINX_PORT"
+echo "Session affinity: enabled (based on X-Session-ID header or JSON session_id)"
+echo "Workers: $NUM_WORKERS (ports $BASE_PORT-$((BASE_PORT + NUM_WORKERS - 1)))"
+echo "Nginx status: http://localhost:$NGINX_PORT/nginx-status"
+echo "UWSGI processes per worker: $UWSGI_PROCESSES"
 if [ -n "$UWSGI_CHEAPER" ]; then
-    echo "💰 UWSGI cheaper mode: $UWSGI_CHEAPER"
+    echo "UWSGI cheaper mode: $UWSGI_CHEAPER"
 else
-    echo "💰 UWSGI cheaper mode: disabled"
+    echo "UWSGI cheaper mode: disabled"
 fi
 
 # Show process status
-echo "📊 Process status:"
+echo "Process status:"
 for i in "${!WORKER_PIDS[@]}"; do
     pid=${WORKER_PIDS[$i]}
     if kill -0 "$pid" 2>/dev/null; then
