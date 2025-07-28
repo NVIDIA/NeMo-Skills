@@ -163,7 +163,12 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
 
-        pred_mounted_path = pred_files[0].replace(str(self.output_dir), "/trajectories_mount")
+        # need to rename .pred to .json
+        pred_mounted_path = (
+            pred_files[0].replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.json')
+        )
+        with open(pred_files[0].replace('.pred', '.json'), 'w') as f:
+            f.write(json.dumps(trajectory_dict))
 
         swe_bench_cmd = (
             # first installing SWE-bench repo
@@ -239,7 +244,7 @@ class SweBenchGenerationTask(GenerationTask):
                     LOG.error(result.stderr if 'result' in locals() else "No error output captured")
                     LOG.error("Return code: %d", result.returncode if 'result' in locals() else "Unknown")
                     raise ValueError(
-                        f"Job logs: Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"Job logs: Expected exactly one report.json file for {data_point['instance_id']}, "
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}. Searched in {search_path}"
                     )
 
