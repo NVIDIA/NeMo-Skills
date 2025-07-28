@@ -117,8 +117,6 @@ class SweBenchGenerationTask(GenerationTask):
             f" {container_name} bash -c {shlex.quote(swe_agent_cmd)}"
         )
 
-        LOG.info("Running command: %s", apptainer_cmd)
-
         # Retry apptainer command up to 3 times
         max_retries = 3
         for attempt in range(max_retries):
@@ -203,14 +201,12 @@ class SweBenchGenerationTask(GenerationTask):
             f" {container_name} bash -c {shlex.quote(swe_bench_cmd)}"
         )
 
-        LOG.info("Running command: %s", apptainer_cmd)
-
         # Retry apptainer command up to 3 times
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 # no timeout, can work as long as needed
-                result = subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
+                result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
                 # Look for the pred file in the temp directory
                 search_path = os.path.join(
