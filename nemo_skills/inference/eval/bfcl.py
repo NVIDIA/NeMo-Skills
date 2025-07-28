@@ -260,10 +260,11 @@ class BFCLGenerationTask(GenerationTask):
                 if model_response["message"] is None:
                     # Ran out of context
                     out_of_context = True
+                    LOG.info("Quitting the multi-turn generation due to running out of context.")
                     break
+
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
-            
 
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
