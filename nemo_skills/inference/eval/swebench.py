@@ -125,30 +125,53 @@ class SweBenchGenerationTask(GenerationTask):
 
         LOG.info("Running command: %s", apptainer_cmd)
 
-        # no timeout, can work as long as needed
-        result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
+        # Retry apptainer command up to 3 times
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # no timeout, can work as long as needed
+                result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
 
-        # Look for the pred file in the temp directory
-        search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
-        pred_files = glob.glob(search_path, recursive=True)
+                # Look for the pred file in the temp directory
+                search_path = os.path.join(self.cfg.trajectories_dir, "**", f"{data_point['instance_id']}.pred")
+                pred_files = glob.glob(search_path, recursive=True)
 
-        if len(pred_files) != 1:
-            LOG.error("Apptainer command failed. Full logs:")
-            LOG.error("STDOUT:")
-            LOG.error(result.stdout)
-            LOG.error("STDERR:")
-            LOG.error(result.stderr)
-            LOG.error("Return code: %d", result.returncode)
-            raise ValueError(
-                f"Job logs: Expected exactly one .pred file for {data_point['instance_id']}, "
-                f"found {len(pred_files)}. Searched in {search_path}"
-            )
+                if len(pred_files) == 1:
+                    # Success, break out of retry loop
+                    break
+                else:
+                    raise ValueError(
+                        f"Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"found {len(pred_files)}. Searched in {search_path}"
+                    )
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    LOG.warning(
+                        "Attempt %d failed for instance %s: %s. Retrying...",
+                        attempt + 1,
+                        data_point['instance_id'],
+                        str(e),
+                    )
+                    continue
+                else:
+                    LOG.error("All %d attempts failed for instance %s", max_retries, data_point['instance_id'])
+                    LOG.error("Apptainer command failed. Full logs:")
+                    LOG.error("STDOUT:")
+                    LOG.error(result.stdout if 'result' in locals() else "No output captured")
+                    LOG.error("STDERR:")
+                    LOG.error(result.stderr if 'result' in locals() else "No error output captured")
+                    LOG.error("Return code: %d", result.returncode if 'result' in locals() else "Unknown")
+                    raise ValueError(
+                        f"Job logs: Expected exactly one .pred file for {data_point['instance_id']}, "
+                        f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}. Searched in {search_path}"
+                    )
+
         with open(pred_files[0], 'r') as f:
-            trajectory_json = f.read().strip()
+            trajectory_dict = json.loads(f.read().strip())
 
-        trajectory_json["generation"] = ""  # required TODO?
+        trajectory_dict["generation"] = ""  # required TODO?
 
-        return trajectory_json
+        return trajectory_dict
 
     def llm_generate(self, data_points, data, is_async=False):
         futures = []
