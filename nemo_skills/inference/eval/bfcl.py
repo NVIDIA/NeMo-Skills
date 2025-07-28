@@ -163,8 +163,10 @@ class BFCLGenerationTask(GenerationTask):
                 **self.extra_generate_params,
             }
 
+        # Enable soft-fail when the models run out of context
         try:
             output = self.llm.generate(**input_dict)[0]
+        # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
             if 'Please reduce the length of the messages or completion' in str(e):
                 LOG.warning("BFCL generation failed due to running out of context. ")
@@ -202,15 +204,11 @@ class BFCLGenerationTask(GenerationTask):
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
         model_response = self._generate_single_assistant_turn(state_dict)
-        if model_response["message"] is None:
-            # Ran out of context
-            return {"generation": "_ran_out_of_context_", "num_generated_tokens": 0}
-        else:
-            proc_model_response = self._process_model_response(model_response)
-            return {
-                "generation": proc_model_response["generation"],
-                "num_generated_tokens": model_response.get("num_generated_tokens", 0),
-            }
+        proc_model_response = self._process_model_response(model_response)
+        return {
+            "generation": proc_model_response["generation"],
+            "num_generated_tokens": model_response.get("num_generated_tokens", 0),
+        }
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
