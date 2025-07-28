@@ -204,11 +204,18 @@ class BFCLGenerationTask(GenerationTask):
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
         model_response = self._generate_single_assistant_turn(state_dict)
-        proc_model_response = self._process_model_response(model_response)
-        return {
-            "generation": proc_model_response["generation"],
-            "num_generated_tokens": model_response.get("num_generated_tokens", 0),
-        }
+        if model_response["message"] is None:
+            # Ran out of context
+            return {
+                "generation": "",
+                "num_generated_tokens": 0,
+            }    
+        else:
+            proc_model_response = self._process_model_response(model_response)
+            return {
+                "generation": proc_model_response["generation"],
+                "num_generated_tokens": model_response.get("num_generated_tokens", 0),
+            }
 
     def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
