@@ -173,7 +173,7 @@ class BFCLGenerationTask(GenerationTask):
         except openai.BadRequestError as e:
             if "Requested token count exceeds the model's maximum context length" in str(e):
                 LOG.warning("BFCL generation failed due to running out of context. ")
-                return {"message": None, "generation": "_ran_out_of_context_"}
+                return {"message": None, "generation": ""}
             else:
                 raise
 
@@ -209,10 +209,7 @@ class BFCLGenerationTask(GenerationTask):
         model_response = self._generate_single_assistant_turn(state_dict)
         if model_response["message"] is None:
             # Ran out of context
-            return {
-                "generation": "",
-                "num_generated_tokens": 0,
-            }    
+            return {"generation": "", "num_generated_tokens": 0}    
         else:
             proc_model_response = self._process_model_response(model_response)
             return {
