@@ -29,7 +29,7 @@ from torchx.specs.api import AppState
 
 from nemo_skills.pipeline.utils.cluster import get_env_variables, get_tunnel, temporary_env_update, tunnel_hash
 from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
-from nemo_skills.pipeline.utils.packager import get_packager
+from nemo_skills.pipeline.utils.packager import get_packager, get_registered_external_repo
 from nemo_skills.pipeline.utils.server import get_free_port, get_server_command
 from nemo_skills.utils import get_logger_name, remove_handlers
 
@@ -545,7 +545,12 @@ def add_task(
 
     # no mounting here, so assuming /nemo_run/code can be replaced with the current dir
     if cluster_config["executor"] == "none":
+        # replacing /nemo_run/code/nemo_skills with the installed location
+
         for idx in range(len(commands)):
+            commands[idx] = commands[idx].replace(
+                '/nemo_run/code/nemo_skills', str(get_registered_external_repo('nemo_skills').path)
+            )
             commands[idx] = commands[idx].replace('/nemo_run/code', './')
 
     if with_ray and cluster_config["executor"] == "slurm":
