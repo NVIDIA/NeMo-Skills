@@ -190,7 +190,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    mkdir -p /trajectories_mount/eval-outputs/{data_point['instance_id']} && "
             f"    echo '{{\""
             + data_point['instance_id']
-            + f"\": {{\"issues_resolved\": false, \"no_patch\": true, \"patch_cant_apply\": true}}}}' > /trajectories_mount/eval-outputs/{data_point['instance_id']}/report.json; "
+            + f"\": {{\"resolved\": false, \"patch_exists\": false, \"patch_successfully_applied\": false}}}}' > /trajectories_mount/eval-outputs/{data_point['instance_id']}/report.json; "
             f"else "
             f"    cp -r logs/run_evaluation/eval-outputs /trajectories_mount/; "
             f"fi"

@@ -56,7 +56,7 @@ class SweBenchMetrics(BaseMetrics):
 
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
-        return {"swe-bench-metrics": {"issues_resolved": False, "no_patch": True, "patch_cant_apply": True}}
+        return {"swe-bench-metrics": {"resolved": False, "patch_exists": True, "patch_successfully_applied": True}}
 
     def update(self, predictions):
         super().update(predictions)
