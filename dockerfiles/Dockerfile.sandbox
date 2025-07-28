@@ -17,7 +17,7 @@ FROM tiangolo/uwsgi-nginx-flask:python3.10
 
 # Install dependencies required for Lean 4 and other tools
 RUN apt-get update && \
-    apt-get install -y curl git gettext-base net-tools
+    apt-get install -y curl git net-tools
 
 RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y && \
     /root/.elan/bin/elan toolchain install leanprover/lean4:v4.12.0 && \
