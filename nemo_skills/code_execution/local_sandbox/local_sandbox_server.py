@@ -58,6 +58,10 @@ kernels = {}
 kernel_lock = threading.Lock()
 KERNEL_TIMEOUT = 3600  # 1 hour timeout for kernels
 
+# Configurable kernel startup parameters
+KERNEL_READY_TIMEOUT = int(os.environ.get('KERNEL_READY_TIMEOUT', '60'))  # Default 60 seconds
+KERNEL_STARTUP_RETRIES = int(os.environ.get('KERNEL_STARTUP_RETRIES', '3'))  # Default 3 retries
+
 def cleanup_expired_kernels():
     """Remove kernels that haven't been used recently"""
     current_time = time.time()
@@ -76,44 +80,60 @@ def cleanup_expired_kernels():
                 print(f"Error cleaning up kernel {session_id}: {e}")
 
 def get_or_create_kernel(session_id):
-    """Get existing kernel or create a new one"""
+    """Get existing kernel or create a new one with retry logic"""
     current_time = time.time()
     with kernel_lock:
         if session_id not in kernels:
-            try:
-                # Create a new kernel manager and start the kernel
-                kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
-                kernel_manager.start_kernel()
-
-                # Create a client to communicate with the kernel
-                kernel_client = kernel_manager.client()
-                kernel_client.start_channels()
-
-                # Wait for kernel to be ready
+            # Try to create kernel with retries
+            for attempt in range(KERNEL_STARTUP_RETRIES):
                 try:
-                    kernel_client.wait_for_ready(timeout=30)
-                except RuntimeError:
-                    print(f"Kernel {session_id} failed to start")
-                    kernel_manager.shutdown_kernel()
-                    raise
+                    print(f"Creating kernel for session {session_id} (attempt {attempt + 1}/{KERNEL_STARTUP_RETRIES})")
 
-                kernels[session_id] = {
-                    'kernel_manager': kernel_manager,
-                    'kernel_client': kernel_client,
-                    'created': current_time,
-                    'last_used': current_time
-                }
-                print(f"Created new kernel for session: {session_id}")
-            except Exception as e:
-                print(f"Failed to create kernel for session {session_id}: {e}")
-                # Try to list available kernels for debugging
-                try:
-                    from jupyter_client import kernelspec
-                    specs = kernelspec.find_kernel_specs()
-                    print(f"Available kernel specs: {list(specs.keys())}")
-                except Exception as list_error:
-                    print(f"Could not list kernel specs: {list_error}")
-                raise e
+                    # Add small delay between retries to avoid thundering herd
+                    if attempt > 0:
+                        time.sleep(1)
+
+                    # Create a new kernel manager and start the kernel
+                    kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
+                    kernel_manager.start_kernel()
+
+                    # Create a client to communicate with the kernel
+                    kernel_client = kernel_manager.client()
+                    kernel_client.start_channels()
+
+                    # Wait for kernel to be ready with configurable timeout
+                    try:
+                        kernel_client.wait_for_ready(timeout=KERNEL_READY_TIMEOUT)
+                    except RuntimeError:
+                        print(f"Kernel {session_id} failed to start (attempt {attempt + 1})")
+                        try:
+                            kernel_manager.shutdown_kernel()
+                        except:
+                            pass
+                        if attempt == KERNEL_STARTUP_RETRIES - 1:  # Last attempt
+                            raise
+                        continue  # Try again
+
+                    kernels[session_id] = {
+                        'kernel_manager': kernel_manager,
+                        'kernel_client': kernel_client,
+                        'created': current_time,
+                        'last_used': current_time
+                    }
+                    print(f"Created new kernel for session: {session_id}")
+                    break  # Success
+
+                except Exception as e:
+                    print(f"Failed to create kernel for session {session_id} (attempt {attempt + 1}): {e}")
+                    if attempt == KERNEL_STARTUP_RETRIES - 1:  # Last attempt
+                        # Basic error info on final failure
+                        try:
+                            from jupyter_client import kernelspec
+                            specs = kernelspec.find_kernel_specs()
+                            print(f"Available kernel specs: {list(specs.keys())}")
+                        except Exception as list_error:
+                            print(f"Could not list kernel specs: {list_error}")
+                        raise e
         else:
             kernels[session_id]['last_used'] = current_time
 
