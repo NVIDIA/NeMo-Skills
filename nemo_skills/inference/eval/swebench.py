@@ -251,11 +251,13 @@ class SweBenchGenerationTask(GenerationTask):
         with open(pred_files[0], 'r') as f:
             report_json = json.loads(f.read().strip())
 
-        trajectory_dict["eval-metrics"] = report_json
+        output_dict = {
+            "swe-bench-metrics": report_json[data_point['instance_id']],
+            "swe-bench-outputs": trajectory_dict,
+            "generation": "",  # required TODO?
+        }
 
-        trajectory_dict["generation"] = ""  # required TODO?
-
-        return trajectory_dict
+        return output_dict
 
     def llm_generate(self, data_points, data, is_async=False):
         futures = []

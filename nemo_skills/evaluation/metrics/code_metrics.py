@@ -49,14 +49,14 @@ class LiveCodeBenchMetrics(BaseMetrics):
 class SweBenchMetrics(BaseMetrics):
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {
-            "issues_resolved": prediction['resolved'],
-            "no_patch": not prediction['patch_exists'],
-            "patch_cant_apply": not prediction['patch_successfully_applied'],
+            "issues_resolved": prediction['swe-bench-metrics']['resolved'],
+            "no_patch": not prediction['swe-bench-metrics']['patch_exists'],
+            "patch_cant_apply": not prediction['swe-bench-metrics']['patch_successfully_applied'],
         }
 
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
-        return {"issues_resolved": False, "no_patch": True, "patch_cant_apply": True}
+        return {"swe-bench-metrics": {"issues_resolved": False, "no_patch": True, "patch_cant_apply": True}}
 
     def update(self, predictions):
         super().update(predictions)
