@@ -147,142 +147,346 @@ def load_theorem_sidebar():
                 st.error(f"❌ {error_count} errors to fix")
 
 def panel_viewer_tab():
-    """Panel viewer functionality."""
+    """Panel viewer with real-time feedback - VS Code style layout."""
     st.header("🔍 Panel Viewer")
-    st.markdown("*VS Code-style proof state and compiler feedback*")
+    st.markdown("*VS Code-style interface with real-time feedback*")
 
     if not st.session_state.agent.current_code:
-        st.info("👋 Load a theorem from the sidebar to see the panel state.")
+        st.info("👋 Load a theorem from the sidebar to start viewing.")
         return
 
-    # Status bar
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # Instruction for the split layout
+    st.info("💡 **Layout:** Edit on the LEFT, see live results on the RIGHT (like VS Code)")
+    st.markdown("---")
 
-    error_count = sum(1 for msg in st.session_state.agent.current_messages if msg.severity == 'error')
-    warning_count = sum(1 for msg in st.session_state.agent.current_messages if msg.severity == 'warning')
-    goal_count = len(st.session_state.agent.current_goals)
-    clause_count = len(st.session_state.agent.editable_clauses)
+    # Two-column layout: Editor on left, Info panel on right
+    left_col, right_col = st.columns([0.6, 0.4], gap="large")
 
-    with col1:
-        if error_count > 0:
-            st.error(f"❌ {error_count} errors")
-        else:
-            st.success("✅ No errors")
+    with left_col:
+        st.subheader("🤖 Agentic Editor")
+        st.markdown("*Make edits and see results immediately →*")
 
-    with col2:
-        if warning_count > 0:
-            st.warning(f"⚠️ {warning_count} warnings")
-        else:
-            st.info("No warnings")
+        # All agentic editing functions in sub-tabs within the left column
+        edit_tab1, edit_tab2, edit_tab3 = st.tabs([
+            "✏️ Edit", "🏗️ Structure", "📍 Position & AI"
+        ])
 
-    with col3:
-        if goal_count > 0:
-            st.info(f"🎯 {goal_count} goals")
-        else:
-            st.success("No goals")
+        with edit_tab1:
+            st.write("**Edit specific clauses:**")
 
-    with col4:
-        st.info(f"✏️ {clause_count} clauses")
+            clauses = st.session_state.agent.editable_clauses
 
-    with col5:
-        st.info(f"🔄 #{st.session_state.agent.compilation_id}")
-
-    st.divider()
-
-    # Sub-tabs for different views
-    subtab1, subtab2, subtab3, subtab4 = st.tabs([
-        "📊 Overview",
-        "💬 Messages",
-        "🎯 Goals",
-        "📝 Code"
-    ])
-
-    with subtab1:
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("📊 Compilation Status")
-            panel = st.session_state.agent.get_interactive_panel()
-            has_errors = any('error' in msg.lower() for msg in panel['messages'])
-            has_warnings = any('warning' in msg.lower() for msg in panel['messages'])
-
-            if has_errors:
-                st.error("❌ COMPILATION FAILED")
-            elif has_warnings:
-                st.warning("⚠️ COMPILED WITH WARNINGS")
+            if not clauses:
+                st.info("No editable clauses found.")
             else:
-                st.success("✅ COMPILATION SUCCESSFUL")
+                # Clause selection
+                clause_ids = list(clauses.keys())
+                selected_clause_id = st.selectbox(
+                    "Select clause:",
+                    clause_ids,
+                    format_func=lambda x: f"{get_clause_icon(clauses[x].clause_type)} {x}",
+                    key="panel_clause_select"
+                )
 
-            st.write(f"**Compilation ID:** {panel['compilation_id']}")
+                if selected_clause_id:
+                    clause = clauses[selected_clause_id]
 
-            # Quick metrics
-            st.subheader("📈 Metrics")
-            st.metric("Errors", error_count)
-            st.metric("Warnings", warning_count)
-            st.metric("Goals", goal_count)
-            st.metric("Editable Clauses", clause_count)
+                    st.write("**Current:**")
+                    st.code(clause.content, language="lean")
+                    st.caption(f"Type: {clause.clause_type} | Line {clause.start_pos.line + 1}")
 
-        with col2:
-            st.subheader("🤖 AI Suggestions")
+                    # Quick tactics
+                    st.write("**Quick Tactics:**")
+                    tactic_col1, tactic_col2 = st.columns(2)
+
+                    # Handle quick tactic selection
+                    tactic_key = f"panel_selected_tactic_{selected_clause_id}"
+                    if tactic_key not in st.session_state:
+                        st.session_state[tactic_key] = clause.content
+
+                    with tactic_col1:
+                        if st.button("intro h", key="panel_tactic_intro"):
+                            st.session_state[tactic_key] = "intro h"
+                            st.rerun()
+                        if st.button("exact h.left", key="panel_tactic_left"):
+                            st.session_state[tactic_key] = "exact h.left"
+                            st.rerun()
+                        if st.button("rfl", key="panel_tactic_rfl"):
+                            st.session_state[tactic_key] = "rfl"
+                            st.rerun()
+
+                    with tactic_col2:
+                        if st.button("exact h.right", key="panel_tactic_right"):
+                            st.session_state[tactic_key] = "exact h.right"
+                            st.rerun()
+                        if st.button("constructor", key="panel_tactic_constructor"):
+                            st.session_state[tactic_key] = "constructor"
+                            st.rerun()
+                        if st.button("simp", key="panel_tactic_simp"):
+                            st.session_state[tactic_key] = "simp"
+                            st.rerun()
+
+                    # Text area with current value
+                    new_content = st.text_area(
+                        "New content:",
+                        value=st.session_state[tactic_key],
+                        height=80,
+                        key=f"panel_edit_{selected_clause_id}"
+                    )
+
+                    # Update tactic state if user manually edited
+                    if new_content != st.session_state[tactic_key]:
+                        st.session_state[tactic_key] = new_content
+
+                    # Apply edit
+                    if st.button("🔄 Apply Edit", type="primary", key="panel_apply_edit"):
+                        if new_content != clause.content:
+                            with st.spinner("Applying edit..."):
+                                edit_result = st.session_state.agent.edit_clause(selected_clause_id, new_content)
+
+                                # Record in history
+                                st.session_state.edit_history.append({
+                                    'clause_id': selected_clause_id,
+                                    'old_content': edit_result['old_content'],
+                                    'new_content': new_content,
+                                    'timestamp': time.time(),
+                                    'success': edit_result['compilation_result']['success']
+                                })
+
+                            if edit_result['compilation_result']['success']:
+                                st.success("✅ Edit applied!")
+                            else:
+                                st.error("❌ Edit failed")
+
+                            st.rerun()
+                        else:
+                            st.info("No changes to apply.")
+
+        with edit_tab2:
+            st.write("**Add Proof Structure:**")
+
+            # Simplified structure templates for the panel
+            structure_templates = {
+                "Basic Have": ["have h1 : P := by sorry"],
+                "Conjunction": [
+                    "have h1 : P := by sorry",
+                    "have h2 : Q := by sorry",
+                    "exact ⟨h1, h2⟩"
+                ],
+                "Implication": [
+                    "have step1 : P → Q := by sorry",
+                    "intro h",
+                    "exact step1 h"
+                ]
+            }
+
+            selected_template = st.selectbox(
+                "Template:",
+                ["Custom"] + list(structure_templates.keys()),
+                key="panel_structure_template"
+            )
+
+            if selected_template == "Custom":
+                structure_input = st.text_area(
+                    "Structure lines:",
+                    height=80,
+                    placeholder="have h1 : P := by sorry",
+                    key="panel_custom_structure"
+                )
+                structure_lines = [line.strip() for line in structure_input.split('\n') if line.strip()]
+            else:
+                structure_lines = structure_templates[selected_template]
+                st.code('\n'.join(structure_lines), language="lean")
+
+            if st.button("➕ Add Structure", key="panel_add_structure"):
+                if structure_lines:
+                    with st.spinner("Adding structure..."):
+                        try:
+                            result = st.session_state.agent.add_proof_structure(structure_lines)
+
+                            # Record in history
+                            st.session_state.edit_history.append({
+                                'clause_id': 'proof_structure',
+                                'old_content': 'N/A',
+                                'new_content': '\n'.join(structure_lines),
+                                'timestamp': time.time(),
+                                'success': result['compilation_result']['success'],
+                                'structure_add': True
+                            })
+
+                            if result['compilation_result']['success']:
+                                st.success("✅ Structure added!")
+                            else:
+                                st.error("❌ Structure failed")
+
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"❌ Failed: {e}")
+                else:
+                    st.error("Enter structure lines.")
+
+        with edit_tab3:
+            st.write("**Position Tools:**")
+
+            max_lines = len(st.session_state.agent.current_code.split('\n'))
+            line_number = st.number_input(
+                "Line:",
+                min_value=1,
+                max_value=max_lines,
+                value=1,
+                key="panel_position_line"
+            )
+
+            pos_col1, pos_col2 = st.columns(2)
+
+            with pos_col1:
+                if st.button("🎯 Goal", key="panel_get_goal"):
+                    try:
+                        goal = st.session_state.agent.get_goal_at_position(line_number - 1, 0)
+                        if goal:
+                            st.success(f"**Goal at line {line_number}:**")
+                            st.code(goal.goal_text, language="lean")
+                        else:
+                            st.info(f"No goal at line {line_number}")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+            with pos_col2:
+                if st.button("💬 Messages", key="panel_get_messages"):
+                    try:
+                        messages = st.session_state.agent.get_messages_at_position(line_number - 1, 0)
+                        if messages:
+                            st.success(f"**Messages at line {line_number}:**")
+                            for msg in messages:
+                                if msg.severity == 'error':
+                                    st.error(f"❌ {msg.message}")
+                                elif msg.severity == 'warning':
+                                    st.warning(f"⚠️ {msg.message}")
+                                else:
+                                    st.info(f"ℹ️ {msg.message}")
+                        else:
+                            st.info(f"No messages at line {line_number}")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+            st.write("**AI Suggestions:**")
             suggestions = st.session_state.agent.suggest_next_actions()
+
             for i, suggestion in enumerate(suggestions, 1):
                 st.write(f"{i}. {suggestion}")
 
-            st.subheader("📋 Current Theorem")
-            code_preview = st.session_state.agent.current_code[:200]
-            if len(st.session_state.agent.current_code) > 200:
-                code_preview += "..."
-            st.code(code_preview, language="lean")
+    with right_col:
+        st.subheader("�� Live Info Panel")
+        st.markdown("*← Updates automatically after each edit*")
 
-    with subtab2:
-        st.subheader("💬 Compiler Messages")
+        # Add a visual separator
+        st.markdown("---")
+
+        # Compilation Status at the top
+        st.write("**🔄 Compilation Status**")
         messages = st.session_state.agent.current_messages
 
-        if not messages:
-            st.info("No compiler messages.")
-        else:
-            for msg in messages:
-                if msg.severity == 'error':
-                    st.error(f"❌ **Error:** {msg.message}")
-                elif msg.severity == 'warning':
-                    st.warning(f"⚠️ **Warning:** {msg.message}")
-                else:
-                    st.info(f"ℹ️ **Info:** {msg.message}")
+        if messages:
+            error_count = sum(1 for msg in messages if msg.severity == 'error')
+            warning_count = sum(1 for msg in messages if msg.severity == 'warning')
+            info_count = sum(1 for msg in messages if msg.severity == 'info')
 
-    with subtab3:
-        st.subheader("🎯 Proof Goals")
+            status_col1, status_col2, status_col3 = st.columns(3)
+            with status_col1:
+                if error_count > 0:
+                    st.error(f"❌ {error_count} errors")
+                else:
+                    st.success("✅ No errors")
+
+            with status_col2:
+                if warning_count > 0:
+                    st.warning(f"⚠️ {warning_count} warnings")
+                else:
+                    st.info("ℹ️ No warnings")
+
+            with status_col3:
+                st.info(f"📝 {info_count} messages")
+        else:
+            st.success("✅ Clean compilation")
+
+        st.divider()
+
+        # Current Theorem
+        st.write("**📝 Current Theorem**")
+        with st.expander("View Code", expanded=True):
+            st.code(st.session_state.agent.current_code, language="lean")
+
+        st.divider()
+
+        # Messages
+        st.write("**💬 Messages**")
+        if messages:
+            for i, msg in enumerate(messages):
+                with st.expander(f"{msg.severity.title()} {i+1}", expanded=False):
+                    if msg.severity == 'error':
+                        st.error(f"❌ {msg.message}")
+                    elif msg.severity == 'warning':
+                        st.warning(f"⚠️ {msg.message}")
+                    else:
+                        st.info(f"ℹ️ {msg.message}")
+                    st.caption(f"Position: Line {msg.start_pos.line + 1}, Col {msg.start_pos.column}")
+        else:
+            st.success("✅ No messages")
+
+        st.divider()
+
+        # Goals
+        st.write("**🎯 Proof Goals**")
         goals = st.session_state.agent.current_goals
 
-        if not goals:
-            st.success("No active goals.")
-        else:
-            for i, goal in enumerate(goals, 1):
-                with st.expander(f"Goal {i}", expanded=True):
+        if goals:
+            for i, goal in enumerate(goals):
+                with st.expander(f"Goal {i+1}", expanded=False):
                     st.code(goal.goal_text, language="lean")
-                    st.caption(f"Position: Line {goal.position.line + 1}, Column {goal.position.column}")
+                    st.caption(f"Position: Line {goal.position.line + 1}, Col {goal.position.column}")
+                    if goal.proof_state_id:
+                        st.caption(f"Proof State ID: {goal.proof_state_id}")
+        else:
+            st.info("No active goals")
 
-    with subtab4:
-        st.subheader("📝 Annotated Code")
-        lines = st.session_state.agent.current_code.split('\n')
+        st.divider()
 
-        annotated_lines = []
-        for i, line in enumerate(lines, 1):
-            line_info = f"{i:3d}: {line}"
+        # Editable Clauses Summary
+        st.write("**✏️ Editable Clauses**")
+        clauses = st.session_state.agent.editable_clauses
 
-            # Check for messages at this line
-            line_messages = st.session_state.agent.get_messages_at_position(i-1, 0)
-            for msg in line_messages:
-                icon = "❌" if msg.severity == 'error' else "⚠️" if msg.severity == 'warning' else "ℹ️"
-                line_info += f"\n     {icon} {msg.message}"
+        if clauses:
+            clause_summary = {}
+            for cid, clause in clauses.items():
+                clause_type = clause.clause_type
+                if clause_type not in clause_summary:
+                    clause_summary[clause_type] = 0
+                clause_summary[clause_type] += 1
 
-            # Check for goals at this line
-            goal = st.session_state.agent.get_goal_at_position(i-1, 0)
-            if goal:
-                line_info += f"\n     🎯 {goal.goal_text[:100]}..."
+            summary_text = ", ".join([f"{count} {ctype}" for ctype, count in clause_summary.items()])
+            st.info(f"📊 Found: {summary_text}")
 
-            annotated_lines.append(line_info)
+            with st.expander("Clause Details", expanded=False):
+                for cid, clause in clauses.items():
+                    st.write(f"**{cid}** ({clause.clause_type})")
+                    st.code(clause.content[:50] + ("..." if len(clause.content) > 50 else ""), language="lean")
+        else:
+            st.info("No editable clauses found")
 
-        st.code('\n'.join(annotated_lines), language="lean")
+        st.divider()
+
+        # Metrics
+        st.write("**📈 Metrics**")
+        metrics_col1, metrics_col2 = st.columns(2)
+
+        with metrics_col1:
+            st.metric("Compilation ID", st.session_state.agent.compilation_id)
+            st.metric("Code Lines", len(st.session_state.agent.current_code.split('\n')))
+
+        with metrics_col2:
+            st.metric("Editable Clauses", len(clauses))
+            st.metric("Edit History", len(st.session_state.edit_history))
 
 def agentic_editor_tab():
     """Agentic editor functionality."""
@@ -707,8 +911,8 @@ def main():
 
     # Main tabs
     tab1, tab2, tab3 = st.tabs([
-        "🔍 Panel Viewer",
-        "🤖 Agentic Editor",
+        "🔍 Panel Viewer (Editor + Info)",
+        "🤖 Agentic Editor (Full)",
         "🔧 Tools"
     ])
 

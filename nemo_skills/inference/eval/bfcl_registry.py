@@ -241,6 +241,26 @@ def list_registered_tools() -> None:
     print(f"\nTotal: {len(_CUSTOM_TOOL_REGISTRY)} custom tools registered")
 
 
+def register_tool_class(class_name: str, module_path: str, stateless: bool = False) -> None:
+    """
+    Programmatically register a tool class.
+
+    Args:
+        class_name: Name of the class to register
+        module_path: Python module path where the class is located
+        stateless: Whether this is a stateless class
+    """
+    global _CUSTOM_TOOL_REGISTRY, _CUSTOM_STATELESS_CLASSES
+
+    _initialize_registry()
+
+    _CUSTOM_TOOL_REGISTRY[class_name] = module_path
+    if stateless and class_name not in _CUSTOM_STATELESS_CLASSES:
+        _CUSTOM_STATELESS_CLASSES.append(class_name)
+
+    LOG.info(f"Registered tool class: {class_name} -> {module_path} (stateless: {stateless})")
+
+
 def validate_tools_config(config_file: Optional[str] = None) -> bool:
     """
     Validate the tools configuration by attempting to load all registered classes.
