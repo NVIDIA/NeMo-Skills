@@ -209,7 +209,7 @@ class BFCLGenerationTask(GenerationTask):
         model_response = self._generate_single_assistant_turn(state_dict)
         if model_response["message"] is None:
             # Ran out of context
-            return {"generation": "", "num_generated_tokens": 0}    
+            return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}    
         else:
             proc_model_response = self._process_model_response(model_response)
             return {
@@ -232,6 +232,7 @@ class BFCLGenerationTask(GenerationTask):
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
         output_dict = {"result": [], "num_generated_tokens": 0, "log_dict_list": []}
+        out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_response = []
@@ -258,6 +259,7 @@ class BFCLGenerationTask(GenerationTask):
                 model_response = self._generate_single_assistant_turn(state_dict)
                 if model_response["message"] is None:
                     # Ran out of context
+                    out_of_context = True
                     break
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
@@ -322,10 +324,18 @@ class BFCLGenerationTask(GenerationTask):
             # Add to the total list
             all_model_response.append(current_turn_response)
 
-            if force_quit:
+            if force_quit or out_of_context:
                 break
 
-        return {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
+        output_dict = {
+            "generation": all_model_response, 
+            "num_generated_tokens": output_dict["num_generated_tokens"]
+        }
+
+        if out_of_context:
+            output_dict["error"] = "_ran_out_of_context_"
+        
+        return output_dict
 
     def llm_generate(self, data_points, data, is_async=True):
         """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
