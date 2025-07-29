@@ -161,8 +161,6 @@ class SweBenchGenerationTask(GenerationTask):
         # TODO: how should we handle tokens_to_generate?
         # TODO: is random_seed different on different reruns? Can we force it to?
 
-        print("Generating for data point:", data_point['instance_id'])
-
         swe_agent_cmd = (
             # first installing swe-agent repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
@@ -208,8 +206,6 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Check if the trajectory has an empty patch before running evaluation
         has_patch = trajectory_dict['model_patch'] is not None
-
-        print("Evaluating for data point:", data_point['instance_id'])
 
         if not has_patch:
             report_json = {
@@ -269,24 +265,18 @@ class SweBenchGenerationTask(GenerationTask):
             "generation": "",  # required TODO: we should fix this
         }
 
-        print("Generation completed for data point:", data_point['instance_id'])
-
         return output_dict
 
     def llm_generate(self, data_points, data, is_async=False):
         futures = []
-        print("Launching gens")
         for data_point in data_points:
             future = self.executor.submit(self.generate_single_answer, data_point, data)
             futures.append(future)
-
-        print("Launched gens")
 
         return futures
 
     def get_llm_generations(self, requests_in_progress, generations):
         for dp_idx, future in requests_in_progress.items():
-            print(f"Checking future for data point {dp_idx}...")
             if future.done():
                 generations[dp_idx] = future.result()
             else:

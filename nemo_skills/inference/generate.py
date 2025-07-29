@@ -584,13 +584,7 @@ class GenerationTask:
 
                     last_submitted_idx += num_to_submit
 
-                print("BEFORE GET GENERATIONS")
-
                 requests_in_progress, generations = self.get_llm_generations(requests_in_progress, generations)
-
-                print("Requests in progress:", len(requests_in_progress))
-                print("Generations:", len(generations))
-                print(generations)
 
                 outputs_to_dump = []
                 data_points_to_dump = []
@@ -600,7 +594,6 @@ class GenerationTask:
                     # remove the completed task from in_progress
                     requests_in_progress.pop(original_dp_idx)
                     output_dict = generations[original_dp_idx]
-                    print("SHOULD DUMP OUTPUT_DICT!!")
                     outputs_to_dump.append(output_dict)
                     data_points_to_dump.append(remaining_data_points[original_dp_idx])
 
