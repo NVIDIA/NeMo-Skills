@@ -261,5 +261,4 @@ if __name__ == '__main__':
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.WARNING)
 
-    print(f"Starting sandbox server on port {port}")
     app.run(port=6000)
