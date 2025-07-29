@@ -215,7 +215,8 @@ class Sandbox(abc.ABC):
     def execute_code(
         self,
         generated_code: str,
-        language: str = 'python',
+        std_input: str = "",
+        language: str = 'ipython',
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
@@ -223,14 +224,14 @@ class Sandbox(abc.ABC):
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
 
-        if session_id is None and language == "python":  # creating a new session with empty state
+        if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
 
         if session_id is not None:
             self.sessions[session_id].append(generated_code)
 
-        if language == 'python':
+        if language == 'ipython':
             TO_EXECUTE = """
 import traceback
 import json
@@ -295,7 +296,7 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language == 'lean4':
+        elif language in ["python", "pypy3", "python3", "lean4"]:
             if session_id is not None:
                 raise RuntimeError(
                     f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
@@ -304,7 +305,7 @@ print(json.dumps(to_return))
         else:
             raise ValueError(f"Unsupported language: {language}")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language)
+        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
         try:
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
@@ -432,9 +433,10 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='python'):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
         return {
             "generated_code": generated_code,
+            "std_input": std_input,
             "timeout": timeout,
             "language": language,
         }
