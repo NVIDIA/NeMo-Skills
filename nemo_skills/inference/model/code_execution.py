@@ -86,9 +86,11 @@ class CodeExecutionWrapper:
         timeout: int | None = None,
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
+        extra_body: dict = None,
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
+
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
 
@@ -110,6 +112,7 @@ class CodeExecutionWrapper:
                 stop_phrases=stop_phrases,
                 timeout=timeout,
                 max_code_executions=max_code_executions,
+                extra_body=extra_body,
             )
 
         effective_max_code_executions = self.config.max_code_executions
@@ -137,6 +140,7 @@ class CodeExecutionWrapper:
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
             "timeout": timeout,
+            "extra_body": extra_body,
         }
         session_id = None
         code_rounds_executed = 0
@@ -220,10 +224,12 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
                 else:
                     request['prompt'] += code_output
+
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
@@ -234,6 +240,7 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt):]
+
 
         return {
             'generation': generation,
@@ -282,6 +289,7 @@ class CodeExecutionWrapper:
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
         stream: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -309,6 +317,7 @@ class CodeExecutionWrapper:
             "timeout": timeout,
             "max_code_executions": max_code_executions,
             "stream": stream,
+            "extra_body": extra_body,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -406,6 +415,7 @@ class CodeExecutionWrapper:
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
         stream: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -430,6 +440,7 @@ class CodeExecutionWrapper:
             timeout=timeout,
             max_code_executions=max_code_executions,
             stream=stream,
+            extra_body=extra_body,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -467,6 +478,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         timeout: int | None = None,
         max_code_executions: int | None = None,
+        extra_body: dict = None,
     ):
         """
         Helper method, that implements streaming generation.
@@ -491,6 +503,7 @@ class CodeExecutionWrapper:
             'timeout': timeout,
             'tokens_to_generate': tokens_to_generate,
             'stream': True,
+            'extra_body': extra_body,
         }
 
         current_full_prompt = copy.deepcopy(prompt)
