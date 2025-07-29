@@ -7,6 +7,9 @@ set -e
 echo "Starting multi-worker deployment with nginx..."
 echo "Workers: $NUM_WORKERS, Base port: $BASE_PORT, Nginx port: $NGINX_PORT"
 
+# Override nginx config for multi-worker mode (single mode uses original config)
+echo "Configuring nginx for multi-worker load balancing..."
+
 # Validate and fix uwsgi configuration
 if [ -z "$UWSGI_PROCESSES" ]; then
     UWSGI_PROCESSES=2

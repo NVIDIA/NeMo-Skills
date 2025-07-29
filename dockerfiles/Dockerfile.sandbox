@@ -55,7 +55,7 @@ RUN mkdir /data && pip install gdown && \
 
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 
-# Copy nginx configuration template and startup scripts
+# Copy nginx configuration template and startup scripts (only used in multi-worker mode)
 COPY dockerfiles/sandbox/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY dockerfiles/sandbox/start-with-nginx.sh /start-with-nginx.sh
 
@@ -69,6 +69,9 @@ WORKDIR /app
 ENV NUM_WORKERS=4
 ENV BASE_PORT=6001
 ENV NGINX_PORT=6000
+
+# Set default port for single worker mode (base image behavior)
+ENV LISTEN_PORT=6000
 
 # Default uwsgi configuration (preserves original behavior)
 ARG UWSGI_CHEAPER
@@ -85,7 +88,6 @@ ENV DEPLOYMENT_MODE=single
 CMD if [ "$DEPLOYMENT_MODE" = "multi-worker" ]; then \
         /start-with-nginx.sh; \
     else \
-        # Original single worker behavior
-        export LISTEN_PORT=6000 && \
+        # Single worker - use original base image behavior (nginx + uwsgi)
         /start.sh; \
     fi
