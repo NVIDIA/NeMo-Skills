@@ -31,15 +31,20 @@ class VLLMModel(OpenAIAPIModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def _build_request_body(self, top_k, min_p, repetition_penalty):
-        extra_body = {
+    def _build_request_body(self, top_k, min_p, repetition_penalty, extra_body: dict = None):
+        full_extra_body = {
             "min_p": min_p,
             "repetition_penalty": repetition_penalty,
             "spaces_between_special_tokens": False,
         }
+
         if top_k > 0:
-            extra_body["top_k"] = top_k
-        return extra_body
+            full_extra_body["top_k"] = top_k
+
+        if extra_body:
+            full_extra_body.update(extra_body)
+
+        return full_extra_body
 
     def _build_completion_request_params(
         self,
@@ -56,6 +61,7 @@ class VLLMModel(OpenAIAPIModel):
         stop_phrases: list[str] | None = None,
         stream: bool = False,
         reasoning_effort: str | None = None,
+        extra_body: dict = None,
     ) -> dict:
         return {
             "model": self.model,
@@ -73,7 +79,7 @@ class VLLMModel(OpenAIAPIModel):
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
         }
 
     def _build_chat_request_params(
@@ -92,6 +98,7 @@ class VLLMModel(OpenAIAPIModel):
         top_logprobs: int | None = None,
         reasoning_effort: str | None = None,
         tools: list[dict] | None = None,
+        extra_body: dict = None,
     ) -> dict:
         request = {
             "model": self.model,
@@ -108,7 +115,7 @@ class VLLMModel(OpenAIAPIModel):
             "presence_penalty": 0.0,
             "stream": stream,
             "timeout": timeout,
-            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty),
+            "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
         }
         if tools is not None:
             request["tools"] = tools
