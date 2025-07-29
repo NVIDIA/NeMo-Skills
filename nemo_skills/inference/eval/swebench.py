@@ -71,6 +71,8 @@ class SweBenchGenerationConfig:
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
 
+    prompt_format: str = "ns"
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
@@ -79,6 +81,7 @@ cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 class SweBenchGenerationTask(GenerationTask):
     def __init__(self, cfg: SweBenchGenerationConfig):
         # not calling parent init on purpose
+        self.cfg = cfg
         self.use_async_loop = True  # SweBench is a multi-call benchmark, so we have to use async loop
         self.output_dir = Path(self.cfg.output_file).parent
 
