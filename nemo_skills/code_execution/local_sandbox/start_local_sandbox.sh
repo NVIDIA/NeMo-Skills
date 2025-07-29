@@ -20,6 +20,5 @@ SANDBOX_NAME=${1:-'local-sandbox'}
 
 docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((`nproc --all` * 10))" --build-arg="UWSGI_CHEAPER=`nproc --all`" -f dockerfiles/Dockerfile.sandbox .
 
-# docker run --network=host -e DEPLOYMENT_MODE=multi-worker -e NUM_WORKERS=$((`nproc --all` * 10)) -e UWSGI_PROCESSES=1 -e UWSGI_CHEAPER=1 --rm --name=local-sandbox ${SANDBOX_NAME}
-docker run --network=host -e DEPLOYMENT_MODE=multi-worker -e NUM_WORKERS=$((`nproc --all` * 10)) -e UWSGI_PROCESSES=1 --rm --name=local-sandbox ${SANDBOX_NAME}
+docker run --network=host -e DEPLOYMENT_MODE=multi-worker -e NUM_WORKERS=$((`nproc --all` * 10)) --rm --name=local-sandbox ${SANDBOX_NAME}
 # docker run --network=host -e DEPLOYMENT_MODE=single -e UWSGI_PROCESSES=240 -e UWSGI_CHEAPER=24 --rm --name=local-sandbox ${SANDBOX_NAME}

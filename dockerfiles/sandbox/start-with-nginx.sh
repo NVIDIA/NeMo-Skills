@@ -10,6 +10,13 @@ echo "Workers: $NUM_WORKERS, Base port: $BASE_PORT, Nginx port: $NGINX_PORT"
 # Override nginx config for multi-worker mode (single mode uses original config)
 echo "Configuring nginx for multi-worker load balancing..."
 
+# Force session affinity settings: 1 process per worker with minimal cheaper
+UWSGI_PROCESSES=1
+UWSGI_CHEAPER=1
+export UWSGI_PROCESSES
+export UWSGI_CHEAPER
+echo "Forced UWSGI settings for session affinity: PROCESSES=$UWSGI_PROCESSES, CHEAPER=$UWSGI_CHEAPER"
+
 # Validate and fix uwsgi configuration
 if [ -z "$UWSGI_PROCESSES" ]; then
     UWSGI_PROCESSES=2
