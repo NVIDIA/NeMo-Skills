@@ -36,8 +36,114 @@ def _get_sandbox(sandbox_type):
     return get_sandbox(sandbox_type, host=host)
 
 
+@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
+def test_triple_quotes(sandbox_type, language):
+    sandbox = _get_sandbox(sandbox_type)
+    code = '''
+def my_func():
+    """Test function"""
+    print("asdf")
+my_func()
+'''
+    output, _ = sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'asdf\n'}
+
+
+@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
+def test_no_output(sandbox_type, language):
+    sandbox = _get_sandbox(sandbox_type)
+
+    code = """a = 2"""
+
+    output, _ = sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': ''}
+
+
+@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
+def test_execution_error(sandbox_type, language):
+    sandbox = _get_sandbox(sandbox_type)
+
+    code = """1 / 0"""
+
+    output, _ = sandbox.execute_code(code, language=language)
+    # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
+    if language == 'ipython':
+        assert output == {
+            'process_status': 'error',
+            'stderr': '',
+            'stdout': 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n',
+        }
+    else:
+        assert output == {
+            'process_status': 'completed',
+            'stderr': 'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\nZeroDivisionError: division by zero\n',
+            'stdout': '',
+        }
+
+
+@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
+def test_syntax_error(sandbox_type, language):
+    sandbox = _get_sandbox(sandbox_type)
+
+    code = """a = 2\n b = 3"""
+
+    output, _ = sandbox.execute_code(code, language=language)
+    if language == 'ipython':
+        assert output == {
+            'process_status': 'error',
+            'stderr': '',
+            'stdout': '    b = 3\n    ^\nIndentationError: unexpected indent\n',
+        }
+    else:
+        assert output == {
+            'process_status': 'completed',
+            'stderr': '  File "<string>", line 2\n    b = 3\nIndentationError: unexpected indent\n',
+            'stdout': '',
+        }
+
+
+@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('piston', 'python')])
+def test_timeout_error(sandbox_type, language):
+    sandbox = _get_sandbox(sandbox_type)
+
+    code = """import time\ntime.sleep(1)\nprint("done")"""
+
+    output, session_id = sandbox.execute_code(code, timeout=1, language=language)
+    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+    output, session_id = sandbox.execute_code(code, timeout=2, session_id=session_id, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'done\n'}
+
+
+@pytest.mark.parametrize("language", ['python', 'pypy3'])
+def test_std_input(language):
+    sandbox = _get_sandbox("local")
+    code = 'print(input("something "))'
+    std_input = "new"
+
+    output, _ = sandbox.execute_code(code, language=language, std_input=std_input)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'something new\n'}
+
+
+@pytest.mark.parametrize("language", ['python', 'pypy3'])
+def test_multiple_prints_python(language):
+    sandbox = _get_sandbox("local")
+
+    code = """
+print("1")
+print("2x3")
+    """
+
+    output, _ = sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n2x3\n'}
+
+    code = "print(2)\nprint(15)"
+    output, _ = sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '2\n15\n'}
+
+
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_multiple_code_blocks(sandbox_type):
+def test_multiple_code_blocks_ipython(sandbox_type):
     sandbox = _get_sandbox(sandbox_type)
 
     code = """
@@ -57,95 +163,22 @@ def test_multiple_code_blocks(sandbox_type):
 
 
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_triple_quotes(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-    code = '''
-    def my_func():
-        """Test function"""
-        print("asdf")
-    my_func()
-'''
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'asdf\n'}
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_multiple_prints(sandbox_type):
+def test_multiple_code_blocks(sandbox_type):
     sandbox = _get_sandbox(sandbox_type)
 
     code = """
-    print("1")
-    print("2x3")
+    a = 1
+    a
     """
 
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n2x3\n'}
+    output, session_id = sandbox.execute_code(code, language="ipython")
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n'}
     assert session_id is not None
 
-    code = "print(2)\n15"
-    output, session_id2 = sandbox.execute_code(code, session_id=session_id)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '2\n15\n'}
+    code = "a + 5"
+    output, session_id2 = sandbox.execute_code(code, session_id=session_id, language="ipython")
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '6\n'}
     assert session_id == session_id2
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_no_output(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """a = 2"""
-
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': ''}
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_execution_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """1 / 0"""
-
-    output, session_id = sandbox.execute_code(code)
-    # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
-    error = 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n'
-    assert output == {
-        'process_status': 'error',
-        'stderr': '',
-        'stdout': error,
-    }
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_syntax_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """a = 2\n b = 3"""
-
-    output, session_id = sandbox.execute_code(code)
-    error = '    b = 3\n    ^\nIndentationError: unexpected indent\n'
-    assert output == {
-        'process_status': 'error',
-        'stderr': '',
-        'stdout': error,
-    }
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_timeout_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """import time\ntime.sleep(1)\nprint("done")"""
-
-    output, session_id = sandbox.execute_code(code, timeout=1)
-    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-    assert session_id is not None
-
-    output, session_id = sandbox.execute_code(code, timeout=2, session_id=session_id)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'done\n'}
-    assert session_id is not None
 
 
 @pytest.mark.parametrize("sandbox_type", ['local', 'piston'])

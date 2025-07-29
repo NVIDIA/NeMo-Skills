@@ -17,7 +17,9 @@ h5py
 ipython
 
 # this are requirements for code execution - put all packages that LLM should have access to in here
+annotated-types>=0.7.0
 numpy
 pandas
 scipy
 sympy
+tqdm

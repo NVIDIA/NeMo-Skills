@@ -28,7 +28,7 @@ class SessionAffinityTester:
             payload = {
                 "generated_code": code,
                 "timeout": timeout,
-                "language": "python",
+                "language": "ipython",
                 "session_id": session_id
             }
 
@@ -417,7 +417,7 @@ class TestSessionAffinity:
                 "generated_code": f"list_test_var_{i} = {i}",
                 "session_id": session_id,
                 "timeout": 10,
-                "language": "python"
+                "language": "ipython"
             })
 
         # List sessions
