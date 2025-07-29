@@ -22,6 +22,7 @@ import sys
 import tempfile
 import time
 import threading
+import signal
 from io import StringIO
 from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
@@ -74,7 +75,7 @@ def get_or_create_session(session_id):
 
         return sessions[session_id]
 
-def execute_python_session(generated_code, session_id, timeout=30):
+def execute_ipython_session(generated_code, session_id, timeout=30):
     """Execute Python code in a persistent IPython session"""
     try:
         # Clean up expired sessions periodically
@@ -131,8 +132,19 @@ def execute_python_session(generated_code, session_id, timeout=30):
 
     except Exception as e:
         return {"process_status": "error", "stdout": "", "stderr": f"Session error: {e}\n"}
+MEM_LIMIT_BYTES = int(os.environ.get('NEMO_SKILLS_SANDBOX_MEM_LIMIT', 10 * 1024 ** 3))  # 10 GiB default
 
-def execute_python(generated_code, timeout):
+def set_limits(mem_bytes: int = MEM_LIMIT_BYTES) -> None:
+    """
+    Apply RLIMITs and start a new session for the child process.
+
+    Called via `preexec_fn` (subprocess) or directly in a forked worker.
+    """
+    resource.setrlimit(resource.RLIMIT_AS,   (mem_bytes, mem_bytes))
+    resource.setrlimit(resource.RLIMIT_DATA, (mem_bytes, mem_bytes))
+    os.setsid()                              # isolate PGID / signals
+
+def execute_ipython(generated_code, timeout):
     # running in a separate process to ensure any kind of crashes are properly handled
     queue = multiprocessing.Queue()
     process = multiprocessing.Process(target=execute_code_subprocess, args=(generated_code, queue))
@@ -144,6 +156,30 @@ def execute_python(generated_code, timeout):
         return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
     return queue.get()
+
+def execute_python(generated_code, std_input, timeout, language):
+
+    execution_command = [language, "-c", generated_code]
+    try:
+        process = subprocess.Popen(
+            execution_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            universal_newlines=True,
+            preexec_fn=set_limits,
+        )
+        stdout, stderr = process.communicate(input=std_input, timeout=timeout)
+        return {"process_status": "completed", "stdout": stdout, "stderr": stderr}
+    except subprocess.TimeoutExpired:
+        try:
+            # kill the whole process group
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=1)  # reap, no extra timeout needed
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
 
 def execute_lean4(generated_code, timeout):
@@ -187,11 +223,9 @@ def execute_lean4(generated_code, timeout):
 # need to memory-limit to avoid common errors of allocating too much
 # but this has to be done in a subprocess to not crush server itself
 def execute_code_subprocess(generated_code, queue):
-    limit = 1024 * 1024 * 1024 * 10  # 10gb - somehow with a smaller limit the server dies when numpy is used
-    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
-    resource.setrlimit(resource.RLIMIT_DATA, (limit, limit))
 
     # this can be overriden inside generated code, so it's not a guaranteed protection
+    set_limits()
     sys.stdout = StringIO()
     try:
         exec(generated_code, {})
@@ -206,7 +240,8 @@ def execute_code_subprocess(generated_code, queue):
 def execute():
     generated_code = request.json['generated_code']
     timeout = request.json['timeout']
-    language = request.json.get('language', 'python')
+    language = request.json.get('language', 'ipython')
+    std_input = request.json.get('std_input', '')
 
     # Get session_id from JSON body first, then from header (for nginx compatibility)
     session_id = request.json.get('session_id') or request.headers.get('X-Session-ID')
@@ -218,6 +253,8 @@ def execute():
             return execute_python(generated_code, timeout)
     elif language == 'lean4':
         return execute_lean4(generated_code, timeout)
+    else:
+        return execute_python(generated_code, std_input, timeout, language)
 
 
 # Session management endpoints
