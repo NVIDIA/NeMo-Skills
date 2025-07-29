@@ -34,6 +34,7 @@ class NemoModel(BaseModel):
         stop_phrases: list[str] | list[list[str]] | None = None,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for Nemo
+        extra_body: dict = None,
     ) -> list[dict]:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -92,6 +93,7 @@ class NemoModel(BaseModel):
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | list[int] | None = None,  # Ignored for Nemo
+        extra_body: dict = None,
     ) -> list[dict]:
         # we are overriding generate directly, since nemo doesn't support inflight batching
         if min_p > 0:

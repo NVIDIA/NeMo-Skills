@@ -99,6 +99,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -133,6 +134,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -149,6 +151,7 @@ class BaseModel(abc.ABC):
             'stream': stream,
             'reasoning_effort': reasoning_effort,
             'include_response': include_response,
+            'extra_body': extra_body,
         }
         if tools is not None:
             kwargs['tools'] = tools
@@ -222,6 +225,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -243,6 +247,7 @@ class BaseModel(abc.ABC):
             reasoning_effort=reasoning_effort,
             tools=tools,
             include_response=include_response,
+            extra_body=extra_body,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -501,7 +506,7 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-        
+
         if include_response:
             result["response"] = response
 

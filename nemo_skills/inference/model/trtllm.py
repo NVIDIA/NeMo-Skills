@@ -38,6 +38,7 @@ class TRTLLMModel(BaseModel):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         if isinstance(prompt, dict):
             raise NotImplementedError("trtllm server does not support OpenAI \"messages\" as prompt.")
@@ -102,6 +103,7 @@ class TRTLLMModel(BaseModel):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 

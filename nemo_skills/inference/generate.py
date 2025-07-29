@@ -52,6 +52,8 @@ class InferenceConfig:
     repetition_penalty: float = 1.0
     top_logprobs: int | None = None
 
+    extra_body: dict = field(default_factory=dict)  # Any other extra params passed with extra_body argument
+
 
 @nested_dataclass(kw_only=True)
 class GenerateSolutionsConfig:

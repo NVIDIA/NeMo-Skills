@@ -82,6 +82,7 @@ class OpenAIModel(OpenAIAPIModel):
         top_logprobs: int | None,
         stream: bool,
         reasoning_effort: str | None,
+        extra_body: dict = None,
     ) -> dict:
         # Validations
         if top_k != 0:
