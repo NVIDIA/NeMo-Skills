@@ -126,7 +126,7 @@ class SweBenchGenerationTask(GenerationTask):
             except Exception as e:
                 if attempt < max_retries - 1:
                     LOG.warning(
-                        "Attempt %d failed for instance %s: %s. Retrying...",
+                        "Attempt %d failed for instance %s. Retrying...",
                         attempt + 1,
                         data_point['instance_id'],
                     )
