@@ -95,7 +95,9 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_prompt(self):
         return
 
-    def _execute_container_command(self, data_point, command, expected_file_pattern, mode, max_retries=3):
+    def _execute_container_command(
+        self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
+    ):
         """Execute a command in an Apptainer container with retry logic."""
         container_name = data_point["container_formatter"].format(
             instance_id=data_point['instance_id'].replace('__', '_1776_')
@@ -119,9 +121,13 @@ class SweBenchGenerationTask(GenerationTask):
             try:
                 # Stream output to log file as it appears
                 with open(log_file_path, 'w') as log_file:
-                    result = subprocess.run(
-                        apptainer_cmd, shell=True, text=True, timeout=100000, stdout=log_file, stderr=log_file
-                    )
+                    try:
+                        result = subprocess.run(
+                            apptainer_cmd, shell=True, text=True, timeout=timeout, stdout=log_file, stderr=log_file
+                        )
+                    except subprocess.TimeoutExpired:
+                        attempt = max_retries  # Force exit the loop on timeout
+                        raise ValueError()
 
                 # Look for the expected file
                 pred_files = glob.glob(expected_file_pattern, recursive=True)
@@ -244,7 +250,13 @@ class SweBenchGenerationTask(GenerationTask):
             )
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
-                report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
+                report_file = self._execute_container_command(
+                    data_point,
+                    swe_bench_cmd,
+                    search_path,
+                    mode="eval",
+                    timeout=self.cfg.swebench_tests_timeout + 120,
+                )
             except ValueError:
                 LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point['instance_id'])
                 report_json = {
