@@ -501,6 +501,7 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
+
         if include_response:
             result["response"] = response
 
