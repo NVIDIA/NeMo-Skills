@@ -189,39 +189,12 @@ except the solutions are generated with [DeepSeek-R1-0528](https://huggingface.c
 
 ## Science data
 
-We generate science problems using [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) and [Qwen3-235B-A22B](https://huggingface.co/Qwen/Qwen3-235B-A22B) LLMs with the prompt below, using few-shot examples to demonstrate the format.
+We generate science problems using [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) and [Qwen3-235B-A22B](https://huggingface.co/Qwen/Qwen3-235B-A22B) LLMs with the [prompt for science question generation](../../recipes/openreasoning/prompts/science_question_generation_prompt.yaml), using few-shot examples to demonstrate the format.
 Questions are generated based on difficulty level, topic, and subtopic.
-```yaml
-system: ""
-
-user: |-
-  {examples}Write a question on {topic}, more specifically on {subtopic}, with up to four choices.
-  Desired difficulty level: {difficulty}.
-  For questions marked "intermediate", the question should require applying basic concepts independently or in simple combinations. The relationships between concepts should be straightforward and directly tied to the problem. Solutions should be accessible with foundational understanding and methodical effort.
-  For questions marked "complex", the question should require identifying and combining multiple clear but non-obvious connections between concepts. The relationships may span different areas within the topic, requiring structured reasoning and careful application of techniques. Focus on recognizing patterns and synthesizing information rather than straightforward computation.
-  For questions marked "hard", the question should involve intricate or abstract relationships between concepts. Solving them should demand advanced reasoning skills, mastery of topic-specific techniques, and the ability to deal with ambiguities or edge cases. Solutions often require navigating multiple layers of logic or constraints.
-  For questions marked "brutal", the question should push problem-solving to the limit, requiring mastery of nuanced relationships across diverse concepts. It should demand precise reasoning, significant abstraction, and fluency in advanced techniques. Problems may include nested or multi-step dependencies, where overlooking a detail can derail the solution.
-  For questions marked "borderline unsolvable", the question should challenge even experts, involving exceptionally intricate or unconventional problem structures. It should combine deep abstraction, subtle constraints, and highly interconnected concepts. While solutions exist, they often require extensive expertise and innovative approaches. Avoid speculative or unsolvable topics (e.g., "Does God exist?" or "How can time travel be achieved?").
-  Ensure that one of the four choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
-```
 Full dataset used for this effort is available at [HuggingFace](https://huggingface.co/datasets/nvidia/OpenScience).
 Note: HuggingFace version includes questions generated with [Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct), which are not used for OpenReasoning.
 
-The next step is to augment these problems using the prompt below, with few-shot examples to demonstrate the format of the output.
-```yaml
-system: ""
-
-user: |-
-  {examples}
-  Write a new multiple-choice question inspired by the given one. Make the new question reasonable and solvable.
-  Ensure that one of the choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
-  Start directly with the question and DO NOT include any phrases such as "Here is a new multiple-choice question inspired by a given one".
-  After the question is completed finish your response right away.
-  Question:
-  {question}
-  Write another multiple-choice question inspired by this one.
-  Don't just change the numbers and context, but try to create a question that requires another approach to solve.
-```
+The next step is to augment these problems using the [prompt for science question augmentation](../../recipes/openreasoning/prompts/science_question_augmentation_prompt.yaml), with few-shot examples to demonstrate the format of the output.
 
 Next, we generate solutions for these problems.
 We use [DeepSeek-R1-0528](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528) to generate solutions with parameters as described in the math section above.
