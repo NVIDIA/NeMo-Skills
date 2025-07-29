@@ -23,23 +23,11 @@ import tempfile
 import time
 import threading
 from io import StringIO
+from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
 from flask import Flask, request
 
 app = Flask(__name__)
-
-
-
-# ============================================================================
-# IPYTHON SESSION BACKEND
-# ============================================================================
-
-try:
-    from IPython.terminal.interactiveshell import TerminalInteractiveShell
-    IPYTHON_AVAILABLE = True
-except ImportError:
-    IPYTHON_AVAILABLE = False
-    print("IPython not available - session persistence will not work!")
 
 # Global dictionary to store IPython shells by session_id
 sessions = {}
@@ -88,9 +76,6 @@ def get_or_create_session(session_id):
 
 def execute_python_session(generated_code, session_id, timeout=30):
     """Execute Python code in a persistent IPython session"""
-    if not IPYTHON_AVAILABLE:
-        return {"process_status": "error", "stdout": "", "stderr": "IPython backend not available\n"}
-
     try:
         # Clean up expired sessions periodically
         cleanup_expired_sessions()
