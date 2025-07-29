@@ -283,7 +283,6 @@ def generate(
                     postprocess_cmd=postprocess_cmd,
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     script=generation_module,
-                    model=model,
                 )
                 prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):

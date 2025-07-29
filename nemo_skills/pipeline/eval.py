@@ -261,7 +261,6 @@ def eval(
         with_sandbox,
         wandb_parameters,
         extra_eval_args,
-        model,
     )
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local

@@ -161,7 +161,6 @@ def get_generation_cmd(
     postprocess_cmd=None,
     wandb_parameters=None,
     script: str = 'nemo_skills.inference.generate',
-    model=None,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -184,9 +183,6 @@ def get_generation_cmd(
     cmd = "export HYDRA_FULL_ERROR=1 && "
     cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
     job_end_cmd = ""
-
-    if model is not None:
-        cmd += f"++server.model={model} "
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations
         cmd += (

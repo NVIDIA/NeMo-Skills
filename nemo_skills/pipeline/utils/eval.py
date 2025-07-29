@@ -218,7 +218,6 @@ def prepare_eval_commands(
     with_sandbox,
     wandb_parameters,
     extra_eval_args,
-    model,
 ):
     # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
 
@@ -370,7 +369,6 @@ def prepare_eval_commands(
                     script=benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    model=model,
                 )
                 job_cmds.append(cmd)
 

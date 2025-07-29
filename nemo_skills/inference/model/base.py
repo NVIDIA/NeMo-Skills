@@ -54,13 +54,11 @@ class BaseModel(abc.ABC):
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
-        model: str | None = None,
     ):
         self.server_host = host
         self.server_port = port
         self.ssh_server = ssh_server
         self.ssh_key_path = ssh_key_path
-        self.model = model
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
         if ssh_key_path is None:
@@ -503,7 +501,6 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-
         if include_response:
             result["response"] = response
 
