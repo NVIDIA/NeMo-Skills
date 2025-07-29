@@ -317,8 +317,8 @@ def configure_client(
             "server_port": server_port,
         }
         extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.host=localhost ++server.port={server_port} "
+            f"{extra_arguments} ++server.server_type={server_type} ++server.host=localhost "
+            f"++server.port={server_port} ++server.model={model} "
         )
     else:  # model is hosted elsewhere
         server_config = None
