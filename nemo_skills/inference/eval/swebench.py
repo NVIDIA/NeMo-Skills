@@ -202,41 +202,48 @@ class SweBenchGenerationTask(GenerationTask):
         # looks like data['info']['model_stats']
         # {'instance_cost': 0, 'tokens_sent': 40858, 'tokens_received': 1775, 'api_calls': 9}
 
-        swe_bench_cmd = (
-            # first installing SWE-bench repo
-            "curl -LsSf https://astral.sh/uv/install.sh | sh && "
-            "source /root/.local/bin/env && "
-            "cd /root && "
-            "git clone https://github.com/Kipok/SWE-bench.git && "
-            "cd SWE-bench && "
-            "uv venv --python 3.12 venv && "
-            "source venv/bin/activate && "
-            "uv pip install -e . && "
-            # then running the evaluation and capturing output
-            f"eval_output=$(/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
-            f"    --predictions_path {pred_mounted_path} "
-            f"    --instance_ids {data_point['instance_id']} "
-            f"    --run_id eval-outputs "
-            f"    ----timeout {self.cfg.swebench_tests_timeout} "
-            f"    --dataset_name {data_point['dataset_name']} "
-            f"    --split {data_point['split']} 2>&1) && "
-            # check if empty patches and handle accordingly
-            f"if echo \"$eval_output\" | grep -q \"Instances with empty patches: 1\"; then "
-            f"    mkdir -p /trajectories_mount/eval-outputs/{data_point['instance_id']} && "
-            f"    echo '{{\"{data_point['instance_id']}:"
-            f"    \" {{\"resolved\": false, \"patch_exists\": false, \"patch_successfully_applied\": false}}}}' > "
-            f"    /trajectories_mount/eval-outputs/{data_point['instance_id']}/report.json; "
-            f"else "
-            f"    cp -r logs/run_evaluation/eval-outputs /trajectories_mount/; "
-            f"fi"
-        )
+        # Check if the trajectory has an empty patch before running evaluation
+        has_patch = trajectory_dict['model_patch'] is not None
 
-        # Execute SWE-bench evaluation command
-        search_path = os.path.join(self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json")
-        report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
+        if not has_patch:
+            report_json = {
+                data_point['instance_id']: {
+                    "resolved": False,
+                    "patch_exists": False,
+                    "patch_successfully_applied": False,
+                }
+            }
+        else:
+            # Run full evaluation with streaming output
+            swe_bench_cmd = (
+                # first installing SWE-bench repo
+                "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+                "source /root/.local/bin/env && "
+                "cd /root && "
+                "git clone https://github.com/Kipok/SWE-bench.git && "
+                "cd SWE-bench && "
+                "uv venv --python 3.12 venv && "
+                "source venv/bin/activate && "
+                "uv pip install -e . && "
+                # then running the evaluation with streaming output
+                f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
+                f"    --predictions_path {pred_mounted_path} "
+                f"    --instance_ids {data_point['instance_id']} "
+                f"    --run_id eval-outputs "
+                f"    --timeout {self.cfg.swebench_tests_timeout} "
+                f"    --dataset_name {data_point['dataset_name']} "
+                f"    --split {data_point['split']} && "
+                f"cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
+            )
 
-        with open(report_file, 'r') as f:
-            report_json = json.loads(f.read().strip())
+            # Execute SWE-bench evaluation command
+            search_path = os.path.join(
+                self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
+            )
+            report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
+
+            with open(report_file, 'r') as f:
+                report_json = json.loads(f.read().strip())
 
         output_dict = {
             "swe-bench-metrics": report_json[data_point['instance_id']],
