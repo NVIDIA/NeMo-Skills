@@ -93,11 +93,16 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_prompt(self):
         return
 
-    def _execute_container_command(self, data_point, command, expected_file_pattern, max_retries=3):
+    def _execute_container_command(self, data_point, command, expected_file_pattern, mode, max_retries=3):
         """Execute a command in an Apptainer container with retry logic."""
         container_name = data_point["container_formatter"].format(
             instance_id=data_point['instance_id'].replace('__', '_1776_')
         )
+
+        # Create logs directory if it doesn't exist
+        logs_dir = self.output_dir / "apptainer_logs"
+        logs_dir.mkdir(exist_ok=True)
+        log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}.log"
 
         # Launch Apptainer container and execute the command
         apptainer_cmd = (
@@ -110,8 +115,11 @@ class SweBenchGenerationTask(GenerationTask):
         # Retry apptainer command up to max_retries times
         for attempt in range(max_retries):
             try:
-                # no timeout, can work as long as needed
-                result = subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
+                # Stream output to log file as it appears
+                with open(log_file_path, 'w') as log_file:
+                    result = subprocess.run(
+                        apptainer_cmd, shell=True, text=True, timeout=100000, stdout=log_file, stderr=log_file
+                    )
 
                 # Look for the expected file
                 pred_files = glob.glob(expected_file_pattern, recursive=True)
@@ -134,14 +142,11 @@ class SweBenchGenerationTask(GenerationTask):
                     continue
                 else:
                     LOG.error("All %d attempts failed for instance %s", max_retries, data_point['instance_id'])
-                    LOG.error("Apptainer command failed. Full logs:")
-                    LOG.error("STDOUT:")
-                    LOG.error(result.stdout if 'result' in locals() else "No output captured")
-                    LOG.error("STDERR:")
-                    LOG.error(result.stderr if 'result' in locals() else "No error output captured")
+                    LOG.error("Apptainer command failed. Check logs at: %s", log_file_path)
                     LOG.error("Return code: %d", result.returncode if 'result' in locals() else "Unknown")
                     raise ValueError(
-                        f"Job logs: Expected exactly one file matching {expected_file_pattern} for {data_point['instance_id']}, "
+                        f"Job failed for {data_point['instance_id']}. Check logs at: {log_file_path}. "
+                        f"Expected exactly one file matching {expected_file_pattern}, "
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}."
                     )
 
@@ -183,7 +188,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute SWE-agent command
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
-        pred_file = self._execute_container_command(data_point, swe_agent_cmd, search_path)
+        pred_file = self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
         with open(pred_file, 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
@@ -228,7 +233,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute SWE-bench evaluation command
         search_path = os.path.join(self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json")
-        report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path)
+        report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
 
         with open(report_file, 'r') as f:
             report_json = json.loads(f.read().strip())
