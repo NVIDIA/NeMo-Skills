@@ -240,7 +240,19 @@ class SweBenchGenerationTask(GenerationTask):
             search_path = os.path.join(
                 self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
             )
-            report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
+            # TODO: should we fail on errors here? Seems that json isn't always generated
+            try:
+                report_file = self._execute_container_command(data_point, swe_bench_cmd, search_path, mode="eval")
+            except ValueError:
+                LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point['instance_id'])
+                report_json = {
+                    data_point['instance_id']: {
+                        "resolved": False,
+                        "patch_exists": True,
+                        "patch_successfully_applied": False,
+                    }
+                }
+                return report_json
 
             with open(report_file, 'r') as f:
                 report_json = json.loads(f.read().strip())
