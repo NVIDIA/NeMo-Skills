@@ -11,8 +11,8 @@ To decide which code to package we use the following logic:
 
 1. If you run commands from inside a cloned NeMo-Skills repository, we will package that repository.
 2. If you run commands from inside a git repository which is not NeMo-Skills (doesn't have `nemo_skills` top-level folder),
-   we will package your current repository and also include `nemo_skills` subfolder from it's installed location.
-3. If you run commands from outside of any git repository, we will only package `nemo_skills` subfolder from it's installed
+   we will package your current repository and also include `nemo_skills` subfolder from its installed location.
+3. If you run commands from outside of any git repository, we will only package `nemo_skills` subfolder from its installed
    location.
 
 Put simply, we will always include `nemo_skills` and will additionally include your personal git repository if you're
@@ -24,9 +24,22 @@ running commands from it.
     (as well as all jsonl files from `nemo_skills/dataset`).
     Any non-tracked files will not be automatically available inside the container or uploaded to slurm.
 
-    When packaging `nemo_skills` form its installed location (which might not be a git repository), we will
-    upload **all** the files inside `nemo_skills` subfolder. Make sure you do not store any heavy files there
-    to avoid uploading large files on the cluster with each experiment!
+    When packaging `nemo_skills` from its installed location (which might not be a git repository), we will
+    upload **all** the files inside `nemo_skills` subfolder. Make sure you do not store any large files there
+    to avoid uploading them on the cluster with each experiment!
+
+!!! note
+    
+    When you run commands from a git repo with uncommitted changes, NeMo-Run throws the following error
+    ```
+    RuntimeError: Your repo has uncommitted changes. Please commit your changes or set check_uncommitted_changes to False to proceed with packaging.
+    ```
+    This error can be avoided by either taking care of the uncommitted changes (via commit/revert), or setting the environment variable: 
+    ```bash
+    export NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK=1
+    ```
+    In all cases, uncommitted code will not be used. 
+
 
 Finally, it's important to keep in mind that whenever you submit a new experiment, NeMo-Run will create a copy of your
 code package both locally (inside `~/.nemo_run`) and on cluster (inside `ssh_tunnel/job_dir` path in your cluster config).
