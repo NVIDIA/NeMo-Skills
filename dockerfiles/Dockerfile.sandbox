@@ -51,8 +51,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN mkdir /data && pip install gdown && \
     python -c "import gdown; url = f'https://drive.google.com/uc?id=17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW'; gdown.download(url, '/data/test_data.h5', quiet=False)"
 
-# IPython is installed via requirements.txt
-
 COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 
 # Copy nginx configuration template and startup scripts (only used in multi-worker mode)
