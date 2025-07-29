@@ -132,6 +132,8 @@ class BFCLGenerationTask(GenerationTask):
             self.cfg.max_concurrent_requests,
         )
 
+        self.executor = ThreadPoolExecutor(max_workers=cfg.max_concurrent_requests)
+
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
@@ -308,14 +310,13 @@ class BFCLGenerationTask(GenerationTask):
     def llm_generate(self, data_points, data, is_async=True):
         """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
         futures = []
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                if data_point["single_turn"]:
-                    method = self.generate_single_data_point_single_turn
-                else:
-                    method = self.generate_single_data_point_multi_turn
-                future = executor.submit(method, data_point)
-                futures.append(future)
+        for data_point in data_points:
+            if data_point["single_turn"]:
+                method = self.generate_single_data_point_single_turn
+            else:
+                method = self.generate_single_data_point_multi_turn
+            future = self.executor.submit(method, data_point)
+            futures.append(future)
 
         return futures
 

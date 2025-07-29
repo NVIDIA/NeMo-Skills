@@ -68,6 +68,8 @@ class SciCodeGenerationTask(GenerationTask):
                 )
         self.use_async_loop = True  # SciCode is a multi-call benchmark, so we have to use async loop
 
+        self.executor = ThreadPoolExecutor(max_workers=cfg.max_concurrent_requests)
+
     def log_example_prompt(self, data):
         """Scicode is multi-call benchmark, so we can't print a single prompt."""
         return
@@ -132,10 +134,9 @@ class SciCodeGenerationTask(GenerationTask):
     def llm_generate(self, data_points, data, is_async=False):
         futures = []
 
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                future = executor.submit(self.generate_single_answer, data_point, data)
-                futures.append(future)
+        for data_point in data_points:
+            future = self.executor.submit(self.generate_single_answer, data_point, data)
+            futures.append(future)
 
         return futures
 
