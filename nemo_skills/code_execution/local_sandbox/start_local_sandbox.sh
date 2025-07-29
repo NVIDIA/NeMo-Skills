@@ -17,8 +17,21 @@
 # NOTE: needs to run from the root of the repo!
 
 SANDBOX_NAME=${1:-'local-sandbox'}
+DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-'single'}
 
 docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((`nproc --all` * 10))" --build-arg="UWSGI_CHEAPER=`nproc --all`" -f dockerfiles/Dockerfile.sandbox .
 
-docker run --network=host -e DEPLOYMENT_MODE=multi-worker -e NUM_WORKERS=$((`nproc --all` * 10)) --rm --name=local-sandbox ${SANDBOX_NAME}
-# docker run --network=host -e DEPLOYMENT_MODE=single -e UWSGI_PROCESSES=240 -e UWSGI_CHEAPER=24 --rm --name=local-sandbox ${SANDBOX_NAME}
+echo "Starting sandbox in $DEPLOYMENT_MODE mode..."
+
+if [ "$DEPLOYMENT_MODE" = "multi-worker" ]; then
+    echo "Multi-worker mode: Starting $((`nproc --all` * 10)) workers with session affinity"
+    docker run --network=host \
+        -e DEPLOYMENT_MODE=multi-worker \
+        -e NUM_WORKERS=$((`nproc --all` * 10)) \
+        --rm --name=local-sandbox ${SANDBOX_NAME}
+else
+    echo "Single-worker mode: High-performance single container (default)"
+    docker run --network=host \
+        -e DEPLOYMENT_MODE=single \
+        --rm --name=local-sandbox ${SANDBOX_NAME}
+fi
