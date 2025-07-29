@@ -36,9 +36,6 @@ class RewardModelConfig(GenerateSolutionsConfig):
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
-    # Async loop is currently not supported for reward model
-    # Currently reward models are quite fast, so we don't need to use async loop
-    use_async_loop: bool = False
     # Code execution is not supported for reward model
     code_execution: bool = False
 
@@ -53,7 +50,6 @@ class RewardModelConfig(GenerateSolutionsConfig):
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
-            ("use_async_loop", False),
             ("code_execution", False),
             ("sandbox", {}),
         ]

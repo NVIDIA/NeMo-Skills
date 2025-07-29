@@ -127,7 +127,6 @@ class BFCLGenerationTask(GenerationTask):
         # TODO: Need a better way to handle this
         self.extra_generate_params = {}
 
-        self.use_async_loop = True  # Set it to True as the default
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
             "Use max_concurrent_requests to control the number of concurrent requests.",

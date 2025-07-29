@@ -105,9 +105,7 @@ class GenerateSolutionsConfig:
     # and so on
     multi_turn_key: str | None = None
 
-    # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
-    # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
-    # to `output_file`-async (and put it back in order after all generations are done)
+    # Must always be True, sync is no longer supported
     use_async_loop: bool = True
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
@@ -249,17 +247,12 @@ class GenerationTask:
 
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
-        self.use_async_loop = (
-            self.cfg.use_async_loop
-            and self.cfg.server["server_type"] not in ["nemo", "megatron"]
-            and self.cfg.multi_turn_key is None
+        assert self.cfg.use_async_loop, "Sync loop is no longer supported"
+        LOG.info(
+            "Async loop is maintaining %d generations in parallel. "
+            "Use max_concurrent_requests to control the number of concurrent requests.",
+            self.cfg.max_concurrent_requests,
         )
-        if self.use_async_loop:
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
 
     def setup_llm(self):
         # TODO: DRY with the check in the validation config
@@ -441,40 +434,6 @@ class GenerationTask:
 
         return generate_method(**generation_params)
 
-    # TODO: rewrite mtbench to have turns separated in data file and remove this method
-    def llm_generate_multi_turn(self, data_points, data):
-        # TODO: this will not be efficient if different elements have different number of turns
-        # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
-        # no matter the turns. Also even the below implementation can probably be simplified
-        turn_data_points = deepcopy(data_points)
-        dp_indices = list(range(len(turn_data_points)))
-        cur_turn = 1
-        outputs = [{"generation": []} for _ in range(len(data_points))]
-        while dp_indices:
-            # updating the turns to only have data up-to the current turn
-            # and adding any generated assistant messages
-            for dp_index in dp_indices:
-                turn_data_points[dp_index][self.cfg.multi_turn_key] = data_points[dp_index][self.cfg.multi_turn_key][
-                    :cur_turn
-                ]
-                for turn_idx in range(cur_turn - 1):
-                    turn_data_points[dp_index][self.cfg.multi_turn_key][turn_idx]['assistant'] = outputs[dp_index][
-                        "generation"
-                    ][turn_idx]
-            # getting a new set of generations
-            turn_outputs = self.llm_generate([turn_data_points[dp_index] for dp_index in dp_indices], data)
-            # adding assistant answers to the generations
-            for pos_index, dp_index in enumerate(dp_indices):
-                outputs[dp_index]["generation"].append(turn_outputs[pos_index]["generation"])
-
-            # removing any indices that got through all turns
-            dp_indices = []
-            for dp_index, (output, dp) in enumerate(zip(outputs, data_points)):
-                if len(output["generation"]) < len(dp[self.cfg.multi_turn_key]):
-                    dp_indices.append(dp_index)
-            cur_turn += 1
-        return outputs
-
     def dump_outputs(self, outputs, data_points, fout):
         for output, original_data_point in zip(outputs, data_points):
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
@@ -510,30 +469,6 @@ class GenerationTask:
         """Prefill generation in case LLM is not required."""
         # Override this method to customize the prefilling behavior.
         return None
-
-    def sync_loop(self, data):
-        with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
-            data_points_batch = []
-            for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
-                prefill_output = self.prefill_generation(data_point)
-                if prefill_output is not None:
-                    # We can bypass the LLM and directly dump the prefilled output
-                    self.dump_outputs([prefill_output], [data_point], fout)
-                else:
-                    data_points_batch.append(data_point)
-
-                if len(data_points_batch) == self.cfg.max_concurrent_requests or idx == len(data) - 1:
-
-                    for data_point in data_points_batch:
-                        # registering current time to calculate total generation time
-                        data_point['generation_start_time'] = time.time()
-
-                    if self.cfg.multi_turn_key is None:
-                        outputs = self.llm_generate(data_points_batch, data)
-                    else:
-                        outputs = self.llm_generate_multi_turn(data_points_batch, data)
-                    self.dump_outputs(outputs, data_points_batch, fout)
-                    data_points_batch = []
 
     def get_llm_generations(self, requests_in_progress, generations):
         """Get the completed LLM generations that were submitted asynchronously."""
@@ -629,10 +564,7 @@ class GenerationTask:
 
         data = self.load_data()
 
-        if self.use_async_loop:
-            data = self.skip_completed_samples_async(data)
-        else:
-            data = self.skip_completed_samples_sync(data)
+        data = self.skip_completed_samples_async(data)
 
         if len(data) == 0:
             LOG.info("No data to process, exiting.")
@@ -651,10 +583,7 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
-        if self.use_async_loop:
-            self.async_loop(data)
-        else:
-            self.sync_loop(data)
+        self.async_loop(data)
 
         self.postprocess()
 
