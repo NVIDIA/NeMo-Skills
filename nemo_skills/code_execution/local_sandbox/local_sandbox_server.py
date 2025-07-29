@@ -260,5 +260,4 @@ def health():
 if __name__ == '__main__':
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.WARNING)
-
     app.run(port=6000)
