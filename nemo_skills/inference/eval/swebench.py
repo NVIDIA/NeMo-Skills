@@ -43,6 +43,7 @@ class SweBenchGenerationConfig:
     # SWE-agent configuration file path. Can be specified in the same way as ns prompt configs
     # TODO: that's probably not a good default, right?
     sweagent_config: str = "eval/swe-bench/swe-agent"
+    swebench_tests_timeout: int = 60 * 15  # Timeout for the tests after applying the patch, in seconds
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
@@ -110,7 +111,7 @@ class SweBenchGenerationTask(GenerationTask):
         for attempt in range(max_retries):
             try:
                 # no timeout, can work as long as needed
-                result = subprocess.run(apptainer_cmd, shell=True, capture_output=True, text=True, timeout=100000)
+                result = subprocess.run(apptainer_cmd, shell=True, text=True, timeout=100000)
 
                 # Look for the expected file
                 pred_files = glob.glob(expected_file_pattern, recursive=True)
@@ -211,6 +212,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --predictions_path {pred_mounted_path} "
             f"    --instance_ids {data_point['instance_id']} "
             f"    --run_id eval-outputs "
+            f"    ----timeout {self.cfg.swebench_tests_timeout} "
             f"    --dataset_name {data_point['dataset_name']} "
             f"    --split {data_point['split']} 2>&1) && "
             # check if empty patches and handle accordingly
