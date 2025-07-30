@@ -167,7 +167,7 @@ class BFCLGenerationTask(GenerationTask):
         # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
         try:
-            output = (await self.llm.generate_asyncio(**input_dict))[0]
+            output = await self.llm.generate_asyncio(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
             if "Requested token count exceeds the model's maximum context length" in str(e) or "is longer than the model's context length" in str(e):

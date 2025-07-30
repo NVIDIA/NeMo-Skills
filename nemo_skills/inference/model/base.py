@@ -280,8 +280,10 @@ class BaseModel(abc.ABC):
 
         return all_generations
     
-    async def generate_asyncio(self, *args, **kwargs):
-        return asyncio.to_thread(self.generate, *args, **kwargs)
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
 
 
 class OpenAIAPIModel(BaseModel):
