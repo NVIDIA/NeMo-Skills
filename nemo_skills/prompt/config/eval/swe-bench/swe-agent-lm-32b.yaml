@@ -1,7 +1,7 @@
 # Based on the config for SWE-agent-LM-32B from the SWE-smith repo:
 # https://github.com/SWE-bench/SWE-smith/blob/057f0478b6918bfcd89a51ceeec7229c60bb1028/agent/swesmith_infer.yaml
 
-# note that this doesn't not use nemo-skills prompt logic and instead is passed directly to swe-agent
+# note that this doesn't use nemo-skills prompt logic and instead is passed directly to swe-agent
 
 agent:
   templates:
@@ -114,10 +114,11 @@ agent:
     - type: last_n_observations
       n: 5
   model:
-    # name and api_base are set in the script parameters
+    # The following parameters are overridden by Nemo-Skills:
+    # name, api_base, temperature and top_p.
+    # Specifying them here will have no effect! Use Nemo-Skills options instead.
     per_instance_cost_limit: 0
     total_cost_limit: 0
     per_instance_call_limit: 75
     max_input_tokens: 0
     max_output_tokens: 0
-    temperature: 0.0

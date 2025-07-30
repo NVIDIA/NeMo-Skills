@@ -41,8 +41,7 @@ class SweBenchGenerationConfig:
     output_file: str  # Where to save the generations
 
     # SWE-agent configuration file path. Can be specified in the same way as ns prompt configs
-    # TODO: that's probably not a good default, right?
-    sweagent_config: str = "eval/swe-bench/swe-agent"
+    sweagent_config: str = "eval/swe-bench/swe-agent-default"
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
