@@ -35,6 +35,14 @@ from .utils import trim_after_stop_phrases
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+# Allow asyncio to use higher thread pool size
+# Set default executor for asyncio globally
+asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.set_default_executor(ThreadPoolExecutor(max_workers=1024))
+
+
 class BaseModel(abc.ABC):
     """Base model class for handling requests to the inference server.
 
@@ -81,11 +89,6 @@ class BaseModel(abc.ABC):
         self.gen_id_to_future = {}
 
         self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
-
-        # Allow asyncio to use higher thread pool size
-        loop = asyncio.get_running_loop()
-        executor = ThreadPoolExecutor(max_workers=1024)
-        loop.set_default_executor(executor)
 
     @abc.abstractmethod
     def _generate_single(
