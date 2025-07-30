@@ -165,7 +165,7 @@ class SweBenchGenerationTask(GenerationTask):
         # TODO: we should disallow any non-supported parameters (e.g. top-k or min-p) by checking against defaults
         # TODO: how should we handle tokens_to_generate?
         # TODO: is random_seed different on different reruns? Can we force it to?
-        print(f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1")
+
         swe_agent_cmd = (
             # first installing swe-agent repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
@@ -180,7 +180,8 @@ class SweBenchGenerationTask(GenerationTask):
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.sweagent_config)} "
             f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
-            f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "
+            f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
+            # f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "  # TODO: that's the same, why it doesn't work??
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --env.deployment.type local "
