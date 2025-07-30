@@ -165,7 +165,7 @@ class SweBenchGenerationTask(GenerationTask):
         # TODO: we should disallow any non-supported parameters (e.g. top-k or min-p) by checking against defaults
         # TODO: how should we handle tokens_to_generate?
         # TODO: is random_seed different on different reruns? Can we force it to?
-
+        print(f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1")
         swe_agent_cmd = (
             # first installing swe-agent repo
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
