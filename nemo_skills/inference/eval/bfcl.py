@@ -120,19 +120,8 @@ cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 
 class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
-        self.cfg = cfg
-        self.llm = self.setup_llm()
-        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
-
-        # TODO: Need a better way to handle this
-        self.extra_generate_params = {}
-
-        LOG.info(
-            "Async loop is maintaining %d generations in parallel. "
-            "Use max_concurrent_requests to control the number of concurrent requests.",
-            self.cfg.max_concurrent_requests,
-        )
-
+        super().__init__(cfg)
+    
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
