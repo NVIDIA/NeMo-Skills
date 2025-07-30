@@ -63,8 +63,3 @@ pass@1[avg-of-4] | 3           | 2455       | 33.33%        | 66.67%
 pass@4           | 3           | 2455       | 100.00%       | 0.00%        
 
 
-------------------------------------- mt-bench -------------------------------------
-evaluation_mode | num_entries | avg_tokens | average | average_turn1 | average_turn2
-pass@1          | 2           | 5050       | 4.25    | 4.50          | 4.00         
-
-
