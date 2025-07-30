@@ -18,6 +18,7 @@ import os
 import threading
 import time
 import uuid
+import asyncio
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Union
@@ -80,6 +81,11 @@ class BaseModel(abc.ABC):
         self.gen_id_to_future = {}
 
         self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+
+        # Allow asyncio to use higher thread pool size
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=1024)
+        loop.set_default_executor(executor)
 
     @abc.abstractmethod
     def _generate_single(
@@ -270,6 +276,9 @@ class BaseModel(abc.ABC):
             time.sleep(1)
 
         return all_generations
+    
+    async def generate_asyncio(self, *args, **kwargs):
+        return asyncio.to_thread(self.generate, *args, **kwargs)
 
 
 class OpenAIAPIModel(BaseModel):

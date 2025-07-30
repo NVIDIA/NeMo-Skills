@@ -14,7 +14,6 @@
 
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
@@ -58,7 +57,7 @@ class SciCodeGenerationTask(GenerationTask):
         """Scicode is multi-call benchmark, so we can't print a single prompt."""
         return
 
-    def generate_single_answer(self, data_point, data):
+    async def process_single_datapoint(self, data_point, all_data):
         """Will do all necessary generations to get a single answer for the data point."""
         problem_id = data_point['problem_id']
         total_steps = len(data_point['sub_steps'])
@@ -88,8 +87,7 @@ class SciCodeGenerationTask(GenerationTask):
                 'dependencies': dependencies,
             }
             try:
-                # we want a synchronous generation here, but it will run in a thread
-                llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
+                llm_output = await super().process_single_datapoint(prepare_data_point, all_data)
             # TODO: this is a hack (as not all servers return that),
             # but eventually we should support handling errors like this globally for all generations
             except openai.BadRequestError as e:
@@ -114,25 +112,6 @@ class SciCodeGenerationTask(GenerationTask):
 
         # generation is a dict["problem_id.subtask_step": full_solution] here
         return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
-
-    def llm_generate(self, data_points, data, is_async=False):
-        futures = []
-
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                future = executor.submit(self.generate_single_answer, data_point, data)
-                futures.append(future)
-
-        return futures
-
-    def get_llm_generations(self, requests_in_progress, generations):
-        for dp_idx, future in requests_in_progress.items():
-            if future.done():
-                generations[dp_idx] = future.result()
-            else:
-                generations[dp_idx] = {'generation': None}
-
-        return requests_in_progress, generations
 
 
 GENERATION_TASK_CLASS = SciCodeGenerationTask
