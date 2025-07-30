@@ -123,10 +123,6 @@ class CheckContaminationTask(GenerationTask):
 
     async def process_single_datapoint(self, data_point, all_data):
         """Process a single data point by running contamination checks on all similar items."""
-        prefill_result = self.prefill_generation(data_point)
-        if prefill_result is not None:
-            return prefill_result
-        
         query_data = self._create_query_data(data_point)
         
         # Create tasks for all queries using super().process_single_datapoint

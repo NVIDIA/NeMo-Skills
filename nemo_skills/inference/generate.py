@@ -106,8 +106,6 @@ class GenerateSolutionsConfig:
     # and so on
     multi_turn_key: str | None = None
 
-    # Must always be True, sync is no longer supported
-    use_async_loop: bool = True
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation
@@ -248,7 +246,6 @@ class GenerationTask:
 
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
-        assert self.cfg.use_async_loop, "Sync loop is no longer supported"
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
             "Use max_concurrent_requests to control the number of concurrent requests.",
@@ -337,7 +334,7 @@ class GenerationTask:
         """
         pass
 
-    def skip_completed_samples_async(self, data):
+    def skip_completed_samples(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
         if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
             return []
@@ -398,7 +395,7 @@ class GenerationTask:
         return filled_prompt
 
 
-    def _dump_outputs(self, outputs, data_points, fout):
+    def dump_outputs(self, outputs, data_points, fout):
         for output, original_data_point in zip(outputs, data_points):
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
             # all of the ground-truth data to the output file alongside the generated solutions
@@ -464,13 +461,11 @@ class GenerationTask:
                 
                 # Thread-safe output writing
                 async with self.output_lock:
-                    self._dump_outputs([output], [data_point], fout)
+                    self.dump_outputs([output], [data_point], fout)
                     pbar.update(1)
                     
             except Exception as e:
                 LOG.error(f"Error processing data point: {e}")
-                # Still update progress bar even on error
-                pbar.update(1)
                 raise
 
     async def async_loop(self, data):
@@ -498,7 +493,7 @@ class GenerationTask:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
                 async with self.output_lock:
-                    self._dump_outputs(prefilled_outputs, prefilled_data_points, fout)
+                    self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
             # Create tasks for all remaining data points
             tasks = []
@@ -537,7 +532,7 @@ class GenerationTask:
 
         data = self.load_data()
 
-        data = self.skip_completed_samples_async(data)
+        data = self.skip_completed_samples(data)
 
         if len(data) == 0:
             LOG.info("No data to process, exiting.")
