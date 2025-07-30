@@ -337,30 +337,6 @@ class GenerationTask:
         """
         pass
 
-    def skip_completed_samples_sync(self, data):
-        if not self.cfg.skip_filled:
-            return data
-
-        starting_idx = 0
-        if self.cfg.num_chunks:
-            chunk_index = self.cfg.output_file.rfind("_chunk")
-            base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
-            if Path(base_output_file).exists():
-                LOG.warning(f"File `{base_output_file}` exists, skipping generation")
-                return []
-        try:
-            with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
-                starting_idx = len(fin.readlines())
-        except FileNotFoundError:
-            LOG.warning(f"File `{self.cfg.output_file}` not found, starting from scratch")
-
-        if starting_idx > len(data):
-            raise ValueError(
-                "Number of completed samples is greater than the number of samples "
-                "in the dataset (or requested max_samples). Some mistake in configuration?"
-            )
-        return data[starting_idx:]
-
     def skip_completed_samples_async(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
         if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
