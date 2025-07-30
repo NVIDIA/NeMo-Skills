@@ -125,6 +125,9 @@ class BFCLGenerationTask(GenerationTask):
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
+    
+    def setup_prompt(self):
+        return None
 
     async def _generate_single_assistant_turn(self, inference_state_dict):
         """Generate for a single assistant turn."""
