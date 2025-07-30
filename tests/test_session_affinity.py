@@ -291,7 +291,7 @@ class TestSessionAffinity:
 
         # Assert that most sessions succeeded (allow for some flakiness under load)
         success_rate = successful_sessions / num_sessions
-        assert success_rate >= 0.9, f"Success rate too low: {success_rate:.1%}. Failed sessions: {failed_sessions}"
+        assert success_rate >= 1.0, f"Success rate too low: {success_rate:.1%}. Failed sessions: {failed_sessions}"
 
     def test_session_affinity_routing(self, tester, server_health_check):
         """Test that the same session_id consistently routes to the same worker"""
@@ -375,7 +375,7 @@ class TestSessionAffinity:
 
         # Assert reasonable success rate (allowing for some other types of failures)
         success_rate = successful_sessions / num_sessions
-        assert success_rate >= 0.8, f"Success rate too low for {session_config['name']}: {success_rate:.1%}"
+        assert success_rate >= 1.0, f"Success rate too low for {session_config['name']}: {success_rate:.1%}"
 
         print(f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time-start_time:.1f}s")
 
@@ -392,10 +392,10 @@ class TestSessionAffinity:
         assert result['process_status'] == 'completed'
         assert 'cleanup_test' in result.get('stdout', '')
 
-        # Delete the session - include session_id in header for proper routing
+        # Delete the session - include session_id in JSON body for proper routing
         delete_response = requests.delete(
             f"{BASE_URL}/sessions/{session_id}",
-            headers={"X-Session-ID": session_id}
+            json={"session_id": session_id}
         )
         assert delete_response.status_code == 200
 

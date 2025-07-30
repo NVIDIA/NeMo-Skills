@@ -33,7 +33,7 @@ app = Flask(__name__)
 # Global dictionary to store IPython shells by session_id
 sessions = {}
 session_lock = threading.Lock()
-SESSION_TIMEOUT = 3600  # 1 hour timeout
+SESSION_TIMEOUT = float(os.getenv('SANDBOX_SESSION_TIMEOUT', -1))
 
 def cleanup_expired_sessions():
     """Remove IPython sessions that haven't been used recently"""
@@ -57,8 +57,8 @@ def get_or_create_session(session_id):
     with session_lock:
         if session_id not in sessions:
             try:
-                # Create NEW IPython shell instance for each session (not singleton!)
-                shell = TerminalInteractiveShell()  # Remove .instance() to create separate instances
+                # Create new IPython shell instance for each session
+                shell = TerminalInteractiveShell()
                 shell.init_create_namespaces()     # Initialize the shell properly
 
                 sessions[session_id] = {
@@ -79,7 +79,8 @@ def execute_ipython_session(generated_code, session_id, timeout=30):
     """Execute Python code in a persistent IPython session"""
     try:
         # Clean up expired sessions periodically
-        cleanup_expired_sessions()
+        if SESSION_TIMEOUT > 0:
+            cleanup_expired_sessions()
 
         # Get or create session
         session_data = get_or_create_session(session_id)
@@ -243,8 +244,8 @@ def execute():
     language = request.json.get('language', 'ipython')
     std_input = request.json.get('std_input', '')
 
-    # Get session_id from JSON body first, then from header (for nginx compatibility)
-    session_id = request.json.get('session_id') or request.headers.get('X-Session-ID')
+    # Get session_id from JSON body
+    session_id = request.json.get('session_id')
 
     if language == 'python':
         if session_id:

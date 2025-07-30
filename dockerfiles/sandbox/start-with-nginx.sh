@@ -238,7 +238,7 @@ nginx
 
 echo "=== Multi-worker deployment ready ==="
 echo "Nginx load balancer: http://localhost:$NGINX_PORT"
-echo "Session affinity: enabled (based on X-Session-ID header or JSON session_id)"
+echo "Session affinity: enabled (based on JSON session_id)"
 echo "Workers: $NUM_WORKERS (ports $BASE_PORT-$((BASE_PORT + NUM_WORKERS - 1)))"
 echo "Nginx status: http://localhost:$NGINX_PORT/nginx-status"
 echo "UWSGI processes per worker: $UWSGI_PROCESSES"
