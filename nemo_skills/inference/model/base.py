@@ -15,6 +15,7 @@
 import abc
 import logging
 import os
+import random
 import threading
 import time
 import uuid
@@ -79,7 +80,7 @@ class BaseModel(abc.ABC):
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
 
-        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+        self.executor = ThreadPoolExecutor(max_workers=2048)  # is this too much?
 
     @abc.abstractmethod
     def _generate_single(
@@ -320,17 +321,19 @@ class OpenAIAPIModel(BaseModel):
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
 
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
-        self.client = openai.OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=None,
-            http_client=http_client,
-        )
+        self.client_arr = [
+            openai.OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=None,
+                http_client=DefaultHttpxClient(
+                    limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+                    transport=httpx.HTTPTransport(retries=3),
+                ),
+            )
+            for _ in range(20)
+        ]
+        self.client = self.client_arr[0]
         self.model = model or self.get_model_name_from_server()
 
     def __del__(self):
@@ -457,9 +460,11 @@ class OpenAIAPIModel(BaseModel):
         return_gen_id = generation_id is not None or kwargs.get('return_generation_id', False)
 
         try:
+            client = self.client_arr[random.randrange(0, len(self.client_arr))]
+
             if isinstance(prompt, list):
                 request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(self.client.chat.completions.create, request_params, gen_id)
+                response = self._make_api_call(client.chat.completions.create, request_params, gen_id)
                 if stream:
                     result = self._stream_chat_chunks(response, gen_id)
                 else:
@@ -467,7 +472,7 @@ class OpenAIAPIModel(BaseModel):
 
             elif isinstance(prompt, str):
                 request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(self.client.completions.create, request_params, gen_id)
+                response = self._make_api_call(client.completions.create, request_params, gen_id)
                 if stream:
                     result = self._stream_completion_chunks(response, gen_id)
                 else:
