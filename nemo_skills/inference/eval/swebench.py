@@ -43,7 +43,7 @@ class SweBenchGenerationConfig:
     # SWE-agent configuration file path. Can be specified in the same way as ns prompt configs
     # TODO: that's probably not a good default, right?
     sweagent_config: str = "eval/swe-bench/swe-agent"
-    swebench_tests_timeout: int = 60 * 15  # Timeout for the tests after applying the patch, in seconds
+    swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
@@ -151,7 +151,6 @@ class SweBenchGenerationTask(GenerationTask):
                 else:
                     LOG.error("All %d attempts failed for instance %s", max_retries, data_point['instance_id'])
                     LOG.error("Apptainer command failed. Check logs at: %s", log_file_path)
-                    LOG.error("Return code: %d", result.returncode if 'result' in locals() else "Unknown")
                     raise ValueError(
                         f"Job failed for {data_point['instance_id']}. Check logs at: {log_file_path}. "
                         f"Expected exactly one file matching {expected_file_pattern}, "
@@ -266,10 +265,11 @@ class SweBenchGenerationTask(GenerationTask):
                         "patch_successfully_applied": False,
                     }
                 }
-                return report_json
+                report_file = None
 
-            with open(report_file, 'r') as f:
-                report_json = json.loads(f.read().strip())
+            if report_file is not None:
+                with open(report_file, 'r') as f:
+                    report_json = json.loads(f.read().strip())
 
         output_dict = {
             "swe-bench-metrics": report_json[data_point['instance_id']],
