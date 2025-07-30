@@ -180,7 +180,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.sweagent_config)} "
             f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
-            f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
+            f"    --agent.model.api_base http://{self.cfg.server.server_host}:{self.cfg.server.server_port}/v1 "
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --env.deployment.type local "
