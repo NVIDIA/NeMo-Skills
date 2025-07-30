@@ -161,7 +161,7 @@ class SweBenchGenerationTask(GenerationTask):
         """Will do all necessary generations to get a single answer for the data point."""
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
-        # TODO: use self.cfg.server.model, self.cfg.server.server_host, self.cfg.server.server_port, etc. Can we pass in API key?
+        # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
         # TODO: we should disallow any non-supported parameters (e.g. top-k or min-p) by checking against defaults
         # TODO: how should we handle tokens_to_generate?
         # TODO: is random_seed different on different reruns? Can we force it to?
