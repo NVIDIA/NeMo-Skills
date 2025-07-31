@@ -122,11 +122,6 @@ class Sandbox(abc.ABC):
         self.http_session = session
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
-        # will keep state of code sessions
-        self.sessions = {}
-
-    def clear_session(self, session_id):
-        del self.sessions[session_id]
 
     def _send_request(self, request, timeout):
         if self.ssh_server and self.ssh_key_path:
@@ -186,8 +181,8 @@ class Sandbox(abc.ABC):
             raise ValueError(f"Unsupported language: {language}")
 
         TO_EXECUTE = generated_code
-        request['session_id'] = session_id
-        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
+        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input, traceback_verbosity)
+        request['session_id'] = session_id if session_id is None else str(session_id)
         try:
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
@@ -309,12 +304,13 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
             "timeout": timeout,
             "language": language,
+            "traceback_verbosity": traceback_verbosity,
         }
 
 
