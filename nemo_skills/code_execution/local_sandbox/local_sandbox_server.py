@@ -266,13 +266,13 @@ def execute():
 
     if language == 'python':
         if session_id:
-            return execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
+            return jsonify(execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity))
         else:
-            return execute_python(generated_code, timeout)
+            return jsonify(execute_ipython(generated_code, timeout))
     elif language == 'lean4':
-        return execute_lean4(generated_code, timeout)
+        return jsonify(execute_lean4(generated_code, timeout))
     else:
-        return execute_python(generated_code, std_input, timeout, language)
+        return jsonify(execute_python(generated_code, std_input, timeout, language))
 
 
 # Session management endpoints
