@@ -69,7 +69,7 @@ agent:
   history_processors: []
   model:
     # The following parameters are overridden by Nemo-Skills:
-    # name, api_base, temperature and top_p.
+    # name, api_base, temperature, top_p, completion_kwargs.
     # Specifying them here will have no effect! Use Nemo-Skills options instead.
     per_instance_cost_limit: 0
     total_cost_limit: 0

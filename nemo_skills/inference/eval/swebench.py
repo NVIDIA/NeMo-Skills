@@ -25,12 +25,43 @@ from pathlib import Path
 
 import hydra
 
-from nemo_skills.inference.generate import GenerationTask, InferenceConfig
+from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.inference.model import server_params
 from nemo_skills.prompt.utils import get_config_path
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+# Like nemo_skills.inference.generate.InferenceConfig, except most parameters are not passed by default
+# because they may not be supported on all servers.
+# tokens_to_generate is purposefully unlimited by default for SWE-bench.
+@nested_dataclass(kw_only=True)
+class SweBenchInferenceConfig:
+    temperature: float = 0.0  # Temperature of 0 means greedy decoding
+    top_k: int | None = None
+    top_p: float = 0.95
+    min_p: float | None = None
+    random_seed: int | None = None
+    tokens_to_generate: int | None = None
+    repetition_penalty: float | None = None
+    top_logprobs: int | None = None
+
+
+# Converts the parameter names above to the corresponding OpenAI parameter names.
+NS_TO_OPENAI_PARAM = {
+    # Officially part of the OpenAI Chat Completions API.
+    "tokens_to_generate": "max_tokens",
+    "top_logprobs": "top_logprobs",
+    "random_seed": "seed",
+
+    # Not in the official API, but still supported by some servers, e.g. vllm.
+    "top_k": "top_k",
+    "min_p": "min_p",
+    "repetition_penalty": "repetition_penalty",
+
+    # temperature and top_p are passed as separate SWE-agent parameters.
+}
 
 
 # not inheriting since most parameters are not supported because we don't use our model client here
@@ -44,7 +75,7 @@ class SweBenchGenerationConfig:
     sweagent_config: str = "eval/swe-bench/swe-agent-default"
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
-    inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
+    inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
 
@@ -161,9 +192,14 @@ class SweBenchGenerationTask(GenerationTask):
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
-        # TODO: we should disallow any non-supported parameters (e.g. top-k or min-p) by checking against defaults
-        # TODO: how should we handle tokens_to_generate?
-        # TODO: is random_seed different on different reruns? Can we force it to?
+
+        completion_kwargs = {
+            openai_param: getattr(self.cfg.inference, ns_param)
+            for ns_param, openai_param in NS_TO_OPENAI_PARAM.items()
+            if getattr(self.cfg.inference, ns_param) is not None
+        }
+        if "top_logprobs" in completion_kwargs:
+            completion_kwargs["logprobs"] = True
 
         swe_agent_cmd = (
             # first installing swe-agent repo
@@ -183,6 +219,7 @@ class SweBenchGenerationTask(GenerationTask):
             # f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "  # TODO: that's the same, why it doesn't work??
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
+            f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
             f"    --env.deployment.type local "
             f"    --env.repo.type preexisting "
             f"    --env.repo.repo_name testbed "
