@@ -86,7 +86,8 @@ def get_mrcr_data(needles_subset, setup, max_context_window):
     data_dir.mkdir(exist_ok=True)
     
     output_file = data_dir / f"{setup}.jsonl"
-    with open("__init__.py", "w", encoding="utf-8") as init_file:
+    
+    with open(data_dir / "__init__.py", "w", encoding="utf-8") as init_file:
         init_file.write(f"DATASET_GROUP = 'long-context'\n")
         init_file.write(f"EVAL_SPLIT = '{setup}'\n")
         
