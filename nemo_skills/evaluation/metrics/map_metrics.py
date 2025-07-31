@@ -16,6 +16,7 @@ from nemo_skills.evaluation.metrics.arena_metrics import ArenaMetrics
 from nemo_skills.evaluation.metrics.bfcl_metrics import BFCLMetrics
 from nemo_skills.evaluation.metrics.code_metrics import CodeMetrics, LiveCodeBenchMetrics, SciCodeMetrics
 from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
+from nemo_skills.evaluation.metrics.ioi_metrics import IOIMetrics
 from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
 from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
@@ -29,6 +30,7 @@ METRICS_MAP = {
     "bfcl": BFCLMetrics,
     "code": CodeMetrics,
     "if": IFMetrics,
+    "ioi": IOIMetrics,
     "multichoice": MathMetrics,
     "ruler": RulerMetrics,
     "livecodebench": LiveCodeBenchMetrics,

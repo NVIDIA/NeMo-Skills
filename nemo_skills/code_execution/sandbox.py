@@ -250,7 +250,7 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language in ["python", "pypy3", "python3", "lean4"]:
+        elif language in ["python", "pypy3", "python3", "lean4", "shell"]:
             if session_id is not None:
                 raise RuntimeError(
                     f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"

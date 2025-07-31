@@ -172,6 +172,31 @@ def execute_lean4(generated_code, timeout):
             os.remove(temp_file_name)
 
 
+def execute_shell(command, timeout):
+    tmp_path = None
+    try:
+        # Write the full script to a temp file so /bin/bash can read it from disk
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".sh", mode="w") as tmp:
+            tmp.write(command)
+            tmp_path = tmp.name
+        os.chmod(tmp_path, 0o755)
+
+        result = subprocess.run(
+            ["/bin/bash", tmp_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            preexec_fn=set_limits,
+        )
+        return {"stdout": result.stdout, "stderr": result.stderr}
+    except subprocess.TimeoutExpired:
+        return {"stdout": "", "stderr": "Timed out\n"}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 # need to memory-limit to avoid common errors of allocating too much
 # but this has to be done in a subprocess to not crush server itself
 def execute_code_subprocess(generated_code, queue):
@@ -199,6 +224,8 @@ def execute():
         return execute_ipython(generated_code, timeout)
     elif language == 'lean4':
         return execute_lean4(generated_code, timeout)
+    elif language == 'shell':
+        return execute_shell(generated_code, timeout)
     else:
         return execute_python(generated_code, std_input, timeout, language)
 
