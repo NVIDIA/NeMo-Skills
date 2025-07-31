@@ -23,6 +23,7 @@ import tempfile
 import time
 import threading
 import signal
+import re
 from io import StringIO
 from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
@@ -75,7 +76,24 @@ def get_or_create_session(session_id):
 
         return sessions[session_id]
 
-def execute_ipython_session(generated_code, session_id, timeout=30):
+def postprocess_output(output, traceback_verbosity):
+    if traceback_verbosity not in ['Minimal', 'Plain']:
+        return output
+
+    def strip_ansi_codes(text):
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+
+    output = strip_ansi_codes(output)
+    lines = []
+    for line in output.split('\n'):
+        if line.strip().startswith('File <ipython-'):
+            continue
+        lines.append(line)
+
+    return '\n'.join(lines)
+
+def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity='Plain'):
     """Execute Python code in a persistent IPython session"""
     try:
         # Clean up expired sessions periodically
@@ -85,6 +103,7 @@ def execute_ipython_session(generated_code, session_id, timeout=30):
         # Get or create session
         session_data = get_or_create_session(session_id)
         shell = session_data['shell']
+        shell.InteractiveTB.set_mode(mode=traceback_verbosity)
 
         # Capture stdout/stderr
         old_stdout = sys.stdout
@@ -114,22 +133,19 @@ def execute_ipython_session(generated_code, session_id, timeout=30):
                     stderr_result += f"\n{result.error_in_exec}"
             else:
                 process_status = "completed" if not stderr_result else "error"
-
-            return {
-                "process_status": process_status,
-                "stdout": stdout_result,
-                "stderr": stderr_result
-            }
-
         except Exception as e:
-            return {
-                "process_status": "error",
-                "stdout": stdout_capture.getvalue(),
-                "stderr": stderr_capture.getvalue() + f"\n{type(e).__name__}: {e}"
-            }
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+            process_status = "error"
+            stdout_result = stdout_capture.getvalue(),
+            stderr_result = stderr_capture.getvalue() + f"\n{type(e).__name__}: {e}"
+
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+        return {
+            "process_status": process_status,
+            "stdout": postprocess_output(stdout_result, traceback_verbosity),
+            "stderr": postprocess_output(stderr_result, traceback_verbosity)
+        }
 
     except Exception as e:
         return {"process_status": "error", "stdout": "", "stderr": f"Session error: {e}\n"}
@@ -243,13 +259,14 @@ def execute():
     timeout = request.json['timeout']
     language = request.json.get('language', 'ipython')
     std_input = request.json.get('std_input', '')
+    traceback_verbosity = request.json.get('traceback_verbosity', 'Plain')
 
     # Get session_id from JSON body
     session_id = request.json.get('session_id')
 
     if language == 'python':
         if session_id:
-            return execute_python_session(generated_code, session_id, timeout)
+            return execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
         else:
             return execute_python(generated_code, timeout)
     elif language == 'lean4':
