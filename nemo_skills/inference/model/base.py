@@ -650,6 +650,3 @@ class BaseRewardModel(abc.ABC):
 
     def score(self, prompts: list[str]) -> list[dict]:
         pass
-
-    def score(self, prompts: list[str]) -> list[dict]:
-        pass
