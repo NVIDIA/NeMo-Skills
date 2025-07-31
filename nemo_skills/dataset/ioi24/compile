@@ -1,0 +1,73 @@
+#!/bin/bash
+
+manager_files=()  # Array to store manager filenames
+current_dir="$(pwd)"
+
+# Checker compilation path
+checker_dir="$current_dir/checker"
+checker_src="$checker_dir/checker.cpp"
+
+if [ -e "$checker_src" ]; then
+    echo "Compiling checker"
+    checker_exe="$checker_dir/checker"
+    g++ -x c++ -std=gnu++17 -O2 -o "$checker_exe" "$checker_src"
+    chmod +x "$checker_exe"
+    if [ $? -ne 0 ]; then
+        echo "Could not compile checker" >&2
+        exit 1
+    fi
+    echo "Compiled checker"
+else
+    echo "No checker found at $checker_src"
+fi
+
+# Graders path
+graders_dir="$current_dir/graders"
+if [ ! -e "$graders_dir" ]; then
+    echo "Grader folder was not found" >&2
+    exit 1
+fi
+
+# Find and compile manager if it exists
+manager_src="$graders_dir/manager.cpp"
+if [ -e "$manager_src" ]; then
+    echo "Compiling manager"
+    manager_exe="$graders_dir/manager"
+    g++ -x c++ -std=gnu++17 -O2 -o "$manager_exe" "$manager_src"
+    chmod +x "$manager_exe"
+    if [ $? -ne 0 ]; then
+        echo "Could not compile manager" >&2
+        exit 1
+    fi
+    manager_files+=("manager")
+fi
+
+# Process other graders
+graders_list=($(ls "$graders_dir" | grep -v 'manager.cpp'))
+for grader_name in "${graders_list[@]}"; do
+    manager_files+=("$grader_name")
+done
+
+# Extract problem name and compile necessary files
+problem_name='?'
+for file in "${manager_files[@]}"; do
+    if [[ "$file" == *.h && "$file" != "testlib.h" ]]; then
+        problem_name="${file%.h}"
+        echo "Problem name: $problem_name"
+        break
+    fi
+done
+
+files_to_compile=("graders/$problem_name.cpp")
+[ -e graders/grader.cpp ] && files_to_compile+=("graders/grader.cpp")
+[ -e graders/stub.cpp ] && files_to_compile+=("graders/stub.cpp")
+
+g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/"$problem_name" "${files_to_compile[@]}"
+if [ $? -ne 0 ]; then
+    echo "Failed to compile $problem_name" >&2
+    exit 1
+fi
+chmod +x graders/"$problem_name"
+echo "Compiled $problem_name from ${files_to_compile[@]} successfully"
+
+echo "Manager files: ${manager_files[@]}"
