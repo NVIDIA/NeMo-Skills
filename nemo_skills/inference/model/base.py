@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import logging
 import os
 import random
 import threading
 import time
 import uuid
-import asyncio
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Union
@@ -272,8 +272,14 @@ class BaseModel(abc.ABC):
             time.sleep(1)
 
         return all_generations
-    
+
     async def generate_asyncio(self, *args, **kwargs) -> dict:
+        # Configure the executor for the current event loop
+        loop = asyncio.get_running_loop()
+        if not hasattr(loop, '_nemo_skills_executor_configured'):
+            loop.set_default_executor(ThreadPoolExecutor(max_workers=1024))
+            loop._nemo_skills_executor_configured = True
+
         result = await asyncio.to_thread(self.generate, *args, **kwargs)
         assert len(result) == 1, "generate_asyncio should return a single result"
         return result[0]
@@ -641,6 +647,9 @@ class BaseRewardModel(abc.ABC):
             self.requests_lib = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
         else:
             self.requests_lib = requests
+
+    def score(self, prompts: list[str]) -> list[dict]:
+        pass
 
     def score(self, prompts: list[str]) -> list[dict]:
         pass
