@@ -33,6 +33,7 @@ from omegaconf import OmegaConf
 from transformers import AutoTokenizer
 
 
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run SFT training with configuration")
@@ -159,7 +160,8 @@ def main():
     if overrides:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
-
+        
+    OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
