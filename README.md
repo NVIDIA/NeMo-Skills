@@ -54,4 +54,9 @@ We've built and released many popular models and datasets using NeMo-Skills. See
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
 
 
+## Contributing
+
+We welcome contributions to NeMo-Skills! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for more information on how to get involved.
+
+
 Disclaimer: This project is strictly for research purposes, and not an official product from NVIDIA.
