@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import logging
 import os
 import random
@@ -271,6 +272,17 @@ class BaseModel(abc.ABC):
             time.sleep(1)
 
         return all_generations
+
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        # Configure the executor for the current event loop
+        loop = asyncio.get_running_loop()
+        if not hasattr(loop, '_nemo_skills_executor_configured'):
+            loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
+            loop._nemo_skills_executor_configured = True
+
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
 
 
 class OpenAIAPIModel(BaseModel):
