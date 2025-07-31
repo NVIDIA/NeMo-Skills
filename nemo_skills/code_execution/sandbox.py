@@ -17,8 +17,8 @@ import glob
 import json
 import logging
 import os
-import uuid
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
 from typing import Dict, List, Optional, Tuple
@@ -125,9 +125,9 @@ def extract_proof_only(lean_code: str) -> str:
 
     # 4. Collect proof lines
     if proof_first_line:
-        proof_lines = [proof_first_line] + lines[header_end_idx + 1:]
+        proof_lines = [proof_first_line] + lines[header_end_idx + 1 :]
     else:
-        proof_lines = lines[header_end_idx + 1:]
+        proof_lines = lines[header_end_idx + 1 :]
 
     # 5. Remove leading 'by' (with or without indentation)
     if proof_lines:
@@ -373,7 +373,9 @@ print(json.dumps(to_return))
                             line_dict["predicted_proof"] = (
                                 line_dict["header"]
                                 + (line_dict["formal_statement"] if restate_formal_statement else '')
-                                + extract_proof_only(generation) if strip_theorem_from_proof else generation
+                                + extract_proof_only(generation)
+                                if strip_theorem_from_proof
+                                else generation
                             )
                         else:
                             if "predicted_proof" not in line_dict:
