@@ -62,7 +62,7 @@ class GenSelectConfig(GenerateSolutionsConfig):
             raise ValueError("Random seed is required for genselect")
         self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
         self.output_file = str(
-            Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl"
+            Path(self.output_dir) / f"output-rs{self.inference.random_seed}.jsonl"
         )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
@@ -111,7 +111,7 @@ class GenSelectTask(GenerationTask):
         input_file = self.cfg.output_file
         # TODO: use last part of input_dir?
         benchmark_dir = "math"
-        output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        output_file = Path(self.cfg.output_dir).parent / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:

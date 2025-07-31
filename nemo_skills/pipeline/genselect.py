@@ -33,7 +33,7 @@ def get_genselect_cmd(
         f"python -m nemo_skills.inference.genselect "
         f"    ++skip_filled=True "
         f"    ++input_dir={output_dir}/comparison_instances "
-        f"    ++output_dir={output_dir} "
+        f"    ++output_dir={output_dir}/comparison_judgment "
         f"    ++inference.random_seed={random_seed} "
         f"    ++inference.temperature=0.7 "
         f"    ++inference.tokens_to_generate=2048 "
@@ -262,11 +262,19 @@ def genselect(
                 )
 
                 prev_tasks = [preprocess_task]
-                generation_cmd = pipeline_utils.wrap_cmd(
-                    cmd=get_genselect_cmd(output_dir=output_dir, extra_arguments=extra_arguments, random_seed=seed),
+                generation_cmd = pipeline_utils.get_generation_cmd(
+                    input_dir=f"{output_dir}/comparison_instances",
+                    random_seed=seed,
+                    output_dir=f"{output_dir}/comparison_judgment",
+                    extra_arguments=extra_arguments,
+                    chunk_id=chunk_id,
+                    num_chunks=num_chunks,
+                    preprocess_cmd=preprocess_cmd,
+                    postprocess_cmd=postprocess_cmd,
+                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                    script="nemo_skills.inference.genselect",
                 )
 
-                # prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):
                     task_name = f'{expname}-rs{seed}' if seed is not None else expname
                     if chunk_id is not None:
