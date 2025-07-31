@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import asyncio
 import copy
 import logging
 import time
@@ -23,8 +24,8 @@ from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.inference.model.base import BaseModel
+from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
@@ -37,7 +38,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
-    code_execution_language: str = 'python'  # could be python, lean4
+    code_execution_language: str = 'ipython'
     code_execution_headers: list[str] = field(default_factory=lambda: [])
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
@@ -216,7 +217,9 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = self.execute_generated_code(prompt, code_begin, code_end, output, session_id)
+                code_execution_time_start, execution_dict = self.execute_generated_code(
+                    prompt, code_begin, code_end, output, session_id
+                )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
@@ -239,8 +242,7 @@ class CodeExecutionWrapper:
         if is_openai_format:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
-            generation = request['prompt'][len(prompt):]
-
+            generation = request['prompt'][len(prompt) :]
 
         return {
             'generation': generation,
@@ -257,13 +259,13 @@ class CodeExecutionWrapper:
         code_block = extract_code_to_execute(output, code_begin, code_end)
         extracted_code = f'{header}{code_block}'
         execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=extracted_code,
-                    language=self.config.code_execution_language,
-                    timeout=self.config.code_execution_timeout,
-                    max_output_characters=self.config.max_code_output_characters,
-                    session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
-                )
+            generated_code=extracted_code,
+            language=self.config.code_execution_language,
+            timeout=self.config.code_execution_timeout,
+            max_output_characters=self.config.max_code_output_characters,
+            session_id=session_id,
+            traceback_verbosity=self.config.sandbox_traceback_verbosity,
+        )
 
         return code_execution_time_start, execution_dict
 
@@ -412,6 +414,7 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
         stream: bool = False,
@@ -437,6 +440,7 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
+            top_logprobs=top_logprobs,
             timeout=timeout,
             max_code_executions=max_code_executions,
             stream=stream,
@@ -459,6 +463,11 @@ class CodeExecutionWrapper:
             time.sleep(1)
 
         return all_generations
+
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
 
     def _stream_single(
         self,

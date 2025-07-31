@@ -229,5 +229,3 @@ easy, that's 5!<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Can you double check?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 ```
-
-For an example of how to use it in real data file, see [mt-bench dataset](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/dataset/mt-bench).
