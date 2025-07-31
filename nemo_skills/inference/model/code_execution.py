@@ -20,6 +20,7 @@ import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
+import asyncio
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
@@ -459,6 +460,12 @@ class CodeExecutionWrapper:
             time.sleep(1)
 
         return all_generations
+    
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
+
 
     def _stream_single(
         self,
