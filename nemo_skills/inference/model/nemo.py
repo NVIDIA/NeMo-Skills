@@ -14,8 +14,8 @@
 
 import json
 
-from .base import BaseModel, BaseRewardModel
-from .utils import RequestException, trim_after_stop_phrases
+from .base import BaseModel
+from .utils import trim_after_stop_phrases
 
 
 class NemoModel(BaseModel):
@@ -141,18 +141,3 @@ class NemoModel(BaseModel):
         # TODO: return num_generated_tokens as well
         return outputs
 
-
-class NemoRewardModel(BaseRewardModel):
-    def score(self, prompts: list[str]) -> list[float]:
-        request = {
-            "prompts": prompts,
-        }
-        response = self.requests_lib.post(f"http://{self.server_host}:{self.server_port}/score", json=request)
-
-        if response.status_code != 200:
-            raise RequestException(f"Failed to score prompts: {response.text}")
-
-        scores = response.json()
-
-        outputs = [{"generation": score} for score in scores["rewards"]]
-        return outputs

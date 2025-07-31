@@ -29,6 +29,11 @@ import openai
 import requests
 from openai import DefaultHttpxClient, Stream
 
+# TODO: Remove this once added to the docker image
+import subprocess
+subprocess.check_call(["pip", "install", "litellm==1.71.1"])
+import litellm
+
 from nemo_skills.utils import get_logger_name
 
 from .utils import trim_after_stop_phrases
@@ -607,46 +612,35 @@ class OpenAIAPIModel(BaseModel):
             # Always unregister the generation when streaming is complete
             self._unregister_generation(gen_id)
 
+class LiteLLMModel(BaseModel):
+    def __init__(self, model_name: str, **kwargs):
+        super().__init__(**kwargs)
+        httpx_limits = httpx.Limits(
+            max_keepalive_connections=1500, max_connections=1500
+        )
+        litellm.client_session = httpx.Client(limits=httpx_limits)
+        litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
-class BaseRewardModel(abc.ABC):
-    """Base model class for handling requests to the reward model inference server.
+        self.model_name = model_name
 
-    Args:
-        model_type: Reward model type
-        host: Optional[str] = '127.0.0.1' - Host of the inference server.
-        port: Optional[str] = '5000' - Port of the inference server.
-            Only required if handle_code_execution is True.
-        ssh_server: Optional[str] = None - SSH server for tunneling requests.
-            Useful if server is running on slurm cluster to which there is an ssh access
-            Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
-        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
-            Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
-    """
-
-    def __init__(
+    def generate_async(
         self,
-        model_type: str,
-        host: str = '127.0.0.1',
-        port: str = '5000',
-        ssh_server: str | None = None,
-        ssh_key_path: str | None = None,
-    ):
-        self.model_type = model_type
-        self.server_host = host
-        self.server_port = port
-        self.ssh_server = ssh_server
-        self.ssh_key_path = ssh_key_path
-        if ssh_server is None:
-            self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
-        if ssh_key_path is None:
-            self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
-
-        if self.ssh_server and self.ssh_key_path:
-            import sshtunnel_requests
-
-            self.requests_lib = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-        else:
-            self.requests_lib = requests
-
-    def score(self, prompts: list[str]) -> list[dict]:
+        prompts: list[str | list],
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: int | list[int] | None = None,
+        remove_stop_phrases: bool = True,
+        stream: bool = False,
+        reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_response: bool = False,
+        extra_body: dict = None,
+    ) -> list[dict]:
         pass
