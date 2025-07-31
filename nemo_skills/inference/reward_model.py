@@ -67,10 +67,16 @@ class RewardModelTask(GenerationTask):
         """LLM is a reward model"""
         return get_reward_model(model_type=self.cfg.reward_model_type, **self.cfg.server)
 
-    def llm_generate(self, data_points, data):
-        """Rather than generating, we are scoring the data points"""
-        outputs = self.llm.score(prompts=[self.prompt.fill(dp, data) for dp in data_points])
-        return outputs
+    async def process_single_datapoint(self, data_point, all_data):
+        """Score a single data point using the reward model."""
+        # Fill the prompt for this data point
+        filled_prompt = self.fill_prompt(data_point, all_data)
+        
+        # Score the single prompt (reward model score method expects a list)
+        outputs = self.llm.score([filled_prompt])
+        
+        # Return the first (and only) result
+        return outputs[0]
 
     @classmethod
     def get_server_command_fn(cls) -> callable:
