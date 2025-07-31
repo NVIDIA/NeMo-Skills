@@ -277,7 +277,7 @@ class BaseModel(abc.ABC):
         # Configure the executor for the current event loop
         loop = asyncio.get_running_loop()
         if not hasattr(loop, '_nemo_skills_executor_configured'):
-            loop.set_default_executor(ThreadPoolExecutor(max_workers=1024))
+            loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
             loop._nemo_skills_executor_configured = True
 
         result = await asyncio.to_thread(self.generate, *args, **kwargs)
