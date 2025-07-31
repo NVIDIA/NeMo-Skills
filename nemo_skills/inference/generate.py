@@ -471,6 +471,15 @@ class GenerationTask:
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
         
+        # Set up a custom thread pool executor for the current event loop
+        # This fixes the 32 thread limitation by ensuring the event loop uses a larger thread pool
+        from concurrent.futures import ThreadPoolExecutor
+        current_loop = asyncio.get_running_loop()
+        if not hasattr(current_loop, '_custom_executor_set'):
+            executor = ThreadPoolExecutor(max_workers=1024)
+            current_loop.set_default_executor(executor)
+            current_loop._custom_executor_set = True
+        
         # Initialize output lock for thread-safe writing
         if self.output_lock is None:
             self.output_lock = asyncio.Lock()
