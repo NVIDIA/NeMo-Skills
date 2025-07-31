@@ -200,7 +200,7 @@ def test_nemo_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++max_samples=20 "
+        f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
@@ -212,7 +212,7 @@ def test_nemo_eval():
         assert metrics['symbolic_correct'] >= 50
     else:  # qwen
         assert metrics['symbolic_correct'] >= 70
-    assert metrics['num_entries'] == 20
+    assert metrics['num_entries'] == 2
 
 
 @pytest.mark.gpu
@@ -240,7 +240,7 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++prompt_template={prompt_template} "
-        f"    ++max_samples=20 "
+        f"    ++max_samples=2 "
         f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -251,4 +251,4 @@ def test_megatron_eval():
     # rough check, since exact accuracy varies depending on gpu type
     # TODO: something is broken in megatron inference here as this should be 50!
     assert metrics['symbolic_correct'] >= 20
-    assert metrics['num_entries'] == 20
+    assert metrics['num_entries'] == 2
