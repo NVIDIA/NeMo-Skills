@@ -455,18 +455,13 @@ class GenerationTask:
             # registering current time to calculate total generation time
             data_point['generation_start_time'] = time.time()
             
-            try:
-                # Generate output for this single data point
-                output = await self.process_single_datapoint(data_point, all_data)
-                
-                # Thread-safe output writing
-                async with self.output_lock:
-                    self.dump_outputs([output], [data_point], fout)
-                    pbar.update(1)
-                    
-            except Exception as e:
-                LOG.error(f"Error processing data point: {e}")
-                raise
+            # Generate output for this single data point
+            output = await self.process_single_datapoint(data_point, all_data)
+            
+            # Thread-safe output writing
+            async with self.output_lock:
+                self.dump_outputs([output], [data_point], fout)
+                pbar.update(1)
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
@@ -505,13 +500,13 @@ class GenerationTask:
 
             # Wait for all tasks to complete
             if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*tasks)
 
             pbar.close()
 
-        self._restore_async_order()
+        self.restore_async_order()
 
-    def _restore_async_order(self):
+    def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
         with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
