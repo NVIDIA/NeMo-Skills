@@ -51,6 +51,7 @@ policy:
     sequence_parallel: false
     activation_checkpointing: false
     tensor_parallel_size: 1
+    context_parallel_size: 1
     custom_parallel_plan: null
 
   # dynamic_batching improves performance by ensuring logprob and training microbatches
@@ -60,6 +61,9 @@ policy:
   # training and logprob stages respectively.
   dynamic_batching:
     enabled: false
+
+  sequence_packing:
+    enabled: False
 
   # makes the training sequence length divisible by the tensor parallel size
   # this is useful for sequence parallel training
@@ -105,6 +109,18 @@ policy:
       pipeline_parallel_size: 1
       gpu_memory_utilization: 0.6
       max_model_len: ${policy.max_total_sequence_length}
+      enforce_eager: False
+      # For most cases, use "dummy" to load the initial weights, since they will be overwritten during refit
+      # For Gemma models, we need to use "auto" due to a vllm bug
+      load_format: dummy
+    colocated:
+      # true: generation shares training GPUs
+      # false: uses dedicated generation resources
+      enabled: true
+      # only relevant when enabled is false
+      resources:
+        gpus_per_node: null # Decides num gpus to be dedicated to generation when there is one node in the cluster i.e cluster.num_nodes == 1
+        num_nodes: null # Decides number of nodes to be dedicated to generation
 
 data:
   max_input_seq_length: ${policy.max_total_sequence_length} # upper bound, real truncation occurs at vllm.max_model_len
@@ -127,11 +143,15 @@ logger:
   num_val_samples_to_print: 0 # Number of validation samples to pretty print on terminal
   wandb_enabled: false
   tensorboard_enabled: false
+  mlflow_enabled: false
   monitor_gpus: false  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   wandb:
     project: "grpo-dev"
     name: "grpo-dev-logger"
   tensorboard: {}
+  mlflow:
+    experiment_name: "grpo-dev"
+    run_name: "grpo-dev-logger"
   gpu_monitoring:
     collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
     flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)
@@ -139,3 +159,5 @@ logger:
 cluster:
   gpus_per_node: 1
   num_nodes: 1
+
+checkpoint_must_save_by: null
