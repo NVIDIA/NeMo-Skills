@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
 import random
 import sys
 import time
-import asyncio
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf, open_dict
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -63,7 +63,11 @@ class GenerateSolutionsConfig:
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
     prompt_config: str | None = None  # How to format the data into prompts
-    prompt_template: str | None = None  # not required for OpenAI server
+    # by default we use chat completions, set this to True to use completions API. In that case we will take the
+    # tokenizer from the model and apply it to the prompt before sending it. You can override tokenizer with
+    # tokenizer_path parameter
+    use_completions_api: bool = False
+    tokenizer_path: str | None = None  # path to the tokenizer to use for completions API. By default uses server.model
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
@@ -76,9 +80,7 @@ class GenerateSolutionsConfig:
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
-    prefix_generation_to_response: bool = False  # whether to include "generation" as prefix to the response
-    # if True, model will be prompted to continue "generation" without closing assistant tag
-    continue_prefix_generation: bool = False
+    start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
@@ -97,14 +99,6 @@ class GenerateSolutionsConfig:
     add_generation_stats: bool = True
 
     generation_key: str = "generation"
-    # if specified, we will have a loop over that key in the data file and
-    # treat each element as a new turn of conversation
-    # E.g. if multi_turn_key="turns" and a line in your data file has
-    # turns: ['Hey how are you?', 'And where do you live?']
-    # the generations will also be a list with the first entry corresponding to prompt
-    # with the first question, second entry to both first question, first answer and second question
-    # and so on
-    multi_turn_key: str | None = None
 
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
@@ -123,8 +117,8 @@ class GenerateSolutionsConfig:
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
 
-    # extra stop phrases for llms
-    extra_stop_phrases: list[str] = field(default_factory=list)
+    # stop phrase for llms
+    stop_phrase: str | None = None  # if None, will not add any extra stop phrase
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -149,19 +143,14 @@ class GenerateSolutionsConfig:
             )
 
     def _post_init_validate_server(self):
-        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
-            # TODO: fix that
-            raise ValueError("Prompt template is required for trtllm servers")
+        if self.server["server_type"] == "trtllm":
+            # forcing completions api
+            self.use_completions_api = True
 
-        if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
+        if self.server["server_type"] in ["nemo", "megatron"]:
             LOG.warning(
-                "NeMo/Megatron implementation of openai chat completions api "
-                "doesn't support batching and thus is very slow. "
-                "Until this is fixed, we highly recommend that you provide prompt template explicitly."
+                "NeMo/Megatron inference is extremely slow. It's highly recommended to use other server types!"
             )
-
-        if self.server["server_type"] in ["openai", "azureopenai"] and self.prompt_template is not None:
-            raise ValueError("Prompt template is not supported for OpenAI server")
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
@@ -170,7 +159,6 @@ class GenerateSolutionsConfig:
 
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
             assert self.system_message is None, "system_message is not supported for prompt_format == 'openai'"
         else:
             assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
@@ -185,20 +173,6 @@ class GenerateSolutionsConfig:
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_generation_config", node=GenerateSolutionsConfig)
-
-
-def combine_stop_phrases(prompt_phrases, extra_phrases):
-    if prompt_phrases is None and extra_phrases is None:
-        return None
-    if prompt_phrases is None:
-        return extra_phrases
-    if extra_phrases is None:
-        return prompt_phrases
-
-    if isinstance(extra_phrases, ListConfig):
-        extra_phrases = OmegaConf.to_object(extra_phrases)
-
-    return prompt_phrases + extra_phrases
 
 
 class GenerationTask:
@@ -244,26 +218,18 @@ class GenerationTask:
         else:
             self.extra_generate_params = {}
 
-        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
-
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
             "Use max_concurrent_requests to control the number of concurrent requests.",
             self.cfg.max_concurrent_requests,
         )
-        
+
         # Initialize semaphore for controlling concurrent requests
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
     def setup_llm(self):
-        # TODO: DRY with the check in the validation config
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] in ["nemo", "megatron"]:
-            with open_dict(self.cfg.server):
-                self.cfg.server["server_type"] = "openai"
-                self.cfg.server["model"] = "model"
-
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
@@ -276,8 +242,16 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             return None
 
+        if self.use_completions_api:
+            tokenizer = self.cfg.tokenizer_path or self.cfg.server['model']
+        else:
+            tokenizer = None
+
         prompt = get_prompt(
-            self.cfg.prompt_config, self.cfg.prompt_template, self.cfg.code_tags, examples_type=self.cfg.examples_type
+            prompt_config=self.cfg.prompt_config,
+            tokenizer=tokenizer,
+            code_tags=self.cfg.code_tags,
+            examples_type=self.cfg.examples_type,
         )
         if self.cfg.system_message is not None:
             prompt.config.system = self.cfg.system_message
@@ -383,9 +357,7 @@ class GenerationTask:
         data_point = deepcopy(data_point)
         filled_prompt = self.prompt.fill(
             data_point,
-            multi_turn_key=self.cfg.multi_turn_key,
-            prefix_generation_to_response=self.cfg.prefix_generation_to_response,
-            continue_prefix_generation=self.cfg.continue_prefix_generation,
+            start_assistant_response_key=self.cfg.start_assistant_response_key,
         )
         if self.cfg.prompt_suffix:
             if isinstance(filled_prompt, list):
@@ -393,7 +365,6 @@ class GenerationTask:
             else:
                 filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
-
 
     def dump_outputs(self, outputs, data_points, fout):
         for output, original_data_point in zip(outputs, data_points):
@@ -434,9 +405,7 @@ class GenerationTask:
     async def process_single_datapoint(self, data_point, all_data):
         generation_params = {
             "prompts": [self.fill_prompt(data_point, all_data)],
-            "stop_phrases": combine_stop_phrases(
-                self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
-            ),
+            "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
         }
@@ -448,16 +417,15 @@ class GenerationTask:
 
         return await self.llm.generate_asyncio(**generation_params)
 
-
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
         async with self.semaphore:
             # registering current time to calculate total generation time
             data_point['generation_start_time'] = time.time()
-            
+
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
-            
+
             # Thread-safe output writing
             async with self.output_lock:
                 self.dump_outputs([output], [data_point], fout)
@@ -465,7 +433,7 @@ class GenerationTask:
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
-        
+
         # Initialize output lock for thread-safe writing
         if self.output_lock is None:
             self.output_lock = asyncio.Lock()
@@ -483,7 +451,7 @@ class GenerationTask:
                 remaining_data_points.append(data_point)
 
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
-        
+
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
@@ -493,9 +461,7 @@ class GenerationTask:
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                task = asyncio.create_task(
-                    self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar)
-                )
+                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete

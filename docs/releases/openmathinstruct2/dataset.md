@@ -265,7 +265,7 @@ python -m nemo_skills.training.prepare_data \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \
     ++min_solution_length=200 \
-    ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
+    ++tokenizer="meta-llama/Meta-Llama-3.1-8B" \
     ++max_solution_length=1024 \
     ++filters.remove_contaminated=true \
     ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm/output.jsonl

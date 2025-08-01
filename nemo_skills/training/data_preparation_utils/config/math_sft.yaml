@@ -26,7 +26,7 @@ num_output_samples: null
 
 # Params for length-based filtering
 # Unit of length - Tokens
-hf_model_name: null
+tokenizer: null
 
 # Problem params
 min_problem_length: 0

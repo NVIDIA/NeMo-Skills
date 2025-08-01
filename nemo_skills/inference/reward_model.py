@@ -40,7 +40,7 @@ class RewardModelConfig(GenerateSolutionsConfig):
     code_execution: bool = False
 
     # Generation is used to construct the prompt for the reward model
-    prefix_generation_to_response: bool = True
+    start_assistant_response_key: str = generation
 
     # Key to store the reward model score
     generation_key: str = "reward_model_score"
@@ -71,10 +71,10 @@ class RewardModelTask(GenerationTask):
         """Score a single data point using the reward model."""
         # Fill the prompt for this data point
         filled_prompt = self.fill_prompt(data_point, all_data)
-        
+
         # Score the single prompt (reward model score method expects a list)
         outputs = self.llm.score([filled_prompt])
-        
+
         # Return the first (and only) result
         return outputs[0]
 

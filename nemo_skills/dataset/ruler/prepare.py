@@ -29,8 +29,7 @@ METRICS_TYPE = "ruler"
 EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type={match_type}"
 GENERATION_ARGS = (
     "++inference.tokens_to_generate={tokens_to_generate} "
-    "++prefix_generation_to_response=True "
-    "++continue_prefix_generation=True"
+    "++start_assistant_response_key=generation "
 )
 """
 TOKENS_TO_GENERATE = {'niah': 128, 'vt': 30, 'cwe': 120, 'fwe': 50, 'qa': 32}

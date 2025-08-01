@@ -178,16 +178,12 @@ ns generate \
     --output_dir=/workspace/generation-local-trtllm \
     --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=qwen-instruct # (3)!
 ```
 
 1.   We are re-downloading the model explicitly since TensorRT-LLM cannot work with the HuggingFace cache.
 2.   You can specify any extra parameters for
      [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
      directly as arguments to this command.
-3.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
-     do that even for vLLM or other locally hosted models as we found that HuggingFace tokenizer templates are not always
-     correct and it's best to be explicit about what is used for each model.
 
 ## Slurm inference
 
@@ -275,7 +271,6 @@ convert(
 
 eval(
     ctx=wrap_arguments(
-        "++prompt_template=qwen-instruct "
         "++inference.tokens_to_generate=16000 "
         "++inference.temperature=0.6"
     ),

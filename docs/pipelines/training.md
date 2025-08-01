@@ -138,7 +138,7 @@ convert(
     convert_to="hf",
     model_type="llama",
     num_gpus=8,
-    hf_model_name="meta-llama/Meta-Llama-3.1-8B",
+    tokenizer="meta-llama/Meta-Llama-3.1-8B",
 )
 
 convert(
