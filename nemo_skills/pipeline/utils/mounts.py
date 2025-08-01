@@ -167,6 +167,7 @@ def get_mounted_path(cluster_config: dict, path: str):
     mount_path = None
     for mount in get_mounts_from_config(cluster_config) + ['/nemo_run/code:/nemo_run/code']:
         mount_source, mount_dest = mount.split(':')
+        mount_source = mount_source.rstrip('/')
         if path.startswith(mount_source):
             mount_path = mount
             break
@@ -184,8 +185,9 @@ def get_mounted_path(cluster_config: dict, path: str):
     # replace the mount destination inside the filepath with the mount source
     mount_source, mount_dest = mount_path.split(':')
     # append the rest of the path to the mount destination
-    filepath = mount_dest + path[len(mount_source) :]
-
+    relative = path[len(mount_source):].lstrip('/')
+    filepath = os.path.join(mount_dest, relative)
+    
     return filepath
 
 
