@@ -62,9 +62,10 @@ class VLLMModel(BaseModel):
         stream: bool = False,
         reasoning_effort: str | None = None,
         extra_body: dict = None,
+        tools: list[dict] | None = None,
     ) -> dict:
         return {
-            "prompt": [prompt],
+            "prompt": prompt,
             "max_tokens": tokens_to_generate,
             "temperature": temperature,
             "top_p": top_p,
@@ -114,9 +115,8 @@ class VLLMModel(BaseModel):
             "stream": stream,
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
+            "toold": tools,
         }
-        if tools is not None:
-            request["tools"] = tools
         return request
 
 

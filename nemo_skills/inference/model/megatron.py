@@ -48,6 +48,7 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
         if top_k not in [0, -1]:
             raise NotImplementedError("Megatron server does not support top_k parameter.")
+        assert kwargs.get('tools') is None, "Megatron server does not support tools parameter."
 
         return {
             "prompt": prompt,
