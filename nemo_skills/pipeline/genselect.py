@@ -74,8 +74,9 @@ def genselect(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    benchmark: str = typer.Option(None, help="The benchmark to use for genselect"),
+    benchmark: str = typer.Option(help="The benchmark to use for genselect"),
     solution_key: str = typer.Option("generation", help="This is the key whose value will be used during genselect"),
+    cluster_key: str = typer.Option(None, help="This is the key whose value will be used to cluster instances"),
     preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -203,6 +204,7 @@ def genselect(
         # Add the preprocessing command for genselect
         preprocess_args = (
             f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++solution_key={solution_key} " + (f" ++benchmark={benchmark} " if benchmark is not None else "") 
+            + (f" ++cluster_key={cluster_key} " if cluster_key is not None else "")
             + (preprocess_args if preprocess_args is not None else "")
         )
         task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"

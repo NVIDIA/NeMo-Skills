@@ -36,16 +36,12 @@ class GenSelectPreprocessConfig:
     output_dir: str | None = None
     benchmark: str
     solution_key: str
+    cluster_key: str | None = None
     max_soln_samples: int = 16
     is_competition: bool = False
     sampling_strategy: str = "linear"
     num_random_seeds: int | None = None
     num_input_samples: int | None = None
-
-
-
-
-
 
 
 def probabilistic_ceil(n: float) -> int:
