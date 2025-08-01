@@ -91,7 +91,6 @@ class OpenAIModel(OpenAIAPIModel):
             raise ValueError("`top_logprobs` is not supported with stream=True.")
 
         params = {
-            "model": self.model,
             "messages": messages,
             "seed": random_seed,
             "stop": stop_phrases or None,
