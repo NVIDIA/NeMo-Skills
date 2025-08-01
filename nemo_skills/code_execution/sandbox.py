@@ -171,11 +171,6 @@ class Sandbox(abc.ABC):
         self.http_session = session
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
-        # will keep state of code sessions
-        self.sessions = {}
-
-    def clear_session(self, session_id):
-        del self.sessions[session_id]
 
     def _send_request(self, request, timeout):
         if self.ssh_server and self.ssh_key_path:
@@ -226,94 +221,22 @@ class Sandbox(abc.ABC):
 
         if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
-            self.sessions[session_id] = []
 
-        if session_id is not None:
-            self.sessions[session_id].append(generated_code)
-
-        if language == 'ipython':
-            TO_EXECUTE = """
-import traceback
-import json
-import os
-import re
-import warnings
-warnings.filterwarnings('ignore')
-os.environ['OPENBLAS_NUM_THREADS'] = '16'
-
-from IPython.core.interactiveshell import InteractiveShell
-from IPython.utils import io
-
-def simplify_errors(error_text):
-    def strip_ansi_codes(text):
-        ansi_escape = re.compile(r'\\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
-
-    error_text = strip_ansi_codes(error_text)
-    output = []
-    for line in error_text.split('\\n'):
-        if line.strip().startswith('File <ipython-'):
-            continue
-        output.append(line)
-    return '\\n'.join(output)
-
-code_snippets = []
-"""
-            for code_snippet in self.sessions[session_id]:
-                TO_EXECUTE += f'\ncode_snippets.append({repr(code_snippet)})\n'
-
-            # we do `strip() + \\n` below to ensure that `print(res)` and `res` return the same output
-            TO_EXECUTE += f"""
-try:
-    shell = InteractiveShell()
-    shell.InteractiveTB.set_mode(mode='{traceback_verbosity}')
-    for code in code_snippets:
-        with io.capture_output() as captured:
-            exec_result = shell.run_cell(code)
-    stdout = captured.stdout.replace("Out[1]: ", "").strip()
-    stderr = captured.stderr.replace("Out[1]: ", "").strip()
-    if len(stdout) > {max_output_characters}:
-        stdout = stdout[:{max_output_characters}] + "<output cut>"
-    if len(stderr) > {max_output_characters}:
-        stderr = stderr[:{max_output_characters}] + "<output cut>"
-    if stdout:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stdout = simplify_errors(stdout)
-        stdout += "\\n"
-    if stderr:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stderr = simplify_errors(stderr)
-        stderr += "\\n"
-    has_error = exec_result.error_before_exec or exec_result.error_in_exec
-    to_return = {{"process_status": "error" if has_error else "completed", "stdout": stdout, "stderr": stderr}}
-
-except Exception:
-    # removing useless prefix from traceback
-    to_return = {{
-        "process_status": "error",
-        "stdout": "",
-        "stderr": "\\n".join(traceback.format_exc().split("\\n")[3:]),
-    }}
-print(json.dumps(to_return))
-"""
-        elif language in ["python", "pypy3", "python3", "lean4"]:
-            if session_id is not None:
-                raise RuntimeError(
-                    f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
-                )
-            TO_EXECUTE = generated_code
-        else:
+        if language in ["python", "pypy3", "python3", "lean4"] and session_id is not None:
+            raise RuntimeError(
+                f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
+            )
+        if language not in ["ipython", "python", "pypy3", "python3", "lean4"]:
             raise ValueError(f"Unsupported language: {language}")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
+        TO_EXECUTE = generated_code
+        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input, traceback_verbosity)
+        request['session_id'] = session_id if session_id is None else str(session_id)
         try:
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-        # removing last state to not re-execute code with errors
-        if session_id is not None:
-            if output['stderr'] or 'Traceback (most recent call last)' in output['stdout']:
-                self.sessions[session_id] = self.sessions[session_id][:-1]
+
         return output, session_id
 
     def is_proof_correct(self, pred_output, timeout=30.0):
@@ -435,12 +358,13 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
             "timeout": timeout,
             "language": language,
+            "traceback_verbosity": traceback_verbosity,
         }
 
 

@@ -1,0 +1,66 @@
+events {
+    worker_connections 1024;
+}
+
+http {
+    # Extract session_id from JSON request body
+    map $request_body $session_id_for_routing {
+        # Match session_id in JSON: "session_id":"value" or "session_id": "value"
+        ~*"session_id"\s*:\s*"([^"]+)" $1;
+        # Default to empty if not found in body
+        default "";
+    }
+
+    # Define upstream servers (dynamically populated)
+    upstream sandbox_workers {
+        # Use consistent hashing based on session_id from JSON body
+        hash $session_id_for_routing consistent;
+
+        # Worker servers will be inserted here by sed
+${UPSTREAM_SERVERS}
+    }
+
+    server {
+        listen ${NGINX_PORT};
+        server_name localhost;
+
+        # Increase body size for large code payloads
+        client_max_body_size 10M;
+        client_body_buffer_size 128k;
+
+        # All endpoints - simple proxy with session affinity
+        location / {
+            # Route based on session affinity
+            proxy_pass http://sandbox_workers;
+
+            # Standard proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Timeouts for long-running code execution
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+
+            # Don't buffer response for streaming
+            proxy_buffering off;
+        }
+
+
+
+        # Nginx status for monitoring
+        location /nginx-status {
+            stub_status on;
+            access_log off;
+            allow 127.0.0.1;
+            allow ::1;
+            deny all;
+        }
+    }
+
+    # Logging
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log warn;
+}

@@ -20,12 +20,135 @@ import resource
 import subprocess
 import sys
 import tempfile
+import time
+import threading
 import signal
+import re
 from io import StringIO
+from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
 from flask import Flask, request
 
 app = Flask(__name__)
+
+# Global dictionary to store IPython shells by session_id
+sessions = {}
+session_lock = threading.Lock()
+SESSION_TIMEOUT = float(os.getenv('SANDBOX_SESSION_TIMEOUT', -1))
+
+def cleanup_expired_sessions():
+    """Remove IPython sessions that haven't been used recently"""
+    current_time = time.time()
+    with session_lock:
+        expired_sessions = []
+        for session_id, session_data in sessions.items():
+            if current_time - session_data['last_used'] > SESSION_TIMEOUT:
+                expired_sessions.append(session_id)
+
+        for session_id in expired_sessions:
+            try:
+                del sessions[session_id]
+                print(f"Cleaned up expired session: {session_id}")
+            except Exception as e:
+                print(f"Error cleaning up session {session_id}: {e}")
+
+def get_or_create_session(session_id):
+    """Get existing IPython session or create a new one (fast startup)"""
+    current_time = time.time()
+    with session_lock:
+        if session_id not in sessions:
+            try:
+                # Create new IPython shell instance for each session
+                shell = TerminalInteractiveShell()
+                shell.init_create_namespaces()     # Initialize the shell properly
+
+                sessions[session_id] = {
+                    'shell': shell,
+                    'created': current_time,
+                    'last_used': current_time
+                }
+                print(f"Created new IPython session: {session_id}")
+            except Exception as e:
+                print(f"Failed to create IPython session {session_id}: {e}")
+                raise
+        else:
+            sessions[session_id]['last_used'] = current_time
+
+        return sessions[session_id]
+
+def postprocess_output(output, traceback_verbosity):
+    if traceback_verbosity not in ['Minimal', 'Plain']:
+        return output
+
+    def strip_ansi_codes(text):
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+
+    output = strip_ansi_codes(output)
+    lines = []
+    for line in output.split('\n'):
+        if line.strip().startswith('File <ipython-'):
+            continue
+        lines.append(line)
+
+    return '\n'.join(lines)
+
+def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity='Plain'):
+    """Execute Python code in a persistent IPython session"""
+    try:
+        # Clean up expired sessions periodically
+        if SESSION_TIMEOUT > 0:
+            cleanup_expired_sessions()
+
+        # Get or create session
+        session_data = get_or_create_session(session_id)
+        shell = session_data['shell']
+        shell.InteractiveTB.set_mode(mode=traceback_verbosity)
+
+        # Capture stdout/stderr
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+
+        sys.stdout = stdout_capture
+        sys.stderr = stderr_capture
+
+        try:
+            # Execute code with IPython's run_cell (handles imports, variables, etc.)
+            result = shell.run_cell(generated_code)
+
+            stdout_result = stdout_capture.getvalue()
+            stderr_result = stderr_capture.getvalue()
+
+            # Add execution result if present
+            if result.result is not None:
+                stdout_result += str(result.result) + '\n'
+
+            # Check for execution errors
+            if result.error_before_exec or result.error_in_exec:
+                process_status = "error"
+                if result.error_in_exec:
+                    stderr_result += f"\n{result.error_in_exec}"
+            else:
+                process_status = "completed" if not stderr_result else "error"
+        except Exception as e:
+            process_status = "error"
+            stdout_result = stdout_capture.getvalue(),
+            stderr_result = stderr_capture.getvalue() + f"\n{type(e).__name__}: {e}"
+
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+        return {
+            "process_status": process_status,
+            "stdout": postprocess_output(stdout_result, traceback_verbosity),
+            "stderr": postprocess_output(stderr_result, traceback_verbosity)
+        }
+
+    except Exception as e:
+        return {"process_status": "error", "stdout": "", "stderr": f"Session error: {e}\n"}
 
 MEM_LIMIT_BYTES = int(os.environ.get('NEMO_SKILLS_SANDBOX_MEM_LIMIT', 10 * 1024 ** 3))  # 10 GiB default
 
@@ -124,7 +247,7 @@ def execute_code_subprocess(generated_code, queue):
     sys.stdout = StringIO()
     try:
         exec(generated_code, {})
-        queue.put(sys.stdout.getvalue())
+        queue.put({"process_status": "completed", "stdout": sys.stdout.getvalue(), "stderr": ""})
     except Exception as e:
         print(f"Error: {str(e)}")
         queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
@@ -137,13 +260,57 @@ def execute():
     timeout = request.json['timeout']
     language = request.json.get('language', 'ipython')
     std_input = request.json.get('std_input', '')
+    traceback_verbosity = request.json.get('traceback_verbosity', 'Plain')
+
+    # Get session_id from JSON body
+    session_id = request.json.get('session_id')
 
     if language == 'ipython':
-        return execute_ipython(generated_code, timeout)
+        if session_id:
+            return execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
+        else:
+            return execute_ipython(generated_code, timeout)
     elif language == 'lean4':
         return execute_lean4(generated_code, timeout)
     else:
         return execute_python(generated_code, std_input, timeout, language)
+
+
+# Session management endpoints
+@app.route("/sessions", methods=["GET"])
+def list_sessions():
+    """List all active IPython sessions"""
+    session_info = {}
+
+    with session_lock:
+        for session_id, session_data in sessions.items():
+            session_info[session_id] = {
+                'backend': 'ipython',
+                'created': session_data['created'],
+                'last_used': session_data['last_used'],
+                'alive': True  # IPython sessions are always "alive"
+            }
+
+    return {"sessions": session_info, "backend": "ipython"}
+
+
+@app.route("/sessions/<session_id>", methods=["DELETE"])
+def delete_session(session_id):
+    """Delete a specific IPython session"""
+    with session_lock:
+        if session_id in sessions:
+            try:
+                del sessions[session_id]
+                return {"message": f"IPython session {session_id} deleted successfully"}
+            except Exception as e:
+                return {"error": f"Error deleting IPython session {session_id}: {e}"}, 500
+        else:
+            return {"error": f"IPython session {session_id} not found"}, 404
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint for load balancer"""
+    return {"status": "healthy", "port": os.environ.get('FLASK_PORT', '6000')}
 
 
 if __name__ == '__main__':
