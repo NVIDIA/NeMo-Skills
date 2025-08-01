@@ -80,19 +80,22 @@ class GenSelectPreprocessor:
         if dataset_module is not None:
             metric_type = dataset_module.METRICS_TYPE
             from nemo_skills.evaluation.metrics.map_metrics import METRICS_MAP
-            metric_module = METRICS_MAP[metric_type]
-            self.get_score_dict = metric_module._get_score_dict
+            self.metric_module = METRICS_MAP[metric_type]
         else:
-            self.get_score_dict = None
+            self.metric_module = None
 
     def get_instance_correctness(self, instance):
-        if self.get_score_dict is None:
+        if self.metric_module is None:
             if "accuracy" in instance:
                 return bool(instance["accuracy"])
             elif "judge_correct" in instance:
                 return bool(instance["judge_correct"])
+            elif "symbolic_correct" in instance:
+                return bool(instance["symbolic_correct"])
+            else:
+                return None
         else:
-            score_dict = self.get_score_dict(instance)
+            score_dict = self.metric_module._get_score_dict(instance)
             if len(score_dict) == 1:
                 # Just one score, so we can use it to determine correctness
                 return bool(list(score_dict.values())[0])
