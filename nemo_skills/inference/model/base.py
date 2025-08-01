@@ -313,7 +313,7 @@ class OpenAIAPIModel(BaseModel):
             if stream:
                 result = self._stream_chat_chunks_async(response)
             else:
-                result = self._parse_chat_completion_response(response, include_response=include_response)
+                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
 
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -321,13 +321,13 @@ class OpenAIAPIModel(BaseModel):
             if stream:
                 result = self._stream_completion_chunks_async(response)
             else:
-                result = self._parse_completion_response(response, include_response=include_response)
+                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
         else:
             raise TypeError(f"Unsupported prompt type: {type(prompt)}")
 
         return result
 
-    def _parse_completion_response(self, response: "openai.types.Completion", include_response: bool = False) -> dict:
+    def _parse_completion_response(self, response: "openai.types.Completion", include_response: bool = False, **kwargs) -> dict:
         choice = response.choices[0]
         output = choice.text
         if output is None:
@@ -354,7 +354,7 @@ class OpenAIAPIModel(BaseModel):
 
         return result
 
-    def _parse_chat_completion_response(self, response, include_response: bool = False) -> dict:
+    def _parse_chat_completion_response(self, response, include_response: bool = False, **kwargs) -> dict:
         choice = response.choices[0]
         output = choice.message.content
         if output is None:
