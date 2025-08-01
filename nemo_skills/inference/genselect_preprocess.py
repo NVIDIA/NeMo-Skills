@@ -97,6 +97,7 @@ class GenSelectPreprocessor:
                 return None
         else:
             score_dict = self.metric_module._get_score_dict(instance)
+            LOG.info(f"Score dict for instance: {score_dict}")
             if len(score_dict) == 1:
                 # Just one score, so we can use it to determine correctness
                 return bool(list(score_dict.values())[0])
@@ -129,6 +130,7 @@ class GenSelectPreprocessor:
         with open(single_correctness_instances_path, "w") as f:
             for problem, instance_list in problem_to_instances.items():
                 correctness_vals = set([self.get_instance_correctness(instance) for instance in instance_list])
+                LOG.info(f"Correctness values for problem\n {correctness_vals}")
                 if len(correctness_vals) == 1 and None not in correctness_vals:
                     # Single correctness
                     f.write(json.dumps(instance_list[0]) + "\n")
@@ -149,7 +151,7 @@ class GenSelectPreprocessor:
                 
                 problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
         else:
-            for problem, instance_list in problem_to_instances.items():
+            for problem in rem_problems:
                 problem_to_clustered_instances[problem] = [[instance] for instance in problem_to_instances[problem]]
 
         LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
