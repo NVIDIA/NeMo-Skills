@@ -56,6 +56,7 @@ DATASETS = [
     ('gaokao2023en', ['test']),
     ('college_math', ['test']),
     ('comp-math-24-25', ['test']),
+    ('mrcr', ['all', 'needle2_64k', 'needle2_128k', 'needle2_1m']),
 ]
 
 
