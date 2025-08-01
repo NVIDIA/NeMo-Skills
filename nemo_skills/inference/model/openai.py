@@ -60,20 +60,7 @@ class OpenAIModel(BaseModel):
         return re.match(r"^o\d", model_name)
 
     def _build_completion_request_params(self, **kwargs) -> dict:
-            "prompt": prompt,
-            "max_tokens": tokens_to_generate,
-            "temperature": temperature,
-            "top_p": top_p,
-            "seed": random_seed,
-            "stop": stop_phrases or None,
-            "logprobs": top_logprobs,
-            "stream": stream,
-            "echo": False,
-            "n": 1,
-            "logit_bias": None,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
-            "timeout": timeout,
+        return dict(kwargs)
 
     def _build_chat_request_params(
         self,
