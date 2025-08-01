@@ -155,7 +155,7 @@ class GenSelectPreprocessor:
         random.shuffle(clustered_instances)
 
         cluster_counts = []
-        for _, same_cluster_instances in clustered_instances:
+        for same_cluster_instances in clustered_instances:
             cluster_counts.append(len(same_cluster_instances))
         total_samples = sum(cluster_counts)
 
