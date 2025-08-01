@@ -38,13 +38,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class GenSelectConfig(GenerateSolutionsConfig):
     """Genselect parameters."""
-
-    input_dir: str  # Directory where the original predictions are saved
-    output_dir: str  # Where to save the intermediate outputs and final predictions
-
-    # Will be set in __post_init__ based on input_dir, output_dir and random_seed
-    input_file: str | None = None
-    output_file: str | None = None
+    input_file: str
+    output_file: str
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
@@ -63,10 +58,6 @@ class GenSelectConfig(GenerateSolutionsConfig):
         super()._post_init_validate_data()
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
-        self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
-        self.output_file = str(
-            Path(self.output_dir) / f"output-rs{self.inference.random_seed}.jsonl"
-        )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
 
