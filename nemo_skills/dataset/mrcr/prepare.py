@@ -62,10 +62,11 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset,
             
             # find n_tokens
             n_tokens = count_n_tokens(messages)
-            if n_tokens > max_context_window:
-                print(f"Skipping {idx} because it has {n_tokens} tokens")
-                continue
-            
+            if max_context_window is not None:
+                if n_tokens > max_context_window:
+                    print(f"Skipping {idx} because it has {n_tokens} tokens")
+                    continue
+
             # convert messages to string
             if convert_messagesto_string:
                 question = convert_messagesto_string(messages, {"user": "User", "assistant": "Assistant"})
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_context_window",
         type=int,
-        default=2000000,
+        default=None,
         help="Maximum context window size.",
     )
     parser.add_argument(
