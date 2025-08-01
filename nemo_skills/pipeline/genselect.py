@@ -229,6 +229,7 @@ def genselect(
         )
         
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+            continue
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(

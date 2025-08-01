@@ -145,7 +145,8 @@ class GenSelectPreprocessor:
                 
                 problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
         else:
-            problem_to_clustered_instances[problem] = [[instance] for instance in problem_to_instances]
+            for problem, instance_list in problem_to_instances.items():
+                problem_to_clustered_instances[problem] = [[instance] for instance in problem_to_instances[problem]]
 
         LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
         return problem_to_clustered_instances
