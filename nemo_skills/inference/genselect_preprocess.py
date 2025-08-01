@@ -24,6 +24,7 @@ import importlib
 
 import hydra
 
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -88,8 +89,8 @@ class GenSelectPreprocessor:
         if self.metric_module is None:
             if "accuracy" in instance:
                 return bool(instance["accuracy"])
-            elif "judge_correct" in instance:
-                return bool(instance["judge_correct"])
+            elif "judgement" in instance:
+                return bool(is_correct_judgement(instance["judgement"]))
             elif "symbolic_correct" in instance:
                 return bool(instance["symbolic_correct"])
             else:
