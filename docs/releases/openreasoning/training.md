@@ -3,6 +3,7 @@
 ## Download data and convert to SFT format
 
 OpenReasoning dataset consists of 5 independent parts:
+
 * Math CoT data
 * Math TIR data
 * Math GenSelect data
@@ -104,9 +105,10 @@ def apply_format(elem, prompt):
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="code")
 
-prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'qwen-instruct')  # data already includes instruction
+prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'qwen-instruct')
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
+dataset = dataset.remove_columns(['messages'])
 
 dataset.to_json("open-reasoning-code-cot.jsonl")
 ```
