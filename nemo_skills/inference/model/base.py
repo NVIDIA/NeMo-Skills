@@ -50,7 +50,7 @@ class BaseModel:
 
     def __init__(
         self,
-        model: str | None = None,
+        model: str,
         api_key: str = "EMPTY",
         base_url: str | None = None,
         max_retries: int = 3,
@@ -93,7 +93,6 @@ class BaseModel:
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
 
-        assert model is not None, "model is required"
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
         self.litellm_kwargs = dict(
