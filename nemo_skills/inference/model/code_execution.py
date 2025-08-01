@@ -290,7 +290,7 @@ class CodeExecutionWrapper:
         
         return output
 
-    async def generate_asyncio(self, prompt, *args, **kwargs) -> dict:
+    async def generate_async(self, prompt, *args, **kwargs) -> dict:
         # Configure the executor for the current event loop
         loop = asyncio.get_running_loop()
         if not hasattr(loop, '_nemo_skills_executor_configured'):

@@ -188,7 +188,7 @@ def get_generation_cmd(
         cmd += (
             f"    ++inference.random_seed={random_seed} "
             f"    ++inference.temperature=0.7 "
-            f"    ++inference.top_k=0 "
+            f"    ++inference.top_k=-1 "
             f"    ++inference.top_p=0.95 "
         )
 

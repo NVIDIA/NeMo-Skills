@@ -30,7 +30,7 @@ class MegatronModel(BaseModel):
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = 0,
+        top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
@@ -46,7 +46,7 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support min_p parameter.")
         if repetition_penalty != 1.0:
             raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
-        if top_k not in [0, -1]:
+        if top_k != -1:
             raise NotImplementedError("Megatron server does not support top_k parameter.")
         assert kwargs.get('tools') is None, "Megatron server does not support tools parameter."
 

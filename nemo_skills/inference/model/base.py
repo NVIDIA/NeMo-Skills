@@ -113,8 +113,8 @@ class BaseModel:
         if self._tunnel:
             self._tunnel.stop()
 
-    def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | list[list[str]] | None) -> None:
-        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
+    def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | None) -> None:
+        if remove_stop_phrases:
             result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
 
     @abc.abstractmethod
@@ -125,31 +125,19 @@ class BaseModel:
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
-    def _prepare_generation_params(
-        self, **kwargs,
-    ) -> dict:
-        """Prepare generation parameters for both sync and async methods."""
-        if kwargs['timeout'] is None:
-            # litellm uses 10min as default None
-            # So we change it to 10000 seconds for consistency with other clients
-            kwargs['timeout'] = 10000 
-        if kwargs['top_k'] == 0:
-            kwargs['top_k'] = -1 # litellm doesn't support top_k=0
-        return kwargs
-
-    async def generate_asyncio(
+    async def generate_async(
         self,
         prompt: str | list,
         tokens_to_generate: int = 2048,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = 0,
+        top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,
+        timeout: float | int | None = 10000, # None is 10min
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | None = None,
@@ -158,82 +146,21 @@ class BaseModel:
         extra_body: dict = None,
     ) -> dict:
         """Native async version of generate for single prompt."""
-        request = self._prepare_generation_params(
-            prompt=prompt,
-            tokens_to_generate=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            random_seed=random_seed,
-            stop_phrases=stop_phrases,
-            top_logprobs=top_logprobs,
-            timeout=timeout,
-            stream=stream,
-            reasoning_effort=reasoning_effort,
-            tools=tools,
-            include_response=include_response,
-            extra_body=extra_body,
-        )
-        result = await self._generate_single_async(**request)
-        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
-
-        return result
-    
-    def generate_sync(
-        self,
-        prompt: str | list,
-        tokens_to_generate: int = 2048,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = 0,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = 0,
-        stop_phrases: list[str] | None = None,
-        top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
-    ) -> dict:
-        """
-        Synchronous version of generate for single prompt.
-        See generate_asyncio for full list of parameters.
-        """
-        request = self._prepare_generation_params(
-            prompt=prompt,
-            tokens_to_generate=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            random_seed=random_seed,
-            stop_phrases=stop_phrases,
-            top_logprobs=top_logprobs,
-            timeout=timeout,
-            stream=stream,
-            reasoning_effort=reasoning_effort,
-            tools=tools,
-            include_response=include_response,
-            extra_body=extra_body,
-        )
-        result = self._generate_single_sync(**request)
-        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
-        return result
-
-    async def _generate_single_async(
-        self,
-        prompt: str | list,
-        stream: bool = False,
-        include_response: bool = False,
-        **kwargs,
-    ):
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
+            'reasoning_effort': reasoning_effort,
+            'tools': tools,
+            'extra_body': extra_body,
+        }
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
             response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
@@ -251,16 +178,50 @@ class BaseModel:
                 result = self._parse_completion_response(response, include_response=include_response, **kwargs)
         else:
             raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+        
+        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
-
-    def _generate_single_sync(
+    
+    def generate_sync(
         self,
         prompt: str | list,
+        tokens_to_generate: int = 2048,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = -1,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: float | int | None = 10000, # None is 10min
+        remove_stop_phrases: bool = True,
         stream: bool = False,
+        reasoning_effort: str | None = None,
+        tools: list[dict] | None = None,
         include_response: bool = False,
-        **kwargs,
-    ):
-        """Synchronous version of _generate_single_async."""
+        extra_body: dict = None,
+    ) -> dict:
+        """
+        Synchronous version of generate for single prompt.
+        See generate_async for full list of parameters.
+        """
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
+            'reasoning_effort': reasoning_effort,
+            'tools': tools,
+            'extra_body': extra_body,
+        }
+        
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
             response = litellm.completion(**request_params, **self.litellm_kwargs)
@@ -279,6 +240,7 @@ class BaseModel:
         else:
             raise TypeError(f"Unsupported prompt type: {type(prompt)}")
 
+        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
 
     def _parse_completion_response(self, response: "openai.types.Completion", include_response: bool = False, **kwargs) -> dict:

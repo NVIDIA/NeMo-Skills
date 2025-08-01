@@ -115,7 +115,7 @@ class VLLMModel(BaseModel):
             "stream": stream,
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
-            "toold": tools,
+            "tools": tools,
         }
         return request
 

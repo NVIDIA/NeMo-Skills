@@ -446,7 +446,7 @@ class GenerationTask:
                 max_code_executions_values = [data_point['total_code_executions']]
                 generation_params['max_code_executions'] = max_code_executions_values
 
-        return await self.llm.generate_asyncio(**generation_params)
+        return await self.llm.generate_async(**generation_params)
 
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
