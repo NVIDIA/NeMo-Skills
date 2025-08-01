@@ -143,7 +143,7 @@ class CodeExecutionWrapper:
                 if request['timeout'] <= 0:
                     break
 
-            output_dict = self.model.generate_sync(**request)
+            output_dict = self.model.generate_sync(**request, remove_stop_phrases=False)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
