@@ -55,7 +55,7 @@ class GenSelectConfig(GenerateSolutionsConfig):
     generation_key: str = "genselect_comparison"
     input_key: str = "problem"
     output_key: str = "generation"
-    cluster_key: str | None = None
+    answer_key: str | None = None
 
     sandbox: dict = field(default_factory=dict)
 
@@ -132,15 +132,8 @@ class GenSelectTask(GenerationTask):
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
 
-                output_instance[self.cfg.solution_key] = instance[f"{self.cfg.solution_key}_{judgment}"]
-
-
-                # output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
-
-                # if f"symbolic_correct_{judgment}" in instance:
-                #     output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
-                # if f"judgement_{judgment}" in instance:
-                #     output_instance["judgement"] = instance[f'judgement_{judgment}']
+                output_instance[self.cfg.output_key] = instance[f"{self.cfg.output_key}_{judgment}"]
+                output_instance[self.cfg.answer_key] = instance[f"{self.cfg.answer_key}_{judgment}"]
 
                 fout.write(json.dumps(output_instance) + '\n')
 

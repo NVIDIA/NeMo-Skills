@@ -33,11 +33,11 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class GenSelectPreprocessConfig:
     input_dir: str
-    output_dir: str | None = None
+    output_dir: str
     benchmark: str
     input_key: str
     output_key: str
-    cluster_key: str | None = None
+    answer_key: str
     max_soln_samples: int = 16
     is_competition: bool = False
     sampling_strategy: str = "linear"
@@ -61,7 +61,7 @@ class GenSelectPreprocessor:
         self.benchmark = cfg.benchmark
         self.input_key = cfg.input_key
         self.output_key = cfg.output_key
-        self.cluster_key = cfg.cluster_key  # Key to cluster instances by
+        self.answer_key = cfg.answer_key  # Key which determines the correctness of the response
         self.max_soln_samples = cfg.max_soln_samples
         self.sampling_strategy = cfg.sampling_strategy
         self.num_random_seeds = cfg.num_random_seeds
@@ -141,18 +141,14 @@ class GenSelectPreprocessor:
         
         # Now cluster the instances by the cluster key
         problem_to_clustered_instances = {}
-        if self.cluster_key is not None:
-            for problem in rem_problems:
-                instance_list = problem_to_instances[problem]
-                cluster_dict = defaultdict(list)
-                for instance in instance_list:
-                    cluster_key_val = instance[self.cluster_key]
-                    cluster_dict[cluster_key_val].append(instance)
-                
-                problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
-        else:
-            for problem in rem_problems:
-                problem_to_clustered_instances[problem] = [[instance] for instance in problem_to_instances[problem]]
+        for problem in rem_problems:
+            instance_list = problem_to_instances[problem]
+            cluster_dict = defaultdict(list)
+            for instance in instance_list:
+                cluster_key_val = instance[self.cluster_key]
+                cluster_dict[cluster_key_val].append(instance)
+            
+            problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
 
         LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
         return problem_to_clustered_instances
@@ -200,13 +196,11 @@ class GenSelectPreprocessor:
 
         for i, instance in enumerate(sampled_instances):
             comparison_instance[f"{self.output_key}_{i}"] = instance[self.output_key]
+            comparison_instance[f"{self.answer_key}_{i}"] = instance[self.answer_key]
 
         return comparison_instance
 
     def preprocess(self):
-        if self.output_dir is None:
-            raise ValueError("Output directory is required")
-
         output_dir = os.path.join(self.output_dir, "comparison_instances")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)

@@ -77,7 +77,7 @@ def genselect(
     benchmark: str = typer.Option(help="The benchmark to use for genselect"),
     input_key: str = typer.Option("problem", help="The input key which forms the prompt"),
     output_key: str = typer.Option("generation", help="This is the key whose value will be used during genselect"),
-    cluster_key: str = typer.Option(None, help="This is the key whose value will be used to cluster instances"),
+    answer_key: str = typer.Option(None, help="This is the key whose value determines the correctness of the response"),
     preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -208,7 +208,7 @@ def genselect(
         # Add the preprocessing command for genselect
         preprocess_args = (
             f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++input_key={input_key} ++output_key={output_key} ++benchmark={benchmark} " 
-            + (f" ++cluster_key={cluster_key} " if cluster_key is not None else "")
+            + (f" ++answer_key={answer_key} " if answer_key is not None else "")
             + (preprocess_args if preprocess_args is not None else "")
         )
         task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
