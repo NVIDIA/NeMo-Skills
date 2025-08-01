@@ -29,5 +29,4 @@ mounts:
   - /tmp:/tmp
   # change this if the models are located in a different place
   # TODO: can we make it simpler?
-  # - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
-  - /home/smahdavi/data/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+  - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
