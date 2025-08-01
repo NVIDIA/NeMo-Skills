@@ -246,7 +246,7 @@ def execute_code_subprocess(generated_code, queue):
     sys.stdout = StringIO()
     try:
         exec(generated_code, {})
-        queue.put(sys.stdout.getvalue())
+        queue.put({"process_status": "completed", "stdout": sys.stdout.getvalue(), "stderr": ""})
     except Exception as e:
         print(f"Error: {str(e)}")
         queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
@@ -266,13 +266,13 @@ def execute():
 
     if language == 'python':
         if session_id:
-            return jsonify(execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity))
+            return execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
         else:
-            return jsonify(execute_ipython(generated_code, timeout))
+            return execute_ipython(generated_code, timeout)
     elif language == 'lean4':
-        return jsonify(execute_lean4(generated_code, timeout))
+        return execute_lean4(generated_code, timeout)
     else:
-        return jsonify(execute_python(generated_code, std_input, timeout, language))
+        return execute_python(generated_code, std_input, timeout, language)
 
 
 # Session management endpoints
