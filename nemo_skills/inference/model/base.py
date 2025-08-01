@@ -56,6 +56,7 @@ class BaseModel(abc.ABC):
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
+        **kwargs,
     ):
         self.server_host = host
         self.server_port = port
