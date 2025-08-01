@@ -170,7 +170,7 @@ class GenSelectPreprocessor:
         # Sample instances from each cluster using the sampling probabilities
         sampled_instances = []
         num_samples = min(self.max_soln_samples, total_samples)
-        for i, (_, same_cluster_instances) in enumerate(clustered_instances):
+        for i, same_cluster_instances in enumerate(clustered_instances):
             cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
             cur_num_samples = min(max(1, cur_num_samples), len(same_cluster_instances))
             sampled_instances.extend(random.sample(same_cluster_instances, cur_num_samples))
