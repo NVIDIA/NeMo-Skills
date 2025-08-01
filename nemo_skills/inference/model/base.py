@@ -241,7 +241,7 @@ class OpenAIAPIModel(BaseModel):
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
-    async def generate_asyncio(
+    def _prepare_generation_params(
         self,
         prompt: str | list,
         tokens_to_generate: int | list[int] = 2048,
@@ -260,8 +260,8 @@ class OpenAIAPIModel(BaseModel):
         tools: list[dict] | None = None,
         include_response: bool = False,
         extra_body: dict = None,
-    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
-        """Native async version of generate for single prompt."""
+    ) -> dict:
+        """Prepare generation parameters for both sync and async methods."""
         # Prepare request parameters similar to generate_async
         if timeout is None:
             # litellm uses 10min as default None
@@ -291,6 +291,48 @@ class OpenAIAPIModel(BaseModel):
         request = kwargs.copy()
         request['prompt'] = prompt
         self.preprocess_request(request)
+        return request
+
+    async def generate_asyncio(
+        self,
+        prompt: str | list,
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: float | int | None = None,
+        remove_stop_phrases: bool = True,
+        stream: bool = False,
+        reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_response: bool = False,
+        extra_body: dict = None,
+    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+        """Native async version of generate for single prompt."""
+        request = self._prepare_generation_params(
+            prompt=prompt,
+            tokens_to_generate=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            random_seed=random_seed,
+            stop_phrases=stop_phrases,
+            top_logprobs=top_logprobs,
+            timeout=timeout,
+            remove_stop_phrases=remove_stop_phrases,
+            stream=stream,
+            reasoning_effort=reasoning_effort,
+            tools=tools,
+            include_response=include_response,
+            extra_body=extra_body,
+        )
 
         result = await self._generate_single_async(**request)
         
@@ -301,8 +343,27 @@ class OpenAIAPIModel(BaseModel):
 
         return result
     
-    def generate_sync(self, prompt, *args, **kwargs) -> dict:
-        return asyncio.run(self.generate_asyncio(prompt, *args, **kwargs))
+    def generate_sync(
+        self,
+        *args,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        remove_stop_phrases: bool = True,
+        **kwargs,
+    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+        """Synchronous version of generate for single prompt."""
+        request = self._prepare_generation_params(
+            *args,
+            stop_phrases=stop_phrases,
+            remove_stop_phrases=remove_stop_phrases,
+            **kwargs,
+        )
+        result = self._generate_single_sync(**request)
+        
+        # Apply stop phrase removal if needed
+        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
+            from .utils import trim_after_stop_phrases
+            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+        return result
 
     async def _generate_single_async(
         self,
@@ -324,6 +385,33 @@ class OpenAIAPIModel(BaseModel):
             response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_completion_chunks_async(response)
+            else:
+                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
+        else:
+            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+        return result
+
+    def _generate_single_sync(
+        self,
+        prompt: str | list,
+        stream: bool = False,
+        include_response: bool = False,
+        **kwargs,
+    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+        """Synchronous version of _generate_single_async."""
+        if isinstance(prompt, list):
+            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+            response = litellm.completion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_chat_chunks_sync(response)
+            else:
+                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
+
+        elif isinstance(prompt, str):
+            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+            response = litellm.text_completion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_completion_chunks_sync(response)
             else:
                 result = self._parse_completion_response(response, include_response=include_response, **kwargs)
         else:
@@ -381,6 +469,52 @@ class OpenAIAPIModel(BaseModel):
             result["response"] = response
 
         return result
+
+    def _stream_completion_chunks_sync(self, response):
+        """Synchronous version of stream completion chunks."""
+        emitted_so_far = []
+        for chunk in response:
+            cur_delta = chunk.choices[0].text
+            emitted_so_far += [cur_delta]
+            if cur_delta:
+                yield {"generation": cur_delta}
+            # vllm variant
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            # sglang variant
+            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+            # vllm variant - emit stop_reason as is and finish
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
+            # sglang variant - emit only not-yet-sent part of matched_stop
+            if matched_stop and isinstance(matched_stop, str):
+                remaining = matched_stop
+                # find the longest prefix of matched_stop that is already at
+                # the end of what we've emitted.
+                emitted_str = "".join(emitted_so_far)
+                max_len = min(len(emitted_str), len(matched_stop))
+                for i in range(max_len, 0, -1):
+                    if emitted_str.endswith(matched_stop[:i]):
+                        remaining = matched_stop[i:]
+                        break
+                if remaining:
+                    yield {"generation": remaining}
+
+    def _stream_chat_chunks_sync(self, response):
+        """Synchronous version of stream chat chunks."""
+        for chunk in response:
+            if hasattr(chunk.choices[0], "delta"):
+                cur_delta = chunk.choices[0].delta.content
+            else:
+                cur_delta = chunk.choices[0].text
+
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            result = {"generation": cur_delta}
+            if finish_reason:
+                result["finish_reason"] = finish_reason
+                if not cur_delta:
+                    result["generation"] = ""
+
+            yield result
 
     async def _stream_completion_chunks_async(self, response):
         """Async version of stream completion chunks."""
