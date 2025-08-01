@@ -1,5 +1,10 @@
 # Dataset construction
 
+!!! note
+
+    This page has instructions for how to re-generate datasets from scratch. If you just want to download existing
+    data that we released, you can use the scripts in the [training documentation](./training.md#download-data-and-convert-to-sft-format).
+
 Here are the commands you can run to re-create our synthetic dataset.
 We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
 running commands with a Slurm config. Change all commands accordingly if running locally or using different paths.
