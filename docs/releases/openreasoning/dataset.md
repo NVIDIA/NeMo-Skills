@@ -205,3 +205,5 @@ Next, we generate solutions for these problems.
 We use [DeepSeek-R1-0528](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528) to generate solutions with parameters as described in the math section above.
 
 The final step is to apply majority voting over the solutions generated in the previous step to obtain the final dataset.
+
+The resulting dataset, OpenScienceReasoning-2, is available for download on Hugging Face [here](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).
