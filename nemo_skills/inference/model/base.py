@@ -83,21 +83,12 @@ class BaseModel(abc.ABC):
             self.requests_lib = session
 
     def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | list[list[str]] | None) -> None:
-        """Apply stop phrase removal to the generation result if needed.
-        
-        Args:
-            result: The result dictionary containing generation output
-            remove_stop_phrases: Whether to remove stop phrases
-            stop_phrases: List of stop phrases to remove
-        """
         if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
             result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
 
     def _generate_single(
         self, *args, **kwargs,
     ) -> dict:
-        """If the engine supports inflight-batching of requests, you only need to define this method.
-        """
         raise NotImplementedError("This method should be implemented by the child class")
 
     def preprocess_request(self, request: dict):
