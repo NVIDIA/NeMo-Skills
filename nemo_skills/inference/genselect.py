@@ -51,6 +51,7 @@ class GenSelectConfig(GenerateSolutionsConfig):
     input_key: str = "problem"
     output_key: str = "generation"
     answer_key: str
+    benchmark: str
 
     sandbox: dict = field(default_factory=dict)
 
@@ -103,9 +104,7 @@ class GenSelectTask(GenerationTask):
         single_correctness_instances = [json.loads(line) for line in open(single_correctness_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        # TODO: use last part of input_dir?
-        benchmark_dir = "math"
-        output_file = Path(self.cfg.output_file).parent.parent / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        output_file = Path(self.cfg.output_file).parent.parent / self.cfg.benchmark / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
