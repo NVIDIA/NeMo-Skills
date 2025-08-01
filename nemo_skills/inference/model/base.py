@@ -82,6 +82,17 @@ class BaseModel(abc.ABC):
             session.mount('https://', adapter)
             self.requests_lib = session
 
+    def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | list[list[str]] | None) -> None:
+        """Apply stop phrase removal to the generation result if needed.
+        
+        Args:
+            result: The result dictionary containing generation output
+            remove_stop_phrases: Whether to remove stop phrases
+            stop_phrases: List of stop phrases to remove
+        """
+        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
+            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+
     def _generate_single(
         self, *args, **kwargs,
     ) -> dict:
@@ -151,8 +162,7 @@ class BaseModel(abc.ABC):
         output = self._generate_single(**request)
 
         # Apply stop phrase removal if needed
-        if remove_stop_phrases and isinstance(output, dict) and output.get('generation') is not None:
-            output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+        self._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
 
         # Remove logprobs if not requested
         if top_logprobs is None:
@@ -333,13 +343,8 @@ class OpenAIAPIModel(BaseModel):
             include_response=include_response,
             extra_body=extra_body,
         )
-
         result = await self._generate_single_async(**request)
-        
-        # Apply stop phrase removal if needed
-        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
-            from .utils import trim_after_stop_phrases
-            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
 
         return result
     
@@ -350,7 +355,10 @@ class OpenAIAPIModel(BaseModel):
         remove_stop_phrases: bool = True,
         **kwargs,
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
-        """Synchronous version of generate for single prompt."""
+        """
+        Synchronous version of generate for single prompt.
+        See generate_asyncio for full list of parameters.
+        """
         request = self._prepare_generation_params(
             *args,
             stop_phrases=stop_phrases,
@@ -358,11 +366,7 @@ class OpenAIAPIModel(BaseModel):
             **kwargs,
         )
         result = self._generate_single_sync(**request)
-        
-        # Apply stop phrase removal if needed
-        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
-            from .utils import trim_after_stop_phrases
-            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
 
     async def _generate_single_async(
