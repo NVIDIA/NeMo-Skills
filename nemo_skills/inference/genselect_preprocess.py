@@ -73,6 +73,7 @@ class GenSelectPreprocessor:
     def _post_init(self):
         dataset_module = None
         try:
+            print(f"Importing dataset module: nemo_skills.dataset.{self.benchmark}")
             dataset_module = importlib.import_module(f"nemo_skills.dataset.{self.benchmark}")
         except ImportError:
             LOG.warning(f"Dataset module {self.benchmark} not found. Ignoring the use of associated metric.")

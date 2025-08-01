@@ -204,8 +204,7 @@ def genselect(
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
         preprocess_args = (
-            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++input_key={input_key} ++output_key={output_key} " 
-            + (f" ++benchmark={benchmark} " if benchmark is not None else "") 
+            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++input_key={input_key} ++output_key={output_key} ++benchmark={benchmark} " 
             + (f" ++cluster_key={cluster_key} " if cluster_key is not None else "")
             + (preprocess_args if preprocess_args is not None else "")
         )
