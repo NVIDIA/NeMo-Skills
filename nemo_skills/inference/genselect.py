@@ -104,7 +104,7 @@ class GenSelectTask(GenerationTask):
         single_correctness_instances = [json.loads(line) for line in open(single_correctness_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        output_file = Path(self.cfg.output_file).parent.parent / self.cfg.benchmark / f"output-rs{self.cfg.inference.random_seed}.jsonl"
+        output_file = Path(self.cfg.output_file).parent.parent / self.cfg.benchmark / Path(self.cfg.output_file).name
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:

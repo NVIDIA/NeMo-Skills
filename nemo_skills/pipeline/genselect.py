@@ -197,6 +197,7 @@ def genselect(
         chunk_ids=[None],
         rerun_done=rerun_done,
     )
+
     all_tasks = []
     has_tasks = False
     if _task_dependencies is None:
