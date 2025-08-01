@@ -83,6 +83,7 @@ class NemoRLTask:
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
+            f"export HF_HOME=/lustre/fsw/portfolios/llmservice/users/wedu/llm && "
             f"echo 'Starting training' && "
             f"cd /opt/NeMo-RL && "
             f"NRL_FORCE_REBUILD_VENVS=true uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
