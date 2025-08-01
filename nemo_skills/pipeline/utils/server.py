@@ -201,7 +201,7 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'trtllm':
-        server_entrypoint = server_entrypoint or "trtllm"
+        server_entrypoint = server_entrypoint or "trtllm-serve"
         if num_nodes > 1 and server_entrypoint == "trtllm":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
         server_start_cmd = (
