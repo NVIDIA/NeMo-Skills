@@ -20,6 +20,7 @@ import os
 import random
 from collections import defaultdict
 from copy import deepcopy
+import importlib
 
 import hydra
 
@@ -29,73 +30,22 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def read_file(file_path):
-    LOG.info(f"Reading file: {file_path}")
-    instances = [json.loads(line) for line in open(file_path, "r")]
-    problem_to_instance = {instance["problem"]: instance for instance in instances}
-    return problem_to_instance
+@nested_dataclass(kw_only=True)
+class GenSelectPreprocessConfig:
+    input_dir: str
+    output_dir: str | None = None
+    benchmark: str
+    solution_key: str
+    max_soln_samples: int = 16
+    is_competition: bool = False
+    sampling_strategy: str = "linear"
+    num_random_seeds: int | None = None
+    num_input_samples: int | None = None
 
 
-def read_files(file_paths, single_answer_instances_path):
-    problem_to_instances = defaultdict(list)
-    for file_path in file_paths:
-        problem_to_instance = read_file(file_path)
-        for problem, instance in problem_to_instance.items():
-            problem_to_instances[problem].append(instance)
-
-    LOG.info(f"Number of problems: {len(problem_to_instances)}")
-
-    with open(single_answer_instances_path, "w") as f:
-        problem_to_clustered_instances = {}
-        for problem, instance_list in problem_to_instances.items():
-            answer_clusters = defaultdict(list)
-            for instance in instance_list:
-                answer = instance["predicted_answer"]
-                answer_clusters[answer].append(instance)
-
-            if len(answer_clusters) == 1:
-                # Single answer or no answer
-                _, single_answer_instance_list = list(answer_clusters.items())[0]
-                instance = single_answer_instance_list[0]
-                single_answer_instance = deepcopy(instance)
-                if single_answer_instance["predicted_answer"] is None:
-                    # The only predicted answer across seeds is None
-                    single_answer_instance["symbolic_correct"] = False
-                else:
-                    single_answer_instance["symbolic_correct"] = (
-                        is_correct_judgement(instance["judgement"])
-                        if "judgement" in instance
-                        else instance["symbolic_correct"]
-                    )
-
-                f.write(json.dumps(single_answer_instance) + "\n")
-            else:
-                problem_to_clustered_instances[problem] = [
-                    (answer, instances) for answer, instances in answer_clusters.items()
-                ]
-
-    LOG.info(f"Number of problems with multiple answers: {len(problem_to_clustered_instances)}")
-    return problem_to_clustered_instances
 
 
-def extract_summary(solution, max_length=5000):
-    """Extract the summary from the solution."""
-    if solution.count("</think>") == 0:
-        if len(solution) < max_length:
-            # Probably the solution is a summary itself
-            summary = solution
-        else:
-            # Take the last 10 steps
-            summary = "\n\n".join(solution.split("\n\n")[-10:])[-max_length:]
-    else:
-        # There's a clear demarcation between the thinking step and the summary
-        summary = solution.rsplit("</think>", 1)[1]
 
-    summary = summary.replace("<think>", "")
-
-    if len(summary) > max_length:
-        summary = summary[-max_length:]
-    return summary
 
 
 def probabilistic_ceil(n: float) -> int:
@@ -106,108 +56,211 @@ def probabilistic_ceil(n: float) -> int:
         return math.floor(n)
 
 
-def sample_instances(clustered_instances, max_soln_samples=8, sampling_strategy="linear", bayesian_constant=1.0):
-    random.shuffle(clustered_instances)
-
-    answer_counts = []
-    for _, same_answer_instances in clustered_instances:
-        answer_counts.append(len(same_answer_instances))
-
-    total_samples = sum(answer_counts)
-
-    if sampling_strategy == "sqrt":
-        unnormalized_sampling_probs = [(answer_count / total_samples) ** 0.5 for answer_count in answer_counts]
-        sampling_probs = [
-            sampling_prob / sum(unnormalized_sampling_probs) for sampling_prob in unnormalized_sampling_probs
-        ]
-
-    elif sampling_strategy == "bayesian":
-        pseudo_answer_counts = [(answer_count + bayesian_constant) for answer_count in answer_counts]
-        sampling_probs = [
-            pseudo_answer_count / sum(pseudo_answer_counts) for pseudo_answer_count in pseudo_answer_counts
-        ]
-    else:
-        sampling_probs = [answer_count / total_samples for answer_count in answer_counts]
-
-    # Sample instances from each cluster using the sampling probabilities
-    sampled_instances = []
-    num_samples = min(max_soln_samples, total_samples)
-    for i, (_, same_answer_instances) in enumerate(clustered_instances):
-        cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
-        cur_num_samples = min(max(1, cur_num_samples), len(same_answer_instances))
-        # if cur_num_samples > 0:
-        sampled_instances.extend(random.sample(same_answer_instances, cur_num_samples))
-
-    return sampled_instances[:max_soln_samples]
 
 
-def create_comparison_instance(clustered_instances, problem, max_soln_samples=8, sampling_strategy="linear"):
-    # Create a consolidated instance
-    sampled_instances = sample_instances(
-        clustered_instances, max_soln_samples=max_soln_samples, sampling_strategy=sampling_strategy
-    )
-    sampled_solutions = [extract_summary(instance["generation"]) for instance in sampled_instances]
-    consolidated_solutions = ""
-    for idx, solution in enumerate(sampled_solutions):
-        consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+# def preprocess(
+#     input_dir, output_dir, max_soln_samples=8, sampling_strategy="linear", num_random_seeds=8, num_input_samples=8
+# ):
+#     if output_dir is None:
+#         raise ValueError("Output directory is required")
 
-    comparison_instance = deepcopy(sampled_instances[0])
-    comparison_instance["solutions"] = consolidated_solutions
-    comparison_instance["max_idx"] = len(sampled_solutions) - 1
-    comparison_instance["num_solutions"] = len(sampled_instances)
+#     output_dir = os.path.join(output_dir, "comparison_instances")
+#     if not os.path.exists(output_dir):
+#         os.makedirs(output_dir, exist_ok=True)
 
-    for i, instance in enumerate(sampled_instances):
-        comparison_instance[f"predicted_answer_{i}"] = instance["predicted_answer"]
-        if "judgement" in instance:
-            comparison_instance[f"judgement_{i}"] = instance["judgement"]
-        if "symbolic_correct" in instance:
-            comparison_instance[f"symbolic_correct_{i}"] = instance["symbolic_correct"]
+#     if not os.path.exists(output_dir):
+#         os.makedirs(output_dir, exist_ok=True)
 
-    comparison_instance["expected_answer"] = clustered_instances[0][1][0]["expected_answer"]
+#     input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")))
+#     if num_input_samples is not None:
+#         input_files = input_files[:num_input_samples]
+#         print(f"Using {num_input_samples} / {len(input_files)} input files")
+#     problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
 
-    return comparison_instance
-
-
-def preprocess(
-    input_dir, output_dir, max_soln_samples=8, sampling_strategy="linear", num_random_seeds=8, num_input_samples=8
-):
-    if output_dir is None:
-        raise ValueError("Output directory is required")
-
-    output_dir = os.path.join(output_dir, "comparison_instances")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-
-    input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")))
-    if num_input_samples is not None:
-        input_files = input_files[:num_input_samples]
-        print(f"Using {num_input_samples} / {len(input_files)} input files")
-    problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
-
-    for random_seed in range(num_random_seeds):
-        # random.seed(random_seed)
-        with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-            for problem, clustered_instances in problem_to_clustered_instances.items():
-                comparison_instance = create_comparison_instance(
-                    clustered_instances,
-                    problem,
-                    max_soln_samples=max_soln_samples,
-                    sampling_strategy=sampling_strategy,
-                )
-                f.write(json.dumps(comparison_instance) + "\n")
+#     for random_seed in range(num_random_seeds):
+#         # random.seed(random_seed)
+#         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
+#             for problem, clustered_instances in problem_to_clustered_instances.items():
+#                 comparison_instance = create_comparison_instance(
+#                     clustered_instances,
+#                     problem,
+#                     max_soln_samples=max_soln_samples,
+#                     sampling_strategy=sampling_strategy,
+#                 )
+#                 f.write(json.dumps(comparison_instance) + "\n")
 
 
-@nested_dataclass(kw_only=True)
-class GenSelectPreprocessConfig:
-    input_dir: str
-    output_dir: str
-    max_soln_samples: int = 16
-    sampling_strategy: str = "linear"
-    num_random_seeds: int | None = None
-    num_input_samples: int | None = None
+class GenSelectPreprocessor:
+    def __init__(self, cfg: GenSelectPreprocessConfig):
+        self.cfg = cfg
+        self.input_dir = cfg.input_dir
+        self.output_dir = cfg.output_dir
+        self.benchmark = cfg.benchmark
+        self.solution_key = cfg.solution_key
+        self.cluster_key = cfg.cluster_key  # Key to cluster instances by
+        self.max_soln_samples = cfg.max_soln_samples
+        self.sampling_strategy = cfg.sampling_strategy
+        self.num_random_seeds = cfg.num_random_seeds
+        self.num_input_samples = cfg.num_input_samples
+
+        # Initialize the class
+        self._post_init()
+        
+    def _post_init(self):
+        dataset_module = None
+        try:
+            dataset_module = importlib.import_module(f"nemo_skills.dataset.{self.benchmark}")
+        except ImportError:
+            LOG.warning(f"Dataset module {self.benchmark} not found. Ignoring the use of associated metric.")
+        
+        if dataset_module is not None:
+            metric_type = dataset_module.METRICS_TYPE
+            from nemo_skills.evaluation.metrics.map_metrics import METRICS_MAP
+            metric_module = METRICS_MAP[metric_type]
+            self.get_score_dict = metric_module._get_score_dict
+        else:
+            self.get_score_dict = None
+
+    def get_instance_correctness(self, instance):
+        if self.get_score_dict is None:
+            if "accuracy" in instance:
+                return bool(instance["accuracy"])
+            elif "judge_correct" in instance:
+                return bool(instance["judge_correct"])
+        else:
+            score_dict = self.get_score_dict(instance)
+            if len(score_dict) == 1:
+                # Just one score, so we can use it to determine correctness
+                return bool(list(score_dict.values())[0])
+            else:
+                # Multiple scores, not clear how to determine correctness
+                # If all scores are the same, then we can use that value
+                # Otherwise we can return None
+                if len(set(score_dict.values())) == 1:
+                    return bool(list(score_dict.values())[0])
+                else:
+                    return None
+    
+    def read_file(self, file_path):
+        LOG.info(f"Reading file: {file_path}")
+        instances = [json.loads(line) for line in open(file_path, "r")]
+        problem_to_instance = {instance["problem"]: instance for instance in instances}
+        return problem_to_instance
+                
+    def read_files(self, file_paths, single_correctness_instances_path):
+        problem_to_instances = defaultdict(list)
+        for file_path in file_paths:
+            problem_to_instance = self.read_file(file_path)
+            for problem, instance in problem_to_instance.items():
+                problem_to_instances[problem].append(instance)
+
+        LOG.info(f"Number of problems: {len(problem_to_instances)}")
+
+        # Identify all instances which have the same correctness value
+        rem_problems = []
+        with open(single_correctness_instances_path, "w") as f:
+            for problem, instance_list in problem_to_instances.items():
+                correctness_vals = set([self.get_instance_correctness(instance) for instance in instance_list])
+                if len(correctness_vals) == 1 and None not in correctness_vals:
+                    # Single correctness
+                    f.write(json.dumps(instance_list[0]) + "\n")
+                    continue
+                else:
+                    # Need to cluster these instances
+                    rem_problems.append(problem)
+        
+        # Now cluster the instances by the cluster key
+        problem_to_clustered_instances = {}
+        if self.cluster_key is not None:
+            for problem in rem_problems:
+                instance_list = problem_to_instances[problem]
+                cluster_dict = defaultdict(list)
+                for instance in instance_list:
+                    cluster_key_val = instance[self.cluster_key]
+                    cluster_dict[cluster_key_val].append(instance)
+                
+                problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
+        else:
+            problem_to_clustered_instances[problem] = [[instance] for instance in problem_to_instances]
+
+        LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
+        return problem_to_clustered_instances
+    
+
+    def sample_instances(self, clustered_instances):
+        random.shuffle(clustered_instances)
+
+        cluster_counts = []
+        for _, same_cluster_instances in clustered_instances:
+            cluster_counts.append(len(same_cluster_instances))
+        total_samples = sum(cluster_counts)
+
+        if self.sampling_strategy == "sqrt":
+            unnormalized_sampling_probs = [(cluster_count / total_samples) ** 0.5 for cluster_count in cluster_counts]
+            sampling_probs = [
+                sampling_prob / sum(unnormalized_sampling_probs) for sampling_prob in unnormalized_sampling_probs
+            ]
+        else:
+            sampling_probs = [cluster_count / total_samples for cluster_count in cluster_counts]
+
+        # Sample instances from each cluster using the sampling probabilities
+        sampled_instances = []
+        num_samples = min(self.max_soln_samples, total_samples)
+        for i, (_, same_cluster_instances) in enumerate(clustered_instances):
+            cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
+            cur_num_samples = min(max(1, cur_num_samples), len(same_cluster_instances))
+            sampled_instances.extend(random.sample(same_cluster_instances, cur_num_samples))
+
+        return sampled_instances[:self.max_soln_samples]
+
+
+    def create_comparison_instance(self, clustered_instances):
+        # Create a consolidated instance
+        sampled_instances = self.sample_instances(clustered_instances)
+        sampled_solutions = [instance[self.solution_key] for instance in sampled_instances]
+        consolidated_solutions = ""
+        for idx, solution in enumerate(sampled_solutions):
+            consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
+
+        comparison_instance = deepcopy(sampled_instances[0])
+        comparison_instance["solutions"] = consolidated_solutions
+        comparison_instance["max_idx"] = len(sampled_solutions) - 1
+        comparison_instance["num_solutions"] = len(sampled_instances)
+
+        for i, instance in enumerate(sampled_instances):
+            comparison_instance[f"{self.solution_key}_{i}"] = instance[self.solution_key]
+
+        return comparison_instance
+
+    def preprocess(self):
+        if self.output_dir is None:
+            raise ValueError("Output directory is required")
+
+        output_dir = os.path.join(self.output_dir, "comparison_instances")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        input_files = sorted(glob.glob(os.path.join(self.input_dir, "output-rs*.jsonl")))
+        if self.num_input_samples is not None:
+            input_files = input_files[:self.num_input_samples]
+            LOG.info(f"Using {self.num_input_samples} / {len(input_files)} input files")
+        
+        problem_to_clustered_instances = self.read_files(
+            input_files, os.path.join(output_dir, "single_correctness_instances.jsonl")
+        )
+
+        for random_seed in range(self.num_random_seeds):
+            random.seed(random_seed)
+            with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
+                for problem, clustered_instances in problem_to_clustered_instances.items():
+                    comparison_instance = self.create_comparison_instance(
+                        clustered_instances,
+                        problem,
+                    )
+                    f.write(json.dumps(comparison_instance) + "\n")
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -220,14 +273,8 @@ def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
     cfg = GenSelectPreprocessConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    preprocess(
-        input_dir=cfg.input_dir,
-        output_dir=cfg.output_dir,
-        max_soln_samples=cfg.max_soln_samples,
-        sampling_strategy=cfg.sampling_strategy,
-        num_random_seeds=cfg.num_random_seeds,
-        num_input_samples=cfg.num_input_samples,
-    )
+    genselect_preprocessor = GenSelectPreprocessor(cfg)
+    genselect_preprocessor.preprocess()
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ class BaseMetrics(abc.ABC):
                     metrics_dict[agg_mode][metric_key] = metric_value
         return metrics_dict
 
+    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
         Returns a dictionary with all applicable ways to measure the correctness score for a given prediction.

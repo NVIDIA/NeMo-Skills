@@ -24,26 +24,6 @@ from nemo_skills.pipeline.utils import get_server_command
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def get_genselect_cmd(
-    output_dir,
-    extra_arguments,
-    random_seed=None,
-):
-    cmd = (
-        f"python -m nemo_skills.inference.genselect "
-        f"    ++skip_filled=True "
-        f"    ++input_dir={output_dir}/comparison_instances "
-        f"    ++output_dir={output_dir}/comparison_judgment "
-        f"    ++inference.random_seed={random_seed} "
-        f"    ++inference.temperature=0.7 "
-        f"    ++inference.tokens_to_generate=2048 "
-        f"    ++inference.top_k=0 "
-        f"    ++inference.top_p=0.95 "
-    )
-    cmd += f" {extra_arguments} "
-    return cmd
-
-
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def genselect(
@@ -94,6 +74,8 @@ def genselect(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    benchmark: str = typer.Option(None, help="The benchmark to use for genselect"),
+    solution_key: str = typer.Option("generation", help="This is the key whose value will be used during genselect"),
     preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -219,8 +201,9 @@ def genselect(
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
-        preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
-            preprocess_args if preprocess_args is not None else ""
+        preprocess_args = (
+            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++solution_key={solution_key} " + (f" ++benchmark={benchmark} " if benchmark is not None else "") 
+            + (preprocess_args if preprocess_args is not None else "")
         )
         task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
@@ -231,6 +214,8 @@ def genselect(
             log_dir=f"{output_dir}/preprocess-logs",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
+            partition=partition,
+            time_min=time_min,
             task_dependencies=_task_dependencies,
             run_after=run_after,
             reuse_code=reuse_code,

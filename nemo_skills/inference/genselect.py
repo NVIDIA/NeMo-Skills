@@ -53,6 +53,8 @@ class GenSelectConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
     generation_key: str = "genselect_comparison"
+    solution_key: str = "generation"
+    cluster_key: str | None = None
 
     sandbox: dict = field(default_factory=dict)
 
@@ -105,8 +107,8 @@ class GenSelectTask(GenerationTask):
         return judgment
 
     def postprocess(self):
-        single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")
-        single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
+        single_correctness_instances_file = path.join(self.cfg.input_dir, "single_correctness_instances.jsonl")
+        single_correctness_instances = [json.loads(line) for line in open(single_correctness_instances_file, "r")]
 
         input_file = self.cfg.output_file
         # TODO: use last part of input_dir?
@@ -115,8 +117,8 @@ class GenSelectTask(GenerationTask):
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
-            for single_answer_instance in single_answer_instances:
-                fout.write(json.dumps(single_answer_instance) + '\n')
+            for single_correctness_instance in single_correctness_instances:
+                fout.write(json.dumps(single_correctness_instance) + '\n')
 
             for line in f:
                 instance = json.loads(line)
@@ -129,12 +131,15 @@ class GenSelectTask(GenerationTask):
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
 
-                output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
+                output_instance[self.cfg.solution_key] = instance[f"{self.cfg.solution_key}_{judgment}"]
+                
 
-                if f"symbolic_correct_{judgment}" in instance:
-                    output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
-                if f"judgement_{judgment}" in instance:
-                    output_instance["judgement"] = instance[f'judgement_{judgment}']
+                # output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
+
+                # if f"symbolic_correct_{judgment}" in instance:
+                #     output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
+                # if f"judgement_{judgment}" in instance:
+                #     output_instance["judgement"] = instance[f'judgement_{judgment}']
 
                 fout.write(json.dumps(output_instance) + '\n')
 
