@@ -32,7 +32,6 @@ from .vllm import VLLMModel
 # Model registry
 models = {
     'trtllm': VLLMModel,
-    'trtllm-serve': VLLMModel,
     'nemo': OpenAIModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
