@@ -259,7 +259,7 @@ class GenerationTask:
 
     def setup_llm(self):
         # TODO: DRY with the check in the validation config
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] in ["nemo", "megatron"]:
+        if self.cfg.server["server_type"] in ["nemo", "megatron"]:
             with open_dict(self.cfg.server):
                 self.cfg.server["server_type"] = "openai"
                 self.cfg.server["model"] = "model"
