@@ -15,7 +15,6 @@
 import abc
 import logging
 import os
-
 import httpx
 
 # TODO: Remove this once added to the docker image

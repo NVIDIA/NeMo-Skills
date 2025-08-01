@@ -13,10 +13,6 @@
 # limitations under the License.
 
 import os
-import threading
-
-from openai import AzureOpenAI
-
 from .openai import OpenAIModel
 
 
