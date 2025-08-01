@@ -35,7 +35,8 @@ class GenSelectPreprocessConfig:
     input_dir: str
     output_dir: str | None = None
     benchmark: str
-    solution_key: str
+    input_key: str
+    output_key: str
     cluster_key: str | None = None
     max_soln_samples: int = 16
     is_competition: bool = False
@@ -52,47 +53,14 @@ def probabilistic_ceil(n: float) -> int:
         return math.floor(n)
 
 
-
-
-# def preprocess(
-#     input_dir, output_dir, max_soln_samples=8, sampling_strategy="linear", num_random_seeds=8, num_input_samples=8
-# ):
-#     if output_dir is None:
-#         raise ValueError("Output directory is required")
-
-#     output_dir = os.path.join(output_dir, "comparison_instances")
-#     if not os.path.exists(output_dir):
-#         os.makedirs(output_dir, exist_ok=True)
-
-#     if not os.path.exists(output_dir):
-#         os.makedirs(output_dir, exist_ok=True)
-
-#     input_files = sorted(glob.glob(os.path.join(input_dir, "output-rs*.jsonl")))
-#     if num_input_samples is not None:
-#         input_files = input_files[:num_input_samples]
-#         print(f"Using {num_input_samples} / {len(input_files)} input files")
-#     problem_to_clustered_instances = read_files(input_files, os.path.join(output_dir, "single_answer_instances.jsonl"))
-
-#     for random_seed in range(num_random_seeds):
-#         # random.seed(random_seed)
-#         with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-#             for problem, clustered_instances in problem_to_clustered_instances.items():
-#                 comparison_instance = create_comparison_instance(
-#                     clustered_instances,
-#                     problem,
-#                     max_soln_samples=max_soln_samples,
-#                     sampling_strategy=sampling_strategy,
-#                 )
-#                 f.write(json.dumps(comparison_instance) + "\n")
-
-
 class GenSelectPreprocessor:
     def __init__(self, cfg: GenSelectPreprocessConfig):
         self.cfg = cfg
         self.input_dir = cfg.input_dir
         self.output_dir = cfg.output_dir
         self.benchmark = cfg.benchmark
-        self.solution_key = cfg.solution_key
+        self.input_key = cfg.input_key
+        self.output_key = cfg.output_key
         self.cluster_key = cfg.cluster_key  # Key to cluster instances by
         self.max_soln_samples = cfg.max_soln_samples
         self.sampling_strategy = cfg.sampling_strategy
@@ -140,7 +108,7 @@ class GenSelectPreprocessor:
     def read_file(self, file_path):
         LOG.info(f"Reading file: {file_path}")
         instances = [json.loads(line) for line in open(file_path, "r")]
-        problem_to_instance = {instance["problem"]: instance for instance in instances}
+        problem_to_instance = {instance[self.input_key]: instance for instance in instances}
         return problem_to_instance
                 
     def read_files(self, file_paths, single_correctness_instances_path):
@@ -213,7 +181,7 @@ class GenSelectPreprocessor:
     def create_comparison_instance(self, clustered_instances):
         # Create a consolidated instance
         sampled_instances = self.sample_instances(clustered_instances)
-        sampled_solutions = [instance[self.solution_key] for instance in sampled_instances]
+        sampled_solutions = [instance[self.output_key] for instance in sampled_instances]
         consolidated_solutions = ""
         for idx, solution in enumerate(sampled_solutions):
             consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
@@ -224,7 +192,7 @@ class GenSelectPreprocessor:
         comparison_instance["num_solutions"] = len(sampled_instances)
 
         for i, instance in enumerate(sampled_instances):
-            comparison_instance[f"{self.solution_key}_{i}"] = instance[self.solution_key]
+            comparison_instance[f"{self.output_key}_{i}"] = instance[self.output_key]
 
         return comparison_instance
 
@@ -252,10 +220,7 @@ class GenSelectPreprocessor:
             random.seed(random_seed)
             with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
                 for problem, clustered_instances in problem_to_clustered_instances.items():
-                    comparison_instance = self.create_comparison_instance(
-                        clustered_instances,
-                        problem,
-                    )
+                    comparison_instance = self.create_comparison_instance(clustered_instances)
                     f.write(json.dumps(comparison_instance) + "\n")
 
 

@@ -53,7 +53,8 @@ class GenSelectConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
     generation_key: str = "genselect_comparison"
-    solution_key: str = "generation"
+    input_key: str = "problem"
+    output_key: str = "generation"
     cluster_key: str | None = None
 
     sandbox: dict = field(default_factory=dict)
@@ -132,7 +133,7 @@ class GenSelectTask(GenerationTask):
                     judgment = random.randint(0, instance["max_idx"])
 
                 output_instance[self.cfg.solution_key] = instance[f"{self.cfg.solution_key}_{judgment}"]
-                
+
 
                 # output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
 
