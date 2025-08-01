@@ -21,7 +21,6 @@ from functools import partial
 
 import hydra
 import openai
-
 from omegaconf import OmegaConf
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
@@ -61,7 +60,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
 
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
@@ -110,7 +108,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("prompt_config", None),
-            ("prompt_template", None),
         ]
 
 
@@ -121,11 +118,11 @@ cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
         super().__init__(cfg)
-    
+
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
-    
+
     def setup_prompt(self):
         return None
 
@@ -137,7 +134,7 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.system_message:
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
-        # Step 1: Construct the prompt 
+        # Step 1: Construct the prompt
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
@@ -155,14 +152,15 @@ class BFCLGenerationTask(GenerationTask):
                 **self.extra_generate_params,
             }
 
-
         # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
         try:
             output = await self.llm.generate_asyncio(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
-            if "Requested token count exceeds the model's maximum context length" in str(e) or "is longer than the model's context length" in str(e):
+            if "Requested token count exceeds the model's maximum context length" in str(
+                e
+            ) or "is longer than the model's context length" in str(e):
                 LOG.warning("BFCL generation failed due to running out of context. ")
                 return {"message": None, "generation": ""}
             else:
@@ -187,7 +185,7 @@ class BFCLGenerationTask(GenerationTask):
                 "tool_calls": parsed_response.get("tool_calls", []),
                 "num_generated_tokens": output["num_generated_tokens"],
             }
-        else:   
+        else:
             if "tool_calls" not in output:
                 output["tool_calls"] = []
             output["message"] = output["response"].choices[0].message
@@ -200,7 +198,7 @@ class BFCLGenerationTask(GenerationTask):
         model_response = await self._generate_single_assistant_turn(state_dict)
         if model_response["message"] is None:
             # Ran out of context
-            return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}    
+            return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}
         else:
             proc_model_response = self._process_model_response(model_response)
             return {
@@ -319,14 +317,11 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit or out_of_context:
                 break
 
-        output_dict = {
-            "generation": all_model_response, 
-            "num_generated_tokens": output_dict["num_generated_tokens"]
-        }
+        output_dict = {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
 
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"
-        
+
         return output_dict
 
     async def process_single_datapoint(self, data_point, all_data):

@@ -53,7 +53,7 @@ stages:
     output_dir: ${directories.step-1-extract-problems}
     input_file: ${input_file}
     dependencies: null
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   classify_problems:
@@ -62,7 +62,7 @@ stages:
     modes: ['proof', 'mcq', 'binary', 'invalid']
     dependencies:
       - extract_problems
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   extract_answers:
@@ -70,7 +70,7 @@ stages:
     input_file: ${directories.step-2-classify-problems}/invalid/no.jsonl
     dependencies:
       - classify_problems
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   convert_proofs:
@@ -78,7 +78,7 @@ stages:
     input_file: ${directories.step-2-classify-problems}/proof/yes.jsonl
     dependencies:
       - classify_problems
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   merge_data:
@@ -99,7 +99,7 @@ stages:
     datasets: ${decontamination_datasets}
     dependencies:
       - merge_data
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs:
       model: ${generate_kwargs.model}
       server_type: ${generate_kwargs.server_type}

@@ -128,7 +128,7 @@ ns generate \
        ++examples_type=math_text_detailed \
        ++use_completions_api=True \
        ++tokenizer=meta-llama/Llama-3.1-405B \
-       ++stop_phrase='\n\n\n\n\n\n'
+       ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B

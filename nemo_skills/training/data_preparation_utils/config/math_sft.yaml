@@ -2,7 +2,6 @@ processors_to_run: all
 
 output_path: ???
 prompt_config: null
-prompt_template: null
 code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space

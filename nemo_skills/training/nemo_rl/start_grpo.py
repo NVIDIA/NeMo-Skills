@@ -167,7 +167,7 @@ def ns_data_processor(
 
     prompt = get_prompt(
         prompt_config=prompt_spec["prompt_config"],
-        prompt_template=prompt_spec["prompt_template"],
+        tokenizer=tokenizer,
         examples_type=prompt_spec["examples_type"],
         config_dir=prompt_spec["config_dir"],
         template_dir=prompt_spec["template_dir"],

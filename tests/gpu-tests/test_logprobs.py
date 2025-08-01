@@ -48,7 +48,6 @@ def test_cross_model_logprobs_consistency():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     model_info = [
         ("trtllm", os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')),
@@ -71,7 +70,6 @@ def test_cross_model_logprobs_consistency():
             f"--benchmarks gsm8k:1 "
             f"--server_gpus 1 "
             f"--server_nodes 1 "
-            f"++prompt_template={prompt_template} "
             f"++max_samples=20 "
             f"++inference.top_logprobs=1 "
             f"++inference.tokens_to_generate=20 "

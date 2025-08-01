@@ -30,7 +30,6 @@ def test_trtllm_eval():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval"
     docker_rm([output_dir])
@@ -44,7 +43,6 @@ def test_trtllm_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -70,7 +68,7 @@ def test_trtllm_code_execution_eval(server_type):
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for llama to make it follow few-shots
-    prompt_template = 'llama3-base' if model_type == 'llama' else 'qwen-instruct'
+    tokenizer = 'meta-llama/Llama-3.1-8B' if model_type == 'llama' else 'Qwen/Qwen2.5-32B-Instruct'
     code_tags = 'nemotron' if model_type == 'llama' else 'qwen'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
@@ -86,7 +84,8 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --with_sandbox "
-        f"    ++prompt_template={prompt_template} "
+        f"    ++tokenizer={tokenizer} "
+        f"    ++stop_phrase='\\n\\n\\n\\n\\n\\n' "
         f"    ++code_tags={code_tags} "
         f"    ++examples_type=gsm8k_text_with_code "
         f"    ++max_samples=20 "
@@ -136,7 +135,6 @@ def test_hf_eval(server_type, server_args):
         f"    --server_nodes 1 "
         f"    --num_jobs 1 "
         f"    --server_args='{server_args}' "
-        f"    ++prompt_template=llama3-instruct "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
     )
@@ -185,7 +183,6 @@ def test_nemo_eval():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/nemo-eval"
     docker_rm([output_dir])
@@ -199,7 +196,6 @@ def test_nemo_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -225,7 +221,6 @@ def test_megatron_eval():
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     if model_type != "llama":
         pytest.skip("Only llama models are supported in Megatron.")
-    prompt_template = 'llama3-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/megatron-eval"
     docker_rm([output_dir])
@@ -239,7 +234,6 @@ def test_megatron_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=2 "
         f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )

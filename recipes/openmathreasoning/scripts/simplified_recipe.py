@@ -80,7 +80,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
     generate(
-        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml " f"++prompt_template=qwen-instruct "),
+        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml "),
         cluster=cluster,
         input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/sdg/problems",
@@ -98,10 +98,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
     generate(
         ctx=wrap_arguments(
-            f"++prompt_config=generic/math "
-            f"++inference.temperature=0.6 "
-            f"++inference.tokens_to_generate=8192 "
-            f"++prompt_template=qwen-instruct "
+            f"++prompt_config=generic/math " f"++inference.temperature=0.6 " f"++inference.tokens_to_generate=8192 "
         ),
         cluster=cluster,
         input_file=f"{workspace}/sdg/extracted-problems.jsonl",
@@ -126,7 +123,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
             f"    ++input_files={workspace}/sdg/solutions/output.jsonl "
             f"    ++output_path={workspace}/sft-data.jsonl "
             f"    ++prompt_config=generic/math "
-            f"    ++prompt_template=qwen-instruct "
+            f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
             f"    ++filters.remove_contaminated=false "
             f"    ++add_unlabeled=true "
             f"    ++filters.remove_no_think_tags=true "

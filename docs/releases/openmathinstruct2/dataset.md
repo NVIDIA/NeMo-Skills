@@ -54,7 +54,9 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
-    ++prompt_template=llama3-base
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 ## Problem augmentation
@@ -74,8 +76,10 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
-    ++prompt_template=llama3-instruct \
-    ++generation_key=problem
+    ++generation_key=problem \
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 GSM8K dataset.
@@ -92,8 +96,10 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
-    ++prompt_template=llama3-instruct \
-    ++generation_key=problem
+    ++generation_key=problem \
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 ## Solutions for augmented data
@@ -123,7 +129,9 @@ for i in range(80):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=math_text_detailed "
-            f"++prompt_template=llama3-base "
+            f"++use_completions_api=True "
+            f"++tokenizer=meta-llama/Llama-3.1-405B "
+            f"++stop_phrase='\n\n\n\n\n\n' "
         ),
     )
 ```
@@ -148,7 +156,9 @@ for i in range(10):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=gsm8k_text_detailed "
-            f"++prompt_template=llama3-base "
+            f"++use_completions_api=True "
+            f"++tokenizer=meta-llama/Llama-3.1-405B "
+            f"++stop_phrase='\n\n\n\n\n\n' "
         ),
     )
 ```
@@ -258,7 +268,6 @@ To avoid the models from generating extremely short solutions, we remove solutio
 ```bash
 ns run_cmd --cluster=slurm \
 python -m nemo_skills.training.prepare_data \
-    ++prompt_template=llama3-instruct \
     ++prompt_config=generic/math \
     ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
     ++output_path=/workspace/sft_data.jsonl \
