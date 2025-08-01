@@ -16,13 +16,8 @@ import abc
 import asyncio
 import logging
 import os
-import random
-import threading
-import time
-import uuid
-from collections.abc import Generator
+from typing import Union
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional, Union
 
 import httpx
 import openai
@@ -83,33 +78,10 @@ class BaseModel(abc.ABC):
             session.mount('https://', adapter)
             self.requests_lib = session
 
-        self.gen_id_to_params = {}
-        self.gen_id_to_future = {}
-
-        self.executor = ThreadPoolExecutor(max_workers=2048)  # is this too much?
-
     def _generate_single(
-        self,
-        prompt: str | list,
-        tokens_to_generate: int | list[int],
-        temperature: float | list[float],
-        top_p: float | list[float],
-        top_k: int | list[int],
-        min_p: float | list[float],
-        repetition_penalty: float | list[float],
-        random_seed: int | list[int],
-        stop_phrases: list[str] | list[list[str]] | None,
-        top_logprobs: int | None = None,
-        timeout: int | None = None,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
+        self, *args, **kwargs,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
-
-        We will call it in threads on the list of prompts.
         """
         raise NotImplementedError("This method should be implemented by the child class")
 
@@ -122,9 +94,9 @@ class BaseModel(abc.ABC):
             request["top_k"] = 1
             request["top_p"] = 1.0
 
-    def generate_async(
+    def generate_sync(
         self,
-        prompts: list[str | list],
+        prompt: str | list,
         tokens_to_generate: int | list[int] = 2048,
         temperature: float | list[float] = 0.0,
         top_p: float | list[float] = 0.95,
@@ -141,8 +113,12 @@ class BaseModel(abc.ABC):
         tools: list[dict] | None = None,
         include_response: bool = False,
         extra_body: dict = None,
-    ) -> list[dict]:
-        """Returns a list of generation ids that can be later queried with get_generation calls."""
+    ) -> dict:
+        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
+
+        Not every server supports that, so make sure to override this method directly if that's not the case.
+        """
+        # Prepare the request parameters
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,
@@ -162,120 +138,24 @@ class BaseModel(abc.ABC):
         if tools is not None:
             kwargs['tools'] = tools
 
-        for key, value in kwargs.items():
-            is_list = False
-            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
-                is_list = True
-            if key != 'stop_phrases' and isinstance(value, list):
-                is_list = True
-            if is_list and len(value) != len(prompts):
-                raise ValueError(f"Length of {key} should match the number of prompts.")
-            if not is_list:
-                kwargs[key] = [value for _ in range(len(prompts))]
+        # Create the request for the single prompt
+        request = kwargs.copy()
+        request['prompt'] = prompt
+        self.preprocess_request(request)
 
-        gen_ids = []
-        for request_idx in range(len(prompts)):
-            # Prepare request
-            request = {key: value[request_idx] for key, value in kwargs.items()}
-            request['prompt'] = prompts[request_idx]
-            self.preprocess_request(request)
+        # Generate directly using _generate_single
+        output = self._generate_single(**request)
 
-            # Generate a unique generation ID
-            gen_id = str(uuid.uuid4())
-            gen_ids.append(gen_id)
+        # Apply stop phrase removal if needed
+        if remove_stop_phrases and isinstance(output, dict) and output.get('generation') is not None:
+            output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
 
-            # Update global dictionaries tracking the progress of generations
-            self.gen_id_to_future[gen_id] = self.executor.submit(self._generate_single, **request)
-            self.gen_id_to_params[gen_id] = (kwargs["stop_phrases"][request_idx], remove_stop_phrases)
+        # Remove logprobs if not requested
+        if top_logprobs is None:
+            output.pop('tokens', None)
+            output.pop('logprobs', None)
 
-        return gen_ids
-
-    def get_generations(self, generation_ids: list[str]) -> list[dict]:
-        generations = []
-        for generation_id in generation_ids:
-            if generation_id not in self.gen_id_to_future:
-                raise ValueError(f"Generation id {generation_id} not found.")
-
-            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
-            future = self.gen_id_to_future[generation_id]
-            if not future.done():
-                output = {'generation': None}
-            else:
-                output = future.result()
-                del self.gen_id_to_future[generation_id]
-                del self.gen_id_to_params[generation_id]
-
-            if remove_stop_phrases:
-                if isinstance(output, dict) and output['generation'] is not None:
-                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
-
-            generations.append(output)
-
-        return generations
-
-    def generate(
-        self,
-        prompts: list[str | list],
-        tokens_to_generate: int | list[int] = 2048,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | list[int] | None = None,
-        timeout: int | list[int] | None = None,
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
-    ) -> list[dict]:
-        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
-
-        Not every server supports that, so make sure to override this method directly if that's not the case.
-        """
-        generation_ids = self.generate_async(
-            prompts=prompts,
-            tokens_to_generate=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            random_seed=random_seed,
-            stop_phrases=stop_phrases,
-            top_logprobs=top_logprobs,
-            remove_stop_phrases=remove_stop_phrases,
-            stream=stream,
-            reasoning_effort=reasoning_effort,
-            tools=tools,
-            include_response=include_response,
-            extra_body=extra_body,
-        )
-        all_generations = [None] * len(prompts)
-        while True:
-            remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
-            if len(remaining_ids) == 0:
-                break
-            remaining_positions = [
-                idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
-            ]
-            generations = self.get_generations(remaining_ids)
-            for gen_pos, gen_dict in zip(remaining_positions, generations):
-                if isinstance(gen_dict, Generator) or gen_dict['generation'] is not None:  # will be None until done
-                    generation_ids[gen_pos] = None
-                    all_generations[gen_pos] = gen_dict
-                    # trtllm always return these fields so we need to remove them if not requested
-                    if isinstance(gen_dict, dict) and top_logprobs is None:
-                        gen_dict.pop('tokens', None)
-                        gen_dict.pop('logprobs', None)
-
-            time.sleep(1)
-
-        return all_generations
+        return output
 
     async def generate_asyncio(self, prompt, *args, **kwargs) -> dict:
         # Configure the executor for the current event loop
@@ -284,10 +164,9 @@ class BaseModel(abc.ABC):
             loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
             loop._nemo_skills_executor_configured = True
 
-        result = await asyncio.to_thread(self.generate, [prompt], *args, **kwargs)
-        return result[0]
-
-
+        result = await asyncio.to_thread(self.generate_sync, prompt, *args, **kwargs)
+        return result
+    
 class OpenAIAPIModel(BaseModel):
     """
     Base class for models using an OpenAI-compatible API.
@@ -417,6 +296,9 @@ class OpenAIAPIModel(BaseModel):
             result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
 
         return result
+    
+    def generate_sync(self, prompt, *args, **kwargs) -> dict:
+        return asyncio.run(self.generate_asyncio(prompt, *args, **kwargs))
 
     async def _generate_single_async(
         self,
