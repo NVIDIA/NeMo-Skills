@@ -18,7 +18,7 @@ from .base import OpenAIAPIModel
 class MegatronModel(OpenAIAPIModel):
     def __init__(self, **kwargs):
         # Megatron uses a non-standard base URL (no /v1) and a fixed model name.
-        super().__init__(model="model", use_v1_endpoint=False, **kwargs)
+        super().__init__(use_v1_endpoint=False, **kwargs)
 
     def _build_chat_request_params(self, **kwargs) -> dict:
         raise NotImplementedError("Megatron server does not support chat completions.")
