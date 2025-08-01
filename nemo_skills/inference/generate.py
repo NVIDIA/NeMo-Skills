@@ -258,12 +258,6 @@ class GenerationTask:
         self.output_lock = None
 
     def setup_llm(self):
-        # TODO: DRY with the check in the validation config
-        if self.cfg.server["server_type"] in ["nemo", "megatron"]:
-            with open_dict(self.cfg.server):
-                self.cfg.server["server_type"] = "openai"
-                self.cfg.server["model"] = "model"
-
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
