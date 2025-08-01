@@ -433,7 +433,7 @@ class GenerationTask:
 
     async def process_single_datapoint(self, data_point, all_data):
         generation_params = {
-            "prompts": [self.fill_prompt(data_point, all_data)],
+            "prompt": self.fill_prompt(data_point, all_data),
             "stop_phrases": combine_stop_phrases(
                 self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
             ),

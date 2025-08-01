@@ -49,7 +49,7 @@ class MegatronModel(OpenAIAPIModel):
             raise NotImplementedError("Megatron server does not support min_p parameter.")
         if repetition_penalty != 1.0:
             raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
-        if top_k != 0:
+        if top_k not in [0, -1]:
             raise NotImplementedError("Megatron server does not support top_k parameter.")
 
         return {

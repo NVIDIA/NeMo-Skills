@@ -141,14 +141,14 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
-                "prompts": [fmted_prompt],
+                "prompt": fmted_prompt,
                 "include_response": True,
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             }
         else:
             input_dict = {
-                "prompts": [messages],
+                "prompt": messages,
                 "tools": [tools],
                 "include_response": True,
                 **asdict(self.cfg.inference),

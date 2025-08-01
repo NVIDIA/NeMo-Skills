@@ -278,15 +278,14 @@ class BaseModel(abc.ABC):
 
         return all_generations
 
-    async def generate_asyncio(self, *args, **kwargs) -> dict:
+    async def generate_asyncio(self, prompt, *args, **kwargs) -> dict:
         # Configure the executor for the current event loop
         loop = asyncio.get_running_loop()
         if not hasattr(loop, '_nemo_skills_executor_configured'):
             loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
             loop._nemo_skills_executor_configured = True
 
-        result = await asyncio.to_thread(self.generate, *args, **kwargs)
-        assert len(result) == 1, "generate_asyncio should return a single result"
+        result = await asyncio.to_thread(self.generate, [prompt], *args, **kwargs)
         return result[0]
 
 
@@ -295,6 +294,8 @@ class OpenAIAPIModel(BaseModel):
     Base class for models using an OpenAI-compatible API.
     Handles client setup, SSH tunneling, and a unified generation flow with generation tracking.
     """
+    # Litellm provider name
+    MODEL_PROVIDER = "openai"
 
     def __init__(
         self,
@@ -302,18 +303,10 @@ class OpenAIAPIModel(BaseModel):
         api_key: str = "EMPTY",
         base_url: str | None = None,
         max_retries: int = 3,
-        initial_retry_delay: float = 2.0,
         use_v1_endpoint: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.max_retries = max_retries
-        self.initial_retry_delay = initial_retry_delay
-
-        # Track active generations with thread-safe operations
-        self.active_generations: Dict[str, Dict[str, Any]] = {}
-        self._generations_lock = threading.Lock()
-
         self._tunnel = None
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel
@@ -338,110 +331,25 @@ class OpenAIAPIModel(BaseModel):
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
 
-        self.client_arr = [
-            openai.OpenAI(
-                api_key=api_key,
-                base_url=base_url,
-                timeout=None,
-                http_client=DefaultHttpxClient(
-                    limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-                    transport=httpx.HTTPTransport(retries=3),
-                ),
-            )
-            for _ in range(20)
-        ]
-        self.client = self.client_arr[0]
-        self.model = model or self.get_model_name_from_server()
+        assert model is not None, "model is required"
+        model_litellm = f"{self.MODEL_PROVIDER}/{model}"
+        # Passed to litellm every time we call it
+        self.litellm_kwargs = dict(
+            model=model_litellm,
+            max_retries=max_retries,
+            api_key=api_key,
+            base_url=base_url,
+        )
+        httpx_limits = httpx.Limits(
+            max_keepalive_connections=1500, max_connections=1500
+        )
+        litellm.client_session = httpx.Client(limits=httpx_limits)
+        litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+
 
     def __del__(self):
         if self._tunnel:
             self._tunnel.stop()
-        # Clean up any remaining active generations
-        self.cancel_all_generations()
-
-    def get_model_name_from_server(self):
-        model_list = self.client.models.list()
-        if not model_list.data:
-            raise ValueError("No models available on the server.")
-        return model_list.data[0].id
-
-    def _register_generation(self, gen_id: str, response: Any) -> None:
-        """Register a new generation with the tracker."""
-        with self._generations_lock:
-            self.active_generations[gen_id] = {'response': response, 'created_at': time.time()}
-
-    def _unregister_generation(self, gen_id: str) -> Optional[Dict[str, Any]]:
-        """Remove a generation from the tracker and return its info."""
-        with self._generations_lock:
-            return self.active_generations.pop(gen_id, None)
-
-    def cancel_generation(self, gen_id: str) -> bool:
-        """
-        Cancel a specific generation by ID.
-        Returns True if the generation was found and cancelled, False otherwise.
-        """
-        generation_info = self._unregister_generation(gen_id)
-        if generation_info is None:
-            return False
-
-        generation_info['response'].close()
-        return True
-
-    def cancel_all_generations(self) -> int:
-        """
-        Cancel all active generations.
-        Returns the number of generations that were cancelled.
-        """
-        with self._generations_lock:
-            generation_ids = list(self.active_generations.keys())
-
-        cancelled_count = 0
-        for gen_id in generation_ids:
-            if self.cancel_generation(gen_id):
-                cancelled_count += 1
-
-        return cancelled_count
-
-    def get_active_generation_count(self) -> int:
-        """Return the number of currently active generations."""
-        with self._generations_lock:
-            return len(self.active_generations)
-
-    def get_active_generation_ids(self) -> list[str]:
-        """Return a list of all active generation IDs."""
-        with self._generations_lock:
-            return list(self.active_generations.keys())
-
-    def _make_api_call(self, api_func, params, gen_id: str):
-        retry_count = 0
-        retry_delay = self.initial_retry_delay
-        while True:
-            try:
-                response = api_func(**params)
-                # Register the generation after successful API call, only for streaming responses
-                is_streaming = params.get('stream', False)
-                if is_streaming:
-                    self._register_generation(gen_id, response)
-                return response
-            except openai.RateLimitError as e:
-                retry_count += 1
-                if retry_count > self.max_retries:
-                    LOG.error("Rate limit exceeded maximum retry attempts (%d). Giving up.", self.max_retries)
-                    raise
-                retry_after = getattr(e, 'retry_after', None)
-                wait_time = float(retry_after) if retry_after is not None else retry_delay
-                LOG.warning(
-                    "Rate limit exceeded. Retrying in %.2f seconds... (Attempt %d/%d)",
-                    wait_time,
-                    retry_count,
-                    self.max_retries,
-                )
-                time.sleep(wait_time)
-                if retry_after is None:
-                    retry_delay *= 2  # Exponential backoff if no header is provided
-            except Exception as e:
-                LOG.error("Unexpected error during API call: %s", str(e))
-                raise
 
     @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:
@@ -451,61 +359,92 @@ class OpenAIAPIModel(BaseModel):
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
-    def _generate_single(
+    async def generate_asyncio(
+        self,
+        prompt: str | list,
+        tokens_to_generate: int | list[int] = 2048,
+        temperature: float | list[float] = 0.0,
+        top_p: float | list[float] = 0.95,
+        top_k: int | list[int] = 0,
+        min_p: float | list[float] = 0.0,
+        repetition_penalty: float | list[float] = 1.0,
+        random_seed: int | list[int] = 0,
+        stop_phrases: list[str] | list[list[str]] | None = None,
+        top_logprobs: int | list[int] | None = None,
+        timeout: float | int | None = None,
+        remove_stop_phrases: bool = True,
+        stream: bool = False,
+        reasoning_effort: str | list[int] | None = None,
+        tools: list[dict] | None = None,
+        include_response: bool = False,
+        extra_body: dict = None,
+    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+        """Native async version of generate for single prompt."""
+        # Prepare request parameters similar to generate_async
+        if timeout is None:
+            # litellm uses 10min as default None
+            # So we change it to 10000 seconds for consistency with other clients
+            timeout = 10000 
+        if top_k == 0:
+            top_k = -1 # litellm doesn't support top_k=0
+        kwargs = {
+            'tokens_to_generate': tokens_to_generate,
+            'temperature': temperature,
+            'top_p': top_p,
+            'top_k': top_k,
+            'min_p': min_p,
+            'repetition_penalty': repetition_penalty,
+            'random_seed': random_seed,
+            'stop_phrases': stop_phrases,
+            'top_logprobs': top_logprobs,
+            'timeout': timeout,
+            'stream': stream,
+            'reasoning_effort': reasoning_effort,
+            'include_response': include_response,
+            'extra_body': extra_body,
+        }
+        if tools is not None:
+            kwargs['tools'] = tools
+
+        request = kwargs.copy()
+        request['prompt'] = prompt
+        self.preprocess_request(request)
+
+        result = await self._generate_single_async(**request)
+        
+        # Apply stop phrase removal if needed
+        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
+            from .utils import trim_after_stop_phrases
+            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+
+        return result
+
+    async def _generate_single_async(
         self,
         prompt: str | list,
         stream: bool = False,
-        generation_id: Optional[str] = None,
         include_response: bool = False,
         **kwargs,
     ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
-        """
-        Generate a single response with optional generation tracking.
-
-        Args:
-            prompt: The input prompt (string or list of messages)
-            stream: Whether to stream the response
-            generation_id: Optional generation ID. If None, one will be generated.
-            **kwargs: Additional parameters for the API call
-
-        Returns:
-            If generation_id is provided in kwargs, returns (gen_id, response)
-            Otherwise returns just the response for backward compatibility
-        """
-        # Generate a unique ID for this generation
-        gen_id = generation_id or str(uuid.uuid4())
-        return_gen_id = generation_id is not None or kwargs.get('return_generation_id', False)
-
-        try:
-            client = self.client_arr[random.randrange(0, len(self.client_arr))]
-
-            if isinstance(prompt, list):
-                request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(client.chat.completions.create, request_params, gen_id)
-                if stream:
-                    result = self._stream_chat_chunks(response, gen_id)
-                else:
-                    result = self._parse_chat_completion_response(response, include_response=include_response)
-
-            elif isinstance(prompt, str):
-                request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(client.completions.create, request_params, gen_id)
-                if stream:
-                    result = self._stream_completion_chunks(response, gen_id)
-                else:
-                    result = self._parse_completion_response(response, include_response=include_response)
+        if isinstance(prompt, list):
+            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_chat_chunks_async(response)
             else:
-                raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+                result = self._parse_chat_completion_response(response, include_response=include_response)
 
-            if return_gen_id:
-                return gen_id, result
+        elif isinstance(prompt, str):
+            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_completion_chunks_async(response)
             else:
-                return result
+                result = self._parse_completion_response(response, include_response=include_response)
+        else:
+            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
 
-        except Exception as e:
-            # Make sure to unregister the generation if an error occurs
-            self._unregister_generation(gen_id)
-            raise
+        return result
 
     def _parse_completion_response(self, response: "openai.types.Completion", include_response: bool = False) -> dict:
         choice = response.choices[0]
@@ -558,89 +497,49 @@ class OpenAIAPIModel(BaseModel):
 
         return result
 
-    def _stream_completion_chunks(self, response, gen_id: str):
-        """Stream completion chunks and automatically unregister when done."""
-        try:
-            emitted_so_far = []
-            for chunk in response:
+    async def _stream_completion_chunks_async(self, response):
+        """Async version of stream completion chunks."""
+        emitted_so_far = []
+        async for chunk in response:
+            cur_delta = chunk.choices[0].text
+            emitted_so_far += [cur_delta]
+            if cur_delta:
+                yield {"generation": cur_delta}
+            # vllm variant
+            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+            # sglang variant
+            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+            # vllm variant - emit stop_reason as is and finish
+            if stop_reason and isinstance(stop_reason, str):
+                yield {"generation": stop_reason}
+            # sglang variant - emit only not-yet-sent part of matched_stop
+            if matched_stop and isinstance(matched_stop, str):
+                remaining = matched_stop
+                # find the longest prefix of matched_stop that is already at
+                # the end of what we've emitted.
+                emitted_str = "".join(emitted_so_far)
+                max_len = min(len(emitted_str), len(matched_stop))
+                for i in range(max_len, 0, -1):
+                    if emitted_str.endswith(matched_stop[:i]):
+                        remaining = matched_stop[i:]
+                        break
+                if remaining:
+                    yield {"generation": remaining}
+
+    async def _stream_chat_chunks_async(self, response):
+        """Async version of stream chat chunks."""
+        async for chunk in response:
+            if hasattr(chunk.choices[0], "delta"):
+                cur_delta = chunk.choices[0].delta.content
+            else:
                 cur_delta = chunk.choices[0].text
-                emitted_so_far += [cur_delta]
-                if cur_delta:
-                    yield {"generation": cur_delta}
-                # vllm variant
-                stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-                # sglang variant
-                matched_stop = getattr(chunk.choices[0], "matched_stop", None)
-                # vllm variant - emit stop_reason as is and finish
-                if stop_reason and isinstance(stop_reason, str):
-                    yield {"generation": stop_reason}
-                # sglang variant - emit only not-yet-sent part of matched_stop
-                if matched_stop and isinstance(matched_stop, str):
-                    remaining = matched_stop
-                    # find the longest prefix of matched_stop that is already at
-                    # the end of what we've emitted.
-                    emitted_str = "".join(emitted_so_far)
-                    max_len = min(len(emitted_str), len(matched_stop))
-                    for i in range(max_len, 0, -1):
-                        if emitted_str.endswith(matched_stop[:i]):
-                            remaining = matched_stop[i:]
-                            break
-                    if remaining:
-                        yield {"generation": remaining}
-        finally:
-            # Always unregister the generation when streaming is complete
-            self._unregister_generation(gen_id)
 
-    def _stream_chat_chunks(self, response, gen_id: str):
-        """Stream chat chunks and automatically unregister when done."""
-        try:
-            for chunk in response:
-                if hasattr(chunk.choices[0], "delta"):
-                    cur_delta = chunk.choices[0].delta.content
-                else:
-                    cur_delta = chunk.choices[0].text
+            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+            result = {"generation": cur_delta}
+            if finish_reason:
+                result["finish_reason"] = finish_reason
+                if not cur_delta:
+                    result["generation"] = ""
 
-                finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-                result = {"generation": cur_delta}
-                if finish_reason:
-                    result["finish_reason"] = finish_reason
-                    if not cur_delta:
-                        result["generation"] = ""
+            yield result
 
-                yield result
-        finally:
-            # Always unregister the generation when streaming is complete
-            self._unregister_generation(gen_id)
-
-class LiteLLMModel(BaseModel):
-    def __init__(self, model_name: str, **kwargs):
-        super().__init__(**kwargs)
-        httpx_limits = httpx.Limits(
-            max_keepalive_connections=1500, max_connections=1500
-        )
-        litellm.client_session = httpx.Client(limits=httpx_limits)
-        litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
-
-        self.model_name = model_name
-
-    def generate_async(
-        self,
-        prompts: list[str | list],
-        tokens_to_generate: int | list[int] = 2048,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | list[int] | None = None,
-        timeout: int | list[int] | None = None,
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
-    ) -> list[dict]:
-        pass
