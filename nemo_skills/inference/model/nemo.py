@@ -77,9 +77,9 @@ class NemoModel(BaseModel):
         output = {'generation': output[(len(prompt) - begin_idx) :]}
         return output
 
-    def generate(
+    def generate_sync(
         self,
-        prompts: list[str | list],
+        prompt: str,
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -103,12 +103,12 @@ class NemoModel(BaseModel):
         if timeout is not None:
             raise NotImplementedError("Nemo server does not support timeout parameter.")
 
-        if isinstance(prompts[0], dict):
+        if isinstance(prompt, dict):
             raise NotImplementedError("NeMo server does not support OpenAI \"messages\" as prompt.")
         if stop_phrases is None:
             stop_phrases = []
         request = {
-            "sentences": prompts,
+            "sentences": [prompt],
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
             "top_k": top_k,
@@ -125,19 +125,14 @@ class NemoModel(BaseModel):
             headers={"Content-Type": "application/json"},
         ).json()
         # we need to remove the original prompt as nemo always returns it
-        outputs = [None] * len(generations['sentences'])
-        for idx, generation in enumerate(generations['sentences']):
-            # when the prompt starts from special tokens like bos, nemo will remove them,
-            # so we need this hack to find where to start the cut
-            begin_idx = 0
-            while begin_idx < len(prompts[idx]) and not prompts[idx][begin_idx:].startswith(generation[:20]):
-                begin_idx += 1
-            outputs[idx] = {'generation': generation[(len(prompts[idx]) - begin_idx) :]}
-
+        # just a single prompt
+        generation = generations['sentences'][0]
+        # when the prompt starts from special tokens like bos, nemo will remove them,
+        # so we need this hack to find where to start the cut
+        begin_idx = 0
+        while begin_idx < len(prompt) and not prompt[begin_idx:].startswith(generation[:20]):
+            begin_idx += 1
+        output = {'generation': generation[(len(prompt) - begin_idx) :]}
         if remove_stop_phrases:
-            for output in outputs:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
-
-        # TODO: return num_generated_tokens as well
-        return outputs
-
+            output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
+        return output
