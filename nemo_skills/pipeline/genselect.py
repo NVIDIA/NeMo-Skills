@@ -202,13 +202,19 @@ def genselect(
     if _task_dependencies is None:
         _task_dependencies = []
 
-    extra_arguments_original = extra_arguments
+    extra_eval_args = (
+        f" ++input_key={input_key} "
+        f" ++output_key={output_key} "
+        f" ++answer_key={answer_key} "
+        f" ++benchmark={benchmark} "  
+    )
+    extra_arguments_original = extra_arguments + extra_eval_args
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
         preprocess_args = (
-            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} ++input_key={input_key} ++output_key={output_key} ++benchmark={benchmark} " 
-            + (f" ++answer_key={answer_key} " if answer_key is not None else "")
+            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " 
+            + extra_eval_args
             + (preprocess_args if preprocess_args is not None else "")
         )
         task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"

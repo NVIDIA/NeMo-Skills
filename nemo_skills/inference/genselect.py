@@ -50,7 +50,7 @@ class GenSelectConfig(GenerateSolutionsConfig):
     generation_key: str = "genselect_comparison"
     input_key: str = "problem"
     output_key: str = "generation"
-    answer_key: str | None = None
+    answer_key: str
 
     sandbox: dict = field(default_factory=dict)
 
