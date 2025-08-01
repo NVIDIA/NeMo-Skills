@@ -13,7 +13,7 @@ Here are some of the features we support:
     - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
     - Coding skills: scicode, livecodebench, human-eval, mbpp
-    - Chat/instruction following: ifeval, arena-hard, mt-bench
+    - Chat/instruction following: ifeval, arena-hard
     - General knowledge: mmlu, mmlu-pro, gpqa
     - Long context: ruler, mrcr
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.

@@ -13,8 +13,16 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/default'
-DATASET_GROUP = 'chat'
-METRICS_TYPE = "mt-bench"
-EVAL_ARGS = "++eval_type=mt-bench ++eval_config.judge_model=gpt-4-0125-preview"
-GENERATION_ARGS = "++multi_turn_key=turns"
+DATASET_GROUP = 'math'
+METRICS_TYPE = "math"
+EVAL_ARGS = "++eval_type=math"
+GENERATION_ARGS = "++prompt_config=generic/math"
+
+# some answers are not possible to compare symbolically, so have to use a judge model
+# setting openai judge by default, but can be overriden from command line for a locally hosted model
+JUDGE_PIPELINE_ARGS = {
+    "generation_type": "math_judge",
+    "model": "gpt-4.1",
+    "server_type": "openai",
+    "server_address": "https://api.openai.com/v1",
+}
