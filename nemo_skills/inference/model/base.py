@@ -184,19 +184,45 @@ class BaseModel:
     
     def generate_sync(
         self,
-        *args,
+        prompt: str | list,
+        tokens_to_generate: int = 2048,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
         stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: float | int | None = 10000,
         remove_stop_phrases: bool = True,
-        **kwargs,
+        stream: bool = False,
+        reasoning_effort: str | None = None,
+        tools: list[dict] | None = None,
+        include_response: bool = False,
+        extra_body: dict = None,
     ) -> dict:
         """
         Synchronous version of generate for single prompt.
         See generate_asyncio for full list of parameters.
         """
         request = self._prepare_generation_params(
-            *args,
+            prompt=prompt,
+            tokens_to_generate=tokens_to_generate,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            random_seed=random_seed,
             stop_phrases=stop_phrases,
-            **kwargs,
+            top_logprobs=top_logprobs,
+            timeout=timeout,
+            stream=stream,
+            reasoning_effort=reasoning_effort,
+            tools=tools,
+            include_response=include_response,
+            extra_body=extra_body,
         )
         result = self._generate_single_sync(**request)
         self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
