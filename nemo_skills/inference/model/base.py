@@ -88,7 +88,6 @@ class BaseModel(abc.ABC):
 
         self.executor = ThreadPoolExecutor(max_workers=2048)  # is this too much?
 
-    @abc.abstractmethod
     def _generate_single(
         self,
         prompt: str | list,
