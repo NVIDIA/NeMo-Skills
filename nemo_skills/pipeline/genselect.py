@@ -199,6 +199,9 @@ def genselect(
     )
     all_tasks = []
     has_tasks = False
+    if _task_dependencies is None:
+        _task_dependencies = []
+
     extra_arguments_original = extra_arguments
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
@@ -228,8 +231,6 @@ def genselect(
         )
         
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
-            has_tasks = True
-            continue
             if wandb_parameters:
                 # no need for chunks as it will run after merging
                 wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
@@ -295,50 +296,6 @@ def genselect(
                     all_tasks.append(new_task)
         if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
-
-        # for seed in remaining_jobs.keys():
-        #     has_tasks = True
-        #     server_config, server_address, extra_arguments = pipeline_utils.configure_client(
-        #         model=model,
-        #         server_type=server_type,
-        #         server_address=original_server_address,
-        #         server_gpus=server_gpus,
-        #         server_nodes=server_nodes,
-        #         server_args=server_args,
-        #         server_entrypoint=server_entrypoint,
-        #         extra_arguments=extra_arguments_original,
-        #         get_random_port=get_random_port,
-        #     )
-        #     cmd = pipeline_utils.wrap_cmd(
-        #         cmd=get_genselect_cmd(output_dir=output_dir, extra_arguments=extra_arguments, random_seed=seed),
-        #         preprocess_cmd=preprocess_cmd,
-        #         postprocess_cmd=postprocess_cmd,
-        #     )
-        #     prev_tasks = [preprocess_task]
-        #     for _ in range(dependent_jobs + 1):
-        #         task_name = f'{expname}-rs{seed}' if seed is not None else expname
-        #         new_task = pipeline_utils.add_task(
-        #             exp,
-        #             cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
-        #             task_name=task_name,
-        #             log_dir=log_dir,
-        #             container=cluster_config["containers"]["nemo-skills"],
-        #             cluster_config=cluster_config,
-        #             partition=partition,
-        #             time_min=time_min,
-        #             server_config=server_config,
-        #             with_sandbox=with_sandbox,
-        #             sandbox_port=None if get_random_port else 6000,
-        #             run_after=run_after,
-        #             reuse_code=reuse_code,
-        #             reuse_code_exp=reuse_code_exp,
-        #             task_dependencies=prev_tasks,
-        #             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-        #             installation_command=installation_command,
-        #         )
-        #         prev_tasks = [new_task]
-        # if has_tasks:
-        #     pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if _reuse_exp:
         return prev_tasks
