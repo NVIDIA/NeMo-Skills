@@ -25,9 +25,12 @@ import requests
 from openai import DefaultHttpxClient, Stream
 
 # TODO: Remove this once added to the docker image
-import subprocess
-subprocess.check_call(["pip", "install", "litellm==1.71.1"])
-import litellm
+try:
+    import litellm
+except ImportError:
+    import subprocess
+    subprocess.check_call(["pip", "install", "litellm==1.71.1"])
+    import litellm
 
 from nemo_skills.utils import get_logger_name
 
