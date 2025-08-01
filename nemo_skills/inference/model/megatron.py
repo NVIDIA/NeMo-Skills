@@ -23,6 +23,9 @@ class MegatronModel(OpenAIAPIModel):
     def _build_chat_request_params(self, **kwargs) -> dict:
         raise NotImplementedError("Megatron server does not support chat completions.")
 
+    def preprocess_request(self, request: dict):
+        pass
+
     def _build_completion_request_params(
         self,
         prompt: str,
