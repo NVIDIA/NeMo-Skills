@@ -34,5 +34,5 @@ class AzureOpenAIModel(OpenAIModel):
             api_key = os.getenv("AZURE_OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("AZURE_OPENAI_API_KEY is required for Azure models and could not be found.")
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, api_key=api_key, **kwargs)
         self.litellm_kwargs['api_version'] = api_version
