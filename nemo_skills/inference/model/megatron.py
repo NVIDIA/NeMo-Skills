@@ -97,3 +97,4 @@ class MegatronModel(BaseModel):
         if include_response:
             result['response'] = response
         return result
+

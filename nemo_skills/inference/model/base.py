@@ -13,16 +13,10 @@
 # limitations under the License.
 
 import abc
-import asyncio
 import logging
 import os
-from typing import Union
-from concurrent.futures import ThreadPoolExecutor
 
 import httpx
-import openai
-import requests
-from openai import DefaultHttpxClient, Stream
 
 # TODO: Remove this once added to the docker image
 try:
@@ -110,7 +104,7 @@ class BaseModel:
             base_url=base_url,
         )
         httpx_limits = httpx.Limits(
-            max_keepalive_connections=1500, max_connections=1500
+            max_keepalive_connections=2048, max_connections=2048
         )
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
@@ -133,76 +127,37 @@ class BaseModel:
         pass
 
     def _prepare_generation_params(
-        self,
-        prompt: str | list,
-        tokens_to_generate: int | list[int] = 2048,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | list[int] | None = None,
-        timeout: float | int | None = None,
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
+        self, **kwargs,
     ) -> dict:
         """Prepare generation parameters for both sync and async methods."""
-        # Prepare request parameters similar to generate_async
-        if timeout is None:
+        if kwargs['timeout'] is None:
             # litellm uses 10min as default None
             # So we change it to 10000 seconds for consistency with other clients
-            timeout = 10000 
-        if top_k == 0:
-            top_k = -1 # litellm doesn't support top_k=0
-        kwargs = {
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'random_seed': random_seed,
-            'stop_phrases': stop_phrases,
-            'top_logprobs': top_logprobs,
-            'timeout': timeout,
-            'stream': stream,
-            'reasoning_effort': reasoning_effort,
-            'include_response': include_response,
-            'extra_body': extra_body,
-        }
-        if tools is not None:
-            kwargs['tools'] = tools
-
-        request = kwargs.copy()
-        request['prompt'] = prompt
-        return request
+            kwargs['timeout'] = 10000 
+        if kwargs['top_k'] == 0:
+            kwargs['top_k'] = -1 # litellm doesn't support top_k=0
+        return kwargs
 
     async def generate_asyncio(
         self,
         prompt: str | list,
-        tokens_to_generate: int | list[int] = 2048,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | list[int] | None = None,
-        timeout: float | int | None = None,
+        tokens_to_generate: int = 2048,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = 0,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
+        top_logprobs: int | None = None,
+        timeout: float | int | None = 10000,
         remove_stop_phrases: bool = True,
         stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
+        reasoning_effort: str | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
         extra_body: dict = None,
-    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+    ) -> dict:
         """Native async version of generate for single prompt."""
         request = self._prepare_generation_params(
             prompt=prompt,
@@ -216,7 +171,6 @@ class BaseModel:
             stop_phrases=stop_phrases,
             top_logprobs=top_logprobs,
             timeout=timeout,
-            remove_stop_phrases=remove_stop_phrases,
             stream=stream,
             reasoning_effort=reasoning_effort,
             tools=tools,
@@ -231,10 +185,10 @@ class BaseModel:
     def generate_sync(
         self,
         *args,
-        stop_phrases: list[str] | list[list[str]] | None = None,
+        stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
         **kwargs,
-    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+    ) -> dict:
         """
         Synchronous version of generate for single prompt.
         See generate_asyncio for full list of parameters.
@@ -242,7 +196,6 @@ class BaseModel:
         request = self._prepare_generation_params(
             *args,
             stop_phrases=stop_phrases,
-            remove_stop_phrases=remove_stop_phrases,
             **kwargs,
         )
         result = self._generate_single_sync(**request)
@@ -255,7 +208,7 @@ class BaseModel:
         stream: bool = False,
         include_response: bool = False,
         **kwargs,
-    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+    ):
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
             response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
@@ -281,7 +234,7 @@ class BaseModel:
         stream: bool = False,
         include_response: bool = False,
         **kwargs,
-    ) -> Union[dict, Stream, tuple[str, Union[dict, Stream]]]:
+    ):
         """Synchronous version of _generate_single_async."""
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
