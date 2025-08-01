@@ -67,7 +67,8 @@ class GenerateSolutionsConfig:
     # tokenizer from the model and apply it to the prompt before sending it. You can override tokenizer with
     # tokenizer_path parameter
     use_completions_api: bool = False
-    tokenizer_path: str | None = None  # path to the tokenizer to use for completions API. By default uses server.model
+    # path or name of the tokenizer to use for completions API. By default uses server.model
+    tokenizer: str | None = None
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
@@ -243,7 +244,7 @@ class GenerationTask:
             return None
 
         if self.use_completions_api:
-            tokenizer = self.cfg.tokenizer_path or self.cfg.server['model']
+            tokenizer = self.cfg.tokenizer or self.cfg.server['model']
         else:
             tokenizer = None
 

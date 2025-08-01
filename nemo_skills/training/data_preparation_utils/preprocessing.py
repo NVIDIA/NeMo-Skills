@@ -309,8 +309,8 @@ class WriteFinalSftManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
+        tokenizer: str | None = None,
+        code_tags: str | None = None,
         chat_format: str | None = None,  # nemotron/llama/None
         input_key: str = "input",
         output_key: str = "output",
@@ -328,15 +328,15 @@ class WriteFinalSftManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config:
+            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
-            if prompt_template:
+            if tokenizer:
                 LOG.warning(
-                    "Prompt template is provided, but prompt config is missing! "
+                    "tokenizer is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template, code_tags)
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
@@ -415,8 +415,8 @@ class WriteFinalRLManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
+        tokenizer: str | None = None,
+        code_tags: str | None = None,
         task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
@@ -434,10 +434,17 @@ class WriteFinalRLManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config:
+            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
-            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+            if tokenizer:
+                LOG.warning(
+                    "tokenizer is provided, but prompt config is missing! "
+                    "Assuming 'user: {input_key}' and no special formatting for output."
+                )
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
+            else:
+                LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle

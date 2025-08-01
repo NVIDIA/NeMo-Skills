@@ -16,7 +16,7 @@ python -m nemo_skills.training.prepare_data \
     ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
-    ++prompt_template=llama3-instruct
+    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct
 ```
 
 !!! tip
@@ -97,8 +97,7 @@ ns eval \
     --output_dir=/workspace/my-training-job/results/ \
     --benchmarks gsm8k,math \
     --server_gpus=8 \
-    --run_after=my-training-job \
-    ++prompt_template=llama3-instruct
+    --run_after=my-training-job
 ```
 
 ## Chaining pipelines with Python
@@ -155,7 +154,7 @@ convert(
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=llama3-instruct"),
+    ctx=wrap_arguments(""),
     cluster=cluster,
     model=f"{output_dir}/model-averaged-trtllm",
     server_type="trtllm",
