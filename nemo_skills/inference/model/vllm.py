@@ -64,7 +64,6 @@ class VLLMModel(OpenAIAPIModel):
         extra_body: dict = None,
     ) -> dict:
         return {
-            "model": self.model,
             "prompt": [prompt],
             "max_tokens": tokens_to_generate,
             "temperature": temperature,
@@ -101,7 +100,6 @@ class VLLMModel(OpenAIAPIModel):
         extra_body: dict = None,
     ) -> dict:
         request = {
-            "model": self.model,
             "messages": messages,
             "max_tokens": tokens_to_generate,
             "temperature": temperature,

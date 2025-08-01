@@ -53,7 +53,6 @@ class MegatronModel(OpenAIAPIModel):
             raise NotImplementedError("Megatron server does not support top_k parameter.")
 
         return {
-            "model": self.model,
             "prompt": [prompt],
             "max_tokens": tokens_to_generate,
             "temperature": temperature,
