@@ -22,7 +22,6 @@ from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.model.base import BaseModel
 from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
@@ -281,7 +280,6 @@ class CodeExecutionWrapper:
         
         request = {key: value for key, value in kwargs.items()}
         request['prompt'] = prompt
-        self.model.preprocess_request(request)
         
         output = self._generate_single(**request)
         

@@ -22,20 +22,17 @@ from .base import BaseModel
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
-from .nemo import NemoModel
 from .openai import OpenAIModel
 
 # Model implementations
-from .trtllm import TRTLLMModel
 
 # Utilities
 from .vllm import VLLMModel
 
 # Model registry
 models = {
-    'trtllm': TRTLLMModel,
     'trtllm-serve': VLLMModel,
-    'nemo': NemoModel,
+    'nemo': OpenAIModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,

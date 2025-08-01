@@ -202,16 +202,7 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = 1
-    elif server_type == 'trtllm':
-        server_entrypoint = server_entrypoint or "nemo_skills.inference.server.serve_trt"
-        server_start_cmd = (
-            f"FORCE_NCCL_ALL_REDUCE_STRATEGY=1 python -m {server_entrypoint} "
-            f"    --model_path {model_path} "
-            f"    --port {server_port} "
-            f"    {server_args} "
-        )
-        num_tasks = num_gpus
-    elif server_type == 'trtllm-serve':
+    elif server_type in ['trtllm-serve', 'trtllm']:
         server_entrypoint = server_entrypoint or "trtllm-serve"
         if num_nodes > 1 and server_entrypoint == "trtllm-serve":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"

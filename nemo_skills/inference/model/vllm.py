@@ -22,12 +22,12 @@ from openai import BadRequestError
 
 from nemo_skills.utils import get_logger_name
 
-from .base import OpenAIAPIModel
+from .base import BaseModel
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-class VLLMModel(OpenAIAPIModel):
+class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

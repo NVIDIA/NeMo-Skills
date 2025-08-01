@@ -39,140 +39,7 @@ from .utils import trim_after_stop_phrases
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-class BaseModel(abc.ABC):
-    """Base model class for handling requests to the inference server.
-
-    Args:
-        host: Optional[str] = '127.0.0.1' - Host of the inference server.
-        port: Optional[str] = '5000' - Port of the inference server.
-            Only required if handle_code_execution is True.
-        ssh_server: Optional[str] = None - SSH server for tunneling requests.
-            Useful if server is running on slurm cluster to which there is an ssh access
-            Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
-        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
-            Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
-    """
-
-    def __init__(
-        self,
-        host: str = '127.0.0.1',
-        port: str = '5000',
-        ssh_server: str | None = None,
-        ssh_key_path: str | None = None,
-        **kwargs,
-    ):
-        self.server_host = host
-        self.server_port = port
-        self.ssh_server = ssh_server
-        self.ssh_key_path = ssh_key_path
-        if ssh_server is None:
-            self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
-        if ssh_key_path is None:
-            self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
-
-        if self.ssh_server and self.ssh_key_path:
-            import sshtunnel_requests
-
-            self.requests_lib = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-        else:
-            # TODO: switch to httpx
-            session = requests.Session()
-            adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
-            session.mount('http://', adapter)
-            session.mount('https://', adapter)
-            self.requests_lib = session
-
-    def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | list[list[str]] | None) -> None:
-        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
-            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
-
-    def _generate_single(
-        self, *args, **kwargs,
-    ) -> dict:
-        raise NotImplementedError("This method should be implemented by the child class")
-
-    def preprocess_request(self, request: dict):
-        """Just a small utility to pre-process some of the parameters of request."""
-        # temperature of 0 means greedy, but it's not always supported by the server
-        # so setting explicit greedy parameters instead
-        if request["temperature"] == 0:
-            request["temperature"] = 1.0
-            request["top_k"] = 1
-            request["top_p"] = 1.0
-
-    def generate_sync(
-        self,
-        prompt: str | list,
-        tokens_to_generate: int | list[int] = 2048,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        top_logprobs: int | list[int] | None = None,
-        timeout: int | list[int] | None = None,
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | list[int] | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
-    ) -> dict:
-        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
-
-        Not every server supports that, so make sure to override this method directly if that's not the case.
-        """
-        # Prepare the request parameters
-        kwargs = {
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'random_seed': random_seed,
-            'stop_phrases': stop_phrases,
-            'top_logprobs': top_logprobs,
-            'timeout': timeout,
-            'stream': stream,
-            'reasoning_effort': reasoning_effort,
-            'include_response': include_response,
-            'extra_body': extra_body,
-        }
-        if tools is not None:
-            kwargs['tools'] = tools
-
-        # Create the request for the single prompt
-        request = kwargs.copy()
-        request['prompt'] = prompt
-        self.preprocess_request(request)
-
-        # Generate directly using _generate_single
-        output = self._generate_single(**request)
-
-        # Apply stop phrase removal if needed
-        self._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
-
-        # Remove logprobs if not requested
-        if top_logprobs is None:
-            output.pop('tokens', None)
-            output.pop('logprobs', None)
-
-        return output
-
-    async def generate_asyncio(self, prompt, *args, **kwargs) -> dict:
-        # Configure the executor for the current event loop
-        loop = asyncio.get_running_loop()
-        if not hasattr(loop, '_nemo_skills_executor_configured'):
-            loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
-            loop._nemo_skills_executor_configured = True
-
-        result = await asyncio.to_thread(self.generate_sync, prompt, *args, **kwargs)
-        return result
-    
-class OpenAIAPIModel(BaseModel):
+class BaseModel:
     """
     Base class for models using an OpenAI-compatible API.
     Handles client setup, SSH tunneling, and a unified generation flow with generation tracking.
@@ -187,10 +54,21 @@ class OpenAIAPIModel(BaseModel):
         base_url: str | None = None,
         max_retries: int = 3,
         use_v1_endpoint: bool = True,
-        **kwargs,
+        host: str = '127.0.0.1',
+        port: str = '5000',
+        ssh_server: str | None = None,
+        ssh_key_path: str | None = None,
     ):
-        super().__init__(**kwargs)
         self._tunnel = None
+        self.server_host = host
+        self.server_port = port
+        self.ssh_server = ssh_server
+        self.ssh_key_path = ssh_key_path
+        if ssh_server is None:
+            self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
+        if ssh_key_path is None:
+            self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
+
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel
 
@@ -233,6 +111,10 @@ class OpenAIAPIModel(BaseModel):
     def __del__(self):
         if self._tunnel:
             self._tunnel.stop()
+
+    def _maybe_apply_stop_phrase_removal(self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | list[list[str]] | None) -> None:
+        if remove_stop_phrases and isinstance(result, dict) and result.get('generation') is not None:
+            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
 
     @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:
@@ -291,7 +173,6 @@ class OpenAIAPIModel(BaseModel):
 
         request = kwargs.copy()
         request['prompt'] = prompt
-        self.preprocess_request(request)
         return request
 
     async def generate_asyncio(
@@ -465,95 +346,83 @@ class OpenAIAPIModel(BaseModel):
 
         return result
 
+    def _process_completion_chunk(self, chunk, emitted_so_far: list):
+        """Process a single completion chunk and return data to yield."""
+        cur_delta = chunk.choices[0].text
+        emitted_so_far.append(cur_delta)
+        
+        results_to_yield = []
+        if cur_delta:
+            results_to_yield.append({"generation": cur_delta})
+        
+        # vllm variant
+        stop_reason = getattr(chunk.choices[0], "stop_reason", None)
+        # sglang variant
+        matched_stop = getattr(chunk.choices[0], "matched_stop", None)
+        
+        # vllm variant - emit stop_reason as is and finish
+        if stop_reason and isinstance(stop_reason, str):
+            results_to_yield.append({"generation": stop_reason})
+        
+        # sglang variant - emit only not-yet-sent part of matched_stop
+        if matched_stop and isinstance(matched_stop, str):
+            remaining = matched_stop
+            # find the longest prefix of matched_stop that is already at
+            # the end of what we've emitted.
+            emitted_str = "".join(emitted_so_far)
+            max_len = min(len(emitted_str), len(matched_stop))
+            for i in range(max_len, 0, -1):
+                if emitted_str.endswith(matched_stop[:i]):
+                    remaining = matched_stop[i:]
+                    break
+            if remaining:
+                results_to_yield.append({"generation": remaining})
+        
+        return results_to_yield
+
+    def _process_chat_chunk(self, chunk):
+        """Process a single chat chunk and return data to yield."""
+        if hasattr(chunk.choices[0], "delta"):
+            cur_delta = chunk.choices[0].delta.content
+        else:
+            cur_delta = chunk.choices[0].text
+
+        finish_reason = getattr(chunk.choices[0], "finish_reason", None)
+        result = {"generation": cur_delta}
+        if finish_reason:
+            result["finish_reason"] = finish_reason
+            if not cur_delta:
+                result["generation"] = ""
+
+        return [result]
+
     def _stream_completion_chunks_sync(self, response):
         """Synchronous version of stream completion chunks."""
         emitted_so_far = []
         for chunk in response:
-            cur_delta = chunk.choices[0].text
-            emitted_so_far += [cur_delta]
-            if cur_delta:
-                yield {"generation": cur_delta}
-            # vllm variant
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            # sglang variant
-            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
-            # vllm variant - emit stop_reason as is and finish
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
-            # sglang variant - emit only not-yet-sent part of matched_stop
-            if matched_stop and isinstance(matched_stop, str):
-                remaining = matched_stop
-                # find the longest prefix of matched_stop that is already at
-                # the end of what we've emitted.
-                emitted_str = "".join(emitted_so_far)
-                max_len = min(len(emitted_str), len(matched_stop))
-                for i in range(max_len, 0, -1):
-                    if emitted_str.endswith(matched_stop[:i]):
-                        remaining = matched_stop[i:]
-                        break
-                if remaining:
-                    yield {"generation": remaining}
+            results = self._process_completion_chunk(chunk, emitted_so_far)
+            for result in results:
+                yield result
 
     def _stream_chat_chunks_sync(self, response):
         """Synchronous version of stream chat chunks."""
         for chunk in response:
-            if hasattr(chunk.choices[0], "delta"):
-                cur_delta = chunk.choices[0].delta.content
-            else:
-                cur_delta = chunk.choices[0].text
-
-            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-            result = {"generation": cur_delta}
-            if finish_reason:
-                result["finish_reason"] = finish_reason
-                if not cur_delta:
-                    result["generation"] = ""
-
-            yield result
+            results = self._process_chat_chunk(chunk)
+            for result in results:
+                yield result
 
     async def _stream_completion_chunks_async(self, response):
         """Async version of stream completion chunks."""
         emitted_so_far = []
         async for chunk in response:
-            cur_delta = chunk.choices[0].text
-            emitted_so_far += [cur_delta]
-            if cur_delta:
-                yield {"generation": cur_delta}
-            # vllm variant
-            stop_reason = getattr(chunk.choices[0], "stop_reason", None)
-            # sglang variant
-            matched_stop = getattr(chunk.choices[0], "matched_stop", None)
-            # vllm variant - emit stop_reason as is and finish
-            if stop_reason and isinstance(stop_reason, str):
-                yield {"generation": stop_reason}
-            # sglang variant - emit only not-yet-sent part of matched_stop
-            if matched_stop and isinstance(matched_stop, str):
-                remaining = matched_stop
-                # find the longest prefix of matched_stop that is already at
-                # the end of what we've emitted.
-                emitted_str = "".join(emitted_so_far)
-                max_len = min(len(emitted_str), len(matched_stop))
-                for i in range(max_len, 0, -1):
-                    if emitted_str.endswith(matched_stop[:i]):
-                        remaining = matched_stop[i:]
-                        break
-                if remaining:
-                    yield {"generation": remaining}
+            results = self._process_completion_chunk(chunk, emitted_so_far)
+            for result in results:
+                yield result
 
     async def _stream_chat_chunks_async(self, response):
         """Async version of stream chat chunks."""
         async for chunk in response:
-            if hasattr(chunk.choices[0], "delta"):
-                cur_delta = chunk.choices[0].delta.content
-            else:
-                cur_delta = chunk.choices[0].text
-
-            finish_reason = getattr(chunk.choices[0], "finish_reason", None)
-            result = {"generation": cur_delta}
-            if finish_reason:
-                result["finish_reason"] = finish_reason
-                if not cur_delta:
-                    result["generation"] = ""
-
-            yield result
+            results = self._process_chat_chunk(chunk)
+            for result in results:
+                yield result
 

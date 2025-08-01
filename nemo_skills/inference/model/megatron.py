@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base import OpenAIAPIModel
+from .base import BaseModel
 
 
-class MegatronModel(OpenAIAPIModel):
+class MegatronModel(BaseModel):
     def __init__(self, **kwargs):
         # Megatron uses a non-standard base URL (no /v1) and a fixed model name.
         super().__init__(use_v1_endpoint=False, **kwargs)
 
     def _build_chat_request_params(self, **kwargs) -> dict:
         raise NotImplementedError("Megatron server does not support chat completions.")
-
-    def preprocess_request(self, request: dict):
-        pass
 
     def _build_completion_request_params(
         self,

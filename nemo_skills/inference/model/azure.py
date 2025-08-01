@@ -17,7 +17,6 @@ import threading
 
 from openai import AzureOpenAI
 
-from .base import BaseModel
 from .openai import OpenAIModel
 
 

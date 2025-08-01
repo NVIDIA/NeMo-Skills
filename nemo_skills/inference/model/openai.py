@@ -16,10 +16,10 @@ import json
 import os
 import re
 
-from .base import OpenAIAPIModel
+from .base import BaseModel
 
 
-class OpenAIModel(OpenAIAPIModel):
+class OpenAIModel(BaseModel):
     def __init__(
         self,
         host: str = '127.0.0.1',
@@ -55,10 +55,6 @@ class OpenAIModel(OpenAIAPIModel):
             max_retries=max_retries,
             **kwargs,
         )
-
-    def preprocess_request(self, request: dict):
-        """OpenAI doesn't use top_k, so we don't apply the greedy conversion."""
-        pass
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         return re.match(r"^o\d", model_name)
