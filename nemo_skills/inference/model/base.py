@@ -478,6 +478,7 @@ class OpenAIAPIModel(BaseModel):
         if output is None:
             output = ""
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        logging.info(f"{choice}")
         if choice.logprobs and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
