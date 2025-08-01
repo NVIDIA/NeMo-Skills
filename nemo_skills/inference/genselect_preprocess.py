@@ -143,12 +143,12 @@ class GenSelectPreprocessor:
         problem_to_clustered_instances = {}
         for problem in rem_problems:
             instance_list = problem_to_instances[problem]
-            cluster_dict = defaultdict(list)
+            answer_dict = defaultdict(list)
             for instance in instance_list:
-                cluster_key_val = instance[self.cluster_key]
-                cluster_dict[cluster_key_val].append(instance)
+                answer_key_val = instance[self.answer_key]
+                answer_dict[answer_key_val].append(instance)
             
-            problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
+            problem_to_clustered_instances[problem] = [instance_list for _, instance_list in answer_dict.items()]
 
         LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
         return problem_to_clustered_instances
@@ -157,26 +157,26 @@ class GenSelectPreprocessor:
     def sample_instances(self, clustered_instances):
         random.shuffle(clustered_instances)
 
-        cluster_counts = []
-        for same_cluster_instances in clustered_instances:
-            cluster_counts.append(len(same_cluster_instances))
-        total_samples = sum(cluster_counts)
+        answer_counts = []
+        for same_answer_instances in clustered_instances:
+            answer_counts.append(len(same_answer_instances))
+        total_samples = sum(answer_counts)
 
         if self.sampling_strategy == "sqrt":
-            unnormalized_sampling_probs = [(cluster_count / total_samples) ** 0.5 for cluster_count in cluster_counts]
+            unnormalized_sampling_probs = [(answer_count / total_samples) ** 0.5 for answer_count in answer_counts]
             sampling_probs = [
                 sampling_prob / sum(unnormalized_sampling_probs) for sampling_prob in unnormalized_sampling_probs
             ]
         else:
-            sampling_probs = [cluster_count / total_samples for cluster_count in cluster_counts]
+            sampling_probs = [answer_count / total_samples for answer_count in answer_counts]
 
         # Sample instances from each cluster using the sampling probabilities
         sampled_instances = []
         num_samples = min(self.max_soln_samples, total_samples)
-        for i, same_cluster_instances in enumerate(clustered_instances):
+        for i, same_answer_instances in enumerate(clustered_instances):
             cur_num_samples = probabilistic_ceil(sampling_probs[i] * num_samples)
-            cur_num_samples = min(max(1, cur_num_samples), len(same_cluster_instances))
-            sampled_instances.extend(random.sample(same_cluster_instances, cur_num_samples))
+            cur_num_samples = min(max(1, cur_num_samples), len(same_answer_instances))
+            sampled_instances.extend(random.sample(same_answer_instances, cur_num_samples))
 
         return sampled_instances[:self.max_soln_samples]
 
@@ -220,7 +220,7 @@ class GenSelectPreprocessor:
         for random_seed in range(self.num_random_seeds):
             random.seed(random_seed)
             with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
-                for problem, clustered_instances in problem_to_clustered_instances.items():
+                for _, clustered_instances in problem_to_clustered_instances.items():
                     comparison_instance = self.create_comparison_instance(clustered_instances)
                     f.write(json.dumps(comparison_instance) + "\n")
 
