@@ -66,7 +66,7 @@ Usage:
             "tokens_to_generate": 300,
             "temperature": 1.0,
             "add_BOS": True,
-            "top_k": 0,
+            "top_k": -1,
             "top_p": 0.9,
             "greedy": False,
             "all_probs": False,

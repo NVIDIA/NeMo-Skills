@@ -56,7 +56,11 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     prompt = get_prompt('judge/math', 'qwen-instruct')
     judge_prompts = [prompt.fill(dp) for dp in data_points]
     if len(judge_prompts) > 0:
-        outputs = llm.generate(prompts=judge_prompts, stop_phrases=prompt.stop_phrases)
+        # Too slow, but we are no longer supporting openrlhf anyways.
+        outputs = [
+            llm.generate_sync(prompt=jp, stop_phrases=prompt.stop_phrases)
+            for jp in judge_prompts
+        ]
     else:
         outputs = []
     judgements = []

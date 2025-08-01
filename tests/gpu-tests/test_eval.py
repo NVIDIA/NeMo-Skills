@@ -61,7 +61,7 @@ def test_trtllm_eval():
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ['trtllm', 'trtllm-serve'])
+@pytest.mark.parametrize("server_type", ['trtllm'])
 def test_trtllm_code_execution_eval(server_type):
     model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
     if not model_path:
@@ -106,7 +106,7 @@ def test_trtllm_code_execution_eval(server_type):
 
 @pytest.mark.gpu
 @pytest.mark.parametrize(
-    "server_type,server_args", [('vllm', ''), ('sglang', ''), ('trtllm-serve', '--backend pytorch')]
+    "server_type,server_args", [('vllm', ''), ('sglang', ''), ('trtllm', '--backend pytorch')]
 )
 def test_hf_eval(server_type, server_args):
     # this test expects llama3-instruct to properly check accuracy

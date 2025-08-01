@@ -258,12 +258,6 @@ class GenerationTask:
         self.output_lock = None
 
     def setup_llm(self):
-        # TODO: DRY with the check in the validation config
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] in ["nemo", "megatron"]:
-            with open_dict(self.cfg.server):
-                self.cfg.server["server_type"] = "openai"
-                self.cfg.server["model"] = "model"
-
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
@@ -433,7 +427,7 @@ class GenerationTask:
 
     async def process_single_datapoint(self, data_point, all_data):
         generation_params = {
-            "prompts": [self.fill_prompt(data_point, all_data)],
+            "prompt": self.fill_prompt(data_point, all_data),
             "stop_phrases": combine_stop_phrases(
                 self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
             ),
@@ -446,7 +440,7 @@ class GenerationTask:
                 max_code_executions_values = [data_point['total_code_executions']]
                 generation_params['max_code_executions'] = max_code_executions_values
 
-        return await self.llm.generate_asyncio(**generation_params)
+        return await self.llm.generate_async(**generation_params)
 
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):

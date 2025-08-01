@@ -56,8 +56,8 @@ class ChatService:
             raise RuntimeError(f"Error preparing prompt: {e}") from e
 
         extra_params = prompt_obj.get_code_execution_args() if use_code else {}
-        stream_iter_list = llm.generate(
-            [prompt_filled],
+        stream_iter_list = llm.generate_sync(
+            prompt=prompt_filled,
             tokens_to_generate=int(tokens_to_generate),
             temperature=float(temperature),
             stream=True,
@@ -67,7 +67,7 @@ class ChatService:
         if not stream_iter_list:
             raise RuntimeError("LLM did not return a stream iterator.")
 
-        for delta in stream_iter_list[0]:
+        for delta in stream_iter_list:
             yield delta["generation"]
 
 
