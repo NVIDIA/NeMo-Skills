@@ -229,6 +229,7 @@ def genselect(
         )
         
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+            has_tasks = True
             continue
             if wandb_parameters:
                 # no need for chunks as it will run after merging
