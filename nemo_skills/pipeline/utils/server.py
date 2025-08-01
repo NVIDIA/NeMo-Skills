@@ -24,7 +24,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 class SupportedServersSelfHosted(str, Enum):
     trtllm = "trtllm"
-    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -33,7 +32,6 @@ class SupportedServersSelfHosted(str, Enum):
 
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
-    trtllm_serve = "trtllm-serve"
     vllm = "vllm"
     nemo = "nemo"
     sglang = "sglang"
@@ -127,7 +125,7 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm;
     # vllm can also pass model name as "model_path" so we need special processing
-    if server_type not in ["vllm", "sglang", "trtllm-serve"]:
+    if server_type not in ["vllm", "sglang", "trtllm"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
@@ -203,8 +201,8 @@ def get_server_command(
         )
         num_tasks = 1
     elif server_type == 'trtllm':
-        server_entrypoint = server_entrypoint or "trtllm-serve"
-        if num_nodes > 1 and server_entrypoint == "trtllm-serve":
+        server_entrypoint = server_entrypoint or "trtllm"
+        if num_nodes > 1 and server_entrypoint == "trtllm":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
         server_start_cmd = (
             f"{server_entrypoint} "
