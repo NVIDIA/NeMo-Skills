@@ -31,6 +31,7 @@ class OpenAIModel(OpenAIAPIModel):
         **kwargs,
     ):
         model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
+        self.model = model
         if model is None:
             raise ValueError("model argument is required for OpenAI model.")
 
