@@ -111,7 +111,7 @@ class BaseModel(abc.ABC):
 
         We will call it in threads on the list of prompts.
         """
-        pass
+        raise NotImplementedError("This method should be implemented by the child class")
 
     def preprocess_request(self, request: dict):
         """Just a small utility to pre-process some of the parameters of request."""
@@ -435,7 +435,7 @@ class OpenAIAPIModel(BaseModel):
 
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_completion_chunks_async(response)
             else:
