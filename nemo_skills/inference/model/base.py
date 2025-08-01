@@ -40,9 +40,17 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class BaseModel:
-    """
-    Base class for models using an OpenAI-compatible API.
-    Handles client setup, SSH tunneling, and a unified generation flow with generation tracking.
+    """Base model class for handling requests to the inference server.
+
+    Args:
+        host: Optional[str] = '127.0.0.1' - Host of the inference server.
+        port: Optional[str] = '5000' - Port of the inference server.
+            Only required if handle_code_execution is True.
+        ssh_server: Optional[str] = None - SSH server for tunneling requests.
+            Useful if server is running on slurm cluster to which there is an ssh access
+            Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
+        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
+            Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
     """
     # Litellm provider name
     MODEL_PROVIDER = "openai"
