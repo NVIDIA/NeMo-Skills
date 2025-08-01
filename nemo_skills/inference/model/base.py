@@ -460,7 +460,7 @@ class OpenAIAPIModel(BaseModel):
                 output += choice.matched_stop
 
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        if choice.logprobs:
+        if getattr(choice, 'logprobs', None):
             result['logprobs'] = choice.logprobs.token_logprobs
             result['tokens'] = choice.logprobs.tokens
             result['top_logprobs'] = choice.logprobs.top_logprobs
@@ -478,8 +478,7 @@ class OpenAIAPIModel(BaseModel):
         if output is None:
             output = ""
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        logging.info(f"{choice}")
-        if choice.logprobs and choice.logprobs.content:
+        if getattr(choice, 'logprobs', None) and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
             result['top_logprobs'] = []
