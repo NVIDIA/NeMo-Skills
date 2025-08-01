@@ -78,6 +78,7 @@ class OpenAIModel(BaseModel):
         stream: bool,
         reasoning_effort: str | None,
         extra_body: dict = None,
+        tools: list[dict] | None = None,
     ) -> dict:
         # Validations
         if top_k not in [0, -1]:
@@ -93,6 +94,7 @@ class OpenAIModel(BaseModel):
             "stop": stop_phrases or None,
             "timeout": timeout,
             "stream": stream,
+            "tools": tools,
         }
 
         if self._is_reasoning_model(self.model):
