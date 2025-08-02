@@ -125,6 +125,15 @@ class GenSelectTask(GenerationTask):
                 output_instance[self.cfg.output_key] = instance[f"{self.cfg.output_key}_{judgment}"]
                 output_instance[self.cfg.answer_key] = instance[f"{self.cfg.answer_key}_{judgment}"]
 
+                # Delete other variables that are not needed for the final output
+                for i in range(instance["num_solutions"]):
+                    del output_instance[f"{self.cfg.output_key}_{i}"]
+                    del output_instance[f"{self.cfg.answer_key}_{i}"]
+
+                del output_instance["solutions"]
+                del output_instance["max_idx"]
+                del output_instance["num_solutions"]
+
                 fout.write(json.dumps(output_instance) + '\n')
 
 
