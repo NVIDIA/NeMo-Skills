@@ -54,12 +54,10 @@ NS_TO_OPENAI_PARAM = {
     "tokens_to_generate": "max_tokens",
     "top_logprobs": "top_logprobs",
     "random_seed": "seed",
-
     # Not in the official API, but still supported by some servers, e.g. vllm.
     "top_k": "top_k",
     "min_p": "min_p",
     "repetition_penalty": "repetition_penalty",
-
     # temperature and top_p are passed as separate SWE-agent parameters.
 }
 
@@ -215,8 +213,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.sweagent_config)} "
             f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
-            f"    --agent.model.api_base http://127.0.0.1:5000/v1 "
-            # f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "  # TODO: that's the same, why it doesn't work??
+            f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
