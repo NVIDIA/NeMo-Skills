@@ -38,6 +38,7 @@ class GenSelectPreprocessConfig:
     input_key: str
     output_key: str
     answer_key: str
+    cluster_key: str | None = None
     max_soln_samples: int = 16
     is_competition: bool = False
     sampling_strategy: str = "linear"
@@ -62,6 +63,7 @@ class GenSelectPreprocessor:
         self.input_key = cfg.input_key
         self.output_key = cfg.output_key
         self.answer_key = cfg.answer_key  # Key which determines the correctness of the response
+        self.cluster_key = cfg.cluster_key  # Key which determines the cluster of the instances
         self.max_soln_samples = cfg.max_soln_samples
         self.sampling_strategy = cfg.sampling_strategy
         self.num_random_seeds = cfg.num_random_seeds
@@ -71,6 +73,9 @@ class GenSelectPreprocessor:
         self._post_init()
         
     def _post_init(self):
+        if self.cluster_key is None:
+            self.cluster_key = self.output_key
+
         dataset_module = None
         try:
             print(f"Importing dataset module: nemo_skills.dataset.{self.benchmark}")
@@ -143,12 +148,12 @@ class GenSelectPreprocessor:
         problem_to_clustered_instances = {}
         for problem in rem_problems:
             instance_list = problem_to_instances[problem]
-            answer_dict = defaultdict(list)
+            cluster_dict = defaultdict(list)
             for instance in instance_list:
-                answer_key_val = instance[self.answer_key]
-                answer_dict[answer_key_val].append(instance)
+                cluster_key_val = instance[self.cluster_key]
+                cluster_dict[cluster_key_val].append(instance)
             
-            problem_to_clustered_instances[problem] = [instance_list for _, instance_list in answer_dict.items()]
+            problem_to_clustered_instances[problem] = [instance_list for _, instance_list in cluster_dict.items()]
 
         LOG.info(f"Number of problems passed to GenSelect: {len(problem_to_clustered_instances)}")
         return problem_to_clustered_instances
