@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: needs to run from the root of the repo!
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+DATASET_GROUP = 'math'
+METRICS_TYPE = "math"
+EVAL_ARGS = "++eval_type=math"
+GENERATION_ARGS = "++prompt_config=generic/math"
 
-SANDBOX_NAME=${1:-'local-sandbox'}
-
-docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((nproc --all * 10))" --build-arg="UWSGI_CHEAPER=nproc --all" -f dockerfiles/Dockerfile.sandbox .
-
-docker run --network=host --rm --memory=${NEMO_SKILLS_SANDBOX_MEM_LIMIT:-"16g"} --restart unless-stopped --name=local-sandbox ${SANDBOX_NAME}
+# some answers are not possible to compare symbolically, so have to use a judge model
+# setting openai judge by default, but can be overriden from command line for a locally hosted model
+JUDGE_PIPELINE_ARGS = {
+    "generation_type": "math_judge",
+    "model": "gpt-4.1",
+    "server_type": "openai",
+    "server_address": "https://api.openai.com/v1",
+}

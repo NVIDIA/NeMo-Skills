@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import logging
 import os
+import random
 import threading
 import time
 import uuid
@@ -79,7 +81,7 @@ class BaseModel(abc.ABC):
         self.gen_id_to_params = {}
         self.gen_id_to_future = {}
 
-        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
+        self.executor = ThreadPoolExecutor(max_workers=2048)  # is this too much?
 
     @abc.abstractmethod
     def _generate_single(
@@ -99,6 +101,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> dict:
         """If the engine supports inflight-batching of requests, you only need to define this method.
 
@@ -133,6 +136,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """Returns a list of generation ids that can be later queried with get_generation calls."""
         kwargs = {
@@ -149,6 +153,7 @@ class BaseModel(abc.ABC):
             'stream': stream,
             'reasoning_effort': reasoning_effort,
             'include_response': include_response,
+            'extra_body': extra_body,
         }
         if tools is not None:
             kwargs['tools'] = tools
@@ -222,6 +227,7 @@ class BaseModel(abc.ABC):
         reasoning_effort: str | list[int] | None = None,
         tools: list[dict] | None = None,
         include_response: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -243,6 +249,7 @@ class BaseModel(abc.ABC):
             reasoning_effort=reasoning_effort,
             tools=tools,
             include_response=include_response,
+            extra_body=extra_body,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -265,6 +272,17 @@ class BaseModel(abc.ABC):
             time.sleep(1)
 
         return all_generations
+
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        # Configure the executor for the current event loop
+        loop = asyncio.get_running_loop()
+        if not hasattr(loop, '_nemo_skills_executor_configured'):
+            loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
+            loop._nemo_skills_executor_configured = True
+
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
 
 
 class OpenAIAPIModel(BaseModel):
@@ -315,17 +333,19 @@ class OpenAIAPIModel(BaseModel):
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
 
-        http_client = DefaultHttpxClient(
-            limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
-            transport=httpx.HTTPTransport(retries=3),
-        )
-
-        self.client = openai.OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=None,
-            http_client=http_client,
-        )
+        self.client_arr = [
+            openai.OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=None,
+                http_client=DefaultHttpxClient(
+                    limits=httpx.Limits(max_keepalive_connections=1500, max_connections=1500),
+                    transport=httpx.HTTPTransport(retries=3),
+                ),
+            )
+            for _ in range(20)
+        ]
+        self.client = self.client_arr[0]
         self.model = model or self.get_model_name_from_server()
 
     def __del__(self):
@@ -452,9 +472,11 @@ class OpenAIAPIModel(BaseModel):
         return_gen_id = generation_id is not None or kwargs.get('return_generation_id', False)
 
         try:
+            client = self.client_arr[random.randrange(0, len(self.client_arr))]
+
             if isinstance(prompt, list):
                 request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(self.client.chat.completions.create, request_params, gen_id)
+                response = self._make_api_call(client.chat.completions.create, request_params, gen_id)
                 if stream:
                     result = self._stream_chat_chunks(response, gen_id)
                 else:
@@ -462,7 +484,7 @@ class OpenAIAPIModel(BaseModel):
 
             elif isinstance(prompt, str):
                 request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-                response = self._make_api_call(self.client.completions.create, request_params, gen_id)
+                response = self._make_api_call(client.completions.create, request_params, gen_id)
                 if stream:
                     result = self._stream_completion_chunks(response, gen_id)
                 else:
@@ -501,7 +523,7 @@ class OpenAIAPIModel(BaseModel):
             result['top_logprobs'] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
-        
+
         if include_response:
             result["response"] = response
 

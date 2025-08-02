@@ -17,6 +17,7 @@ import glob
 import json
 import logging
 import os
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
@@ -89,6 +90,54 @@ def write_tmp_files_back(input_files):
                     fout.write(line)
         # then replacing original file with tmp file
         os.replace(manifest + "-tmp", manifest)
+
+
+def extract_proof_only(lean_code: str) -> str:
+    lines = lean_code.strip().splitlines()
+    if not lines:
+        return ""
+
+    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_idx = None
+
+    # 1. Find where the theorem starts
+    for i, line in enumerate(lines):
+        if header_start_pattern.match(line):
+            header_start_idx = i
+            break
+
+    if header_start_idx is None:
+        return lean_code.strip()
+
+    # 2. Find where ':=' occurs, starting from the header
+    header_end_idx = None
+    for i in range(header_start_idx, len(lines)):
+        if ":=" in lines[i]:
+            header_end_idx = i
+            break
+
+    if header_end_idx is None:
+        return lean_code.strip()
+
+    # 3. Extract the line after ':='
+    header_line, after = lines[header_end_idx].split(":=", 1)
+    proof_first_line = after.strip()
+
+    # 4. Collect proof lines
+    if proof_first_line:
+        proof_lines = [proof_first_line] + lines[header_end_idx + 1 :]
+    else:
+        proof_lines = lines[header_end_idx + 1 :]
+
+    # 5. Remove leading 'by' (with or without indentation)
+    if proof_lines:
+        first = proof_lines[0].lstrip()
+        if first == "by":
+            proof_lines = proof_lines[1:]
+        elif first.startswith("by "):
+            proof_lines[0] = first[3:]  # Strip 'by '
+
+    return "\n".join(proof_lines).rstrip()
 
 
 class Sandbox(abc.ABC):
@@ -166,7 +215,8 @@ class Sandbox(abc.ABC):
     def execute_code(
         self,
         generated_code: str,
-        language: str = 'python',
+        std_input: str = "",
+        language: str = 'ipython',
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
@@ -174,14 +224,14 @@ class Sandbox(abc.ABC):
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
 
-        if session_id is None and language == "python":  # creating a new session with empty state
+        if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
 
         if session_id is not None:
             self.sessions[session_id].append(generated_code)
 
-        if language == 'python':
+        if language == 'ipython':
             TO_EXECUTE = """
 import traceback
 import json
@@ -246,7 +296,7 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language == 'lean4':
+        elif language in ["python", "pypy3", "python3", "lean4"]:
             if session_id is not None:
                 raise RuntimeError(
                     f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
@@ -255,7 +305,7 @@ print(json.dumps(to_return))
         else:
             raise ValueError(f"Unsupported language: {language}")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language)
+        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
         try:
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
@@ -274,6 +324,8 @@ print(json.dumps(to_return))
             output = self._send_request(request, timeout)
         except requests.exceptions.Timeout:
             return "timeout"
+        if output['process_status'] == 'completed' and output['stdout'] != '':
+            return 'has_sorry'
         return output["process_status"]
 
     def batch_evaluate_results(
@@ -287,6 +339,7 @@ print(json.dumps(to_return))
         use_predicted_proof_key: bool = False,
         final_answer_key: str = "**FINAL ANSWER**",
         restate_formal_statement: bool = True,
+        strip_theorem_from_proof: bool = True,
     ):
         """Will write if the results are correct back into the original files."""
 
@@ -320,7 +373,9 @@ print(json.dumps(to_return))
                             line_dict["predicted_proof"] = (
                                 line_dict["header"]
                                 + (line_dict["formal_statement"] if restate_formal_statement else '')
-                                + generation
+                                + extract_proof_only(generation)
+                                if strip_theorem_from_proof
+                                else generation
                             )
                         else:
                             if "predicted_proof" not in line_dict:
@@ -380,9 +435,10 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='python'):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
         return {
             "generated_code": generated_code,
+            "std_input": std_input,
             "timeout": timeout,
             "language": language,
         }

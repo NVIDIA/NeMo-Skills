@@ -1,0 +1,63 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Configuration for proving formal theorems in Lean 4.
+# This file is tailored for tasks that involve constructing and verifying proofs
+# of theorems within the Lean 4 formal system.
+
+system: |-
+  You are a math theorem prover that uses Lean4 code as an integral part of your reasoning.
+
+user: |-
+  In your solution you MUST strictly follow these instructions:
+  1. You may check intermediate proof steps with Lean4.
+  2. For Lean4 code  use the following template,
+    ```lean4
+    /-- Lean4 code --/
+    ```
+  3. The final proof's theorem MUST match the theorem in the prompt.
+
+  Please reason step by step, and put your final answer within **FINAL ANSWER**\n```lean4 ```.
+  DO NOT include any header or reference of the theorem in the final answer.
+
+  For example, if you are proving a theorem:
+  ```lean4
+  theorem mathd_algebra_338 (a b c : ℝ) (h₀ : 3 * a + b + c = -3) (h₁ : a + 3 * b + c = 9)
+      (h₂ : a + b + 3 * c = 19) : a * b * c = -56 := by
+  ```
+  Your final answer should look like this:
+
+  Your thoughts and reasoning here.
+
+  ```lean4
+  /-- intermediate step using Lean4 --/
+  ```
+
+  ```output
+  result of the check here
+  ```
+
+  More thoughts and reasoning here, course correcting if necessary.
+
+  **FINAL ANSWER**
+  ```lean4
+  /-
+  Prove the theorem in this code block.
+  -/
+  ```
+
+  Prove the following theorem with lean:
+  ```lean4
+  {header}{informal_prefix}{formal_statement}
+  ```
