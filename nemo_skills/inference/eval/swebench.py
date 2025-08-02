@@ -91,7 +91,6 @@ class SweBenchGenerationConfig:
     # Useful when running judge jobs to keep the original generation statistics
     add_generation_stats: bool = True
     generation_key: str = "generation"
-    use_async_loop: bool = True
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
     dry_run: bool = False
 
@@ -102,25 +101,22 @@ class SweBenchGenerationConfig:
 
     prompt_format: str = "ns"
 
+    code_execution: bool = False
+    extra_stop_phrases: list[str] = field(default_factory=list)
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 
 
 class SweBenchGenerationTask(GenerationTask):
-    def __init__(self, cfg: SweBenchGenerationConfig):
-        # not calling parent init on purpose
-        self.cfg = cfg
-        self.use_async_loop = True  # SweBench is a multi-call benchmark, so we have to use async loop
-        self.output_dir = Path(self.cfg.output_file).parent
-
-        self.executor = ThreadPoolExecutor(max_workers=cfg.max_concurrent_requests)
-
     def log_example_prompt(self, data):
-        """SweBench is multi-call benchmark, so we can't print a single prompt."""
         return
 
     def setup_prompt(self):
+        return
+
+    def setup_llm(self):
         return
 
     def _execute_container_command(
@@ -185,8 +181,9 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}."
                     )
 
-    def generate_single_answer(self, data_point, data):
+    async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
+        self.output_dir = Path(self.cfg.output_file).parent
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
@@ -198,6 +195,11 @@ class SweBenchGenerationTask(GenerationTask):
         }
         if "top_logprobs" in completion_kwargs:
             completion_kwargs["logprobs"] = True
+
+        if 'base_url' in self.cfg.server:
+            api_base = self.cfg.server.base_url
+        else:
+            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
         swe_agent_cmd = (
             # first installing swe-agent repo
@@ -213,7 +215,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.sweagent_config)} "
             f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
-            f"    --agent.model.api_base http://{self.cfg.server.host}:{self.cfg.server.port}/v1 "
+            f"    --agent.model.api_base {api_base} "
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
@@ -229,7 +231,9 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute SWE-agent command
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
+        print("HERE")
         pred_file = self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
+        print("THERE")
 
         with open(pred_file, 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
@@ -312,23 +316,6 @@ class SweBenchGenerationTask(GenerationTask):
         }
 
         return output_dict
-
-    def llm_generate(self, data_points, data, is_async=False):
-        futures = []
-        for data_point in data_points:
-            future = self.executor.submit(self.generate_single_answer, data_point, data)
-            futures.append(future)
-
-        return futures
-
-    def get_llm_generations(self, requests_in_progress, generations):
-        for dp_idx, future in requests_in_progress.items():
-            if future.done():
-                generations[dp_idx] = future.result()
-            else:
-                generations[dp_idx] = {'generation': None}
-
-        return requests_in_progress, generations
 
 
 GENERATION_TASK_CLASS = SweBenchGenerationTask
