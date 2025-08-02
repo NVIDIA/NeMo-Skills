@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import glob
 import json
 import logging
@@ -119,7 +120,7 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_llm(self):
         return
 
-    def _execute_container_command(
+    async def _execute_container_command(
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
         """Execute a command in an Apptainer container with retry logic."""
@@ -146,12 +147,23 @@ class SweBenchGenerationTask(GenerationTask):
                 # Stream output to log file as it appears
                 with open(log_file_path, 'w') as log_file:
                     try:
-                        result = subprocess.run(
-                            apptainer_cmd, shell=True, text=True, timeout=timeout, stdout=log_file, stderr=log_file
+                        # Create async subprocess
+                        process = await asyncio.create_subprocess_shell(
+                            apptainer_cmd, stdout=log_file, stderr=log_file
                         )
-                    except subprocess.TimeoutExpired:
+                        # Wait for completion with timeout
+                        await asyncio.wait_for(process.communicate(), timeout=timeout)
+
+                        if process.returncode != 0:
+                            raise ValueError(f"Command failed with return code {process.returncode}")
+
+                    except asyncio.TimeoutError:
+                        # Kill the process if it's still running
+                        if process.returncode is None:
+                            process.kill()
+                            await process.wait()
                         attempt = max_retries  # Force exit the loop on timeout
-                        raise ValueError()
+                        raise ValueError("Command timed out")
 
                 # Look for the expected file
                 pred_files = glob.glob(expected_file_pattern, recursive=True)
@@ -231,9 +243,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute SWE-agent command
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
-        print("HERE")
-        pred_file = self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
-        print("THERE")
+        pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
         with open(pred_file, 'r') as f:
             trajectory_dict = json.loads(f.read().strip())
@@ -287,7 +297,7 @@ class SweBenchGenerationTask(GenerationTask):
             )
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
-                report_file = self._execute_container_command(
+                report_file = await self._execute_container_command(
                     data_point,
                     swe_bench_cmd,
                     search_path,
