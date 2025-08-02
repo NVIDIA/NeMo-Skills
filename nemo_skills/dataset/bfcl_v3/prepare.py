@@ -12,17 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import subprocess
-import os
-import glob
-import tempfile
-import json
-import shutil
-from nemo_skills.dataset.bfcl_v3.utils import func_doc_language_specific_pre_processing, convert_to_tool, is_multi_turn, load_file
-from pathlib import Path
-from nemo_skills.dataset.bfcl_v3.constants import DATA_FOLDER_PATH, MULTI_TURN_FUNC_DOC_PATH, MULTI_TURN_FUNC_DOC_FILE_MAPPING
 import argparse
+import glob
+import json
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+from nemo_skills.dataset.bfcl_v3.constants import (
+    DATA_FOLDER_PATH,
+    MULTI_TURN_FUNC_DOC_FILE_MAPPING,
+    MULTI_TURN_FUNC_DOC_PATH,
+)
+from nemo_skills.dataset.bfcl_v3.utils import (
+    convert_to_tool,
+    func_doc_language_specific_pre_processing,
+    is_multi_turn,
+    load_file,
+)
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -34,7 +44,6 @@ REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
 
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
-PROMPT_CONFIG = "null"
 DATASET_GROUP = "tool"
 METRICS_TYPE = "bfcl"
 EVAL_ARGS = "++eval_type=bfcl"
@@ -48,7 +57,7 @@ def process_multi_turn_test_case(instance, repo_root_dir):
     """
     Multi-turn test cases don't have the function doc in the prompt. We need to add them here.
     """
-    # Mark whether the instance is single-turn or multi-turn. 
+    # Mark whether the instance is single-turn or multi-turn.
     # This is used to determine if the inference should be done in a single turn or multiple turns.
     if not is_multi_turn(instance["id"]):
         instance["single_turn"] = True
@@ -92,54 +101,54 @@ def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemot
             test_category = instance["id"].rsplit("_", 1)[0]
             if idx == 0:
                 LOG.info(f"Processing {test_category}")
-            
+
             # TODO: Current preprocessing can be model dependent. This could be moved to inference time as well
             # Convert class-based method calls to function calls
             instance = process_multi_turn_test_case(instance, repo_root_dir)
-            
+
             # Convert function calls to tools format and add them to the system prompt
             if "function" in instance:
                 # Add the tools to the system prompt
                 instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
                 instance["tools"] = convert_to_tool(instance["function"])
-                
+
             f_out.write(json.dumps(instance) + "\n")
 
 
 def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_prefix="BFCL_v3", model_type="nemotron"):
     """
     Download JSON files from the BFCL GitHub repo via cloning
-    
+
     Args:
         repo_url: GitHub repository URL
         subfolder_path: Path to the data subfolder in case of BFCL
         output_dir: Directory to save the processed JSONL files
         file_prefix: Only process files starting with this prefix
-        model_type: Formatting of functions and tools can be model dependent. 
+        model_type: Formatting of functions and tools can be model dependent.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             # Clone repository with minimal depth
             print(f"Cloning repository {repo_url} to {temp_dir}")
-            subprocess.run([
-                "git", "clone", "--depth=1", repo_url, temp_dir
-            ], check=True, capture_output=True)
-            
+            subprocess.run(["git", "clone", "--depth=1", repo_url, temp_dir], check=True, capture_output=True)
+
             # Find the target folder
             target_folder = Path(temp_dir) / subfolder_path
-            
+
             if not os.path.exists(target_folder):
                 print(f"Folder {subfolder_path} not found in repository")
-                raise FileNotFoundError(f"Folder {subfolder_path} not found in {repo_url} cloned to {temp_dir}. The structure of BFCL has changed!")
-            
+                raise FileNotFoundError(
+                    f"Folder {subfolder_path} not found in {repo_url} cloned to {temp_dir}. The structure of BFCL has changed!"
+                )
+
             # Find JSON files matching criteria
             json_pattern = os.path.join(target_folder, f"{file_prefix}*.json")
             json_files = glob.glob(json_pattern)
-            
+
             print(f"Found {len(json_files)} JSON files matching pattern")
-            
+
             if not os.path.exists(output_dir):
-                os.makedirs(output_dir) 
+                os.makedirs(output_dir)
 
             processed_files = 0
             for input_file in json_files:
@@ -157,21 +166,21 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
                 # Copy the original json file to the split directory
                 shutil.copy(input_file, os.path.join(split_dirname, filename))
                 processed_files += 1
-            
+
             print(f"Successfully processed {processed_files} JSON files to {output_dir}")
-            
+
         except subprocess.CalledProcessError as e:
             print(f"Git command failed: {e}")
             print("Make sure git is installed and the repository URL is correct")
 
 
 def main(args):
-    LOG.warning("Currently processing according to the OpenAI model style which works for most models, including Qwen/Llama-Nemotron/DeepSeek.")
+    LOG.warning(
+        "Currently processing according to the OpenAI model style which works for most models, including Qwen/Llama-Nemotron/DeepSeek."
+    )
 
     download_and_process_bfcl_data(
-        REPO_URL, DATA_FOLDER_PATH, 
-        output_dir=os.path.join(os.path.dirname(__file__)),
-        model_type=args.model_type
+        REPO_URL, DATA_FOLDER_PATH, output_dir=os.path.join(os.path.dirname(__file__)), model_type=args.model_type
     )
 
 
@@ -181,6 +190,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
-    
-
- 

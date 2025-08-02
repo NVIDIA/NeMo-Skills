@@ -13,8 +13,9 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
+EVAL_SPLIT = "default"
 DATASET_GROUP = 'code'
-METRICS_TYPE = 'livecodebench'
-EVAL_SPLIT = 'test_v6_2408_2505'
-EVAL_ARGS = "++eval_type=livecodebench"
-GENERATION_ARGS = "++prompt_config=eval/livecodebench/python_codegen"
+METRICS_TYPE = "swe-bench"
+EVAL_ARGS = "++eval_type=no-op"  # evaluation is fused with generation for efficiency
+GENERATION_ARGS = ""
+GENERATION_MODULE = "nemo_skills.inference.eval.swebench"

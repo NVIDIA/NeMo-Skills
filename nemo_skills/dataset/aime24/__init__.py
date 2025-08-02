@@ -13,8 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
 EVAL_ARGS = "++eval_type=math"
-GENERATION_ARGS = ""
+GENERATION_ARGS = f"++prompt_config=generic/math"

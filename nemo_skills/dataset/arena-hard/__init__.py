@@ -14,11 +14,10 @@
 
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'chat'
 METRICS_TYPE = "arena"
-EVAL_ARGS = "++eval_type=arena"
-GENERATION_ARGS = ""
+EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
+GENERATION_ARGS = "++prompt_config=generic/default"
 
 JUDGE_PIPELINE_ARGS = {
     "generation_module": "nemo_skills.inference.eval.arena_judge",

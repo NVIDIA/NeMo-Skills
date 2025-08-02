@@ -52,11 +52,13 @@ class BaseModel(abc.ABC):
 
     def __init__(
         self,
+        model: str | None = None,
         host: str = '127.0.0.1',
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
     ):
+        self.model = model
         self.server_host = host
         self.server_port = port
         self.ssh_server = ssh_server

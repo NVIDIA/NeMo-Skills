@@ -51,7 +51,6 @@ class ArenaJudgeTask(GenerationTask):
     def __init__(self, cfg: ArenaJudgeConfig):
         super().__init__(cfg)
 
-
     def log_example_prompt(self, all_data):
         data_point = deepcopy(all_data[0])
 
@@ -62,7 +61,9 @@ class ArenaJudgeTask(GenerationTask):
 
         data_point['answer_1'] = data_point['generation']
         data_point['answer_2'] = data_point['baseline_answer']
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, all_data))
+        LOG.info(
+            "Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, all_data)
+        )
 
     async def process_single_datapoint(self, data_point, all_data):
         gen_base_data = data_point.copy()
@@ -76,7 +77,7 @@ class ArenaJudgeTask(GenerationTask):
         # Make two async calls instead of one batch call
         llm_output_1, llm_output_2 = await asyncio.gather(
             super().process_single_datapoint(gen_base_data, all_data),
-            super().process_single_datapoint(base_gen_data, all_data)
+            super().process_single_datapoint(base_gen_data, all_data),
         )
 
         return {

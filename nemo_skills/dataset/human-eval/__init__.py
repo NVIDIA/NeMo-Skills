@@ -13,8 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/codegen'
 DATASET_GROUP = 'code'
-METRICS_TYPE = "code"
+METRICS_TYPE = "evalplus"
 EVAL_ARGS = "++eval_type=evalplus ++eval_config.dataset=humaneval"
-GENERATION_ARGS = ""
+GENERATION_ARGS = "++prompt_config=generic/codegen"
