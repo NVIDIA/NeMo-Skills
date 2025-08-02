@@ -13,13 +13,17 @@ Here are some of the features we support:
     - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
     - Coding skills: scicode, livecodebench, human-eval, mbpp
-    - Chat/instruction following: ifeval, arena-hard, mt-bench
+    - Chat/instruction following: ifeval, arena-hard
     - General knowledge: mmlu, mmlu-pro, gpqa
     - Long context: ruler
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
 ## News
+
+* [07/30/2025]: The datasets used to train OpenReasoning models are released! Math and code are available as part of [Nemotron-Post-Training-Dataset-v1](https://huggingface.co/datasets/nvidia/Nemotron-Post-Training-Dataset-v1) and science is available in
+[OpenScienceReasoning-2](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).
+See our [documentation](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/training) for more details.
 
 * [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/) models! SOTA scores on math, coding and science benchmarks.
 
@@ -52,6 +56,11 @@ You can find more examples of how to use NeMo-Skills in the [tutorials](https://
 We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
+
+
+## Contributing
+
+We welcome contributions to NeMo-Skills! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for more information on how to get involved.
 
 
 Disclaimer: This project is strictly for research purposes, and not an official product from NVIDIA.

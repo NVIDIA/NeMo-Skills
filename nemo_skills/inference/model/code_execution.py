@@ -13,15 +13,19 @@
 # limitations under the License.
 
 
+import asyncio
 import copy
 import logging
 import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
+from nemo_skills.inference.model.base import BaseModel
+from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
@@ -34,6 +38,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class CodeExecutionConfig:
     max_code_output_characters: int = 1000
     code_execution_timeout: float = 10.0
+    code_execution_language: str = 'ipython'
+    code_execution_headers: list[str] = field(default_factory=lambda: [])
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
@@ -81,10 +87,11 @@ class CodeExecutionWrapper:
         timeout: int | None = None,
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
+        extra_body: dict = None,
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
-            
+
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
 
@@ -106,6 +113,7 @@ class CodeExecutionWrapper:
                 stop_phrases=stop_phrases,
                 timeout=timeout,
                 max_code_executions=max_code_executions,
+                extra_body=extra_body,
             )
 
         effective_max_code_executions = self.config.max_code_executions
@@ -133,6 +141,7 @@ class CodeExecutionWrapper:
             "repetition_penalty": repetition_penalty,
             "stop_phrases": stop_phrases + [code_end],
             "timeout": timeout,
+            "extra_body": extra_body,
         }
         session_id = None
         code_rounds_executed = 0
@@ -208,13 +217,8 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start = time.time()
-                execution_dict, session_id = self.sandbox.execute_code(
-                    generated_code=extract_code_to_execute(output, code_begin, code_end),
-                    timeout=self.config.code_execution_timeout,
-                    max_output_characters=self.config.max_code_output_characters,
-                    session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
+                code_execution_time_start, execution_dict = self.execute_generated_code(
+                    prompt, code_begin, code_end, output, session_id
                 )
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -223,12 +227,12 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
-                
+
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
                 else:
                     request['prompt'] += code_output
-                    
+
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
             else:  # if no code was generated, we need to finish
@@ -238,8 +242,8 @@ class CodeExecutionWrapper:
         if is_openai_format:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
-            generation = request['prompt'][len(prompt):]
-            
+            generation = request['prompt'][len(prompt) :]
+
         return {
             'generation': generation,
             'code_rounds_executed': code_rounds_executed,
@@ -248,6 +252,22 @@ class CodeExecutionWrapper:
             'code_execution_time': code_execution_time,
             'stopped_on_repetition': stopped_on_repetition,
         }
+
+    def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
+        code_execution_time_start = time.time()
+        header = '\n'.join(self.config.code_execution_headers)
+        code_block = extract_code_to_execute(output, code_begin, code_end)
+        extracted_code = f'{header}{code_block}'
+        execution_dict, session_id = self.sandbox.execute_code(
+            generated_code=extracted_code,
+            language=self.config.code_execution_language,
+            timeout=self.config.code_execution_timeout,
+            max_output_characters=self.config.max_code_output_characters,
+            session_id=session_id,
+            traceback_verbosity=self.config.sandbox_traceback_verbosity,
+        )
+
+        return code_execution_time_start, execution_dict
 
     # TODO: is there a way to reuse this with BaseModel?
     def generate_async(
@@ -271,6 +291,7 @@ class CodeExecutionWrapper:
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
         stream: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -298,6 +319,7 @@ class CodeExecutionWrapper:
             "timeout": timeout,
             "max_code_executions": max_code_executions,
             "stream": stream,
+            "extra_body": extra_body,
         }
         for key, value in kwargs.items():
             is_list = False
@@ -392,9 +414,11 @@ class CodeExecutionWrapper:
         random_seed: int | list[int] = 0,
         stop_phrases: list[str] | list[list[str]] | None = None,
         remove_stop_phrases: bool = True,
+        top_logprobs: int | list[int] | None = None,
         timeout: int | list[int] | None = None,
         max_code_executions: int | list[int] | None = None,
         stream: bool = False,
+        extra_body: dict = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -416,9 +440,11 @@ class CodeExecutionWrapper:
             random_seed=random_seed,
             stop_phrases=stop_phrases,
             remove_stop_phrases=remove_stop_phrases,
+            top_logprobs=top_logprobs,
             timeout=timeout,
             max_code_executions=max_code_executions,
             stream=stream,
+            extra_body=extra_body,
         )
         all_generations = [None] * len(prompts)
         while True:
@@ -438,6 +464,11 @@ class CodeExecutionWrapper:
 
         return all_generations
 
+    async def generate_asyncio(self, *args, **kwargs) -> dict:
+        result = await asyncio.to_thread(self.generate, *args, **kwargs)
+        assert len(result) == 1, "generate_asyncio should return a single result"
+        return result[0]
+
     def _stream_single(
         self,
         prompt: str,
@@ -456,13 +487,14 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         timeout: int | None = None,
         max_code_executions: int | None = None,
+        extra_body: dict = None,
     ):
         """
         Helper method, that implements streaming generation.
         """
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
-        
+
         effective_max_code_executions = self.config.max_code_executions
         if max_code_executions is not None:
             effective_max_code_executions = max_code_executions
@@ -480,6 +512,7 @@ class CodeExecutionWrapper:
             'timeout': timeout,
             'tokens_to_generate': tokens_to_generate,
             'stream': True,
+            'extra_body': extra_body,
         }
 
         current_full_prompt = copy.deepcopy(prompt)
@@ -522,6 +555,7 @@ class CodeExecutionWrapper:
             ) > current_output_segment.rfind(code_end, 0, -1):
                 execution_dict, session_id = self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
+                    language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
                     max_output_characters=self.config.max_code_output_characters,
                     session_id=session_id,
@@ -537,7 +571,7 @@ class CodeExecutionWrapper:
                 )
 
                 yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
-                
+
                 # Append executed code's output to the prompt
                 if is_openai_format:
                     current_full_prompt[-2]['content'] += formatted_code_output
