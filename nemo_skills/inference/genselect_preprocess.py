@@ -32,9 +32,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 def read_file(file_path):
     LOG.info(f"Reading file: {file_path}")
     instances = [json.loads(line) for line in open(file_path, "r")]
-    for instance in instances:
-        if "symbolic_correct" not in instance:
-            instance["symbolic_correct"] = instance["is_correct"]
     problem_to_instance = {instance["problem"]: instance for instance in instances}
     return problem_to_instance
 
