@@ -190,6 +190,8 @@ class GenSelectPreprocessor:
             consolidated_solutions += f"Solution {idx}:\n{solution}\n\n"
 
         comparison_instance = deepcopy(sampled_instances[0])
+        # Add the "problem" key to the comparison instance for the prompt formatting
+        comparison_instance["problem"] = comparison_instance[self.input_key]
         comparison_instance["solutions"] = consolidated_solutions
         comparison_instance["max_idx"] = len(sampled_solutions) - 1
         comparison_instance["num_solutions"] = len(sampled_instances)

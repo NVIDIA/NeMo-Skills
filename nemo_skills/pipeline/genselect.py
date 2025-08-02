@@ -261,7 +261,7 @@ def genselect(
 
                 prev_tasks = [preprocess_task]
                 generation_cmd = pipeline_utils.get_generation_cmd(
-                    input_dir=f"{output_dir}/comparison_instances",
+                    input_file=f"{output_dir}/comparison_instances/output-rs{seed}.jsonl",
                     random_seed=seed,
                     output_dir=f"{output_dir}/comparison_judgment",
                     extra_arguments=extra_arguments,
