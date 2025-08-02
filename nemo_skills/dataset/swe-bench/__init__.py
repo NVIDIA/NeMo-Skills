@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
+EVAL_SPLIT = "default"
 DATASET_GROUP = 'code'
 METRICS_TYPE = "swe-bench"
 EVAL_ARGS = "++eval_type=no-op"  # evaluation is fused with generation for efficiency
