@@ -84,7 +84,6 @@ def get_mrcr_data(needles_subset, setup, max_context_window):
         
     dataset = load_dataset("openai/mrcr")['train']
     data_dir = Path(__file__).absolute().parent
-    data_dir.mkdir(exist_ok=True)
     
     output_file = data_dir / f"{setup}.jsonl"
     
