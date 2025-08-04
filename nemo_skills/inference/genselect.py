@@ -127,12 +127,15 @@ class GenSelectTask(GenerationTask):
 
                 # Delete other variables that are not needed for the final output
                 for i in range(instance["num_solutions"]):
-                    del output_instance[f"{self.cfg.output_key}_{i}"]
-                    del output_instance[f"{self.cfg.answer_key}_{i}"]
+                    # Check if the key exists before deleting
+                    if f"{self.cfg.output_key}_{i}" in output_instance:
+                        del output_instance[f"{self.cfg.output_key}_{i}"]
+                    if f"{self.cfg.answer_key}_{i}" in output_instance:
+                        del output_instance[f"{self.cfg.answer_key}_{i}"]
 
-                del output_instance["solutions"]
-                del output_instance["max_idx"]
-                del output_instance["num_solutions"]
+                for key in ["solutions", "max_idx", "num_solutions", "_full_generation"]:
+                    if key in output_instance:
+                        del output_instance[key]
 
                 fout.write(json.dumps(output_instance) + '\n')
 
