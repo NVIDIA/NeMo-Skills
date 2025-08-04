@@ -155,7 +155,7 @@ class Sandbox(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _prepare_request(self, generated_code, timeout):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
         pass
 
     def execute_code(
@@ -326,7 +326,7 @@ class PistonSandbox(Sandbox):
             return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
         return json.loads(output['run']['output'])
 
-    def _prepare_request(self, generated_code, timeout):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
         return {
             "language": "py",
             "version": "3.10.0",
