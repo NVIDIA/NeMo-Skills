@@ -130,7 +130,7 @@ def get_training_cmd(
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path, step):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export UV_PROJECT=/opt/NeMo-RL && "
@@ -139,6 +139,8 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path):
         f"    --training-folder={output_dir} "
         f"    --hf-ckpt-path={final_hf_path} "
     )
+    if step is not None:
+        cmd += f"  --step {step} "
     return cmd
 
 
@@ -164,6 +166,7 @@ def sft_nemo_rl(
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -292,6 +295,7 @@ def sft_nemo_rl(
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+                step=conversion_step,
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",
