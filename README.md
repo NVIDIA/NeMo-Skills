@@ -21,6 +21,10 @@ Here are some of the features we support:
 
 ## News
 
+* [07/30/2025]: The datasets used to train OpenReasoning models are released! Math and code are available as part of [Nemotron-Post-Training-Dataset-v1](https://huggingface.co/datasets/nvidia/Nemotron-Post-Training-Dataset-v1) and science is available in
+[OpenScienceReasoning-2](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).
+See our [documentation](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/training) for more details.
+
 * [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/) models! SOTA scores on math, coding and science benchmarks.
 
 ![Evaluation Results with pass@1](docs/releases/openreasoning/pass-1.png)
