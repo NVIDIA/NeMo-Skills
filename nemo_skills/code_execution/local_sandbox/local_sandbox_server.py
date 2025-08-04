@@ -61,6 +61,7 @@ def get_or_create_session(session_id):
                 # Create new IPython shell instance for each session
                 shell = TerminalInteractiveShell()
                 shell.init_create_namespaces()     # Initialize the shell properly
+                shell.user_ns['_oh'] = {}
 
                 sessions[session_id] = {
                     'shell': shell,
@@ -89,9 +90,15 @@ def postprocess_output(output, traceback_verbosity):
     for line in output.split('\n'):
         if line.strip().startswith('File <ipython-'):
             continue
+        line = re.sub(r'^Out\[\d+\]:\s*', '', line)
         lines.append(line)
 
-    return '\n'.join(lines)
+    # Remove leading blank lines introduced by displayhook
+    while lines and lines[0] == '':
+        lines.pop(0)
+
+    output = '\n'.join(lines).rstrip()
+    return output + ('\n' if output else '')
 
 def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity='Plain'):
     """Execute Python code in a persistent IPython session"""
@@ -122,21 +129,22 @@ def execute_ipython_session(generated_code, session_id, timeout=30, traceback_ve
             stdout_result = stdout_capture.getvalue()
             stderr_result = stderr_capture.getvalue()
 
-            # Add execution result if present
-            if result.result is not None:
-                stdout_result += str(result.result) + '\n'
-
             # Check for execution errors
             if result.error_before_exec or result.error_in_exec:
                 process_status = "error"
-                if result.error_in_exec:
-                    stderr_result += f"\n{result.error_in_exec}"
             else:
                 process_status = "completed" if not stderr_result else "error"
+
+            if process_status == "error":
+                stdout_result += stderr_result
+                stderr_result = ''
+
         except Exception as e:
             process_status = "error"
-            stdout_result = stdout_capture.getvalue(),
+            stdout_result = stdout_capture.getvalue()
             stderr_result = stderr_capture.getvalue() + f"\n{type(e).__name__}: {e}"
+            stdout_result += stderr_result
+            stderr_result = ''
 
         sys.stdout = old_stdout
         sys.stderr = old_stderr
