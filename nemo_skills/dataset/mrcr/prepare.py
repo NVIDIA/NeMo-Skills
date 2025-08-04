@@ -19,8 +19,6 @@ from datasets import load_dataset
 from tqdm import tqdm
 import tempfile
 
-subprocess.run(["pip install tiktoken"], check=True, shell=True)
-import tiktoken
 """
 Usage 
 # default. setup is all. 
@@ -81,7 +79,8 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset,
 
 
 def get_mrcr_data(needles_subset, setup, max_context_window):
-        
+    subprocess.run(["pip install tiktoken"], check=True, shell=True)
+    import tiktoken
     dataset = load_dataset("openai/mrcr")['train']
     data_dir = Path(__file__).absolute().parent
     
