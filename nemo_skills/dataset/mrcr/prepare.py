@@ -69,7 +69,7 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset,
 
             # convert messages to string
             if convert_messagesto_string:
-                question = convert_messagesto_string(messages, {"user": "User", "assistant": "Assistant"})
+                question = convert_messages_to_string(messages, {"user": "User", "assistant": "Assistant"})
             
             else:
                 question = entry.pop('prompt')
