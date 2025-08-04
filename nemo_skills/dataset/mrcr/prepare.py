@@ -42,7 +42,7 @@ def count_n_tokens(messages : list[dict]) -> int:
     return sum([len(enc.encode(m["content"])) for m in messages])
 
 
-def convert_messagesto_string(
+def convert_messages_to_string(
     messages : list[dict],
     role_to_string : dict[str, str] = {"user": "user", "assistant": "assistant"},
     ) -> str:
