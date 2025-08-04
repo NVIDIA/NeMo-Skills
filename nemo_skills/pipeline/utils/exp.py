@@ -480,7 +480,10 @@ def add_task(
 
     # finally a sandbox if needed
     if with_sandbox:
-        sandbox_env_updates = {"LISTEN_PORT": sandbox_port}
+        sandbox_env_updates = {
+            "LISTEN_PORT": sandbox_port,
+            "NGINX_PORT": sandbox_port,
+        }
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
