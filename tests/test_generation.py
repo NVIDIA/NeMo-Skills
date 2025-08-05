@@ -44,7 +44,7 @@ def test_generation_dryrun_llama(dataset, split):
         f"    ++prompt_template={prompt_template} "
         f"    ++prompt_config={prompt_config} "
         f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
-        f"    ++server.server_type=nemo "
+        f"    ++server.server_type=sglang "
         f"    ++dry_run=True "
         f"    {extra_args} "
     )
@@ -62,7 +62,7 @@ def test_generation_dryrun_gsm8k(prompt_template):
         f"    ++prompt_template={prompt_template} "
         f"    ++prompt_config=generic/math "
         f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
-        f"    ++server.server_type=nemo "
+        f"    ++server.server_type=trtllm "
         f"    ++dry_run=True "
     )
     subprocess.run(cmd, shell=True, check=True)

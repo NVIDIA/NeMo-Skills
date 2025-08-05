@@ -14,7 +14,6 @@
 
 import logging
 from enum import Enum
-from typing import Optional
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
 from nemo_skills.utils import get_logger_name
@@ -25,7 +24,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class SupportedServersSelfHosted(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
-    nemo = "nemo"
     sglang = "sglang"
     megatron = "megatron"
 
@@ -33,7 +31,6 @@ class SupportedServersSelfHosted(str, Enum):
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
-    nemo = "nemo"
     sglang = "sglang"
     megatron = "megatron"
     openai = "openai"
@@ -132,23 +129,7 @@ def get_server_command(
     elif model_path.startswith("/"):
         check_if_mounted(cluster_config, model_path)
 
-    if server_type == 'nemo':
-        server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_nemo"
-        server_start_cmd = (
-            f"python {server_entrypoint} "
-            f"    gpt_model_file={model_path} "
-            f"    trainer.devices={num_gpus} "
-            f"    trainer.num_nodes={num_nodes} "
-            f"    tensor_model_parallel_size={num_gpus} "
-            f"    pipeline_model_parallel_size={num_nodes} "
-            f"    ++port={server_port} "
-            f"    {server_args} "
-        )
-
-        # somehow on slurm nemo needs multiple tasks, but locally only 1
-        if cluster_config["executor"] != "slurm":
-            num_tasks = 1
-    elif server_type == 'megatron':
+    if server_type == 'megatron':
         if cluster_config["executor"] != "slurm":
             num_tasks = 1
             prefix = f"torchrun --nproc_per_node {num_gpus}"

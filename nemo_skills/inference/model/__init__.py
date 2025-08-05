@@ -24,22 +24,21 @@ from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 
-# Model implementations
-
 # Utilities
 from .vllm import VLLMModel
+
+# Model implementations
+
 
 # Model registry
 models = {
     'trtllm': VLLMModel,
-    'nemo': OpenAIModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,
 }
-
 
 
 def get_model(server_type, **kwargs):

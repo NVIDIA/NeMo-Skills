@@ -176,42 +176,6 @@ def test_hf_eval(server_type, server_args):
 
 
 @pytest.mark.gpu
-def test_nemo_eval():
-    model_path = os.getenv('NEMO_SKILLS_TEST_NEMO_MODEL')
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_NEMO_MODEL to run this test")
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/nemo-eval"
-    docker_rm([output_dir])
-
-    cmd = (
-        f"ns eval "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type nemo "
-        f"    --output_dir {output_dir} "
-        f"    --benchmarks gsm8k "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    ++max_samples=2 "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    # running compute_metrics to check that results are expected
-    with open(f"{output_dir}/eval-results/gsm8k/metrics.json", 'r') as f:
-        metrics = json.load(f)["gsm8k"]["pass@1"]
-    # rough check, since exact accuracy varies depending on gpu type
-    if model_type == 'llama':
-        assert metrics['symbolic_correct'] >= 50
-    else:  # qwen
-        assert metrics['symbolic_correct'] >= 70
-    assert metrics['num_entries'] == 2
-
-
-@pytest.mark.gpu
 def test_megatron_eval():
     model_path = os.getenv('NEMO_SKILLS_TEST_MEGATRON_MODEL')
     if not model_path:

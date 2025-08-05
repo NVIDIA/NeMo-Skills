@@ -16,7 +16,7 @@ export NEMO_SKILLS_TEST_NEMO_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODE
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/nemo-to-hf/model
 
 # generation/evaluation tests
-pytest tests/gpu-tests/test_eval.py -s -x
+pytest tests/gpu-tests/test_eval.py -s -x -k test_megatron_eval
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
 pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x

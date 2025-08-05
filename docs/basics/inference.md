@@ -4,13 +4,8 @@ Here are the instructions on how to run inference with our repo.
 
 ## Download/convert the model
 
-Get the model you want to use. You can use any model that's supported by vLLM, TensorRT-LLM or NeMo.
+Get the model you want to use. You can use any model that's supported by vLLM, sglang, TensorRT-LLM or Megatron.
 You can also use [Nvidia NIM API](https://www.nvidia.com/en-us/ai/) for models that are hosted there.
-
-[Convert the model](../pipelines/checkpoint-conversion.md) if it's not in the format you want to use.
-You do not need any conversion if using vLLM inference with HF models
-(and can directly use model id if you want vLLM to download it for you).
-For fastest inference we recommend to convert the model to TensorRT-LLM format.
 
 ## Start the server
 
