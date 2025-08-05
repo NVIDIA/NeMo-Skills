@@ -51,7 +51,6 @@ class GenSelectConfig(GenerateSolutionsConfig):
     input_key: str = "problem"
     output_key: str = "generation"
     answer_key: str
-    metric_key: str
     benchmark: str
 
     sandbox: dict = field(default_factory=dict)
@@ -125,7 +124,6 @@ class GenSelectTask(GenerationTask):
 
                 output_instance[self.cfg.output_key] = instance[f"{self.cfg.output_key}_{judgment}"]
                 output_instance[self.cfg.answer_key] = instance[f"{self.cfg.answer_key}_{judgment}"]
-                output_instance[self.cfg.metric_key] = instance[f"{self.cfg.metric_key}_{judgment}"]
 
                 # Delete other variables that are not needed for the final output
                 for i in range(instance["num_solutions"]):
@@ -134,8 +132,6 @@ class GenSelectTask(GenerationTask):
                         del output_instance[f"{self.cfg.output_key}_{i}"]
                     if f"{self.cfg.answer_key}_{i}" in output_instance:
                         del output_instance[f"{self.cfg.answer_key}_{i}"]
-                    if f"{self.cfg.metric_key}_{i}" in output_instance:
-                        del output_instance[f"{self.cfg.metric_key}_{i}"]
 
                 for key in ["solutions", "max_idx", "num_solutions", "_full_generation"]:
                     if key in output_instance:

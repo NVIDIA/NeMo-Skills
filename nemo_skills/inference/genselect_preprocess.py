@@ -38,7 +38,6 @@ class GenSelectPreprocessConfig:
     input_key: str
     output_key: str
     answer_key: str
-    metric_key: str   # Key which determines the correctness of the response
     cluster_key: str | None = None
     max_soln_samples: int = 16
     is_competition: bool = False
@@ -205,7 +204,6 @@ class GenSelectPreprocessor:
         for i, instance in enumerate(sampled_instances):
             comparison_instance[f"{self.output_key}_{i}"] = instance[self.output_key]
             comparison_instance[f"{self.answer_key}_{i}"] = instance[self.answer_key]
-            comparison_instance[f"{self.metric_key}_{i}"] = instance[self.metric_key]
 
         return comparison_instance
 
