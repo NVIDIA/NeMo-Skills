@@ -59,9 +59,11 @@ class OpenAIModel(BaseModel):
         return re.match(r"^o\d", model_name)
 
     def _build_completion_request_params(self, **kwargs) -> dict:
-        assert kwargs.get('tools') is None, "tools are not supported by completion requests."
-        assert kwargs.get('reasoning_effort') is None, "reasoning_effort is not supported by completion requests."
         kwargs = copy.deepcopy(kwargs)
+        assert kwargs.pop('tools', None) is None, "tools are not supported by completion requests."
+        assert kwargs.pop('reasoning_effort', None) is None, "reasoning_effort is not supported by completion requests."
+        assert kwargs.pop('top_k', -1) == -1, "`top_k` is not supported by OpenAI API, please set it to -1."
+        assert kwargs.pop('min_p', 0.0) == 0.0, "`min_p` is not supported by OpenAI API, please set it to 0.0."
         if 'tokens_to_generate' in kwargs:
             tokens_to_generate = kwargs.pop('tokens_to_generate')
             kwargs['max_tokens'] = tokens_to_generate
@@ -86,8 +88,8 @@ class OpenAIModel(BaseModel):
         tools: list[dict] | None = None,
     ) -> dict:
         # Validations
-        if top_k not in [0, -1]:
-            raise ValueError("`top_k` is not supported by OpenAI API, please set it to 0 or -1.")
+        if top_k != -1:
+            raise ValueError("`top_k` is not supported by OpenAI API, please set it to -1.")
         if min_p > 0:
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to 0.0.")
         if stream and top_logprobs is not None:
