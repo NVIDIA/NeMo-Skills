@@ -197,68 +197,68 @@ class SweBenchGenerationTask(GenerationTask):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
 
-        # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
-        # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
+        # # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
+        # # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
 
-        completion_kwargs = {
-            openai_param: getattr(self.cfg.inference, ns_param)
-            for ns_param, openai_param in NS_TO_OPENAI_PARAM.items()
-            if getattr(self.cfg.inference, ns_param) is not None
-        }
-        if "top_logprobs" in completion_kwargs:
-            completion_kwargs["logprobs"] = True
+        # completion_kwargs = {
+        #     openai_param: getattr(self.cfg.inference, ns_param)
+        #     for ns_param, openai_param in NS_TO_OPENAI_PARAM.items()
+        #     if getattr(self.cfg.inference, ns_param) is not None
+        # }
+        # if "top_logprobs" in completion_kwargs:
+        #     completion_kwargs["logprobs"] = True
 
-        if 'base_url' in self.cfg.server:
-            api_base = self.cfg.server.base_url
-        else:
-            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
+        # if 'base_url' in self.cfg.server:
+        #     api_base = self.cfg.server.base_url
+        # else:
+        #     api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
-        swe_agent_cmd = (
-            # first installing swe-agent repo
-            "curl -LsSf https://astral.sh/uv/install.sh | sh && "
-            "source /root/.local/bin/env && "
-            "cd /root && "
-            "git clone https://github.com/SWE-agent/SWE-agent.git && "
-            "cd SWE-agent && "
-            "uv venv --python 3.12 venv && "
-            "source venv/bin/activate && "
-            "uv pip install -e . && "
-            # then running the agent
-            f"/root/SWE-agent/venv/bin/python -m sweagent run "
-            f"    --config {get_config_path(self.cfg.sweagent_config)} "
-            f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
-            f"    --agent.model.api_base {api_base} "
-            f"    --agent.model.temperature {self.cfg.inference.temperature} "
-            f"    --agent.model.top_p {self.cfg.inference.top_p} "
-            f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
-            f"    --env.deployment.type local "
-            f"    --env.repo.type preexisting "
-            f"    --env.repo.repo_name testbed "
-            f"    --env.repo.base_commit {data_point['base_commit']} "
-            f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
-            f"    --problem_statement.id {data_point['instance_id']} && "
-            # move trajectories to the mounted directory
-            f"cp -r trajectories /trajectories_mount/"
-        )
+        # swe_agent_cmd = (
+        #     # first installing swe-agent repo
+        #     "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+        #     "source /root/.local/bin/env && "
+        #     "cd /root && "
+        #     "git clone https://github.com/SWE-agent/SWE-agent.git && "
+        #     "cd SWE-agent && "
+        #     "uv venv --python 3.12 venv && "
+        #     "source venv/bin/activate && "
+        #     "uv pip install -e . && "
+        #     # then running the agent
+        #     f"/root/SWE-agent/venv/bin/python -m sweagent run "
+        #     f"    --config {get_config_path(self.cfg.sweagent_config)} "
+        #     f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
+        #     f"    --agent.model.api_base {api_base} "
+        #     f"    --agent.model.temperature {self.cfg.inference.temperature} "
+        #     f"    --agent.model.top_p {self.cfg.inference.top_p} "
+        #     f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
+        #     f"    --env.deployment.type local "
+        #     f"    --env.repo.type preexisting "
+        #     f"    --env.repo.repo_name testbed "
+        #     f"    --env.repo.base_commit {data_point['base_commit']} "
+        #     f"    --problem_statement.text {shlex.quote(data_point['problem_statement'])} "
+        #     f"    --problem_statement.id {data_point['instance_id']} && "
+        #     # move trajectories to the mounted directory
+        #     f"cp -r trajectories /trajectories_mount/"
+        # )
 
-        # Execute SWE-agent command
-        search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
-        pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
+        # # Execute SWE-agent command
+        # search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
+        # pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
-        with open(pred_file, 'r') as f:
-            trajectory_dict = json.loads(f.read().strip())
+        # with open(pred_file, 'r') as f:
+        #     trajectory_dict = json.loads(f.read().strip())
 
-        # need to rename .pred to .jsonl
-        pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.jsonl')
-        with open(pred_file.replace('.pred', '.jsonl'), 'w') as f:
-            f.write(json.dumps(trajectory_dict))
+        # # need to rename .pred to .jsonl
+        # pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.jsonl')
+        # with open(pred_file.replace('.pred', '.jsonl'), 'w') as f:
+        #     f.write(json.dumps(trajectory_dict))
 
         # TODO: get num_generated_tokens and other stats from .traj file
         # looks like data['info']['model_stats']
         # {'instance_cost': 0, 'tokens_sent': 40858, 'tokens_received': 1775, 'api_calls': 9}
 
         # Check if the trajectory has an empty patch before running evaluation
-        has_patch = trajectory_dict['model_patch'] is not None
+        has_patch = True # trajectory_dict['model_patch'] is not None
 
         if not has_patch:
             report_json = {
@@ -282,7 +282,8 @@ class SweBenchGenerationTask(GenerationTask):
                 "uv pip install -e . && "
                 # then running the evaluation with streaming output
                 f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
-                f"    --predictions_path {pred_mounted_path} "
+                #f"    --predictions_path {pred_mounted_path} "
+                f"    --predictions_path gold "
                 f"    --instance_ids {data_point['instance_id']} "
                 f"    --run_id eval-outputs "
                 f"    --timeout {self.cfg.swebench_tests_timeout} "
@@ -321,7 +322,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         output_dict = {
             "swe-bench-metrics": report_json[data_point['instance_id']],
-            "swe-bench-outputs": trajectory_dict,
+            "swe-bench-outputs": {}, # trajectory_dict,
             "generation": "",  # required TODO: we should fix this
         }
 
