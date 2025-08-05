@@ -155,7 +155,15 @@ class Sandbox(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language='ipython',
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity='Plain',
+    ):
         pass
 
     def execute_code(
@@ -179,9 +187,13 @@ class Sandbox(abc.ABC):
             )
         if language not in ["ipython", "python", "pypy3", "python3", "lean4"]:
             raise ValueError(f"Unsupported language: {language}")
+        if language != "ipython" and traceback_verbosity != "Plain":
+            raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
         TO_EXECUTE = generated_code
-        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input, traceback_verbosity)
+        request = self._prepare_request(
+            TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
+        )
         request['session_id'] = session_id if session_id is None else str(session_id)
         try:
             output = self._send_request(request, timeout)
@@ -304,12 +316,21 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language='ipython',
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity='Plain',
+    ):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
             "timeout": timeout,
             "language": language,
+            "max_output_characters": max_output_characters,
             "traceback_verbosity": traceback_verbosity,
         }
 
@@ -326,7 +347,15 @@ class PistonSandbox(Sandbox):
             return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
         return json.loads(output['run']['output'])
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input="", traceback_verbosity='Plain'):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language='ipython',
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity='Plain',
+    ):
         return {
             "language": "py",
             "version": "3.10.0",

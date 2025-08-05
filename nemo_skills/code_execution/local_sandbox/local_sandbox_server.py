@@ -16,18 +16,18 @@
 import logging
 import multiprocessing
 import os
+import re
 import resource
+import signal
 import subprocess
 import sys
 import tempfile
-import time
 import threading
-import signal
-import re
+import time
 from io import StringIO
-from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
 from flask import Flask, request
+from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
 app = Flask(__name__)
 
@@ -35,6 +35,7 @@ app = Flask(__name__)
 sessions = {}
 session_lock = threading.Lock()
 SESSION_TIMEOUT = float(os.getenv('SANDBOX_SESSION_TIMEOUT', -1))
+
 
 def cleanup_expired_sessions():
     """Remove IPython sessions that haven't been used recently"""
@@ -52,6 +53,7 @@ def cleanup_expired_sessions():
             except Exception as e:
                 print(f"Error cleaning up session {session_id}: {e}")
 
+
 def get_or_create_session(session_id):
     """Get existing IPython session or create a new one (fast startup)"""
     current_time = time.time()
@@ -60,14 +62,10 @@ def get_or_create_session(session_id):
             try:
                 # Create new IPython shell instance for each session
                 shell = TerminalInteractiveShell()
-                shell.init_create_namespaces()     # Initialize the shell properly
+                shell.init_create_namespaces()  # Initialize the shell properly
                 shell.user_ns['_oh'] = {}
 
-                sessions[session_id] = {
-                    'shell': shell,
-                    'created': current_time,
-                    'last_used': current_time
-                }
+                sessions[session_id] = {'shell': shell, 'created': current_time, 'last_used': current_time}
                 print(f"Created new IPython session: {session_id}")
             except Exception as e:
                 print(f"Failed to create IPython session {session_id}: {e}")
@@ -76,6 +74,7 @@ def get_or_create_session(session_id):
             sessions[session_id]['last_used'] = current_time
 
         return sessions[session_id]
+
 
 def postprocess_output(output, traceback_verbosity):
     if traceback_verbosity not in ['Minimal', 'Plain']:
@@ -100,7 +99,8 @@ def postprocess_output(output, traceback_verbosity):
     output = '\n'.join(lines).rstrip()
     return output + ('\n' if output else '')
 
-def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity='Plain'):
+
+def execute_ipython_session(generated_code, session_id, traceback_verbosity='Plain'):
     """Execute Python code in a persistent IPython session"""
     try:
         # Clean up expired sessions periodically
@@ -152,12 +152,15 @@ def execute_ipython_session(generated_code, session_id, timeout=30, traceback_ve
         return {
             "process_status": process_status,
             "stdout": postprocess_output(stdout_result, traceback_verbosity),
-            "stderr": postprocess_output(stderr_result, traceback_verbosity)
+            "stderr": postprocess_output(stderr_result, traceback_verbosity),
         }
 
     except Exception as e:
         return {"process_status": "error", "stdout": "", "stderr": f"Session error: {e}\n"}
-MEM_LIMIT_BYTES = int(os.environ.get('NEMO_SKILLS_SANDBOX_MEM_LIMIT', 10 * 1024 ** 3))  # 10 GiB default
+
+
+MEM_LIMIT_BYTES = int(os.environ.get('NEMO_SKILLS_SANDBOX_MEM_LIMIT', 10 * 1024**3))  # 10 GiB default
+
 
 def set_limits(mem_bytes: int = MEM_LIMIT_BYTES) -> None:
     """
@@ -165,22 +168,10 @@ def set_limits(mem_bytes: int = MEM_LIMIT_BYTES) -> None:
 
     Called via `preexec_fn` (subprocess) or directly in a forked worker.
     """
-    resource.setrlimit(resource.RLIMIT_AS,   (mem_bytes, mem_bytes))
+    resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
     resource.setrlimit(resource.RLIMIT_DATA, (mem_bytes, mem_bytes))
-    os.setsid()                              # isolate PGID / signals
+    os.setsid()  # isolate PGID / signals
 
-def execute_ipython(generated_code, timeout):
-    # running in a separate process to ensure any kind of crashes are properly handled
-    queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target=execute_code_subprocess, args=(generated_code, queue))
-    process.start()
-    process.join(timeout=timeout)
-
-    if process.is_alive():  # didn't finish successfully
-        process.kill()
-        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-
-    return queue.get()
 
 def execute_python(generated_code, std_input, timeout, language):
 
@@ -245,21 +236,6 @@ def execute_lean4(generated_code, timeout):
             os.remove(temp_file_name)
 
 
-# need to memory-limit to avoid common errors of allocating too much
-# but this has to be done in a subprocess to not crush server itself
-def execute_code_subprocess(generated_code, queue):
-
-    # this can be overriden inside generated code, so it's not a guaranteed protection
-    set_limits()
-    sys.stdout = StringIO()
-    try:
-        exec(generated_code, {})
-        queue.put({"process_status": "completed", "stdout": sys.stdout.getvalue(), "stderr": ""})
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        queue.put({"process_status": "error", "stdout": "", "stderr": str(e) + "\n"})
-
-
 # Main Flask endpoint to handle execution requests
 @app.route("/execute", methods=["POST"])
 def execute():
@@ -267,20 +243,25 @@ def execute():
     timeout = request.json['timeout']
     language = request.json.get('language', 'ipython')
     std_input = request.json.get('std_input', '')
+    max_output_characters = request.json.get('max_output_characters', 1000)
     traceback_verbosity = request.json.get('traceback_verbosity', 'Plain')
 
     # Get session_id from JSON body
     session_id = request.json.get('session_id')
 
-    if language == 'python':
-        if session_id:
-            return execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
-        else:
-            return execute_ipython(generated_code, timeout)
+    if language == 'ipython':
+        result = execute_ipython_session(generated_code, session_id, traceback_verbosity)
     elif language == 'lean4':
-        return execute_lean4(generated_code, timeout)
+        result = execute_lean4(generated_code, timeout)
     else:
-        return execute_python(generated_code, std_input, timeout, language)
+        result = execute_python(generated_code, std_input, timeout, language)
+
+    if len(result['stdout']) > max_output_characters:
+        result['stdout'] = result['stdout'][:max_output_characters] + "<output cut>"
+    if len(result['stderr']) > max_output_characters:
+        result['stderr'] = result['stderr'][:max_output_characters] + "<output cut>"
+
+    return result
 
 
 # Session management endpoints
@@ -295,7 +276,7 @@ def list_sessions():
                 'backend': 'ipython',
                 'created': session_data['created'],
                 'last_used': session_data['last_used'],
-                'alive': True  # IPython sessions are always "alive"
+                'alive': True,  # IPython sessions are always "alive"
             }
 
     return {"sessions": session_info, "backend": "ipython"}
@@ -313,6 +294,7 @@ def delete_session(session_id):
                 return {"error": f"Error deleting IPython session {session_id}: {e}"}, 500
         else:
             return {"error": f"IPython session {session_id} not found"}, 404
+
 
 @app.route("/health", methods=["GET"])
 def health():
