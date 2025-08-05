@@ -45,7 +45,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class InferenceConfig:
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
-    top_k: int = 0
+    top_k: int = -1
     top_p: float = 0.95
     min_p: float = 0.0
     random_seed: int = 0
