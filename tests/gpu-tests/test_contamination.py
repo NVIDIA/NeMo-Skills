@@ -67,6 +67,7 @@ def test_check_contamination():
         output_dir=output_dir,
         model=model_path,
         server_type="trtllm",
+        server_args="--backend pytorch",
         server_gpus=1,
     )
 
