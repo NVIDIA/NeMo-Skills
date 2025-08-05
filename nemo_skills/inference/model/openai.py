@@ -64,6 +64,7 @@ class OpenAIModel(BaseModel):
         assert kwargs.pop('reasoning_effort', None) is None, "reasoning_effort is not supported by completion requests."
         assert kwargs.pop('top_k', -1) == -1, "`top_k` is not supported by OpenAI API, please set it to -1."
         assert kwargs.pop('min_p', 0.0) == 0.0, "`min_p` is not supported by OpenAI API, please set it to 0.0."
+        assert kwargs.pop('repetition_penalty', 1.0) == 1.0, "`repetition_penalty` is not supported by OpenAI API, please set it to 1.0."
         if 'tokens_to_generate' in kwargs:
             tokens_to_generate = kwargs.pop('tokens_to_generate')
             kwargs['max_tokens'] = tokens_to_generate
