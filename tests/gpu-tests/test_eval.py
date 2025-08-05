@@ -44,6 +44,7 @@ def test_trtllm_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
+        f"    --server_args='--backend pytorch' "
         f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=20 "
     )
@@ -86,6 +87,7 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --with_sandbox "
+        f"    --server_args='--backend pytorch' "
         f"    ++prompt_template={prompt_template} "
         f"    ++code_tags={code_tags} "
         f"    ++examples_type=gsm8k_text_with_code "
