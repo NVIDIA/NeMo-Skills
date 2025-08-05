@@ -70,6 +70,8 @@ class OpenAIModel(BaseModel):
             kwargs['max_tokens'] = tokens_to_generate
         if 'random_seed' in kwargs:
             kwargs['seed'] = kwargs.pop('random_seed')
+        if 'stop_phrases' in kwargs:
+            kwargs['stop'] = kwargs.pop('stop_phrases')
         return dict(kwargs)
 
     def _build_chat_request_params(
