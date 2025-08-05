@@ -14,6 +14,7 @@
 
 import os
 import re
+import copy
 from .base import BaseModel
 
 
@@ -58,6 +59,12 @@ class OpenAIModel(BaseModel):
         return re.match(r"^o\d", model_name)
 
     def _build_completion_request_params(self, **kwargs) -> dict:
+        assert kwargs.get('tools') is None, "tools are not supported by completion requests."
+        assert kwargs.get('reasoning_effort') is None, "reasoning_effort is not supported by completion requests."
+        kwargs = copy.deepcopy(kwargs)
+        if 'tokens_to_generate' in kwargs:
+            tokens_to_generate = kwargs.pop('tokens_to_generate')
+            kwargs['max_tokens'] = tokens_to_generate
         return dict(kwargs)
 
     def _build_chat_request_params(
