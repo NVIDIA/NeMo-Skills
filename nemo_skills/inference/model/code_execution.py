@@ -48,7 +48,7 @@ class CodeExecutionWrapper:
         self.sandbox = sandbox
         self.config = config
 
-    def _generate_single(
+    async def _generate_single(
         self,
         prompt: str | list,
         code_begin: str,
@@ -78,7 +78,7 @@ class CodeExecutionWrapper:
             raise NotImplementedError("top_logprobs is not supported yet.")
 
         if stream:
-            return self._stream_single(
+            return await self._stream_single(
                 prompt=prompt,
                 code_begin=code_begin,
                 code_end=code_end,
@@ -175,7 +175,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = self.execute_generated_code(
+                code_execution_time_start, execution_dict = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
                 remaining_code_executions = None
@@ -211,12 +211,12 @@ class CodeExecutionWrapper:
             'stopped_on_repetition': stopped_on_repetition,
         }
 
-    def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
+    async def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
         header = '\n'.join(self.config.code_execution_headers)
         code_block = extract_code_to_execute(output, code_begin, code_end)
         extracted_code = f'{header}{code_block}'
-        execution_dict, session_id = self.sandbox.execute_code(
+        execution_dict, session_id = await self.sandbox.execute_code(
             generated_code=extracted_code,
             language=self.config.code_execution_language,
             timeout=self.config.code_execution_timeout,
@@ -228,7 +228,7 @@ class CodeExecutionWrapper:
         return code_execution_time_start, execution_dict
 
     # TODO: is there a way to reuse this with BaseModel?
-    def generate_sync(
+    async def generate_sync(
         self,
         prompt: str | list,
         code_begin: str | list[str],
@@ -281,7 +281,7 @@ class CodeExecutionWrapper:
         request = {key: value for key, value in kwargs.items()}
         request['prompt'] = prompt
         
-        output = self._generate_single(**request)
+        output = await self._generate_single(**request)
         
         if remove_stop_phrases:
             stop_phrases_for_request = request['stop_phrases']
@@ -291,14 +291,10 @@ class CodeExecutionWrapper:
         return output
 
     async def generate_async(self, prompt, *args, **kwargs) -> dict:
-        # Configure the executor for the current event loop
-        loop = asyncio.get_running_loop()
-        if not hasattr(loop, '_nemo_skills_executor_configured'):
-            loop.set_default_executor(ThreadPoolExecutor(max_workers=2048))
-            loop._nemo_skills_executor_configured = True
-        return await asyncio.to_thread(self.generate_sync, prompt, *args, **kwargs)
+        # Now that generate_sync is async, we can call it directly
+        return await self.generate_sync(prompt, *args, **kwargs)
 
-    def _stream_single(
+    async def _stream_single(
         self,
         prompt: str,
         code_begin: str,
@@ -382,7 +378,7 @@ class CodeExecutionWrapper:
             if current_output_segment.endswith(code_end) and current_output_segment.rfind(
                 code_begin
             ) > current_output_segment.rfind(code_end, 0, -1):
-                execution_dict, session_id = self.sandbox.execute_code(
+                execution_dict, session_id = await self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
                     language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,
