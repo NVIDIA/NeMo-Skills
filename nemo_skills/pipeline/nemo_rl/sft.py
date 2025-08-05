@@ -14,8 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import List, Literal
-
+from typing import List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -186,9 +185,9 @@ def sft_nemo_rl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
-    backend: Literal["fsdp", "megatron"] = typer.Option(
-        ...,
-        help="Choose the backend type: 'fsdp' or 'megatron'"
+    backend: str = typer.Option(
+        ..., 
+        help="Choose backend: fsdp or megatron"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: List[str] = typer.Option(
@@ -252,6 +251,9 @@ def sft_nemo_rl(
         mount_map={hf_model: None, output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
+
+    if backend not in ("fsdp", "megatron"):
+        raise typer.BadParameter("Invalid backend. Must be 'fsdp' or 'megatron'")
 
     if num_training_jobs > 0:
         if training_data is None:
