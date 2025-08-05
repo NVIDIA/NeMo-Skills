@@ -268,6 +268,11 @@ class BaseModel:
         if output is None:
             output = ""
         result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        
+        # Add reasoning_content if available
+        if hasattr(choice.message, 'reasoning_content') and choice.message.reasoning_content:
+            result['reasoning_content'] = choice.message.reasoning_content
+        
         if getattr(choice, 'logprobs', None) and choice.logprobs.content:
             result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
             result['tokens'] = [tok.token for tok in choice.logprobs.content]
@@ -324,11 +329,19 @@ class BaseModel:
         """Process a single chat chunk and return data to yield."""
         if hasattr(chunk.choices[0], "delta"):
             cur_delta = chunk.choices[0].delta.content
+            # Check for reasoning_content in delta
+            reasoning_delta = getattr(chunk.choices[0].delta, 'reasoning_content', None) if hasattr(chunk.choices[0].delta, 'reasoning_content') else None
         else:
             cur_delta = chunk.choices[0].text
+            reasoning_delta = None
 
         finish_reason = getattr(chunk.choices[0], "finish_reason", None)
         result = {"generation": cur_delta}
+        
+        # Add reasoning_content to result if available
+        if reasoning_delta:
+            result["reasoning_content"] = reasoning_delta
+            
         if finish_reason:
             result["finish_reason"] = finish_reason
             if not cur_delta:
