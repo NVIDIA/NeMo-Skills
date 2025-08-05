@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import field
 
@@ -51,23 +51,9 @@ class ArenaJudgeTask(GenerationTask):
     def __init__(self, cfg: ArenaJudgeConfig):
         super().__init__(cfg)
 
-        if not self.use_async_loop:  # if it was True, this message is printed by base class
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
-            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
-                LOG.warning(
-                    "NeMo/Megatron servers don't support inflight batching, "
-                    "but SciCode evaluation requires it for efficient inference. "
-                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
-                    "We highly recommend switching to a server that supports inflight batching."
-                )
-        self.use_async_loop = True
 
-    def log_example_prompt(self, data):
-        data_point = deepcopy(data[0])
+    def log_example_prompt(self, all_data):
+        data_point = deepcopy(all_data[0])
 
         if self.cfg.prompt_format == "openai":
             # print the prompt in openai format
@@ -76,9 +62,9 @@ class ArenaJudgeTask(GenerationTask):
 
         data_point['answer_1'] = data_point['generation']
         data_point['answer_2'] = data_point['baseline_answer']
-        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data))
+        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, all_data))
 
-    def generate_single_answer(self, data_point, data):
+    async def process_single_datapoint(self, data_point, all_data):
         gen_base_data = data_point.copy()
         gen_base_data['answer_1'] = data_point['generation']
         gen_base_data['answer_2'] = data_point['baseline_answer']
@@ -87,33 +73,17 @@ class ArenaJudgeTask(GenerationTask):
         base_gen_data['answer_2'] = data_point['generation']
         base_gen_data['answer_1'] = data_point['baseline_answer']
 
-        llm_output = super().llm_generate([gen_base_data, base_gen_data], data, is_async=False)
+        # Make two async calls instead of one batch call
+        llm_output_1, llm_output_2 = await asyncio.gather(
+            super().process_single_datapoint(gen_base_data, all_data),
+            super().process_single_datapoint(base_gen_data, all_data)
+        )
 
         return {
-            f'{self.cfg.generation_key}-gen-base': llm_output[0]['generation'],
-            f'{self.cfg.generation_key}-base-gen': llm_output[1]['generation'],
+            f'{self.cfg.generation_key}-gen-base': llm_output_1['generation'],
+            f'{self.cfg.generation_key}-base-gen': llm_output_2['generation'],
             "generation": "",  # dummy key since the downstream code expects it # TODO: fix this
         }
-
-    # TODO: this is now replicated across 3 classes, need to unify
-    def llm_generate(self, data_points, data, is_async=False):
-        futures = []
-
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                future = executor.submit(self.generate_single_answer, data_point, data)
-                futures.append(future)
-
-        return futures
-
-    def get_llm_generations(self, requests_in_progress, generations):
-        for dp_idx, future in requests_in_progress.items():
-            if future.done():
-                generations[dp_idx] = future.result()
-            else:
-                generations[dp_idx] = {'generation': None}
-
-        return requests_in_progress, generations
 
 
 GENERATION_TASK_CLASS = ArenaJudgeTask

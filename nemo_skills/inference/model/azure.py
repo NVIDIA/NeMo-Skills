@@ -55,11 +55,15 @@ class AzureOpenAIModel(OpenAIModel):
         if not api_key:
             raise ValueError("api_key/AZURE_OPENAI_API_KEY is required for Azure OpenAI model.")
 
-        self.client = AzureOpenAI(
-            api_key=api_key,
-            azure_endpoint=azure_endpoint,
-            api_version=api_version,
-        )
+        self.client_arr = [
+            AzureOpenAI(
+                api_key=api_key,
+                azure_endpoint=azure_endpoint,
+                api_version=api_version,
+            )
+            for _ in range(20)
+        ]
+        self.client = self.client_arr[0]
         self.model = model
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay

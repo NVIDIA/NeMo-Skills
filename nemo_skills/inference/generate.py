@@ -17,6 +17,7 @@ import logging
 import random
 import sys
 import time
+import asyncio
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
@@ -105,10 +106,6 @@ class GenerateSolutionsConfig:
     # and so on
     multi_turn_key: str | None = None
 
-    # set to False if you want to use synchronous loop instead of async. Async loop means we will send all
-    # data to engine at the same time (batch size is ignored) and then write the output as soon as it's ready
-    # to `output_file`-async (and put it back in order after all generations are done)
-    use_async_loop: bool = True
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
 
     # can add this flag to just print the first prompt instead of running generation
@@ -249,17 +246,16 @@ class GenerationTask:
 
         self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
 
-        self.use_async_loop = (
-            self.cfg.use_async_loop
-            and self.cfg.server["server_type"] not in ["nemo", "megatron"]
-            and self.cfg.multi_turn_key is None
+        LOG.info(
+            "Async loop is maintaining %d generations in parallel. "
+            "Use max_concurrent_requests to control the number of concurrent requests.",
+            self.cfg.max_concurrent_requests,
         )
-        if self.use_async_loop:
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
+        
+        # Initialize semaphore for controlling concurrent requests
+        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        # output_lock will be initialized when async_loop is called
+        self.output_lock = None
 
     def setup_llm(self):
         # TODO: DRY with the check in the validation config
@@ -338,31 +334,7 @@ class GenerationTask:
         """
         pass
 
-    def skip_completed_samples_sync(self, data):
-        if not self.cfg.skip_filled:
-            return data
-
-        starting_idx = 0
-        if self.cfg.num_chunks:
-            chunk_index = self.cfg.output_file.rfind("_chunk")
-            base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
-            if Path(base_output_file).exists():
-                LOG.warning(f"File `{base_output_file}` exists, skipping generation")
-                return []
-        try:
-            with open(self.cfg.output_file, "rt", encoding="utf-8") as fin:
-                starting_idx = len(fin.readlines())
-        except FileNotFoundError:
-            LOG.warning(f"File `{self.cfg.output_file}` not found, starting from scratch")
-
-        if starting_idx > len(data):
-            raise ValueError(
-                "Number of completed samples is greater than the number of samples "
-                "in the dataset (or requested max_samples). Some mistake in configuration?"
-            )
-        return data[starting_idx:]
-
-    def skip_completed_samples_async(self, data):
+    def skip_completed_samples(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
         if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
             return []
@@ -422,58 +394,6 @@ class GenerationTask:
                 filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
 
-    def llm_generate(self, data_points, data, is_async=False):
-        generation_params = {
-            "prompts": [self.fill_prompt(dp, data) for dp in data_points],
-            "stop_phrases": combine_stop_phrases(
-                self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
-            ),
-            **asdict(self.cfg.inference),
-            **self.extra_generate_params,
-        }
-
-        if self.cfg.code_execution:
-            if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [dp['total_code_executions'] for dp in data_points]
-                generation_params['max_code_executions'] = max_code_executions_values
-
-        generate_method = self.llm.generate_async if is_async else self.llm.generate
-
-        return generate_method(**generation_params)
-
-    # TODO: rewrite mtbench to have turns separated in data file and remove this method
-    def llm_generate_multi_turn(self, data_points, data):
-        # TODO: this will not be efficient if different elements have different number of turns
-        # (effective batch size gets smaller). Need to rewrite it to ensure batch size is filled
-        # no matter the turns. Also even the below implementation can probably be simplified
-        turn_data_points = deepcopy(data_points)
-        dp_indices = list(range(len(turn_data_points)))
-        cur_turn = 1
-        outputs = [{"generation": []} for _ in range(len(data_points))]
-        while dp_indices:
-            # updating the turns to only have data up-to the current turn
-            # and adding any generated assistant messages
-            for dp_index in dp_indices:
-                turn_data_points[dp_index][self.cfg.multi_turn_key] = data_points[dp_index][self.cfg.multi_turn_key][
-                    :cur_turn
-                ]
-                for turn_idx in range(cur_turn - 1):
-                    turn_data_points[dp_index][self.cfg.multi_turn_key][turn_idx]['assistant'] = outputs[dp_index][
-                        "generation"
-                    ][turn_idx]
-            # getting a new set of generations
-            turn_outputs = self.llm_generate([turn_data_points[dp_index] for dp_index in dp_indices], data)
-            # adding assistant answers to the generations
-            for pos_index, dp_index in enumerate(dp_indices):
-                outputs[dp_index]["generation"].append(turn_outputs[pos_index]["generation"])
-
-            # removing any indices that got through all turns
-            dp_indices = []
-            for dp_index, (output, dp) in enumerate(zip(outputs, data_points)):
-                if len(output["generation"]) < len(dp[self.cfg.multi_turn_key]):
-                    dp_indices.append(dp_index)
-            cur_turn += 1
-        return outputs
 
     def dump_outputs(self, outputs, data_points, fout):
         for output, original_data_point in zip(outputs, data_points):
@@ -511,49 +431,50 @@ class GenerationTask:
         # Override this method to customize the prefilling behavior.
         return None
 
-    def sync_loop(self, data):
-        with open(self.cfg.output_file, "at", encoding="utf-8", buffering=1) as fout:
-            data_points_batch = []
-            for idx, data_point in tqdm(enumerate(data), total=len(data), desc="Remaining generations"):
-                prefill_output = self.prefill_generation(data_point)
-                if prefill_output is not None:
-                    # We can bypass the LLM and directly dump the prefilled output
-                    self.dump_outputs([prefill_output], [data_point], fout)
-                else:
-                    data_points_batch.append(data_point)
+    async def process_single_datapoint(self, data_point, all_data):
+        generation_params = {
+            "prompts": [self.fill_prompt(data_point, all_data)],
+            "stop_phrases": combine_stop_phrases(
+                self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
+            ),
+            **asdict(self.cfg.inference),
+            **self.extra_generate_params,
+        }
 
-                if len(data_points_batch) == self.cfg.max_concurrent_requests or idx == len(data) - 1:
+        if self.cfg.code_execution:
+            if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
+                max_code_executions_values = [data_point['total_code_executions']]
+                generation_params['max_code_executions'] = max_code_executions_values
 
-                    for data_point in data_points_batch:
-                        # registering current time to calculate total generation time
-                        data_point['generation_start_time'] = time.time()
+        return await self.llm.generate_asyncio(**generation_params)
 
-                    if self.cfg.multi_turn_key is None:
-                        outputs = self.llm_generate(data_points_batch, data)
-                    else:
-                        outputs = self.llm_generate_multi_turn(data_points_batch, data)
-                    self.dump_outputs(outputs, data_points_batch, fout)
-                    data_points_batch = []
 
-    def get_llm_generations(self, requests_in_progress, generations):
-        """Get the completed LLM generations that were submitted asynchronously."""
+    async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
+        """Process a single data point with semaphore control."""
+        async with self.semaphore:
+            # registering current time to calculate total generation time
+            data_point['generation_start_time'] = time.time()
+            
+            # Generate output for this single data point
+            output = await self.process_single_datapoint(data_point, all_data)
+            
+            # Thread-safe output writing
+            async with self.output_lock:
+                self.dump_outputs([output], [data_point], fout)
+                pbar.update(1)
 
-        gen_ids = list(requests_in_progress.values())
-        outputs = self.llm.get_generations(gen_ids)
-
-        for dp_idx, output in zip(requests_in_progress.keys(), outputs):
-            generations[dp_idx] = output
-
-        return requests_in_progress, generations
-
-    def async_loop(self, data):
-        """Async loop to generate generations."""
+    async def async_loop(self, data):
+        """Async loop to generate generations using asyncio."""
+        
+        # Initialize output lock for thread-safe writing
+        if self.output_lock is None:
+            self.output_lock = asyncio.Lock()
 
         # We first segregate the data into prefilled and non-prefilled data points
         prefilled_data_points, prefilled_outputs = [], []
         remaining_data_points = []
 
-        for idx, data_point in enumerate(data):
+        for data_point in data:
             prefill_output = self.prefill_generation(data_point)
             if prefill_output is not None:
                 prefilled_outputs.append(prefill_output)
@@ -562,47 +483,24 @@ class GenerationTask:
                 remaining_data_points.append(data_point)
 
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
-        last_submitted_idx = 0
-        requests_in_progress = {}  # original data_point_idx -> generation_id
-        generations = []  # original data_point_idx -> generation_dict
+        
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
-                self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
+                async with self.output_lock:
+                    self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
-            while last_submitted_idx < len(remaining_data_points) or len(requests_in_progress) > 0:
-                num_to_submit = self.cfg.max_concurrent_requests - len(requests_in_progress)
-                if last_submitted_idx < len(remaining_data_points) and num_to_submit > 0:
-                    current_data_batch = remaining_data_points[last_submitted_idx : last_submitted_idx + num_to_submit]
-                    for data_point in current_data_batch:
-                        # registering current time to calculate total generation time
-                        data_point['generation_start_time'] = time.time()
+            # Create tasks for all remaining data points
+            tasks = []
+            for data_point in remaining_data_points:
+                task = asyncio.create_task(
+                    self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar)
+                )
+                tasks.append(task)
 
-                    generation_ids = self.llm_generate(current_data_batch, data, is_async=True)
-
-                    for idx, gen_id in enumerate(generation_ids):
-                        requests_in_progress[last_submitted_idx + idx] = gen_id
-                        generations.append({"generation": None})
-
-                    last_submitted_idx += num_to_submit
-
-                requests_in_progress, generations = self.get_llm_generations(requests_in_progress, generations)
-
-                outputs_to_dump = []
-                data_points_to_dump = []
-                for original_dp_idx in requests_in_progress.copy().keys():
-                    if generations[original_dp_idx]['generation'] is None:  # not done yet
-                        continue
-                    # remove the completed task from in_progress
-                    requests_in_progress.pop(original_dp_idx)
-                    output_dict = generations[original_dp_idx]
-                    outputs_to_dump.append(output_dict)
-                    data_points_to_dump.append(remaining_data_points[original_dp_idx])
-
-                    pbar.update(1)
-
-                self.dump_outputs(outputs_to_dump, data_points_to_dump, fout)
-                time.sleep(1)  # Prevent excessive API overload
+            # Wait for all tasks to complete
+            if tasks:
+                await asyncio.gather(*tasks)
 
             pbar.close()
 
@@ -629,10 +527,7 @@ class GenerationTask:
 
         data = self.load_data()
 
-        if self.use_async_loop:
-            data = self.skip_completed_samples_async(data)
-        else:
-            data = self.skip_completed_samples_sync(data)
+        data = self.skip_completed_samples(data)
 
         if len(data) == 0:
             LOG.info("No data to process, exiting.")
@@ -651,10 +546,7 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
-        if self.use_async_loop:
-            self.async_loop(data)
-        else:
-            self.sync_loop(data)
+        asyncio.run(self.async_loop(data))
 
         self.postprocess()
 

@@ -5,9 +5,9 @@ OpenMathReasoning-1 dataset consists of mathematical problems collected from [Ao
 
 If you don't have a slurm cluster with a large number of GPUs,
 you can still try out all the steps of our pipeline by using [Nvidia NIM models](https://build.nvidia.com/). We include
-a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/example-data.txt) and you can
+a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/problem_sdg/example-data.txt) and you can
 switch to that data and NIM models by adding `--mode demo` to all the pipeline commands. We also use different models
-in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/demo.yaml) to pick
+in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/problem_sdg/demo.yaml) to pick
 any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
