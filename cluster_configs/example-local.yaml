@@ -15,7 +15,7 @@
 executor: local
 
 containers:
-  trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
+  trtllm: nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev
   vllm: igitman/nemo-skills-vllm:0.7.0
   sglang: igitman/nemo-skills-sglang:0.7.0
   nemo: igitman/nemo-skills-nemo:0.7.0

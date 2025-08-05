@@ -51,6 +51,7 @@ def test_trtllm_judge():
         f"    --output_dir={output_dir} "
         f"    --num_random_seeds=1 "
         f"    --preprocess_cmd='cp {input_dir}/output-rs0.test {input_dir}/output-rs0.jsonl' "
+        f"    --server_args='--backend pytorch' "
         f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
