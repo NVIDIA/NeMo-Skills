@@ -102,31 +102,6 @@ def get_hf_to_trtllm_cmd(
             f"    {extra_arguments} && "
             f"cp {input_model}/tokenizer* {output_model} "
         )
-    else:
-        hf_to_trtllm_cmd = (
-            f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
-            f"    --model_dir {input_model} "
-            f"    --output_dir {tmp_engine_dir} "
-            f"    --dtype {dtype} "
-            f"    --tp_size {num_gpus} "
-            f"    --pp_size {num_nodes} "
-            f"    --workers 16 "
-            f"    {trt_prepare_args} "
-        )
-        trtllm_build_cmd = (
-            f"trtllm-build "
-            f"    --checkpoint_dir {tmp_engine_dir} "
-            f"    --output_dir {output_model} "
-            f"    --gpt_attention_plugin {dtype} "
-            f"    --use_paged_context_fmha enable "
-            f"    --max_batch_size 512 "
-            f"    --max_input_len 4096 "
-            f"    --max_seq_len 8192 "
-            f"    --max_num_tokens 8192 "
-            f"    {extra_arguments} && "
-            f"cp {input_model}/tokenizer* {output_model} "
-        )
-
     if trt_reuse_tmp_engine:
         cmd = (
             setup_cmd + f"if [ ! -f {tmp_engine_dir}/config.json ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
@@ -297,9 +272,8 @@ def convert(
         if convert_to != "trtllm":
             raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
 
-    # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
-    if convert_from == "nemo" and convert_to == "trtllm":
-        raise ValueError("Conversion from NeMo to TensorRT LLM is not supported directly. Convert to HF first.")
+    if convert_to == "trtllm" and dtype != "fp8":
+        raise ValueError("Conversion to TensorRT-LLM is no longer needed, please use HF checkpoint directly!")
 
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
