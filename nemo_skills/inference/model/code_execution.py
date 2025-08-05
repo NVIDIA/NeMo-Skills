@@ -296,7 +296,7 @@ class CodeExecutionWrapper:
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = 0,
+        top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
