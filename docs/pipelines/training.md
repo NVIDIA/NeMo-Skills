@@ -126,28 +126,15 @@ convert(
     hf_model_name="meta-llama/Meta-Llama-3.1-8B",
 )
 
-convert(
-    ctx=wrap_arguments(""),
-    cluster=cluster,
-    input_model=f"{output_dir}/model-averaged-hf",
-    output_model=f"{output_dir}/model-averaged-trtllm",
-    expname=f"{expname}-to-trtllm",
-    run_after=f"{expname}-to-hf",
-    convert_from="hf",
-    convert_to="trtllm",
-    model_type="llama",
-    num_gpus=8,
-)
-
 eval(
     ctx=wrap_arguments("++prompt_template=llama3-instruct"),
     cluster=cluster,
-    model=f"{output_dir}/model-averaged-trtllm",
+    model=f"{output_dir}/model-averaged-hf",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
     benchmarks="gsm8k,math",
     server_gpus=8,
-    run_after=f"{expname}-to-trtllm",
+    run_after=f"{expname}-to-hf",
 )
 ```
 
