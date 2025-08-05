@@ -227,8 +227,7 @@ class CodeExecutionWrapper:
 
         return code_execution_time_start, execution_dict
 
-    # TODO: is there a way to reuse this with BaseModel?
-    async def generate_sync(
+    async def generate_async(
         self,
         prompt: str | list,
         code_begin: str | list[str],
@@ -282,18 +281,10 @@ class CodeExecutionWrapper:
         request['prompt'] = prompt
         
         output = await self._generate_single(**request)
-        
-        if remove_stop_phrases:
-            stop_phrases_for_request = request['stop_phrases']
-            if output['generation'] is not None:
-                output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases_for_request)
+        self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
         
         return output
-
-    async def generate_async(self, prompt, *args, **kwargs) -> dict:
-        # Now that generate_sync is async, we can call it directly
-        return await self.generate_sync(prompt, *args, **kwargs)
-
+    
     async def _stream_single(
         self,
         prompt: str,
