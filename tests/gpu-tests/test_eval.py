@@ -24,9 +24,9 @@ from tests.conftest import docker_rm
 
 @pytest.mark.gpu
 def test_trtllm_eval():
-    model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
+    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_TRTLLM_MODEL to run this test")
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
@@ -63,9 +63,9 @@ def test_trtllm_eval():
 @pytest.mark.gpu
 @pytest.mark.parametrize("server_type", ['trtllm'])
 def test_trtllm_code_execution_eval(server_type):
-    model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
+    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_TRTLLM_MODEL to run this test")
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
@@ -105,9 +105,7 @@ def test_trtllm_code_execution_eval(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "server_type,server_args", [('vllm', ''), ('sglang', ''), ('trtllm', '--backend pytorch')]
-)
+@pytest.mark.parametrize("server_type,server_args", [('vllm', ''), ('sglang', ''), ('trtllm', '--backend pytorch')])
 def test_hf_eval(server_type, server_args):
     # this test expects llama3-instruct to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast

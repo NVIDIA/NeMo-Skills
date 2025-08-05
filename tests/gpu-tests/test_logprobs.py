@@ -51,7 +51,7 @@ def test_cross_model_logprobs_consistency():
     prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     model_info = [
-        ("trtllm", os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')),
+        ("trtllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),
         ("vllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),
     ]
 
