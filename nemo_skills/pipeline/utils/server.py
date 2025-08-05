@@ -185,6 +185,8 @@ def get_server_command(
         server_entrypoint = server_entrypoint or "trtllm-serve"
         if num_nodes > 1 and server_entrypoint == "trtllm":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
+        else:
+            server_entrypoint = f"mpirun -n 1 --oversubscribe --allow-run-as-root {server_entrypoint}"
         server_start_cmd = (
             f"{server_entrypoint} "
             f"    {model_path} "
