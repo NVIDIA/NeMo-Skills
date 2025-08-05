@@ -183,7 +183,6 @@ def test_nemo_eval():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/nemo-eval"
     docker_rm([output_dir])
@@ -197,7 +196,6 @@ def test_nemo_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=2 "
     )
     subprocess.run(cmd, shell=True, check=True)
