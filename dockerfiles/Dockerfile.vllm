@@ -1,4 +1,0 @@
-FROM vllm/vllm-openai:gptoss
-
-# adding editable vllm installation to allow overriding python code with a custom mount
-RUN cd /opt && git clone https://github.com/vllm-project/vllm.git && cd vllm && git checkout 59a0b8554bf0e8a9902e14e3d0e564fea38157b6 && VLLM_USE_PRECOMPILED=1 pip install -e .

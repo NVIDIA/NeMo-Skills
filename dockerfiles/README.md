@@ -11,3 +11,7 @@ It might take a long time for some of the images.
 ## Building trtllm image
 
 We directly use official TensorRT-LLM ngc containers. Current version is `nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev`.
+
+## Building vllm image
+
+We directly use `vllm/vllm-openai:gptoss`
