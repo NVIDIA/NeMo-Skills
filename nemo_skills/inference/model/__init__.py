@@ -17,26 +17,22 @@ from nemo_skills.utils import python_doc_to_cmd_help
 from .azure import AzureOpenAIModel
 
 # Base classes
-from .base import BaseModel, BaseRewardModel, OpenAIAPIModel
+from .base import BaseModel
 
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
-from .nemo import NemoModel, NemoRewardModel
 from .openai import OpenAIModel
 
-# Model implementations
-from .trtllm import TRTLLMModel
-
 # Utilities
-from .utils import RequestException, trim_after_stop_phrases
-from .vllm import VLLMModel, VLLMRewardModel
+from .vllm import VLLMModel
+
+# Model implementations
+
 
 # Model registry
 models = {
-    'trtllm': TRTLLMModel,
-    'trtllm-serve': VLLMModel,
-    'nemo': NemoModel,
+    'trtllm': VLLMModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,
@@ -44,23 +40,11 @@ models = {
     'sglang': VLLMModel,
 }
 
-# Reward model registry
-reward_models = {
-    'nemo': NemoRewardModel,
-    'vllm': VLLMRewardModel,
-}
-
 
 def get_model(server_type, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
     return model_class(**kwargs)
-
-
-def get_reward_model(server_type, model_type, **kwargs):
-    """A helper function to make it easier to set server through cmd."""
-    model_class = reward_models[server_type.lower()]
-    return model_class(model_type=model_type, **kwargs)
 
 
 def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
