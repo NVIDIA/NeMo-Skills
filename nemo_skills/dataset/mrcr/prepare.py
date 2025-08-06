@@ -11,53 +11,51 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import subprocess
-import json
-from pathlib import Path
 import argparse
+import json
+import subprocess
+from pathlib import Path
+
+import tiktoken
 from datasets import load_dataset
 from tqdm import tqdm
-import tempfile
 
 """
-Usage 
-# default. setup is all. 
-python prepare.py 
+Usage
+# default. setup is all.
+python prepare.py
 
-# prepare subset needle2_128k. 
+# prepare subset needle2_128k.
 python prepare.py --max_context_window 131072 --needles_subset 2 --setup needle2_128k
 python prepare.py --max_context_window 131072 --needles_subset 2 4 --setup needle2_needle_4_128k
 """
-    
-    
-    
-def count_n_tokens(messages : list[dict]) -> int:
+
+
+def count_n_tokens(messages: list[dict]) -> int:
     """
     Follow the official way to count tokens in messages.
     with tokenizer o200k_base
     """
-    enc = tiktoken.get_encoding("o200k_base") 
+    enc = tiktoken.get_encoding("o200k_base")
     return sum([len(enc.encode(m["content"])) for m in messages])
 
 
 def convert_messages_to_string(
-    messages : list[dict],
-    role_to_string : dict[str, str] = {"user": "user", "assistant": "assistant"},
-    ) -> str:
-    
+    messages: list[dict],
+    role_to_string: dict[str, str] = {"user": "user", "assistant": "assistant"},
+) -> str:
     return "\n".join([f"{role_to_string[m['role']]}: {m['content']}" for m in messages])
 
 
-def write_data_to_file(output_file, data, max_context_window, needles_subset, 
-                       convert_messagesto_string=False):
+def write_data_to_file(output_file, data, max_context_window, needles_subset, convert_messagesto_string=False):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for idx, entry in tqdm(enumerate(data), desc=f"Writing {output_file.name}"):
             messages = json.loads(entry["prompt"])
-            
+
             if entry['n_needles'] not in needles_subset:
                 print(f"Skipping {idx} because it has {entry['n_needles']} needle")
                 continue
-            
+
             # find n_tokens
             n_tokens = count_n_tokens(messages)
             if max_context_window is not None:
@@ -68,7 +66,7 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset,
             # convert messages to string
             if convert_messagesto_string:
                 question = convert_messages_to_string(messages, {"user": "User", "assistant": "Assistant"})
-            
+
             else:
                 question = entry.pop('prompt')
             entry['question'] = question
@@ -79,17 +77,14 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset,
 
 
 def get_mrcr_data(needles_subset, setup, max_context_window):
-    subprocess.run(["pip install tiktoken"], check=True, shell=True)
-    import tiktoken
     dataset = load_dataset("openai/mrcr")['train']
     data_dir = Path(__file__).absolute().parent
-    
+
     output_file = data_dir / f"{setup}.jsonl"
     write_data_to_file(output_file, dataset, max_context_window, needles_subset)
-    
-            
-if __name__ == "__main__":
 
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare MRCR dataset.")
     parser.add_argument(
         "--max_context_window",
@@ -98,21 +93,23 @@ if __name__ == "__main__":
         help="Maximum context window size.",
     )
     parser.add_argument(
-        "--needles_subset", nargs="+", type=int, choices=[2, 4, 8],
-        default=[2, 4, 8], help="Needles subset to include."
+        "--needles_subset",
+        nargs="+",
+        type=int,
+        choices=[2, 4, 8],
+        default=[2, 4, 8],
+        help="Needles subset to include.",
     )
-    
+
     parser.add_argument(
         "--setup",
         type=str,
         default="all",
         help="setup name. e.g. all or <needle2>_<128k>",
     )
-    
+
     args = parser.parse_args()
 
     print(f"Preparing MRCR dataset with additional arguments: {args}")
     get_mrcr_data(args.needles_subset, args.setup, args.max_context_window)
     print(f"MRCR dataset preparation with setup {args.setup} completed. Use --split=${args.setup} to evaluate!")
-    
-    
