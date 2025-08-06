@@ -47,7 +47,7 @@ ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
 FROM base AS hermetic
 
 ARG NEMO_RL_COMMIT
-ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-dd5dc68fc19a39d3f04b71169795465b5b930e9d}
+ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-b6269f70f40fd33ca5adfd1f9aa0cac4619581d4}
 
 RUN git clone https://github.com/NVIDIA-NeMo/RL.git /opt/NeMo-RL && cd /opt/NeMo-RL && git checkout ${NEMO_RL_COMMIT} && git submodule update --init --recursive
 
