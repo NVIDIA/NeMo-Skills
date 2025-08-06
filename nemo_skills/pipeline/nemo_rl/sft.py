@@ -132,15 +132,29 @@ def get_training_cmd(
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export UV_PROJECT=/opt/NeMo-RL && "
         f"cd /nemo_run/code && "
-        f"uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
-        f"    --training-folder={output_dir} "
-        f"    --hf-ckpt-path={final_hf_path} "
     )
+    if backend == "fsdp":
+        cmd += (
+            "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
+        )
+    elif backend == "megatron":
+        cmd += (
+            "uv run --extra mcore python -m nemo_skills.training.nemo_rl.convert_megatron_to_hf "
+        )
+    else:
+        raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
+
+    cmd += f"   --training-folder={output_dir} "
+    cmd += f"   --hf-ckpt-path={final_hf_path} "
+
+    if step is not None:
+        cmd += f"  --step {step} "
+
     return cmd
 
 
@@ -166,6 +180,7 @@ def sft_nemo_rl(
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -173,6 +188,10 @@ def sft_nemo_rl(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    backend: str = typer.Option(
+        ..., 
+        help="Choose backend: fsdp or megatron"
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -235,6 +254,9 @@ def sft_nemo_rl(
         check_mounted_paths=check_mounted_paths,
     )
 
+    if backend not in ("fsdp", "megatron"):
+        raise typer.BadParameter("Invalid backend. Must be 'fsdp' or 'megatron'")
+    
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
@@ -294,6 +316,8 @@ def sft_nemo_rl(
             cmd=get_checkpoint_convert_cmd(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+                step=conversion_step,
+                backend=backend
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",
