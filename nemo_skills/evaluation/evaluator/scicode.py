@@ -14,7 +14,7 @@
 
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 from dataclasses import field
 
 from nemo_skills.code_execution.sandbox import get_sandbox
@@ -31,7 +31,7 @@ class ScicodeEvaluatorConfig:
     num_parallel_requests: int = 20
 
 
-def _execute_single_test(args):
+async def _execute_single_test(args):
     """Helper function to execute a single test case."""
     eval_config, elem_idx, full_generation, json_content, subtask_step = args
 
@@ -45,7 +45,7 @@ def _execute_single_test(args):
             code += line + '\n'
 
     sandbox = get_sandbox(**eval_config.sandbox)
-    output_dict, _ = sandbox.execute_code(code, timeout=eval_config.timeout, max_output_characters=100000)
+    output_dict, _ = await sandbox.execute_code(code, timeout=eval_config.timeout, max_output_characters=100000)
 
     return elem_idx, output_dict
 
@@ -68,9 +68,14 @@ def test_code(eval_config, scicode_data):
     # Initialize status_lists with correct structure
     status_lists = [[] for _ in range(len(scicode_data))]
 
-    # Execute tasks in parallel
-    with ThreadPoolExecutor(max_workers=eval_config.num_parallel_requests) as executor:
-        results = list(executor.map(_execute_single_test, tasks))
+    # Execute tasks in parallel using asyncio with a semaphore for num_parallel_requests
+    async def run_tasks():
+        semaphore = asyncio.Semaphore(eval_config.num_parallel_requests)
+        async def execute_with_semaphore(task_args):
+            async with semaphore:
+                return await _execute_single_test(task_args)
+        return await asyncio.gather(*[execute_with_semaphore(task) for task in tasks])
+    results = asyncio.run(run_tasks())
 
     # Organize results back into the original structure
     for elem_idx, output_dict in results:
