@@ -29,6 +29,7 @@ from nemo_skills.pipeline.utils import (
     get_timeout,
     resolve_mount_paths,
     run_exp,
+    get_env_variables
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -49,6 +50,8 @@ class NemoRLTask:
     wandb_group: str
     timeout: str
     log_dir: str
+    env_variables: dict
+    backend: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -56,6 +59,7 @@ class NemoRLTask:
             f"++policy.model_name={self.model} "
             f"++cluster.gpus_per_node={self.num_gpus} "
             f"++cluster.num_nodes={self.num_nodes} "
+            f"++checkpointing.checkpoint_must_save_by={self.timeout} "
             f"++logger.log_dir={self.log_dir} "
             f"++checkpointing.checkpoint_dir={self.output_dir}/checkpoints "
         )
@@ -79,11 +83,15 @@ class NemoRLTask:
 
     def get_cmd(self):
         self.logging_params = self.format_wandb_args()
-
+        # Conditionally add HF_HOME export only for 'megatron' backend
+        hf_home_export = ""
+        if self.backend == "megatron":
+            hf_home_export = f"export HF_HOME={self.env_variables['HF_HOME']} && "
+        
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
-            f"export HF_HOME=/lustre/fsw/portfolios/llmservice/users/wedu/llm && "
+            f"{hf_home_export}"
             f"echo 'Starting training' && "
             f"cd /opt/NeMo-RL && "
             f"NRL_FORCE_REBUILD_VENVS=true uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
@@ -92,7 +100,9 @@ class NemoRLTask:
             f"  {self.logging_params} "
             f"  {self.extra_arguments} "
         )
+
         return cmd
+
 
 
 def get_training_cmd(
@@ -110,6 +120,8 @@ def get_training_cmd(
     wandb_group,
     extra_arguments,
     log_dir,
+    env_variables,
+    backend,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -127,6 +139,8 @@ def get_training_cmd(
         timeout=timeout,
         extra_arguments=extra_arguments,
         log_dir=log_dir,
+        env_variables=env_variables,
+        backend=backend
     )
 
     return task.get_cmd()
@@ -253,10 +267,17 @@ def sft_nemo_rl(
         mount_map={hf_model: None, output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
-
+    env_variables = get_env_variables(cluster_config)
     if backend not in ("fsdp", "megatron"):
         raise typer.BadParameter("Invalid backend. Must be 'fsdp' or 'megatron'")
     
+    if backend == "megatron":
+        if "HF_HOME" not in env_variables:
+            raise typer.BadParameter(
+                    "Missing required environment variable 'HF_HOME' for 'megatron' backend.\n"
+                    "You can set it in your cluster config like this:\n"
+                    '  env_vars: ["HF_HOME=/your/path/to/hf_home"]'
+                )
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
@@ -282,6 +303,8 @@ def sft_nemo_rl(
         wandb_group=wandb_group,
         extra_arguments=extra_arguments,
         log_dir=f"{log_dir}/training-logs",
+        env_variables=env_variables,
+        backend=backend,
     )
 
     server_config = None

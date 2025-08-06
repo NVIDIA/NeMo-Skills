@@ -20,6 +20,7 @@ checkpointing:
   higher_is_better: false
   keep_top_k: 50
   save_period: 100
+  checkpoint_must_save_by: null
 
 
 policy:
@@ -136,6 +137,8 @@ data:
   add_generation_prompt: false
   input_key: input
   output_key: output
+  force_reprocess: false
+  shuffle: true
 
 logger:
   log_dir: "logs"  # Base directory for all logs
