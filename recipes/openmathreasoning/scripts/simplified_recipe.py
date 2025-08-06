@@ -40,20 +40,6 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         expname=f"{expname_prefix}-download-assets",
         log_dir=f"{workspace}/download-assets",
     )
-    # convert QwQ trtllm format
-    convert(
-        ctx=wrap_arguments("--max_seq_len 10000"),
-        cluster=cluster,
-        input_model=f"{workspace}/QwQ-32B",
-        output_model=f"{workspace}/qwq32b-trtllm",
-        convert_from="hf",
-        convert_to="trtllm",
-        num_gpus=num_gpus,
-        model_type="qwen",
-        hf_model_name="Qwen/QwQ-32B",
-        expname=f"{expname_prefix}-convert-qwq-trtllm",
-        run_after=f"{expname_prefix}-download-assets",
-    )
 
     if training_backend == "nemo-aligner":
         # convert Qwen2.5-14B-Instruct to nemo format
@@ -80,7 +66,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
     generate(
-        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml " f"++prompt_template=qwen-instruct "),
+        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml ++prompt_template=qwen-instruct "),
         cluster=cluster,
         input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/sdg/problems",
@@ -107,8 +93,8 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         input_file=f"{workspace}/sdg/extracted-problems.jsonl",
         output_dir=f'{workspace}/sdg/solutions',
         expname=f'{expname_prefix}-solution-generation',
-        run_after=[f'{expname_prefix}-problem-extraction', f'{expname_prefix}-convert-qwq-trtllm'],
-        model=f'{workspace}/qwq32b-trtllm',
+        run_after=f'{expname_prefix}-problem-extraction',
+        model=f"{workspace}/QwQ-32B",
         server_type='trtllm',
         server_gpus=num_gpus,
         log_samples=not wandb_params['disable_wandb'],
