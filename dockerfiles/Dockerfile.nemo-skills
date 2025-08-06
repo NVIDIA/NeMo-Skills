@@ -7,6 +7,11 @@ RUN apt-get update && apt-get -y install curl git git-lfs
 RUN mkdir /opt/benchmarks
 RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1
 
+# ifbench
+RUN git clone https://github.com/allenai/IFBench.git /opt/benchmarks/IFBench --depth=1
+RUN cd /opt/benchmarks/IFBench && sed -i '/^unicodedata[=<>]*.*$/d' requirements.txt && pip install -r requirements.txt
+RUN cd /opt/benchmarks
+
 RUN pip install langdetect absl-py immutabledict nltk ipython && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
 
