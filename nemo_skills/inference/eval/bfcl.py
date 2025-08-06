@@ -141,14 +141,14 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
-                "prompts": [fmted_prompt],
+                "prompt": fmted_prompt,
                 "include_response": True,
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             }
         else:
             input_dict = {
-                "prompts": [messages],
+                "prompt": messages,
                 "tools": [tools],
                 "include_response": True,
                 **asdict(self.cfg.inference),
@@ -159,7 +159,7 @@ class BFCLGenerationTask(GenerationTask):
         # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
         try:
-            output = await self.llm.generate_asyncio(**input_dict)
+            output = await self.llm.generate_async(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
             if "Requested token count exceeds the model's maximum context length" in str(e) or "is longer than the model's context length" in str(e):

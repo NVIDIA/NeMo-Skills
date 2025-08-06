@@ -13,8 +13,11 @@
 # limitations under the License.
 
 import subprocess
+
 import pytest
+
 from nemo_skills.pipeline.utils import get_mounted_path
+
 
 def test_error_on_extra_params():
     """Testing that when we pass in any unsupported parameters, there is an error."""
@@ -26,7 +29,7 @@ def test_error_on_extra_params():
         "    ++prompt_config=generic/math "
         "    ++output_file=./test-results/gsm8k/output.jsonl "
         "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "
-        "    ++server.server_type=nemo "
+        "    ++server.server_type=trtllm "
         "    ++test=1"
     )
     try:
@@ -41,7 +44,7 @@ def test_error_on_extra_params():
         "    ++output_file=./test-results/gsm8k/output.jsonl "
         "    ++inference.num_few_shots=0 "
         "    ++input_file=./nemo_skills/dataset/gsm8k/test.jsonl "
-        "    ++server.server_type=nemo "
+        "    ++server.server_type=vllm "
     )
     try:
         subprocess.run(cmd, shell=True, check=True, capture_output=True)
@@ -63,21 +66,20 @@ def test_error_on_extra_params():
         assert "got an unexpected keyword argument 'sandbox'" in e.stderr.decode()
 
 
-
-
-@pytest.mark.parametrize("mount_source, mount_dest, input_path, expected", [
-    # Original path should be mapped correctly
-    ("/lustre/data", "/data", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
-    ("/lustre/data/", "/data", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
-    ("/lustre/data", "/data/", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
-    ("/lustre/data/", "/data/", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
-
-    # Already mounted path should return unchanged
-    ("/lustre/data", "/data", "/data/my_path.jsonl", "/data/my_path.jsonl"),
-
-    # Fallback mount - match broader /lustre if more specific one is not present
-    ("/lustre", "/lustre", "/lustre/data/my_path.jsonl", "/lustre/data/my_path.jsonl"),
-])
+@pytest.mark.parametrize(
+    "mount_source, mount_dest, input_path, expected",
+    [
+        # Original path should be mapped correctly
+        ("/lustre/data", "/data", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
+        ("/lustre/data/", "/data", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
+        ("/lustre/data", "/data/", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
+        ("/lustre/data/", "/data/", "/lustre/data/my_path.jsonl", "/data/my_path.jsonl"),
+        # Already mounted path should return unchanged
+        ("/lustre/data", "/data", "/data/my_path.jsonl", "/data/my_path.jsonl"),
+        # Fallback mount - match broader /lustre if more specific one is not present
+        ("/lustre", "/lustre", "/lustre/data/my_path.jsonl", "/lustre/data/my_path.jsonl"),
+    ],
+)
 def test_get_mounted_path(mount_source, mount_dest, input_path, expected):
     """
     Test get_mounted_path with various combinations of mount source/destination paths
@@ -90,4 +92,3 @@ def test_get_mounted_path(mount_source, mount_dest, input_path, expected):
 
     result = get_mounted_path(cluster_config, input_path)
     assert result == expected
-
