@@ -10,7 +10,7 @@ Here are some of the features we support:
 
 - [Flexible LLM inference](basics/inference.md):
     - Seamlessly switch between API providers, local server and large-scale Slurm jobs for LLM inference.
-    - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang), [Megatron](https://github.com/NVIDIA/Megatron-LM) or [NeMo](https://github.com/NVIDIA/NeMo).
+    - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang) or [Megatron](https://github.com/NVIDIA/Megatron-LM).
     - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a Slurm cluster.
 - [Model evaluation](pipelines/evaluation.md):
     - Evaluate your models on many popular benchmarks.

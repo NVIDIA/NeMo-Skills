@@ -22,37 +22,6 @@ from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu
-def test_hf_trtllm_conversion():
-    model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    hf_model_name = (
-        'meta-llama/Meta-Llama-3.1-8B-Instruct' if model_type == 'llama' else 'Qwen/Qwen2.5-Math-7B-Instruct'
-    )
-
-    output_model = f"/tmp/nemo-skills-tests/{model_type}/conversion/hf-to-trtllm/model"
-    docker_rm([output_model])
-
-    cmd = (
-        f"ns convert "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --input_model {model_path} "
-        f"    --output_model {output_model} "
-        f"    --convert_from hf "
-        f"    --convert_to trtllm "
-        f"    --model_type {model_type} "
-        f"    --num_gpus 1 "
-        f"    --hf_model_name {hf_model_name} "
-    )
-
-    subprocess.run(cmd, shell=True, check=True)
-    assert Path(f"{output_model}").exists()
-
-
-@pytest.mark.gpu
 def test_hf_nemo_conversion():
     model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:

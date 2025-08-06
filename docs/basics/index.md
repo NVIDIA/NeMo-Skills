@@ -152,42 +152,19 @@ This command might take a while to start since it's going to download a fairly-h
 [vLLM](https://github.com/vllm-project/vllm) container. But after
 that's done, it should start a local server with the Qwen2.5-1.5B model and run inference on the same set of prompts.
 
-It's also very easy to convert the HuggingFace checkpoint to [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/) and
-run inference with it, instead of vLLM (which we highly recommend for anything large-scale). If you'd like to try that,
-run the commands below (again, might take a while the first time, since we will be downloading another heavy container).
+It's also very easy to use TensorRT-LLM, just change the server type!
 
 ```bash
-pip install -U "huggingface_hub[cli]" # (1)!
-huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir Qwen2.5-1.5B-Instruct
-
-ns convert \  # (2)!
-    --cluster=local \
-    --input_model=/workspace/Qwen2.5-1.5B-Instruct \
-    --output_model=/workspace/qwen2.5-1.5b-instruct-trtllm \
-    --convert_from=hf \
-    --convert_to=trtllm \
-    --num_gpus=1 \
-    --model_type=qwen \
-    --hf_model_name=Qwen/Qwen2.5-1.5B-Instruct
-
 ns generate \
     --cluster=local \
     --server_type=trtllm \
-    --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
+    --model=Qwen/Qwen2.5-1.5B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/generation-local-trtllm \
     --input_file=/workspace/input.jsonl \
-    ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=qwen-instruct # (3)!
+    ++prompt_config=/workspace/prompt.yaml
 ```
 
-1.   We are re-downloading the model explicitly since TensorRT-LLM cannot work with the HuggingFace cache.
-2.   You can specify any extra parameters for
-     [TensorRT-LLM conversion script](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/conversion/hf_to_trtllm_qwen.py)
-     directly as arguments to this command.
-3.   We need to explicitly specify [prompt template](./prompt-format.md) for TensoRT-LLM server. We actually recommend to
-     do that even for vLLM or other locally hosted models as we found that HuggingFace tokenizer templates are not always
-     correct and it's best to be explicit about what is used for each model.
 
 ## Slurm inference
 
@@ -229,7 +206,7 @@ printed `nemo experiment logs ...` command to stream job logs. You can also chec
 the `/workspace/generation/generation-logs` folder on cluster to see the logs there.
 
 We can also easily run a much more large-scale jobs on slurm using ns commands. E.g. here is a simple script that
-uses nemo-skills Python API[^3] to convert [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) model to TensorRT-LLM and
+uses nemo-skills Python API[^3] to run [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) with TensorRT-LLM and
 launch 16 parallel evaluation jobs on aime24 and aime25 benchmarks (each doing 4 independent samples from the
 model for a total of 64 samples)
 
@@ -260,22 +237,8 @@ run_cmd( # (1)!
     log_dir=f"{output_dir}/download-logs"
 )
 
-convert(
-    ctx=wrap_arguments("--max_input_len 2000 --max_seq_len 20000"), # (2)!
-    cluster=cluster,
-    input_model=f"{output_dir}/QwQ-32B",
-    output_model=f"{output_dir}/qwq-32b-trtllm",
-    expname=f"{expname}-to-trtllm",
-    run_after=f"{expname}-download-hf", # (3)!
-    convert_from="hf",
-    convert_to="trtllm",
-    model_type="qwen",
-    num_gpus=8,
-)
-
 eval(
-    ctx=wrap_arguments(
-        "++prompt_template=qwen-instruct "
+    ctx=wrap_arguments( # (2)!
         "++inference.tokens_to_generate=16000 "
         "++inference.temperature=0.6"
     ),
@@ -283,17 +246,18 @@ eval(
     model=f"{output_dir}/qwq-32b-trtllm",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
+    run_after=f"{expname}-download-hf", # (3)!
     benchmarks="aime24:64,aime25:64", # (4)!
     num_jobs=16,
     server_gpus=8,
-    run_after=f"{expname}-to-trtllm",
 )
 ```
 
 1.   `run_cmd` just runs an arbitrary command inside our containers. It's useful for some pre/post processing when
-     building large pipelines, but mostly optional here. You can alternately just go on cluster and run those commands
-     yourself. Can also specify `partition="cpu"` as an argument in case it's available on your cluster since this
-     command doesn't require GPUs.
+     building large pipelines, but fully optional here. Just showing it as an example of how you can add custom steps.
+     Can also specify `partition="cpu"` as an argument in case it's available on your cluster since this
+     command doesn't require GPUs. Best practice is to add `cpu_partition: <partition name>` to your cluster config
+     and then it will be automatically used whenever GPUs are not requested.
 2.   `wrap_arguments` is used to capture any arguments that are not part of the *wrapper* script but are passed into
      the actual *main* script that's being launched by the wrapper. You can read more about this in the
      [Important details](#important-details) section at the end of this document.
