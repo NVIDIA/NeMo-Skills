@@ -21,6 +21,7 @@ checkpointing:
   keep_top_k: 50
   save_period: 100
 
+
 policy:
   model_name: "meta-llama/Llama-3.2-1B"
   tokenizer:
@@ -60,14 +61,14 @@ policy:
     moe_router_load_balancing_type: "aux_loss"
     moe_router_bias_update_rate: 1e-3
     #gives ~20% training perf speedup with sequence packing 
-    apply_rope_fusion: True   
+    apply_rope_fusion: False  # Only used if position_embedding_type=rope
 
     optimizer:
       optimizer: "adam"
       lr: 5.0e-6
-      min_lr: 4.9999e-6
+      min_lr: ${policy.megatron_cfg.optimizer.lr}
       weight_decay: 0.01
-      bf16: true
+      bf16: true  # must be true to avoid checkpoint load error
       fp16: false
       params_dtype: "float32"
 
@@ -91,7 +92,7 @@ policy:
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
       lr_decay_iters: null
-      lr_warmup_iters: 50
+      lr_warmup_iters: 0
       lr_warmup_init: 1e-7
 
     distributed_data_parallel_config:
