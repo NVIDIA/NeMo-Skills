@@ -45,7 +45,9 @@ class LiveCodeBenchMetrics(BaseMetrics):
 
     def update(self, predictions):
         super().update(predictions)
+        predicted_answers = [pred['completion'] for pred in predictions]
         self._compute_pass_at_k(predictions=predictions)
+        self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
 
 class SciCodeMetrics(BaseMetrics):
