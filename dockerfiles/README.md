@@ -10,6 +10,4 @@ It might take a long time for some of the images.
 
 ## Building trtllm image
 
-Follow instructions in [TensorRT-LLM documentation](https://nvidia.github.io/TensorRT-LLM/installation/build-from-source-linux.html#option-1-build-tensorrt-llm-in-one-step).
-
-Our current container is built from `v0.19.0` code version.
+We directly use official TensorRT-LLM ngc containers. Current version is `nvcr.io/nvidia/tensorrt-llm/release:0.21.0`.
