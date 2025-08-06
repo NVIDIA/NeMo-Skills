@@ -38,6 +38,7 @@ BENCHMARKS = {
     },
     "scicode": {
         "GENERATION_ARGS": "++inference.temperature=0.0",
+        "EVAL_SPLIT": "test_aai",
         "NUM_SAMPLES": 3,
     },
     "livecodebench": {
