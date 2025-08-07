@@ -22,24 +22,18 @@ from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.prompt.few_shot_examples import examples_map
 
 
-def _get_sandbox(sandbox_type):
-    if sandbox_type == 'local':
-        host = os.getenv('NEMO_SKILLS_SANDBOX_HOST')
-        if not host:
-            pytest.skip("Define NEMO_SKILLS_SANDBOX_HOST to run this test")
+def _get_sandbox():
+    host = os.getenv('NEMO_SKILLS_SANDBOX_HOST')
+    if not host:
+        pytest.skip("Define NEMO_SKILLS_SANDBOX_HOST to run this test")
 
-    if sandbox_type == 'piston':
-        host = os.getenv('NEMO_SKILLS_PISTON_SANDBOX_URL')
-        if not host:
-            pytest.skip("Define NEMO_SKILLS_PISTON_SANDBOX_URL to run this test")
-
-    return get_sandbox(sandbox_type, host=host)
+    return get_sandbox(host=host)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
-async def test_triple_quotes(sandbox_type, language):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_triple_quotes(language):
+    sandbox = _get_sandbox()
     code = '''
 def my_func():
     """Test function"""
@@ -51,9 +45,9 @@ my_func()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
-async def test_no_output(sandbox_type, language):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_no_output(language):
+    sandbox = _get_sandbox()
 
     code = """a = 2"""
 
@@ -62,9 +56,9 @@ async def test_no_output(sandbox_type, language):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
-async def test_execution_error(sandbox_type, language):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_execution_error(language):
+    sandbox = _get_sandbox()
 
     code = """1 / 0"""
 
@@ -85,9 +79,9 @@ async def test_execution_error(sandbox_type, language):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('local', 'pypy3'), ('piston', 'python')])
-async def test_syntax_error(sandbox_type, language):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_syntax_error(language):
+    sandbox = _get_sandbox()
 
     code = """a = 2\n b = 3"""
 
@@ -107,9 +101,9 @@ async def test_syntax_error(sandbox_type, language):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("sandbox_type", "language"), [('local', 'python'), ('local', 'ipython'), ('piston', 'python')])
-async def test_timeout_error(sandbox_type, language):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_timeout_error(language):
+    sandbox = _get_sandbox()
 
     code = """import time\ntime.sleep(1)\nprint("done")"""
 
@@ -123,7 +117,7 @@ async def test_timeout_error(sandbox_type, language):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", ['python', 'pypy3'])
 async def test_std_input(language):
-    sandbox = _get_sandbox("local")
+    sandbox = _get_sandbox()
     code = 'print(input("something "))'
     std_input = "new"
 
@@ -134,7 +128,7 @@ async def test_std_input(language):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", ['python', 'pypy3'])
 async def test_multiple_prints_python(language):
-    sandbox = _get_sandbox("local")
+    sandbox = _get_sandbox()
 
     code = """
 print("1")
@@ -150,9 +144,8 @@ print("2x3")
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_multiple_code_blocks_ipython(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_multiple_code_blocks_ipython():
+    sandbox = _get_sandbox()
 
     code = """
     a = 1
@@ -171,9 +164,8 @@ async def test_multiple_code_blocks_ipython(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_multiple_code_blocks(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_multiple_code_blocks():
+    sandbox = _get_sandbox()
 
     code = """
     a = 1
@@ -191,9 +183,8 @@ async def test_multiple_code_blocks(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_real_generations(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_real_generations():
+    sandbox = _get_sandbox()
 
     code = """
 # height of bamboo in inches
@@ -219,7 +210,6 @@ x
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
 @pytest.mark.parametrize(
     "code_begin,code_end,code_output_begin,code_output_end,code_output_format",
     [
@@ -233,7 +223,7 @@ x
         ),
     ],
 )
-async def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_output_end, code_output_format):
+async def test_few_shots(code_begin, code_end, code_output_begin, code_output_end, code_output_format):
     def replace_code_output(match):
         code_output = match.group(2)
         formatted_output = format_code_output(
@@ -244,7 +234,7 @@ async def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, 
         )
         return formatted_output
 
-    sandbox = _get_sandbox(sandbox_type)
+    sandbox = _get_sandbox()
 
     for example_name, example_list in examples_map.items():
         for example in example_list:
@@ -289,9 +279,8 @@ async def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_lean4_basic_code_execution(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_lean4_basic_code_execution():
+    sandbox = _get_sandbox()
 
     # Test case for correct basic Lean4 code execution
     correct_code = """
@@ -313,9 +302,8 @@ async def test_lean4_basic_code_execution(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_lean4_mathlib_code_execution(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_lean4_mathlib_code_execution():
+    sandbox = _get_sandbox()
 
     # Test case for Lean4 code that imports mathlib
     correct_code_mathlib = """
@@ -335,9 +323,8 @@ async def test_lean4_mathlib_code_execution(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_lean4_code_execution_failure(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_lean4_code_execution_failure():
+    sandbox = _get_sandbox()
 
     # Test case for Lean4 code with syntax error
     incorrect_code = """
@@ -360,9 +347,8 @@ async def test_lean4_code_execution_failure(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_minif2f_deepseek_fewshots(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_minif2f_deepseek_fewshots():
+    sandbox = _get_sandbox()
 
     from nemo_skills.prompt.few_shot_examples.lean4 import minif2f_deepseek_fewshot
 
@@ -402,9 +388,8 @@ async def test_minif2f_deepseek_fewshots(sandbox_type):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-async def test_math_to_lean4_fewshots(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+async def test_math_to_lean4_fewshots():
+    sandbox = _get_sandbox()
 
     from nemo_skills.prompt.few_shot_examples.lean4 import math_to_lean4_fewshot
 
