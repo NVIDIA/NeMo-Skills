@@ -31,4 +31,4 @@ ns run_cmd --cluster test-local --config_dir tests/gpu-tests --container nemo \
 # converting the model through test
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/tiny-model-hf
 # training tests
-pytest tests/gpu-tests/test_train.py -s -x -k megatron
+pytest tests/gpu-tests/test_train.py -s -x
