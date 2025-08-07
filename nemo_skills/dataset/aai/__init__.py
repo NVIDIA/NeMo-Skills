@@ -56,6 +56,11 @@ BENCHMARKS = {
         "EVAL_SPLIT": "test",
         "NUM_SAMPLES": 5,
     },
-
-    # TODO: Add AA-LCR https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR
+    # Long Context Reading benchmark
+    "aalcr": {
+        "GENERATION_ARGS": "++prompt_config=generic/default ++inference.temperature=0.0",
+        "JUDGE_ARGS": "++prompt_config=eval/aai/judge_aalcr ++generation_key=judgement",
+        "EVAL_SPLIT": "test",
+        "NUM_SAMPLES": 1,
+    },
 }

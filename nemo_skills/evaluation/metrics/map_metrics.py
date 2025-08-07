@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific lang
 
+from nemo_skills.evaluation.metrics.aalcr_metrics import AALCRMetrics
 from nemo_skills.evaluation.metrics.answer_judgement_metrics import AnswerJudgementMetrics
 from nemo_skills.evaluation.metrics.arena_metrics import ArenaMetrics
 from nemo_skills.evaluation.metrics.bfcl_metrics import BFCLMetrics
@@ -21,6 +22,7 @@ from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 
 METRICS_MAP = {
+    "aalcr": AALCRMetrics,
     "math": MathMetrics,
     "lean4-proof": Lean4Metrics,
     "lean4-statement": Lean4Metrics,
