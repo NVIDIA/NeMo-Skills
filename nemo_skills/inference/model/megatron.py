@@ -33,7 +33,7 @@ class MegatronModel(BaseModel):
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         stop_phrases: list[str] | None = None,
         timeout: int | None = None,
         top_logprobs: int | None = None,
