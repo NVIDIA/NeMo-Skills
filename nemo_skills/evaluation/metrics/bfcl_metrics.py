@@ -20,7 +20,7 @@ class BFCLMetrics(BaseMetrics):
 
     # TODO: Ideally we should combine the accuracies across different subsets of the benchmark to
     # report something similar to the final score in the BFCL leaderboard.
-    
+    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {"accuracy": prediction['is_correct']}
 

@@ -21,6 +21,7 @@ class Lean4Metrics(BaseMetrics):
     def __init__(self):
         self.reset()
 
+    @classmethod
     def _get_score_dict(self, prediction):
         return {"lean4_correct": prediction['proof_status'] == "completed"}
 
