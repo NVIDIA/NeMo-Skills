@@ -12,38 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# copied from https://github.com/NVIDIA-NeMo/RL/blob/main/examples/converters/convert_dcp_to_hf.py
-# and added logic to figure out max step automatically
 
+# copied from https://github.com/NVIDIA-NeMo/RL/blob/main/examples/converters/convert_megatron_to_hf.py
+# and added logic to figure out max step automatically 
 import argparse
 import os
 import re
 
 import yaml
-from nemo_rl.utils.native_checkpoint import convert_dcp_to_hf
+
+from nemo_rl.models.megatron.community_import import export_model_from_megatron
+
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Convert Torch DCP checkpoint to HF checkpoint")
+    parser = argparse.ArgumentParser(
+        description="Convert Torch DCP checkpoint to HF checkpoint"
+    )
     parser.add_argument(
         "--config",
         type=str,
         default=None,
         help="Path to config.yaml file in the checkpoint directory",
     )
-    parser.add_argument("--dcp-ckpt-path", type=str, default=None, help="Path to DCP checkpoint")
-    parser.add_argument("--hf-ckpt-path", type=str, required=True, help="Path to save HF checkpoint")
+    parser.add_argument(
+        "--megatron-ckpt-path",
+        type=str,
+        default=None,
+        help="Path to Megatron checkpoint",
+    )
+    parser.add_argument(
+        "--hf-ckpt-path", type=str, default=None, help="Path to save HF checkpoint"
+    )
+
     parser.add_argument(
         "--training-folder", type=str, default=None, help="Path to training folder containing step_X subfolders"
     )
     parser.add_argument(
         "--step", type=int, default=None, help="Step number to use from training folder (overrides highest found)"
     )
+
     # Parse known args for the script
     args = parser.parse_args()
 
     return args
+
 
 
 def find_max_step_folder(training_folder, step_override=None):
@@ -73,15 +87,17 @@ def find_max_step_folder(training_folder, step_override=None):
     return os.path.join(training_folder, f"step_{chosen_step}")
 
 
+
+
+
 def main():
     """Main entry point."""
     args = parse_args()
 
-    # Raise error if both dcp_ckpt_path and training_folder are specified
-    if args.dcp_ckpt_path and args.training_folder:
-        raise ValueError("Specify only one of --dcp-ckpt-path or --training-folder, not both.")
 
-    # If training-folder is specified, determine dcp_ckpt_path and config path automatically
+    if args.megatron_ckpt_path and args.training_folder:
+        raise ValueError("Specify only one of --megatron-ckpt-path or --training-folder, not both.")
+
     if args.training_folder:
         if args.config:
             raise ValueError(
@@ -90,35 +106,30 @@ def main():
         step_folder = find_max_step_folder(args.training_folder, args.step)
         if not step_folder:
             raise RuntimeError(f"No step_X folders found in {args.training_folder}")
-        dcp_ckpt_path = os.path.join(step_folder, "policy", "weights")
+        megatron_ckpt_path = os.path.join(step_folder, "policy", "weights", "iter_0000000")
         config_path = os.path.join(step_folder, "config.yaml")
     else:
-        dcp_ckpt_path = args.dcp_ckpt_path
+        megatron_ckpt_path = args.megatron_ckpt_path
         config_path = args.config
+
+
 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    model_name_or_path = config["policy"]["model_name"]
-    # TODO: After the following PR gets merged:
-    # https://github.com/NVIDIA/NeMo-RL/pull/148/files
-    # tokenizer should be copied from policy/tokenizer/* instead of relying on the model name
-    # We can expose a arg at the top level --tokenizer_path to plumb that through.
-    # This is more stable than relying on the current NeMo-RL get_tokenizer() which can
-    # change release to release.
-    tokenizer_name_or_path = config["policy"]["model_name"]
+    model_name = config["policy"]["model_name"]
+    tokenizer_name = config["policy"]["tokenizer"]["name"]
 
-    print(f"Converting checkpoint from {dcp_ckpt_path} to {args.hf_ckpt_path}")
-    print(f"Using tokenizer from: {tokenizer_name_or_path}")
+    print(f"Converting checkpoint from {megatron_ckpt_path} to {args.hf_ckpt_path}")
+    print(f"Using tokenizer from: {tokenizer_name}")
 
-    hf_ckpt = convert_dcp_to_hf(
-        dcp_ckpt_path=dcp_ckpt_path,
-        hf_ckpt_path=args.hf_ckpt_path,
-        model_name_or_path=model_name_or_path,
-        tokenizer_name_or_path=tokenizer_name_or_path,
+    export_model_from_megatron(
+        hf_model_name=model_name,
+        input_path=megatron_ckpt_path,
+        output_path=args.hf_ckpt_path,
+        hf_tokenizer_path=tokenizer_name,
         overwrite=True,
     )
-    print(f"Saved HF checkpoint to: {hf_ckpt}")
 
 
 if __name__ == "__main__":
