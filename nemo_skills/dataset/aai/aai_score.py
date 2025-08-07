@@ -18,24 +18,41 @@ def compute_score(metrics: dict):
     hle = metrics['hle']['pass@1']['judge_correct']
     gpqa = metrics['gpqa']['pass@1']['symbolic_correct']
 
-    aime24 = metrics['aime24']['pass@1[avg-of-10]']['symbolic_correct']
-    math500 = metrics['math-500']['pass@1[avg-of-3]']['symbolic_correct']
+    aime25 = metrics['aime24']['pass@1[avg-of-10]']['symbolic_correct']
 
     scicode = metrics['scicode']['pass@1[avg-of-3]']['subtask_accuracy']
     livecodebench = metrics['livecodebench']['pass@1[avg-of-3]']['accuracy']
 
-    math_score = (aime24 + math500) / 2
+    ifbench = metrics['ifbench']['pass@1[avg-of-5]']['average_score']
+    
+    # TODO: Add AA-LCR Score. Currently using a placeholder value
+    aalcr = 0.0
+
+    math_score = aime25
     code_score = (scicode + livecodebench) / 2
-    overall_score = (mmlu_pro + hle + gpqa) / 6 + (math_score + code_score) / 4
+    reasoning_knowledge_score = (mmlu_pro + hle) / 2
+    science_score = gpqa
+    if_score = ifbench
+
+    # long_context_reasoning_score = aalcr
+    long_context_reasoning_score = 0.0
+
+    overall_score = (mmlu_pro + hle + gpqa + aime25 + scicode + livecodebench + if_score + long_context_reasoning_score) / 8
+    
     return {
         'overall_score': overall_score,
         'math_score': math_score,
         'code_score': code_score,
+        'reasoning_knowledge_score': reasoning_knowledge_score,
+        'science_score': science_score,
+        'if_score': if_score,
+        'long_context_reasoning_score': long_context_reasoning_score,
         'mmlu_pro': mmlu_pro,
         'hle': hle,
         'gpqa': gpqa,
-        'aime24': aime24,
-        'math500': math500,
+        'aime25': aime25,
         'scicode': scicode,
         'livecodebench': livecodebench,
+        'ifbench': ifbench,
+        'aalcr': aalcr,
     }
