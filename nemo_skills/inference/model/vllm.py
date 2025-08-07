@@ -55,7 +55,7 @@ class VLLMModel(BaseModel):
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         top_logprobs: int | None = None,
         timeout: int | None = None,
         stop_phrases: list[str] | None = None,
@@ -64,6 +64,8 @@ class VLLMModel(BaseModel):
         extra_body: dict = None,
         tools: list[dict] | None = None,
     ) -> dict:
+        assert reasoning_effort is None, "reasoning_effort is not supported for text completion requests"
+        assert tools is None, "tools are not supported for text completion requests"
         return {
             "prompt": prompt,
             "max_tokens": tokens_to_generate,
@@ -117,6 +119,8 @@ class VLLMModel(BaseModel):
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
             "tools": tools,
         }
+        if reasoning_effort:
+            request["allowed_openai_params"] = ["reasoning_effort"]
+            request["reasoning_effort"] = reasoning_effort
         return request
-
 

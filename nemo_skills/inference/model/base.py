@@ -126,7 +126,7 @@ class BaseModel:
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
         timeout: float | int | None = 10000, # None is 10min
@@ -183,7 +183,7 @@ class BaseModel:
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
         timeout: float | int | None = 10000, # None is 10min
