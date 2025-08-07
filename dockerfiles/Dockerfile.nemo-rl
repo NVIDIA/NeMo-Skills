@@ -47,23 +47,30 @@ ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
 FROM base AS hermetic
 
 ARG NEMO_RL_COMMIT
-ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-51f8b2672535e30a588f988ce65871442c5109df}
+ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-9af0a529e3230724444e4d74504b2e61538508f7}
 
-RUN git clone https://github.com/NVIDIA/NeMo-RL.git /opt/NeMo-RL && cd /opt/NeMo-RL && git checkout ${NEMO_RL_COMMIT}
+RUN git clone https://github.com/NVIDIA-NeMo/RL.git /opt/NeMo-RL && cd /opt/NeMo-RL && git checkout ${NEMO_RL_COMMIT} && git submodule update --init --recursive
 
 WORKDIR /opt/NeMo-RL
 
 # Variables to control the build of TE. If there are issues with parallelization, consider
 # setting these to 1.
-ARG MAX_JOBS=4
-ARG NVTE_BUILD_THREADS_PER_JOB=1
+ARG MAX_JOBS
+ARG NVTE_BUILD_THREADS_PER_JOB
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/nemo_rl_venv
 ENV UV_LINK_MODE=copy
 
-# Create and activate virtual environment
+# This step is to warm the uv cache with flash-attn without invalidating it due to COPY layers
+# This layer has to be manually updated
 RUN <<"EOF" bash -exu
 uv venv ${UV_PROJECT_ENVIRONMENT}
+
+VIRTUAL_ENV=$UV_PROJECT_ENVIRONMENT uv pip install --link-mode symlink setuptools torch==2.7.0 psutil ninja --torch-backend=cu128
+VIRTUAL_ENV=$UV_PROJECT_ENVIRONMENT uv pip install --link-mode symlink flash-attn==2.7.4.post1 --no-build-isolation
+EOF
+
+RUN <<"EOF" bash -exu
 # uv sync has a more reliable resolver than simple uv pip install which can fail
 
 # Sync each training + inference backend one at a time (since they may conflict)
@@ -77,14 +84,16 @@ uv sync --link-mode symlink --locked --extra mcore --no-install-project
 uv sync --link-mode symlink --locked --all-groups --no-install-project
 EOF
 
+RUN VIRTUAL_ENV=$UV_PROJECT_ENVIRONMENT uv pip install --link-mode=symlink /opt/NeMo-RL/3rdparty/Megatron-LM-workspace/Megatron-LM
 ENV PATH="/opt/nemo_rl_venv/bin:$PATH"
 ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
 
-# Prefetch all virtual environments
-# Copy entire source to temp location, run prefetch, then clean up
-RUN cp -r /opt/NeMo-RL /tmp/nemo-rl-prefetch && cd /tmp/nemo-rl-prefetch && \
-    UV_PROJECT_ENVIRONMENT="/tmp/nemo-rl-prefetch/.venv" uv run nemo_rl/utils/prefetch_venvs.py && \
-    cd / && \
-    rm -rf /tmp/nemo-rl-prefetch
+
+
+WORKDIR /opt/NeMo-RL
+ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
+
+# Copy in source and prefetch all virtual environments
+RUN UV_LINK_MODE=symlink uv run nemo_rl/utils/prefetch_venvs.py
 
 RUN git clone https://github.com/NVIDIA/NeMo-Skills.git /opt/NeMo-Skills && cd /opt/NeMo-Skills && uv pip install .

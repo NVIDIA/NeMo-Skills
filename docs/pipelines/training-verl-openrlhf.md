@@ -83,7 +83,7 @@ ppo_openrlhf(
     # this is used for the LLM judge
     server_gpus=8,
     server_type='trtllm',
-    server_model='/trt_models/qwen2.5-32b-instruct',
+    server_model='/hf_models/Qwen2.5-32B-Instruct',
     num_training_jobs=1,
 )
 ```
@@ -119,7 +119,7 @@ ppo_verl(
     # this is used for the LLM judge
     server_gpus=8,
     server_type='trtllm',
-    server_model='/trt_models/qwen2.5-32b-instruct',
+    server_model='/hf_models/Qwen2.5-32B-Instruct',
     num_training_jobs=1,
 )
 ```

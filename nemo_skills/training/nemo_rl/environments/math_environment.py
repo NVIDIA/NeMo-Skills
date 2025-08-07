@@ -69,11 +69,13 @@ class HFVerifyWorker:
                 # surface any other unexpected error so that we don't silently assign zero reward
                 with _mute_output():
                     ret_score = float(math_equal(ground_truth, extract_answer(response)))
+                    extracted_asnwer = extract_answer(response)
             except TimeoutException:
                 logging.warning("math_verify timed out while checking response; assigning 0 reward")
                 ret_score = 0.0
+                extracted_asnwer = None
 
-            results.append(float(ret_score))
+            results.append((ret_score, extracted_asnwer))
         return results
 
 
@@ -143,16 +145,17 @@ class MathEnvironment(EnvironmentInterface):
 
         # flatten the results
         results = [item for sublist in results for item in sublist]
+        # Unpack scores and extracted answers
+        scores, extracted_answers = zip(*results)
         observations = [
             {
                 "role": "environment",
-                "content": "Environment: correct" if result else "Environment: incorrect",
+                "content": "Environment: correct" if score else "Environment: incorrect",
             }
-            for result in results
+            for score in scores
         ]
-
-        # create a tensor of rewards and done flags
-        rewards = torch.tensor(results).cpu()
+        # Build reward and done tensors
+        rewards = torch.tensor(scores).cpu()
         done = torch.ones_like(rewards).cpu()
 
         next_stop_strings = [None] * len(message_log_batch)
@@ -163,6 +166,7 @@ class MathEnvironment(EnvironmentInterface):
             next_stop_strings=next_stop_strings,
             rewards=rewards,
             terminateds=done,
+            answers=list(extracted_answers),
         )
 
     def global_post_process_and_metrics(

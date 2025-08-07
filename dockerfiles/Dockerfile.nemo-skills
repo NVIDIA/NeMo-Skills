@@ -7,11 +7,10 @@ RUN apt-get update && apt-get -y install curl git git-lfs
 RUN mkdir /opt/benchmarks
 RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1
 
-RUN mkdir -p /opt/NeMo-Skills/requirements
-COPY pyproject.toml README.md /opt/NeMo-Skills/
-COPY nemo_skills /opt/NeMo-Skills/nemo_skills/
-COPY requirements /opt/NeMo-Skills/requirements/
-RUN cd /opt/NeMo-Skills && pip install -e .[all]
+# ifbench
+RUN git clone https://github.com/allenai/IFBench.git /opt/benchmarks/IFBench --depth=1
+RUN cd /opt/benchmarks/IFBench && sed -i '/^unicodedata[=<>]*.*$/d' requirements.txt && pip install -r requirements.txt
+RUN cd /opt/benchmarks
 
 RUN pip install langdetect absl-py immutabledict nltk ipython && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
@@ -19,3 +18,15 @@ RUN pip install langdetect absl-py immutabledict nltk ipython && \
 RUN git clone https://github.com/ShishirPatil/gorilla.git /opt/gorilla
 RUN cd /opt/gorilla && git checkout d2177992bbba9aa228b53c0645bf8f5613a5a7c6
 RUN cd /opt/gorilla/berkeley-function-call-leaderboard && pip install -e .
+
+# installing apptainer
+RUN apt install -y wget && \
+    cd /tmp && \
+    wget https://github.com/apptainer/apptainer/releases/download/v1.4.1/apptainer_1.4.1_amd64.deb && \
+    apt install -y ./apptainer_1.4.1_amd64.deb
+
+RUN mkdir -p /opt/NeMo-Skills/requirements
+COPY pyproject.toml README.md /opt/NeMo-Skills/
+COPY nemo_skills /opt/NeMo-Skills/nemo_skills/
+COPY requirements /opt/NeMo-Skills/requirements/
+RUN cd /opt/NeMo-Skills && pip install -e .[all]

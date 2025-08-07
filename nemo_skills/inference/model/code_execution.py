@@ -17,14 +17,11 @@ import asyncio
 import copy
 import logging
 import time
-import uuid
-from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.model.base import BaseModel
 from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
@@ -51,22 +48,7 @@ class CodeExecutionWrapper:
         self.sandbox = sandbox
         self.config = config
 
-        self.gen_id_to_params = {}
-        self.gen_id_to_future = {}
-        self.cancelled_gen_ids = set()  # Track cancelled generation IDs
-
-        self.executor = ThreadPoolExecutor(max_workers=1024)  # is this too much?
-
-        if hasattr(model, '_generate_single_async') and hasattr(model, 'cancel_generations'):
-            self._can_cancel_generations = True
-        else:
-            self._can_cancel_generations = False
-
-    def _is_generation_cancelled(self, gen_id):
-        """Check if a generation has been requested to be cancelled."""
-        return gen_id in self.cancelled_gen_ids
-
-    def _generate_single(
+    async def _generate_single(
         self,
         prompt: str | list,
         code_begin: str,
@@ -96,7 +78,7 @@ class CodeExecutionWrapper:
             raise NotImplementedError("top_logprobs is not supported yet.")
 
         if stream:
-            return self._stream_single(
+            return await self._stream_single(
                 prompt=prompt,
                 code_begin=code_begin,
                 code_end=code_end,
@@ -160,31 +142,7 @@ class CodeExecutionWrapper:
                 if request['timeout'] <= 0:
                     break
 
-            # Check if generation has been cancelled before proceeding
-            if gen_id is not None and self._is_generation_cancelled(gen_id):
-                break
-
-            if self._can_cancel_generations:
-                # Wait for generation to finish while periodically checking for cancellation
-                # TODO: clean up the interface to always use public method, not just in this case
-                request["prompts"] = [request.pop("prompt")]
-                async_gen_id = self.model.generate_async(**request, remove_stop_phrases=False)[0]
-                while True:
-                    time.sleep(0.5)
-                    # Check periodically if generation should be cancelled
-                    if gen_id is not None and self._is_generation_cancelled(gen_id):
-                        self.model.cancel_generations([async_gen_id])
-                        break
-
-                    output_dict = self.model.get_generations([async_gen_id])[0]
-                    if output_dict['generation'] is not None:
-                        break
-
-                if gen_id is not None and self._is_generation_cancelled(gen_id):
-                    break
-                request["prompt"] = request.pop("prompts")[0]
-            else:
-                output_dict = self.model._generate_single(**request)
+            output_dict = self.model.generate_sync(**request, remove_stop_phrases=False)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
@@ -217,7 +175,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = self.execute_generated_code(
+                code_execution_time_start, execution_dict = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
                 remaining_code_executions = None
@@ -253,12 +211,12 @@ class CodeExecutionWrapper:
             'stopped_on_repetition': stopped_on_repetition,
         }
 
-    def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
+    async def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
         header = '\n'.join(self.config.code_execution_headers)
         code_block = extract_code_to_execute(output, code_begin, code_end)
         extracted_code = f'{header}{code_block}'
-        execution_dict, session_id = self.sandbox.execute_code(
+        execution_dict, session_id = await self.sandbox.execute_code(
             generated_code=extracted_code,
             language=self.config.code_execution_language,
             timeout=self.config.code_execution_timeout,
@@ -269,27 +227,26 @@ class CodeExecutionWrapper:
 
         return code_execution_time_start, execution_dict
 
-    # TODO: is there a way to reuse this with BaseModel?
-    def generate_async(
+    async def generate_async(
         self,
-        prompts: list[str | dict],
-        code_begin: str | list[str],
-        code_end: str | list[str],
-        code_output_begin: str | list[str],
-        code_output_end: str | list[str],
-        code_output_format: str | list[str],
-        tokens_to_generate: int | list[int] = 512,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
+        prompt: str | list,
+        code_begin: str,
+        code_end: str,
+        code_output_begin: str,
+        code_output_end: str,
+        code_output_format: str,
+        tokens_to_generate: int = 512,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        top_k: int = -1,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+        random_seed: int = 0,
+        stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
-        top_logprobs: int | list[int] | None = None,
-        timeout: int | list[int] | None = None,
-        max_code_executions: int | list[int] | None = None,
+        top_logprobs: int | None = None,
+        timeout: int | None = None,
+        max_code_executions: int | None = None,
         stream: bool = False,
         extra_body: dict = None,
     ) -> list[dict]:
@@ -297,11 +254,9 @@ class CodeExecutionWrapper:
 
         Not every server supports that, so make sure to override this method directly if that's not the case.
         """
-        # TODO: currently nemo server would get separate 1-batch requests, which is likely really inefficient
-        #       but the alternative is to have a fully separate implementation, which is also not nice
-        #       If we find ourselves needing to use nemo with code execution often, we should fix this
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
+        
         kwargs = {
             'code_begin': code_begin,
             'code_end': code_end,
@@ -321,155 +276,16 @@ class CodeExecutionWrapper:
             "stream": stream,
             "extra_body": extra_body,
         }
-        for key, value in kwargs.items():
-            is_list = False
-            if key == 'stop_phrases' and (value and isinstance(value[0], list)):
-                is_list = True
-            if key != 'stop_phrases' and isinstance(value, list):
-                is_list = True
-            if is_list and len(value) != len(prompts):
-                raise ValueError(f"Length of {key} should match the number of prompts.")
-            if not is_list:
-                kwargs[key] = [value for _ in range(len(prompts))]
-
-        gen_ids = []
-        for request_idx in range(len(prompts)):
-            request = {key: value[request_idx] for key, value in kwargs.items()}
-            request['prompt'] = prompts[request_idx]
-            self.model.preprocess_request(request)
-            gen_id = str(uuid.uuid4())
-            # Pass the gen_id to _generate_single
-            future = self.executor.submit(self._generate_single, gen_id=gen_id, **request)
-            self.gen_id_to_future[gen_id] = future
-            self.gen_id_to_params[gen_id] = (request['stop_phrases'], remove_stop_phrases)
-            gen_ids.append(gen_id)
-
-        return gen_ids
-
-    def cancel_generations(self, generation_ids: list[str]) -> list[str]:
-        if not self._can_cancel_generations:
-            raise NotImplementedError("This model does not support cancelling generations.")
-
-        statuses = []
-        for generation_id in generation_ids:
-            if generation_id not in self.gen_id_to_future:
-                raise ValueError(f"Generation id {generation_id} not found.")
-
-            # Mark this generation as cancelled - it will be actually cancelled in the generate_single loop
-            self.cancelled_gen_ids.add(generation_id)
-            statuses.append("canceled")
-
-            # TODO: more checks?
-
-        return statuses
-
-    def get_generations(
-        self,
-        generation_ids: list[str],
-    ) -> list[dict]:
-
-        generations = []
-        for generation_id in generation_ids:
-            if generation_id not in self.gen_id_to_future:
-                raise ValueError(f"Generation id {generation_id} not found.")
-
-            stop_phrases, remove_stop_phrases = self.gen_id_to_params[generation_id]
-            future = self.gen_id_to_future[generation_id]
-            if not future.done():
-                output = {
-                    'generation': None,
-                    'code_rounds_executed': None,
-                    'num_generated_tokens': None,
-                    'generation_time': None,
-                    'code_execution_time': None,
-                    'stopped_on_repetition': None,
-                }
-            else:
-                output = future.result()
-                del self.gen_id_to_future[generation_id]
-                del self.gen_id_to_params[generation_id]
-
-            if remove_stop_phrases:
-                if isinstance(output, dict) and output['generation'] is not None:
-                    output['generation'] = trim_after_stop_phrases(output['generation'], stop_phrases)
-
-            generations.append(output)
-
-        return generations
-
-    def generate(
-        self,
-        prompts: list[str | dict],
-        code_begin: str | list[str],
-        code_end: str | list[str],
-        code_output_begin: str | list[str],
-        code_output_end: str | list[str],
-        code_output_format: str | list[str],
-        tokens_to_generate: int | list[int] = 512,
-        temperature: float | list[float] = 0.0,
-        top_p: float | list[float] = 0.95,
-        top_k: int | list[int] = 0,
-        min_p: float | list[float] = 0.0,
-        repetition_penalty: float | list[float] = 1.0,
-        random_seed: int | list[int] = 0,
-        stop_phrases: list[str] | list[list[str]] | None = None,
-        remove_stop_phrases: bool = True,
-        top_logprobs: int | list[int] | None = None,
-        timeout: int | list[int] | None = None,
-        max_code_executions: int | list[int] | None = None,
-        stream: bool = False,
-        extra_body: dict = None,
-    ) -> list[dict]:
-        """For any generation parameter you can specify a list of values that needs to match the number of prompts.
-
-        Not every server supports that, so make sure to override this method directly if that's not the case.
-        """
-        generation_ids = self.generate_async(
-            prompts=prompts,
-            code_begin=code_begin,
-            code_end=code_end,
-            code_output_begin=code_output_begin,
-            code_output_end=code_output_end,
-            code_output_format=code_output_format,
-            tokens_to_generate=tokens_to_generate,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            random_seed=random_seed,
-            stop_phrases=stop_phrases,
-            remove_stop_phrases=remove_stop_phrases,
-            top_logprobs=top_logprobs,
-            timeout=timeout,
-            max_code_executions=max_code_executions,
-            stream=stream,
-            extra_body=extra_body,
-        )
-        all_generations = [None] * len(prompts)
-        while True:
-            remaining_ids = [generation_id for generation_id in generation_ids if generation_id is not None]
-            if len(remaining_ids) == 0:
-                break
-            remaining_positions = [
-                idx for idx, generation_id in enumerate(generation_ids) if generation_id is not None
-            ]
-            generations = self.get_generations(remaining_ids)
-            for gen_pos, gen_dict in zip(remaining_positions, generations):
-                if isinstance(gen_dict, Generator) or gen_dict['generation'] is not None:  # will be None until done
-                    generation_ids[gen_pos] = None
-                    all_generations[gen_pos] = gen_dict
-
-            time.sleep(1)
-
-        return all_generations
-
-    async def generate_asyncio(self, *args, **kwargs) -> dict:
-        result = await asyncio.to_thread(self.generate, *args, **kwargs)
-        assert len(result) == 1, "generate_asyncio should return a single result"
-        return result[0]
-
-    def _stream_single(
+        
+        request = {key: value for key, value in kwargs.items()}
+        request['prompt'] = prompt
+        
+        output = await self._generate_single(**request)
+        self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
+        
+        return output
+    
+    async def _stream_single(
         self,
         prompt: str,
         code_begin: str,
@@ -480,7 +296,7 @@ class CodeExecutionWrapper:
         tokens_to_generate: int = 512,
         temperature: float = 0.0,
         top_p: float = 0.95,
-        top_k: int = 0,
+        top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
@@ -553,7 +369,7 @@ class CodeExecutionWrapper:
             if current_output_segment.endswith(code_end) and current_output_segment.rfind(
                 code_begin
             ) > current_output_segment.rfind(code_end, 0, -1):
-                execution_dict, session_id = self.sandbox.execute_code(
+                execution_dict, session_id = await self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
                     language=self.config.code_execution_language,
                     timeout=self.config.code_execution_timeout,

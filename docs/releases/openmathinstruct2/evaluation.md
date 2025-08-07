@@ -15,26 +15,6 @@ pip install -U "huggingface_hub[cli]"
 huggingface-cli download nvidia/OpenMath2-Llama3.1-8B --local-dir OpenMath2-Llama3.1-8B
 ```
 
-## Convert to TensorRT-LLM
-
-Convert the model to TensorRT-LLM format. This is optional, but highly recommended for more exact
-results and faster inference. If you skip it, replace `--server_type trtllm` with `--server-type vllm`
-in the commands below and change model path to `/workspace/OpenMath2-Llama3.1-8B`.
-
-```bash
-ns convert \
-    --cluster=local \
-    --input_model=/workspace/OpenMath2-Llama3.1-8B \
-    --output_model=/workspace/openmath2-llama3.1-8b-trtllm \
-    --convert_from=hf \
-    --convert_to=trtllm \
-    --model_type=llama \
-    --num_gpus=1 \
-    --hf_model_name=nvidia/OpenMath2-Llama3.1-8B
-```
-
-Change the number of GPUs if you have more than 1 (required for 70B model).
-
 ## Prepare evaluation data
 
 ```bash
@@ -46,7 +26,7 @@ ns prepare_data gsm8k math amc23 aime24 omni-math
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath2-llama3.1-8b-trtllm \
+    --model=/workspace/OpenMath2-Llama3.1-8B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath2-llama3.1-8b-eval \
     --benchmarks=aime24,amc23,math,gsm8k,omni-math \
@@ -118,7 +98,7 @@ The numbers may vary by 1-2% depending on the server type, number of GPUs and ba
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath2-llama3.1-8b-trtllm \
+    --model=/workspace/OpenMath2-Llama3.1-8B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath2-llama3.1-8b-eval \
     --benchmarks=aime24:256,amc23:256,math:256,gsm8k:256,omni-math:256 \

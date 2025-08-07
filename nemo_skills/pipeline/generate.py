@@ -36,7 +36,6 @@ class GenerationType(str, Enum):
 
 GENERATION_MODULE_MAP = {
     GenerationType.generate: "nemo_skills.inference.generate",
-    GenerationType.reward: "nemo_skills.inference.reward_model",
     GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
     GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
 }

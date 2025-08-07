@@ -19,6 +19,7 @@ import os
 import pprint
 from functools import partial
 from typing import Any, Dict
+from pathlib import Path
 
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
@@ -31,6 +32,75 @@ from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 from omegaconf import OmegaConf
 from transformers import AutoTokenizer
+from datasets import load_dataset, load_from_disk, Dataset
+
+class PromptResponseDataset:
+    def __init__(
+        self,
+        train_ds_path: str,
+        val_ds_path: str,
+        input_key: str = "input",
+        output_key: str = "output",
+        num_proc: int | None = None,
+        force_reprocess: bool = False,  # Only keep this to control overwriting
+    ):
+        self.input_key = input_key
+        self.output_key = output_key
+        self.force_reprocess = force_reprocess
+
+        # Auto-determine number of processes
+        if num_proc is None:
+            cpu_count = os.cpu_count() or 2
+            self.num_proc = min(8, cpu_count)
+        else:
+            self.num_proc = num_proc
+
+        # Train and validation set processing
+        self.formatted_ds = {
+            "train": self.load_or_process_split(train_ds_path, "train"),
+            "validation": self.load_or_process_split(val_ds_path, "val"),
+        }
+
+        self.task_spec = TaskDataSpec("json_dataset")
+
+    def load_or_process_split(self, path: str, split_name: str) -> Dataset:
+        data_path = Path(path)
+
+        # Cache path: same folder as data file
+        cache_dir = data_path.parent / ".cache" / split_name
+
+        # Use cached version unless forced to reprocess
+        if cache_dir.exists() and not self.force_reprocess:
+            print(f"[Cache] Loading {split_name} dataset from: {cache_dir}")
+            return load_from_disk(str(cache_dir))
+
+        # Reprocess and save
+        print(f"[Map] Processing {split_name} dataset from: {path}")
+        raw_dataset = load_dataset("json", data_files=str(path))["train"]
+
+        mapped_dataset = raw_dataset.map(
+            self.add_messages_key,
+            batched=True,
+            num_proc=self.num_proc,
+        )
+
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        mapped_dataset.save_to_disk(str(cache_dir))
+        print(f"[Cache] Saved {split_name} dataset to: {cache_dir}")
+
+        return mapped_dataset
+
+    def add_messages_key(self, examples: dict[str, list[Any]]) -> dict[str, list[list[dict[str, Any]]]]:
+        return {
+            "messages": [
+                [
+                    {"role": "user", "content": input_},
+                    {"role": "assistant", "content": output},
+                ]
+                for input_, output in zip(examples[self.input_key], examples[self.output_key])
+            ]
+        }
+
 
 
 def parse_args():
@@ -94,11 +164,12 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     elif data_cls == "squad":
         data = hf_datasets.SquadDataset()
     elif data_cls == "prompt_response_dataset":
-        data = hf_datasets.PromptResponseDataset(
+        data = PromptResponseDataset(
             data_config["train_data_path"],
             data_config["val_data_path"],
             data_config["input_key"],
             data_config["output_key"],
+            force_reprocess=data_config.get("force_reprocess", False),
         )
     elif data_cls == "openmathinstruct2":
         data = hf_datasets.OpenMathInstruct2Dataset(
@@ -159,7 +230,8 @@ def main():
     if overrides:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
-
+        
+    OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 

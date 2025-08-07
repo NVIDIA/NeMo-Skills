@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 from dataclasses import asdict, field
 
@@ -49,9 +50,7 @@ def eval_math(cfg):
 class LeanEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
     num_parallel_requests: int = 10
-    in_memory_lines: int = 500
     timeout: float = 30.0
-    ignore_cache: bool = False
     final_answer_key: str = "**FINAL ANSWER**"
     restate_formal_statement: bool = True
 
@@ -62,10 +61,12 @@ def eval_lean4_proof(cfg):
     sandbox = get_sandbox(**eval_config.sandbox)
     eval_config_dict = asdict(eval_config)
     eval_config_dict.pop('sandbox')
-    sandbox.batch_evaluate_results(
-        input_files=cfg.input_files,
-        answer_format='lean4-proof',
-        **eval_config_dict,
+    asyncio.run(
+        sandbox.batch_evaluate_results(
+            input_files=cfg.input_files,
+            answer_format='lean4-proof',
+            **eval_config_dict,
+        )
     )
 
 
@@ -75,8 +76,10 @@ def eval_lean4_statement(cfg):
     sandbox = get_sandbox(**eval_config.sandbox)
     eval_config_dict = asdict(eval_config)
     eval_config_dict.pop('sandbox')
-    sandbox.batch_evaluate_results(
-        input_files=cfg.input_files,
-        answer_format='lean4-statement',
-        **eval_config_dict,
+    asyncio.run(
+        sandbox.batch_evaluate_results(
+            input_files=cfg.input_files,
+            answer_format='lean4-statement',
+            **eval_config_dict,
+        )
     )

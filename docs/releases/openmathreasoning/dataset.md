@@ -53,35 +53,6 @@ huggingface-cli download Qwen/QwQ-32B --local-dir QwQ-32B
 huggingface-cli download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
 ```
 
-Convert the model to TensorRT-LLM with the following (you can skip this and make corresponding changes in the pipeline
-scripts to run with `server_type=vllm` or `server_type=sglang`)
-
-```bash
-ns convert \
-   --cluster=slurm \
-   --input_model=/hf_models/Qwen2.5-32B-Instruct \
-   --output_model=/trt_models/qwen2.5-32b-instruct \
-   --convert_from=hf \
-   --convert_to=trtllm \
-   --num_gpus=8 \
-   --model_type=qwen \
-   --hf_model_name=Qwen/Qwen2.5-32B-Instruct \
-   --max_input_len 24580 \
-   --max_seq_len 32768
-
-ns convert \
-   --cluster=slurm \
-   --input_model=/hf_models/QwQ-32B \
-   --output_model=/trt_models/qwq-32b \
-   --convert_from=hf \
-   --convert_to=trtllm \
-   --num_gpus=8 \
-   --model_type=qwen \
-   --hf_model_name=Qwen/QwQ-32B \
-   --max_input_len 24580 \
-   --max_seq_len 32768
-```
-
 At the time of our experiments serving DeepSeek-R1 model with sglang was faster than with TensorRT-LLM, so
 we do not convert that model, but instead prepare a sharded checkpoint that is much faster to load.
 

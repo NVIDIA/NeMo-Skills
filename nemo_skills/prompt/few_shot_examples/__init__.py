@@ -16,6 +16,7 @@ from nemo_skills.prompt.few_shot_examples.math import examples_map as examples_m
 from nemo_skills.prompt.few_shot_examples.lean4 import examples_map as examples_lean4
 from nemo_skills.prompt.few_shot_examples.mmlu_pro import examples_map as examples_mmlu_pro
 from nemo_skills.prompt.few_shot_examples.mmlu import examples_map as examples_mmlu
+from nemo_skills.prompt.few_shot_examples.open_science import examples_map as examples_open_science
 
 all_example_sets = [
     examples_gsm8k,
@@ -23,6 +24,7 @@ all_example_sets = [
     examples_lean4,
     examples_mmlu_pro,
     examples_mmlu,
+    examples_open_science,
 ]
 
 examples_map = {k: v for d in all_example_sets for k, v in d.items()}

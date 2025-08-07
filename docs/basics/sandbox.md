@@ -14,15 +14,17 @@ Please note that our provided sandbox is not fully secure and you are strongly e
 setup a properly configured virtual machine such that generated code executes in an unprivileged environment
 with no external network access unless necessary.
 
-## Piston sandbox
-
-A better alternative is to host a [Piston server](https://github.com/engineer-man/piston)
-in a properly configured VM. If you're using a Piston server (you need to host it yourself),
-add the following parameters to the relevant scripts
+Most of the time, the pipeline scripts will launch sandbox automatically when requested. But if you want to launch
+it manually, you can use the following command
 
 ```bash
-++sandbox_type=piston
-++sandbox.host=<where your server is hosted, e.g. https://emkc.org/api/v2/piston>
+docker run --rm --network=host igitman/nemo-skills-sandbox:0.7.0
+```
+
+If docker is not available, you can still run a sandbox (although less efficient version) like this
+
+```bash
+python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server
 ```
 
 ## Other sandboxes
