@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Scoring based on: https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+
 
 def compute_score(metrics: dict):
     mmlu_pro = metrics['mmlu-pro']['pass@1']['symbolic_correct']
@@ -30,23 +32,13 @@ def compute_score(metrics: dict):
 
     math_score = aime25
     code_score = (scicode + livecodebench) / 2
-    reasoning_knowledge_score = (mmlu_pro + hle) / 2
-    science_score = gpqa
-    if_score = ifbench
 
-    # long_context_reasoning_score = aalcr
-    long_context_reasoning_score = 0.0
-
-    overall_score = (mmlu_pro + hle + gpqa + aime25 + scicode + livecodebench + if_score + long_context_reasoning_score) / 8
+    overall_score = (mmlu_pro + hle + gpqa + aime25 + scicode + livecodebench + ifbench + aalcr) / 8
     
     return {
         'overall_score': overall_score,
         'math_score': math_score,
         'code_score': code_score,
-        'reasoning_knowledge_score': reasoning_knowledge_score,
-        'science_score': science_score,
-        'if_score': if_score,
-        'long_context_reasoning_score': long_context_reasoning_score,
         'mmlu_pro': mmlu_pro,
         'hle': hle,
         'gpqa': gpqa,
