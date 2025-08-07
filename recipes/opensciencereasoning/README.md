@@ -1,6 +1,9 @@
 # Reproducing the OpenScience Dataset collection
 
-This recipe contains the scripts and prompts to reproduce the **OpenScience** dataset, as described in the paper "A Scalable LLM Framework for Seed-Free Synthetic Data Generation".
+This recipe contains the scripts and prompts to reproduce the **OpenScience** datasets:
+
+* [OpenScienceReasoning-2](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2)
+* [OpenScience](https://huggingface.co/datasets/nvidia/OpenScience)
 
 ## What We Share
 
