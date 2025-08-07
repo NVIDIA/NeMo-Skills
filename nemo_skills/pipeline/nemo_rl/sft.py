@@ -14,11 +14,10 @@
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import List
 
 import typer
-from enum import Enum
-
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
@@ -26,21 +25,23 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_mounts,
     get_cluster_config,
+    get_env_variables,
     get_exp,
     get_mounted_path,
     get_timeout,
     resolve_mount_paths,
     run_exp,
-    get_env_variables
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+
 # Define supported backend options using Enum
 class SupportedBackends(str, Enum):
     fsdp = "fsdp"
     megatron = "megatron"
+
 
 @dataclass
 class NemoRLTask:
@@ -69,6 +70,10 @@ class NemoRLTask:
             f"++logger.log_dir={self.log_dir} "
             f"++checkpointing.checkpoint_dir={self.output_dir}/checkpoints "
         )
+        if self.backend == "megatron":
+            cmd += " ++policy.dtensor_cfg.enabled=false ++policy.megatron_cfg.enabled=true "
+        else:
+            cmd += " ++policy.dtensor_cfg.enabled=true ++policy.megatron_cfg.enabled=false "
         return cmd
 
     def format_data_args(self):
@@ -88,7 +93,7 @@ class NemoRLTask:
         return cmd
 
     def get_cmd(self):
-        self.logging_params = self.format_wandb_args()        
+        self.logging_params = self.format_wandb_args()
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
@@ -101,6 +106,7 @@ class NemoRLTask:
         )
 
         return cmd
+
 
 def get_training_cmd(
     cluster_config,
@@ -137,7 +143,7 @@ def get_training_cmd(
         extra_arguments=extra_arguments,
         log_dir=log_dir,
         env_variables=env_variables,
-        backend=backend
+        backend=backend,
     )
 
     return task.get_cmd()
@@ -150,13 +156,9 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
         f"cd /nemo_run/code && "
     )
     if backend == "fsdp":
-        cmd += (
-            "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
-        )
+        cmd += "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
     elif backend == "megatron":
-        cmd += (
-            "uv run --extra mcore python -m nemo_skills.training.nemo_rl.convert_megatron_to_hf "
-        )
+        cmd += "uv run --extra mcore python -m nemo_skills.training.nemo_rl.convert_megatron_to_hf "
     else:
         raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
 
@@ -200,9 +202,7 @@ def sft_nemo_rl(
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
-        ...,  # Required
-        "--backend",
-        help="Choose backend. Supported options: fsdp, megatron"
+        ..., "--backend", help="Choose backend. Supported options: fsdp, megatron"  # Required
     ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -270,10 +270,10 @@ def sft_nemo_rl(
     if backend == "megatron":
         if "HF_HOME" not in env_variables:
             raise typer.BadParameter(
-                    "Missing required environment variable 'HF_HOME' for 'megatron' backend.\n"
-                    "You can set it in your cluster config like this:\n"
-                    '  env_vars: ["HF_HOME=/your/path/to/hf_home"]'
-                )
+                "Missing required environment variable 'HF_HOME' for 'megatron' backend.\n"
+                "You can set it in your cluster config like this:\n"
+                '  env_vars: ["HF_HOME=/your/path/to/hf_home"]'
+            )
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
@@ -336,7 +336,7 @@ def sft_nemo_rl(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
                 step=conversion_step,
-                backend=backend
+                backend=backend,
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",
