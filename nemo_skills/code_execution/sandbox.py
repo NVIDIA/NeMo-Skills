@@ -20,8 +20,6 @@ import logging
 import os
 import re
 import uuid
-from concurrent.futures import ThreadPoolExecutor
-
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -132,7 +130,7 @@ class Sandbox(abc.ABC):
         if self.ssh_server and self.ssh_key_path:
             # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
-            
+
             def ssh_request():
                 sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
                 return sshtunnel_request.post(
@@ -141,6 +139,7 @@ class Sandbox(abc.ABC):
                     timeout=timeout,
                     headers={"Content-Type": "application/json"},
                 )
+
             # Native async requires more lines of code, so we use to_thread
             # Should be ok since this is a debug mode
             output = await asyncio.to_thread(ssh_request)
@@ -296,24 +295,22 @@ print(json.dumps(to_return))
         strip_theorem_from_proof: bool = True,
     ):
         """Evaluate results and write back to original files."""
-        
+
         semaphore = asyncio.Semaphore(num_parallel_requests)
-        
+
         async def process_line(line_data):
             """Process a single line and return updated line data."""
             if not line_data or not line_data.strip():
                 return line_data
-                
+
             line_dict = json.loads(line_data)
             if not line_dict:
                 return line_data
-            
+
             # Prepare predicted_proof based on format
             if answer_format == "lean4-proof":
                 if not use_predicted_proof_key:
-                    generation = clean_formal_generation(
-                        line_dict["generation"], final_answer_key=final_answer_key
-                    )
+                    generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
                     line_dict["predicted_proof"] = (
                         line_dict["header"]
                         + (line_dict["formal_statement"] if restate_formal_statement else '')
@@ -345,7 +342,7 @@ print(json.dumps(to_return))
             async with semaphore:
                 proof_status = await self.is_proof_correct(line_dict["predicted_proof"], timeout=timeout)
                 line_dict["proof_status"] = proof_status
-            
+
             return json.dumps(line_dict)
 
         # Process each file
@@ -353,20 +350,20 @@ print(json.dumps(to_return))
             # Read all lines
             with open(input_file, "rt", encoding="utf-8") as f:
                 lines = f.readlines()
-            
+
             # Process lines concurrently with progress bar
             print(f"Processing {input_file}...")
             processed_lines = []
             for line in tqdm.tqdm(lines):
                 result = await process_line(line.rstrip('\n'))
                 processed_lines.append(result)
-            
+
             # Write to temp file then replace original
             temp_file = input_file + "-tmp"
             with open(temp_file, "wt", encoding="utf-8") as f:
                 for line in processed_lines:
                     f.write(line + "\n")
-            
+
             # Replace original with temp file
             os.replace(temp_file, input_file)
 
@@ -393,38 +390,8 @@ class LocalSandbox(Sandbox):
         }
 
 
-class PistonSandbox(Sandbox):
-    """Piston sandbox (https://github.com/engineer-man/piston)"""
-
-    def _get_execute_url(self):
-        return f"{self.host}/execute"
-
-    def _parse_request_output(self, output):
-        output = output.json()
-        if output['run']['signal'] == "SIGKILL":
-            return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
-        return json.loads(output['run']['output'])
-
-    def _prepare_request(self, generated_code, timeout):
-        return {
-            "language": "py",
-            "version": "3.10.0",
-            "files": [
-                {
-                    "content": generated_code,
-                }
-            ],
-            "stdin": "",
-            "args": [],
-            "run_timeout": timeout * 1000.0,  # milliseconds
-            "compile_memory_limit": -1,
-            "run_memory_limit": -1,
-        }
-
-
 sandboxes = {
     'local': LocalSandbox,
-    'piston': PistonSandbox,
 }
 
 
