@@ -17,7 +17,7 @@
 # NOTE: needs to run from the root of the repo!
 
 SANDBOX_NAME=${1:-'local-sandbox'}
-DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-'single'}
+DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-'multi-worker'}
 
 docker build --tag=${SANDBOX_NAME} --build-arg="UWSGI_PROCESSES=$((nproc --all * 10))" --build-arg="UWSGI_CHEAPER=nproc --all" -f dockerfiles/Dockerfile.sandbox .
 
