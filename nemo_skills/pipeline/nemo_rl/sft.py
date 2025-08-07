@@ -82,18 +82,11 @@ class NemoRLTask:
         return cmd
 
     def get_cmd(self):
-        self.logging_params = self.format_wandb_args()
-        # Conditionally add HF_HOME export only for 'megatron' backend
-        hf_home_export = ""
-        if self.backend == "megatron":
-            hf_home_export = f"export HF_HOME={self.env_variables['HF_HOME']} && "
-        
+        self.logging_params = self.format_wandb_args()        
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
-            f"{hf_home_export}"
             f"echo 'Starting training' && "
-            f"cd /opt/NeMo-RL && "
             f"NRL_FORCE_REBUILD_VENVS=true uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"  {self.format_train_args()} "
             f"  {self.format_data_args()} "
@@ -102,8 +95,6 @@ class NemoRLTask:
         )
 
         return cmd
-
-
 
 def get_training_cmd(
     cluster_config,
