@@ -82,9 +82,8 @@ ENV UWSGI_CHEAPER=$UWSGI_CHEAPER
 ARG UWSGI_PROCESSES
 ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 
-# Default to single worker mode (original behavior)
-# Set DEPLOYMENT_MODE=multi-worker to enable multiple workers with nginx
-ENV DEPLOYMENT_MODE=single
+# Set DEPLOYMENT_MODE=single to disable multiple workers
+ENV DEPLOYMENT_MODE=multi-worker
 
 # Conditional startup based on deployment mode
 CMD if [ "$DEPLOYMENT_MODE" = "multi-worker" ]; then \
