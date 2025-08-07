@@ -1,0 +1,13 @@
+# AA-LCR (Artificial Analysis Long Context Reading) judge prompt
+# Based on the official AA-LCR scoring approach using Qwen3 235B A22B 2507 Non-reasoning
+
+system: ""
+
+user: |-
+    Assess whether the following CANDIDATE ANSWER is CORRECT or INCORRECT. For the CANDIDATE ANSWER to be correct, it must be consistent with the OFFICIAL ANSWER.
+
+    The question, for reference only: {problem}
+    The OFFICIAL ANSWER: {expected_answer}
+    CANDIDATE ANSWER TO ASSESS: {predicted_answer}
+
+    Reply only with CORRECT or INCORRECT.
