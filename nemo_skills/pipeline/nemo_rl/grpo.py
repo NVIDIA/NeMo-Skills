@@ -14,6 +14,7 @@
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import List
 
 import typer
@@ -24,6 +25,7 @@ from nemo_skills.pipeline.utils import (
     add_task,
     check_mounts,
     get_cluster_config,
+    get_env_variables,
     get_exp,
     get_mounted_path,
     get_timeout,
@@ -34,6 +36,10 @@ from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+# Define supported backend options using Enum
+class SupportedBackends(str, Enum):
+    fsdp = "fsdp"
+    megatron = "megatron"
 
 @dataclass
 class NemoRLTask:
@@ -49,6 +55,8 @@ class NemoRLTask:
     wandb_group: str
     timeout: str
     log_dir: str
+    env_variables: dict
+    backend: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -56,9 +64,16 @@ class NemoRLTask:
             f"++policy.model_name={self.model} "
             f"++cluster.gpus_per_node={self.num_gpus} "
             f"++cluster.num_nodes={self.num_nodes} "
+            f"++checkpointing.checkpoint_must_save_by={self.timeout} "
             f"++logger.log_dir={self.log_dir} "
             f"++checkpointing.checkpoint_dir={self.output_dir}/checkpoints "
         )
+        if self.backend == "megatron":
+            cmd += " ++policy.dtensor_cfg.enabled=false ++policy.megatron_cfg.enabled=true "
+            cmd += " ++policy.optimizer=None ++policy.dynamic_batching.enabled=false "
+        else:
+            cmd += " ++policy.dtensor_cfg.enabled=true ++policy.megatron_cfg.enabled=false "
+
         return cmd
 
     def format_data_args(self):
@@ -108,6 +123,8 @@ def get_training_cmd(
     wandb_group,
     extra_arguments,
     log_dir,
+    env_variables,
+    backend,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -125,22 +142,32 @@ def get_training_cmd(
         timeout=timeout,
         extra_arguments=extra_arguments,
         log_dir=log_dir,
+        env_variables=env_variables,
+        backend=backend,
     )
 
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path, step):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     cmd = (
         f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
         f"export UV_PROJECT=/opt/NeMo-RL && "
         f"cd /nemo_run/code && "
-        f"uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
-        f"    --training-folder={output_dir} "
-        f"    --hf-ckpt-path={final_hf_path} "
     )
+    if backend == "fsdp":
+        cmd += "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
+    elif backend == "megatron":
+        cmd += "uv run --extra mcore python -m nemo_skills.training.nemo_rl.convert_megatron_to_hf "
+    else:
+        raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
+
+    cmd += f"   --training-folder={output_dir} "
+    cmd += f"   --hf-ckpt-path={final_hf_path} "
+
     if step is not None:
         cmd += f"  --step {step} "
+
     return cmd
 
 
@@ -174,6 +201,9 @@ def grpo_nemo_rl(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
+    backend: SupportedBackends = typer.Option(
+        ..., "--backend", help="Choose backend. Supported options: fsdp, megatron"  # Required
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -237,6 +267,14 @@ def grpo_nemo_rl(
         check_mounted_paths=check_mounted_paths,
     )
 
+    env_variables = get_env_variables(cluster_config)
+    if backend == "megatron":
+        if "HF_HOME" not in env_variables:
+            raise typer.BadParameter(
+                "Missing required environment variable 'HF_HOME' for 'megatron' backend.\n"
+                "You can set it in your cluster config like this:\n"
+                '  env_vars: ["HF_HOME=/your/path/to/hf_home"]'
+            )
     if num_training_jobs > 0:
         if training_data is None:
             raise ValueError("training_data is required when num_training_jobs > 0")
@@ -262,6 +300,8 @@ def grpo_nemo_rl(
         wandb_group=wandb_group,
         extra_arguments=extra_arguments,
         log_dir=f"{log_dir}/training-logs",
+        env_variables=env_variables,
+        backend=backend,
     )
 
     server_config = None
@@ -297,6 +337,7 @@ def grpo_nemo_rl(
                 output_dir=output_dir,
                 final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
                 step=conversion_step,
+                backend=backend,
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",

@@ -83,7 +83,8 @@ def test_sft_nemo_rl(backend):
 
 
 @pytest.mark.gpu
-def test_grpo_nemo_rl():
+@pytest.mark.parametrize("backend", ["fsdp", "megatron"])
+def test_grpo_nemo_rl(backend):
     model_path = os.getenv('NEMO_SKILLS_TEST_HF_MODEL')
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
@@ -92,7 +93,7 @@ def test_grpo_nemo_rl():
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-grpo-nemo-rl"
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-grpo-nemo-rl/{backend}"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
     docker_rm(['/tmp/ray/ray_current_cluster', output_dir])
@@ -119,6 +120,7 @@ def test_grpo_nemo_rl():
         num_gpus=1,
         num_training_jobs=1,
         training_data="/nemo_run/code/tests/data/small-grpo-data.test",
+        backend=backend,
         disable_wandb=True,
     )
 
