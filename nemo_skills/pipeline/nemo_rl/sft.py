@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from typing import List
 
 import typer
+from enum import Enum
+
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
@@ -35,6 +37,10 @@ from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+# Define supported backend options using Enum
+class SupportedBackends(str, Enum):
+    fsdp = "fsdp"
+    megatron = "megatron"
 
 @dataclass
 class NemoRLTask:
@@ -193,9 +199,10 @@ def sft_nemo_rl(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    backend: str = typer.Option(
-        ..., 
-        help="Choose backend: fsdp or megatron"
+    backend: SupportedBackends = typer.Option(
+        ...,  # Required
+        "--backend",
+        help="Choose backend. Supported options: fsdp, megatron"
     ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -259,9 +266,7 @@ def sft_nemo_rl(
         check_mounted_paths=check_mounted_paths,
     )
     env_variables = get_env_variables(cluster_config)
-    if backend not in ("fsdp", "megatron"):
-        raise typer.BadParameter("Invalid backend. Must be 'fsdp' or 'megatron'")
-    
+
     if backend == "megatron":
         if "HF_HOME" not in env_variables:
             raise typer.BadParameter(
