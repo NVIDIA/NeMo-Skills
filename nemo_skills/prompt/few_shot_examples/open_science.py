@@ -321,3 +321,10 @@ open_science_aug = [
         'augmented_question': "A container initially holds 10 liters of water at 20°C. Water at 80°C is added at a rate of 2 liters per minute, while the mixture is continuously stirred and flows out at the same rate. Assuming perfect mixing, what is the temperature of the water in the container after 60 minutes? A: 30°C\nB: 40°C\nC: 50°C\nD: 60°C\nE: 70°C\nF: 80°C\nG: 90°C\nH: 100°C\nI: 25°C\nJ: 35°C",
     },
 ]
+
+examples_map = {
+    'open_science_mcq_four_options': open_science_mcq_four_options,
+    'open_science_mcq_ten_options': open_science_mcq_ten_options,
+    'open_science_aug_similar': open_science_aug_similar,
+    'open_science_aug': open_science_aug
+}
