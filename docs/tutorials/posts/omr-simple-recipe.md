@@ -247,7 +247,7 @@ ns nemo_rl sft \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
-    --cache_dir=/workspace/nemo-rl-cache \
+    --backend=fsdp \
     --final_hf_path=/workspace/training/qwen2.5-14b-improved-hf \
     ++sft.max_num_epochs=4 \
     ++policy.dtensor_cfg.tensor_parallel_size=8 \
