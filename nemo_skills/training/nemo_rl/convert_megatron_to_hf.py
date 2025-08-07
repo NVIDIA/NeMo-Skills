@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# copied from https://github.com/NVIDIA-NeMo/RL/blob/main/examples/converters/convert_megatron_to_hf.py
+# and added logic to figure out max step automatically 
 import argparse
 import os
 import re
