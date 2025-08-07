@@ -119,8 +119,8 @@ def test_grpo_nemo_rl(backend):
         num_nodes=1,
         num_gpus=1,
         num_training_jobs=1,
+        training_data="/nemo_run/code/tests/data/small-grpo-data.test",
         backend=backend,
-        training_data='/home/wedu/NeMo-Skills/tests/data/small-grpo-data.test',
         disable_wandb=True,
     )
 
