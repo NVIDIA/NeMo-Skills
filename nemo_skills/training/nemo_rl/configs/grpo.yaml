@@ -46,14 +46,17 @@ policy:
   fsdp_offload_enabled: false
   activation_checkpointing_enabled: false
   refit_buffer_size_gb: 4 # used for refitting inference engine, the unit is GB
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  context_parallel_size: 1
 
   dtensor_cfg:
     enabled: true
     cpu_offload: False
     sequence_parallel: false
     activation_checkpointing: false
-    tensor_parallel_size: 1
-    context_parallel_size: 1
+    tensor_parallel_size: ${policy.tensor_model_parallel_size}
+    context_parallel_size: ${policy.context_parallel_size}
     custom_parallel_plan: null
 
   # dynamic_batching improves performance by ensuring logprob and training microbatches
@@ -99,13 +102,13 @@ policy:
     empty_unused_memory_level: 0
     activation_checkpointing: false
     converter_type: "Qwen2ForCausalLM"
-    tensor_model_parallel_size: 1
+    tensor_model_parallel_size: ${policy.tensor_model_parallel_size}
     expert_tensor_parallel_size: 1
     expert_model_parallel_size: 1
-    pipeline_model_parallel_size: 1
+    pipeline_model_parallel_size: ${policy.pipeline_model_parallel_size}
     num_layers_in_first_pipeline_stage: null
     num_layers_in_last_pipeline_stage: null
-    context_parallel_size: 1
+    context_parallel_size: ${policy.context_parallel_size}
     pipeline_dtype: ${policy.precision}
     sequence_parallel: false
     freeze_moe_router: true
