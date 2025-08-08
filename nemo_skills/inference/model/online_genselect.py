@@ -32,6 +32,7 @@ class OnlineGenSelectConfig:
     max_concurrent_requests: int = 8
     max_num_solutions: int = 8
     prompt_config: str = "generic/genselect"
+    prompt_template: str | None = None
     temperature: float = 0.6
     tokens_to_generate: int = 2048
     comparison_key: str = "generation"  # Key used for comparing the different solutions
@@ -49,7 +50,7 @@ class OnlineGenSelectWrapper:
         self.cfg = cfg
 
         # Load GenSelect prompt
-        self.genselect_prompt = get_prompt(self.cfg.prompt_config)
+        self.genselect_prompt = get_prompt(self.cfg.prompt_config, prompt_template=self.cfg.prompt_template)
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:

@@ -276,6 +276,8 @@ class GenerationTask:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
         elif self.cfg.online_genselect:
+            # Use the same prompt template for genselect as the one used for generation
+            self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
             llm = get_online_genselect_model(
                 **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
             )
