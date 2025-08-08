@@ -1,0 +1,13 @@
+system: ""
+
+user: |-
+
+  {question}
+
+  (A) {A}
+  (B) {B}
+  (C) {C}
+  (D) {D}
+
+  Express your final answer as the corresponding option 'A', 'B', 'C', or 'D'.
+  Please reason step by step, and put your final answer within \\boxed{{}}.
