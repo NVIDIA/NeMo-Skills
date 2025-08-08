@@ -63,8 +63,7 @@ def get_online_genselect_model(server_type, online_genselect_config=None, **kwar
     """A helper function to create OnlineGenSelect model."""
     model = get_model(server_type=server_type, **kwargs)
     if online_genselect_config is None:
-        online_genselect_config = {}
-    online_genselect_config = OnlineGenSelectConfig(**online_genselect_config)
+        online_genselect_config = OnlineGenSelectConfig()
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
 
