@@ -11,10 +11,16 @@ http {
         default "";
     }
 
+    # If no session_id found, use a per-request random key (request_id) for load balancing
+    map $session_id_for_routing $hash_key {
+        ""        $request_id;
+        default   $session_id_for_routing;
+    }
+
     # Define upstream servers (dynamically populated)
     upstream sandbox_workers {
-        # Use consistent hashing based on session_id from JSON body
-        hash $session_id_for_routing consistent;
+        # Use consistent hashing on real session_id or random request_id
+        hash $hash_key consistent;
 
         # Worker servers will be inserted here by sed
 ${UPSTREAM_SERVERS}
