@@ -76,6 +76,7 @@ class VLLMModel(BaseModel):
             "logprobs": top_logprobs,
             "stream": stream,
             "echo": False,
+            "skip_special_tokens": False,
             "n": 1,
             "logit_bias": None,
             "frequency_penalty": 0.0,
@@ -123,4 +124,3 @@ class VLLMModel(BaseModel):
             request["allowed_openai_params"] = ["reasoning_effort"]
             request["reasoning_effort"] = reasoning_effort
         return request
-
