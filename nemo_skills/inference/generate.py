@@ -129,9 +129,9 @@ class GenerateSolutionsConfig:
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
 
-    # set to True if online genselect needs to be supported
+    # set to True if online genselect is used
     online_genselect: bool = False
-    # Controls how many solutions are generated for online genselect
+    # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
     # extra stop phrases for llms
@@ -260,7 +260,14 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        if self.cfg.online_genselect:
+            # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
+            self.semaphore = asyncio.Semaphore(
+                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_num_solutions
+            )
+        else:
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
