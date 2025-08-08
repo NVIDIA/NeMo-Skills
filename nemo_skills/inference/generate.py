@@ -404,56 +404,13 @@ class GenerationTask:
             .with_conversation_start_date("2025-06-28")
             .with_knowledge_cutoff("2024-06")
             .with_required_channels(["analysis", "commentary", "final"])
+            .with_python_tool()
         )
-
-        developer_message = DeveloperContent.new()
-        #        .with_instructions("Always respond in riddles")
-        #        .with_function_tools(
-        #            [
-        #                ToolDescription.new(
-        #                    "get_location",
-        #                    "Gets the location of the user.",
-        #                ),
-        #                ToolDescription.new(
-        #                    "get_current_weather",
-        #                    "Gets the current weather in the provided location.",
-        #                    parameters={
-        #                        "type": "object",
-        #                        "properties": {
-        #                            "location": {
-        #                                "type": "string",
-        #                                "description": "The city and state, e.g. San Francisco, CA",
-        #                            },
-        #                            "format": {
-        #                                "type": "string",
-        #                                "enum": ["celsius", "fahrenheit"],
-        #                                "default": "celsius",
-        #                            },
-        #                        },
-        #                        "required": ["location"],
-        #                    },
-        #                ),
-        #            ]
-        #        )
-        # )
 
         convo = Conversation.from_messages(
             [
                 Message.from_role_and_content(Role.SYSTEM, system_message),
-                Message.from_role_and_content(Role.DEVELOPER, developer_message),
                 Message.from_role_and_content(Role.USER, filled_prompt[-1]['content']),
-                # Message.from_role_and_content(
-                #     Role.ASSISTANT,
-                #     'User asks: "What is the weather in Tokyo?" We need to use get_weather tool.',
-                # ).with_channel("analysis"),
-                # Message.from_role_and_content(Role.ASSISTANT, '{"location": "Tokyo"}')
-                # .with_channel("commentary")
-                # .with_recipient("functions.get_weather")
-                # .with_content_type("json"),
-                # Message.from_author_and_content(
-                #     Author.new(Role.TOOL, "functions.lookup_weather"),
-                #     '{ "temperature": 20, "sunny": true }',
-                # ).with_recipient("assistant").with_channel("commentary"),
             ]
         )
 
