@@ -1,0 +1,8 @@
+system: ""
+
+user: |-
+  {question}
+  Please reason step by step, and put your final answer within \\boxed{{}}.
+  Solve the following problem. Make sure to put the answer (and only answer) inside \boxed{{}}.
+
+  {examples}{prompt}
