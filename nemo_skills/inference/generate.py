@@ -28,7 +28,13 @@ from omegaconf import ListConfig, OmegaConf, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
+from nemo_skills.inference.model import (
+    OnlineGenSelectConfig,
+    get_code_execution_model,
+    get_model,
+    get_online_genselect_model,
+    server_params,
+)
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
     chunk_data,
@@ -122,6 +128,11 @@ class GenerateSolutionsConfig:
     total_code_executions_in_prompt: Any = None
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
+
+    # set to True if online genselect needs to be supported
+    online_genselect: bool = False
+    # Controls how many solutions are generated for online genselect
+    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
@@ -257,6 +268,10 @@ class GenerationTask:
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+        elif self.cfg.online_genselect:
+            llm = get_online_genselect_model(
+                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+            )
         else:
             llm = get_model(**self.cfg.server)
 

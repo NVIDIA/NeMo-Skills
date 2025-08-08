@@ -30,11 +30,11 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class OnlineGenSelectConfig:
     max_num_solutions: int = 8
-    genselect_prompt_config: str = "generic/genselect"
-    genselect_temperature: float = 0.6
-    genselect_max_tokens: int = 2048
-    comparison_key: str = "generation"
-    genselect_regex: str = r"Judg[e]?ment: (\d+)"
+    prompt_config: str = "generic/genselect"
+    temperature: float = 0.6
+    tokens_to_generate: int = 2048
+    comparison_key: str = "generation"  # Key used for comparing the different solutions
+    regex: str = r"Judg[e]?ment: (\d+)"
 
 
 class OnlineGenSelectWrapper:
@@ -48,14 +48,14 @@ class OnlineGenSelectWrapper:
         self.cfg = cfg
 
         # Load GenSelect prompt
-        self.genselect_prompt = get_prompt(self.cfg.genselect_prompt_config)
+        self.genselect_prompt = get_prompt(self.cfg.prompt_config)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
         judgment = None
 
         try:
-            matches = re.findall(self.cfg.genselect_regex, generation)
+            matches = re.findall(self.cfg.regex, generation)
             if matches:
                 number = matches[-1]
                 judgment = int(number)
@@ -75,105 +75,101 @@ class OnlineGenSelectWrapper:
         """Format solutions for GenSelect prompt."""
         formatted_solutions = []
         for i, solution in enumerate(solutions):
-            formatted_solutions.append(f"Solution {i}: {solution['generation']}")
+            formatted_solutions.append(f"Solution {i}: {solution[self.cfg.comparison_key]}")
         return "\n\n".join(formatted_solutions)
 
-    async def _run_genselect(self, problem: str, solutions: List[Dict]) -> int:
+    async def _run_genselect(self, prompt: str, solutions: List[Dict]) -> int:
         """Run GenSelect to choose the best solution."""
+        # Step 1: Format the solutions for GenSelect
         num_solutions = len(solutions)
         max_idx = num_solutions - 1
-
         solutions_text = self._format_solutions_for_genselect(solutions)
 
-        # Create GenSelect prompt
         genselect_input = {
-            'problem': problem,
+            'problem': prompt,
             'solutions': solutions_text,
             'num_solutions': num_solutions,
             'max_idx': max_idx,
         }
         genselect_prompt = self.genselect_prompt.fill(genselect_input)
 
-        # Generate GenSelect judgment
+        # Step 2: Run Self-GenSelect
         genselect_result = await self.model.generate_async(
             prompt=genselect_prompt,
-            tokens_to_generate=self.config.genselect_max_tokens,
-            temperature=self.config.genselect_temperature,
+            tokens_to_generate=self.cfg.tokens_to_generate,
+            temperature=self.cfg.temperature,
             remove_stop_phrases=True,
         )
 
+        # Step 3: Extract the judgment from the GenSelect result
         judgment = self._extract_judgment(genselect_result['generation'], max_idx)
-
         if judgment is None:
             LOG.warning("GenSelect failed to produce valid judgment, falling back to random selection")
             judgment = random.randint(0, max_idx)
 
-        return judgment
+        return judgment, genselect_result
 
     async def generate_async(
         self,
         prompt: Union[str, List],
         random_seed: int = 0,
-        **kwargs,
+        **solution_kwargs,
     ) -> Dict:
         """
-        Generate multiple solutions and use GenSelect to choose the best one.
+        Generate multiple solutions and use Self-GenSelect to choose the best one.
         """
+        # Step 1: Generate multiple solutions
+        random.seed(random_seed)
+        tasks = []
+        for _ in range(self.cfg.max_num_solutions):
+            # Generate solutions with different seeds for diversity
+            cur_random_seed = random.getrandbits(32)
+            # Create a copy to avoid mutation issues
+            current_kwargs = solution_kwargs.copy()
+            current_kwargs['random_seed'] = cur_random_seed
 
-        # Generate multiple solutions
+            task = self.model.generate_async(prompt=prompt, **current_kwargs)
+            tasks.append(task)
+
+        generation_results = await asyncio.gather(*tasks)
         solutions = []
-        generation_kwargs = {
-            'prompt': prompt,
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'stop_phrases': stop_phrases,
-            'timeout': timeout,
-            'remove_stop_phrases': remove_stop_phrases,
-            'reasoning_effort': reasoning_effort,
-            'tools': tools,
-            'include_response': include_response,
-            'extra_body': extra_body,
-        }
-
-        # Generate solutions with different seeds for diversity
-        for i in range(self.cfg.max_num_solutions):
-            solution_kwargs = generation_kwargs.copy()
-            solution_kwargs['random_seed'] = random_seed + i
-
-            solution_result = await self.model.generate_async(**solution_kwargs)
-
-            # Extract answer from the generation
-            predicted_answer = self._extract_answer(solution_result['generation'])
-
+        for generation_result in generation_results:
             solutions.append(
                 {
-                    'generation': solution_result['generation'],
-                    self.cfg.answer_key: predicted_answer,
-                    'solution_index': i,
+                    self.cfg.comparison_key: generation_result[self.cfg.comparison_key],
+                    "output_dict": generation_result,
                 }
             )
 
-        # Run GenSelect to choose the best solution
-        best_index = await self._run_genselect(problem_text, solutions)
+        random.shuffle(solutions)
+
+        # Step 2: Run GenSelect to choose the best solution
+        best_index, genselect_result = await self._run_genselect(prompt, solutions)
         best_solution = solutions[best_index]
 
         # Return the best solution in the expected format
         result = {
-            'generation': best_solution['generation'],
-            'genselect_chosen_index': best_index,
-            'genselect_num_solutions': self.cfg.max_num_solutions,
+            self.cfg.comparison_key: best_solution[self.cfg.comparison_key],
+            "solution_list": [solution[self.cfg.comparison_key] for solution in solutions],
+            "genselect_comparison": genselect_result["generation"],
         }
 
-        # Add answer if extracted
-        if self.cfg.answer_key in best_solution:
-            result[self.cfg.answer_key] = best_solution[self.cfg.answer_key]
+        total_num_generated_tokens = 0
+        for solution in solutions:
+            total_num_generated_tokens += solution["output_dict"].get('num_generated_tokens', 0)
+        result["total_solution_generated_tokens"] = total_num_generated_tokens
 
-        # Add generation metadata from the chosen solution if available
-        if 'num_generated_tokens' in best_solution:
-            result['num_generated_tokens'] = best_solution['num_generated_tokens']
+        # Add the tokens for genselect
+        result["genselect_num_generated_tokens"] = genselect_result.get("num_generated_tokens", 0)
+
+        # Add the tokens for all the solutions and genselect
+        total_gen_tokens = result["total_solution_generated_tokens"] + result["genselect_num_generated_tokens"]
+
+        # TODO: Decide what count of generated tokens do we want to report - the total or the best solution?
+        # Current implementation returns the total number of generated tokens
+        result["num_generated_tokens"] = total_gen_tokens
+
+        # Add the tokens for the best solution
+        result['num_best_solution_generated_tokens'] = best_solution["output_dict"].get("num_generated_tokens", 0)
 
         return result

@@ -59,13 +59,13 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(server_type, online_genselect=None, **kwargs):
+def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
     model = get_model(server_type=server_type, **kwargs)
-    if online_genselect is None:
-        online_genselect = {}
-    online_genselect_config = OnlineGenSelectConfig(**online_genselect)
-    return OnlineGenSelectWrapper(model=model, config=online_genselect_config)
+    if online_genselect_config is None:
+        online_genselect_config = {}
+    online_genselect_config = OnlineGenSelectConfig(**online_genselect_config)
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
 
 def server_params():
