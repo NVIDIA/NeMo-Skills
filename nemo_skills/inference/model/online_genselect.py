@@ -29,6 +29,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class OnlineGenSelectConfig:
+    max_concurrent_requests: int = 8
     max_num_solutions: int = 8
     prompt_config: str = "generic/genselect"
     temperature: float = 0.6
@@ -49,6 +50,7 @@ class OnlineGenSelectWrapper:
 
         # Load GenSelect prompt
         self.genselect_prompt = get_prompt(self.cfg.prompt_config)
+        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
