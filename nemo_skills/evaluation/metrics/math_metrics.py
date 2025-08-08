@@ -59,7 +59,6 @@ class MathMetrics(BaseMetrics):
             self.eval_dict[f"rm_best@{k}"]["no_answer"] += no_answer
             self.eval_dict[f"rm_majority@{k}"]["no_answer"] += no_answer
 
-    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         correctness_dict = {}
         if 'symbolic_correct' in prediction:

@@ -38,8 +38,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class GenSelectConfig(GenerateSolutionsConfig):
     """Genselect parameters."""
-    input_file: str
-    output_file: str
+
+    input_dir: str  # Directory where the original predictions are saved
+    output_dir: str  # Where to save the intermediate outputs and final predictions
+
+    # Will be set in __post_init__ based on input_dir, output_dir and random_seed
+    input_file: str | None = None
+    output_file: str | None = None
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
@@ -48,10 +53,6 @@ class GenSelectConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # LLM call parameters
 
     generation_key: str = "genselect_comparison"
-    input_key: str = "problem"
-    output_key: str = "generation"
-    answer_key: str
-    benchmark: str
 
     sandbox: dict = field(default_factory=dict)
 
@@ -59,6 +60,10 @@ class GenSelectConfig(GenerateSolutionsConfig):
         super()._post_init_validate_data()
         if self.inference.random_seed is None:
             raise ValueError("Random seed is required for genselect")
+        self.input_file = str(Path(self.input_dir) / f"output-rs{self.inference.random_seed}.jsonl")
+        self.output_file = str(
+            Path(self.output_dir) / "comparison_judgment" / f"output-rs{self.inference.random_seed}.jsonl"
+        )
 
         Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
 
@@ -100,16 +105,18 @@ class GenSelectTask(GenerationTask):
         return judgment
 
     def postprocess(self):
-        single_correctness_instances_file = Path(self.cfg.input_file).parent / "single_correctness_instances.jsonl"
-        single_correctness_instances = [json.loads(line) for line in open(single_correctness_instances_file, "r")]
+        single_answer_instances_file = path.join(self.cfg.input_dir, "single_answer_instances.jsonl")
+        single_answer_instances = [json.loads(line) for line in open(single_answer_instances_file, "r")]
 
         input_file = self.cfg.output_file
-        output_file = Path(self.cfg.output_file).parent.parent / self.cfg.benchmark / Path(self.cfg.output_file).name
+        # TODO: use last part of input_dir?
+        benchmark_dir = "math"
+        output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         with open(input_file, 'r') as f, open(output_file, 'w') as fout:
-            for single_correctness_instance in single_correctness_instances:
-                fout.write(json.dumps(single_correctness_instance) + '\n')
+            for single_answer_instance in single_answer_instances:
+                fout.write(json.dumps(single_answer_instance) + '\n')
 
             for line in f:
                 instance = json.loads(line)
@@ -122,20 +129,12 @@ class GenSelectTask(GenerationTask):
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
 
-                output_instance[self.cfg.output_key] = instance[f"{self.cfg.output_key}_{judgment}"]
-                output_instance[self.cfg.answer_key] = instance[f"{self.cfg.answer_key}_{judgment}"]
+                output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
 
-                # Delete other variables that are not needed for the final output
-                for i in range(instance["num_solutions"]):
-                    # Check if the key exists before deleting
-                    if f"{self.cfg.output_key}_{i}" in output_instance:
-                        del output_instance[f"{self.cfg.output_key}_{i}"]
-                    if f"{self.cfg.answer_key}_{i}" in output_instance:
-                        del output_instance[f"{self.cfg.answer_key}_{i}"]
-
-                for key in ["solutions", "max_idx", "num_solutions", "_full_generation"]:
-                    if key in output_instance:
-                        del output_instance[key]
+                if f"symbolic_correct_{judgment}" in instance:
+                    output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
+                if f"judgement_{judgment}" in instance:
+                    output_instance["judgement"] = instance[f'judgement_{judgment}']
 
                 fout.write(json.dumps(output_instance) + '\n')
 

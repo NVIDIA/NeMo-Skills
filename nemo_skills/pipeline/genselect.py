@@ -18,10 +18,29 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
-from nemo_skills.pipeline.utils import get_server_command
+from nemo_skills.utils import get_logger_name, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def get_genselect_cmd(
+    output_dir,
+    extra_arguments,
+    random_seed=None,
+):
+    cmd = (
+        f"python -m nemo_skills.inference.genselect "
+        f"    ++skip_filled=True "
+        f"    ++input_dir={output_dir}/comparison_instances "
+        f"    ++output_dir={output_dir} "
+        f"    ++inference.random_seed={random_seed} "
+        f"    ++inference.temperature=0.7 "
+        f"    ++inference.tokens_to_generate=2048 "
+        f"    ++inference.top_k=-1 "
+        f"    ++inference.top_p=0.95 "
+    )
+    cmd += f" {extra_arguments} "
+    return cmd
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -59,25 +78,12 @@ def genselect(
         "Can provide a list directly when using through Python",
     ),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
-    num_chunks: int = typer.Option(
-        None,
-        help="Number of chunks to split the dataset into. If None, will not chunk the dataset.",
-    ),
-    chunk_ids: str = typer.Option(
-        None,
-        help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
-        "Can provide a list directly when using through Python",
-    ),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    benchmark: str = typer.Option(help="The benchmark to use for genselect"),
-    input_key: str = typer.Option("problem", help="The input key which forms the prompt"),
-    output_key: str = typer.Option("generation", help="This is the key whose value will be used during genselect"),
-    answer_key: str = typer.Option(None, help="This is the key whose value determines the correctness of the response"),
     preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -102,21 +108,6 @@ def genselect(
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
-    log_samples: bool = typer.Option(
-        False,
-        help="If True, will log random samples from the output files to wandb. "
-        "Requires WANDB_API_KEY to be set in the environment. "
-        "Use wandb_name/wandb_group/wandb_project to specify where to log.",
-    ),
-    wandb_name: str = typer.Option(
-        None,
-        help="Name of the wandb group to sync samples to. If not specified, but log_samples=True, will use expname.",
-    ),
-    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
-    wandb_project: str = typer.Option(
-        'nemo-skills',
-        help="Name of the wandb project to sync samples to.",
-    ),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -144,16 +135,6 @@ def genselect(
     except AttributeError:
         pass
 
-    if log_samples:
-        wandb_parameters = {
-            'name': wandb_name or expname,
-            'project': wandb_project,
-            'group': wandb_group,
-        }
-    else:
-        wandb_parameters = None
-
-
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
 
     if random_seeds and num_random_seeds:
@@ -162,11 +143,6 @@ def genselect(
         random_seeds = list(range(starting_seed, starting_seed + num_random_seeds))
     if isinstance(random_seeds, str):
         random_seeds = str_ids_to_list(random_seeds)
-
-    if num_chunks:
-        chunk_ids = compute_chunk_ids(chunk_ids, num_chunks)
-    if chunk_ids is None:
-        chunk_ids = [None]
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -197,26 +173,13 @@ def genselect(
         chunk_ids=[None],
         rerun_done=rerun_done,
     )
-
-    all_tasks = []
     has_tasks = False
-    if _task_dependencies is None:
-        _task_dependencies = []
-
-    extra_eval_args = (
-        f" ++input_key={input_key} "
-        f" ++output_key={output_key} "
-        f" ++answer_key={answer_key} "
-        f" ++benchmark={benchmark} "  
-    )
-    extra_arguments_original = extra_arguments + extra_eval_args
+    extra_arguments_original = extra_arguments
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
-        preprocess_args = (
-            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " 
-            + extra_eval_args
-            + (preprocess_args if preprocess_args is not None else "")
+        preprocess_args = f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " + (
+            preprocess_args if preprocess_args is not None else ""
         )
         task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
 
@@ -227,8 +190,6 @@ def genselect(
             log_dir=f"{output_dir}/preprocess-logs",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
-            partition=partition,
-            time_min=time_min,
             task_dependencies=_task_dependencies,
             run_after=run_after,
             reuse_code=reuse_code,
@@ -236,72 +197,48 @@ def genselect(
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
         )
-        
-        for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
-            if wandb_parameters:
-                # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
-                    output_dir,
-                    random_seed=seed,
-                    chunk_id=None,
+        for seed in remaining_jobs.keys():
+            has_tasks = True
+            server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+                model=model,
+                server_type=server_type,
+                server_address=original_server_address,
+                server_gpus=server_gpus,
+                server_nodes=server_nodes,
+                server_args=server_args,
+                server_entrypoint=server_entrypoint,
+                extra_arguments=extra_arguments_original,
+                get_random_port=get_random_port,
+            )
+            cmd = pipeline_utils.wrap_cmd(
+                cmd=get_genselect_cmd(output_dir=output_dir, extra_arguments=extra_arguments, random_seed=seed),
+                preprocess_cmd=preprocess_cmd,
+                postprocess_cmd=postprocess_cmd,
+            )
+            prev_tasks = [preprocess_task]
+            for _ in range(dependent_jobs + 1):
+                task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                new_task = pipeline_utils.add_task(
+                    exp,
+                    cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
+                    task_name=task_name,
+                    log_dir=log_dir,
+                    container=cluster_config["containers"]["nemo-skills"],
+                    cluster_config=cluster_config,
+                    partition=partition,
+                    time_min=time_min,
+                    server_config=server_config,
+                    with_sandbox=with_sandbox,
+                    sandbox_port=None if get_random_port else 6000,
+                    run_after=run_after,
+                    reuse_code=reuse_code,
+                    reuse_code_exp=reuse_code_exp,
+                    task_dependencies=prev_tasks,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
                 )
-            for chunk_id in chunk_ids:
-                has_tasks = True
-                server_config, server_address, extra_arguments = pipeline_utils.configure_client(
-                    model=model,
-                    server_type=server_type,
-                    server_address=original_server_address,
-                    server_gpus=server_gpus,
-                    server_nodes=server_nodes,
-                    server_args=server_args,
-                    server_entrypoint=server_entrypoint,
-                    extra_arguments=extra_arguments_original,
-                    get_random_port=get_random_port,
-                )
-
-                prev_tasks = [preprocess_task]
-                generation_cmd = pipeline_utils.get_generation_cmd(
-                    input_file=f"{output_dir}/comparison_instances/output-rs{seed}.jsonl",
-                    random_seed=seed,
-                    output_dir=f"{output_dir}/comparison_judgment",
-                    extra_arguments=extra_arguments,
-                    chunk_id=chunk_id,
-                    num_chunks=num_chunks,
-                    preprocess_cmd=preprocess_cmd,
-                    postprocess_cmd=postprocess_cmd,
-                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    script="nemo_skills.inference.genselect",
-                )
-
-                for _ in range(dependent_jobs + 1):
-                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
-                    if chunk_id is not None:
-                        task_name += f'-chunk{chunk_id}'
-                    new_task = pipeline_utils.add_task(
-                        exp,
-                        cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=generation_cmd),
-                        task_name=task_name,
-                        log_dir=log_dir,
-                        container=cluster_config["containers"]["nemo-skills"],
-                        cluster_config=cluster_config,
-                        partition=partition,
-                        time_min=time_min,
-                        server_config=server_config,
-                        with_sandbox=with_sandbox,
-                        sandbox_port=None if get_random_port else 6000,
-                        run_after=run_after,
-                        reuse_code=reuse_code,
-                        reuse_code_exp=reuse_code_exp,
-                        task_dependencies=(
-                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
-                        ),
-                        get_server_command=get_server_command,
-                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        installation_command=installation_command,
-                    )
-                    prev_tasks = [new_task]
-                    all_tasks.append(new_task)
-        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
+                prev_tasks = [new_task]
+        if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if _reuse_exp:

@@ -16,7 +16,6 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class CodeMetrics(BaseMetrics):
-    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {
             "passing_base_tests": prediction['is_correct'],
@@ -33,7 +32,6 @@ class CodeMetrics(BaseMetrics):
 
 
 class LiveCodeBenchMetrics(BaseMetrics):
-    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {
             "accuracy": prediction['graded_list'][0],
@@ -45,13 +43,10 @@ class LiveCodeBenchMetrics(BaseMetrics):
 
     def update(self, predictions):
         super().update(predictions)
-        predicted_answers = [pred['completion'] for pred in predictions]
         self._compute_pass_at_k(predictions=predictions)
-        self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
 
 class SciCodeMetrics(BaseMetrics):
-    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         subtask_status_list = prediction['eval_status']
         correct_subtasks = sum(subtask['process_status'] == 'completed' for subtask in subtask_status_list)

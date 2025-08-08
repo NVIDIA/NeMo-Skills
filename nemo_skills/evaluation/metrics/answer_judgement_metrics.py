@@ -32,7 +32,6 @@ class AnswerJudgementMetrics(BaseMetrics):
         super().reset()
         self.individual_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
 
-    @classmethod
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         gt_judgement = is_correct_judgement_or_none(prediction['expected_judgement'])
         pred_judgement = is_correct_judgement_or_none(prediction['judgement'])
