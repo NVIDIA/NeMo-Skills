@@ -1,0 +1,7 @@
+
+system: ""
+
+user: |-
+  {problem}
+
+  Express your final answer as the corresponding option 'A', 'B', 'C', or 'D'.
