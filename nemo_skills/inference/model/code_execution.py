@@ -142,7 +142,7 @@ class CodeExecutionWrapper:
                 if request['timeout'] <= 0:
                     break
 
-            output_dict = self.model.generate_sync(**request, remove_stop_phrases=False)
+            output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
@@ -175,7 +175,7 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict = await self.execute_generated_code(
+                code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
                 remaining_code_executions = None
@@ -225,7 +225,7 @@ class CodeExecutionWrapper:
             traceback_verbosity=self.config.sandbox_traceback_verbosity,
         )
 
-        return code_execution_time_start, execution_dict
+        return code_execution_time_start, execution_dict, session_id
 
     async def generate_async(
         self,
@@ -256,7 +256,7 @@ class CodeExecutionWrapper:
         """
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
-        
+
         kwargs = {
             'code_begin': code_begin,
             'code_end': code_end,
@@ -276,15 +276,15 @@ class CodeExecutionWrapper:
             "stream": stream,
             "extra_body": extra_body,
         }
-        
+
         request = {key: value for key, value in kwargs.items()}
         request['prompt'] = prompt
-        
+
         output = await self._generate_single(**request)
         self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
-        
+
         return output
-    
+
     async def _stream_single(
         self,
         prompt: str,
