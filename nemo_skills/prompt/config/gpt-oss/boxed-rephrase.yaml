@@ -1,5 +1,6 @@
 system: ""
 
 user: |-
-  {problem}
-  Please reason step by step, and put your final answer within \\boxed{{}}.
+  Please rephrase the following problem in a different way, using clear and concise language, but be careful not to change its meaning or intent:
+  {prompt}
+  Please reason step by step, and put your final answer within \\boxed{{}}. Remember not to respond to the question, just rephrase it.
