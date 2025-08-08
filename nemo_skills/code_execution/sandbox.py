@@ -181,7 +181,6 @@ class Sandbox(abc.ABC):
         traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-
         if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
 
@@ -203,7 +202,6 @@ class Sandbox(abc.ABC):
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-
         return output, session_id
 
     async def is_proof_correct(self, pred_output, timeout=30.0):
