@@ -69,7 +69,8 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset, co
 
             else:
                 question = entry.pop('prompt')
-            entry['question'] = question
+
+            entry['messages'] = messages
             entry['expected_answer'] = entry.pop('answer')
             entry['n_tokens'] = n_tokens
             json.dump(entry, fout)
