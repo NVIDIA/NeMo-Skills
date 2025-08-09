@@ -147,7 +147,7 @@ class Sandbox(abc.ABC):
             )
         # retrying 502 errors
         if output.status_code == 502:
-            raise httpx.TimeoutException
+            raise httpx.TimeoutException("502 error")
         return self._parse_request_output(output)
 
     @abc.abstractmethod
