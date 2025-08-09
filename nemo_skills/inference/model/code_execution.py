@@ -65,7 +65,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,  # None is 10min
+        timeout: float | int | None = 14400,  # None is 10min
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
         extra_body: dict = None,
@@ -244,7 +244,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,  # None is 10min
+        timeout: float | int | None = 14400,  # None is 10min
         max_code_executions: int | None = None,
         stream: bool = False,
         extra_body: dict = None,
@@ -300,7 +300,7 @@ class CodeExecutionWrapper:
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
-        timeout: float | int | None = 10000,  # None is 10min,
+        timeout: float | int | None = 14400,  # None is 10min,
         max_code_executions: int | None = None,
         extra_body: dict = None,
     ):
