@@ -20,7 +20,7 @@ from dataclasses import field
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_logger_name, nested_dataclass
+from nemo_skills.utils import get_logger_name, nested_dataclass, remove_thinking
 
 from .base import BaseModel
 
@@ -37,6 +37,9 @@ class OnlineGenSelectConfig:
     tokens_to_generate: int = 2048
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     regex: str = r"Judg[e]?ment: (\d+)"
+    remove_thinking: bool = True  # Remove thinking tokens from the comparison key
+    thinking_begin: str = "<think>"
+    thinking_end: str = "</think>"
 
 
 class OnlineGenSelectWrapper:
@@ -137,6 +140,14 @@ class OnlineGenSelectWrapper:
         generation_results = await asyncio.gather(*tasks)
         solutions = []
         for generation_result in generation_results:
+            if self.cfg.remove_thinking:
+                remove_thinking(
+                    generation_result,
+                    generation_key=self.cfg.comparison_key,
+                    thinking_begin=self.cfg.thinking_begin,
+                    thinking_end=self.cfg.thinking_end,
+                )
+
             solutions.append(
                 {
                     self.cfg.comparison_key: generation_result[self.cfg.comparison_key],

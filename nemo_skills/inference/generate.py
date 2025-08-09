@@ -278,6 +278,8 @@ class GenerationTask:
         elif self.cfg.online_genselect:
             # Use the same prompt template for genselect as the one used for generation
             self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
+            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
+            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
                 **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
             )
