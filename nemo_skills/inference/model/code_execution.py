@@ -50,7 +50,7 @@ class CodeExecutionWrapper:
 
     async def _generate_single(
         self,
-        prompt: str | list,
+        prompt: str | list[dict],
         code_begin: str,
         code_end: str,
         code_output_begin: str,
@@ -65,8 +65,7 @@ class CodeExecutionWrapper:
         random_seed: int,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        gen_id: str = None,  # used for cancelling requests if supported
-        timeout: int | None = None,
+        timeout: float | int | None = 10000,  # None is 10min
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
         extra_body: dict = None,
@@ -229,7 +228,7 @@ class CodeExecutionWrapper:
 
     async def generate_async(
         self,
-        prompt: str | list,
+        prompt: str | list[dict],
         code_begin: str,
         code_end: str,
         code_output_begin: str,
@@ -245,7 +244,7 @@ class CodeExecutionWrapper:
         stop_phrases: list[str] | None = None,
         remove_stop_phrases: bool = True,
         top_logprobs: int | None = None,
-        timeout: int | None = None,
+        timeout: float | int | None = 10000,  # None is 10min
         max_code_executions: int | None = None,
         stream: bool = False,
         extra_body: dict = None,
@@ -287,7 +286,7 @@ class CodeExecutionWrapper:
 
     async def _stream_single(
         self,
-        prompt: str,
+        prompt: str | list[dict],
         code_begin: str,
         code_end: str,
         code_output_begin: str,
@@ -301,7 +300,7 @@ class CodeExecutionWrapper:
         repetition_penalty: float = 1.0,
         random_seed: int = 0,
         stop_phrases: list[str] | None = None,
-        timeout: int | None = None,
+        timeout: float | int | None = 10000,  # None is 10min,
         max_code_executions: int | None = None,
         extra_body: dict = None,
     ):
