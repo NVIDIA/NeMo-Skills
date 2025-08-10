@@ -84,7 +84,9 @@ class OnlineGenSelectWrapper:
             formatted_solutions.append(f"Solution {i}: {solution[self.cfg.comparison_key]}")
         return "\n\n".join(formatted_solutions)
 
-    async def _run_genselect(self, prompt: str, solutions: List[Dict]) -> int:
+    async def _run_genselect(
+        self, prompt: str, solutions: List[Dict], local_random: random.Random
+    ) -> tuple[int, Dict]:
         """Run GenSelect to choose the best solution."""
         # Step 1: Format the solutions for GenSelect
         num_solutions = len(solutions)
@@ -111,7 +113,7 @@ class OnlineGenSelectWrapper:
         judgment = self._extract_judgment(genselect_result['generation'], max_idx)
         if judgment is None:
             LOG.warning("GenSelect failed to produce valid judgment, falling back to random selection")
-            judgment = random.randint(0, max_idx)
+            judgment = local_random.randint(0, max_idx)
 
         return judgment, genselect_result
 
@@ -125,11 +127,11 @@ class OnlineGenSelectWrapper:
         Generate multiple solutions and use Self-GenSelect to choose the best one.
         """
         # Step 1: Generate multiple solutions
-        random.seed(random_seed)
+        local_random = random.Random(random_seed)
         tasks = []
         for _ in range(self.cfg.max_num_solutions):
             # Generate solutions with different seeds for diversity
-            cur_random_seed = random.getrandbits(32)
+            cur_random_seed = local_random.getrandbits(32)
             # Create a copy to avoid mutation issues
             current_kwargs = solution_kwargs.copy()
             current_kwargs['random_seed'] = cur_random_seed
@@ -155,10 +157,10 @@ class OnlineGenSelectWrapper:
                 }
             )
 
-        random.shuffle(solutions)
+        local_random.shuffle(solutions)
 
         # Step 2: Run GenSelect to choose the best solution
-        best_index, genselect_result = await self._run_genselect(prompt, solutions)
+        best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
         best_solution = solutions[best_index]
 
         # Return the best solution in the expected format
