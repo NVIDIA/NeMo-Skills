@@ -1,0 +1,12 @@
+# src: https://github.com/LiveCodeBench/LiveCodeBench/blob/28fef95ea8c9f7a547c8329f2cd3d32b92c1fa24/lcb_runner/prompts/code_generation.py#L40
+
+system: ""
+
+user: |-
+  ### Question
+  {question}
+
+  ### Format: {oai_formatting_message}
+  {starter_code}
+
+  ### Answer: (use the provided format with backticks)

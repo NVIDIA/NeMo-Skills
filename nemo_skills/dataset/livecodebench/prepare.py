@@ -23,9 +23,10 @@ from dateutil.relativedelta import relativedelta
 
 
 class PromptConstants:
-    # reference: https://github.com/QwenLM/Qwen2.5-Coder/blob/main/qwencoder-eval/reasoning/livecode_bench_cot/lcb_runner_cq/prompts/code_generation.py#L31
+    # reference: https://github.com/LiveCodeBench/LiveCodeBench/blob/main/lcb_runner/prompts/code_generation.py#L35
     FORMATTING_MESSAGE_WITH_STARTER_CODE = "You will use the following starter code to write the solution to the problem and enclose your code within delimiters."
     FORMATTING_WITHOUT_STARTER_CODE = "Read the inputs from stdin solve the problem and write the answer to stdout (do not directly test on the sample inputs). Enclose your code within delimiters as follows. Ensure that when the python program runs, it reads the inputs, runs the algorithm and writes output to STDOUT."
+    OAI_FORMATTING_WITHOUT_STARTER_CODE = "Implement a function called `main()` which orchastrates the solution by reading inputs from stdin and writing the answer to stdout. Feel free to use additional functions as necessary. Next do NOT forget to call `main` function at the end of the program otherwise you will not be awarded any points."
 
 
 def parse_data(release_version='release_latest'):
@@ -70,11 +71,13 @@ def clean_data(dataset):
     def map_fn(data):
         question = data["question_content"] + "\n\n"
         if data["starter_code"]:
-            question += f"{PromptConstants.FORMATTING_MESSAGE_WITH_STARTER_CODE}\n"
-            question += f"```python\n{data['starter_code']}\n```\n\n"
+            data["formatting_message"] = PromptConstants.FORMATTING_MESSAGE_WITH_STARTER_CODE
+            data["oai_formatting_message"] = PromptConstants.FORMATTING_MESSAGE_WITH_STARTER_CODE
+            data["starter_code"] = f"```python\n{data['starter_code']}\n```\n\n"
         else:
-            question += f"{PromptConstants.FORMATTING_WITHOUT_STARTER_CODE}\n\n"
-            question += f"```python\n# YOUR CODE HERE\n```\n\n"
+            data["formatting_message"] = PromptConstants.FORMATTING_WITHOUT_STARTER_CODE
+            data["oai_formatting_message"] = PromptConstants.OAI_FORMATTING_WITHOUT_STARTER_CODE
+            data["starter_code"] = "```python\n# YOUR CODE HERE\n```\n\n"
 
         data["task_id"] = data["question_id"]
         data['question'] = question.replace('    ', '\t')
@@ -89,7 +92,6 @@ def clean_data(dataset):
         'question_content',
         'platform',
         'question_id',
-        'starter_code',
     ]
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
@@ -119,6 +121,9 @@ def prepare(start_date, end_date, release_version, output_dir):
                     {
                         "task_id": problem["task_id"],
                         "question": problem["question"],
+                        "formatting_message": problem["formatting_message"],
+                        "oai_formatting_message": problem["oai_formatting_message"],
+                        "starter_code": problem["starter_code"],
                         "difficulty": problem["difficulty"],
                         "subset_for_metrics": problem["difficulty"],
                         "release_version": release_version,
@@ -133,7 +138,6 @@ DEFAULT_SPLITS = [
     ('v5', '2024-07', '2024-12'),  # aai split
     ('v6', '2024-08', '2025-05'),  # current default in lb
 ]
-
 
 if __name__ == '__main__':
     # Write an argparse to a json file, read it in and parse it
