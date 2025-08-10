@@ -69,7 +69,6 @@ def parse_month_range(start_date, end_date):
 
 def clean_data(dataset):
     def map_fn(data):
-        question = data["question_content"] + "\n\n"
         if data["starter_code"]:
             data["formatting_message"] = PromptConstants.FORMATTING_MESSAGE_WITH_STARTER_CODE
             data["oai_formatting_message"] = PromptConstants.FORMATTING_MESSAGE_WITH_STARTER_CODE
@@ -80,7 +79,7 @@ def clean_data(dataset):
             data["starter_code"] = "```python\n# YOUR CODE HERE\n```\n\n"
 
         data["task_id"] = data["question_id"]
-        data['question'] = question.replace('    ', '\t')
+        data['question'] = data["question_content"].replace('    ', '\t')
         return data
 
     remove_columns = [
