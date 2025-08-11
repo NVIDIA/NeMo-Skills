@@ -82,13 +82,7 @@ ENV UWSGI_CHEAPER=$UWSGI_CHEAPER
 ARG UWSGI_PROCESSES
 ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 
-# Set DEPLOYMENT_MODE=single to disable multiple workers
-ENV DEPLOYMENT_MODE=multi-worker
+ENV LISTEN_PORT=6000
+RUN echo "uwsgi_read_timeout 14400s;" > /etc/nginx/conf.d/custom_timeout.conf
 
-# Conditional startup based on deployment mode
-CMD if [ "$DEPLOYMENT_MODE" = "multi-worker" ]; then \
-        /start-with-nginx.sh; \
-    else \
-        # Single worker - use original base image behavior (nginx + uwsgi)
-        /start.sh; \
-    fi
+CMd /start-with-nginx.sh

@@ -16,14 +16,14 @@
 Pytest-compatible session affinity tests for the multi-worker sandbox server.
 Tests verify that session state persists across requests and that session routing works correctly.
 """
+import json
+import random
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import pytest
 import requests
-import json
-import time
-import random
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
-
 
 BASE_URL = "http://localhost:6000"
 
@@ -37,12 +37,7 @@ class SessionAffinityTester:
         """Execute code with session and return result with timing info"""
         start_time = time.time()
         try:
-            payload = {
-                "generated_code": code,
-                "timeout": timeout,
-                "language": "python",
-                "session_id": session_id
-            }
+            payload = {"generated_code": code, "timeout": timeout, "language": "ipython", "session_id": session_id}
 
             # HTTP timeout should be longer than execution timeout + buffer for IPython session creation
             http_timeout = max(timeout + 10, 30)  # IPython sessions start much faster than Jupyter kernels
@@ -55,7 +50,7 @@ class SessionAffinityTester:
                     "stdout": "",
                     "stderr": f"HTTP {response.status_code}: {response.text[:500]}",
                     "response_time": end_time - start_time,
-                    "timestamp": end_time
+                    "timestamp": end_time,
                 }
 
             try:
@@ -66,7 +61,7 @@ class SessionAffinityTester:
                     "stdout": "",
                     "stderr": f"JSON decode error: {e}. Response status: {response.status_code}, Content-Type: {response.headers.get('content-type', 'unknown')}, Body: '{response.text[:500]}'",
                     "response_time": end_time - start_time,
-                    "timestamp": end_time
+                    "timestamp": end_time,
                 }
 
             result['response_time'] = end_time - start_time
@@ -80,7 +75,7 @@ class SessionAffinityTester:
                 "stdout": "",
                 "stderr": f"Request failed: {str(e)}",
                 "response_time": time.time() - start_time,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
 
     def test_session_persistence(self, session_id, num_operations=5):
@@ -156,9 +151,11 @@ except Exception as e:
             operations.append((f'op_{operation_num}', result))
 
             # Check for session miss
-            if ('SESSION MISS DETECTED' in result.get('stdout', '') or
-                'NameError' in result.get('stderr', '') or
-                result.get('process_status') != 'completed'):
+            if (
+                'SESSION MISS DETECTED' in result.get('stdout', '')
+                or 'NameError' in result.get('stderr', '')
+                or result.get('process_status') != 'completed'
+            ):
                 return operations, False, f"Session miss in operation {operation_num}"
 
         return operations, True, "All operations successful"
@@ -266,7 +263,9 @@ class TestSessionAffinity:
 
         # Verify all operations completed successfully
         for op_name, result in operations:
-            assert result['process_status'] == 'completed', f"Operation {op_name} failed: {result.get('stderr', 'Unknown error')}"
+            assert (
+                result['process_status'] == 'completed'
+            ), f"Operation {op_name} failed: {result.get('stderr', 'Unknown error')}"
 
     @pytest.mark.parametrize("num_operations", [3, 5, 8])
     def test_session_persistence_various_lengths(self, tester, server_health_check, num_operations):
@@ -319,7 +318,9 @@ class TestSessionAffinity:
             time.sleep(0.1)  # Small delay between requests
 
         # All requests with same session_id should hit the same worker
-        assert len(workers_hit) == 1, f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
+        assert (
+            len(workers_hit) == 1
+        ), f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
 
     def test_different_sessions_can_hit_different_workers(self, tester, server_health_check):
         """Test that different session_ids can potentially hit different workers"""
@@ -351,11 +352,14 @@ class TestSessionAffinity:
         # (unless there's only 1 worker)
         assert len(workers_hit) >= 1, "No workers responded to requests"
 
-    @pytest.mark.parametrize("session_config", [
-        {"sessions": 5, "ops": 3, "workers": 3, "name": "Light Load"},
-        {"sessions": 10, "ops": 4, "workers": 5, "name": "Medium Load"},
-        {"sessions": 20, "ops": 3, "workers": 8, "name": "Heavy Load"},
-    ])
+    @pytest.mark.parametrize(
+        "session_config",
+        [
+            {"sessions": 5, "ops": 3, "workers": 3, "name": "Light Load"},
+            {"sessions": 10, "ops": 4, "workers": 5, "name": "Medium Load"},
+            {"sessions": 20, "ops": 3, "workers": 8, "name": "Heavy Load"},
+        ],
+    )
     def test_session_affinity_under_load(self, tester, server_health_check, session_config):
         """Test session affinity under various load conditions"""
         num_sessions = session_config["sessions"]
@@ -383,13 +387,17 @@ class TestSessionAffinity:
                 session_misses += 1
 
         # Assert no session misses (critical for session affinity)
-        assert session_misses == 0, f"Session affinity failure: {session_misses} session misses detected in {session_config['name']}"
+        assert (
+            session_misses == 0
+        ), f"Session affinity failure: {session_misses} session misses detected in {session_config['name']}"
 
         # Assert reasonable success rate (allowing for some other types of failures)
         success_rate = successful_sessions / num_sessions
         assert success_rate >= 1.0, f"Success rate too low for {session_config['name']}: {success_rate:.1%}"
 
-        print(f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time-start_time:.1f}s")
+        print(
+            f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time-start_time:.1f}s"
+        )
 
     def test_session_cleanup_endpoint(self, tester, server_health_check):
         """Test that session management endpoints work correctly"""
@@ -405,10 +413,7 @@ class TestSessionAffinity:
         assert 'cleanup_test' in result.get('stdout', '')
 
         # Delete the session - include session_id in JSON body for proper routing
-        delete_response = requests.delete(
-            f"{BASE_URL}/sessions/{session_id}",
-            json={"session_id": session_id}
-        )
+        delete_response = requests.delete(f"{BASE_URL}/sessions/{session_id}", json={"session_id": session_id})
         assert delete_response.status_code == 200
 
         # Verify session is gone (this should fail with NameError)
@@ -425,12 +430,15 @@ class TestSessionAffinity:
             session_ids.append(session_id)
 
             # Execute code to create the session
-            requests.post(f"{BASE_URL}/execute", json={
-                "generated_code": f"list_test_var_{i} = {i}",
-                "session_id": session_id,
-                "timeout": 10,
-                "language": "python"
-            })
+            requests.post(
+                f"{BASE_URL}/execute",
+                json={
+                    "generated_code": f"list_test_var_{i} = {i}",
+                    "session_id": session_id,
+                    "timeout": 10,
+                    "language": "ipython",
+                },
+            )
 
         # List sessions
         list_response = requests.get(f"{BASE_URL}/sessions")

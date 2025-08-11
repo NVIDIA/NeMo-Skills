@@ -25,8 +25,8 @@ import tempfile
 import threading
 import time
 from io import StringIO
-import psutil
 
+import psutil
 from flask import Flask, request
 from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
@@ -175,7 +175,7 @@ def kill_process_tree(proc):
         children = parent.children(recursive=True)
         # Add the parent to the list of processes to be killed.
         all_processes = children + [parent]
-        
+
         # Kill all processes in the tree.
         for p in all_processes:
             try:
@@ -184,7 +184,7 @@ def kill_process_tree(proc):
             except psutil.NoSuchProcess:
                 # The process might have already died, which is fine.
                 pass
-        
+
         # Wait for all processes to be terminated.
         gone, alive = psutil.wait_procs(all_processes, timeout=3)
         if alive:
@@ -197,6 +197,7 @@ def kill_process_tree(proc):
         pass
     except Exception as e:
         print(f"Error in kill_process_tree: {e}")
+
 
 def set_limits(mem_bytes: int = MEM_LIMIT_BYTES) -> None:
     """
@@ -236,14 +237,14 @@ def execute_python(generated_code, std_input, timeout, language):
 
 def execute_lean4(generated_code, timeout):
     temp_file_name = None
-    proc = None # <-- Keep track of the process object
+    proc = None  # <-- Keep track of the process object
     try:
         project_path = "/lean4/my_project"
         # Use a with statement for the temp file to ensure it's closed
         with tempfile.NamedTemporaryFile(dir=project_path, delete=False, suffix=".lean") as temp_file:
             temp_file_name = temp_file.name
             temp_file.write(generated_code.encode('utf-8'))
-            temp_file.flush() # Ensure data is written to disk
+            temp_file.flush()  # Ensure data is written to disk
 
         # Use subprocess.Popen for more control
         proc = subprocess.Popen(
@@ -251,7 +252,7 @@ def execute_lean4(generated_code, timeout):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=project_path,
-            preexec_fn=os.setsid
+            preexec_fn=os.setsid,
         )
 
         # Communicate with the process, which waits for it to finish
@@ -273,7 +274,7 @@ def execute_lean4(generated_code, timeout):
 
         # kill the process tree
         kill_process_tree(proc)
-        
+
         # Now we can safely get any output that was generated before the kill.
         stdout, stderr = proc.communicate()
 
