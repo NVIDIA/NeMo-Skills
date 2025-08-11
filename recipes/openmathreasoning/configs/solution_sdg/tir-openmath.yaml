@@ -91,15 +91,15 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
+    # inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs:
       <<: *generate_kwargs
 
   postprocess_tir_generations:
     output_dir: ${directories.step-4-postprocess-tir}
     input_dir: ${directories.step-3-judge-answers}
-    code_begin: "<tool_call>\n"
-    code_end: "</tool_call>\n"
+    code_begin: "```python\n"
+    code_end: "```\n"
     dependencies:
       - judge_answers
     # You can use CPU partition for this script, if available
