@@ -25,7 +25,7 @@ generate_kwargs: &generate_kwargs
 generate_new_summaries_kwargs:
   <<: *generate_kwargs
   # Generate 4 new summaries for each solution
-  num_random_seeds: 4
+  num_random_seeds: 2
 
 # Define the full sequence of stages for this mode
 pipeline_stages:
