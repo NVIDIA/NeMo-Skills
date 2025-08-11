@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 EVAL_SPLIT = 'all'
+PROMPT_CONFIG = None
 DATASET_GROUP = 'long-context'
 METRICS_TYPE = 'mrcr'
 EVAL_ARGS = '++eval_type=mrcr'
