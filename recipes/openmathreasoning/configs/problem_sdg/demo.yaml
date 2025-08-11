@@ -10,11 +10,9 @@ input_file: /nemo_run/code/recipes/openmathreasoning/configs/problem_sdg/example
 # Define model server parameters
 generate_kwargs:
   # Model to be used for data processing stages
-  model: meta/llama-3.3-70b-instruct
-  # Server type to launch the model
-  server_type: openai
-  # NIM API endpoint
-  server_address: https://integrate.api.nvidia.com/v1
+  model: gpt-4.1
+  server_type: azureopenai
+  server_address: https://prod.api.nvidia.com/llm/v1/azure
 
 # List of datasets to run problem decontamination with
 decontamination_datasets:

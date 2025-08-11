@@ -23,7 +23,7 @@ class AzureOpenAIModel(OpenAIModel):
         self,
         *args,
         api_key: str | None = None,
-        api_version: str = "2024-02-15-preview",
+        api_version: str = "2025-04-01-preview",
         **kwargs,
     ):
         if api_key is None:
