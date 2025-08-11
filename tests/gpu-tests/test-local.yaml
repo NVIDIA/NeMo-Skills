@@ -18,15 +18,18 @@ containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
   vllm: igitman/nemo-skills-vllm:0.7.0
   sglang: igitman/nemo-skills-sglang:0.7.0
-  nemo: igitman/nemo-skills-nemo:0.6.1
-  megatron: igitman/nemo-skills-megatron:0.6.1
-  sandbox: igitman/nemo-skills-sandbox:0.6.1
+  nemo: igitman/nemo-skills-nemo:0.7.0
+  megatron: igitman/nemo-skills-megatron:0.7.0
+  sandbox: igitman/nemo-skills-sandbox:0.7.0
   nemo-skills: igitman/nemo-skills:0.7.0
-  verl: igitman/nemo-skills-verl:0.6.1
-  nemo-rl: igitman/nemo-skills-nemo-rl:0.6.1
+  verl: igitman/nemo-skills-verl:0.7.0
+  nemo-rl: igitman/nemo-skills-nemo-rl:0.7.0
 
 mounts:
   - /tmp:/tmp
   # change this if the models are located in a different place
   # TODO: can we make it simpler?
   - /mnt/datadrive/nemo-skills-test-data:/mnt/datadrive/nemo-skills-test-data
+
+env_vars:
+  - HF_HOME=/mnt/datadrive/nemo-skills-test-data/hf-cache
