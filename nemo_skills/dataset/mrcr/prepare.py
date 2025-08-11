@@ -40,14 +40,7 @@ def count_n_tokens(messages: list[dict]) -> int:
     return sum([len(enc.encode(m["content"])) for m in messages])
 
 
-def convert_messages_to_string(
-    messages: list[dict],
-    role_to_string: dict[str, str] = {"user": "user", "assistant": "assistant"},
-) -> str:
-    return "\n".join([f"{role_to_string[m['role']]}: {m['content']}" for m in messages])
-
-
-def write_data_to_file(output_file, data, max_context_window, needles_subset, convert_messagesto_string=False):
+def write_data_to_file(output_file, data, max_context_window, needles_subset):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for idx, entry in tqdm(enumerate(data), desc=f"Writing {output_file.name}"):
             messages = json.loads(entry["prompt"])
@@ -62,15 +55,8 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset, co
                 if n_tokens > max_context_window:
                     print(f"Skipping {idx} because it has {n_tokens} tokens")
                     continue
-
-            # convert messages to string
-            if convert_messagesto_string:
-                question = convert_messages_to_string(messages, {"user": "User", "assistant": "Assistant"})
-
-            else:
-                question = entry.pop('prompt')
-
-            entry['messages'] = messages
+                
+            entry['messages'] = entry.pop('prompt')
             entry['expected_answer'] = entry.pop('answer')
             entry['n_tokens'] = n_tokens
             json.dump(entry, fout)
