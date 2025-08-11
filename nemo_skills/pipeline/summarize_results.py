@@ -297,7 +297,7 @@ def summarize_results(
         metrics = {}
 
         has_greedy = Path(f'{benchmark_path}/output.jsonl').exists()
-        input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl') 
+        input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
         has_sampling = len(input_files) > 0
 
         if has_greedy and has_sampling:
