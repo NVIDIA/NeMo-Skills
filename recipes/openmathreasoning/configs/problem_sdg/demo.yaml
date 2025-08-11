@@ -10,7 +10,7 @@ input_file: /nemo_run/code/recipes/openmathreasoning/configs/problem_sdg/example
 # Define model server parameters
 generate_kwargs:
   # Model to be used for data processing stages
-  model: gpt-4.1
+  model: o3-mini
   server_type: azureopenai
   server_address: https://prod.api.nvidia.com/llm/v1/azure
 
