@@ -16,16 +16,16 @@ generate_kwargs:
 
 # List of datasets to run problem decontamination with
 decontamination_datasets:
-  - math
+  # - math
   - aime24
   - aime25
-  - amc23
-  - college_math
-  - gaokao2023en
-  - gsm8k
-  - minerva_math
-  - olympiadbench
-  - omni-math
+  # - amc23
+  # - college_math
+  # - gaokao2023en
+  # - gsm8k
+  # - minerva_math
+  # - olympiadbench
+  # - omni-math
 
 pipeline_stages:
   - extract_problems
