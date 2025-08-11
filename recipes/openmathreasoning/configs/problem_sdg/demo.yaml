@@ -13,9 +13,9 @@ generate_kwargs:
   # model: o3-mini
   # server_type: azureopenai
   # server_address: https://prod.api.nvidia.com/llm/v1/azure
-  model: nvdev/openai/gpt-oss-120b
+  model: openai/gpt-oss-120b
   server_type: openai
-  server_address: https://integrate.api.nvidia.com/v1
+  server_address: http://localhost:8000/v1
 
 # List of datasets to run problem decontamination with
 decontamination_datasets:
