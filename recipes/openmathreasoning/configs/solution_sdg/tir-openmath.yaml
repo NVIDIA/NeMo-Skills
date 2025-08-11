@@ -114,7 +114,6 @@ stages:
       - judge_answers
     inline_args: >-
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml
-      ++prompt_template=qwen-instruct
       ++inference.temperature=0.7
       ++inference.tokens_to_generate=2048
     stage_kwargs: ${generate_new_summaries_kwargs}
