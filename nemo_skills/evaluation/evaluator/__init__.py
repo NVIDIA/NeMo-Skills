@@ -23,6 +23,7 @@ from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 from nemo_skills.evaluation.evaluator.ioi import eval_ioi
+from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
 
 
 def dummy_eval(cfg):
@@ -45,6 +46,7 @@ EVALUATOR_MAP = {
     'livecodebench_pro': eval_livecodebench_pro,
     'scicode': eval_scicode,
     'ioi': eval_ioi,
+    'mrcr': eval_mrcr,
 }
 
 

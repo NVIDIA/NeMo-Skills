@@ -15,7 +15,7 @@ Here are some of the features we support:
     - Coding skills: scicode, livecodebench, human-eval, mbpp
     - Chat/instruction following: ifbench, ifeval, arena-hard
     - General knowledge: mmlu, mmlu-pro, gpqa
-    - Long context: ruler
+    - Long context: ruler, mrcr
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
