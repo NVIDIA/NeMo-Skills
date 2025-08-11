@@ -1,7 +1,7 @@
-cluster: slurm
-base_output_dir: /workspace/openmathreasoning
-expname: openmathreasoning
-suffix: tir-openmath  # Suffix for experiment names
+cluster: local
+base_output_dir: /workspace/openmathreasoning-demo
+expname: omr-tir
+suffix: omr
 
 
 # Input file for the first stage (generate_solutions)
@@ -10,19 +10,15 @@ input_file: ${base_output_dir}/problem-sdg/step-5-merge-data/all-problems.jsonl
 # File with benchmark problems you want decontaminate with
 contamination_file: ${base_output_dir}/problem-sdg/step-6-decontamination/output.jsonl
 # Number of solutions per each problem from the input file to generate
-num_random_seeds_to_generate: 16
+num_random_seeds_to_generate: 2
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
-  # Model to be used for answer judgement
-  model: /hf_models/Qwen2.5-32B-Instruct
-  # Server type to launch the model
-  server_type: trtllm
-  # Server parameters
-  server_gpus: 8
-  server_nodes: 1
+  model: gpt-4.1
+  server_type: azureopenai
+  server_address: https://prod.api.nvidia.com/llm/v1/azure
   # Number of generated solutions per problem to judge
   num_random_seeds: ${num_random_seeds_to_generate}
 
@@ -61,8 +57,7 @@ stages:
     # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
       ++prompt_config=openmath/tir
-      ++prompt_template=qwen-instruct
-      ++code_tags=openmath
+      ++code_tags=qwen
       ++inference.tokens_to_generate=16384
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
@@ -73,13 +68,12 @@ stages:
     stage_kwargs:
       # you can take our published model from HF and use it as data generator
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
-      model: /trt_models/openmath-nemotron-14b
       with_sandbox: true
-      server_type: trtllm
-      server_gpus: 8
-      server_nodes: 1
+      model: gpt-4.1
+      server_type: azureopenai
+      server_address: https://prod.api.nvidia.com/llm/v1/azure
       num_random_seeds: ${num_random_seeds_to_generate}
-      num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
+      # num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
       # if your slurm cluster has a mandatory job timeout, you can schedule multiple dependent jobs with
       # dependent_jobs: N
 
