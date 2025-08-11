@@ -28,7 +28,13 @@ from omegaconf import ListConfig, OmegaConf, open_dict
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
+from nemo_skills.inference.model import (
+    OnlineGenSelectConfig,
+    get_code_execution_model,
+    get_model,
+    get_online_genselect_model,
+    server_params,
+)
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
     chunk_data,
@@ -122,6 +128,11 @@ class GenerateSolutionsConfig:
     total_code_executions_in_prompt: Any = None
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
+
+    # set to True if online genselect is used
+    online_genselect: bool = False
+    # genselect config
+    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
@@ -249,7 +260,14 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        if self.cfg.online_genselect:
+            # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
+            self.semaphore = asyncio.Semaphore(
+                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
+            )
+        else:
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
@@ -257,6 +275,14 @@ class GenerationTask:
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+        elif self.cfg.online_genselect:
+            # Use the same prompt template for genselect as the one used for generation
+            self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
+            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
+            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
+            llm = get_online_genselect_model(
+                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+            )
         else:
             llm = get_model(**self.cfg.server)
 
