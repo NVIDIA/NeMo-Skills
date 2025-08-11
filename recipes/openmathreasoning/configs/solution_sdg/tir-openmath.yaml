@@ -124,7 +124,7 @@ stages:
 
     dependencies:
       - generate_new_summaries
-    inline_args: "++prompt_template=qwen-instruct"
+    # inline_args: "++prompt_template=qwen-instruct"
     stage_kwargs: ${generate_new_summaries_kwargs}
 
   merge_new_summaries:
