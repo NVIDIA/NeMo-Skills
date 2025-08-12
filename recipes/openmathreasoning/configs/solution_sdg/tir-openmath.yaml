@@ -56,10 +56,11 @@ stages:
     input_file: ${input_file}
     # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
-      ++prompt_config=openmath/tir
-      ++code_tags=qwen
-      ++inference.tokens_to_generate=16384
-      ++code_execution=true
+      ++inference.tokens_to_generate=120000
+      ++max_concurrent_requests=1024
+      ++prompt_config=gpt-oss/math
+      ++prompt_template=gpt-oss-high-python
+      ++code_tags=gpt-oss
       ++server.code_execution.max_code_executions=null
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[1, 8]'
@@ -69,16 +70,6 @@ stages:
       # you can take our published model from HF and use it as data generator
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
-      inline_args: >-
-        ++inference.tokens_to_generate=120000
-        ++max_concurrent_requests=1024
-        ++prompt_config=gpt-oss/math
-        ++prompt_template=gpt-oss-high-python
-        ++code_tags=gpt-oss
-        ++server.code_execution.max_code_executions=null
-        ++server.code_execution.add_remaining_code_executions=true
-        ++total_code_executions_in_prompt='[1, 8]'
-        ++override_max_code_executions=true
       model: /hf_models/models--openai--gpt-oss-120b/snapshots/bc75b44b8a2a116a0e4c6659bcd1b7969885f423
       server_type: vllm
       server_gpus: 2
