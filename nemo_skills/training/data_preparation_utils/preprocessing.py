@@ -66,6 +66,7 @@ class ReadData(BaseProcessor):
                 self.keys_to_keep.add(self.output_key)
                 self.keys_to_keep.add("symbolic_correct")
                 self.keys_to_keep.add("judgement")
+                self.keys_to_keep.add("reasoning_content")
 
         if isinstance(self.input_files, str):
             if ',' in self.input_files:
@@ -368,10 +369,10 @@ class WriteFinalSftManifest(BaseProcessor):
                     generation = elem.pop(self.output_key)
                     if self.prompt:
                         output_sample["input"] = self.prompt.fill(input_dict=elem)
-                        if 'reasoning_content' in output_sample:
+                        if 'reasoning_content' in elem:
                             output_sample["output"] = (
                                 self.prompt.config.template.thinking_begin
-                                + output_sample["reasoning_content"]
+                                + elem["reasoning_content"]
                                 + self.prompt.config.template.thinking_end
                             )
                             output_sample["output"] += generation
