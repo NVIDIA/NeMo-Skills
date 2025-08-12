@@ -303,8 +303,6 @@ class CodeExecutionWrapper:
         request['prompt'] = prompt
 
         output = await self._generate_single(**request)
-        # NOTE: 
-        remove_stop_phrases = False
         self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
 
         return output
