@@ -106,8 +106,8 @@ stages:
   postprocess_tir_generations:
     output_dir: ${directories.step-4-postprocess-tir}
     input_dir: ${directories.step-3-judge-answers}
-    code_begin: "```python\n"
-    code_end: "```\n"
+    code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>" # "```python\n"
+    code_end: "<|call|>" # "```\n"
     dependencies:
       - judge_answers
     # You can use CPU partition for this script, if available
