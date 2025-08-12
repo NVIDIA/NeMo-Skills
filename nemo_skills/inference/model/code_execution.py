@@ -152,12 +152,6 @@ class CodeExecutionWrapper:
             if is_openai_format and output_dict.get('finish_reason') == 'stop':
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
-            # BUGFIX: Handle non-OpenAI format (like vLLM) where stop phrases are also removed
-            # Check if we have an unmatched code_begin that likely ended with code_end stop phrase
-            # NOTE added this
-            elif not is_openai_format and output.count(code_begin) > output.count(code_end):
-                output += code_end
-            # NOTE: END 
             # Update the prompt based on format
             if is_openai_format:
                 request['prompt'].append({'role': 'assistant', 'content': output})
@@ -359,13 +353,6 @@ class CodeExecutionWrapper:
             if is_openai_format and chunk.get('finish_reason') == 'stop':
                 if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
                     current_output_segment += code_end
-            # NOTE: Added this
-            # BUGFIX: Handle non-OpenAI format (like vLLM) where stop phrases are also removed
-            # Check if we have an unmatched code_begin that likely ended with code_end stop phrase
-            elif not is_openai_format and current_output_segment.count(code_begin) > current_output_segment.count(code_end):
-                current_output_segment += code_end
-            # NOTE: End
-
             # Update the prompt based on format
             if is_openai_format:
                 current_full_prompt.append({'role': 'assistant', 'content': current_output_segment})

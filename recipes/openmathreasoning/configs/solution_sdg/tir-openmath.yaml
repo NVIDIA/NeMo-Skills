@@ -64,7 +64,7 @@ stages:
       ++prompt_template=gpt-oss-high-python
       ++code_tags=gpt-oss
       ++code_execution=true
-      ++server.code_execution.max_code_executions=100
+      ++server.code_execution.max_code_executions=10
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       # you can take our published model from HF and use it as data generator

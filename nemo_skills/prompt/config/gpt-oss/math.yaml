@@ -1,5 +1,18 @@
 system: ""
 
 user: |-
-  {problem}
-  Please reason step by step, and put your final answer within \boxed{{}}.
+  Solve the following math problem, integrating natural language reasoning with Python code executions.
+  You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
+  Do not generate more than {total_code_executions} tool calls.
+  
+  When using python code, you must use the following format:
+  # used to execute code within these tags
+  code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
+  code_end: "<|call|>"
+  # code output format: 
+  code_output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
+  code_output_end: "<|end|><|start|>assistant"
+  Each output block must be preceded by an actual tool call. Do not write output block yourself, without an actual tool call. 
+  Finally, end your response with exactly **Final Answer**: \boxed{{}}, where your answer is placed inside the box. 
+
+  Problem: {problem}
