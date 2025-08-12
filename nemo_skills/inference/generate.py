@@ -432,7 +432,7 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [data_point['total_code_executions']] # [data_point['total_code_executions']] #NOTE: need int, not llist. 
+                max_code_executions_values = data_point['total_code_executions'] # [data_point['total_code_executions']] #NOTE: need int, not llist. 
                 generation_params['max_code_executions'] = max_code_executions_values
 
         return await self.llm.generate_async(**generation_params)
