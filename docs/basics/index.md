@@ -98,9 +98,9 @@ config might look like
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.6.1
-  vllm: igitman/nemo-skills-vllm:0.6.1
-  nemo: igitman/nemo-skills-nemo:0.6.1
+  trtllm: igitman/nemo-skills-trtllm:0.7.0
+  vllm: igitman/nemo-skills-vllm:0.7.0
+  nemo: igitman/nemo-skills-nemo:0.7.0
   # ... there are some more containers defined here
 
 env_vars:

@@ -11,16 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-h5py
-# needed for persistent sessions
-ipython
-
-# this are requirements for code execution - put all packages that LLM should have access to in here
-annotated-types>=0.7.0
-numpy
-pandas
-scipy
-sympy
-tqdm
-psutil
+EVAL_SPLIT = 'all'
+PROMPT_CONFIG = 'null'
+DATASET_GROUP = 'long-context'
+METRICS_TYPE = 'mrcr'
+EVAL_ARGS = '++eval_type=mrcr'
+GENERATION_ARGS = '++prompt_format=openai'
