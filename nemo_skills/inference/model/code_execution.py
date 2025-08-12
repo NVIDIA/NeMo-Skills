@@ -161,7 +161,8 @@ class CodeExecutionWrapper:
             print("--------------DEBUGGING: output-------------")
             print(output)
             print("--------------DEBUGGING: forcing code_end tagging-------------")
-            output += code_end
+            if output_dict.get('finish_reason') == 'stop':
+                output += code_end
             print("--------------DEBUGGING: output after forcing code_end tagging-------------")
             print(output)
 
