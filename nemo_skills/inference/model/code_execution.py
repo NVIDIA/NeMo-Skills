@@ -133,6 +133,9 @@ class CodeExecutionWrapper:
         # adding plus one to make sure there is always some completion after the last requested code block
         for generation_index in range(effective_max_code_executions + 1):
 
+            print("--------------DEBUGGING: generation_index-------------")
+            print(generation_index)
+
             generation_time_start = time.time()
             if timeout is not None:
                 # updating timeout to account for the time already spent
@@ -142,6 +145,8 @@ class CodeExecutionWrapper:
                     break
 
             output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
+            print("--------------DEBUGGING: output_dict-------------")
+            print(output_dict)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
             # no need to do anything with this as the code below should just exit, so that's only for logging
@@ -152,6 +157,14 @@ class CodeExecutionWrapper:
             if is_openai_format and output_dict.get('finish_reason') == 'stop':
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
+
+            print("--------------DEBUGGING: output-------------")
+            print(output)
+            print("--------------DEBUGGING: forcing code_end tagging-------------")
+            output += code_end
+            print("--------------DEBUGGING: output after forcing code_end tagging-------------")
+            print(output)
+
             # Update the prompt based on format
             if is_openai_format:
                 request['prompt'].append({'role': 'assistant', 'content': output})
@@ -174,9 +187,12 @@ class CodeExecutionWrapper:
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                print("--------------DEBUGGING: found code in output------------")
                 code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
+                print("--------------DEBUGGING: execution_dict-------------")
+                print(execution_dict)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
