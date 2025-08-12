@@ -333,6 +333,12 @@ class CodeExecutionWrapper:
         current_full_prompt = copy.deepcopy(prompt)
         session_id = None  # For sandbox state continuity
         for generation_index in range(effective_max_code_executions + 1):
+
+            # NOTE:
+            print("--------------DEBUGGING: running the generation loop-------------")
+            print("generation_index: ", generation_index)
+            print("effective_max_code_executions: ", effective_max_code_executions)
+
             model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
 
             current_output_segment = ""
@@ -364,9 +370,15 @@ class CodeExecutionWrapper:
                 # This was the last iteration, intended for final text generation after all code executions.
                 break
 
+            # NOTE: 
+            print("--------------DEBUGGING: current_full_prompt-------------")
+            print(current_full_prompt)
+
             if current_output_segment.endswith(code_end) and current_output_segment.rfind(
                 code_begin
             ) > current_output_segment.rfind(code_end, 0, -1):
+                # NOTE: 
+                print("--------------DEBUGGING: executing code-------------")
                 execution_dict, session_id = await self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
                     language=self.config.code_execution_language,
@@ -375,6 +387,9 @@ class CodeExecutionWrapper:
                     session_id=session_id,
                     traceback_verbosity=self.config.sandbox_traceback_verbosity,
                 )
+                # NOte:
+                print("--------------DEBUGGING: execution_dict-------------")
+                print(execution_dict)
 
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -383,6 +398,9 @@ class CodeExecutionWrapper:
                 formatted_code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+                # NOTE: 
+                print("--------------DEBUGGING: formatted_code_output--------------")
+                print(formatted_code_output)
 
                 yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
 
