@@ -1,0 +1,38 @@
+# Prompt specification for the original Llama3-instruct model
+
+# these tokens are always used to construct a prompt like this
+#
+#   single-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user}<user_end><assistant_begin>{generation}
+#   multi-turn:
+#     <text_begin><system_begin>{system}<system_end><user_begin>{user1}<user_end><assistant_begin>{assistant1}<assistant_end>...
+#     <user_begin>{userN}<user_end><assistant_begin>{generation}
+
+text_begin: ""
+
+system_begin: |-
+  <|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.
+  Knowledge cutoff: 2024-06
+  Current date: 2025-08-08
+
+  Reasoning: high
+
+  # Tools
+
+  ## python
+
+  Use this tool to execute Python code in your chain of thought. The code will not be shown to the user. This tool should be used for internal reasoning, but not for code that is intended to be visible to the user (e.g. when creating plots, tables, or files).
+
+  When you send a message containing Python code to python, it will be executed in a stateful Jupyter notebook environment. python will respond with the output of the execution or time out after 120.0 seconds. The drive at '/mnt/data' can be used to save and persist user files. Internet access for this session is UNKNOWN. Depends on the cluster.
+
+  # Valid channels: analysis, commentary, final. Channel must be included for every message.
+
+system_end: "<|end|>"
+
+user_begin: "<|start|>user<|message|>"
+user_end: "<|end|>"
+
+assistant_begin: "<|start|>assistant"
+assistant_end: "<|end|>"
+
+stop_phrases: ['<|call|>', '<|return|>']

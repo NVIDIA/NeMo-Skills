@@ -69,9 +69,20 @@ stages:
       # you can take our published model from HF and use it as data generator
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
-      model: openai/gpt-oss-120b
-      server_type: openai
-      server_address: http://localhost:8000/v1
+      inline_args: >-
+        ++inference.tokens_to_generate=120000
+        ++max_concurrent_requests=1024
+        ++prompt_config=gpt-oss/math
+        ++prompt_template=gpt-oss-high-python
+        ++code_tags=gpt-oss
+        ++server.code_execution.max_code_executions=null
+        ++server.code_execution.add_remaining_code_executions=true
+        ++total_code_executions_in_prompt='[1, 8]'
+        ++override_max_code_executions=true
+      model: /hf_models/models--openai--gpt-oss-120b/snapshots/bc75b44b8a2a116a0e4c6659bcd1b7969885f423
+      server_type: vllm
+      server_gpus: 2
+      server_args: "--async-scheduling --max-num-seqs=1024"
       # model: gpt-4.1
       # server_type: azureopenai
       # server_address: https://prod.api.nvidia.com/llm/v1/azure
