@@ -145,8 +145,8 @@ Note that unlike OpenMathReasoning, we are not starting from *Math* models, but 
 
 |                       | **lr** | **min_lr** | **TP** | **PP** | **CP** |
 | --------------------- | ------ | ---------- | ------ | ------ | ------ |
-| **Qwen2.5-1.5B** | 1e-4   | 1e-7       | 1      | 1      | 4      |
-| **Qwen2.5-7B**   | 1e-4   | 1e-7       | 4      | 1      | 4      |
+| **Qwen2.5-1.5B**      | 1e-4   | 1e-7       | 1      | 1      | 4      |
+| **Qwen2.5-7B**        | 1e-4   | 1e-7       | 4      | 1      | 4      |
 | **Qwen2.5-14B**       | 1e-4   | 1e-7       | 8      | 1      | 4      |
 | **Qwen2.5-32B**       | 1e-4   | 1e-7       | 8      | 2      | 4      |
 
