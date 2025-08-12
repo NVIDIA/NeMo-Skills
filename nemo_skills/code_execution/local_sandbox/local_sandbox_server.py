@@ -235,6 +235,31 @@ def execute_python(generated_code, std_input, timeout, language):
         return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
 
+def execute_python(generated_code, std_input, timeout, language):
+
+    execution_command = [language, "-c", generated_code]
+    try:
+        process = subprocess.Popen(
+            execution_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            universal_newlines=True,
+            preexec_fn=set_limits,
+        )
+        stdout, stderr = process.communicate(input=std_input, timeout=timeout)
+        return {"process_status": "completed", "stdout": stdout, "stderr": stderr}
+    except subprocess.TimeoutExpired:
+        try:
+            # kill the whole process group
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=1)  # reap, no extra timeout needed
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+
 def execute_lean4(generated_code, timeout):
     temp_file_name = None
     proc = None  # <-- Keep track of the process object
@@ -274,7 +299,6 @@ def execute_lean4(generated_code, timeout):
 
         # kill the process tree
         kill_process_tree(proc)
-
         # Now we can safely get any output that was generated before the kill.
         stdout, stderr = proc.communicate()
 
