@@ -183,6 +183,7 @@ class CodeExecutionWrapper:
                 break
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
+            print("--------------DEBUGGING: Checking if code is in output-------------")
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
                 print("--------------DEBUGGING: found code in output------------")
                 code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
@@ -197,11 +198,17 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
+                print("--------------DEBUGGING: code_output-------------")
+                print(code_output)
 
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
+                    print("--------------DEBUGGING: request['prompt'] after code output-------------")
+                    print(request['prompt'][-2]['content'])
                 else:
                     request['prompt'] += code_output
+                    print("--------------DEBUGGING: request['prompt'] after code output-------------")
+                    print(request['prompt'])
 
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
@@ -213,6 +220,9 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt) :]
+            
+        print("--------------DEBUGGING: Final generation-------------")
+        print(generation)
 
         return {
             'generation': generation,
