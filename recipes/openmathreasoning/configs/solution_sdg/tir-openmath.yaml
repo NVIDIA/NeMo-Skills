@@ -61,6 +61,7 @@ stages:
       ++prompt_config=gpt-oss/math
       ++prompt_template=gpt-oss-high-python
       ++code_tags=gpt-oss
+      ++code_execution=true
       ++server.code_execution.max_code_executions=null
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[1, 8]'
