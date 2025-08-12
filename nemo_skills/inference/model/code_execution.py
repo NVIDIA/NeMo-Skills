@@ -220,7 +220,7 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             generation = request['prompt'][len(prompt) :]
-            
+
         print("--------------DEBUGGING: Final generation-------------")
         print(generation)
 
@@ -303,6 +303,8 @@ class CodeExecutionWrapper:
         request['prompt'] = prompt
 
         output = await self._generate_single(**request)
+        # NOTE: 
+        remove_stop_phrases = False
         self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
 
         return output
