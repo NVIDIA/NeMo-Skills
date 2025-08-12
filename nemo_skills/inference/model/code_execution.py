@@ -160,12 +160,6 @@ class CodeExecutionWrapper:
 
             print("--------------DEBUGGING: output-------------")
             print(output)
-            print("--------------DEBUGGING: forcing code_end tagging-------------")
-            if output_dict.get('finish_reason') == 'stop':
-                output += code_end
-            print("--------------DEBUGGING: output after forcing code_end tagging-------------")
-            print(output)
-
             # Update the prompt based on format
             if is_openai_format:
                 request['prompt'].append({'role': 'assistant', 'content': output})
@@ -174,6 +168,8 @@ class CodeExecutionWrapper:
                 request['prompt'] += output
 
             # if it's the extra iteration, we don't execute the code block and just finish
+            print("--------------DEBUGGING: effective_max_code_executions-------------")
+            print(effective_max_code_executions)
 
             if generation_index == effective_max_code_executions:
                 break
