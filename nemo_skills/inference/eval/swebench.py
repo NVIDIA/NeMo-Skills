@@ -133,6 +133,9 @@ class SweBenchGenerationTask(GenerationTask):
         logs_dir.mkdir(exist_ok=True)
         log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}.log"
 
+        # Fix localhost URLs not working sometimes
+        command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
+
         # Launch Apptainer container and execute the command
         apptainer_cmd = (
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
