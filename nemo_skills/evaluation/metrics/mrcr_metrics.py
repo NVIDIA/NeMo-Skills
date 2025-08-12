@@ -15,14 +15,11 @@
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
-class BFCLMetrics(BaseMetrics):
-    """Metrics for BFCL (Berkeley Function Calling Leaderboard) evaluation."""
-
-    # TODO: Ideally we should combine the accuracies across different subsets of the benchmark to
-    # report something similar to the final score in the BFCL leaderboard.
-
+class MRCRMetrics(BaseMetrics):
+    """Metrics for MRCR (Multi-Round Coreference) evaluation."""
+    
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
-        return {"accuracy": prediction['is_correct']}
+        return {"accuracy": prediction['seq_match_ratio']}
 
     def update(self, predictions):
         super().update(predictions)

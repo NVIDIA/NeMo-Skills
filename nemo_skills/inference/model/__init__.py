@@ -18,6 +18,9 @@ from .azure import AzureOpenAIModel
 from .base import BaseModel
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
+
+# Online GenSelect
+from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
 from .vllm import VLLMModel
 
@@ -45,6 +48,14 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
+
+
+def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
+    """A helper function to create OnlineGenSelect model."""
+    model = get_model(server_type=server_type, **kwargs)
+    if online_genselect_config is None:
+        online_genselect_config = OnlineGenSelectConfig()
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
 
 def server_params():
