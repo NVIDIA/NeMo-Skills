@@ -139,11 +139,15 @@ class Sandbox(abc.ABC):
             # Should be ok since this is a debug mode
             output = await asyncio.to_thread(ssh_request)
         else:
+            session_id = request.pop('session_id', None)
+            extra_headers = {}
+            if session_id is not None:
+                extra_headers['X-Session-ID'] = str(session_id)
             output = await self.http_session.post(
                 url=self._get_execute_url(),
                 content=json.dumps(request),
                 timeout=timeout,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **extra_headers},
             )
         # retrying 502 errors
         if output.status_code == 502:

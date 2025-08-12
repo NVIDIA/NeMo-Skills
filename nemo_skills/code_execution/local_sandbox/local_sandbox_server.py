@@ -304,8 +304,7 @@ def execute():
     max_output_characters = request.json.get('max_output_characters', 1000)
     traceback_verbosity = request.json.get('traceback_verbosity', 'Plain')
 
-    # Get session_id from JSON body
-    session_id = request.json.get('session_id')
+    session_id = request.headers.get('X-Session-ID')
 
     if language == 'ipython':
         result = execute_ipython_session(generated_code, session_id, traceback_verbosity)

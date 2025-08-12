@@ -3,18 +3,10 @@ events {
 }
 
 http {
-    # Extract session_id from JSON request body
-    map $request_body $session_id_for_routing {
-        # Match session_id in JSON: "session_id":"value" or "session_id": "value"
-        ~*"session_id"\s*:\s*"([^"]+)" $1;
-        # Default to empty if not found in body
-        default "";
-    }
-
-    # If no session_id found, use a per-request random key (request_id) for load balancing
-    map $session_id_for_routing $hash_key {
+    # Extract session_id from X-Session-ID header
+    map $http_x_session_id $hash_key {
         ""        $request_id;
-        default   $session_id_for_routing;
+        default   $http_x_session_id;
     }
 
     # Define upstream servers (dynamically populated)

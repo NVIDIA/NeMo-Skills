@@ -37,11 +37,21 @@ class SessionAffinityTester:
         """Execute code with session and return result with timing info"""
         start_time = time.time()
         try:
-            payload = {"generated_code": code, "timeout": timeout, "language": "ipython", "session_id": session_id}
+            payload = {
+                "generated_code": code,
+                "timeout": timeout,
+                "language": "ipython",
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+            }
+            if session_id:
+                headers["X-Session-ID"] = session_id
 
             # HTTP timeout should be longer than execution timeout + buffer for IPython session creation
             http_timeout = max(timeout + 10, 30)  # IPython sessions start much faster than Jupyter kernels
-            response = requests.post(f"{self.base_url}/execute", json=payload, timeout=http_timeout)
+            response = requests.post(f"{self.base_url}/execute", json=payload, headers=headers, timeout=http_timeout)
             end_time = time.time()
 
             if response.status_code != 200:
@@ -170,7 +180,11 @@ process_id = os.getpid()
 print(f"WORKER_INFO: port={worker_port}, num={worker_num}, pid={process_id}")
 """
 
-        result = self.execute_code(code, session_id)
+        headers = {}
+        if session_id:
+            headers["X-Session-ID"] = session_id
+
+        result = self.execute_code(code, session_id)  # Will use headers via execute_code
 
         # For session requests, we get JSON response with stdout
         if result.get('process_status') == 'completed':
@@ -412,8 +426,8 @@ class TestSessionAffinity:
         assert result['process_status'] == 'completed'
         assert 'cleanup_test' in result.get('stdout', '')
 
-        # Delete the session - include session_id in JSON body for proper routing
-        delete_response = requests.delete(f"{BASE_URL}/sessions/{session_id}", json={"session_id": session_id})
+        # Delete the session - include session_id in header for proper routing
+        delete_response = requests.delete(f"{BASE_URL}/sessions/{session_id}", headers={"X-Session-ID": session_id})
         assert delete_response.status_code == 200
 
         # Verify session is gone (this should fail with NameError)
@@ -432,12 +446,8 @@ class TestSessionAffinity:
             # Execute code to create the session
             requests.post(
                 f"{BASE_URL}/execute",
-                json={
-                    "generated_code": f"list_test_var_{i} = {i}",
-                    "session_id": session_id,
-                    "timeout": 10,
-                    "language": "ipython",
-                },
+                json={"generated_code": f"list_test_var_{i} = {i}", "timeout": 10, "language": "ipython"},
+                headers={"X-Session-ID": session_id},
             )
 
         # List sessions
