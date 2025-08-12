@@ -7,11 +7,11 @@ user: |-
   
   When using python code, you must use the following format:
   # used to execute code within these tags
-  code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
-  code_end: "<|call|>"
+  code_begin: <|start|>assistant<|channel|>analysis to=python code<|message|>
+  code_end: <|call|>
   # code output format: 
-  code_output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
-  code_output_end: "<|end|><|start|>assistant"
+  code_output_begin: <|start|>python code to=assistant<|channel|>analysis<|message|>
+  code_output_end: <|end|><|start|>assistant
   Each output block must be preceded by an actual tool call. Do not write output block yourself, without an actual tool call. 
   Finally, end your response with exactly **Final Answer**: \boxed{{}}, where your answer is placed inside the box. 
 
