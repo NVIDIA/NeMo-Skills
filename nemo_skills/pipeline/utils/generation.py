@@ -76,7 +76,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
     # If random_seeds has more than N elements, split commands into groups of N
     request_size = len(check_commands[0]) // 10
-    if len(random_seeds) > request_size:
+    if len(expected_files) > request_size:
         outputs = []
         for i in range(0, len(check_commands), request_size):
             group = check_commands[i : i + request_size]
