@@ -20,6 +20,7 @@ import json
 import random
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
@@ -335,6 +336,64 @@ class TestSessionAffinity:
         assert (
             len(workers_hit) == 1
         ), f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
+
+    def test_session_persistence_large_payload(self, tester, server_health_check):
+        """Test session persistence with large payloads exceeding nginx body buffer"""
+        LARGE_PAYLOAD_SIZE = 1024 * 1024 + 1024  # 257KB to exceed 128KB buffer
+        session_id = f"test_large_payload_{uuid.uuid4()}"
+
+        # Generate large code string (>128KB)
+        large_var = 'x' * (LARGE_PAYLOAD_SIZE // 2)  # Roughly half size for string
+        init_code = f"""
+large_var = '{large_var}'
+print('Large variable initialized')
+"""
+
+        result = tester.execute_code(init_code, session_id)
+        assert result['process_status'] == 'completed', "Failed to initialize large variable"
+        assert 'Large variable initialized' in result['stdout']
+
+        # Second request: use the large variable and add more data
+        large_addition = 'y' * (LARGE_PAYLOAD_SIZE // 2)
+        use_code = f"""
+try:
+    combined = large_var + '{large_addition}'
+    print(f'Combined length: {{len(combined)}}')
+    print('Large payload test successful')
+except NameError:
+    print('SESSION MISS: large_var not found')
+"""
+
+        result = tester.execute_code(use_code, session_id)
+        assert result['process_status'] == 'completed', "Failed to use large variable"
+        assert 'Large payload test successful' in result['stdout']
+        assert 'SESSION MISS' not in result['stdout']
+
+    def test_multiple_large_payloads_concurrent(self, tester, server_health_check):
+        """Test concurrent sessions with large payloads"""
+        LARGE_PAYLOAD_SIZE = 1024 * 1024 + 1024  # 257KB to exceed 128KB buffer
+        num_sessions = 3
+
+        def test_large_session(i):
+            session_id = f"concurrent_large_{i}_{uuid.uuid4()}"
+
+            large_var = 'z' * LARGE_PAYLOAD_SIZE
+            code1 = f"large_var = '{large_var}'; print('Initialized')"
+            res1 = tester.execute_code(code1, session_id)
+
+            code2 = "print(len(large_var))"
+            res2 = tester.execute_code(code2, session_id)
+
+            return (
+                res1['process_status'] == 'completed'
+                and res2['process_status'] == 'completed'
+                and str(LARGE_PAYLOAD_SIZE) in res2['stdout']
+            )
+
+        with ThreadPoolExecutor(max_workers=num_sessions) as executor:
+            results = list(executor.map(test_large_session, range(num_sessions)))
+
+        assert all(results), f"{results.count(False)} concurrent large payload sessions failed"
 
     def test_different_sessions_can_hit_different_workers(self, tester, server_health_check):
         """Test that different session_ids can potentially hit different workers"""
