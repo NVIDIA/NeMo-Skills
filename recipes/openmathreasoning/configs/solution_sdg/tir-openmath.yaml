@@ -16,9 +16,9 @@ initial_dependency: ${expname}-merge-data-qwen-instruct
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
-  model: gpt-4.1
-  server_type: azureopenai
-  server_address: https://prod.api.nvidia.com/llm/v1/azure
+  model: openai/gpt-oss-120b
+  server_type: openai
+  server_address: http://localhost:8000/v1
   # Number of generated solutions per problem to judge
   num_random_seeds: ${num_random_seeds_to_generate}
 
