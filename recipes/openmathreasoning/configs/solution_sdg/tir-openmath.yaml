@@ -57,15 +57,14 @@ stages:
     # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
       ++inference.tokens_to_generate=120000
+      ++inference.temperature=1.0
+      ++inference.top_p=1.0
       ++max_concurrent_requests=1024
       ++prompt_config=gpt-oss/math
       ++prompt_template=gpt-oss-high-python
       ++code_tags=gpt-oss
       ++code_execution=true
-      ++server.code_execution.max_code_executions=null
-      ++server.code_execution.add_remaining_code_executions=true
-      ++total_code_executions_in_prompt='[1, 8]'
-      ++override_max_code_executions=true
+      ++server.code_execution.max_code_executions=100
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       # you can take our published model from HF and use it as data generator
