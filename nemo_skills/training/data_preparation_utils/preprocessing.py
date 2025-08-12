@@ -368,7 +368,15 @@ class WriteFinalSftManifest(BaseProcessor):
                     generation = elem.pop(self.output_key)
                     if self.prompt:
                         output_sample["input"] = self.prompt.fill(input_dict=elem)
-                        output_sample["output"] = generation
+                        if 'reasoning_content' in output_sample:
+                            output_sample["output"] = (
+                                self.prompt.config.template.thinking_begin
+                                + output_sample["reasoning_content"]
+                                + self.prompt.config.template.thinking_end
+                            )
+                            output_sample["output"] += generation
+                        else:
+                            output_sample["output"] = generation
                         # not adding end-of-turn for incomplete generations
                         if output_sample.get("finish_reason", "stop") == "stop":
                             output_sample["output"] += self.prompt.config.template.assistant_end

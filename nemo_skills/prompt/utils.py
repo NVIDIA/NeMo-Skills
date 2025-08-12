@@ -17,9 +17,9 @@ import logging
 import random
 import re
 from dataclasses import asdict, field
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from itertools import zip_longest
 
 import yaml
 
@@ -103,6 +103,9 @@ class PromptTemplate:
     user_end: str
     assistant_begin: str
     assistant_end: str
+
+    thinking_begin: str | None = None
+    thinking_end: str | None = None
 
     # TODO: should stop phrases not be here?
     stop_phrases: List[str]
@@ -244,7 +247,7 @@ class Prompt:
                 and use it to construct the prompt. You input_dict should also have "assistant" key in all
                 turns except last containing assistant reply.
             return_templated_dict: Indicates whether to return a messages list where the template is used
-                to fill the prompt. If so, a list of dicts with 'role' and 'content' keys will be returned. 
+                to fill the prompt. If so, a list of dicts with 'role' and 'content' keys will be returned.
                 In this case the final user and assistant messages will include special tokens.
 
         Returns:
@@ -259,12 +262,16 @@ class Prompt:
 
         if self.config.template:
             if multi_turn_key is None:
-                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
-                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                ))
-                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                    user=self.build_user_message(input_dict), **asdict(self.config.template)
-                ))
+                prompt_string = (
+                    system_string := self.SYSTEM_FORMAT.format(
+                        system=self.config.system.format(**input_dict), **asdict(self.config.template)
+                    )
+                )
+                prompt_string += (
+                    user_string := self.TURN_BEGIN_FORMAT.format(
+                        user=self.build_user_message(input_dict), **asdict(self.config.template)
+                    )
+                )
                 user_strings = [user_string]
                 assistant_strings = []
                 if generation:
@@ -273,30 +280,40 @@ class Prompt:
                         # Append generation without the closing tag.
                         prompt_string += (assistant_string := generation)
                     else:
-                        prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
-                            assistant=generation, **asdict(self.config.template)
-                        ))
+                        prompt_string += (
+                            assistant_string := self.TURN_END_FORMAT.format(
+                                assistant=generation, **asdict(self.config.template)
+                            )
+                        )
                     assistant_strings.append(assistant_string)
 
             else:
-                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
-                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                ))
+                prompt_string = (
+                    system_string := self.SYSTEM_FORMAT.format(
+                        system=self.config.system.format(**input_dict), **asdict(self.config.template)
+                    )
+                )
                 user_strings = []
                 assistant_strings = []
                 for turn in input_dict[multi_turn_key][:-1]:
-                    prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                        user=self.build_user_message(turn), **asdict(self.config.template)
-                    ))
+                    prompt_string += (
+                        user_string := self.TURN_BEGIN_FORMAT.format(
+                            user=self.build_user_message(turn), **asdict(self.config.template)
+                        )
+                    )
                     user_strings.append(user_string)
-                    prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
-                        assistant=turn["assistant"], **asdict(self.config.template)
-                    ))
+                    prompt_string += (
+                        assistant_string := self.TURN_END_FORMAT.format(
+                            assistant=turn["assistant"], **asdict(self.config.template)
+                        )
+                    )
                     assistant_strings.append(assistant_string)
 
-                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                    user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
-                ))
+                prompt_string += (
+                    user_string := self.TURN_BEGIN_FORMAT.format(
+                        user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
+                    )
+                )
                 user_strings.append(user_string)
                 prompt_string += generation
                 if generation:
@@ -412,7 +429,7 @@ def get_prompt(
         else:
             code_tags_dict = code_tags
         code_tags_obj = CodeTags(**code_tags_dict)
-    
+
     prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
 
     if examples_type is not None:

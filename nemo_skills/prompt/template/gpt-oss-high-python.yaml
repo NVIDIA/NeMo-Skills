@@ -36,3 +36,6 @@ assistant_begin: "<|start|>assistant"
 assistant_end: "<|end|>"
 
 stop_phrases: ['<|call|>', '<|return|>']
+
+thinking_begin: "<|channel|>analysis<|message|>"
+thinking_end: "<|end|><|start|>assistant<|channel|>final<|message|>"
