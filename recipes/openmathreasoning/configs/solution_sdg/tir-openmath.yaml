@@ -70,7 +70,7 @@ stages:
       # you can take our published model from HF and use it as data generator
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
-      model: /hf_models/models--openai--gpt-oss-120b/snapshots/bc75b44b8a2a116a0e4c6659bcd1b7969885f423
+      model: /hf_models/gpt-oss-120b
       server_type: vllm
       server_gpus: 2
       server_args: "--async-scheduling --max-num-seqs=1024"
