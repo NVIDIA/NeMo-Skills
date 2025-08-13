@@ -96,7 +96,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
 def get_sandbox_command(cluster_config):
     if cluster_config['executor'] == 'none':
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
-    return "/entrypoint.sh && /start.sh"
+    return "/start-with-nginx.sh"
 
 
 @dataclass(kw_only=True)

@@ -122,6 +122,11 @@ class Sandbox(abc.ABC):
         await self.http_session.aclose()
 
     async def _send_request(self, request, timeout):
+        session_id = request.pop('session_id', None)
+        extra_headers = {}
+        if session_id is not None:
+            extra_headers['X-Session-ID'] = str(session_id)
+
         if self.ssh_server and self.ssh_key_path:
             # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
@@ -132,17 +137,13 @@ class Sandbox(abc.ABC):
                     url=self._get_execute_url(),
                     data=json.dumps(request),
                     timeout=timeout,
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", **extra_headers},
                 )
 
             # Native async requires more lines of code, so we use to_thread
             # Should be ok since this is a debug mode
             output = await asyncio.to_thread(ssh_request)
         else:
-            session_id = request.pop('session_id', None)
-            extra_headers = {}
-            if session_id is not None:
-                extra_headers['X-Session-ID'] = str(session_id)
             output = await self.http_session.post(
                 url=self._get_execute_url(),
                 content=json.dumps(request),
