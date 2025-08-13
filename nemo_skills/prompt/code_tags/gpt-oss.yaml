@@ -12,22 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-
-from nemo_skills.utils import get_logger_name
-
-from .vllm import VLLMModel
-
-LOG = logging.getLogger(get_logger_name(__file__))
-
-
-class TrtllmModel(VLLMModel):
-    def _build_completion_request_params(self, **kwargs) -> dict:
-        params = super()._build_completion_request_params(**kwargs)
-        params['skip_special_tokens'] = False
-        return params
-
-    def _build_chat_request_params(self, **kwargs) -> dict:
-        request = super()._build_chat_request_params(**kwargs)
-        request['skip_special_tokens'] = False
-        return request
+# used to execute code within these tags
+code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
+code_end: "<|call|>"
+# used to extract the code output
+code_output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
+code_output_end: "<|end|><|start|>assistant"
+# used to post-process code output
+# choices: llama, qwen
+code_output_format: "qwen"

@@ -152,7 +152,7 @@ class Sandbox(abc.ABC):
             )
         # retrying 502 errors
         if output.status_code == 502:
-            raise httpx.TimeoutException
+            raise httpx.TimeoutException("502 error")
         return self._parse_request_output(output)
 
     @abc.abstractmethod
@@ -178,7 +178,6 @@ class Sandbox(abc.ABC):
         traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-
         if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
@@ -267,7 +266,7 @@ print(json.dumps(to_return))
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         # removing last state to not re-execute code with errors
         if session_id is not None:
-            if output['stderr'] or 'Traceback (most recent call last)' in output['stdout']:
+            if output['process_status'] != "completed":
                 self.sessions[session_id] = self.sessions[session_id][:-1]
         return output, session_id
 

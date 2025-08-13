@@ -1,0 +1,10 @@
+system: ""
+
+user: |-
+  ### Question
+  {question}
+
+  {formatting_message}
+  {starter_code}
+
+  ### Answer: (use the provided format with backticks)

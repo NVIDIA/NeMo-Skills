@@ -19,12 +19,11 @@ from .base import BaseModel
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
 from .openai import OpenAIModel
-from .trtllm import TrtllmModel
 from .vllm import VLLMModel
 
 # Model registry
 models = {
-    'trtllm': TrtllmModel,
+    'trtllm': VLLMModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,

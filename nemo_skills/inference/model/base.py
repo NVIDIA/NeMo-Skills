@@ -121,17 +121,17 @@ class BaseModel:
 
     async def generate_async(
         self,
-        prompt: str | list,
+        prompt: str | list[dict],
         tokens_to_generate: int = 2048,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,  # None is 10min
+        timeout: float | int | None = 14400,  # None is 10min
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | None = None,
@@ -156,7 +156,7 @@ class BaseModel:
             'extra_body': extra_body,
         }
 
-        max_retries = 10
+        max_retries = 2
         retry_count = 0
 
         while retry_count <= max_retries:
@@ -190,21 +190,22 @@ class BaseModel:
                     LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
                     continue
                 else:
-                    raise
+                    LOG.error(f"BadRequestError after {max_retries} retries, returning empty response: {e}")
+                    return {'generation': '', 'reasoning_content': '', 'num_generated_tokens': 0}
 
     def generate_sync(
         self,
-        prompt: str | list,
+        prompt: str | list[dict],
         tokens_to_generate: int = 2048,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = -1,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
-        random_seed: int = 0,
+        random_seed: int = None,
         stop_phrases: list[str] | None = None,
         top_logprobs: int | None = None,
-        timeout: float | int | None = 10000,  # None is 10min
+        timeout: float | int | None = 14400,  # None is 10min
         remove_stop_phrases: bool = True,
         stream: bool = False,
         reasoning_effort: str | None = None,
