@@ -3,7 +3,6 @@ from enum import Enum
 
 class GenerationType(str, Enum):
     generate = "generate"
-    reward = "reward"
     math_judge = "math_judge"
     check_contamination = "check_contamination"
 
