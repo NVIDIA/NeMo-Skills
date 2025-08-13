@@ -31,6 +31,7 @@ from nemo_skills.pipeline.utils import (
     get_timeout,
     resolve_mount_paths,
     run_exp,
+    temporary_env_update,
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -59,7 +60,6 @@ class NemoRLTask:
     log_dir: str
     env_variables: dict
     backend: str
-    nsys_profile: bool
     profile_step_range: str
     extra_arguments: str = ""
 
@@ -101,7 +101,7 @@ class NemoRLTask:
             f'export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/lib/x86_64-linux-gnu" && '
             f"export NRL_NSYS_PROFILE_STEP_RANGE={self.profile_step_range} && "
             'export NRL_NSYS_WORKER_PATTERNS="*policy*,*vllm*" && '
-            if self.nsys_profile is True
+            if self.profile_step_range is not None
             else ""
         )
         cmd = (
@@ -135,7 +135,6 @@ def get_training_cmd(
     log_dir,
     env_variables,
     backend,
-    nsys_profile,
     profile_step_range,
 ):
     timeout = get_timeout(cluster_config, partition)
@@ -156,7 +155,6 @@ def get_training_cmd(
         log_dir=log_dir,
         env_variables=env_variables,
         backend=backend,
-        nsys_profile=nsys_profile,
         profile_step_range=profile_step_range,
     )
 
@@ -211,8 +209,12 @@ def sft_nemo_rl(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
-    nsys_profile: bool = typer.Option(False, help="Profile GPU with Nsight Systems for selected Ray workers via env var matching."),
-    profile_step_range: str = typer.Option(None, help="Environment variable to control which training steps the profiler captures."),
+    profile_step_range: str = typer.Option(
+        None, 
+        help="Environment variable to control which training steps the profiler captures. "
+        "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
+        "Example: '3:5' profiles steps 3 and 4 only. NOTE: START must be ≥ 1, so '0:10' is invalid."
+    ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -283,22 +285,6 @@ def sft_nemo_rl(
     )
     env_variables = get_env_variables(cluster_config)
 
-    if nsys_profile:
-        if "RAY_LOG_SYNC_FREQUENCY" not in env_variables:
-            raise typer.BadParameter(
-                "Nsight Systems profiling requires the 'RAY_LOG_SYNC_FREQUENCY' environment variable.\n"
-                'Add it in your cluster config, e.g.: env_vars: ["RAY_LOG_SYNC_FREQUENCY=20"] '
-                "(the FREQUENCY value controls how often logs are synced; 20 is usually a good choice)."
-            )
-
-        if profile_step_range is None:
-            raise typer.BadParameter(
-                "Nsight Systems profiling requires 'profile_step_range'.\n"
-                "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
-                "Example: '3:5' profiles steps 3 and 4 only. "
-                "NOTE: START must be ≥ 1, so '0:10' is invalid."
-            )
-
     if backend == "megatron":
         if "HF_HOME" not in env_variables:
             raise typer.BadParameter(
@@ -333,36 +319,36 @@ def sft_nemo_rl(
         log_dir=f"{log_dir}/training-logs",
         env_variables=env_variables,
         backend=backend,
-        nsys_profile=nsys_profile,
         profile_step_range=profile_step_range,
     )
 
     server_config = None
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        for job_id in range(num_training_jobs):
-            prev_task = add_task(
-                exp,
-                cmd=train_cmd,
-                task_name=f'{expname}-sft-{job_id}',
-                log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["nemo-rl"],
-                num_gpus=num_gpus,
-                num_nodes=num_nodes,
-                cluster_config=cluster_config,
-                server_config=server_config,
-                partition=partition,
-                time_min=time_min,
-                run_after=run_after,
-                reuse_code=reuse_code,
-                reuse_code_exp=reuse_code_exp,
-                task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                heterogeneous=True if server_config is not None else False,
-                with_sandbox=False,
-                with_ray=True,
-                installation_command=installation_command,
-            )
+        with temporary_env_update(cluster_config, {"RAY_LOG_SYNC_FREQUENCY": 20}):
+            for job_id in range(num_training_jobs):
+                prev_task = add_task(
+                    exp,
+                    cmd=train_cmd,
+                    task_name=f'{expname}-sft-{job_id}',
+                    log_dir=f"{log_dir}/training-logs",
+                    container=cluster_config["containers"]["nemo-rl"],
+                    num_gpus=num_gpus,
+                    num_nodes=num_nodes,
+                    cluster_config=cluster_config,
+                    server_config=server_config,
+                    partition=partition,
+                    time_min=time_min,
+                    run_after=run_after,
+                    reuse_code=reuse_code,
+                    reuse_code_exp=reuse_code_exp,
+                    task_dependencies=[prev_task] if prev_task is not None else None,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    heterogeneous=True if server_config is not None else False,
+                    with_sandbox=False,
+                    with_ray=True,
+                    installation_command=installation_command,
+                )
 
         prev_task = add_task(
             exp,
