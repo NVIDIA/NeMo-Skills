@@ -68,7 +68,6 @@ RUN chmod +x /start-with-nginx.sh
 WORKDIR /app
 
 # Environment variables for multi-worker setup
-ENV BASE_PORT=6001
 ENV NGINX_PORT=6000
 
 # Set default port for single worker mode

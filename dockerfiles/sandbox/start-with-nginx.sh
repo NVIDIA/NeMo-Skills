@@ -5,7 +5,7 @@
 set -e
 
 echo "Starting multi-worker deployment with nginx..."
-echo "Workers: $NUM_WORKERS, Base port: $BASE_PORT, Nginx port: $NGINX_PORT"
+echo "Workers: $NUM_WORKERS, Nginx port: $NGINX_PORT"
 
 # Override nginx config for multi-worker mode (single mode uses original config)
 echo "Configuring nginx for multi-worker load balancing..."
@@ -48,14 +48,32 @@ else
     echo "UWSGI config - Processes: $UWSGI_PROCESSES, Cheaper: disabled"
 fi
 
-# Generate upstream servers configuration for nginx
+# Helper to find a free TCP port inside the current network namespace
+find_free_port() {
+    python - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+# Pick a dedicated HTTP port for each worker dynamically
+NUM_WORKERS=${NUM_WORKERS:-4}
+declare -a WORKER_PORTS
+for i in $(seq 1 "$NUM_WORKERS"); do
+    WORKER_PORTS[$i]=$(find_free_port)
+done
+
+# Generate upstream servers configuration for nginx using dynamic ports
 echo "Generating nginx configuration..."
 
 # Write upstream servers to a temp file
 UPSTREAM_FILE="/tmp/upstream_servers.conf"
 > $UPSTREAM_FILE  # Clear the file
 for i in $(seq 1 $NUM_WORKERS); do
-    PORT=$((BASE_PORT + i - 1))
+    PORT=${WORKER_PORTS[$i]}
     echo "        server 127.0.0.1:${PORT} max_fails=3 fail_timeout=30s;" >> $UPSTREAM_FILE
 done
 
@@ -114,7 +132,7 @@ trap cleanup SIGTERM SIGINT
 
 # Start all workers simultaneously
 for i in $(seq 1 $NUM_WORKERS); do
-    PORT=$((BASE_PORT + i - 1))
+    PORT=${WORKER_PORTS[$i]}
 
     echo "Starting worker $i on port $PORT..."
 
@@ -179,7 +197,7 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
         echo "Worker status:"
         for i in "${!WORKER_PIDS[@]}"; do
             pid=${WORKER_PIDS[$i]}
-            port=$((BASE_PORT + i))
+            port=${WORKER_PORTS[$((i+1))]}
             if kill -0 "$pid" 2>/dev/null; then
                 echo "  Worker $((i+1)) (PID $pid): Process Running"
 
@@ -211,7 +229,7 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
             continue
         fi
 
-        PORT=$((BASE_PORT + i - 1))
+        PORT=${WORKER_PORTS[$i]}
 
         # Try the health check
         if curl -s -f --connect-timeout 2 --max-time 5 http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
@@ -239,7 +257,11 @@ nginx
 echo "=== Multi-worker deployment ready ==="
 echo "Nginx load balancer: http://localhost:$NGINX_PORT"
 echo "Session affinity: enabled (based on JSON session_id)"
-echo "Workers: $NUM_WORKERS (ports $BASE_PORT-$((BASE_PORT + NUM_WORKERS - 1)))"
+printf "Workers: %s (ports: " "$NUM_WORKERS"
+for i in $(seq 1 $NUM_WORKERS); do
+  printf "%s%s" "${WORKER_PORTS[$i]}" "$([ $i -lt $NUM_WORKERS ] && echo ", " )"
+done
+echo ")"
 echo "Nginx status: http://localhost:$NGINX_PORT/nginx-status"
 echo "UWSGI processes per worker: $UWSGI_PROCESSES"
 if [ -n "$UWSGI_CHEAPER" ]; then
