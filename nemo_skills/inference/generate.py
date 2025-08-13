@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf, open_dict
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -458,8 +458,7 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [data_point['total_code_executions']]
-                generation_params['max_code_executions'] = max_code_executions_values
+                generation_params['max_code_executions'] = data_point['total_code_executions']
 
         return await self.llm.generate_async(**generation_params, remove_stop_phrases=False)
 
