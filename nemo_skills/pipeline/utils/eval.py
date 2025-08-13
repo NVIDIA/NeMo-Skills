@@ -374,7 +374,7 @@ def prepare_eval_commands(
                     eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=benchmark_args.num_chunks,
-                    script=benchmark_args.generation_module,
+                    script=generation_module or benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )
