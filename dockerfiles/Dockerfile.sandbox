@@ -85,4 +85,4 @@ ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 ENV LISTEN_PORT=6000
 RUN echo "uwsgi_read_timeout 14400s;" > /etc/nginx/conf.d/custom_timeout.conf
 
-CMd /start-with-nginx.sh
+CMD /start-with-nginx.sh
