@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf, open_dict
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params

@@ -13,7 +13,6 @@
 # limitations under the License.
 import importlib
 import logging
-from enum import Enum
 from typing import List
 
 import typer
@@ -21,25 +20,11 @@ import typer
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
+from nemo_skills.inference import GenerationType, GENERATION_MODULE_MAP
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: add num_jobs here for consistency with eval?
-
-
-class GenerationType(str, Enum):
-    generate = "generate"
-    reward = "reward"
-    math_judge = "math_judge"
-    check_contamination = "check_contamination"
-
-
-GENERATION_MODULE_MAP = {
-    GenerationType.generate: "nemo_skills.inference.generate",
-    GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
-    GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
-}
-
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
