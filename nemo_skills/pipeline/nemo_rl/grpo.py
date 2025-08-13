@@ -31,6 +31,8 @@ from nemo_skills.pipeline.utils import (
     get_timeout,
     resolve_mount_paths,
     run_exp,
+    temporary_env_update,
+    get_nsight_cmd,
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -57,6 +59,7 @@ class NemoRLTask:
     log_dir: str
     env_variables: dict
     backend: str
+    profile_step_range: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -94,10 +97,11 @@ class NemoRLTask:
 
     def get_cmd(self):
         self.logging_params = self.format_wandb_args()
-
+        nsight_cmd = get_nsight_cmd(self.profile_step_range)
         cmd = (
             f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
             f"export UV_PROJECT=/opt/NeMo-RL && "
+            f"{nsight_cmd}"
             f"echo 'Starting training' && "
             f"uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_grpo.py "
             f"  {self.format_train_args()} "
@@ -125,6 +129,7 @@ def get_training_cmd(
     log_dir,
     env_variables,
     backend,
+    profile_step_range,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -144,6 +149,7 @@ def get_training_cmd(
         log_dir=log_dir,
         env_variables=env_variables,
         backend=backend,
+        profile_step_range=profile_step_range,
     )
 
     return task.get_cmd()
@@ -197,6 +203,12 @@ def grpo_nemo_rl(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
+    profile_step_range: str = typer.Option(
+        None, 
+        help="Environment variable to control which training steps the profiler captures. "
+        "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
+        "Example: '3:5' profiles steps 3 and 4 only. NOTE: START must be ≥ 1, so '0:10' is invalid."
+    ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -302,34 +314,36 @@ def grpo_nemo_rl(
         log_dir=f"{log_dir}/training-logs",
         env_variables=env_variables,
         backend=backend,
+        profile_step_range=profile_step_range,
     )
 
     server_config = None
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        for job_id in range(num_training_jobs):
-            prev_task = add_task(
-                exp,
-                cmd=train_cmd,
-                task_name=f'{expname}-grpo-{job_id}',
-                log_dir=f"{log_dir}/training-logs",
-                container=cluster_config["containers"]["nemo-rl"],
-                num_gpus=num_gpus,
-                num_nodes=num_nodes,
-                cluster_config=cluster_config,
-                server_config=server_config,
-                partition=partition,
-                time_min=time_min,
-                run_after=run_after,
-                reuse_code=reuse_code,
-                reuse_code_exp=reuse_code_exp,
-                task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                heterogeneous=True if server_config is not None else False,
-                with_sandbox=with_sandbox,
-                with_ray=True,
-                installation_command=installation_command,
-            )
+        with temporary_env_update(cluster_config, {"RAY_LOG_SYNC_FREQUENCY": 20}):
+            for job_id in range(num_training_jobs):
+                prev_task = add_task(
+                    exp,
+                    cmd=train_cmd,
+                    task_name=f'{expname}-grpo-{job_id}',
+                    log_dir=f"{log_dir}/training-logs",
+                    container=cluster_config["containers"]["nemo-rl"],
+                    num_gpus=num_gpus,
+                    num_nodes=num_nodes,
+                    cluster_config=cluster_config,
+                    server_config=server_config,
+                    partition=partition,
+                    time_min=time_min,
+                    run_after=run_after,
+                    reuse_code=reuse_code,
+                    reuse_code_exp=reuse_code_exp,
+                    task_dependencies=[prev_task] if prev_task is not None else None,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    heterogeneous=True if server_config is not None else False,
+                    with_sandbox=with_sandbox,
+                    with_ray=True,
+                    installation_command=installation_command,
+                )
 
         prev_task = add_task(
             exp,
