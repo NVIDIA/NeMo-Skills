@@ -59,6 +59,8 @@ class NemoRLTask:
     log_dir: str
     env_variables: dict
     backend: str
+    nsys_profile: bool
+    profile_step_range: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -94,18 +96,26 @@ class NemoRLTask:
 
     def get_cmd(self):
         self.logging_params = self.format_wandb_args()
-        cmd = (
-            f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
-            f"export UV_PROJECT=/opt/NeMo-RL && "
-            f"echo 'Starting training' && "
-            f"NRL_FORCE_REBUILD_VENVS=true uv run --active python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
-            f"  {self.format_train_args()} "
-            f"  {self.format_data_args()} "
-            f"  {self.logging_params} "
-            f"  {self.extra_arguments} "
-        )
 
+        nsight_cmd = (
+            f'export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/lib/x86_64-linux-gnu" && '
+            f"export NRL_NSYS_PROFILE_STEP_RANGE={self.profile_step_range} && "
+            'export NRL_NSYS_WORKER_PATTERNS="*policy*,*vllm*" && '
+            if self.nsys_profile is True
+            else ""
+        )
+        cmd = (
+            "export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
+            "export UV_PROJECT=/opt/NeMo-RL && "
+            f"{nsight_cmd}"
+            "echo 'Starting training' && "
+            "NRL_FORCE_REBUILD_VENVS=true uv run --active "
+            "python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
+            f"{self.format_train_args()} {self.format_data_args()} "
+            f"{self.logging_params} {self.extra_arguments}"
+        )
         return cmd
+
 
 
 def get_training_cmd(
@@ -125,6 +135,8 @@ def get_training_cmd(
     log_dir,
     env_variables,
     backend,
+    nsys_profile,
+    profile_step_range,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -144,6 +156,8 @@ def get_training_cmd(
         log_dir=log_dir,
         env_variables=env_variables,
         backend=backend,
+        nsys_profile=nsys_profile,
+        profile_step_range=profile_step_range,
     )
 
     return task.get_cmd()
@@ -197,6 +211,8 @@ def sft_nemo_rl(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
+    nsys_profile: bool = typer.Option(False, help="Profile GPU with Nsight Systems for selected Ray workers via env var matching."),
+    profile_step_range: str = typer.Option(None, help="Environment variable to control which training steps the profiler captures."),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
@@ -267,6 +283,22 @@ def sft_nemo_rl(
     )
     env_variables = get_env_variables(cluster_config)
 
+    if nsys_profile:
+        if "RAY_LOG_SYNC_FREQUENCY" not in env_variables:
+            raise typer.BadParameter(
+                "Nsight Systems profiling requires the 'RAY_LOG_SYNC_FREQUENCY' environment variable.\n"
+                'Add it in your cluster config, e.g.: env_vars: ["RAY_LOG_SYNC_FREQUENCY=20"] '
+                "(the FREQUENCY value controls how often logs are synced; 20 is usually a good choice)."
+            )
+
+        if profile_step_range is None:
+            raise typer.BadParameter(
+                "Nsight Systems profiling requires 'profile_step_range'.\n"
+                "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
+                "Example: '3:5' profiles steps 3 and 4 only. "
+                "NOTE: START must be ≥ 1, so '0:10' is invalid."
+            )
+
     if backend == "megatron":
         if "HF_HOME" not in env_variables:
             raise typer.BadParameter(
@@ -301,6 +333,8 @@ def sft_nemo_rl(
         log_dir=f"{log_dir}/training-logs",
         env_variables=env_variables,
         backend=backend,
+        nsys_profile=nsys_profile,
+        profile_step_range=profile_step_range,
     )
 
     server_config = None
