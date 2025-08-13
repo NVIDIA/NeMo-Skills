@@ -13,20 +13,16 @@
 # limitations under the License.
 
 
-import asyncio
 import copy
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 from nemo_skills.code_execution import extract_code_to_execute, format_code_output
 from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.inference.model.utils import trim_after_stop_phrases
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 from .base import BaseModel
-from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
