@@ -4,9 +4,6 @@
 
 set -e
 
-NUM_WORKERS=$((`nproc --all`))
-export NUM_WORKERS
-
 echo "Starting multi-worker deployment with nginx..."
 echo "Workers: $NUM_WORKERS, Base port: $BASE_PORT, Nginx port: $NGINX_PORT"
 
