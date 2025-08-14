@@ -137,6 +137,12 @@ def get_benchmark_args_from_module(
         eval_subfolder += f"{benchmark_group}/"
     eval_subfolder += benchmark
 
+    # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
+    # TODO: is there a better way to handle this?
+    if benchmark == "swe-bench" and cluster_config['executor'] == 'local':
+        LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
+        os.environ['NEMO_SKILLS_PRIVILEGED_DOCKER'] = '1'
+
     return BenchmarkArgs(
         name=benchmark,
         input_file=input_file,

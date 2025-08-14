@@ -187,6 +187,7 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
+            privileged=bool(os.getenv('NEMO_SKILLS_PRIVILEGED_DOCKER', 0)),
             # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
             num_gpus=-1 if gpus_per_node is not None else None,
             network="host",
