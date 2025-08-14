@@ -26,8 +26,7 @@ class IOIEvaluatorConfig:
     dataset: str = "ioi24"
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
-    # where test cases are stored in automatically mounted eval datasets folder.
-    test_file: str = "/eval_dataset/ioi24/test_metadata.json"
+    test_file: str = "/datasets/ioi24/test_metadata.json" # test metadata file created by prepare.py
 
 
 def init_worker(sandbox_arg):
@@ -168,7 +167,7 @@ def eval_ioi(cfg):
     sandbox = LocalSandbox()
     batch_size = eval_config.test_batch_size
     if not os.path.exists(eval_config.test_file):
-        raise ValueError(f"Failed to find test cases in eval dataset directory: {eval_config.test_file}")
+        raise ValueError(f"Failed to find test cases metadata file: {eval_config.test_file}")
 
     with open(eval_config.test_file) as f:
         metadata = json.load(f)
