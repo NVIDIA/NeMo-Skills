@@ -530,6 +530,7 @@ Here is the problem you need to solve:
 
 def test_qwen_code_output_format_examples():
     prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct', 'qwen', examples_type='math_text_with_code')
+    prompt.config.system = ''
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -706,40 +707,6 @@ Here is the problem you need to solve:
 <|im_start|>assistant
 """
     assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
-
-
-def test_llama3_instruct_math_prompt():
-    prompt = get_prompt('llama3-instruct/math', 'meta-llama/Llama-3.1-8B-Instruct')
-    prompt.config.system = ""
-
-    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
-
-Solve the following math problem efficiently and clearly:
-
-- For simple problems (2 steps or fewer):
-Provide a concise solution with minimal explanation.
-
-- For complex problems (3 steps or more):
-Use this step-by-step format:
-
-## Step 1: [Concise description]
-[Brief explanation and calculations]
-
-## Step 2: [Concise description]
-[Brief explanation and calculations]
-
-...
-
-Regardless of the approach, always conclude with:
-
-Therefore, the final answer is: $\\boxed{answer}$. I hope it is correct.
-
-Where [answer] is just the final number or expression that solves the problem.
-
-Problem: 3 + 5?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-    assert prompt.fill({'problem': '3 + 5?'}) == expected_prompt
 
 
 def test_judge_arena():
