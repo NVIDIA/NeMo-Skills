@@ -160,9 +160,10 @@ class BFCLGenerationTask(GenerationTask):
             output = await self.llm.generate_async(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
-            if "Requested token count exceeds the model's maximum context length" in str(
+            if "Requested token count exceeds model's maximum context length" in str(
                 e
             ) or "is longer than the model's context length" in str(e):
+                print("L164", e)
                 LOG.warning("BFCL generation failed due to running out of context. ")
                 return {"message": None, "generation": ""}
             else:
@@ -189,6 +190,10 @@ class BFCLGenerationTask(GenerationTask):
             }
         else:
             output["message"] = output["response"].choices[0].message
+            if output["message"].tool_calls:
+                output["tool_calls"] = output["message"].tool_calls
+            else:
+                output["tool_calls"] = []
             return output
 
     async def generate_single_data_point_single_turn(self, data_point):
@@ -344,9 +349,9 @@ class BFCLGenerationTask(GenerationTask):
             else:
                 generation = [
                     {func_call.function.name: func_call.function.arguments}
-                    for func_call in model_response["message"].tool_calls
+                    for func_call in model_response["tool_calls"]
                 ]
-                tool_call_ids = [func_call.id for func_call in model_response["message"].tool_calls]
+                tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
         except:
             generation = model_response["generation"]
             tool_call_ids = []
