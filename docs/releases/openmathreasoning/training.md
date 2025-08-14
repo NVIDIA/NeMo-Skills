@@ -42,6 +42,7 @@ for inference_mode in ["cot", "tir", "genselect"]:
     if inference_mode == 'genselect':  # already formatted
         prompt_config = {'user': '{problem}'}
     prompt = get_prompt(prompt_config, 'Qwen/Qwen2.5-32B-Instruct', code_tags)
+    prompt.config.system = ""  # disabling default identity system message
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 
@@ -288,6 +289,7 @@ for inference_mode in ["cot", "tir", "genselect"]:
     func = partial(filter_func, inference_mode=inference_mode)
     dataset[inference_mode] = dataset[inference_mode].filter(func, num_proc=20)
     prompt = get_prompt(prompt_config, 'Qwen/Qwen2.5-32B-Instruct', code_tags)
+    prompt.config.system = ""  # disabling default identity system message
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 

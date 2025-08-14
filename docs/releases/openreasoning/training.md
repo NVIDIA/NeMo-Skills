@@ -31,6 +31,7 @@ def apply_format(elem, prompt):
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="math")
 
 prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct')
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -49,7 +50,7 @@ To get this data, follow instructions for the **second-round** SFT data in [Open
 
 ### Math GenSelect data
 
-Coming soon!
+We have not released this data yes. Please open an issue if you need it.
 
 ### Code CoT data
 
@@ -106,6 +107,7 @@ def apply_format(elem, prompt):
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="code")
 
 prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'Qwen/Qwen2.5-32B-Instruct')
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -130,6 +132,7 @@ def apply_format(elem, prompt):
 dataset = load_dataset("nvidia/OpenScienceReasoning-2", split="train")
 
 prompt = get_prompt('generic/default', 'Qwen/Qwen2.5-32B-Instruct')  # data already includes instruction
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 
