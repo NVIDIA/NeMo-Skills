@@ -204,6 +204,24 @@ class Prompt:
             "code_output_format": self.config.code_tags.code_output_format,
         }
 
+    def format_as_assistant_response(self, assistant_response: str) -> str:
+        """Adds special tokens to the end of assistant response."""
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer is not set.")
+
+        messages = [{'role': 'user', 'content': ''}]
+
+        user_string = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        messages.append([{'role': 'assistant', 'content': assistant_response}])
+        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+
+        assert assistant_string.startswith(user_string), "Something is very wrong.."
+
+        formatted_response = assistant_string[len(user_string) :]
+
+        return formatted_response
+
     def fill(
         self,
         input_dict: Dict[str, str],
