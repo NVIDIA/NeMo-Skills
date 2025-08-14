@@ -163,7 +163,6 @@ class BFCLGenerationTask(GenerationTask):
             if "Requested token count exceeds model's maximum context length" in str(
                 e
             ) or "is longer than the model's context length" in str(e):
-                print("L164", e)
                 LOG.warning("BFCL generation failed due to running out of context. ")
                 return {"message": None, "generation": ""}
             else:
