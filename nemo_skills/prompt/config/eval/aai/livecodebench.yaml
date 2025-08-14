@@ -1,7 +1,6 @@
 # almost identical to https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
 # except we don't add ### before Format.
 # The starter code and formatting instructions are already included inside question by prepare.py
-system: ""
 
 user: |-
   ### Question:

@@ -1,14 +1,12 @@
 
-system: ""
-
 user: |-
   You will be given a problem followed by an enumerated list of {num_solutions} candidate solutions. Your task is to systematically analyze these solutions to identify the best approach.
-  
+
   Problem: {problem}
-  
-  Solutions: 
+
+  Solutions:
   {solutions}
 
   End your evaluation with exactly:
   Judgment: [IDX]
-  where IDX is the index 0-{max_idx} of the best solution. 
+  where IDX is the index 0-{max_idx} of the best solution.

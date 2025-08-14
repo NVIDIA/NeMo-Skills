@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
     You will be given a fragment of a solution to a math problem that includes a Python code block.
     Your task is to determine the purpose of this Python code block in the solution fragment.
@@ -17,7 +15,7 @@ user: |-
         Reasoning: <a couple of sentences explaining your rationale>
         Judgement: <Verification or Novel Calculation>
         ```
-    
+
     ---
 
     **EXAMPLES**

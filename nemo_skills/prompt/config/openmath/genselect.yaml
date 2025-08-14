@@ -1,7 +1,5 @@
 # Prompt used for GenSelect inference - https://arxiv.org/abs/2504.16891
 
-system: ""
-
 user: |-
   You will be given a challenging math problem followed by {num_solutions} solutions. Your task is to systematically analyze these solutions to identify the most mathematically sound approach.
 

@@ -27,7 +27,8 @@ few_shot_examples:
   # if examples_type is not specified, then {examples} will be empty
   # by default there are no examples, but can be changed from code/cmd
 
-system: ""
+# optional system message
+# system: ""
 
 user: |-
   Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{{}}.
