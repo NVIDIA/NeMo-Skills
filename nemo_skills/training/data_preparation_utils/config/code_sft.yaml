@@ -16,6 +16,10 @@ do_shuffle: true
 num_output_samples: null
 
 prompt_config: null
+# Needed to format the data and also for length-based filtering
+tokenizer: null
+system_message: null  # can be used to override default from the tokenizer
+
 code_tags: null
 
 input_key: input  # key to group samples by before code_text_filter
@@ -48,6 +52,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     tokenizer: ${tokenizer}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     input_key: question
     output_key: ${output_key}

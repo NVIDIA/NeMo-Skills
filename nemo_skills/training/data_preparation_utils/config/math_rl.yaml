@@ -15,9 +15,9 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
-# Params for length-based filtering
-# Unit of length - Tokens
+# Needed to format the data and also for length-based filtering
 tokenizer: null
+system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
 min_problem_length: 0
@@ -82,6 +82,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     tokenizer: ${tokenizer}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     task_name: math
     input_key: ${input_key}

@@ -310,6 +310,7 @@ class WriteFinalSftManifest(BaseProcessor):
         self,
         prompt_config: str,
         tokenizer: str | None = None,
+        system_message: str | None = None,
         code_tags: str | None = None,
         input_key: str = "input",
         output_key: str = "output",
@@ -337,6 +338,13 @@ class WriteFinalSftManifest(BaseProcessor):
                 self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        if system_message is not None:
+            self.prompt.config.system = system_message
 
     def process(self):
         samples_count = 0
@@ -385,6 +393,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self,
         prompt_config: str,
         tokenizer: str | None = None,
+        system_message: str | None = None,
         code_tags: str | None = None,
         task_name: str | None = None,
         input_key: str = "input",
@@ -414,6 +423,13 @@ class WriteFinalRLManifest(BaseProcessor):
                 self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        if system_message is not None:
+            self.prompt.config.system = system_message
 
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle
