@@ -4,7 +4,7 @@
 
 set -e
 
-echo "Starting multi-worker deployment with nginx..."
+echo "Starting multi-worker deployment with nginx (unix sockets upstream)..."
 echo "Workers: $NUM_WORKERS, Nginx port: $NGINX_PORT"
 
 # Override nginx config for multi-worker mode (single mode uses original config)
@@ -13,10 +13,8 @@ echo "Configuring nginx for multi-worker load balancing..."
 # Force session affinity settings: 1 process per worker with minimal cheaper
 UWSGI_PROCESSES=1
 UWSGI_CHEAPER=1
-BASE_PORT=$NGINX_PORT
 export UWSGI_PROCESSES
 export UWSGI_CHEAPER
-export BASE_PORT
 echo "Forced UWSGI settings for session affinity: PROCESSES=$UWSGI_PROCESSES, CHEAPER=$UWSGI_CHEAPER"
 
 # Validate and fix uwsgi configuration
@@ -50,18 +48,23 @@ else
     echo "UWSGI config - Processes: $UWSGI_PROCESSES, Cheaper: disabled"
 fi
 
-# Generate upstream servers configuration for nginx
+# Generate upstream servers configuration for nginx (using unix sockets)
 echo "Generating nginx configuration..."
+
+# Prepare socket directory
+SOCKET_DIR="/tmp/uwsgi_sockets"
+mkdir -p "$SOCKET_DIR"
+chmod 777 "$SOCKET_DIR"
 
 # Write upstream servers to a temp file
 UPSTREAM_FILE="/tmp/upstream_servers.conf"
 > $UPSTREAM_FILE  # Clear the file
 for i in $(seq 1 $NUM_WORKERS); do
-    PORT=$((BASE_PORT + i - 1))
-    echo "        server 127.0.0.1:${PORT} max_fails=3 fail_timeout=30s;" >> $UPSTREAM_FILE
+    SOCKET_PATH="${SOCKET_DIR}/worker${i}.sock"
+    echo "        server unix:${SOCKET_PATH} max_fails=3 fail_timeout=30s;" >> $UPSTREAM_FILE
 done
 
-echo "Generated upstream servers for $NUM_WORKERS workers:"
+echo "Generated upstream servers for $NUM_WORKERS workers (unix sockets):"
 cat $UPSTREAM_FILE
 
 # Create nginx config by replacing placeholders
@@ -109,6 +112,10 @@ cleanup() {
         fi
     done
     pkill -f nginx || true
+    # Cleanup leftover unix sockets
+    if [ -n "$SOCKET_DIR" ] && [ -d "$SOCKET_DIR" ]; then
+        rm -f "$SOCKET_DIR"/worker*.sock 2>/dev/null || true
+    fi
     exit 0
 }
 
@@ -116,17 +123,24 @@ trap cleanup SIGTERM SIGINT
 
 # Start all workers simultaneously
 for i in $(seq 1 $NUM_WORKERS); do
-    PORT=$((BASE_PORT + i - 1))
+    SOCKET_PATH="${SOCKET_DIR}/worker${i}.sock"
 
-    echo "Starting worker $i on port $PORT..."
+    echo "Starting worker $i on socket $SOCKET_PATH..."
 
-    # Create a custom uwsgi.ini for this worker that uses HTTP instead of unix socket
+    # Ensure old socket is removed if present
+    if [ -S "$SOCKET_PATH" ]; then
+        rm -f "$SOCKET_PATH"
+    fi
+
+    # Create a custom uwsgi.ini for this worker that serves HTTP over a unix socket
     cat > /tmp/worker${i}_uwsgi.ini << EOF
 [uwsgi]
 module = main
 callable = app
 processes = ${UWSGI_PROCESSES}
-http = 0.0.0.0:${PORT}
+http-socket = ${SOCKET_PATH}
+chmod-socket = 666
+vacuum = true
 master = true
 die-on-term = true
 memory-report = true
@@ -150,15 +164,15 @@ EOF
         echo "cheaper = ${UWSGI_CHEAPER}" >> /tmp/worker${i}_uwsgi.ini
     fi
 
-    echo "Created custom uwsgi config for worker $i (HTTP port $PORT)"
+    echo "Created custom uwsgi config for worker $i (HTTP unix socket ${SOCKET_PATH})"
 
     # Start worker with custom config - NO DELAY between workers
-    cd /app && env LISTEN_PORT=$PORT WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini > /var/log/worker${i}.log 2>&1 &
+    cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini > /var/log/worker${i}.log 2>&1 &
 
     WORKER_PID=$!
     WORKER_PIDS+=($WORKER_PID)
 
-    echo "Worker $i started with PID $WORKER_PID on port $PORT"
+    echo "Worker $i started with PID $WORKER_PID on socket $SOCKET_PATH"
 done
 
 echo "All $NUM_WORKERS workers started simultaneously - waiting for readiness..."
@@ -181,15 +195,15 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
         echo "Worker status:"
         for i in "${!WORKER_PIDS[@]}"; do
             pid=${WORKER_PIDS[$i]}
-            port=$((BASE_PORT + i))
+            socket_path="${SOCKET_DIR}/worker$((i+1)).sock"
             if kill -0 "$pid" 2>/dev/null; then
                 echo "  Worker $((i+1)) (PID $pid): Process Running"
 
-                # Check if port is bound (use netstat instead of ss)
-                if netstat -tlnp 2>/dev/null | grep ":$port " > /dev/null; then
-                    echo "    Port $port: Bound"
+                # Check if socket exists
+                if [ -S "$socket_path" ]; then
+                    echo "    Socket $socket_path: Present"
                 else
-                    echo "    Port $port: Not bound"
+                    echo "    Socket $socket_path: Not present"
                 fi
 
                 # Show recent log output
@@ -213,13 +227,13 @@ while [ $READY_WORKERS -lt $NUM_WORKERS ]; do
             continue
         fi
 
-        PORT=$((BASE_PORT + i - 1))
+        SOCKET_PATH="${SOCKET_DIR}/worker${i}.sock"
 
-        # Try the health check
-        if curl -s -f --connect-timeout 2 --max-time 5 http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
+        # Try the health check via unix socket
+        if curl -s -f --connect-timeout 2 --max-time 5 --unix-socket "$SOCKET_PATH" http://localhost/health > /dev/null 2>&1; then
             READY_WORKERS=$((READY_WORKERS + 1))
             WORKER_READY[$i]=1
-            echo "  Worker $i (port $PORT): Ready! ($READY_WORKERS/$NUM_WORKERS)"
+            echo "  Worker $i (socket $SOCKET_PATH): Ready! ($READY_WORKERS/$NUM_WORKERS)"
         fi
     done
 
@@ -241,7 +255,7 @@ nginx
 echo "=== Multi-worker deployment ready ==="
 echo "Nginx load balancer: http://localhost:$NGINX_PORT"
 echo "Session affinity: enabled (based on JSON session_id)"
-echo "Workers: $NUM_WORKERS (ports $BASE_PORT-$((BASE_PORT + NUM_WORKERS - 1)))"
+echo "Workers: $NUM_WORKERS (unix sockets in ${SOCKET_DIR}/worker{1..$NUM_WORKERS}.sock)"
 echo "Nginx status: http://localhost:$NGINX_PORT/nginx-status"
 echo "UWSGI processes per worker: $UWSGI_PROCESSES"
 if [ -n "$UWSGI_CHEAPER" ]; then
