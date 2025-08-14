@@ -106,6 +106,7 @@ def get_benchmark_args_from_module(
                 "Did you forget to run prepare data commands?"
             )
 
+    # this is deprecated, should remove in the future
     prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", "", override_dict=override_dict)
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
     if prompt_config:
