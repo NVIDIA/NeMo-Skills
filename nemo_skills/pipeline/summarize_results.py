@@ -30,6 +30,7 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     check_if_mounted,
     cluster_download_dir,
+    cluster_download_file,
     cluster_upload,
     get_cluster_config,
     get_env_variables,
@@ -181,6 +182,10 @@ def summarize_results(
         None,
         help="Specify max_seq_len for computing metrics. Will consider anything longer as incorrect.",
     ),
+    override_previous_metrics: bool = typer.Option(
+        True,
+        help="If true, will override previous metrics.json file if it exists. Otherwise will just reuse it.",
+    ),
     save_metrics_path: Optional[str] = typer.Option(
         None,
         help="Path to save the metrics.json file. If not specified, will save to results_dir/metrics.json.",
@@ -212,15 +217,25 @@ def summarize_results(
         else:
             upload_path = results_dir
             temp_dir = tempfile.mkdtemp()
-            print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
-            os.makedirs(temp_dir, exist_ok=True)
-            cluster_download_dir(
-                cluster_config,
-                get_unmounted_path(cluster_config, results_dir),
-                temp_dir,
-                remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
-                verbose=verbose,
-            )
+            if override_previous_metrics:
+                print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
+                os.makedirs(temp_dir, exist_ok=True)
+                cluster_download_dir(
+                    cluster_config,
+                    get_unmounted_path(cluster_config, results_dir),
+                    temp_dir,
+                    remote_tar_dir=get_unmounted_path(cluster_config, remote_tar_dir),
+                    verbose=verbose,
+                )
+            else:
+                LOG.info(
+                    "Skipping copying results from cluster, using existing metrics.json file from %s", results_dir
+                )
+                cluster_download_file(
+                    cluster_config,
+                    get_unmounted_path(cluster_config, results_dir) / "metrics.json",
+                    temp_dir / "metrics.json",
+                )
             results_dir = Path(temp_dir) / Path(results_dir).name
         env_vars = get_env_variables(cluster_config)
         data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
