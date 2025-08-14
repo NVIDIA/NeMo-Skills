@@ -125,17 +125,28 @@ class SweBenchGenerationConfig:
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
 
-    prompt_format: str = "ns"
-
-    code_execution: bool = False
-    extra_stop_phrases: list[str] = field(default_factory=list)
-
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 
 
 class SweBenchGenerationTask(GenerationTask):
+    def __init__(self, cfg: SweBenchGenerationConfig):
+        self.cfg = cfg
+
+        LOG.info(
+            "Async loop is maintaining %d generations in parallel. "
+            "Use max_concurrent_requests to control the number of concurrent requests.",
+            self.cfg.max_concurrent_requests,
+        )
+        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
+        # output_lock will be initialized when async_loop is called
+        self.output_lock = None
+
+        # needs to skip completed samples, not used otherwise
+        self.cfg.prompt_format = "ns"
+
     def log_example_prompt(self, data):
         return
 
@@ -301,7 +312,7 @@ class SweBenchGenerationTask(GenerationTask):
             "model": self.cfg.server.model,
             "base_url": api_base,
             "temperature": self.cfg.inference.temperature,
-            "top_p": self.cfg.inference.top_p
+            "top_p": self.cfg.inference.top_p,
         }
 
         for ns_param, oh_param in NS_TO_OPENHANDS_PARAM.items():
@@ -373,11 +384,15 @@ class SweBenchGenerationTask(GenerationTask):
         # Create file in the SWE-bench evaluation format
         pred_file = out_file.replace("output.jsonl", "output_for_eval.jsonl")
         with open(pred_file, "w") as f:
-            f.write(json.dumps({
-                "model_name_or_path": out_dict["metadata"]["llm_config"]["model"],
-                "instance_id": out_dict["instance_id"],
-                "model_patch": patch
-            }))
+            f.write(
+                json.dumps(
+                    {
+                        "model_name_or_path": out_dict["metadata"]["llm_config"]["model"],
+                        "instance_id": out_dict["instance_id"],
+                        "model_patch": patch,
+                    }
+                )
+            )
         return pred_file
 
     async def process_single_datapoint(self, data_point, data):
