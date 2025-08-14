@@ -17,7 +17,9 @@ from nemo_skills.prompt.utils import get_prompt
 
 
 def test_generic_math_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation', 'llama3-instruct', examples_type='math_problem_augmentation')
+    prompt = get_prompt(
+        'generic/problem-augmentation', 'meta-llama/Llama-3.1-8B-Instruct', examples_type='math_problem_augmentation'
+    )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -101,7 +103,7 @@ After the problem is completed finish your response right away.<|eot_id|><|start
 
 
 def test_qwen_math_prompt_dict():
-    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
+    prompt = get_prompt('qwen/math-cot', 'Qwen/Qwen2.5-32B-Instruct')
 
     filled = prompt.fill({'problem': "What's the meaning of life?"}, return_templated_dict=True)
     expected_result = [
@@ -109,16 +111,16 @@ def test_qwen_math_prompt_dict():
             'role': 'system',
             'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
         },
-
         {
             'role': 'user',
             'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
-        }
+        },
     ]
     assert filled == expected_result
 
+
 def test_qwen_math_prompt_dict_multi_turn():
-    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
+    prompt = get_prompt('qwen/math-cot', 'Qwen/Qwen2.5-32B-Instruct')
 
     input_dict = {
         'turns': [
@@ -148,110 +150,9 @@ def test_qwen_math_prompt_dict_multi_turn():
         {
             'role': 'user',
             'content': "<|im_start|>user\nWhy do you think that's the case?<|im_end|>\n<|im_start|>assistant\n",
-        }
+        },
     ]
     assert filled == expected_result
-
-
-def test_generic_gsm8k_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation-similar', 'nemotron-instruct', examples_type='gsm8k_problem_augmentation')
-
-    expected_prompt = """<extra_id_0>System
-
-<extra_id_1>User
-Write a new math problem similar to a given one. Make the new problem reasonable and solvable.
-
-Here are some examples of how to complete this task.
-
-Original problem:
-Olivia has $23. She bought five bagels for $3 each. How much money does she have left?
-
-New problem:
-Aiden has $35. He purchased eight pencils for $2 each and a notebook for $5. How much money does he have remaining?
-
-
-
-
-
-Original problem:
-Michael had 58 golf balls. On tuesday, he lost 23 golf balls. On wednesday, he lost 2 more. How many golf balls did he have at the end of wednesday?
-
-New problem:
-Sarah collected 72 seashells during her beach vacation. On Thursday, she gave 15 seashells to her friend as a souvenir. On Friday, she found 8 more seashells while exploring the shore. How many seashells did Sarah have at the end of Friday?
-
-
-
-
-
-Original problem:
-Angelo and Melanie want to plan how many hours over the next week they should study together for their test next week. They have 2 chapters of their textbook to study and 4 worksheets to memorize. They figure out that they should dedicate 3 hours to each chapter of their textbook and 1.5 hours for each worksheet. If they plan to study no more than 4 hours each day, how many days should they plan to study total over the next week if they take a 10-minute break every hour, include 3 10-minute snack breaks each day, and 30 minutes for lunch each day?
-
-New problem:
-Samantha and David are preparing for their upcoming science fair project. They have four different experiments to conduct and a research paper to write. Each experiment is estimated to take 2 hours, and the research paper will require 8 hours to complete. To stay focused and productive, they plan to take a 15-minute break for every 1.5 hours of work and have three 20-minute snack breaks each day. Additionally, they allocate 45 minutes for lunch each day. If they want to limit their daily study time to 5 hours, how many days should they plan to work on their project over the next two weeks?
-
-
-
-
-
-Original problem:
-Leah had 32 chocolates and her sister had 42. If they ate 35, how many pieces do they have left in total?
-
-New problem:
-Tom has 50 marbles, and his friend Jerry has 65 marbles. If they decide to play a game and bet 20 marbles each, how many marbles will they have left in total after the game?
-
-
-
-
-
-Original problem:
-There were nine computers in the server room. Five more computers were installed each day, from monday to thursday. How many computers are now in the server room?
-
-New problem:
-In a garden, there were 12 flowers. Every morning for a week (from Monday to Sunday), 3 more flowers were planted. How many flowers are there in the garden now?
-
-
-
-
-
-Original problem:
-Jason had 20 lollipops. He gave Denny some lollipops. Now Jason has 12 lollipops. How many lollipops did Jason give to Denny?
-
-New problem:
-Sarah had 35 marbles. She gave some marbles to her friend Emma. Now Sarah has 18 marbles left. How many marbles did Sarah give to Emma?
-
-
-
-
-
-Original problem:
-Sam bought a dozen boxes, each with 30 highlighter pens inside, for $10 each box. He rearranged five of these boxes into packages of six highlighters each and sold them for $3 per package. He sold the rest of the highlighters separately at the rate of three pens for $2. How much profit did he make in total, in dollars?
-
-New problem:
-Amy purchased 8 crates, each containing 24 colorful markers, for $12 per crate. She decided to create sets of 4 markers each and sell them for $2 per set. The remaining markers she sold individually at a rate of 5 markers for $3. Calculate the total profit Amy made, in dollars.
-
-
-
-
-
-Original problem:
-There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?
-
-New problem:
-In a garden, there are 25 rose bushes. The gardener plans to plant some more rose bushes today. After planting, there will be a total of 40 rose bushes in the garden. How many rose bushes will the gardener plant today?
-
-
-
-
-
-Original problem:
-What's the meaning of life?
-
-Write another problem similar to this one.
-Start directly with the problem statement and DO NOT include any phrases such as "Here is a new math problem similar to a given one".
-After the problem is completed finish your response right away.
-<extra_id_1>Assistant
-"""
-    assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
 
 
 def test_generic_codegen_prompt():
@@ -289,7 +190,7 @@ def test_generic_default_prompt():
 
 
 def test_generic_math_prompt():
-    prompt = get_prompt('generic/math', 'llama3-instruct')
+    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -304,7 +205,7 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt('generic/math', 'llama3-base', 'nemotron', examples_type='math_text_with_code')
+    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B', 'nemotron', examples_type='math_text_with_code')
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -479,7 +380,9 @@ Here is the problem you need to solve:
 
 
 def test_llama_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'llama3-instruct', 'llama3', examples_type='math_text_with_code')
+    prompt = get_prompt(
+        'generic/math', 'meta-llama/Llama-3.1-8B-Instruct', 'llama3', examples_type='math_text_with_code'
+    )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -670,7 +573,7 @@ Here is the problem you need to solve:
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'qwen-instruct', 'qwen', examples_type='math_text_with_code')
+    prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct', 'qwen', examples_type='math_text_with_code')
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -850,7 +753,8 @@ Here is the problem you need to solve:
 
 
 def test_llama3_instruct_math_prompt():
-    prompt = get_prompt('llama3-instruct/math', 'llama3-instruct-nosys')
+    prompt = get_prompt('llama3-instruct/math', 'meta-llama/Llama-3.1-8B-Instruct')
+    prompt.config.system = ""
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
@@ -1065,7 +969,7 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
 
 
 def test_generic_formal_proof_prompt():
-    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover')
+    prompt = get_prompt('lean4/formal-proof', 'deepseek-ai/DeepSeek-Prover-V1.5-Base')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1095,7 +999,9 @@ theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 
 
 
 def test_minif2f_deepseek_fewshot_prompt():
-    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', examples_type='minif2f_deepseek_fewshot')
+    prompt = get_prompt(
+        'lean4/formal-proof', 'deepseek-ai/DeepSeek-Prover-V1.5-Base', examples_type='minif2f_deepseek_fewshot'
+    )
 
     expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
 
@@ -1234,7 +1140,7 @@ theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁
 
 
 def test_generic_general_boxed_prompt():
-    prompt = get_prompt('generic/general-boxed', 'llama3-instruct')
+    prompt = get_prompt('generic/general-boxed', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -1266,7 +1172,7 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 
 def test_nat_to_lean4_prompt():
-    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
+    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-ai/DeepSeek-Prover-V1.5-Base')
 
     expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
 
@@ -1293,7 +1199,7 @@ open scoped BigOperators Topology
 
 
 def test_llm_as_judge_hle_original_prompt():
-    prompt = get_prompt('judge/hle', 'llama3-instruct')
+    prompt = get_prompt('judge/hle', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>
 

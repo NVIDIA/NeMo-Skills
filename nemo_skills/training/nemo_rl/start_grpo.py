@@ -148,10 +148,6 @@ class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any] | None = None
 
 
-def apply_ns_chat_template(prompt, datum_dict) -> str:
-    return prompt.fill(datum_dict, return_templated_dict=True)
-
-
 # TaskDataProcessFnCallable
 def ns_data_processor(
     datum_dict: dict[str, Any],
@@ -172,10 +168,9 @@ def ns_data_processor(
         config_dir=prompt_spec["config_dir"],
         template_dir=prompt_spec["template_dir"],
     )
-    message_log = apply_ns_chat_template(prompt, datum_dict)
+    user_message = prompt.fill(datum_dict)
 
-    for message in message_log:
-        message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
+    message_log[0]["token_ids"] = tokenizer([user_message], return_tensors="pt")["input_ids"][0]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 

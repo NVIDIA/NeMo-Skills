@@ -263,7 +263,7 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             return None
 
-        if self.use_completions_api:
+        if self.cfg.use_completions_api:
             tokenizer = self.cfg.tokenizer or self.cfg.server['model']
         else:
             tokenizer = None

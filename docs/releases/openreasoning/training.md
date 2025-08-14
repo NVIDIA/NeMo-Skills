@@ -25,12 +25,12 @@ from nemo_skills.prompt.utils import get_prompt
 def apply_format(elem, prompt):
     assert len(elem['messages']) == 2
     elem['input'] = prompt.fill({'problem': elem['messages'][0]['content']})
-    elem['output'] = elem['messages'][1]['content'] + prompt.config.template.assistant_end
+    elem['output'] = prompt.add_assistant_end_suffix(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="math")
 
-prompt = get_prompt('generic/math', 'qwen-instruct')
+prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct')
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -100,12 +100,12 @@ def apply_format(elem, prompt):
     question = get_question(metadata['dataset'], metadata['split'], int(metadata['index']))
 
     elem['input'] = prompt.fill({'question': question})
-    elem['output'] = elem['messages'][1]['content'] + prompt.config.template.assistant_end
+    elem['output'] = prompt.add_assistant_end_suffix(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="code")
 
-prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'qwen-instruct')
+prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'Qwen/Qwen2.5-32B-Instruct')
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -124,12 +124,12 @@ from nemo_skills.prompt.utils import get_prompt
 
 def apply_format(elem, prompt):
     elem['input'] = prompt.fill({'question': elem['input']})
-    elem['output'] += prompt.config.template.assistant_end
+    elem['output'] = prompt.add_assistant_end_suffix(elem['output'])
     return elem
 
 dataset = load_dataset("nvidia/OpenScienceReasoning-2", split="train")
 
-prompt = get_prompt('generic/default', 'qwen-instruct')  # data already includes instruction
+prompt = get_prompt('generic/default', 'Qwen/Qwen2.5-32B-Instruct')  # data already includes instruction
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 
