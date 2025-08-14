@@ -18,13 +18,13 @@ import json
 import logging
 import os
 import shlex
-import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
+from enum import Enum
 from pathlib import Path
 
 import hydra
+import tomlkit
 
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.inference.model import server_params
@@ -34,8 +34,13 @@ from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclas
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+class SupportedAgentFrameworks(str, Enum):
+    swe_agent = "swe-agent"
+    openhands = "openhands"
+
+
 # Like nemo_skills.inference.generate.InferenceConfig, except most parameters are not passed by default
-# because they may not be supported on all servers.
+# because they may not be supported by all LLM servers or agent frameworks.
 # tokens_to_generate is purposefully unlimited by default for SWE-bench.
 @nested_dataclass(kw_only=True)
 class SweBenchInferenceConfig:
@@ -63,6 +68,21 @@ NS_TO_OPENAI_PARAM = {
 }
 
 
+# Converts the parameter names above to the corresponding parameters in OpenHands's LLM config.
+# https://github.com/All-Hands-AI/OpenHands/blob/main/openhands/core/config/llm_config.py#L12
+NS_TO_OPENHANDS_PARAM = {
+    # Supported on OpenHands's side. top_k is not OpenAI-compatible and so may break some servers.
+    "tokens_to_generate": "max_output_tokens",
+    "top_k": "top_k",
+    "random_seed": "seed",
+    # Not supported by OpenHands. Nemo-Skills will raise an error if they are passed.
+    "min_p": None,
+    "repetition_penalty": None,
+    "top_logprobs": None,
+    # temperature and top_p are passed separately.
+}
+
+
 # not inheriting since most parameters are not supported because we don't use our model client here
 # TODO: should we fix that?
 @nested_dataclass(kw_only=True)
@@ -70,8 +90,11 @@ class SweBenchGenerationConfig:
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
 
-    # SWE-agent configuration file path. Can be specified in the same way as ns prompt configs
-    sweagent_config: str = "eval/swe-bench/swe-agent-default"
+    agent_framework: SupportedAgentFrameworks  # Which agentic framework to use
+
+    # SWE-agent/OpenHands configuration file path. Can be specified in the same way as ns prompt configs
+    # If None, will use the default for the chosen framework
+    agent_config: str | None = None
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
@@ -196,12 +219,13 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}."
                     )
 
-    async def process_single_datapoint(self, data_point, data):
-        """Will do all necessary generations to get a single answer for the data point."""
-        self.output_dir = Path(self.cfg.output_file).parent
-
-        # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
-        # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
+    async def _run_swe_agent(self, data_point, api_base):
+        """
+        Runs SWE-agent on one instance.
+        Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
+        """
+        if self.cfg.agent_config is None:
+            self.cfg.agent_config = "eval/swe-bench/swe-agent/default"
 
         completion_kwargs = {
             openai_param: getattr(self.cfg.inference, ns_param)
@@ -210,11 +234,6 @@ class SweBenchGenerationTask(GenerationTask):
         }
         if "top_logprobs" in completion_kwargs:
             completion_kwargs["logprobs"] = True
-
-        if 'base_url' in self.cfg.server:
-            api_base = self.cfg.server.base_url
-        else:
-            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
         swe_agent_cmd = (
             # first installing swe-agent repo
@@ -228,7 +247,7 @@ class SweBenchGenerationTask(GenerationTask):
             "uv pip install -e . && "
             # then running the agent
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
-            f"    --config {get_config_path(self.cfg.sweagent_config)} "
+            f"    --config {get_config_path(self.cfg.agent_config)} "
             f"    --agent.model.name hosted_vllm/{self.cfg.server.model} "
             f"    --agent.model.api_base {api_base} "
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
@@ -252,13 +271,137 @@ class SweBenchGenerationTask(GenerationTask):
             trajectory_dict = json.loads(f.read().strip())
 
         # need to rename .pred to .jsonl
-        pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount").replace('.pred', '.jsonl')
-        with open(pred_file.replace('.pred', '.jsonl'), 'w') as f:
+        pred_jsonl_file = pred_file.replace('.pred', '.jsonl')
+        with open(pred_jsonl_file, 'w') as f:
             f.write(json.dumps(trajectory_dict))
 
         # TODO: get num_generated_tokens and other stats from .traj file
         # looks like data['info']['model_stats']
         # {'instance_cost': 0, 'tokens_sent': 40858, 'tokens_received': 1775, 'api_calls': 9}
+
+        return pred_jsonl_file
+
+    async def _run_openhands(self, data_point, api_base):
+        """
+        Runs OpenHands on one instance.
+        Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
+        """
+        if self.cfg.agent_config is None:
+            self.cfg.agent_config = "eval/swe-bench/openhands/default"
+
+        # Add parameters to config.toml
+
+        with open(get_config_path(self.cfg.agent_config, config_extension="toml"), "r") as f:
+            config = tomlkit.parse(f.read())
+
+        config["llm"]["model"] |= {
+            "model": self.cfg.server.model,
+            "base_url": api_base,
+            "temperature": self.cfg.inference.temperature,
+            "top_p": self.cfg.inference.top_p
+        }
+
+        for ns_param, oh_param in NS_TO_OPENHANDS_PARAM.items():
+            if getattr(self.cfg.inference, ns_param) is not None:
+                if oh_param is not None:
+                    config["llm"]["model"][oh_param] = getattr(self.cfg.inference, ns_param)
+                else:
+                    supported_params = [key for key, value in NS_TO_OPENHANDS_PARAM.items() if value is not None]
+                    raise ValueError(
+                        f"Inference parameter {ns_param} is not supported by OpenHands. "
+                        f"Supported inference parameters: temperature, top_p, {', '.join(supported_params)}."
+                    )
+
+        config_str = tomlkit.dumps(config)
+
+        openhands_cmd = (
+            # make sure /workspace isn't mounted as a safety precaution
+            # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
+            "if [ -d /workspace ]; then "
+            "    echo 'Exiting because /workspace is mounted.' && "
+            "    echo 'Please make sure /workspace is not mounted inside of Apptainer before running OpenHands.' && "
+            "    echo 'This is because OpenHands DELETES EVERYTHING in the /workspace folder if it exists.' && "
+            "    exit 1; "
+            "fi && "
+            # install openhands repo + dependencies
+            "cd /root && "
+            "curl -L -O \"https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh\" && "
+            "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
+            "eval \"$(/root/miniforge3/bin/conda shell.bash hook)\" && "
+            "mamba install -y python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
+            "git clone https://github.com/All-Hands-AI/OpenHands.git && "
+            "cd OpenHands && "
+            "export INSTALL_DOCKER=0 && "
+            "make build && "
+            "poetry run python -m pip install datasets && "
+            # set up config files
+            f"echo {shlex.quote(config_str)} >config.toml && "
+            f"echo \"selected_ids = ['{data_point['instance_id']}']\" >evaluation/benchmarks/swe_bench/config.toml && "
+            # set local runtime & force verbose logs
+            "export RUNTIME=local && "
+            "export LOG_ALL_EVENTS=true && "
+            "export LOG_LEVEL=DEBUG && "
+            # run the agent
+            f"./evaluation/benchmarks/swe_bench/scripts/run_infer.sh "
+            f"    llm.model "  # name of llm config section in config.toml
+            f"    HEAD "  # openhands commit
+            f"    CodeActAgent "  # agent
+            f"    1 "  # number of instances
+            f"    100 "  # max agent iterations (TODO: would be nice to make this configurable)
+            f"    1 "  # number of workers
+            f"    {data_point['dataset_name']} "  # dataset name
+            f"    {data_point['split']} && "  # dataset split
+            # move outputs to the mounted directory
+            f"mkdir -p /trajectories_mount/trajectories && "
+            f"cp -r evaluation/evaluation_outputs/outputs/*/*/* /trajectories_mount/trajectories/{data_point['instance_id']}"
+        )
+
+        # Execute OpenHands command
+        search_path = os.path.join(self.output_dir / "trajectories", "**", data_point['instance_id'], "output.jsonl")
+        out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
+
+        with open(out_file, "r") as f:
+            out_dict = json.loads(f.read().strip())
+
+        patch = out_dict["test_result"]["git_patch"]
+        if not patch:
+            patch = None
+
+        # Create file in the SWE-bench evaluation format
+        pred_file = out_file.replace("output.jsonl", "output_for_eval.jsonl")
+        with open(pred_file, "w") as f:
+            f.write(json.dumps({
+                "model_name_or_path": out_dict["metadata"]["llm_config"]["model"],
+                "instance_id": out_dict["instance_id"],
+                "model_patch": patch
+            }))
+        return pred_file
+
+    async def process_single_datapoint(self, data_point, data):
+        """Will do all necessary generations to get a single answer for the data point."""
+        self.output_dir = Path(self.cfg.output_file).parent
+
+        # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
+        # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
+
+        if 'base_url' in self.cfg.server:
+            api_base = self.cfg.server.base_url
+        else:
+            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
+
+        if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
+            pred_file = await self._run_swe_agent(data_point, api_base)
+        elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
+            pred_file = await self._run_openhands(data_point, api_base)
+        else:
+            raise ValueError(
+                f"Unsupported agent framework: {self.cfg.agent_framework}. "
+                f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
+            )
+
+        pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
+        with open(pred_file, "r") as f:
+            trajectory_dict = json.loads(f.read())
 
         # Check if the trajectory has an empty patch before running evaluation
         has_patch = trajectory_dict['model_patch'] is not None

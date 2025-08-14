@@ -365,16 +365,16 @@ class Prompt:
         return str(self.config)
 
 
-def get_config_path(config: str, config_dir: str | None = None) -> Path:
+def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
     if config_dir is None:
         config_dir = str(Path(__file__).parent.absolute() / 'config')
 
-    if config.endswith(".yaml"):
+    if config.endswith(f".{config_extension}"):
         config_path = Path(config).absolute()
     elif config.startswith("nemo_skills"):
-        config_path = Path(__file__).parents[2].absolute() / f"{config}.yaml"
+        config_path = Path(__file__).parents[2].absolute() / f"{config}.{config_extension}"
     else:
-        config_path = Path(config_dir) / f"{config}.yaml"
+        config_path = Path(config_dir) / f"{config}.{config_extension}"
 
     return config_path
 
