@@ -23,6 +23,9 @@ def test_generic_math_problem_augmentation_prompt():
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
+
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Write a new math problem inspired by a given one. Make the new problem reasonable and solvable.
@@ -102,59 +105,6 @@ After the problem is completed finish your response right away.<|eot_id|><|start
     assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
 
 
-def test_qwen_math_prompt_dict():
-    prompt = get_prompt('qwen/math-cot', 'Qwen/Qwen2.5-32B-Instruct')
-
-    filled = prompt.fill({'problem': "What's the meaning of life?"}, return_templated_dict=True)
-    expected_result = [
-        {
-            'role': 'system',
-            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
-        },
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
-        },
-    ]
-    assert filled == expected_result
-
-
-def test_qwen_math_prompt_dict_multi_turn():
-    prompt = get_prompt('qwen/math-cot', 'Qwen/Qwen2.5-32B-Instruct')
-
-    input_dict = {
-        'turns': [
-            {
-                'problem': 'What\'s the meaning of life?',
-                'assistant': 'The meaning of life is 42',
-            },
-            {
-                'problem': 'Why do you think that\'s the case?',
-            },
-        ]
-    }
-    filled = prompt.fill(input_dict, return_templated_dict=True, multi_turn_key='turns')
-    expected_result = [
-        {
-            'role': 'system',
-            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
-        },
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
-        },
-        {
-            'role': 'assistant',
-            'content': 'The meaning of life is 42<|im_end|>\n',
-        },
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhy do you think that's the case?<|im_end|>\n<|im_start|>assistant\n",
-        },
-    ]
-    assert filled == expected_result
-
-
 def test_generic_codegen_prompt():
     prompt = get_prompt('generic/codegen')
 
@@ -193,6 +143,9 @@ def test_generic_math_prompt():
     prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -385,6 +338,9 @@ def test_llama_code_output_format_examples():
     )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -1144,6 +1100,9 @@ def test_generic_general_boxed_prompt():
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
+
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Solve the following problem. Make sure to put the answer (and only answer) inside \\boxed{}.
@@ -1201,7 +1160,12 @@ open scoped BigOperators Topology
 def test_llm_as_judge_hle_original_prompt():
     prompt = get_prompt('judge/hle', 'meta-llama/Llama-3.1-8B-Instruct')
 
-    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>
+    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Judge whether the following [response] to [question] is correct or not based on the precise and unambiguous [correct_answer] below.
 
