@@ -2,9 +2,13 @@ import argparse
 import json
 import os.path
 from pathlib import Path
+import requests
 
 from datasets import load_dataset
 from collections import defaultdict
+
+run_url = "https://raw.githubusercontent.com/huggingface/ioi/refs/heads/main/run_tests/custom_setup/run"
+compile_url = "https://raw.githubusercontent.com/huggingface/ioi/refs/heads/main/run_tests/custom_setup/compile"
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -15,10 +19,8 @@ if __name__ == '__main__':
     # pack the run and compile code into the jsonl file.
     root_dataset_dir = os.path.dirname(Path(__file__))
 
-    with open(os.path.join(root_dataset_dir, "run")) as f:
-        run_code = f.read()
-    with open(os.path.join(root_dataset_dir, "compile")) as f:
-        compile_code = f.read()
+    run_code = requests.get(run_url).text
+    compile_code = requests.get(compile_url).text
 
     tests_dataset = load_dataset("open-r1/ioi-test-cases", name="2024", split="train")
 
