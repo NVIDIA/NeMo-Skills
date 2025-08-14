@@ -115,10 +115,9 @@ agent:
       n: 5
   model:
     # The following parameters are overridden by Nemo-Skills:
-    # name, api_base, temperature, top_p, completion_kwargs.
+    # name, api_base, temperature, top_p, completion_kwargs, per_instance_call_limit.
     # Specifying them here will have no effect! Use Nemo-Skills options instead.
     per_instance_cost_limit: 0
     total_cost_limit: 0
-    per_instance_call_limit: 75
     max_input_tokens: 0
     max_output_tokens: 0

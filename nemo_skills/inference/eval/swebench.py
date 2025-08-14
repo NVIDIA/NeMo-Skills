@@ -95,6 +95,8 @@ class SweBenchGenerationConfig:
     # SWE-agent/OpenHands configuration file path. Can be specified in the same way as ns prompt configs
     # If None, will use the default for the chosen framework
     agent_config: str | None = None
+    agent_max_turns: int = 100  # Max iterations for the agent
+
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
@@ -253,6 +255,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    --agent.model.temperature {self.cfg.inference.temperature} "
             f"    --agent.model.top_p {self.cfg.inference.top_p} "
             f"    --agent.model.completion_kwargs {shlex.quote(json.dumps(completion_kwargs))} "
+            f"    --agent.model.per_instance_call_limit {self.cfg.agent_max_turns} "
             f"    --env.deployment.type local "
             f"    --env.repo.type preexisting "
             f"    --env.repo.repo_name testbed "
@@ -347,7 +350,7 @@ class SweBenchGenerationTask(GenerationTask):
             f"    HEAD "  # openhands commit
             f"    CodeActAgent "  # agent
             f"    1 "  # number of instances
-            f"    100 "  # max agent iterations (TODO: would be nice to make this configurable)
+            f"    {self.cfg.agent_max_turns} "  # max agent iterations
             f"    1 "  # number of workers
             f"    {data_point['dataset_name']} "  # dataset name
             f"    {data_point['split']} && "  # dataset split
