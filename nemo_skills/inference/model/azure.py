@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+
 from .openai import OpenAIModel
 
 
@@ -23,7 +24,7 @@ class AzureOpenAIModel(OpenAIModel):
         self,
         *args,
         api_key: str | None = None,
-        api_version: str = "2024-02-15-preview",
+        api_version: str = "2024-12-01-preview",
         **kwargs,
     ):
         if api_key is None:

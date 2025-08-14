@@ -22,7 +22,6 @@ from tqdm import tqdm
 def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            print(entry)
             entry['expected_answer'] = entry.pop('answer')
             json.dump(entry, fout)
             fout.write("\n")
