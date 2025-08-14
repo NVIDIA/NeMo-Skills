@@ -34,7 +34,7 @@ or
 ns prepare_data \
     --data_dir=/workspace/ns-data \
     --cluster=fei-ord \
-    aalcr --txt_file_folder=/workspace/ns-data/lcr-document-sets
+    aalcr --txt_file_folder=/workspace/do_not_share_data/lcr-document-sets
 """
 
 
