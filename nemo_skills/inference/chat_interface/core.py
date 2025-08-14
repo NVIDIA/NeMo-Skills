@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -257,7 +258,7 @@ class ModelLoader:
             return False
 
         try:
-            resp = self._sandbox.execute_code("1")
+            resp = asyncio.run(self._sandbox.execute_code("1"))
             return int(resp[0]["stdout"].strip()) == 1
         except requests.RequestException as e:  # noqa: BLE001
             logger.warning("Sandbox health check failed: %s", e)

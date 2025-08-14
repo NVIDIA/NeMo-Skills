@@ -38,6 +38,7 @@ from nemo_skills.pipeline.utils.exp import (
     get_exp_handles,
     get_sandbox_command,
     run_exp,
+    get_nsight_cmd,
 )
 from nemo_skills.pipeline.utils.generation import (
     configure_client,
@@ -69,7 +70,6 @@ from nemo_skills.pipeline.utils.server import (
     SupportedServersSelfHosted,
     get_free_port,
     get_ray_server_cmd,
-    get_reward_server_command,
     get_server_command,
     should_get_random_port,
     wait_for_server,

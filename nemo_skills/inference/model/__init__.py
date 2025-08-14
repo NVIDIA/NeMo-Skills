@@ -17,37 +17,30 @@ from nemo_skills.utils import python_doc_to_cmd_help
 from .azure import AzureOpenAIModel
 
 # Base classes
-from .base import BaseModel, BaseRewardModel, OpenAIAPIModel
+from .base import BaseModel
 
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
-from .nemo import NemoModel, NemoRewardModel
+
+# Online GenSelect
+from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
 
-# Model implementations
-from .trtllm import TRTLLMModel
-
 # Utilities
-from .utils import RequestException, trim_after_stop_phrases
-from .vllm import VLLMModel, VLLMRewardModel
+from .vllm import VLLMModel
+
+# Model implementations
+
 
 # Model registry
 models = {
-    'trtllm': TRTLLMModel,
-    'trtllm-serve': VLLMModel,
-    'nemo': NemoModel,
+    'trtllm': VLLMModel,
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,
-}
-
-# Reward model registry
-reward_models = {
-    'nemo': NemoRewardModel,
-    'vllm': VLLMRewardModel,
 }
 
 
@@ -57,12 +50,6 @@ def get_model(server_type, **kwargs):
     return model_class(**kwargs)
 
 
-def get_reward_model(server_type, model_type, **kwargs):
-    """A helper function to make it easier to set server through cmd."""
-    model_class = reward_models[server_type.lower()]
-    return model_class(model_type=model_type, **kwargs)
-
-
 def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model = get_model(server_type=server_type, **kwargs)
@@ -70,6 +57,14 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
+
+
+def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
+    """A helper function to create OnlineGenSelect model."""
+    model = get_model(server_type=server_type, **kwargs)
+    if online_genselect_config is None:
+        online_genselect_config = OnlineGenSelectConfig()
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
 
 def server_params():
