@@ -59,6 +59,7 @@ class NemoRLTask:
     log_dir: str
     env_variables: dict
     backend: str
+    profile_step_range: str
     extra_arguments: str = ""
 
     def format_train_args(self):
@@ -128,6 +129,7 @@ def get_training_cmd(
     log_dir,
     env_variables,
     backend,
+    profile_step_range,
 ):
     timeout = get_timeout(cluster_config, partition)
 
@@ -147,6 +149,7 @@ def get_training_cmd(
         log_dir=log_dir,
         env_variables=env_variables,
         backend=backend,
+        profile_step_range=profile_step_range,
     )
 
     return task.get_cmd()
@@ -311,6 +314,7 @@ def grpo_nemo_rl(
         log_dir=f"{log_dir}/training-logs",
         env_variables=env_variables,
         backend=backend,
+        profile_step_range=profile_step_range,
     )
 
     server_config = None
