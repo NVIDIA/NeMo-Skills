@@ -84,8 +84,7 @@ If you're implementing a new script, you can use the following code to create a 
 ```python
 from nemo_skills.prompt.utils import get_prompt
 
-# code_tags parameter is optional and only needed for code execution
-prompt = get_prompt('generic/math', code_tags='llama3')
+prompt = get_prompt('generic/math')
 print(prompt.fill({'problem': "What's 2 + 2?"}))
 ```
 
@@ -105,3 +104,28 @@ You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tr
 
 If your data is already formatted as a list of openai messages, you can directly use it as an input to the pipeline scripts
 if you set `++prompt_format=openai`.
+
+If you want to use completions API, you can set `++use_completions_api=True`. This will use model's tokenizer to format
+messages as a string (you can specify a custom tokenizer with `++tokenizer=...` argument).
+
+Here is an example of the input to completions api
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+# code_tags parameter is optional and only needed for code execution
+prompt = get_prompt('generic/math', tokenizer='Qwen/Qwen2.5-32B-Instruct')
+print(prompt.fill({'problem': "What's 2 + 2?"}))
+```
+
+which outputs
+
+```python-console
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{}.
+
+What's 2 + 2?<|im_end|>
+<|im_start|>assistant
+```
