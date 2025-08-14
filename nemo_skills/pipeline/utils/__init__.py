@@ -38,6 +38,7 @@ from nemo_skills.pipeline.utils.exp import (
     get_exp_handles,
     get_sandbox_command,
     run_exp,
+    get_nsight_cmd,
 )
 from nemo_skills.pipeline.utils.generation import (
     configure_client,
