@@ -17,7 +17,6 @@ num_output_samples: null
 
 prompt_config: null
 code_tags: null
-chat_format: null  # null/nemotron/llama
 
 input_key: input  # key to group samples by before code_text_filter
 output_key: output  # key to filter solutions by
@@ -52,5 +51,4 @@ processors:
     code_tags: ${code_tags}
     input_key: question
     output_key: ${output_key}
-    chat_format: ${chat_format}
     metadata: ${metadata}
