@@ -283,22 +283,7 @@ class GenerationTask:
     def log_example_prompt(self, data):
         data_point = deepcopy(data[0])
 
-        if self.cfg.prompt_format == "openai":
-            # print the prompt in openai format
-            LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
-            return
-
-        if self.cfg.multi_turn_key is None:
-            LOG.info(
-                "Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data)
-            )
-        else:
-            data_point[self.cfg.multi_turn_key] = data_point[self.cfg.multi_turn_key][:1]
-            LOG.info(
-                "Example prompt (first turn only):\nData dictionary: %s\nPrompt: %s",
-                data_point,
-                self.fill_prompt(data_point, data),
-            )
+        LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data))
 
     def load_data(self):
         data = []
