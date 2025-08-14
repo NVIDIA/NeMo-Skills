@@ -166,7 +166,6 @@ class GenerateSolutionsConfig:
 
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.system_message is None, "system_message is not supported for prompt_format == 'openai'"
         else:
             assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
@@ -249,7 +248,8 @@ class GenerationTask:
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
         elif self.cfg.online_genselect:
             # Use the same prompt template for genselect as the one used for generation
-            self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
+            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
+            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
@@ -353,6 +353,11 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
                 data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
+            if self.cfg.system_message:
+                if data_point["messages"][0]["role"] != "system":
+                    data_point["messages"].insert(0, {"role": "system", "content": self.cfg.system_message})
+                else:
+                    data_point["messages"][0]["content"] = self.cfg.system_message
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
