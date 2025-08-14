@@ -97,7 +97,7 @@ class CodeTags:
 @nested_dataclass(kw_only=True)
 class PromptConfig:
     user: str
-    system: str = ""
+    system: str | None = None
     code_tags: CodeTags = None
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
 
@@ -223,7 +223,7 @@ class Prompt:
             The filled prompt - either a string or a list of dictionaries.
         """
 
-        if self.config.system:
+        if self.config.system is not None:
             messages = [
                 {"role": "system", "content": self.config.system},
             ]
@@ -240,7 +240,9 @@ class Prompt:
 
         if self.tokenizer is not None:
             try:
-                messages_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+                messages_string = self.tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
             except ValueError as e:
                 if "Cannot use chat template functions because tokenizer.chat_template is not set" in str(e):
                     # assuming that's a base model and we just need to add bos
