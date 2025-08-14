@@ -206,7 +206,7 @@ def sft_nemo_rl(
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     profile_step_range: str = typer.Option(
         None, 
-        help="Environment variable to control which training steps the profiler captures. "
+        help="Controls which training steps the nsys profiler captures. "
         "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
         "Example: '3:5' profiles steps 3 and 4 only. NOTE: START must be ≥ 1, so '0:10' is invalid."
     ),
@@ -318,9 +318,10 @@ def sft_nemo_rl(
     )
 
     server_config = None
+    env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        with temporary_env_update(cluster_config, {"RAY_LOG_SYNC_FREQUENCY": 20}):
+        with temporary_env_update(cluster_config, env_update):
             for job_id in range(num_training_jobs):
                 prev_task = add_task(
                     exp,
