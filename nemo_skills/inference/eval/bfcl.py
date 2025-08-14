@@ -324,7 +324,7 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit or out_of_context:
                 break
 
-        output_dict = {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
+        output_dict["generation"] = all_model_response
 
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"
