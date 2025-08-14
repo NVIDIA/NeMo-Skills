@@ -63,7 +63,7 @@ class SweBenchMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions)
 
 
-class SciEvalPlusMetrics(BaseMetrics):
+class SciCodeMetrics(BaseMetrics):
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         subtask_status_list = prediction['eval_status']
         correct_subtasks = sum(subtask['process_status'] == 'completed' for subtask in subtask_status_list)

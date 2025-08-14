@@ -4,22 +4,17 @@ Here are the instructions on how to run inference with our repo.
 
 ## Download/convert the model
 
-Get the model you want to use. You can use any model that's supported by vLLM, TensorRT-LLM or NeMo.
+Get the model you want to use. You can use any model that's supported by vLLM, sglang, TensorRT-LLM or Megatron.
 You can also use [Nvidia NIM API](https://www.nvidia.com/en-us/ai/) for models that are hosted there.
-
-[Convert the model](../pipelines/checkpoint-conversion.md) if it's not in the format you want to use.
-You do not need any conversion if using vLLM inference with HF models
-(and can directly use model id if you want vLLM to download it for you).
-For fastest inference we recommend to convert the model to TensorRT-LLM format.
 
 ## Start the server
 
-Start the server hosting your model. Here is an example (make sure the `/hf_models` mount is defined in your cluster config). Skip this step if you want to use cloud models through an API.
+Start the server hosting your model. Skip this step if you want to use cloud models through an API.
 
 ```bash
 ns start_server \
     --cluster local \
-    --model /hf_models/Meta-Llama-3.1-8B-Instruct \
+    --model meta-llama/Llama-3.1-8B-Instruct \
     --server_type vllm \
     --server_gpus 1 \
     --server_nodes 1
@@ -40,12 +35,12 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     from nemo_skills.inference.model import get_model
     from nemo_skills.prompt.utils import get_prompt
 
-    llm = get_model(server_type="vllm")  # localhost by default
+    llm = get_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm")  # localhost by default
     prompt = get_prompt('generic/default', 'llama3-instruct') # (1)!
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
-    print(prompts[0]) # (2)!
-    outputs = llm.generate(prompts=prompts)
-    print(outputs[0]["generation"]) # (3)!
+    prompt = prompt.fill({'question': "What's 2 + 2?"})
+    print(prompt) # (2)!
+    output = llm.generate_sync(prompt=prompt)
+    print(output["generation"]) # (3)!
     ```
 
     1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
@@ -58,7 +53,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     2.   This should print
 
          ```python-console
-         >>> print(prompts[0])
+         >>> print(prompt)
          <|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
          <|eot_id|><|start_header_id|>user<|end_header_id|>
@@ -70,7 +65,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     3.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          2 + 2 = 4.
          ```
 
@@ -87,11 +82,11 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     )
     prompt = get_prompt('generic/default') # (2)!
 
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
+    prompt = prompt.fill({'question': "What's 2 + 2?"})
 
-    print(prompts[0]) # (3)!
-    outputs = llm.generate(prompts=prompts)
-    print(outputs[0]["generation"]) # (4)!
+    print(prompt) # (3)!
+    output = llm.generate_sync(prompt=prompt)
+    print(output["generation"]) # (4)!
     ```
 
     1.   Don't forget to define `NVIDIA_API_KEY`.
@@ -108,7 +103,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     3.   This should print
 
          ```python-console
-         >>> print(prompts[0])
+         >>> print(prompt)
          [{'role': 'user', 'content': "What's 2 + 2?"}]
          ```
 
@@ -116,7 +111,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     4.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          2 + 2 = 4.
          ```
 
@@ -128,16 +123,16 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     from nemo_skills.prompt.utils import get_prompt
 
     sandbox = get_sandbox()  # localhost by default
-    llm = get_code_execution_model(server_type="vllm", sandbox=sandbox)
+    llm = get_code_execution_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm", sandbox=sandbox)
     prompt = get_prompt('generic/default', 'llama3-instruct', code_tags='llama3') # (1)!
     prompt.config.system = ( # (2)!
         "Environment: ipython\n\n"
         "Use Python to solve this math problem."
     )
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
-    print(prompts[0]) # (3)!
-    outputs = llm.generate(prompts=prompts, **prompt.get_code_execution_args()) # (4)!
-    print(outputs[0]["generation"]) # (5)!
+    prompt = prompt.fill({'question': "What's 2 + 2?"})
+    print(prompt) # (3)!
+    output = llm.generate_sync(prompt=prompt, **prompt.get_code_execution_args()) # (4)!
+    print(output["generation"]) # (5)!
     ```
 
     1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
@@ -153,7 +148,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     3.   This should print
 
          ```python-console
-         >>> print(prompts[0])
+         >>> print(prompt)
          <|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
          Environment: ipython
@@ -172,7 +167,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     5.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          <|python_tag|>print(2 + 2)<|eom_id|><|start_header_id|>ipython<|end_header_id|>
 
          completed

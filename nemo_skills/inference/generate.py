@@ -12,23 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
 import random
 import sys
 import time
-import asyncio
 from copy import deepcopy
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf, open_dict
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
+from nemo_skills.inference.model import (
+    OnlineGenSelectConfig,
+    get_code_execution_model,
+    get_model,
+    get_online_genselect_model,
+    server_params,
+)
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
     chunk_data,
@@ -45,7 +51,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class InferenceConfig:
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
-    top_k: int = 0
+    top_k: int = -1
     top_p: float = 0.95
     min_p: float = 0.0
     random_seed: int = 0
@@ -123,6 +129,11 @@ class GenerateSolutionsConfig:
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
 
+    # set to True if online genselect is used
+    online_genselect: bool = False
+    # genselect config
+    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
+
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
 
@@ -149,10 +160,6 @@ class GenerateSolutionsConfig:
             )
 
     def _post_init_validate_server(self):
-        if self.server["server_type"] == "trtllm" and self.prompt_template is None:
-            # TODO: fix that
-            raise ValueError("Prompt template is required for trtllm servers")
-
         if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
             LOG.warning(
                 "NeMo/Megatron implementation of openai chat completions api "
@@ -251,22 +258,31 @@ class GenerationTask:
             "Use max_concurrent_requests to control the number of concurrent requests.",
             self.cfg.max_concurrent_requests,
         )
-        
+
         # Initialize semaphore for controlling concurrent requests
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        if self.cfg.online_genselect:
+            # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
+            self.semaphore = asyncio.Semaphore(
+                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
+            )
+        else:
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
     def setup_llm(self):
-        # TODO: DRY with the check in the validation config
-        if self.cfg.prompt_template is None and self.cfg.server["server_type"] in ["nemo", "megatron"]:
-            with open_dict(self.cfg.server):
-                self.cfg.server["server_type"] = "openai"
-                self.cfg.server["model"] = "model"
-
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+        elif self.cfg.online_genselect:
+            # Use the same prompt template for genselect as the one used for generation
+            self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
+            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
+            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
+            llm = get_online_genselect_model(
+                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+            )
         else:
             llm = get_model(**self.cfg.server)
 
@@ -394,7 +410,6 @@ class GenerationTask:
                 filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
 
-
     def dump_outputs(self, outputs, data_points, fout):
         for output, original_data_point in zip(outputs, data_points):
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
@@ -433,7 +448,7 @@ class GenerationTask:
 
     async def process_single_datapoint(self, data_point, all_data):
         generation_params = {
-            "prompts": [self.fill_prompt(data_point, all_data)],
+            "prompt": self.fill_prompt(data_point, all_data),
             "stop_phrases": combine_stop_phrases(
                 self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
             ),
@@ -443,21 +458,19 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [data_point['total_code_executions']]
-                generation_params['max_code_executions'] = max_code_executions_values
+                generation_params['max_code_executions'] = data_point['total_code_executions']
 
-        return await self.llm.generate_asyncio(**generation_params)
-
+        return await self.llm.generate_async(**generation_params)
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
         async with self.semaphore:
             # registering current time to calculate total generation time
             data_point['generation_start_time'] = time.time()
-            
+
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
-            
+
             # Thread-safe output writing
             async with self.output_lock:
                 self.dump_outputs([output], [data_point], fout)
@@ -465,7 +478,7 @@ class GenerationTask:
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
-        
+
         # Initialize output lock for thread-safe writing
         if self.output_lock is None:
             self.output_lock = asyncio.Lock()
@@ -483,7 +496,7 @@ class GenerationTask:
                 remaining_data_points.append(data_point)
 
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
-        
+
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
@@ -493,9 +506,7 @@ class GenerationTask:
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                task = asyncio.create_task(
-                    self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar)
-                )
+                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete

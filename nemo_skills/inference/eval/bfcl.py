@@ -140,15 +140,15 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
-                "prompts": [fmted_prompt],
+                "prompt": fmted_prompt,
                 "include_response": True,
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             }
         else:
             input_dict = {
-                "prompts": [messages],
-                "tools": [tools],
+                "prompt": messages,
+                "tools": tools,
                 "include_response": True,
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
@@ -157,13 +157,15 @@ class BFCLGenerationTask(GenerationTask):
         # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
         try:
-            output = await self.llm.generate_asyncio(**input_dict)
+            output = await self.llm.generate_async(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
         except openai.BadRequestError as e:
-            if "Requested token count exceeds the model's maximum context length" in str(
-                e
-            ) or "is longer than the model's context length" in str(e):
-                LOG.warning("BFCL generation failed due to running out of context. ")
+            error_str = str(e)
+            context_error = "is longer than the model's context length" in error_str
+            token_error = "Requested token count exceeds model's maximum context length" in error_str
+
+            if context_error or token_error:
+                LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
                 return {"message": None, "generation": ""}
             else:
                 raise
@@ -188,9 +190,11 @@ class BFCLGenerationTask(GenerationTask):
                 "num_generated_tokens": output["num_generated_tokens"],
             }
         else:
-            if "tool_calls" not in output:
-                output["tool_calls"] = []
             output["message"] = output["response"].choices[0].message
+            output["tool_calls"] = []
+            if output["message"].tool_calls:
+                output["tool_calls"] = output["message"].tool_calls
+
             return output
 
     async def generate_single_data_point_single_turn(self, data_point):
@@ -198,6 +202,7 @@ class BFCLGenerationTask(GenerationTask):
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
         model_response = await self._generate_single_assistant_turn(state_dict)
+
         if model_response["message"] is None:
             # Ran out of context
             return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}
@@ -319,7 +324,7 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit or out_of_context:
                 break
 
-        output_dict = {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
+        output_dict["generation"] = all_model_response
 
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"

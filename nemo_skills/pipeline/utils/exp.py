@@ -634,3 +634,14 @@ def get_exp(expname, cluster_config, _reuse_exp=None):
     if cluster_config['executor'] == 'local':
         return run.Experiment(expname, clean_mode=True)
     return run.Experiment(expname, clean_mode=True, log_level="WARN")
+
+
+def get_nsight_cmd(profile_step_range):
+    cmd = ''
+    if profile_step_range is not None:
+        cmd = (
+            f'export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/lib/x86_64-linux-gnu" && '
+            f"export NRL_NSYS_PROFILE_STEP_RANGE={profile_step_range} && "
+            'export NRL_NSYS_WORKER_PATTERNS="*policy*,*vllm*" && '
+        )
+    return cmd

@@ -59,6 +59,7 @@ class SciCodeGenerationTask(GenerationTask):
         total_steps = len(data_point['sub_steps'])
         previous_llm_code = [None] * total_steps
         task_solutions = {}
+        full_outputs = {}
         total_generated_tokens = 0
         out_of_context = False
         for cur_step in range(total_steps):
@@ -98,6 +99,7 @@ class SciCodeGenerationTask(GenerationTask):
                 else:
                     raise
 
+            full_outputs[f"{problem_id}.{cur_step}"] = llm_output
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)
             if self.cfg.remove_thinking:
                 remove_thinking(llm_output, 'generation', self.cfg.thinking_begin, self.cfg.thinking_end)
@@ -107,7 +109,11 @@ class SciCodeGenerationTask(GenerationTask):
             task_solutions[f"{problem_id}.{cur_step}"] = f'{previous_code}\n{extracted_python}'
 
         # generation is a dict["problem_id.subtask_step": full_solution] here
-        return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
+        return {
+            'generation': task_solutions,
+            'num_generated_tokens': total_generated_tokens,
+            'full_outputs': full_outputs,
+        }
 
 
 GENERATION_TASK_CLASS = SciCodeGenerationTask
