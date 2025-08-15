@@ -24,6 +24,7 @@ gradio
 httpx
 huggingface_hub
 hydra-core
+iso639-lang
 ipython
 litellm < 1.75.0  # some bug with asyncio.run hanging forever
 math-verify[antlr4_9_3]
