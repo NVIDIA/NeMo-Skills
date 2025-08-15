@@ -216,7 +216,7 @@ class Prompt:
         messages.append({'role': 'assistant', 'content': assistant_response})
         assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
 
-        assert assistant_string.startswith(user_string), "Something is very wrong.."
+        assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
 
         formatted_response = assistant_string[len(user_string) :]
 

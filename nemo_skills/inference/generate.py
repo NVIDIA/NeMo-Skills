@@ -71,7 +71,7 @@ class GenerateSolutionsConfig:
     prompt_config: str | None = None  # How to format the data into prompts
     # by default we use chat completions, set this to True to use completions API. In that case we will take the
     # tokenizer from the model and apply it to the prompt before sending it. You can override tokenizer with
-    # tokenizer_path parameter
+    # tokenizer parameter
     use_completions_api: bool = False
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
