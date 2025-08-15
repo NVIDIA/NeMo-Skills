@@ -7,7 +7,7 @@ readtime: 15
 # Reproducing Llama-Nemotron-Super-49B-V1.5 Evals 
 
 In this tutorial, we will reproduce the evals for the Llama-3.3-Nemotron-Super-49B-v1.5 model using NeMo-Skills.
-For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](./omr-simple-recipe.md).
+For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
 
 
 We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
@@ -17,11 +17,14 @@ executing all commands from that folder locally. Change all commands accordingly
 
 ## Download the model
 
-Get the model from HF. 
+Get the model from HF.   
 ```bash
 pip install -U "huggingface_hub[cli]"
 huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
 ```
+
+!!!note
+     In most cases, we can define `HF_HOME` in the cluster config to a mounted directory, and refer to models by their huggingface names such as `nvidia/Llama-3_3-Nemotron-Super-49B-v1_5` in this case. However, in this example, we download the model to an explicit location because we rely on the tool parsing script which is part of the huggingface repo. Alternatively, users can download the model to the `HF_HOME` and separately download the [tool parsing script](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5/blob/main/llama_nemotron_toolcall_parser_no_streaming.py){target="_blank"} to another mounted location.  
 
 ## Prepare evaluation data
 
@@ -59,7 +62,7 @@ We detail the evaluation commands and results for both the modes.
 Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations. 
 
 !!! note 
-    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, you can set `--num_jobs` to a bigger number or just set it to -1 to run each benchmark and their random seeds as an independent job which in case of Llama-Nemotron-Super-49B-V1.5 requires one node per job.  
+    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, by default we will run each benchmark and their random seeds as an independent job.  
 
 
 
@@ -77,15 +80,14 @@ For the reasoning mode evals, we follow the recommended recipe of setting:
 The following command evaluates the model on GPQA, MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
 
 
-```bash hl_lines="9-13"
+```bash hl_lines="8-12"
 ns eval \
     --cluster=local \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5/ \
     --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -102,8 +104,7 @@ ns eval \
     --output_dir=/workspace/llama_nemotron_49b_1_5/ \
     --benchmarks=livecodebench:16 \
     --split=test_v5_2410_2502 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -113,17 +114,19 @@ ns eval \
 #### Command for HLE Eval (Reasoning on)
 
 
-For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
+For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}. 
 
-```bash hl_lines="9-10"
+Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/Llama-3_3-Nemotron-Super-49B-v1_5"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 2` will use the `Llama-3_3-Nemotron-Super-49B-v1_5` itself as a judge. 
+
+
+```bash hl_lines="8-9"
 ns eval \
     --cluster=local \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5/ \
     --benchmarks=hle:16 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     --judge_model="o3-mini-20250131" \
     --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
     ++inference.tokens_to_generate=65536 \
@@ -142,14 +145,13 @@ ns eval \
 #### Command for BFCL Eval (Reasoning on)
 
 Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
-```bash hl_lines="13-17"
+```bash hl_lines="12-16"
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
-    --server_gpus=8 \
+    --server_gpus=2 \
     --server_type=vllm \
-    --num_jobs=1 \
     --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
@@ -165,10 +167,11 @@ ns eval \
 
 ### Reasoning-on Results
 
-We use the `summarize_results` pipeline to calculate the evaluation metrics, for all but BFCL where the metrics are calculated as part of the evaluation job itself. 
-The following results were obtained by running the command:
+The eval jobs also launch a dependent job to perform metrics calculation and store the result in a file called `metrics.json`. 
+In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/llama_nemotron_49b_1_5/eval-results/aime25/metrics.json`. 
+This metrics calculation is done typically by the `summarize_results` pipeline, except in the case of BFCL where the metrics are calculated by a BFCL specific script because BFCL has a specific way of combining subtask accuracy to obtain the overall accuracy. 
 
-
+To print the results for these benchmarks (except for BFCL), we could rerun the `summarize_results` script manually as follows: 
 ```bash
 ns summarize_results --cluster=local /workspace/llama_nemotron_49b_1_5/eval-results/{BENCHMARK}
 ```
@@ -191,9 +194,9 @@ pass@16           | 12032       | 4879       | 12516       | 91.32%           | 
 
 -------------------------------------------------- hle --------------------------------------------------
 evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
-pass@1[avg-of-15] | 2158        | 12111      | 7782        | 7.75%         | 2.40%            | 64.13%
-majority@15       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
-pass@15           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
+pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%            | 64.13%
+majority@16       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
+pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
 ```
 
 !!!note
@@ -276,15 +279,14 @@ For the non-reasoning mode evals, we follow the recommended recipe of setting:
 The following command evaluates the model on GPQA, MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
 
 
-```bash hl_lines="10-13"
+```bash hl_lines="9-12"
 ns eval \
     --cluster=local \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
     --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
@@ -301,8 +303,7 @@ ns eval \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
     --benchmarks=livecodebench:16 \
     --split=test_v5_2410_2502 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
@@ -319,8 +320,7 @@ ns eval \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
     --benchmarks=hle:16 \
-    --server_gpus=8 \
-    --num_jobs=1 \
+    --server_gpus=2 \
     --judge_model="o3-mini-20250131" \
     --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
     ++inference.tokens_to_generate=65536 \
@@ -336,9 +336,8 @@ ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
-    --server_gpus=8 \
+    --server_gpus=2 \
     --server_type=vllm \
-    --num_jobs=1 \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off_tool_calling/ \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.0 \
