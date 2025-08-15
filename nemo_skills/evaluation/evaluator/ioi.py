@@ -15,6 +15,7 @@ import json
 import multiprocessing
 import os
 import re
+import asyncio
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.file_utils import jdump
@@ -26,12 +27,16 @@ class IOIEvaluatorConfig:
     dataset: str = "ioi24"
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
-    test_file: str = "/datasets/ioi24/test_metadata.json" # test metadata file created by prepare.py
+    # where test cases are stored in automatically mounted eval datasets folder.
+    test_file: str = "/eval_dataset/ioi24/test_metadata.json"
 
 
 def init_worker(sandbox_arg):
     global worker_sandbox
     worker_sandbox = sandbox_arg
+    global worker_loop
+    worker_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(worker_loop)
 
 
 def run_test_case(task_args: dict, worker_id: int) -> dict:
@@ -87,13 +92,17 @@ _EOT_
 """)
 
         setup_script = "\n".join(file_creation_commands)
-        setup_result, _ = worker_sandbox.execute_code(setup_script, language='shell')
+        setup_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(setup_script, language='shell')
+        )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
-        compile_result, _ = worker_sandbox.execute_code(compile_command, language='shell')
+        compile_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(compile_command, language='shell')
+        )
 
         result = {
             "compile_success": not compile_result.get('stderr'),
@@ -109,7 +118,9 @@ _EOT_
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        run_result, _ = worker_sandbox.execute_code(run_command, language='shell')
+        run_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(run_command, language='shell')
+        )
 
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
@@ -130,10 +141,10 @@ _EOT_
         return {"score": 0.0, "output": "", "error": str(e)}
 
     finally:
-        # 4. Clean up the directory
-        # Fire and forget; ignore return values
         try:
-            worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+            worker_loop.run_until_complete(
+                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+            )
         except Exception:
             pass
 
@@ -167,7 +178,7 @@ def eval_ioi(cfg):
     sandbox = LocalSandbox()
     batch_size = eval_config.test_batch_size
     if not os.path.exists(eval_config.test_file):
-        raise ValueError(f"Failed to find test cases metadata file: {eval_config.test_file}")
+        raise ValueError(f"Failed to find test cases in eval dataset directory: {eval_config.test_file}")
 
     with open(eval_config.test_file) as f:
         metadata = json.load(f)
