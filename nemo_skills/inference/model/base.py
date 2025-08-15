@@ -158,7 +158,7 @@ class BaseModel:
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
             # response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
             # NOTE: added by me, for response API
-            response = await litellm.aresponses(**request_params, **self.litellm_kwargs)
+            response = await litellm.aresponses(**request_params, stream=stream, **self.litellm_kwargs)
             if stream:
                 result = self._stream_chat_chunks_async(response)
             else:

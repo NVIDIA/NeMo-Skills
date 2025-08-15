@@ -69,7 +69,7 @@ stages:
       # you can take our published model from HF and use it as data generator
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
-      model: hosted_vllm/openai/gpt-oss-120b
+      model: openai/gpt-oss-120b
       server_type: openai
       server_address: http://localhost:8000/v1
       num_random_seeds: ${num_random_seeds_to_generate}
