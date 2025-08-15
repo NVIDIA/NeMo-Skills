@@ -109,7 +109,9 @@ class Prompt:
         self.config = PromptConfig(_init_nested=True, **asdict(config))
         self.tokenizer = tokenizer
         if self.tokenizer:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+            # assuming it's the object already if not str
+            if isinstance(self.tokenizer, str):
+                self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
 
     def build_filled_example(self, example_dict: Dict[str, Any]) -> str:
         """Builds a filled example string based on the example dictionary."""

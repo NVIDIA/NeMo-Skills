@@ -172,7 +172,7 @@ def ns_data_processor(
         {
             'role': 'user',
             'content': user_message,
-            'token_ids': tokenizer([user_message], return_tensors="pt")["input_ids"][0],
+            'token_ids': tokenizer([user_message], return_tensors="pt", add_special_tokens=False)["input_ids"][0],
         }
     ]
 
