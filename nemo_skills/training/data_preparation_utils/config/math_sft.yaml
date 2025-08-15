@@ -147,11 +147,10 @@ processors:
         should_run: ${filters.remove_no_think_tags}
         text_key: ${output_key}
         regex_patterns:
-          - '<think>'
           - '</think>'
         test_cases:
-          - {input: {generation: "My solution:\n---<think>---\nSomething else"}, output: null}
-          - {input: {generation: "My solution:\n</think>\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\n---</think>---\nSomething else"}, output: {generation: "My solution:\n---</think>---\nSomething else"}}
+          - {input: {generation: "<think>My solution:\n\nSomething else"}, output: null}
           - {input: {generation: "<think>thinking</think>summary"}, output: {generation: "<think>thinking</think>summary"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
