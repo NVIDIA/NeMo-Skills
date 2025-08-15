@@ -327,7 +327,7 @@ class WriteFinalSftManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config:
+        if prompt_config and tokenizer:
             self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
             if tokenizer:
@@ -412,7 +412,7 @@ class WriteFinalRLManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config:
+        if prompt_config and tokenizer:
             self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
             if tokenizer:

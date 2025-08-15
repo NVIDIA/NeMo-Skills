@@ -159,8 +159,6 @@ def ns_data_processor(
     prompt_spec = task_data_spec.prompt_spec
     extra_env_info = copy.deepcopy(datum_dict)
 
-    message_log: LLMMessageLogType = []
-
     prompt = get_prompt(
         prompt_config=prompt_spec["prompt_config"],
         tokenizer=tokenizer,
@@ -168,9 +166,16 @@ def ns_data_processor(
         config_dir=prompt_spec["config_dir"],
         template_dir=prompt_spec["template_dir"],
     )
+    # it's ok to include system message here as roles are only used for masking
+    # so prompt.fill can return a combined system + user message
     user_message = prompt.fill(datum_dict)
-
-    message_log[0]["token_ids"] = tokenizer([user_message], return_tensors="pt")["input_ids"][0]
+    message_log = [
+        {
+            'role': 'user',
+            'content': user_message,
+            'token_ids': tokenizer([user_message], return_tensors="pt")["input_ids"][0],
+        }
+    ]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 
