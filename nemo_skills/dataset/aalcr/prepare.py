@@ -40,7 +40,7 @@ ns prepare_data \
 
 def count_n_tokens(prompt: str, tokenizer_name: str) -> int:
     """
-    count tokens with tokenizer, default is o200k_base. You can use other tokenizers with AutoTokenizer
+    count tokens with tokenizer, default is cl100k_base. You can use other tokenizers with AutoTokenizer
     """
     enc = tiktoken.get_encoding(tokenizer_name)
     return len(enc.encode(prompt))
@@ -76,7 +76,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
             entry[f'n_tokens_{tokenizer_name}'] = n_tokens
             entry['question'] = question
             entry['expected_answer'] = entry.pop('answer')
-            
+            print(f'n_tokens_{tokenizer_name} - input_tokens: {n_tokens - entry["input_tokens"]}')
             json.dump(entry, fout)
             fout.write("\n")
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--tokenizer_name",
         type=str,
-        default="o200k_base",
+        default="cl100k_base",
         help="tokenizer name",
     )
     
