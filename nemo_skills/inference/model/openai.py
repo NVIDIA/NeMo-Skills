@@ -107,9 +107,19 @@ class OpenAIModel(BaseModel):
         # NOTE: added by me, for Response API
         instructions, messages = self._convert_to_response_api_format(messages)
 
+        # params = {
+        #     "messages": messages,
+        #     "seed": random_seed,
+        #     "stop": stop_phrases or None,
+        #     "timeout": timeout,
+        #     "stream": stream,
+        #     "tools": tools,
+        # }
+
+        # NOTE: added by me, for Response API
         params = {
-            "instructions": instructions, # NOTE: added by me, for Response API
-            "messages": messages,
+            "instructions": instructions, 
+            "input": messages,            
             "seed": random_seed,
             "stop": stop_phrases or None,
             "timeout": timeout,
