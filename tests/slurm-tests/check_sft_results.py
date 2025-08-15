@@ -72,8 +72,6 @@ def main():
     ws = args.workspace.rstrip("/")
     baseline_metric = args.baseline_path or os.path.join(ws, "evals", "baseline", "eval-results", "metrics.json")
     after_metric = args.after_path or os.path.join(ws, "evals", "after-training", "eval-results", "metrics.json")
-    print('baseline file', baseline_metric)
-    print('after file', after_metric)
     # Load both JSON files
     baseline = load_json(baseline_metric)
     after = load_json(after_metric)
