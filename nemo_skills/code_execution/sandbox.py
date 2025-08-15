@@ -186,9 +186,6 @@ class Sandbox(abc.ABC):
         traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-        if session_id is None and language == "ipython":  # creating a new session with empty state
-            session_id = uuid.uuid4()
-
         if language in ["python", "pypy3", "python3", "lean4"] and session_id is not None:
             raise RuntimeError(
                 f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
@@ -198,16 +195,23 @@ class Sandbox(abc.ABC):
         if language != "ipython" and traceback_verbosity != "Plain":
             raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
+        request_session_id = session_id
+        if request_session_id is None and language == "ipython":  # creating a new session with empty state
+            request_session_id = uuid.uuid4()
+
         TO_EXECUTE = generated_code
         request = self._prepare_request(
             TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
         )
-        request['session_id'] = session_id if session_id is None else str(session_id)
+        request['session_id'] = request_session_id if request_session_id is None else str(request_session_id)
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-        return output, session_id
+        new_session_created = output.pop("new_session_created", False)
+        if session_id is not None and new_session_created:
+            raise RuntimeError(f"Session {session_id} not found on the worker; a new one was created unexpectedly.")
+        return output, request_session_id
 
     async def is_proof_correct(self, pred_output, timeout=30.0):
         TO_EXECUTE = pred_output

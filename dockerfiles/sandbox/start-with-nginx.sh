@@ -167,7 +167,7 @@ EOF
     echo "Created custom uwsgi config for worker $i (HTTP unix socket ${SOCKET_PATH})"
 
     # Start worker with custom config - NO DELAY between workers
-    cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini > /var/log/worker${i}.log 2>&1 &
+    cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini &
 
     WORKER_PID=$!
     WORKER_PIDS+=($WORKER_PID)

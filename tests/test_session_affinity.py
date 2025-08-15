@@ -21,8 +21,10 @@ import random
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
 import pytest
 import requests
 
@@ -34,14 +36,14 @@ class SessionAffinityTester:
         self.base_url = base_url
         self.lock = threading.Lock()
 
-    def execute_code(self, code, session_id, timeout=30):
+    def execute_code(self, code, session_id, timeout=30, language='ipython'):
         """Execute code with session and return result with timing info"""
         start_time = time.time()
         try:
             payload = {
                 "generated_code": code,
                 "timeout": timeout,
-                "language": "ipython",
+                "language": language,
             }
 
             headers = {
@@ -171,7 +173,7 @@ except Exception as e:
 
         return operations, True, "All operations successful"
 
-    def get_worker_info(self, session_id=None):
+    def get_worker_info(self, session_id=None, language='ipython'):
         """Get worker info by executing code that reveals worker details"""
         code = """
 import os
@@ -185,7 +187,7 @@ print(f"WORKER_INFO: port={worker_port}, num={worker_num}, pid={process_id}")
         if session_id:
             headers["X-Session-ID"] = session_id
 
-        result = self.execute_code(code, session_id)  # Will use headers via execute_code
+        result = self.execute_code(code, session_id, language=language)  # Will use headers via execute_code
 
         # For session requests, we get JSON response with stdout
         if result.get('process_status') == 'completed':
@@ -416,7 +418,7 @@ except NameError:
         num_requests = 20
 
         for i in range(num_requests):
-            worker_info = tester.get_worker_info(session_id=None)  # No session_id
+            worker_info = tester.get_worker_info(session_id=None, language='python')  # No session_id
             if worker_info and 'port' in worker_info:
                 workers_hit.add(worker_info['port'])
             time.sleep(0.05)
@@ -529,6 +531,45 @@ except NameError:
                 assert "created" in session_info
                 assert "last_used" in session_info
                 assert "alive" in session_info
+
+    def test_load_balancing(self, server_health_check):
+        """Test that requests without session ID are distributed across multiple workers"""
+        num_requests = 2560
+        workers = []
+        for _ in range(num_requests):
+            resp = requests.get(f"{BASE_URL}/health")
+            assert resp.status_code == 200
+            workers.append(resp.json()['worker'])
+        unique_workers = set(workers)
+        assert len(unique_workers) > 1, f"All requests went to the same worker: {unique_workers}"
+        counts = Counter(workers)
+
+        # Check for and identify the full range of active workers
+        int_keys = sorted(int(k) for k in counts if k != 'unknown')
+        min_key = min(int_keys)
+        max_key = max(int_keys)
+        expected_keys = list(range(min_key, max_key + 1))
+        assert len(int_keys) == len(
+            expected_keys
+        ), f"Gaps in worker numbers: missing {set(expected_keys) - set(int_keys)}"
+
+        # Chi-Squared Goodness-of-Fit Test
+        num_workers = len(expected_keys)
+        observed_counts = np.array(list(counts.values()))
+        expected_count = num_requests / num_workers
+
+        # The chi-squared statistic measures the deviation from the expected distribution
+        chi2_stat = np.sum((observed_counts - expected_count) ** 2 / expected_count)
+
+        degrees_of_freedom = num_workers - 1
+        z_score = 3.0902  # z-score for p-value = 0.001
+        critical_value = 0.5 * (z_score + np.sqrt(2 * degrees_of_freedom - 1)) ** 2
+        assert chi2_stat <= critical_value, (
+            f"Uneven distribution of jobs across uwsgi workers. "
+            f"Observed counts: {sorted(counts.items())} (min={np.min(observed_counts)}, max={np.max(observed_counts)}, avg={expected_count:.1f}). "
+            f"Chi-squared statistic ({chi2_stat:.2f}) > Critical Value ({critical_value:.2f}) "
+            f"for {degrees_of_freedom} degrees of freedom at p={p_value_threshold}."
+        )
 
 
 if __name__ == "__main__":
