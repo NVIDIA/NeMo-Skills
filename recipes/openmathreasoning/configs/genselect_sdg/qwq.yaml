@@ -106,6 +106,7 @@ stages:
     input_file: ${directories.step-5-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-6-prepare-sft}
     prompt_config: openmath/genselect
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
 
     dependencies:

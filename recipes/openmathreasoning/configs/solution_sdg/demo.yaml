@@ -71,6 +71,7 @@ stages:
     output_dir: ${directories.step-4-prepare-sft}
     input_file: ${directories.step-3-judge-answers}/output-rs*.jsonl
     prompt_config: generic/math
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
     dependencies:
       - judge_answers

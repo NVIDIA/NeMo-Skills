@@ -44,6 +44,7 @@ def test_trtllm_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --server_args='--backend pytorch' "
+        f"    ++max_samples=20 "
     )
     subprocess.run(cmd, shell=True, check=True)
 

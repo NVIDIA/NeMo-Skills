@@ -144,6 +144,7 @@ stages:
     input_file: ${directories.step-7-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-8-prepare-sft}
     prompt_config: openmath/tir
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     code_tags: openmath
     contamination_file: ${contamination_file}
     dependencies:
