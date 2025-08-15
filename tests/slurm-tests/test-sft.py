@@ -15,5 +15,5 @@ run_cmd(
     ctx=wrap_arguments(cmd),
     cluster=cluster,
     expname=f"download-assets",
-    log_dir=f"{workspace}/",
+    log_dir=f"{workspace}/logs",
 )
