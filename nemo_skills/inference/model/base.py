@@ -156,11 +156,15 @@ class BaseModel:
         }
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            # response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            # NOTE: added by me, for response API
+            response = await litellm.aresponses(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_chat_chunks_async(response)
             else:
-                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
+                # result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
+                # NOTE: added by me, for response API
+                result = self._parse_response_api_response(response, include_response=include_response, **kwargs)
 
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -293,6 +297,52 @@ class BaseModel:
         if include_response:
             result["response"] = response
 
+        return result
+
+    def _parse_response_api_response(self, response, include_response: bool = False, **kwargs) -> dict:
+        """
+        # NOTE: added by me, for response API
+        Extract both output text and reasoning traces from OpenAI Response API.
+        
+        Args:
+            response: OpenAI Response API response object
+            
+        Returns:
+            dict: Contains 'output_text' and 'reasoning_traces'
+        """
+        result = {
+            'generation': "",
+            'reasoning_content': "",
+            "num_generated_tokens": 0,
+        }
+        
+        # Iterate through all items in response.output
+        for item in response.output:
+            # Extract reasoning traces from ResponseReasoningItem
+            if hasattr(item, 'type') and item.type == 'reasoning':
+                if hasattr(item, 'content') and item.content:
+                    # only extract the 1st content item
+                    content_item = item.content[0]
+                    if hasattr(content_item, 'text'): 
+                        result['reasoning_content'] = content_item.text
+            
+            # Extract output text from ResponseOutputMessage
+            elif hasattr(item, 'type') and item.type == 'message':
+                if hasattr(item, 'content') and item.content:
+                    # only extract the 1st content item
+                    content_item = item.content[0]
+                    if hasattr(content_item, 'text'): 
+                        result['generation'] = content_item.text
+
+        if hasattr(response, 'status'):
+            result['finish_reason'] = response.status
+
+        if include_response:
+            result["response"] = response
+
+        if hasattr(response, 'usage'):
+            result['num_generated_tokens'] = response.usage.output_tokens
+        
         return result
 
     def _process_completion_chunk(self, chunk, emitted_so_far: list):

@@ -104,7 +104,11 @@ class OpenAIModel(BaseModel):
         if stream and top_logprobs is not None:
             raise ValueError("`top_logprobs` is not supported with stream=True.")
 
+        # NOTE: added by me, for Response API
+        instructions, messages = self._convert_to_response_api_format(messages)
+
         params = {
+            "instructions": instructions, # NOTE: added by me, for Response API
             "messages": messages,
             "seed": random_seed,
             "stop": stop_phrases or None,
@@ -148,3 +152,22 @@ class OpenAIModel(BaseModel):
             params["top_p"] = top_p
 
         return params
+
+    def _convert_to_response_api_format(self, messages):
+        # NOTE: added by me
+        """
+        Given a list of messages in Chat API format,
+        returns (instructions, filtered_messages) so that is compatible with Response API.
+        If no system message is found, instructions = "".
+        """
+        instructions = ""
+        filtered = []
+        
+        for msg in messages:
+            if msg.get("role") == "system" and not instructions:
+                instructions = msg.get("content", "")
+            else:
+                filtered.append(msg)
+        
+        return instructions, filtered
+
