@@ -21,12 +21,12 @@ class IOIMetrics(BaseMetrics):
         self.reset()
 
     def update(self, predictions):
-        if len(predictions) > 1:
-            self.max_k = len(predictions)
-            self.agg_mode = f"pass@{len(predictions)}"
+        super().update(predictions)
+        self.max_k = len(predictions)
+        if self.max_k == 1:
+            self.agg_mode = "pass@1"
         else:
-            self.max_k = 0
-            self.agg_mode = "greedy"
+            self.agg_mode = f"pass@{self.max_k}"
         for pred in predictions:
             problem_name = pred["name"]
             self.predictions_by_problem[problem_name].append(pred)
@@ -102,5 +102,5 @@ class IOIMetrics(BaseMetrics):
         }
 
     def reset(self):
-        # Store predictions grouped by problem name.
+        super().reset()
         self.predictions_by_problem = defaultdict(list)
