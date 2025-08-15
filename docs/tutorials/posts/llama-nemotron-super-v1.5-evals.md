@@ -258,7 +258,7 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 ```
 
 !!! note
-    Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json` using an LLM.  
+    Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.  
 
 
 
