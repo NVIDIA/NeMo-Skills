@@ -17,6 +17,11 @@ from pathlib import Path
 
 from datasets import load_dataset
 
+
+class PromptConstants:
+    FORMATTING_WITHOUT_STARTER_CODE = "Read the inputs from stdin solve the problem and write the answer to stdout (do not directly test on the sample inputs). Enclose your code within delimiters as follows. Ensure that when the python program runs, it reads the inputs, runs the algorithm and writes output to STDOUT."
+
+
 if __name__ == '__main__':
     data_dir = Path(__file__).absolute().parent
     output_file = str(data_dir / f"test.jsonl")
@@ -27,5 +32,7 @@ if __name__ == '__main__':
             for row in split:
                 row['task_id'] = row.pop('problem_id')
                 row['question'] = row.pop('problem_statement')
+                row["formatting_message"] = PromptConstants.FORMATTING_WITHOUT_STARTER_CODE
+                row["starter_code"] = "```python\n# YOUR CODE HERE\n```\n\n"
                 row['split'] = split_name
                 f.write(json.dumps(row) + '\n')

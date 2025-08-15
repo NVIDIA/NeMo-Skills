@@ -1,0 +1,11 @@
+# src: https://github.com/LiveCodeBench/LiveCodeBench/blob/main/lcb_runner/prompts/code_generation.py#L155
+
+system: ""
+
+user: |-
+  You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.
+
+  Question: {question}
+
+  {formatting_message}
+  {starter_code}
