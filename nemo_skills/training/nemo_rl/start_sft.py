@@ -18,9 +18,10 @@ import argparse
 import os
 import pprint
 from functools import partial
-from typing import Any, Dict
 from pathlib import Path
+from typing import Any, Dict
 
+from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig, hf_datasets
@@ -32,7 +33,7 @@ from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 from omegaconf import OmegaConf
 from transformers import AutoTokenizer
-from datasets import load_dataset, load_from_disk, Dataset
+
 
 class PromptResponseDataset:
     def __init__(
@@ -102,7 +103,6 @@ class PromptResponseDataset:
         }
 
 
-
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run SFT training with configuration")
@@ -146,6 +146,8 @@ def sft_preprocessor(
             message["token_ids"] = message["token_ids"][: min(4, max_seq_length // len(message_log))]
         loss_multiplier = 0.0
 
+    print(message_log)
+
     output = {
         "message_log": message_log,
         "length": length,
@@ -158,29 +160,17 @@ def sft_preprocessor(
 
 def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     print("\n▶ Setting up data...")
-    data_cls = data_config["dataset_name"]
-    if data_cls == "open_assistant":
-        data = hf_datasets.OasstDataset(output_dir="/tmp/open_assistant")
-    elif data_cls == "squad":
-        data = hf_datasets.SquadDataset()
-    elif data_cls == "prompt_response_dataset":
-        data = PromptResponseDataset(
-            data_config["train_data_path"],
-            data_config["val_data_path"],
-            data_config["input_key"],
-            data_config["output_key"],
-            force_reprocess=data_config.get("force_reprocess", False),
-        )
-    elif data_cls == "openmathinstruct2":
-        data = hf_datasets.OpenMathInstruct2Dataset(
-            split=data_config["split"],
-            output_key=data_config["output_key"],
-            prompt_file=data_config["prompt_file"],
-        )
-    else:
-        raise ValueError(f"Unknown dataset class: {data_cls}")
+    assert data_config["dataset_name"] == 'prompt_response_dataset'
+    data = PromptResponseDataset(
+        data_config["train_data_path"],
+        data_config["val_data_path"],
+        data_config["input_key"],
+        data_config["output_key"],
+        force_reprocess=data_config.get("force_reprocess", False),
+    )
     print(
-        f"  ✓ Training and validation datasets loaded with {len(data.formatted_ds['train'])} and {len(data.formatted_ds['validation'])} samples, respectively."
+        f"  ✓ Training and validation datasets loaded with {len(data.formatted_ds['train'])} and "
+        f"{len(data.formatted_ds['validation'])} samples, respectively."
     )
 
     train_dataset = data.formatted_ds["train"]
@@ -206,8 +196,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         sft_task_spec,
         partial(
             sft_preprocessor,
-            add_bos=data_config.get("add_bos", True),
-            add_eos=data_config.get("add_eos", True),
+            add_bos=data_config["add_bos"],
+            add_eos=data_config["add_eos"],
             add_generation_prompt=data_config["add_generation_prompt"],
         ),
         max_seq_length=data_config["max_input_seq_length"],
@@ -230,7 +220,7 @@ def main():
     if overrides:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
-        
+
     OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
