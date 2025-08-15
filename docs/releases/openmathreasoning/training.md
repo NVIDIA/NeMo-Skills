@@ -259,7 +259,7 @@ def apply_format(elem, prompt, is_tir):
         elem['input'] = prompt.fill({'problem': elem['input'], 'total_code_executions': total_code_executions})
     else:
         elem['input'] = prompt.fill({'problem': elem['input']})
-    elem['output'] += prompt.add_assistant_end_suffix(elem['output'])
+    elem['output'] = prompt.add_assistant_end_suffix(elem['output'])
     return elem
 
 def filter_func(example, inference_mode):

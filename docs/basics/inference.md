@@ -39,13 +39,13 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     prompt_obj = get_prompt('generic/default') # (1)!
     prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
     print(prompt) # (2)!
-    output = llm.generate(prompt=prompt)
+    output = llm.generate_sync(prompt=prompt)
     print(output["generation"]) # (3)!
     ```
 
     1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
@@ -90,7 +90,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
@@ -125,7 +125,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     )
     prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
     print(prompt) # (3)!
-    output = llm.generate_sync(prompt=prompt, **prompt.get_code_execution_args()) # (4)!
+    output = await llm.generate_async(prompt=prompt, **prompt.get_code_execution_args()) # (4)!
     print(output["generation"]) # (5)!
     ```
 
@@ -133,7 +133,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          Note how we are updating system message on the next line (you can also include it in the config directly).
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
     2.   8B model doesn't always follow these instructions, so using 70B or 405B for code execution is recommended.
