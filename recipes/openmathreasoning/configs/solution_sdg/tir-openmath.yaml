@@ -70,7 +70,7 @@ stages:
       # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
       model: openai/gpt-oss-120b
-      server_type: openai
+      server_type: vllm
       server_address: http://localhost:8000/v1
       num_random_seeds: ${num_random_seeds_to_generate}
       # num_chunks: 10  # since data is big, we are parallelizing it 10x (for each seed, so in total 80 jobs are scheduled)
