@@ -1,12 +1,12 @@
 ---
-date: 2025-08-12
-readtime: 20 # TODO: Revisit this number
+date: 2025-08-15
+readtime: 15 
 ---
 
 # Reproducing Llama-Nemotron-Super-49B-V1.5 Evals 
 
 In this tutorial, we will reproduce the evals for the Llama-3.3-Nemotron-Super-49B-v1.5 model using NeMo-Skills.
-For an introduction to the NeMo-Skills framework, we recommed going over [our introductory tutorial](./omr-simple-recipe.md).
+For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](./omr-simple-recipe.md).
 
 
 We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
@@ -128,7 +128,7 @@ ns eval \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message='' \
+    ++system_message=''
 ```
 
 !!! note
@@ -138,27 +138,26 @@ ns eval \
     If the OpenAI API throws the `Rate limit exceeded` error, please reduce the `max_concurrent_requests` value in the `extra_judge_args` argument and restart the job.
 
 
-### Command for BFCL Eval (Reasoning on)
+#### Command for BFCL Eval (Reasoning on)
 
 Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
 ```bash hl_lines="13-17"
 ns eval \
-  --cluster=local \
-  --benchmarks=bfcl_v3 \
-  --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
-  --server_gpus=8 \
-  --server_type=vllm \
-  --num_jobs=1 \
-  --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
-  ++inference.tokens_to_generate=65536 \
-  ++inference.temperature=0.6 \
-  ++inference.top_p=0.95 \
-  ++system_message='' \
-  ++use_client_parsing=False \
-  --server_args="--tool-parser-plugin \"/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/llama_nemotron_toolcall_parser_no_streaming.py\" \
-                 --tool-call-parser \"llama_nemotron_json\" \
-                 --enable-auto-tool-choice"
-
+    --cluster=local \
+    --benchmarks=bfcl_v3 \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --server_gpus=8 \
+    --server_type=vllm \
+    --num_jobs=1 \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++system_message='' \
+    ++use_client_parsing=False \
+    --server_args="--tool-parser-plugin \"/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/llama_nemotron_toolcall_parser_no_streaming.py\" \
+                    --tool-call-parser \"llama_nemotron_json\" \
+                    --enable-auto-tool-choice"
 ```
 
 
@@ -195,6 +194,9 @@ pass@1[avg-of-15] | 2158        | 12111      | 7782        | 7.75%         | 2.4
 majority@15       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
 pass@15           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
 ```
+
+!!!note
+    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.    
 
 
 #### Results for Code Reasoning benchmarks (Reasoning on)
@@ -258,3 +260,181 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
     Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json` using an LLM.  
 
 
+
+### Reasoning-off Evals
+
+For the non-reasoning mode evals, we follow the recommended recipe of setting: 
+
+- temperature to 0.0
+- top-p to 1.0
+- system_message to '/no_think'
+- keep the maximum number of generated tokens to 65536 
+
+#### Command for Math, Code, and Science Reasoning Eval (Reasoning off)
+
+The following command evaluates the model on GPQA, MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
+
+
+```bash hl_lines="10-13"
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+    --server_gpus=8 \
+    --num_jobs=1 \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+For LiveCodeBench, the command is:
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=livecodebench:16 \
+    --split=test_v5_2410_2502 \
+    --server_gpus=8 \
+    --num_jobs=1 \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+#### Command for HLE Eval (Reasoning off)
+
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=hle:16 \
+    --server_gpus=8 \
+    --num_jobs=1 \
+    --judge_model="o3-mini-20250131" \
+    --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+#### Command for BFCL Eval (Reasoning off)
+
+```bash
+ns eval \
+    --cluster=local \
+    --benchmarks=bfcl_v3 \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --server_gpus=8 \
+    --server_type=vllm \
+    --num_jobs=1 \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off_tool_calling/ \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think' \
+    ++use_client_parsing=False \
+    --server_args="--tool-parser-plugin \"/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/llama_nemotron_toolcall_parser_no_streaming.py\" \
+                   --tool-call-parser \"llama_nemotron_json\" \
+                   --enable-auto-tool-choice"
+```
+
+
+### Reasoning-off Results
+
+
+We use the `summarize_results` on the reasoning_off results directory as follows:
+
+```bash
+ns summarize_results --cluster=local /workspace/llama_nemotron_49b_1_5_reasoning_off/eval-results/{BENCHMARK}
+```
+
+
+#### Results for Science & General Reasoning benchmarks (Reasoning off)
+
+```
+------------------------------------------ gpqa -----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-16] | 198         | 853        | 1552        | 51.61%           | 0.25%
+majority@16       | 198         | 853        | 1552        | 52.53%           | 0.00%
+pass@16           | 198         | 853        | 1552        | 74.75%           | 0.00%
+
+---------------------------------------- mmlu-pro ---------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-16] | 12032       | 625        | 5684        | 69.19%           | 0.34%
+majority@16       | 12032       | 625        | 5684        | 69.94%           | 0.01%
+pass@16           | 12032       | 625        | 5684        | 77.67%           | 0.01%
+
+-------------------------------------------------- hle --------------------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
+pass@1[avg-of-16] | 2158        | 1349       | 2667        | 3.92%         | 1.30%            | 59.09%
+majority@16       | 2158        | 1349       | 2667        | 1.53%         | 1.44%            | 47.03%
+pass@16           | 2158        | 1349       | 2667        | 12.09%        | 3.29%            | 47.03%
+```
+
+
+#### Results for Code Reasoning benchmarks (Reasoning off)
+
+```
+--------------------------- livecodebench ---------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1[avg-of-16] | 166         | 609        | 1156        | 29.89%
+pass@16           | 166         | 609        | 1156        | 33.73%
+
+--------------------------------------------------- scicode ----------------------------------------------------
+evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
+pass@1[avg-of-16] | 3067       | 66547       | 0.00%            | 19.44%           | 65           | 288
+pass@16           | 3067       | 66547       | 0.00%            | 29.51%           | 65           | 288
+```
+
+#### Results for Math Reasoning benchmarks (Reasoning off)
+
+```
+---------------------------------------- math-500 ---------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-16] | 500         | 765        | 1185        | 75.55%           | 0.26%
+majority@16       | 500         | 765        | 1185        | 76.00%           | 0.00%
+pass@16           | 500         | 765        | 1185        | 84.00%           | 0.00%
+
+----------------------------------------- aime24 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-16] | 30          | 3611       | 1165        | 16.88%           | 3.75%
+majority@16       | 30          | 3611       | 1165        | 16.67%           | 0.00%
+pass@16           | 30          | 3611       | 1165        | 33.33%           | 0.00%
+
+----------------------------------------- aime25 ----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-16] | 30          | 1720       | 1149        | 5.42%            | 1.25%
+majority@16       | 30          | 1720       | 1149        | 6.67%            | 0.00%
+pass@16           | 30          | 1720       | 1149        | 10.00%           | 0.00%
+```
+
+#### Results for Tool Calling  (Reasoning off)
+
+
+```
+----------------------- bfcl_v3 ------------------------
+| Category                    | num_entries | accuracy |
+|-----------------------------|-------------|----------|
+| overall_accuracy            | 4441        | 68.52%   |
+| overall_non_live            | 1390        | 87.55%   |
+| non_live_ast                | 1150        | 87.35%   |
+| irrelevance                 | 240         | 88.33%   |
+| overall_live                | 2251        | 81.87%   |
+| live_ast                    | 1351        | 79.79%   |
+| live_irrelevance            | 882         | 85.60%   |
+| live_relevance              | 18          | 55.56%   |
+| overall_multi_turn          | 800         | 36.13%   |
+```
+
+The reasoning-on vs reasoning-off comparison shows inference-time scaling's impact: higher accuracy at the cost of more tokens and longer generation times.
