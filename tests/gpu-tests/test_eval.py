@@ -199,6 +199,7 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++max_samples=2 "
+        f"    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct "
         f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
