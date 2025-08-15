@@ -321,6 +321,21 @@ async def test_lean4_mathlib_code_execution():
     assert expected_output == output["stdout"], f"Expected the output to include '{expected_output}'"
     assert output["stderr"] == "", "Expected no error output"
 
+@pytest.mark.asyncio
+async def test_shell_code_execution():
+    sandbox = _get_sandbox()
+
+    # Test case for shell code
+    correct_code_shell = """echo "Hello, World!"""
+    expected_output = "Hello, World!\n"
+
+    output, session_id = await sandbox.execute_code(correct_code_shell, language="shell")
+
+    # Assertions for the shell code
+    assert session_id == None
+    assert output["process_status"] == 'completed', "Expected the process to complete successfully"
+    assert expected_output in output["stdout"], f"Expected the output to include '{expected_output}'"
+    assert output["stderr"] == "", "Expected no error output"
 
 @pytest.mark.asyncio
 async def test_lean4_code_execution_failure():
