@@ -16,5 +16,12 @@
 PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'long-context'
 METRICS_TYPE = "aalcr"
-EVAL_ARGS = ""
+EVAL_ARGS = "++eval_type=math"
 GENERATION_ARGS = ""
+JUDGE_PIPELINE_ARGS = {
+    "model": "/hf_models/Qwen3-235B-A22B-Thinking-2507",
+    "server_type": "sglang",
+    "server_gpus": "8",
+}
+JUDGE_ARGS = "++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False"
+

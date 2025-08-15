@@ -28,6 +28,7 @@ from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
 from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
 from nemo_skills.evaluation.metrics.mrcr_metrics import MRCRMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
+from nemo_skills.evaluation.metrics.aalcr_metrics import AALCRMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
@@ -46,6 +47,7 @@ METRICS_MAP = {
     "swe-bench": SweBenchMetrics,
     "scicode": SciCodeMetrics,
     "mrcr": MRCRMetrics,
+    "aalcr": AALCRMetrics,
 }
 
 
