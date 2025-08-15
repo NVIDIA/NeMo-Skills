@@ -107,12 +107,8 @@ def format_passthrough(data):
 
 def prepare_math_dataset(split_ds):
     # Format the examples, removing original columns
-    train_formatted = split_ds["train"].map(
-        format_passthrough,
-    )
-    val_formatted = split_ds["validation"].map(
-        format_passthrough,
-    )
+    train_formatted = split_ds["train"].map(format_passthrough)
+    val_formatted = split_ds["validation"].map(format_passthrough)
 
     return {
         "train": train_formatted,
@@ -165,8 +161,9 @@ def ns_data_processor(
         examples_type=prompt_spec["examples_type"],
         config_dir=prompt_spec["config_dir"],
     )
-    # it's ok to include system message here as roles are only used for masking
+    # we need to include system message here as roles are only used for masking
     # so prompt.fill can return a combined system + user message
+    # if we use separate, it will have double BOS in the tokens!
     user_message = prompt.fill(datum_dict)
     message_log = [
         {
