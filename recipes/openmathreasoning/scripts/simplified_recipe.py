@@ -146,18 +146,17 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
     elif training_backend == "nemo-rl":
         sft_nemo_rl(
             ctx=wrap_arguments(
-                '++sft.max_num_epochs=4 '  # training for a bit longer here
-                '++policy.dtensor_cfg.tensor_parallel_size=8 '
                 '++policy.max_total_sequence_length=8192 '
                 '++policy.train_global_batch_size=32 '
+                '++policy.megatron_cfg.tensor_model_parallel_size=4 '
+                '++policy.megatron_cfg.context_parallel_size=2 '
                 '++policy.optimizer.kwargs.lr=1e-5 '
-                '++policy.dtensor_cfg.sequence_parallel=true '
-                '++policy.dtensor_cfg.activation_checkpointing=true '
+                '++sft.max_num_epochs=2 '
             ),
             cluster=cluster,
             output_dir=f'{workspace}/training',
             hf_model=f'{workspace}/Qwen2.5-14B-Instruct',
-            backend="fsdp",
+            backend="megatron",
             num_gpus=num_gpus,
             num_nodes=1,
             disable_wandb=wandb_params['disable_wandb'],
