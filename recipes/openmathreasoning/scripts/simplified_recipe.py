@@ -66,7 +66,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
     generate(
-        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml "),
+        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml"),
         cluster=cluster,
         input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/sdg/problems",
@@ -84,7 +84,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
     generate(
         ctx=wrap_arguments(
-            f"++prompt_config=generic/math " f"++inference.temperature=0.6 " f"++inference.tokens_to_generate=8192 "
+            f"++prompt_config=generic/math ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "
         ),
         cluster=cluster,
         input_file=f"{workspace}/sdg/extracted-problems.jsonl",
