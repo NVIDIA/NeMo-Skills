@@ -1,10 +1,11 @@
 ---
 date: 2025-08-15
-readtime: 15 
+readtime: 15
+hide:
+  - toc
 ---
 
-
-# Reproducing Llama-Nemotron-Super-49B-V1.5 Evals 
+# Reproducing Llama-Nemotron-Super-49B-V1.5 Evals
 
 In this tutorial, we will reproduce the evals for the Llama-3.3-Nemotron-Super-49B-v1.5 model using NeMo-Skills.
 For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
@@ -17,14 +18,14 @@ executing all commands from that folder locally. Change all commands accordingly
 
 ## Download the model
 
-Get the model from HF.   
+Get the model from HF.
 ```bash
 pip install -U "huggingface_hub[cli]"
 huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
 ```
 
 !!!note
-     In most cases, we can define `HF_HOME` in the cluster config to a mounted directory, and refer to models by their huggingface names such as `nvidia/Llama-3_3-Nemotron-Super-49B-v1_5` in this case. However, in this example, we download the model to an explicit location because we rely on the tool parsing script which is part of the huggingface repo. Alternatively, users can download the model to the `HF_HOME` and separately download the [tool parsing script](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5/blob/main/llama_nemotron_toolcall_parser_no_streaming.py){target="_blank"} to another mounted location.  
+     In most cases, we can define `HF_HOME` in the cluster config to a mounted directory, and refer to models by their huggingface names such as `nvidia/Llama-3_3-Nemotron-Super-49B-v1_5` in this case. However, in this example, we download the model to an explicit location because we rely on the tool parsing script which is part of the huggingface repo. Alternatively, users can download the model to the `HF_HOME` and separately download the [tool parsing script](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5/blob/main/llama_nemotron_toolcall_parser_no_streaming.py){target="_blank"} to another mounted location.
 
 ## Prepare evaluation data
 
@@ -32,8 +33,8 @@ We will evaluate the model on the following:
 
 - Science & General reasoning benchmarks:
     - GPQA
-    - MMLU-Pro 
-    - HLE 
+    - MMLU-Pro
+    - HLE
 
 - Coding reasoning benchmarks
     - LiveCodeBench
@@ -51,29 +52,29 @@ We will evaluate the model on the following:
 Here is the command to prepare these datasets using NeMo-Skills:
 
 ```bash
-ns prepare_data gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25 
+ns prepare_data gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25
 ```
 
 
 ## Evaluation commands
 
-Llama-3.3-Nemotron-Super-49B-v1.5 can perform inference in both reasoning on and off modes. 
-We detail the evaluation commands and results for both the modes. 
-Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations. 
+Llama-3.3-Nemotron-Super-49B-v1.5 can perform inference in both reasoning on and off modes.
+We detail the evaluation commands and results for both the modes.
+Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations.
 
-!!! note 
-    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, by default we will run each benchmark and their random seeds as an independent job.  
+!!! note
+    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, by default we will run each benchmark and their random seeds as an independent job.
 
 
 
 ### Reasoning-on Evals
 
-For the reasoning mode evals, we follow the recommended recipe of setting: 
+For the reasoning mode evals, we follow the recommended recipe of setting:
 
 - temperature to 0.6
 - top-p to 0.95
 - system_message to empty i.e. ''
-- maximum number of generated tokens to 65536 
+- maximum number of generated tokens to 65536
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning on)
 
@@ -114,9 +115,9 @@ ns eval \
 #### Command for HLE Eval (Reasoning on)
 
 
-For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}. 
+For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
 
-Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/Llama-3_3-Nemotron-Super-49B-v1_5"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 2` will use the `Llama-3_3-Nemotron-Super-49B-v1_5` itself as a judge. 
+Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/Llama-3_3-Nemotron-Super-49B-v1_5"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 2` will use the `Llama-3_3-Nemotron-Super-49B-v1_5` itself as a judge.
 
 
 ```bash hl_lines="8-9"
@@ -136,7 +137,7 @@ ns eval \
 ```
 
 !!! note
-    For Llama-Nemotron-Super-49B-V1.5, we found that the difference in judge models can result in almost 0.8-1% performance difference. Our earlier experiments with GPT-4.1 as the judge was giving a performance of 6.8%. This can explain why [AAI reports a performance of 6.8%](https://artificialanalysis.ai/models/llama-nemotron-super-49b-v1-5-reasoning#intelligence-evaluations){target="_blank"} vs our reproduced performance of 7.75%.  
+    For Llama-Nemotron-Super-49B-V1.5, we found that the difference in judge models can result in almost 0.8-1% performance difference. Our earlier experiments with GPT-4.1 as the judge was giving a performance of 6.8%. This can explain why [AAI reports a performance of 6.8%](https://artificialanalysis.ai/models/llama-nemotron-super-49b-v1-5-reasoning#intelligence-evaluations){target="_blank"} vs our reproduced performance of 7.75%.
 
 !!! note
     If the OpenAI API throws the `Rate limit exceeded` error, please reduce the `max_concurrent_requests` value in the `extra_judge_args` argument and restart the job.
@@ -167,11 +168,11 @@ ns eval \
 
 ### Reasoning-on Results
 
-The eval jobs also launch a dependent job to perform metrics calculation and store the result in a file called `metrics.json`. 
-In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/llama_nemotron_49b_1_5/eval-results/aime25/metrics.json`. 
-This metrics calculation is done typically by the `summarize_results` pipeline, except in the case of BFCL where the metrics are calculated by a BFCL specific script because BFCL has a specific way of combining subtask accuracy to obtain the overall accuracy. 
+The eval jobs also launch a dependent job to perform metrics calculation and store the result in a file called `metrics.json`.
+In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/llama_nemotron_49b_1_5/eval-results/aime25/metrics.json`.
+This metrics calculation is done typically by the `summarize_results` pipeline, except in the case of BFCL where the metrics are calculated by a BFCL specific script because BFCL has a specific way of combining subtask accuracy to obtain the overall accuracy.
 
-To print the results for these benchmarks (except for BFCL), we could rerun the `summarize_results` script manually as follows: 
+To print the results for these benchmarks (except for BFCL), we could rerun the `summarize_results` script manually as follows:
 ```bash
 ns summarize_results --cluster=local /workspace/llama_nemotron_49b_1_5/eval-results/{BENCHMARK}
 ```
@@ -200,7 +201,7 @@ pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.
 ```
 
 !!!note
-    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.    
+    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
 
 
 #### Results for Code Reasoning benchmarks (Reasoning on)
@@ -261,18 +262,18 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 ```
 
 !!! note
-    Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.  
+    Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.
 
 
 
 ### Reasoning-off Evals
 
-For the non-reasoning mode evals, we follow the recommended recipe of setting: 
+For the non-reasoning mode evals, we follow the recommended recipe of setting:
 
 - temperature to 0.0
 - top-p to 1.0
 - system_message to '/no_think'
-- keep the maximum number of generated tokens to 65536 
+- keep the maximum number of generated tokens to 65536
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning off)
 
