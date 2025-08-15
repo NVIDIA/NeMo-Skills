@@ -106,9 +106,11 @@ def get_benchmark_args_from_module(
                 "Did you forget to run prepare data commands?"
             )
 
-    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", override_dict=override_dict)
+    # this is deprecated, should remove in the future
+    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", "", override_dict=override_dict)
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
-    generation_args = f"++prompt_config={prompt_config} {generation_args}"
+    if prompt_config:
+        generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
 
     generation_module = get_arg_from_module_or_dict(
@@ -134,6 +136,12 @@ def get_benchmark_args_from_module(
     if benchmark_group:
         eval_subfolder += f"{benchmark_group}/"
     eval_subfolder += benchmark
+
+    # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
+    # TODO: is there a better way to handle this?
+    if benchmark == "swe-bench" and cluster_config['executor'] == 'local':
+        LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
+        os.environ['NEMO_SKILLS_PRIVILEGED_DOCKER'] = '1'
 
     return BenchmarkArgs(
         name=benchmark,
@@ -228,7 +236,7 @@ def prepare_eval_commands(
     if generation_type is not None:
         if generation_module is not None:
             raise ValueError("Cannot specify both generation_module and generation_type. ")
-        
+
         generation_module = GENERATION_MODULE_MAP[generation_type]
 
     benchmarks_or_groups = {
