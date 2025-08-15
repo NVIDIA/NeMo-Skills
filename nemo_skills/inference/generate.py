@@ -178,7 +178,6 @@ class GenerateSolutionsConfig:
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
             assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
-            assert self.system_message is None, "system_message is not supported for prompt_format == 'openai'"
         else:
             assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
@@ -305,7 +304,7 @@ class GenerationTask:
 
         if self.cfg.prompt_format == "openai":
             # print the prompt in openai format
-            LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
+            LOG.info("Example prompt in OpenAI format: %s", self.fill_prompt(data_point, data))
             return
 
         if self.cfg.multi_turn_key is None:
@@ -388,6 +387,11 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
                 data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
+            if self.cfg.system_message:
+                if data_point["messages"][0]["role"] != "system":
+                    data_point["messages"].insert(0, {"role": "system", "content": self.cfg.system_message})
+                else:
+                    data_point["messages"][0]["content"] = self.cfg.system_message
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
