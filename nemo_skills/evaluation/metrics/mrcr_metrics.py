@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .factory import GenerationType, GENERATION_MODULE_MAP
+from nemo_skills.evaluation.metrics.base import BaseMetrics
 
-__all__ = ["GenerationType", "GENERATION_MODULE_MAP"]
+
+class MRCRMetrics(BaseMetrics):
+    """Metrics for MRCR (Multi-Round Coreference) evaluation."""
+    
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        return {"accuracy": prediction['seq_match_ratio']}
+
+    def update(self, predictions):
+        super().update(predictions)
+        self._compute_pass_at_k(predictions=predictions)

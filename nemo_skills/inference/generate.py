@@ -24,11 +24,17 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf, open_dict
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
+from nemo_skills.inference.model import (
+    OnlineGenSelectConfig,
+    get_code_execution_model,
+    get_model,
+    get_online_genselect_model,
+    server_params,
+)
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
     chunk_data,
@@ -123,6 +129,11 @@ class GenerateSolutionsConfig:
     # When True, total_code_executions_in_prompt override model defaults
     override_max_code_executions: bool = False
 
+    # set to True if online genselect is used
+    online_genselect: bool = False
+    # genselect config
+    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
+
     # extra stop phrases for llms
     extra_stop_phrases: list[str] = field(default_factory=list)
 
@@ -167,7 +178,6 @@ class GenerateSolutionsConfig:
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
             assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
-            assert self.system_message is None, "system_message is not supported for prompt_format == 'openai'"
         else:
             assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
@@ -249,7 +259,14 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        if self.cfg.online_genselect:
+            # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
+            self.semaphore = asyncio.Semaphore(
+                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
+            )
+        else:
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
@@ -257,6 +274,14 @@ class GenerationTask:
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+        elif self.cfg.online_genselect:
+            # Use the same prompt template for genselect as the one used for generation
+            self.cfg.online_genselect_config.prompt_template = self.cfg.prompt_template
+            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
+            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
+            llm = get_online_genselect_model(
+                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+            )
         else:
             llm = get_model(**self.cfg.server)
 
@@ -279,7 +304,7 @@ class GenerationTask:
 
         if self.cfg.prompt_format == "openai":
             # print the prompt in openai format
-            LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
+            LOG.info("Example prompt in OpenAI format: %s", self.fill_prompt(data_point, data))
             return
 
         if self.cfg.multi_turn_key is None:
@@ -362,6 +387,11 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
                 data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
+            if self.cfg.system_message:
+                if data_point["messages"][0]["role"] != "system":
+                    data_point["messages"].insert(0, {"role": "system", "content": self.cfg.system_message})
+                else:
+                    data_point["messages"][0]["content"] = self.cfg.system_message
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt
@@ -432,8 +462,7 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                max_code_executions_values = [data_point['total_code_executions']]
-                generation_params['max_code_executions'] = max_code_executions_values
+                generation_params['max_code_executions'] = data_point['total_code_executions']
 
         return await self.llm.generate_async(**generation_params)
 
