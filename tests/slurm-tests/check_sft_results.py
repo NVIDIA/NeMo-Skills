@@ -1,113 +1,147 @@
+# -*- coding: utf-8 -*-
 import argparse
 import json
 import os
 import sys
-from typing import Any, Dict
+from pathlib import Path
 
 
-def load_json(p: str):
-    """Load a JSON file from the given path."""
-    if not os.path.isfile(p):
-        raise FileNotFoundError(f"File not found: {p}")
-    with open(p, "r", encoding="utf-8") as f:
+def load_json(path):
+    """Load a JSON file from the given string path."""
+    if not os.path.isfile(path):
+        raise IOError("File not found: {}".format(path))
+    with open(path, "r") as f:
         return json.load(f)
 
 
-def _resolve_root(d: Dict[str, Any], bench_key: str) -> Dict[str, Any]:
-    """
-    Support two common JSON structures:
-      1) {"aime24": {...}, "aime25": {...}}
-      2) {"benchmarks": {"aime24": {...}, "aime25": {...}}}
-    Returns the dictionary corresponding to the given benchmark key.
-    """
-    if bench_key in d:
-        return d[bench_key]
-    if "benchmarks" in d and bench_key in d["benchmarks"]:
-        return d["benchmarks"][bench_key]
-    raise KeyError(f"Cannot find benchmark '{bench_key}'. Top-level keys: {list(d.keys())}")
+def fmt_pct(x, nd=2):
+    """Format a number as percentage text with a % sign (no scaling)."""
+    return "{0:.{1}f}%".format(x, nd)
 
 
-def get_metric(d: Dict[str, Any], bench_key: str, metric_path: str) -> float:
-    """
-    Retrieve a metric value from the JSON dictionary using a dot-path.
+def in_any_range(value, ranges):
+    """Return True if value is inside ANY (lo, hi) inclusive range."""
+    for lo, hi in ranges:
+        if lo <= value <= hi:
+            return True
+    return False
 
-    Example metric_path values:
-      - 'pass@1'
-      - 'pass@1[avg-of-8].symbolic_correct'
 
-    The dot-path is split on '.' and each part is used as a key
-    to navigate nested dictionaries.
+def get_aime_symbolic_avg8(d, bench_key):
     """
-    node: Any = _resolve_root(d, bench_key)
-    for part in metric_path.split("."):
-        if not isinstance(node, dict) or part not in node:
-            raise KeyError(
-                f"Cannot find metric path '{metric_path}' under '{bench_key}'. "
-                f"Missing key: '{part}'. Available keys: {list(node.keys()) if isinstance(node, dict) else type(node)}"
-            )
-        node = node[part]
+    Return float(d[bench_key]['pass@1[avg-of-8]']['symbolic_correct']).
+    The root JSON is expected to have benchmark keys at the top-level.
+    """
     try:
-        return float(node)
+        return float(d[bench_key]["pass@1[avg-of-8]"]["symbolic_correct"])
+    except KeyError as e:
+        raise KeyError("Missing key for {}.pass@1[avg-of-8].symbolic_correct".format(bench_key))
     except Exception as e:
-        raise ValueError(f"Metric not numeric for {bench_key}.{metric_path}: {node!r}") from e
+        raise ValueError("Non-numeric value at {}.pass@1[avg-of-8].symbolic_correct".format(bench_key))
+
+
+RANGE_CONSTRAINTS = {
+    "after_training": {
+        "aime24": [(20.0, 30.0)],
+        "aime25": [(17.5, 27.5)],
+    },
+    "baseline": {
+        "aime24": [(6.25, 16.25)],
+        "aime25": [(8.75, 18.75)],
+    },
+}
+
+
+def check_benchmark(benchmark, baseline_results, after_training_results):
+    lines = []
+
+    baseline_accuracy = get_aime_symbolic_avg8(baseline_results, benchmark)
+    after_training_accuracy = get_aime_symbolic_avg8(after_training_results, benchmark)
+
+    # Condition 1: strict improvement
+    improvement_pass = after_training_accuracy > baseline_accuracy
+
+    # Condition 2: after training accuracy in range (assume ranges exist)
+
+    after_training_ranges = RANGE_CONSTRAINTS["after_training"][benchmark]
+    after_training_in_range = in_any_range(after_training_accuracy, after_training_ranges)
+    after_training_range_status = "OK" if after_training_in_range else "FAIL"
+    after_training_range_desc = " OR ".join(
+        "[{},{}]".format(fmt_pct(lo), fmt_pct(hi)) for lo, hi in after_training_ranges
+    )
+
+    # Condition 3: baseline accuracy in range (assume ranges exist)
+
+    baseline_ranges = RANGE_CONSTRAINTS["baseline"][benchmark]
+    baseline_in_range = in_any_range(baseline_accuracy, baseline_ranges)
+    baseline_range_status = "OK" if baseline_in_range else "FAIL"
+    baseline_range_desc = " OR ".join("[{},{}]".format(fmt_pct(lo), fmt_pct(hi)) for lo, hi in baseline_ranges)
+
+    # Overall pass
+    overall_pass = improvement_pass and after_training_in_range and baseline_in_range
+    overall_status = "OK" if overall_pass else "FAIL"
+
+    # Print lines
+    lines.append("[check] --- {} ---".format(benchmark))
+    lines.append(
+        "[check] accuracy: after training={}, baseline={}".format(
+            fmt_pct(after_training_accuracy), fmt_pct(baseline_accuracy)
+        )
+    )
+    lines.append(
+        "[check] condition 1: improvement -> after training > baseline ({} > {})  RESULT={}".format(
+            fmt_pct(after_training_accuracy), fmt_pct(baseline_accuracy), "OK" if improvement_pass else "FAIL"
+        )
+    )
+    lines.append(
+        "[check] condition 2: after training accuracy in-range -> ranges {}  ACCURACY={}  RESULT={}".format(
+            after_training_range_desc, fmt_pct(after_training_accuracy), after_training_range_status
+        )
+    )
+    lines.append(
+        "[check] condition 3: baseline accuracy in-range -> ranges {}  ACCURACY={}  RESULT={}".format(
+            baseline_range_desc, fmt_pct(baseline_accuracy), baseline_range_status
+        )
+    )
+    lines.append("[check] RESULT: {}".format(overall_status))
+
+    return overall_pass, lines
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Compare after-training vs baseline metrics for AIME24/25.")
-    ap.add_argument("--workspace", required=True, help="Base workspace directory containing eval results.")
-    ap.add_argument("--baseline_path", default="", help="Optional explicit path to baseline metric.json")
-    ap.add_argument("--after_path", default="", help="Optional explicit path to after-training metric.json")
-    ap.add_argument(
-        "--benchmarks", default="aime24,aime25", help="Comma-separated benchmark keys, e.g. 'aime24,aime25'"
+    parser = argparse.ArgumentParser(
+        description="Compare after-training vs baseline metrics for AIME24/25 (metric fixed to pass@1[avg-of-8].symbolic_correct)."
     )
-    ap.add_argument(
-        "--metric",
-        default="pass@1[avg-of-8].symbolic_correct",
-        help="Dot-path to metric, e.g. 'pass@1' or 'pass@1[avg-of-8].symbolic_correct'",
-    )
-    ap.add_argument("--strict_increase", action="store_true", help="Require strict improvement (>) instead of >=.")
-    args = ap.parse_args()
+    parser.add_argument("--workspace", required=True, help="Base workspace directory containing eval results.")
+    args = parser.parse_args()
 
-    # Resolve default metric file paths
-    ws = args.workspace.rstrip("/")
-    baseline_metric = args.baseline_path or os.path.join(ws, "evals", "baseline", "eval-results", "metrics.json")
-    after_metric = args.after_path or os.path.join(ws, "evals", "after-training", "eval-results", "metrics.json")
-    # Load both JSON files
-    baseline = load_json(baseline_metric)
-    after = load_json(after_metric)
+    workspace = Path(args.workspace).expanduser()
+    baseline_metric_path = os.path.join(workspace, "evals", "baseline", "eval-results", "metrics.json")
+    after_training_metric_path = os.path.join(workspace, "evals", "after-training", "eval-results", "metrics.json")
 
-    # Parse benchmarks and metric path
-    benches = [b.strip() for b in args.benchmarks.split(",") if b.strip()]
-    metric_path = args.metric
+    baseline_results = load_json(baseline_metric_path)
+    after_training_results = load_json(after_training_metric_path)
 
-    all_ok = True
-    lines = []
-    for b in benches:
-        # Get values from both baseline and after-training
-        b_val = get_metric(baseline, b, metric_path)
-        a_val = get_metric(after, b, metric_path)
+    benchmarks = ["aime24", "aime25"]
 
-        # Check comparison rule
-        if args.strict_increase:
-            ok = a_val > b_val
-            cmp = ">"
-        else:
-            ok = a_val >= b_val
-            cmp = ">="
-        status = "OK" if ok else "FAIL"
-        lines.append(f"{status}: after[{b}.{metric_path}]={a_val:.6f} {cmp} baseline[{b}.{metric_path}]={b_val:.6f}")
-        if not ok:
-            all_ok = False
+    print("[check] baseline file: {}".format(baseline_metric_path))
+    print("[check] after training file: {}".format(after_training_metric_path))
+    print("[check] metric: pass@1[avg-of-8].symbolic_correct")
+    print("[check] rule: after training accuracy must be strictly greater than baseline accuracy")
 
-    # Print results
-    print(f"[check] baseline: {baseline_metric}")
-    print(f"[check] after-training: {after_metric}")
-    for ln in lines:
-        print("[check]", ln)
+    all_passed = True
+    for benchmark in benchmarks:
+        passed, lines = check_benchmark(benchmark, baseline_results, after_training_results)
+        for ln in lines:
+            print(ln)
+        if not passed:
+            all_passed = False
 
-    # Exit with error code if any check failed
-    if not all_ok:
+    if not all_passed:
+        print("[check] FINAL RESULT: FAIL — one or more benchmarks did not meet the criteria.")
         sys.exit(1)
+    else:
+        print("[check] FINAL RESULT: OK — all benchmarks passed.")
 
 
 if __name__ == "__main__":
