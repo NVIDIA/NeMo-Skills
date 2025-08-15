@@ -156,9 +156,11 @@ class BaseModel:
         }
         if isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
-            # NOTE: added by me, for response API
-            # response = await litellm.aresponses(**request_params, **self.litellm_kwargs)
+            # response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            # NOTE: added by me, for response API. Need to manually override model and api_base.
+            self.litellm_kwargs['model'] = "hosted_vllm/openai/gpt-oss-120b"
+            self.litellm_kwargs['api_base'] = "http://localhost:8000/v1"
+            response = await litellm.aresponses(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_chat_chunks_async(response)
             else:
