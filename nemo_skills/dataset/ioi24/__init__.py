@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'eval/ioi/codegen'
+PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'code'
 METRICS_TYPE = "ioi"
 EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi24"
