@@ -98,6 +98,14 @@ fi
 
 # Create log directory
 mkdir -p /var/log/nginx
+# Remove symlinks if present and create real log files
+rm -f /var/log/nginx/access.log /var/log/nginx/error.log
+touch /var/log/nginx/access.log /var/log/nginx/error.log
+chmod 644 /var/log/nginx/*.log
+
+# Mirror logs to stdout/stderr for docker logs
+tail -f /var/log/nginx/access.log &> /dev/stdout &
+tail -f /var/log/nginx/error.log &> /dev/stderr &
 
 # Start workers as background processes
 echo "Starting $NUM_WORKERS workers in parallel..."
@@ -277,6 +285,17 @@ done
 
 # Keep the container running and monitor
 echo "Monitoring processes (Ctrl+C to stop)..."
+monitor_load() {
+    echo "Starting worker load monitor (updates every 60s)..."
+    while true; do
+        sleep 60
+        echo "--- Worker Load Stats (Top 10) at $(date) ---"
+        grep "upstream:" /var/log/nginx/access.log | awk -F'upstream: ' '{print $2}' | awk -F' session: ' '{print $1}' | sort | uniq -c | sort -nr | head -n 10 || echo "No logs yet"
+        echo "--- End Stats ---"
+    done
+}
+monitor_load &  # Run in background
+
 while true; do
     # Check if any worker died
     for i in "${!WORKER_PIDS[@]}"; do
