@@ -164,9 +164,9 @@ class BaseModel:
             if stream:
                 result = self._stream_chat_chunks_async(response)
             else:
-                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
+                # result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
                 # NOTE: added by me, for response API
-                # result = self._parse_response_api_response(response, include_response=include_response, **kwargs)
+                result = self._parse_response_api_response(response, include_response=include_response, **kwargs)
 
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
