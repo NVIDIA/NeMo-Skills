@@ -35,7 +35,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 class SupportedAgentFrameworks(str, Enum):
-    swe_agent = "swe-agent"
+    swe_agent = "swe_agent"
     openhands = "openhands"
 
 
