@@ -164,7 +164,6 @@ def ns_data_processor(
         tokenizer=tokenizer,
         examples_type=prompt_spec["examples_type"],
         config_dir=prompt_spec["config_dir"],
-        template_dir=prompt_spec["template_dir"],
     )
     # it's ok to include system message here as roles are only used for masking
     # so prompt.fill can return a combined system + user message
