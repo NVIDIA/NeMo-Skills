@@ -20,9 +20,9 @@ from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_statement, eval_math
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
+from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
-from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
 
 
 def dummy_eval(cfg):
@@ -35,8 +35,7 @@ EVALUATOR_MAP = {
     'if': eval_if,
     'ifbench': eval_ifbench,
     'bfcl': eval_bfcl,
-    'arena': dummy_eval,
-    'answer_judgement': dummy_eval,
+    'no-op': dummy_eval,
     'lean4-proof': eval_lean4_proof,
     'lean4-statement': eval_lean4_statement,
     'multichoice': eval_mcq,

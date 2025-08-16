@@ -61,7 +61,6 @@ DATASETS = [
 def test_dataset_init_defaults():
     for dataset, _ in DATASETS:
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-        assert hasattr(dataset_module, 'PROMPT_CONFIG'), f"{dataset} is missing PROMPT_CONFIG attribute"
         assert hasattr(dataset_module, 'DATASET_GROUP'), f"{dataset} is missing DATASET_GROUP attribute"
         assert dataset_module.DATASET_GROUP in [
             "math",

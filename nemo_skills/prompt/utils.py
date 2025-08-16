@@ -284,6 +284,20 @@ class Prompt:
         return str(self.config)
 
 
+def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
+    if config_dir is None:
+        config_dir = str(Path(__file__).parent.absolute() / 'config')
+
+    if config.endswith(f".{config_extension}"):
+        config_path = Path(config).absolute()
+    elif config.startswith("nemo_skills"):
+        config_path = Path(__file__).parents[2].absolute() / f"{config}.{config_extension}"
+    else:
+        config_path = Path(config_dir) / f"{config}.{config_extension}"
+
+    return config_path
+
+
 def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     Reads the prompt config/template from the yaml file.
@@ -298,15 +312,7 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
     Returns:
         The loaded dictionary.
     """
-    if config_dir is None:
-        config_dir = str(Path(__file__).parent.absolute() / 'config')
-
-    if config.endswith(".yaml"):
-        config_path = Path(config).absolute()
-    elif config.startswith("nemo_skills"):
-        config_path = Path(__file__).parents[2].absolute() / f"{config}.yaml"
-    else:
-        config_path = Path(config_dir) / f"{config}.yaml"
+    config_path = get_config_path(config, config_dir)
 
     with open(config_path, "rt", encoding="utf-8") as fin:
         return yaml.safe_load(fin)
