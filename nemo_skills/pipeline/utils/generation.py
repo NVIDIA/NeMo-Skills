@@ -113,7 +113,9 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
                     if out:
                         outputs.append(out)
                 except Exception as inner_e:
-                    LOG.error(f"Failed to check file {i+j+1}/{total_files}: {inner_e}")
+                    error_msg = f"Failed to check file {i+j+1}/{total_files}: {inner_e}"
+                    LOG.error(error_msg)
+                    raise RuntimeError(f"{error_msg}. Unable to determine job status reliably.")
     
     output = "\n".join(outputs)
 
@@ -211,7 +213,7 @@ def get_generation_cmd(
         cmd += (
             f"    ++inference.random_seed={random_seed} "
             f"    ++inference.temperature=0.7 "
-            f"    ++inference.top_k=0 "
+            f"    ++inference.top_k=-1 "
             f"    ++inference.top_p=0.95 "
         )
 
@@ -341,7 +343,7 @@ def configure_client(
         }
         extra_arguments = (
             f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.host=localhost ++server.port={server_port} "
+            f"++server.host=localhost ++server.port={server_port} ++server.model={model} "
         )
     else:  # model is hosted elsewhere
         server_config = None
