@@ -105,26 +105,26 @@ class OpenAIModel(BaseModel):
             raise ValueError("`top_logprobs` is not supported with stream=True.")
 
 
-        # params = {
-        #     "messages": messages,
-        #     "seed": random_seed,
-        #     "stop": stop_phrases or None,
-        #     "timeout": timeout,
-        #     "stream": stream,
-        #     "tools": tools,
-        # }
-
-        # NOTE: added by me, for Response API
-        instructions, messages = self._convert_to_response_api_format(messages)
         params = {
-            "instructions": instructions, 
-            "input": messages,            
+            "messages": messages,
             "seed": random_seed,
             "stop": stop_phrases or None,
             "timeout": timeout,
             "stream": stream,
             "tools": tools,
         }
+
+        # NOTE: added by me, for Response API
+        # instructions, messages = self._convert_to_response_api_format(messages)
+        # params = {
+        #     "instructions": instructions, 
+        #     "input": messages,            
+        #     "seed": random_seed,
+        #     "stop": stop_phrases or None,
+        #     "timeout": timeout,
+        #     "stream": stream,
+        #     "tools": tools,
+        # }
 
         if self._is_reasoning_model(self.model):
             # Reasoning model specific validations and parameters
