@@ -58,7 +58,7 @@ stages:
     output_dir: ${directories.step-1-generate-solutions}
     input_file: ${input_file}
     # Arguments passed inside the generate context string (e.g., ++param=value)
-    inline_args: "++prompt_template=qwen-instruct ++inference.tokens_to_generate=16384"
+    inline_args: "++inference.tokens_to_generate=16384"
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       model: /hf_models/QwQ-32B
@@ -84,7 +84,7 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   generate_new_summaries:
@@ -96,7 +96,6 @@ stages:
       - judge_answers
     inline_args: >-
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml
-      ++prompt_template=qwen-instruct
       ++inference.temperature=0.7
       ++inference.tokens_to_generate=2048
     stage_kwargs: ${generate_new_summaries_kwargs}
@@ -108,7 +107,7 @@ stages:
 
     dependencies:
       - generate_new_summaries
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_new_summaries_kwargs}
 
 
@@ -125,7 +124,7 @@ stages:
     input_file: ${directories.step-6-merge-new-summaries}/output-rs*.jsonl
     output_dir: ${directories.step-7-prepare-sft}
     prompt_config: generic/math
-    prompt_template: qwen-instruct
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
     dependencies:
       - merge_new_summaries

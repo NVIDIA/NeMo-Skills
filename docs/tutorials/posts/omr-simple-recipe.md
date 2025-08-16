@@ -127,7 +127,6 @@ postprocess_cmd = (
 generate(
     ctx=wrap_arguments(
         f"++prompt_config=/workspace/extract-problems.yaml "
-        f"++prompt_template=qwen-instruct "
     ),
     cluster=cluster,
     input_file="/workspace/data.jsonl",
@@ -154,7 +153,6 @@ generate(
         f"++prompt_config=generic/math "
         f"++inference.temperature=0.6 "
         f"++inference.tokens_to_generate=8192 "
-        f"++prompt_template=qwen-instruct "
     ),
     cluster=cluster,
     input_file="/workspace/sdg/extracted-problems.jsonl",
@@ -190,7 +188,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
       ++input_files=/workspace/sdg/solutions/output.jsonl \
       ++output_path=/workspace/sft-data.jsonl \
       ++prompt_config=generic/math \
-      ++prompt_template=qwen-instruct \
+      ++tokenizer=Qwen/Qwen2.5-32B-Instruct \
       ++filters.remove_contaminated=false \
       ++add_unlabeled=true \
       ++filters.remove_no_think_tags=true \

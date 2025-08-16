@@ -29,8 +29,7 @@ EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type={match_type}"
 GENERATION_ARGS = (
     "++prompt_config=generic/default "
     "++inference.tokens_to_generate={tokens_to_generate} "
-    "++prefix_generation_to_response=True "
-    "++continue_prefix_generation=True"
+    "++start_assistant_response_key=generation "
 )
 """
 TOKENS_TO_GENERATE = {'niah': 128, 'vt': 30, 'cwe': 120, 'fwe': 50, 'qa': 32}
@@ -64,7 +63,7 @@ def prepare_task_for_ns(task, data_dir, setup):
         )
 
 
-def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
+def get_ruler_data(tasks, setup, template_tokens, max_seq_length, ruler_prepare_args, tmp_data_dir=None):
     if 'cwe' in tasks:
         # checking if git-lfs is installed
         try:
@@ -107,12 +106,14 @@ def get_ruler_data(tasks, setup, ruler_prepare_args, tmp_data_dir=None):
                 cwd=tmpdirname,
             )
 
+        max_seq_length -= template_tokens  # Adjusting for template tokens
+
         # preparing the datasets based on user options, in parallel
         def prepare_task(task):
             subprocess.run(
                 f"python prepare.py --save_dir {tmpdirname}/ruler_data --benchmark synthetic "
                 f"    --subset test --task {task} --tokenizer_type hf --model_template_type base --prepare_for_ns "
-                f"    --num_samples 500 {ruler_prepare_args}",
+                f"    --num_samples 500 --max_seq_length {max_seq_length} {ruler_prepare_args}",
                 shell=True,
                 check=True,
                 cwd=Path(tmpdirname) / "RULER" / "scripts" / "data",
@@ -168,6 +169,18 @@ if __name__ == "__main__":
         help="Name of the setup for RULER dataset. Typically should be <model_name>_<sequence_length>.",
     )
     parser.add_argument(
+        "--max_seq_length",
+        type=int,
+        required=True,
+        help="Sequence length to check with RULER.",
+    )
+    parser.add_argument(
+        '--template_tokens',
+        type=int,
+        default=10,
+        help='Number of tokens in chat template (will be subtracted from max_seq_length to not exceed max context)',
+    )
+    parser.add_argument(
         "--tmp_data_dir",
         type=str,
         default=None,
@@ -186,5 +199,12 @@ if __name__ == "__main__":
         )
         exit(0)
     print(f"Preparing RULER dataset for tasks: {args.tasks} with additional arguments: {ruler_prepare_args}")
-    get_ruler_data(args.tasks, args.setup, ruler_prepare_args, tmp_data_dir=args.tmp_data_dir)
+    get_ruler_data(
+        args.tasks,
+        args.setup,
+        args.template_tokens,
+        args.max_seq_length,
+        ruler_prepare_args,
+        tmp_data_dir=args.tmp_data_dir,
+    )
     print("RULER dataset preparation completed.")

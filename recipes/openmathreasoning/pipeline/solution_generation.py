@@ -159,7 +159,6 @@ def _run_fragment_judge(
 
     generate(
         ctx=wrap_arguments(
-            f"++prompt_template={stage_config.get('prompt_template', 'qwen-instruct')} "
             f"++prompt_config={prompt_config} "
             f"++generation_key={generation_key} "
             f"++skip_filled=True "
@@ -340,9 +339,9 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     if not prompt_config:
         raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
 
-    prompt_template = stage_config.get("prompt_template")
-    if not prompt_template:
-        raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
+    tokenizer = stage_config.get("tokenizer")
+    if not tokenizer:
+        raise ValueError("`tokenizer` is not defined in `prepare_for_sft` stage config")
 
     contamination_file = stage_config.get('contamination_file')
     if not contamination_file:
@@ -353,7 +352,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"    ++input_files='{input_file}' "
         f"    ++output_path={output_file} "
         f"    ++prompt_config={prompt_config} "
-        f"    ++prompt_template={prompt_template} "
+        f"    ++tokenizer={tokenizer} "
         f"    ++filters.drop_multi_boxed=false "
         f"    ++filters.remove_len_outlier_problems=false "
         f"    ++filters.remove_len_outlier_solutions=false "

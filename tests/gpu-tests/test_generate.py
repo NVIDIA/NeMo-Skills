@@ -33,7 +33,6 @@ def test_vllm_generate_greedy():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy/generation"
     docker_rm([output_dir])
@@ -48,7 +47,6 @@ def test_vllm_generate_greedy():
         f"    --server_nodes 1 "
         f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -73,7 +71,6 @@ def test_vllm_generate_greedy_chunked():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy-chunked/generation"
     docker_rm([output_dir])
@@ -89,7 +86,6 @@ def test_vllm_generate_greedy_chunked():
         f"    --num_chunks 2 "
         f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
-        f"    ++prompt_template={prompt_template} "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -134,7 +130,6 @@ def test_vllm_generate_seeds():
         f"    --with_sandbox "
         f"    --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/test.jsonl "
         f"    ++prompt_config=generic/math "
-        f"    ++prompt_template=llama3-instruct "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )

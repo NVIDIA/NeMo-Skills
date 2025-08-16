@@ -29,7 +29,7 @@ stages:
     input_file: ${input_file}
     language: python  # Language of the solutions to generate
     # Arguments passed inside the generate context string (e.g., ++param=value)
-    inline_args: "++prompt_template=deepseek-instruct ++inference.tokens_to_generate=28768 ++generation_key='output' ++inference.temperature=0.6"
+    inline_args: "++inference.tokens_to_generate=28768 ++generation_key='output' ++inference.temperature=0.6"
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       # assuming the model is in fp8 and running on H100 GPUs

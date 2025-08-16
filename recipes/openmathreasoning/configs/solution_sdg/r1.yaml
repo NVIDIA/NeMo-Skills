@@ -46,7 +46,7 @@ stages:
     output_dir: ${directories.step-1-generate-solutions}
     input_file: ${input_file}
     # Arguments passed inside the generate context string (e.g., ++param=value)
-    inline_args: "++prompt_template=deepseek-instruct ++inference.tokens_to_generate=16384"
+    inline_args: "++inference.tokens_to_generate=16384"
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       # assuming the model is in fp8 and running on H100 GPUs
@@ -74,14 +74,14 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_kwargs}
 
   prepare_for_sft:
     output_dir: ${directories.step-4-prepare-sft}
     input_file: ${directories.step-3-judge-answers}/output-rs*.jsonl
     prompt_config: generic/math
-    prompt_template: qwen-instruct
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
     dependencies:
       - judge_answers

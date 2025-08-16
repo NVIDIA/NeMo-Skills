@@ -309,9 +309,9 @@ class WriteFinalSftManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
-        chat_format: str | None = None,  # nemotron/llama/None
+        tokenizer: str | None = None,
+        system_message: str | None = None,
+        code_tags: str | None = None,
         input_key: str = "input",
         output_key: str = "output",
         metadata: Optional[Dict] = None,
@@ -321,24 +321,30 @@ class WriteFinalSftManifest(BaseProcessor):
         super().__init__(**kwargs)
         self.input_key = input_key
         self.output_key = output_key
-        self.chat_format = chat_format
         self.metadata = metadata
         self.exclude_optional_keys = exclude_optional_keys
         if not self.metadata:
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config and tokenizer:
+            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
-            if prompt_template:
+            if tokenizer:
                 LOG.warning(
-                    "Prompt template is provided, but prompt config is missing! "
+                    "tokenizer is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template, code_tags)
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        if system_message is not None:
+            self.prompt.config.system = system_message
 
     def process(self):
         samples_count = 0
@@ -364,46 +370,17 @@ class WriteFinalSftManifest(BaseProcessor):
                 elif "expected_answer" in elem:
                     output_sample["expected_answer"] = elem["expected_answer"]
 
-                if self.chat_format is None:
-                    generation = elem.pop(self.output_key)
-                    if self.prompt:
-                        output_sample["input"] = self.prompt.fill(input_dict=elem)
-                        output_sample["output"] = generation
-                        # not adding end-of-turn for incomplete generations
-                        if output_sample.get("finish_reason", "stop") == "stop":
-                            output_sample["output"] += self.prompt.config.template.assistant_end
-                    else:
-                        output_sample["input"] = elem[self.input_key]
-                        output_sample["output"] = generation
-
-                elif self.chat_format.lower() == "nemotron":
-                    output_sample['conversations'] = [
-                        {
-                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
-                            'from': 'User',
-                            'canonical_form': '',
-                        },
-                        {'value': elem.pop(self.output_key), 'from': 'Assistant', 'canonical_form': ''},
-                    ]
-                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
-                    output_sample['mask'] = 'User'
-                elif self.chat_format.lower() == "llama":
-                    output_sample['conversations'] = [
-                        {
-                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
-                            'from': '<|start_header_id|>user<|end_header_id|>',
-                            'canonical_form': '',
-                        },
-                        {
-                            'value': elem.pop(self.output_key),
-                            'from': '<|start_header_id|>assistant<|end_header_id|>',
-                            'canonical_form': '',
-                        },
-                    ]
-                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
-                    output_sample['mask'] = '<|start_header_id|>user<|end_header_id|>'
+                generation = elem.pop(self.output_key)
+                if self.prompt:
+                    output_sample["input"] = self.prompt.fill(input_dict=elem)
+                    output_sample["output"] = generation
+                    # not adding end-of-turn for incomplete generations
+                    if output_sample.get("finish_reason", "stop") == "stop":
+                        output_sample["output"] = self.prompt.add_assistant_end_suffix(output_sample["output"])
                 else:
-                    raise ValueError(f"Chat format {self.chat_format} is not supported")
+                    output_sample["input"] = elem[self.input_key]
+                    output_sample["output"] = generation
+
                 output_sample.update(self.metadata)
                 fout.write(json.dumps(output_sample) + "\n")
                 samples_count += 1
@@ -415,8 +392,9 @@ class WriteFinalRLManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
+        tokenizer: str | None = None,
+        system_message: str | None = None,
+        code_tags: str | None = None,
         task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
@@ -434,10 +412,24 @@ class WriteFinalRLManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config and tokenizer:
+            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
         else:
-            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+            if tokenizer:
+                LOG.warning(
+                    "tokenizer is provided, but prompt config is missing! "
+                    "Assuming 'user: {input_key}' and no special formatting for output."
+                )
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
+            else:
+                LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        if system_message is not None:
+            self.prompt.config.system = system_message
 
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle
