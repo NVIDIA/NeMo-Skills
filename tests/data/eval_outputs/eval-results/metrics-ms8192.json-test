@@ -209,22 +209,22 @@
     "pass@1": {
       "num_prompts": 3,
       "num_instructions": 5,
-      "average_score": 36.666666666666664,
+      "average_score": 46.666666666666664,
       "prompt_strict_accuracy": 33.33333333333333,
-      "instruction_strict_accuracy": 40.0,
+      "instruction_strict_accuracy": 60.0,
       "prompt_loose_accuracy": 33.33333333333333,
-      "instruction_loose_accuracy": 40.0,
+      "instruction_loose_accuracy": 60.0,
       "num_entries": 3,
       "avg_tokens": 2597
     },
     "pass@2": {
       "num_prompts": 3,
       "num_instructions": 5,
-      "average_score": 36.666666666666664,
+      "average_score": 46.666666666666664,
       "prompt_strict_accuracy": 33.33333333333333,
-      "instruction_strict_accuracy": 40.0,
+      "instruction_strict_accuracy": 60.0,
       "prompt_loose_accuracy": 33.33333333333333,
-      "instruction_loose_accuracy": 40.0,
+      "instruction_loose_accuracy": 60.0,
       "num_entries": 3,
       "avg_tokens": 2597
     },
@@ -242,11 +242,11 @@
     "pass@3": {
       "num_prompts": 3,
       "num_instructions": 5,
-      "average_score": 36.666666666666664,
+      "average_score": 46.666666666666664,
       "prompt_strict_accuracy": 33.33333333333333,
-      "instruction_strict_accuracy": 40.0,
+      "instruction_strict_accuracy": 60.0,
       "prompt_loose_accuracy": 33.33333333333333,
-      "instruction_loose_accuracy": 40.0,
+      "instruction_loose_accuracy": 60.0,
       "num_entries": 3,
       "avg_tokens": 2597
     },
