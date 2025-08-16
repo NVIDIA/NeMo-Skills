@@ -46,7 +46,7 @@ class IFMetrics(BaseMetrics):
         loose_predictions = [pred['loose_eval'] for pred in predictions]
 
         self._compute_pass_at_k(predictions=strict_predictions, eval_dict=self.strict_eval_dict)
-        # self._compute_pass_at_k(predictions=loose_predictions, eval_dict=self.loose_eval_dict)
+        self._compute_pass_at_k(predictions=loose_predictions, eval_dict=self.loose_eval_dict)
 
     def get_metrics(self):
         metrics_dict = {}
