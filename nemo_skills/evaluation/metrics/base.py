@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import random
 from collections import Counter, defaultdict
 
 
@@ -174,10 +175,19 @@ class BaseMetrics(abc.ABC):
                     majority_score = 0
                     majority_answer = None
                 else:
-                    # sorting to ensure reproducible scores in case of ties in majority
-                    valid_answers_and_results = sorted(valid_answers_and_results)
+                    # # sorting to ensure reproducible scores in case of ties in majority
+                    # valid_answers_and_results = sorted(valid_answers_and_results)
                     # Find the most common answer and its correctness
-                    majority_answer, majority_score = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    majority_count = Counter(valid_answers_and_results).most_common(1)[0][1]
+                    majority_answer_list = [
+                        (answer, score)
+                        for (answer, score), count in Counter(valid_answers_and_results).items()
+                        if count == majority_count
+                    ]
+                    # Majority score is the average of the scores of the most common answers
+                    majority_score = sum(score for answer, score in majority_answer_list) / len(majority_answer_list)
+                    # Choose a random answer from the most common answers
+                    majority_answer = random.choice(majority_answer_list)[0]
 
                 eval_dict[f"majority@{k}"][score_method] += majority_score
 
