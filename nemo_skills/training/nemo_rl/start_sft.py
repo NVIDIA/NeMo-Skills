@@ -250,8 +250,6 @@ def sft_preprocessor(
             message["token_ids"] = message["token_ids"][: min(4, max_seq_length // len(message_log))]
         loss_multiplier = 0.0
 
-    print(message_log)
-
     output = {
         "message_log": message_log,
         "length": length,
