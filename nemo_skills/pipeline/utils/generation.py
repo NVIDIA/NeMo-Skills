@@ -74,25 +74,50 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         seed_str = "NONE" if seed is None else str(seed)
         chunk_str = "NONE" if chunk_id is None else str(chunk_id)
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
-    # If random_seeds has more than N elements, split commands into groups of N
-    request_size = len(check_commands[0]) // 10
-    if len(expected_files) > request_size:
-        outputs = []
-        for i in range(0, len(check_commands), request_size):
-            group = check_commands[i : i + request_size]
-            command = f"bash -c '{'; '.join(group)}'"
+    
+    # Process commands in batches to avoid "Argument list too long" error
+    # Use a conservative batch size that works well even with long paths
+    batch_size = 30  # Very conservative to handle long file paths
+    
+    outputs = []
+    total_files = len(check_commands)
+    LOG.info(f"Checking {total_files} files in batches of {batch_size}...")
+    
+    for i in range(0, len(check_commands), batch_size):
+        batch = check_commands[i : i + batch_size]
+        batch_num = i // batch_size + 1
+        total_batches = (len(check_commands) + batch_size - 1) // batch_size
+        
+        if total_files > 100:  # Show progress for large file sets
+            LOG.info(f"Processing batch {batch_num}/{total_batches}...")
+        
+        command = f"bash -c '{'; '.join(batch)}'"
+        
+        try:
             if cluster_config['executor'] == 'slurm':
                 out = get_tunnel(cluster_config).run(command).stdout.strip()
             else:
                 out = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
-            outputs.append(out)
-        output = "\n".join(outputs).strip()
-    else:
-        command = f"bash -c '{'; '.join(check_commands)}'"
-        if cluster_config['executor'] == 'slurm':
-            output = get_tunnel(cluster_config).run(command).stdout.strip()
-        else:
-            output = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+            if out:  # Only append non-empty outputs
+                outputs.append(out)
+        except Exception as e:
+            # If even batched commands fail, try processing one by one
+            LOG.warning(f"Batch {batch_num} failed: {e}. Falling back to individual file checks.")
+            for j, cmd in enumerate(batch):
+                single_command = f"bash -c '{cmd}'"
+                try:
+                    if cluster_config['executor'] == 'slurm':
+                        out = get_tunnel(cluster_config).run(single_command).stdout.strip()
+                    else:
+                        out = subprocess.run(single_command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+                    if out:
+                        outputs.append(out)
+                except Exception as inner_e:
+                    error_msg = f"Failed to check file {i+j+1}/{total_files}: {inner_e}"
+                    LOG.error(error_msg)
+                    raise RuntimeError(f"{error_msg}. Unable to determine job status reliably.")
+    
+    output = "\n".join(outputs)
 
     # Parse results into a mapping of missing jobs
     missing_jobs = defaultdict(list)
