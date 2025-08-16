@@ -290,10 +290,11 @@ class BaseMetrics(abc.ABC):
                     else:
                         prob_all_incorrect = math.comb(total_incorrect, k) / math.comb(total, k)
                     # Probability of picking at least one correct answer
-                    eval_dict[f"pass@{k}"][score_method] += 1 - prob_all_incorrect
+                    instance_pass_score = 1 - prob_all_incorrect
                 else:
                     instance_pass_score = max(scores_list[:k])
-                    eval_dict[f"pass@{k}"][score_method] += instance_pass_score
+
+                eval_dict[f"pass@{k}"][score_method] += instance_pass_score
 
                 # pass@1[avg-of-k] - mean of pass@1 across all generations
                 eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list[:k]) / k
