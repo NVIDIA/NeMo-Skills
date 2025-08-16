@@ -185,8 +185,8 @@ class BaseMetrics(abc.ABC):
                     ]
                     # Majority score is the average of the scores of the most common answers
                     majority_score = sum(score for answer, score in majority_answer_list) / len(majority_answer_list)
-                    # Choose a random answer from the most common answers
-                    majority_answer = random.choice(majority_answer_list)[0]
+                    # Choose a deterministic answer from the most common answers for reproducibility
+                    majority_answer = sorted(majority_answer_list)[0][0]
 
                 eval_dict[f"majority@{k}"][score_method] += majority_score
 
@@ -268,23 +268,32 @@ class BaseMetrics(abc.ABC):
 
         for score_method in score_dicts[0].keys():
             scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
-            total_correct = sum(scores_list)
-            total = len(scores_list)
-            total_incorrect = total - total_correct
+
+            # Check if the task/instance has binary scores
+            # For tasks like IF, the probabilistic logic for pass@k is not applicable
+            is_binary_score = (max(scores_list) == 1) and (min(scores_list) == 0)
+
+            if is_binary_score:
+                total_correct = sum(scores_list)
+                total = len(scores_list)
+                total_incorrect = total - total_correct
 
             for k in range(1, len(predictions) + 1):
                 # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" metrics
-                # Pass@k is (1 - ((total -correct) choose k) / (total choose k))
-                # Probability of picking all incorrect answers
-                if total_incorrect < k:
-                    prob_all_incorrect = 0
-                else:
-                    prob_all_incorrect = math.comb(total_incorrect, k) / math.comb(total, k)
-                # Probability of picking at least one correct answer
-                prob_at_least_one_correct = 1 - prob_all_incorrect
-                instance_pass_score = prob_at_least_one_correct
 
-                eval_dict[f"pass@{k}"][score_method] += instance_pass_score
+                if is_binary_score:
+                    # Pass@k is (1 - ((total -correct) choose k) / (total choose k))
+                    # Probability of picking all incorrect answers
+                    if total_incorrect < k:
+                        # If fewer incorrect answers than k, impossible to pick all incorrect
+                        prob_all_incorrect = 0
+                    else:
+                        prob_all_incorrect = math.comb(total_incorrect, k) / math.comb(total, k)
+                    # Probability of picking at least one correct answer
+                    eval_dict[f"pass@{k}"][score_method] += 1 - prob_all_incorrect
+                else:
+                    instance_pass_score = max(scores_list[:k])
+                    eval_dict[f"pass@{k}"][score_method] += instance_pass_score
 
                 # pass@1[avg-of-k] - mean of pass@1 across all generations
                 eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list[:k]) / k
