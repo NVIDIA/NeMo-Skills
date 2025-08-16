@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import math
 import random
 from collections import Counter, defaultdict
 
@@ -267,26 +268,37 @@ class BaseMetrics(abc.ABC):
             eval_dict = self.eval_dict
         score_dicts = [self._get_score_dict(pred) for pred in predictions]
 
-        for k in range(1, len(predictions) + 1):
-            for score_method in score_dicts[0].keys():
+        for score_method in score_dicts[0].keys():
+            scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
+            total_correct = sum(scores_list)
+            total = len(scores_list)
+
+            # Pass@k is (1 - ((t -c) choose k) / (t choose k))
+
+            for k in range(1, len(predictions) + 1):
                 # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" metrics
 
-                scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts[:k]]
-                pass_score = max(scores_list)
-                eval_dict[f"pass@{k}"][score_method] += pass_score
+                # Probability of picking all incorrect answers
+                prob_all_incorrect = math.comb(total - total_correct, k) / math.comb(total, k)
+                # Probability of picking at least one correct answer
+                prob_at_least_one_correct = 1 - prob_all_incorrect
+                instance_pass_score = prob_at_least_one_correct
+
+                eval_dict[f"pass@{k}"][score_method] += instance_pass_score
 
                 # pass@1[avg-of-k] - mean of pass@1 across all generations
-                eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list) / k
+                eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list[:k]) / k
 
                 self._update_score_metrics_for_pass(
                     eval_dict=eval_dict,
                     k=k,
                     score_method=score_method,
                     score_dicts=score_dicts,
-                    pass_score=pass_score,
+                    pass_score=instance_pass_score,
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                 )
+
             if predicted_answers is not None:
                 no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
                 eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
