@@ -311,49 +311,6 @@ class BaseMetrics(abc.ABC):
                     predicted_answers=predicted_answers,
                 )
 
-        # for k in range(2, len(predictions) + 1):
-        #     for score_method in score_dicts[0].keys():
-        #         # Get valid answers and their results for this field
-        #         valid_answers_and_results = [
-        #             (pred_answer, correctness_dict[score_method])
-        #             for pred_answer, correctness_dict in zip(predicted_answers[:k], score_dicts[:k])
-        #             if pred_answer is not None
-        #         ]
-
-        #         # If no valid answers, it's incorrect
-        #         if not valid_answers_and_results:
-        #             majority_score = 0
-        #             majority_answer = None
-        #         else:
-        #             # sorting to ensure reproducible scores in case of ties in majority
-        #             valid_answers_and_results = sorted(valid_answers_and_results)
-        #             # Find the most common answer and its correctness
-        #             majority_answer, majority_score = Counter(valid_answers_and_results).most_common(1)[0][0]
-
-        #         eval_dict[f"majority@{k}"][score_method] += majority_score
-
-        #         # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" and "majority_ties" metrics
-
-        #         # In case there are other metrics we need to update
-        #         self._update_score_metrics_for_majority(
-        #             eval_dict=eval_dict,
-        #             k=k,
-        #             score_method=score_method,
-        #             score_dicts=score_dicts,
-        #             majority_score=majority_score,
-        #             majority_answer=majority_answer,
-        #             predictions=predictions,
-        #             predicted_answers=predicted_answers,
-        #         )
-
-        #     eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
-        #     self._update_metrics_for_majority(
-        #         eval_dict=eval_dict,
-        #         k=k,
-        #         predictions=predictions,
-        #         predicted_answers=predicted_answers,
-        #     )
-
     def setup(self, input_files):
         pass
 
