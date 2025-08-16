@@ -36,17 +36,16 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     from nemo_skills.prompt.utils import get_prompt
 
     llm = get_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm")  # localhost by default
-    prompt = get_prompt('generic/default', 'llama3-instruct') # (1)!
-    prompt = prompt.fill({'question': "What's 2 + 2?"})
+    prompt_obj = get_prompt('generic/default') # (1)!
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
     print(prompt) # (2)!
     output = llm.generate_sync(prompt=prompt)
     print(output["generation"]) # (3)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
@@ -54,14 +53,10 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          ```python-console
          >>> print(prompt)
-         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-         <|eot_id|><|start_header_id|>user<|end_header_id|>
-
-         What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+         [{'role': 'user', 'content': "What's 2 + 2?"}]
          ```
 
-         If you don't want to use our prompt class, just create this string yourself
+         If you don't want to use our prompt class, just create this list yourself
 
     3.   This should print
          ```python-console
@@ -80,9 +75,9 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
         base_url="https://integrate.api.nvidia.com/v1",
         model="meta/llama-3.1-8b-instruct",
     )
-    prompt = get_prompt('generic/default') # (2)!
+    prompt_obj = get_prompt('generic/default') # (2)!
 
-    prompt = prompt.fill({'question': "What's 2 + 2?"})
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
 
     print(prompt) # (3)!
     output = llm.generate_sync(prompt=prompt)
@@ -94,9 +89,8 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
          To use OpenAI models, use `OPENAI_API_KEY` and set `base_url=https://api.openai.com/v1`.
 
     2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
-         Note that with API models we can't add special tokens, so prompt template is not specified.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
@@ -124,23 +118,22 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     sandbox = get_sandbox()  # localhost by default
     llm = get_code_execution_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm", sandbox=sandbox)
-    prompt = get_prompt('generic/default', 'llama3-instruct', code_tags='llama3') # (1)!
-    prompt.config.system = ( # (2)!
+    prompt_obj = get_prompt('generic/default', code_tags='llama3') # (1)!
+    prompt_obj.config.system = ( # (2)!
         "Environment: ipython\n\n"
         "Use Python to solve this math problem."
     )
-    prompt = prompt.fill({'question': "What's 2 + 2?"})
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
     print(prompt) # (3)!
-    output = llm.generate_sync(prompt=prompt, **prompt.get_code_execution_args()) # (4)!
+    output = await llm.generate_async(prompt=prompt, **prompt.get_code_execution_args()) # (4)!
     print(output["generation"]) # (5)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
          Note how we are updating system message on the next line (you can also include it in the config directly).
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
     2.   8B model doesn't always follow these instructions, so using 70B or 405B for code execution is recommended.
@@ -149,16 +142,13 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          ```python-console
          >>> print(prompt)
-         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-         Environment: ipython
-
-         Use Python to solve this math problem.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-         What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+         [
+            {'role': 'system', 'content': 'Environment: ipython\n\nUse Python to solve this math problem.'},
+            {'role': 'user', 'content': "What's 2 + 2?"}
+         ]
          ```
 
-         If you don't want to use our prompt class, just create this string yourself
+         If you don't want to use our prompt class, just create this object yourself
 
     4.   `prompt.get_code_execution_args()` simply returns a dictionary with start/stop tokens,
          so that we know when to stop LLM generation and how to format the output.
@@ -180,9 +170,8 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          The "4" in the stdout is coming directly from Python interpreter running in the sandbox.
 
-Note that for self-hosted models we are explicitly adding all the special tokens before sending prompt to an LLM.
-This is necessary to retain flexibility. E.g. this way we can use base model format with
-instruct models that we found to work better with few-shot examples.
+If you want to use completions api, you can also provide `tokenizer` parameter to `get_prompt` and it will use
+tokenizer's chat template to format messages and return you a string.
 
 You can learn more about how our prompt formatting works in the [prompt format docs](../basics/prompt-format.md).
 

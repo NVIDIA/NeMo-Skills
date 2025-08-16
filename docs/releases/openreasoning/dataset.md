@@ -160,7 +160,7 @@ generate(
 # This script will also filter anything not judged as correct
 cmd = (
     "python -m nemo_skills.training.prepare_data "
-    "    ++prompt_template=qwen-instruct "
+    "    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
     "    ++prompt_config=generic/math "
     "    ++input_files='/workspace/open-reasoning/sdg/maj-if-no-correct-judged/output-rs*.jsonl' "
     "    ++output_path=/workspace/open-reasoning/sft-data-math.jsonl "

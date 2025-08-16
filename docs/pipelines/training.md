@@ -16,7 +16,7 @@ python -m nemo_skills.training.prepare_data \
     ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
-    ++prompt_template=llama3-instruct
+    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct
 ```
 
 !!! tip
@@ -26,7 +26,7 @@ python -m nemo_skills.training.prepare_data \
 
 If you want to run that command inside container or on cluster, add `ns run_cmd --cluster=...` in the beginning.
 
-You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
+You need to pass in the config and tokenizer so that we can format the data accordingly. There are many more parameters
 that data preparation script supports which you can see
 [here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/config/math_sft.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
@@ -123,11 +123,11 @@ convert(
     convert_to="hf",
     model_type="llama",
     num_gpus=8,
-    hf_model_name="meta-llama/Meta-Llama-3.1-8B",
+    tokenizer="meta-llama/Meta-Llama-3.1-8B",
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=llama3-instruct"),
+    ctx=wrap_arguments(""),
     cluster=cluster,
     model=f"{output_dir}/model-averaged-hf",
     server_type="trtllm",

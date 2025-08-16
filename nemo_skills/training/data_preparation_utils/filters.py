@@ -261,7 +261,7 @@ class RemoveLenOutliers(BaseFilter):
         property_key: str = "generation",
         min_length: int = 0,
         max_length: int = None,
-        hf_model_name: str = None,
+        tokenizer: str = None,
         use_chars_for_min_length: bool = False,
         **kwargs,
     ):
@@ -271,11 +271,11 @@ class RemoveLenOutliers(BaseFilter):
         self.min_length = min_length
         self.use_chars_for_min_length = use_chars_for_min_length
 
-        if hf_model_name is None:
-            raise ValueError("Specify 'hf_model_name' for length-based filtering")
+        if tokenizer is None:
+            raise ValueError("Specify 'tokenizer' for length-based filtering")
         from transformers import AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
     def process_dataset_entry(self, data_entry):
         property_val = data_entry[self.property_key]

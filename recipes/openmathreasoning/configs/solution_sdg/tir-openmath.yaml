@@ -61,7 +61,6 @@ stages:
     # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
       ++prompt_config=openmath/tir
-      ++prompt_template=qwen-instruct
       ++code_tags=openmath
       ++inference.tokens_to_generate=16384
       ++code_execution=true
@@ -97,7 +96,7 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs:
       <<: *generate_kwargs
 
@@ -120,7 +119,6 @@ stages:
       - judge_answers
     inline_args: >-
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-solution.yaml
-      ++prompt_template=qwen-instruct
       ++inference.temperature=0.7
       ++inference.tokens_to_generate=2048
     stage_kwargs: ${generate_new_summaries_kwargs}
@@ -131,7 +129,7 @@ stages:
 
     dependencies:
       - generate_new_summaries
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs: ${generate_new_summaries_kwargs}
 
   merge_new_summaries:
@@ -146,7 +144,7 @@ stages:
     input_file: ${directories.step-7-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-8-prepare-sft}
     prompt_config: openmath/tir
-    prompt_template: qwen-instruct
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     code_tags: openmath
     contamination_file: ${contamination_file}
     dependencies:

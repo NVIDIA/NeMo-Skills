@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
   {examples}Write a question on {topic}, more specifically on {subtopic}, with up to four choices.
   Desired difficulty level: {difficulty}.
@@ -8,4 +6,4 @@ user: |-
   For questions marked "hard", the question should involve intricate or abstract relationships between concepts. Solving them should demand advanced reasoning skills, mastery of topic-specific techniques, and the ability to deal with ambiguities or edge cases. Solutions often require navigating multiple layers of logic or constraints.
   For questions marked "brutal", the question should push problem-solving to the limit, requiring mastery of nuanced relationships across diverse concepts. It should demand precise reasoning, significant abstraction, and fluency in advanced techniques. Problems may include nested or multi-step dependencies, where overlooking a detail can derail the solution.
   For questions marked "borderline unsolvable", the question should challenge even experts, involving exceptionally intricate or unconventional problem structures. It should combine deep abstraction, subtle constraints, and highly interconnected concepts. While solutions exist, they often require extensive expertise and innovative approaches. Avoid speculative or unsolvable topics (e.g., "Does God exist?" or "How can time travel be achieved?").
-  Ensure that one of the four choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices. 
+  Ensure that one of the four choices is correct. You are not required to specify which one is correct, but your question must include a valid answer within the given choices.
