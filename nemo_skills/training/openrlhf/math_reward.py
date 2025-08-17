@@ -53,14 +53,11 @@ def reward_func(queries: list[str], prompts: list[str], prompt_metadata: list[di
     server_args = json.loads(os.getenv("REWARD_SERVER_ARGS", "{}"))
     llm = get_model(host=host, **server_args)
     # TODO: remove hardcoded qwen template
-    prompt = get_prompt('judge/math', 'qwen-instruct')
+    prompt = get_prompt('judge/math', 'Qwen/Qwen2.5-32B-Instruct')
     judge_prompts = [prompt.fill(dp) for dp in data_points]
     if len(judge_prompts) > 0:
         # Too slow, but we are no longer supporting openrlhf anyways.
-        outputs = [
-            llm.generate_sync(prompt=jp, stop_phrases=prompt.stop_phrases)
-            for jp in judge_prompts
-        ]
+        outputs = [llm.generate_sync(prompt=jp, stop_phrases=prompt.stop_phrases) for jp in judge_prompts]
     else:
         outputs = []
     judgements = []

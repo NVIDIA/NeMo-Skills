@@ -136,9 +136,9 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     if not prompt_config:
         raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
 
-    prompt_template = stage_config.get("prompt_template")
-    if not prompt_template:
-        raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
+    tokenizer = stage_config.get("tokenizer")
+    if not tokenizer:
+        raise ValueError("`tokenizer` is not defined in `prepare_for_sft` stage config")
 
     contamination_file = stage_config.get('contamination_file')
     if not contamination_file:
@@ -149,7 +149,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"    ++preprocessed_dataset_files='{input_file}' "
         f"    ++output_path={output_file} "
         f"    ++prompt_config={prompt_config} "
-        f"    ++prompt_template={prompt_template} "
+        f"    ++tokenizer={tokenizer} "
         f"    ++filters.trim_prefix=false "
         f"    ++filters.trim_solutions=false "
         f"    ++filters.drop_incorrect_arithmetic=false "

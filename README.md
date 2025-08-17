@@ -12,7 +12,7 @@ Here are some of the features we support:
   - Evaluate your models on many popular benchmarks.
     - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: scicode, livecodebench, human-eval, mbpp
+    - Coding skills: swe-bench, scicode, livecodebench, human-eval, mbpp
     - Chat/instruction following: ifbench, ifeval, arena-hard
     - General knowledge: mmlu, mmlu-pro, gpqa
     - Long context: ruler, mrcr
@@ -20,7 +20,7 @@ Here are some of the features we support:
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
 ## News
-
+* [08/15/2025]: Added details for [reproducing evals](https://nvidia.github.io/NeMo-Skills/tutorials/2025/08/15/reproducing-llama-nemotron-super-49b-v15-evals/) for the [Llama-3_3-Nemotron-Super-49B-v1_5](nvidia/Llama-3_3-Nemotron-Super-49B-v1_5) model by NVIDIA.
 * [07/30/2025]: The datasets used to train OpenReasoning models are released! Math and code are available as part of [Nemotron-Post-Training-Dataset-v1](https://huggingface.co/datasets/nvidia/Nemotron-Post-Training-Dataset-v1) and science is available in
 [OpenScienceReasoning-2](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).
 See our [documentation](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/training) for more details.

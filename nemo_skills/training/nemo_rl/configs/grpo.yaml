@@ -203,7 +203,6 @@ data:
   shuffle: true
   prompt:
     prompt_config: ???
-    prompt_template: ???
     examples_type: null
     config_dir: null
     template_dir: null

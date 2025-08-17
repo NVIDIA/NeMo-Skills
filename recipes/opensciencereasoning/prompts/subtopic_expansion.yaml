@@ -1,12 +1,10 @@
-system: ""
-
 user: |-
   You are a highly knowledgeable assistant specializing in the academic field of {topic_name}.
   Your primary task is to generate a comprehensive list of advanced subtopics within {topic_name}.
   These subtopics should represent specialized, complex, or cutting-edge areas of study within the field, suitable for crafting challenging questions for individuals with graduate-level expertise or domain specialists.
   Focus on depth and specificity.
   Please generate exactly {max_subtopics} distinct advanced subtopics.
-  The output must be a Python list of strings, where each string is a subtopic. 
+  The output must be a Python list of strings, where each string is a subtopic.
   Do not include any headers, footers, or any text other than the Python list itself. Stop generation immediately after the closing bracket of the list.
   Academic Field: {topic_name}
   Maximum Number of Subtopics: {max_subtopics}

@@ -16,9 +16,11 @@ do_shuffle: true
 num_output_samples: null
 
 prompt_config: null
-prompt_template: null
+# Needed to format the data and also for length-based filtering
+tokenizer: null
+system_message: null  # can be used to override default from the tokenizer
+
 code_tags: null
-chat_format: null  # null/nemotron/llama
 
 input_key: input  # key to group samples by before code_text_filter
 output_key: output  # key to filter solutions by
@@ -49,9 +51,9 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
-    prompt_template: ${prompt_template}
+    tokenizer: ${tokenizer}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     input_key: question
     output_key: ${output_key}
-    chat_format: ${chat_format}
     metadata: ${metadata}

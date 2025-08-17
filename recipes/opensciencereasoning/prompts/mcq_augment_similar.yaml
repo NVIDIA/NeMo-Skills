@@ -11,8 +11,6 @@ few_shot_examples:
   suffix: ""
   examples_type: open_science_aug_similar
 
-system: ""
-
 user: |-
   {examples}
   Write a new multiple-choice question similar to the given one. Make the new question reasonable and solvable.

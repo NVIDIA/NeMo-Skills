@@ -1,5 +1,3 @@
 # Default prompt that does not contain any extra instructions. Can be used for instruction following evals (e.g. ifeval)
 
-system: ""
-
 user: "{question}"

@@ -19,9 +19,9 @@ import re
 from dataclasses import asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from itertools import zip_longest
 
 import yaml
+from transformers import AutoTokenizer
 
 from nemo_skills.code_execution.utils import format_code_output
 from nemo_skills.prompt.few_shot_examples import examples_map
@@ -95,37 +95,23 @@ class CodeTags:
 
 
 @nested_dataclass(kw_only=True)
-class PromptTemplate:
-    text_begin: str
-    system_begin: str
-    system_end: str
-    user_begin: str
-    user_end: str
-    assistant_begin: str
-    assistant_end: str
-
-    # TODO: should stop phrases not be here?
-    stop_phrases: List[str]
-
-
-@nested_dataclass(kw_only=True)
 class PromptConfig:
     user: str
-    system: str = ""
-    template: PromptTemplate = None
+    system: str | None = None
     code_tags: CodeTags = None
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
 
 
 class Prompt:
-    SYSTEM_FORMAT = "{text_begin}{system_begin}{system}{system_end}"
-    TURN_BEGIN_FORMAT = "{user_begin}{user}{user_end}{assistant_begin}"
-    TURN_END_FORMAT = "{assistant}{assistant_end}"
-
-    def __init__(self, config):
+    def __init__(self, config, tokenizer):
         # rebuilding prompt config to make sure post init is called again in
         # case some parameters were manually changed after the config was created
         self.config = PromptConfig(_init_nested=True, **asdict(config))
+        self.tokenizer = tokenizer
+        if self.tokenizer:
+            # assuming it's the object already if not str
+            if isinstance(self.tokenizer, str):
+                self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
 
     def build_filled_example(self, example_dict: Dict[str, Any]) -> str:
         """Builds a filled example string based on the example dictionary."""
@@ -154,10 +140,7 @@ class Prompt:
             example_dict["solution"] = example_dict["solution"].replace("{code_output_begin}", "")
             example_dict["solution"] = example_dict["solution"].replace("{code_output_end}", "")
 
-        if self.config.template:
-            return self.config.few_shot_examples.template.format(**example_dict, **asdict(self.config.template))
-        else:
-            return self.config.few_shot_examples.template.format(**example_dict)
+        return self.config.few_shot_examples.template.format(**example_dict)
 
     def build_examples_dict(self, input_dict):
         if self.config.few_shot_examples.examples_type:
@@ -223,132 +206,96 @@ class Prompt:
             "code_output_format": self.config.code_tags.code_output_format,
         }
 
+    def add_assistant_end_suffix(self, assistant_response: str) -> str:
+        """Adds special tokens to the end of assistant response."""
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer is not set.")
+
+        messages = [{'role': 'user', 'content': ''}]
+
+        user_string = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        messages.append({'role': 'assistant', 'content': assistant_response})
+        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+
+        assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
+
+        formatted_response = assistant_string[len(user_string) :]
+
+        return formatted_response
+
     def fill(
         self,
         input_dict: Dict[str, str],
-        prefix_generation_to_response: bool = False,
-        continue_prefix_generation: bool = False,
-        multi_turn_key: str | None = None,
-        return_templated_dict: bool = False,
+        start_assistant_response_key: str | None = None,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
         Operates in two modes:
-        - If `config.template` is set, it will use the template to fill the prompt, returning a string.
-        - If `config.template` is not set, it will assume chat format and return a list of dictionaries.
+        - If `self.tokenizer` is set, it will use it to format the prompt, returning a string.
+        - If `self.tokenizer` is not set, it will assume chat format and return a list of dictionaries.
 
         Args:
             input_dict: The input dictionary to fill the prompt with.
-            prefix_generation_to_response: Whether to include the generation in the prompt.
-            multi_turn_key: If specified, will read the list from input_dict[multi_turn_key]
-                and use it to construct the prompt. You input_dict should also have "assistant" key in all
-                turns except last containing assistant reply.
-            return_templated_dict: Indicates whether to return a messages list where the template is used
-                to fill the prompt. If so, a list of dicts with 'role' and 'content' keys will be returned. 
-                In this case the final user and assistant messages will include special tokens.
+            start_assistant_response_key: Whether to append the value of this key to the beginning of assistant response.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
         """
-        # TODO: this function has too many cases, can we simplify this?
-        # TODO: some error message for multi-turn + few-shots (it doesn't work well now)
-        if prefix_generation_to_response:
-            generation = input_dict.get("generation", "")
-        else:
-            generation = ""
 
-        if self.config.template:
-            if multi_turn_key is None:
-                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
-                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                ))
-                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                    user=self.build_user_message(input_dict), **asdict(self.config.template)
-                ))
-                user_strings = [user_string]
-                assistant_strings = []
-                if generation:
-                    # Generation can be part of the input in cases such as reward models
-                    if continue_prefix_generation:
-                        # Append generation without the closing tag.
-                        prompt_string += (assistant_string := generation)
+        if self.config.system is not None:
+            messages = [
+                {"role": "system", "content": self.config.system},
+            ]
+        else:
+            messages = []
+        messages.append({"role": "user", "content": self.build_user_message(input_dict)})
+
+        if start_assistant_response_key and self.tokenizer is None:
+            raise ValueError(
+                f"start_assistant_response_key is '{start_assistant_response_key}', but tokenizer is not set. "
+                "It's not possible to start assistant response with openai messages "
+                "format, so please set tokenizer to a valid value."
+            )
+
+        if self.tokenizer is not None:
+            try:
+                messages_string = self.tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+            except ValueError as e:
+                if "Cannot use chat template functions because tokenizer.chat_template is not set" in str(e):
+                    # assuming that's a base model and we just need to add bos
+                    if len(messages) != 1 or messages[0]['role'] != 'user':
+                        raise ValueError(
+                            "The model doesn't support chat template, can't format messages which contain non-user values"
+                        )
+                    if hasattr(self.tokenizer, 'bos_token'):
+                        messages_string = self.tokenizer.bos_token + messages[0]['content']
                     else:
-                        prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
-                            assistant=generation, **asdict(self.config.template)
-                        ))
-                    assistant_strings.append(assistant_string)
+                        messages_string = messages[0]['content']
+            if start_assistant_response_key:
+                messages_string += input_dict[start_assistant_response_key]
+            return messages_string
 
-            else:
-                prompt_string = (system_string := self.SYSTEM_FORMAT.format(
-                    system=self.config.system.format(**input_dict), **asdict(self.config.template)
-                ))
-                user_strings = []
-                assistant_strings = []
-                for turn in input_dict[multi_turn_key][:-1]:
-                    prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                        user=self.build_user_message(turn), **asdict(self.config.template)
-                    ))
-                    user_strings.append(user_string)
-                    prompt_string += (assistant_string := self.TURN_END_FORMAT.format(
-                        assistant=turn["assistant"], **asdict(self.config.template)
-                    ))
-                    assistant_strings.append(assistant_string)
-
-                prompt_string += (user_string := self.TURN_BEGIN_FORMAT.format(
-                    user=self.build_user_message(input_dict[multi_turn_key][-1]), **asdict(self.config.template)
-                ))
-                user_strings.append(user_string)
-                prompt_string += generation
-                if generation:
-                    assistant_strings.append(generation)
-
-            if return_templated_dict:
-                messages = [
-                    {'role': 'system', 'content': system_string},
-                ]
-
-                for user_msg, assistant_msg in zip_longest(user_strings, assistant_strings, fillvalue=None):
-                    if user_msg is not None:
-                        messages.append({'role': 'user', 'content': user_msg})
-                    if assistant_msg is not None:
-                        messages.append({'role': 'assistant', 'content': assistant_msg})
-
-                return messages
-            return prompt_string
-        else:
-            if multi_turn_key is None:
-                if self.config.system:
-                    messages = [
-                        {"role": "system", "content": self.config.system},
-                    ]
-                else:
-                    messages = []
-                messages.append({"role": "user", "content": self.build_user_message(input_dict)})
-                if generation and prefix_generation_to_response:
-                    messages.append({"role": "assistant", "content": generation})
-            else:
-                if self.config.system:
-                    messages = [{"role": "system", "content": self.config.system}]
-                else:
-                    messages = []
-                for turn in input_dict[multi_turn_key][:-1]:
-                    messages.append({"role": "user", "content": self.build_user_message(turn)})
-                    messages.append({"role": "assistant", "content": turn["assistant"]})
-                messages.append({"role": "user", "content": self.build_user_message(input_dict[multi_turn_key][-1])})
-                if prefix_generation_to_response:  # optionally adding generation as the last assistant reply
-                    messages.append({"role": "assistant", "content": turn["assistant"]})
-            return messages
-
-    @property
-    def stop_phrases(self):
-        """Returns the stop phrases from the template if it exists, otherwise None."""
-        if self.config.template:
-            return list(self.config.template.stop_phrases)
-
-        return None
+        return messages
 
     def __str__(self):
         return str(self.config)
+
+
+def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
+    if config_dir is None:
+        config_dir = str(Path(__file__).parent.absolute() / 'config')
+
+    if config.endswith(f".{config_extension}"):
+        config_path = Path(config).absolute()
+    elif config.startswith("nemo_skills"):
+        config_path = Path(__file__).parents[2].absolute() / f"{config}.{config_extension}"
+    else:
+        config_path = Path(config_dir) / f"{config}.{config_extension}"
+
+    return config_path
 
 
 def load_config(config: str, config_dir: str | None = None) -> dict:
@@ -365,15 +312,7 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
     Returns:
         The loaded dictionary.
     """
-    if config_dir is None:
-        config_dir = str(Path(__file__).parent.absolute() / 'config')
-
-    if config.endswith(".yaml"):
-        config_path = Path(config).absolute()
-    elif config.startswith("nemo_skills"):
-        config_path = Path(__file__).parents[2].absolute() / f"{config}.yaml"
-    else:
-        config_path = Path(config_dir) / f"{config}.yaml"
+    config_path = get_config_path(config, config_dir)
 
     with open(config_path, "rt", encoding="utf-8") as fin:
         return yaml.safe_load(fin)
@@ -381,15 +320,12 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
 
 def get_prompt(
     prompt_config: str | dict,
-    prompt_template: str | dict | None = None,
+    tokenizer: Any | None = None,
     code_tags: str | dict | None = None,
     examples_type: str | None = None,
     config_dir: str | None = None,
-    template_dir: str | None = None,
     code_tags_dir: str | None = None,
 ) -> Prompt:
-    if template_dir is None:
-        template_dir = Path(__file__).parent.absolute() / 'template'
     if code_tags_dir is None:
         code_tags_dir = Path(__file__).parent.absolute() / 'code_tags'
 
@@ -398,13 +334,6 @@ def get_prompt(
     else:
         config = prompt_config
 
-    template_obj = None
-    if prompt_template is not None:
-        if isinstance(prompt_template, str):
-            template_dict = load_config(prompt_template, template_dir)
-        else:
-            template_dict = prompt_template
-        template_obj = PromptTemplate(**template_dict)
     code_tags_obj = None
     if code_tags is not None:
         if isinstance(code_tags, str):
@@ -412,8 +341,8 @@ def get_prompt(
         else:
             code_tags_dict = code_tags
         code_tags_obj = CodeTags(**code_tags_dict)
-    
-    prompt = Prompt(PromptConfig(**config, template=template_obj, code_tags=code_tags_obj))
+
+    prompt = Prompt(PromptConfig(**config, code_tags=code_tags_obj), tokenizer=tokenizer)
 
     if examples_type is not None:
         prompt.config.few_shot_examples.examples_type = examples_type

@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-text_begin: "<｜begin▁of▁sentence｜>"
-system_begin: ""
-system_end: ""
-user_begin: "<｜User｜>"
-user_end: ""
-assistant_begin: "<｜Assistant｜>"
-assistant_end: "<｜end▁of▁sentence｜>"  # TODO: is that right? Shouldn't affect single turn, but need to check more for multi-turn
-stop_phrases: ["<｜end▁of▁sentence｜>"]
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+EVAL_SPLIT = "default"
+DATASET_GROUP = 'code'
+METRICS_TYPE = "swe-bench"
+EVAL_ARGS = "++eval_type=no-op"  # evaluation is fused with generation for efficiency
+GENERATION_ARGS = ""
+GENERATION_MODULE = "nemo_skills.inference.eval.swebench"

@@ -49,9 +49,6 @@ cs.store(name="base_scicode_generation_config", node=SciCodeGenerationConfig)
 
 
 class SciCodeGenerationTask(GenerationTask):
-    def __init__(self, cfg: SciCodeGenerationConfig):
-        super().__init__(cfg)
-
     def log_example_prompt(self, data):
         """Scicode is multi-call benchmark, so we can't print a single prompt."""
         return

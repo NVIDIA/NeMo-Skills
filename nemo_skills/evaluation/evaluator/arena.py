@@ -15,21 +15,15 @@
 # adapted from https://github.com/lm-sys/arena-hard-auto/blob/main/show_result.py
 
 import inspect
-import json
 import logging
 import math
 from collections import defaultdict
-from copy import deepcopy
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from tqdm import tqdm
 
-from nemo_skills.inference.model import get_model
-from nemo_skills.prompt.utils import get_prompt
-from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
+from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -212,4 +206,3 @@ class LlmEvaluatorConfig:
     judge_model: str = JUDGE_MODEL
     # defaults to True to avoid regenerating judgements unless necessary
     skip_filled: bool = True
-

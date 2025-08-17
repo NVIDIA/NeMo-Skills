@@ -60,7 +60,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
 
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
@@ -109,7 +108,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("prompt_config", None),
-            ("prompt_template", None),
         ]
 
 
