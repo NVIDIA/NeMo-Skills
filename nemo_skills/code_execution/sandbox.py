@@ -357,6 +357,8 @@ class LocalSandbox(Sandbox):
             response.raise_for_status()
         except Exception as e:
             LOG.warning("Failed to delete session %s: %s", session_id, e)
+            LOG.warning(f"Delete response status: {response.status_code}")
+            LOG.warning(f"Delete response content: {response.text}")
 
 
 sandboxes = {
