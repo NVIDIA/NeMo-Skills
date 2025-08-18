@@ -91,6 +91,9 @@ class SweBenchGenerationConfig:
     output_file: str  # Where to save the generations
 
     agent_framework: SupportedAgentFrameworks  # Which agentic framework to use
+
+    # URL of the SWE-agent/OpenHands repo to pass to git clone. If None, will use the official repo
+    agent_framework_repo: str | None = None  
     agent_framework_commit: str = "HEAD"  # Which commit to use when cloning the SWE-agent/OpenHands repo
 
     # SWE-agent/OpenHands configuration file path. Can be specified in the same way as ns prompt configs
@@ -241,6 +244,8 @@ class SweBenchGenerationTask(GenerationTask):
         """
         if self.cfg.agent_config is None:
             self.cfg.agent_config = "eval/swe-bench/swe-agent/default"
+        if self.cfg.agent_framework_repo is None:
+            self.cfg.agent_framework_repo = "https://github.com/SWE-agent/SWE-agent.git"
 
         completion_kwargs = {
             openai_param: getattr(self.cfg.inference, ns_param)
@@ -255,8 +260,9 @@ class SweBenchGenerationTask(GenerationTask):
             "curl -LsSf https://astral.sh/uv/install.sh | sh && "
             "source /root/.local/bin/env && "
             "cd /root && "
-            "git clone https://github.com/SWE-agent/SWE-agent.git && "
+            "mkdir SWE-agent && "
             "cd SWE-agent && "
+            f"git clone {self.cfg.agent_framework_repo} . && "
             f"git checkout {self.cfg.agent_framework_commit} && "
             "uv venv --python 3.12 venv && "
             "source venv/bin/activate && "
@@ -305,6 +311,8 @@ class SweBenchGenerationTask(GenerationTask):
         """
         if self.cfg.agent_config is None:
             self.cfg.agent_config = "eval/swe-bench/openhands/default"
+        if self.cfg.agent_framework_repo is None:
+            self.cfg.agent_framework_repo = "https://github.com/All-Hands-AI/OpenHands.git"
 
         # Add parameters to config.toml
 
@@ -346,8 +354,9 @@ class SweBenchGenerationTask(GenerationTask):
             "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
             "eval \"$(/root/miniforge3/bin/conda shell.bash hook)\" && "
             "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
-            "git clone https://github.com/All-Hands-AI/OpenHands.git && "
+            "mkdir OpenHands && "
             "cd OpenHands && "
+            f"git clone {self.cfg.agent_framework_repo} . && "
             f"git checkout {self.cfg.agent_framework_commit} && "
             "export INSTALL_DOCKER=0 && "
             "make build && "
