@@ -21,6 +21,7 @@ import os
 import re
 import traceback
 import uuid
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -117,6 +118,7 @@ class Sandbox(abc.ABC):
         )
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
+        self.session_histories = defaultdict(list)  # session_id -> list of generated_code
 
     async def close(self):
         """Close the HTTP session."""
@@ -215,8 +217,24 @@ class Sandbox(abc.ABC):
         except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         new_session_created = output.pop("new_session_created", False)
+
+        # Rebuild state by executing concatenated history
         if session_id is not None and new_session_created:
-            raise RuntimeError(f"Session {session_id} not found on the worker; a new one was created unexpectedly.")
+            history = self.session_histories.get(session_id, [])
+            combined_code = '\n'.join(history) + ('\n' if history else '') + generated_code
+            request = self._prepare_request(
+                combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+            )
+            request['session_id'] = request_session_id if request_session_id is None else str(request_session_id)
+            try:
+                output = await self._send_request(request, timeout)
+            except httpx.TimeoutException:
+                output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+        # Append to history if successful execution (process_status == 'completed')
+        if output.get('process_status') == 'completed':
+            self.session_histories[request_session_id].append(generated_code)
+
         return output, request_session_id
 
     async def is_proof_correct(self, pred_output, timeout=30.0):
@@ -360,9 +378,13 @@ class LocalSandbox(Sandbox):
                     headers={"X-Session-ID": session_id},
                 )
                 if response.status_code == 200:  # Success
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
                     return
                 if response.status_code == 404:  # We were routed to a different worker
                     LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
                     return
                 response.raise_for_status()
             except (

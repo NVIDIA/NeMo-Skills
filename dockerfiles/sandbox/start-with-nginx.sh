@@ -129,8 +129,9 @@ cleanup() {
 
 trap cleanup SIGTERM SIGINT
 
-# Start all workers simultaneously
-for i in $(seq 1 $NUM_WORKERS); do
+# Function to start a single worker and return its PID
+start_worker() {
+    local i=$1
     SOCKET_PATH="${SOCKET_DIR}/worker${i}.sock"
 
     echo "Starting worker $i on socket $SOCKET_PATH..."
@@ -167,20 +168,24 @@ log-date = true
 log-prefix = [worker${i}]
 EOF
 
-    # Add cheaper configuration if enabled
     if [ -n "$UWSGI_CHEAPER" ]; then
         echo "cheaper = ${UWSGI_CHEAPER}" >> /tmp/worker${i}_uwsgi.ini
     fi
 
     echo "Created custom uwsgi config for worker $i (HTTP unix socket ${SOCKET_PATH})"
 
-    # Start worker with custom config - NO DELAY between workers
+    # Start worker with custom config
     cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini &
 
-    WORKER_PID=$!
-    WORKER_PIDS+=($WORKER_PID)
+    local pid=$!
+    echo "Worker $i started with PID $pid on socket $SOCKET_PATH"
+    return $pid
+}
 
-    echo "Worker $i started with PID $WORKER_PID on socket $SOCKET_PATH"
+# Start all workers simultaneously
+for i in $(seq 1 $NUM_WORKERS); do
+    pid=$(start_worker $i)
+    WORKER_PIDS+=($pid)
 done
 
 echo "All $NUM_WORKERS workers started simultaneously - waiting for readiness..."
@@ -298,14 +303,13 @@ monitor_load &  # Run in background
 
 while true; do
     # Check if any worker died
-    for i in "${!WORKER_PIDS[@]}"; do
-        pid=${WORKER_PIDS[$i]}
+    for idx in "${!WORKER_PIDS[@]}"; do
+        pid=${WORKER_PIDS[$idx]}
+        i=$((idx + 1))
         if ! kill -0 "$pid" 2>/dev/null; then
-            echo "ERROR: Worker $((i+1)) (PID $pid) died unexpectedly"
-            echo "Worker log:"
-            tail -20 /var/log/worker$((i+1)).log 2>/dev/null || echo "No log found"
-            cleanup
-            exit 1
+            echo "WARNING: Worker $i (PID $pid) died - restarting..."
+            new_pid=$(start_worker $i)
+            WORKER_PIDS[$idx]=$new_pid
         fi
     done
 
