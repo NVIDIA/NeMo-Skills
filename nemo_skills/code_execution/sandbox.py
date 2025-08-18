@@ -350,17 +350,21 @@ class LocalSandbox(Sandbox):
     async def delete_session(self, session_id: str) -> None:
         """Delete an IPython session on the local sandbox server."""
         max_retries = 3
-        retry_delay = 5
+        retry_delay = 2
 
         for attempt in range(max_retries):
             try:
                 response = await self.http_session.delete(
                     url=f"http://{self.host}:{self.port}/sessions/{session_id}",
-                    timeout=5.0,
+                    timeout=10.0,
                     headers={"X-Session-ID": session_id},
                 )
+                if response.status_code == 200:  # Success
+                    return
+                if response.status_code == 404:  # We were routed to a different worker
+                    LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
+                    return
                 response.raise_for_status()
-                return  # Success
             except httpx.ReadTimeout as e:
                 LOG.warning(f"ReadTimeout during session deletion (attempt {attempt + 1}/{max_retries})")
                 if attempt < max_retries - 1:

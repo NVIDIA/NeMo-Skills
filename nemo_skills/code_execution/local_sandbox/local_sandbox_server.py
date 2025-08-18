@@ -35,7 +35,7 @@ app = Flask(__name__)
 # Global dictionary to store IPython shells by session_id
 sessions = {}
 session_lock = threading.Lock()
-SESSION_TIMEOUT = float(os.getenv('SANDBOX_SESSION_TIMEOUT', -1))
+SESSION_TIMEOUT = float(os.getenv('SANDBOX_SESSION_TIMEOUT', 3600))  # 1 hour
 
 
 def cleanup_expired_sessions():
