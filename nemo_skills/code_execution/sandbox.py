@@ -365,8 +365,14 @@ class LocalSandbox(Sandbox):
                     LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
                     return
                 response.raise_for_status()
-            except httpx.ReadTimeout as e:
-                LOG.warning(f"ReadTimeout during session deletion (attempt {attempt + 1}/{max_retries})")
+            except (
+                httpx.ReadTimeout,  # retry for other communication errors and statuses
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.RemoteProtocolError,
+                httpx.HTTPStatusError,
+            ) as e:
+                LOG.warning("Retry %d/%d deleting session %s – %s", attempt + 1, max_retries, session_id, e)
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
                 else:
@@ -380,7 +386,7 @@ class LocalSandbox(Sandbox):
                     e,
                     traceback.format_exc(),
                 )
-                raise  # Re-raise non-timeout exceptions
+                raise  # Re-raise unexpected exceptions
 
 
 sandboxes = {
