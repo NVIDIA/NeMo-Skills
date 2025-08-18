@@ -175,6 +175,11 @@ class Sandbox(abc.ABC):
     ):
         pass
 
+    @abc.abstractmethod
+    async def delete_session(self, session_id: str) -> None:
+        """Delete a remote execution session if supported by the backend."""
+        pass
+
     async def execute_code(
         self,
         generated_code: str,
@@ -340,6 +345,18 @@ class LocalSandbox(Sandbox):
             "max_output_characters": max_output_characters,
             "traceback_verbosity": traceback_verbosity,
         }
+
+    async def delete_session(self, session_id: str) -> None:
+        """Delete an IPython session on the local sandbox server."""
+        try:
+            response = await self.http_session.delete(
+                url=f"http://{self.host}:{self.port}/sessions/{session_id}",
+                timeout=5.0,
+                headers={"X-Session-ID": session_id},
+            )
+            response.raise_for_status()
+        except Exception as e:
+            LOG.warning("Failed to delete session %s: %s", session_id, e)
 
 
 sandboxes = {

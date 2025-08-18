@@ -127,84 +127,93 @@ class CodeExecutionWrapper:
         code_execution_time = 0
         stopped_on_repetition = False
         # adding plus one to make sure there is always some completion after the last requested code block
-        for generation_index in range(effective_max_code_executions + 1):
+        try:
+            for generation_index in range(effective_max_code_executions + 1):
 
-            generation_time_start = time.time()
-            if timeout is not None:
-                # updating timeout to account for the time already spent
-                new_timeout = int(timeout - (time.time() - start_time))
-                request["timeout"] = new_timeout
-                if request['timeout'] <= 0:
+                generation_time_start = time.time()
+                if timeout is not None:
+                    # updating timeout to account for the time already spent
+                    new_timeout = int(timeout - (time.time() - start_time))
+                    request["timeout"] = new_timeout
+                    if request['timeout'] <= 0:
+                        break
+
+                output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
+
+                output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
+                # no need to do anything with this as the code below should just exit, so that's only for logging
+                stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
+
+                # openai don't show what stop word was triggered, so we assume that it was `code_end`
+                # if there's an unfinished code block
+                if is_openai_format and output_dict.get('finish_reason') == 'stop':
+                    if output.count(code_end) + 1 == output.count(code_begin):
+                        output += code_end
+                # Update the prompt based on format
+                if is_openai_format:
+                    request['prompt'].append({'role': 'assistant', 'content': output})
+                    request['prompt'].append({'role': 'user', 'content': "continue"})
+                else:
+                    request['prompt'] += output
+
+                # if it's the extra iteration, we don't execute the code block and just finish
+
+                if generation_index == effective_max_code_executions:
+                    break
+                # adjusting requested tokens to account for what has been generated already
+                request['tokens_to_generate'] -= num_generated_tokens
+                total_num_generated_tokens += num_generated_tokens
+                generation_time += int(time.time() - generation_time_start)
+                # TODO: currently we don't account for tokens in the code output that we add to the prompt
+                #       in most cases the output should be small though
+                if request['tokens_to_generate'] <= 0:
+                    break
+                # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
+                # that the last code_begin is not closed to ensure that we are inside the code block
+                if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
+                    code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
+                        prompt, code_begin, code_end, output, session_id
+                    )
+                    remaining_code_executions = None
+                    if self.config.add_remaining_code_executions:
+                        remaining_code_executions = effective_max_code_executions - generation_index - 1
+                    # adding code output to the prompt
+                    code_output = format_code_output(
+                        execution_dict,
+                        code_output_begin,
+                        code_output_end,
+                        code_output_format,
+                        remaining_code_executions,
+                    )
+
+                    if is_openai_format:
+                        request['prompt'][-2]['content'] += code_output
+                    else:
+                        request['prompt'] += code_output
+
+                    code_execution_time += int(time.time() - code_execution_time_start)
+                    code_rounds_executed += 1
+                else:  # if no code was generated, we need to finish
                     break
 
-            output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
-
-            output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
-            # no need to do anything with this as the code below should just exit, so that's only for logging
-            stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
-
-            # openai don't show what stop word was triggered, so we assume that it was `code_end`
-            # if there's an unfinished code block
-            if is_openai_format and output_dict.get('finish_reason') == 'stop':
-                if output.count(code_end) + 1 == output.count(code_begin):
-                    output += code_end
-            # Update the prompt based on format
+            # removing original prompt and returning the generation
             if is_openai_format:
-                request['prompt'].append({'role': 'assistant', 'content': output})
-                request['prompt'].append({'role': 'user', 'content': "continue"})
+                generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
             else:
-                request['prompt'] += output
+                generation = request['prompt'][len(prompt) :]
 
-            # if it's the extra iteration, we don't execute the code block and just finish
-
-            if generation_index == effective_max_code_executions:
-                break
-            # adjusting requested tokens to account for what has been generated already
-            request['tokens_to_generate'] -= num_generated_tokens
-            total_num_generated_tokens += num_generated_tokens
-            generation_time += int(time.time() - generation_time_start)
-            # TODO: currently we don't account for tokens in the code output that we add to the prompt
-            #       in most cases the output should be small though
-            if request['tokens_to_generate'] <= 0:
-                break
-            # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
-            # that the last code_begin is not closed to ensure that we are inside the code block
-            if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
-                    prompt, code_begin, code_end, output, session_id
-                )
-                remaining_code_executions = None
-                if self.config.add_remaining_code_executions:
-                    remaining_code_executions = effective_max_code_executions - generation_index - 1
-                # adding code output to the prompt
-                code_output = format_code_output(
-                    execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                )
-
-                if is_openai_format:
-                    request['prompt'][-2]['content'] += code_output
-                else:
-                    request['prompt'] += code_output
-
-                code_execution_time += int(time.time() - code_execution_time_start)
-                code_rounds_executed += 1
-            else:  # if no code was generated, we need to finish
-                break
-
-        # removing original prompt and returning the generation
-        if is_openai_format:
-            generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
-        else:
-            generation = request['prompt'][len(prompt) :]
-
-        return {
-            'generation': generation,
-            'code_rounds_executed': code_rounds_executed,
-            'num_generated_tokens': total_num_generated_tokens,
-            'generation_time': generation_time,
-            'code_execution_time': code_execution_time,
-            'stopped_on_repetition': stopped_on_repetition,
-        }
+            return {
+                'generation': generation,
+                'code_rounds_executed': code_rounds_executed,
+                'num_generated_tokens': total_num_generated_tokens,
+                'generation_time': generation_time,
+                'code_execution_time': code_execution_time,
+                'stopped_on_repetition': stopped_on_repetition,
+            }
+        finally:
+            # Clean up session if we created one and configured to do so
+            if session_id is not None and self.config.code_execution_language == 'ipython':
+                await self.sandbox.delete_session(str(session_id))
 
     async def execute_generated_code(self, input_prompt, code_begin, code_end, output, session_id):
         code_execution_time_start = time.time()
@@ -328,65 +337,73 @@ class CodeExecutionWrapper:
 
         current_full_prompt = copy.deepcopy(prompt)
         session_id = None  # For sandbox state continuity
-        for generation_index in range(effective_max_code_executions + 1):
-            model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
+        try:
+            for generation_index in range(effective_max_code_executions + 1):
+                model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
 
-            current_output_segment = ""
-            num_generated_tokens = 0
-            for chunk in model_token_iterator:
-                yield chunk
-                current_output_segment += chunk['generation']
-                num_generated_tokens += 1
+                current_output_segment = ""
+                num_generated_tokens = 0
+                for chunk in model_token_iterator:
+                    yield chunk
+                    current_output_segment += chunk['generation']
+                    num_generated_tokens += 1
 
-            request['tokens_to_generate'] -= num_generated_tokens
-            if request['tokens_to_generate'] <= 0:
-                break
-            if not current_output_segment:
-                break
+                request['tokens_to_generate'] -= num_generated_tokens
+                if request['tokens_to_generate'] <= 0:
+                    break
+                if not current_output_segment:
+                    break
 
-            # openai don't show what stop word was triggered, so we assume that it was `code_end`
-            # if there's an unfinished code block
-            if is_openai_format and chunk.get('finish_reason') == 'stop':
-                if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
-                    current_output_segment += code_end
+                # openai don't show what stop word was triggered, so we assume that it was `code_end`
+                # if there's an unfinished code block
+                if is_openai_format and chunk.get('finish_reason') == 'stop':
+                    if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
+                        current_output_segment += code_end
 
-            # Update the prompt based on format
-            if is_openai_format:
-                current_full_prompt.append({'role': 'assistant', 'content': current_output_segment})
-                current_full_prompt.append({'role': 'user', 'content': "continue"})
-            else:
-                current_full_prompt += current_output_segment
-
-            if generation_index == effective_max_code_executions:
-                # This was the last iteration, intended for final text generation after all code executions.
-                break
-
-            if current_output_segment.endswith(code_end) and current_output_segment.rfind(
-                code_begin
-            ) > current_output_segment.rfind(code_end, 0, -1):
-                execution_dict, session_id = await self.sandbox.execute_code(
-                    generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
-                    language=self.config.code_execution_language,
-                    timeout=self.config.code_execution_timeout,
-                    max_output_characters=self.config.max_code_output_characters,
-                    session_id=session_id,
-                    traceback_verbosity=self.config.sandbox_traceback_verbosity,
-                )
-
-                remaining_code_executions = None
-                if self.config.add_remaining_code_executions:
-                    remaining_code_executions = effective_max_code_executions - generation_index - 1
-
-                formatted_code_output = format_code_output(
-                    execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
-                )
-
-                yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
-
-                # Append executed code's output to the prompt
+                # Update the prompt based on format
                 if is_openai_format:
-                    current_full_prompt[-2]['content'] += formatted_code_output
+                    current_full_prompt.append({'role': 'assistant', 'content': current_output_segment})
+                    current_full_prompt.append({'role': 'user', 'content': "continue"})
                 else:
-                    current_full_prompt += formatted_code_output
-            else:
-                break
+                    current_full_prompt += current_output_segment
+
+                if generation_index == effective_max_code_executions:
+                    # This was the last iteration, intended for final text generation after all code executions.
+                    break
+
+                if current_output_segment.endswith(code_end) and current_output_segment.rfind(
+                    code_begin
+                ) > current_output_segment.rfind(code_end, 0, -1):
+                    execution_dict, session_id = await self.sandbox.execute_code(
+                        generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
+                        language=self.config.code_execution_language,
+                        timeout=self.config.code_execution_timeout,
+                        max_output_characters=self.config.max_code_output_characters,
+                        session_id=session_id,
+                        traceback_verbosity=self.config.sandbox_traceback_verbosity,
+                    )
+
+                    remaining_code_executions = None
+                    if self.config.add_remaining_code_executions:
+                        remaining_code_executions = effective_max_code_executions - generation_index - 1
+
+                    formatted_code_output = format_code_output(
+                        execution_dict,
+                        code_output_begin,
+                        code_output_end,
+                        code_output_format,
+                        remaining_code_executions,
+                    )
+
+                    yield {'generation': formatted_code_output}  # Yield the entire formatted code output as one chunk
+
+                    # Append executed code's output to the prompt
+                    if is_openai_format:
+                        current_full_prompt[-2]['content'] += formatted_code_output
+                    else:
+                        current_full_prompt += formatted_code_output
+                else:
+                    break
+        finally:
+            if session_id is not None and self.config.code_execution_language == 'ipython':
+                await self.sandbox.delete_session(str(session_id))
