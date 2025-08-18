@@ -1,7 +1,5 @@
 # adapted from https://github.com/lm-sys/llm-decontaminator/blob/main/detect_instruct.py
 
-system: ""
-
 user: |-
   Help me determine if the following two math problems are the same.
 

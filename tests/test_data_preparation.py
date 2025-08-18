@@ -39,7 +39,7 @@ def test_multiple_files():
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
-            f"    ++prompt_template=llama3-instruct "
+            f"    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct "
             f"    ++exclude_optional_keys=false "
             f"    ++filters.remove_len_outlier_problems=false "
             f"    ++filters.drop_multi_boxed=true "
@@ -53,12 +53,10 @@ def test_multiple_files():
         ),
     )
 
-    expected_md5 = "7c3129affcf6f31a68775fae6f8c1742"
+    expected_md5 = "56359ab5b822fa0186e163ef495b649f"
     output_md5 = compute_md5(output_file)
 
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
+    assert expected_md5 == output_md5, f"MD5 hashes do not match (new hash {output_md5}), inspect {output_file}"
 
 
 def test_exclude_keys():
@@ -73,7 +71,7 @@ def test_exclude_keys():
             f"    ++input_files='tests/data/output-rs*.test' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/math "
-            f"    ++prompt_template=llama3-instruct "
+            f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
             f"    ++exclude_optional_keys=true "
             f"    ++filters.remove_len_outlier_problems=false "
             f"    ++filters.drop_multi_boxed=true "
@@ -87,12 +85,10 @@ def test_exclude_keys():
         ),
     )
 
-    expected_md5 = "08c9b228faa1065825b68c0c994fcdb4"
+    expected_md5 = "f9cef05a83b52438295ded2b6a960946"
     output_md5 = compute_md5(output_file)
 
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
+    assert expected_md5 == output_md5, f"MD5 hashes do not match (new hash {output_md5}), inspect {output_file}"
 
 
 def test_code_sft_data():
@@ -106,52 +102,19 @@ def test_code_sft_data():
             f"python -m nemo_skills.training.prepare_data "
             f"    --config-name=code_sft "
             f"    ++preprocessed_dataset_files='tests/data/code-output.test' "
+            f"    ++system_message='' "
             f"    ++output_path={output_file} "
             f"    ++prompt_config=generic/codegen "
-            f"    ++prompt_template=llama3-instruct "
+            f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
             f"    ++exclude_optional_keys=false "
             f"    ++filters.drop_incorrect_code_blocks=false "
         ),
     )
 
-    expected_md5 = "a830a174291795cc7db0d1c3ee39de25"
+    expected_md5 = "8425de695ffa48a3ad15eff2f9ee1ac7"
     output_md5 = compute_md5(output_file)
 
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
-
-
-def test_openmathinstruct2():
-    output_file = f"/tmp/nemo-skills-tests/data/openmathinstruct2-sft.jsonl"
-    docker_rm_and_mkdir(output_file)
-    run_cmd(
-        cluster='test-local',
-        config_dir=Path(__file__).parent / 'gpu-tests',
-        log_dir='/tmp/nemo-skills-tests/test_openmathinstruct2',
-        ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_data "
-            f"    ++preprocessed_dataset_files='tests/data/openmathinstruct2.test' "
-            f"    ++output_path={output_file} "
-            f"    ++prompt_template=llama3-instruct "
-            f"    ++prompt_config=generic/math "
-            f"    ++output_key=generated_solution "
-            f"    ++filters.remove_len_outlier_problems=false "
-            f"    ++filters.drop_multi_boxed=false "
-            f"    ++filters.trim_prefix=false "
-            f"    ++filters.trim_solutions=false "
-            f"    ++filters.drop_incorrect_arithmetic=false "
-            f"    ++filters.split_arithmetic=false "
-            f"    ++filters.remove_contaminated=false "
-        ),
-    )
-
-    expected_md5 = "981e11051436be68cdc45953888a5685"
-    output_md5 = compute_md5(output_file)
-
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/training/prepare_data.py"
+    assert expected_md5 == output_md5, f"MD5 hashes do not match (new hash {output_md5}), inspect {output_file}"
 
 
 def test_aggregate_answers_fill():
@@ -174,9 +137,7 @@ def test_aggregate_answers_fill():
     expected_md5 = "20cd998b090603b2049f27a321cc9e27"
     output_md5 = compute_md5(output_file)
 
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/evaluation/aggregate_answers.py"
+    assert expected_md5 == output_md5, f"MD5 hashes do not match (new hash {output_md5}), inspect {output_file}"
 
 
 def test_aggregate_answers_extract():
@@ -201,6 +162,4 @@ def test_aggregate_answers_extract():
 
     print(f"output_md5: {output_md5}")
 
-    assert (
-        expected_md5 == output_md5
-    ), "MD5 hashes do not match, something is wrong with nemo_skills/evaluation/aggregate_answers.py"
+    assert expected_md5 == output_md5, f"MD5 hashes do not match (new hash {output_md5}), inspect {output_file}"

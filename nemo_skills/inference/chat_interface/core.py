@@ -51,7 +51,7 @@ class AppConfig:
     # Prompt configuration
     base_prompt_config: str = "generic/math"
     code_prompt_config: str = "openmath/tir"
-    prompt_template: str = "qwen-instruct"
+    tokenizer: str = "nvidia/OpenMath-Nemotron-14B"
     code_tags: str = "openmath"
 
     # Code-execution related
@@ -138,7 +138,7 @@ class PromptManager:
         if prompt_config_override:
             # When using override, always load fresh (don't cache overrides)
             logger.debug("Loading prompt config override: %s", prompt_config_override)
-            prompt = get_prompt(prompt_config=prompt_config_override, prompt_template=self._cfg.prompt_template)
+            prompt = get_prompt(prompt_config=prompt_config_override, tokenizer=self._cfg.tokenizer)
             return prompt
 
         path = self._cfg.code_prompt_config if use_code else self._cfg.base_prompt_config
@@ -146,7 +146,7 @@ class PromptManager:
             return self._cache[path]
 
         logger.debug("Loading prompt config: %s", path)
-        prompt = get_prompt(prompt_config=path, prompt_template=self._cfg.prompt_template)
+        prompt = get_prompt(prompt_config=path, tokenizer=self._cfg.tokenizer)
         self._cache[path] = prompt
         return prompt
 

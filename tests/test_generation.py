@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
 import json
 import os
 
@@ -26,51 +25,12 @@ from nemo_skills.evaluation.metrics import ComputeMetrics
 
 DATA_TO_TEST = []
 template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
-prompt_templates = [f[:-5] for f in os.listdir(template_folder) if f.endswith('.yaml')]
 
 for dataset, split in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test')]:
     DATA_TO_TEST.append((dataset, split))
 
 
-@pytest.mark.parametrize("dataset,split", DATA_TO_TEST)
-def test_generation_dryrun_llama(dataset, split):
-    """Testing the default prompts for each dataset."""
-    prompt_template = "llama3-instruct"
-    extra_args = importlib.import_module(f'nemo_skills.dataset.{dataset}').GENERATION_ARGS
-    prompt_config = importlib.import_module(f'nemo_skills.dataset.{dataset}').PROMPT_CONFIG
-    cmd = (
-        "python nemo_skills/inference/generate.py "
-        f"    ++output_file=./test.jsonl "
-        f"    ++prompt_template={prompt_template} "
-        f"    ++prompt_config={prompt_config} "
-        f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
-        f"    ++server.server_type=sglang "
-        f"    ++server.model=dummy "
-        f"    ++dry_run=True "
-        f"    {extra_args} "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-
-@pytest.mark.parametrize("prompt_template", prompt_templates)
-def test_generation_dryrun_gsm8k(prompt_template):
-    """Testing that each template can work with a single dataset."""
-    dataset = "gsm8k"
-    split = "test"
-    cmd = (
-        "python nemo_skills/inference/generate.py "
-        f"    ++output_file=./test.jsonl "
-        f"    ++prompt_template={prompt_template} "
-        f"    ++prompt_config=generic/math "
-        f"    ++input_file=./nemo_skills/dataset/{dataset}/{split}.jsonl "
-        f"    ++server.server_type=trtllm "
-        f"    ++server.model=dummy "
-        f"    ++dry_run=True "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-
-def test_eval_mtbench_api(tmp_path):
+def test_eval_gsm8k_api(tmp_path):
     if not os.getenv('NVIDIA_API_KEY'):
         pytest.skip("Define NVIDIA_API_KEY to run this test")
 

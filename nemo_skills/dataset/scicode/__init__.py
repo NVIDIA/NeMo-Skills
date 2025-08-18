@@ -13,11 +13,10 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'eval/scicode/default'
 DATASET_GROUP = 'code'
 METRICS_TYPE = 'scicode'
 # generation is a dictionary instead of string and remove_thinking is done during inference
 EVAL_ARGS = "++eval_type=scicode ++remove_thinking=False"
-GENERATION_ARGS = ""
+GENERATION_ARGS = "++prompt_config=eval/scicode/default"
 GENERATION_MODULE = "nemo_skills.inference.eval.scicode"
 REQUIRES_SANDBOX = True

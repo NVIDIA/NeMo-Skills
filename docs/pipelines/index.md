@@ -26,8 +26,7 @@ This might sound a little complicated, so let's see how it works through an exam
         --server_gpus=1 \
         --output_dir=/workspace/generation-local-trtllm \
         --input_file=/workspace/input.jsonl \
-        ++prompt_config=/workspace/prompt.yaml \
-        ++prompt_template=qwen-instruct
+        ++prompt_config=/workspace/prompt.yaml
     ```
 
 === "python interface"
@@ -44,7 +43,6 @@ This might sound a little complicated, so let's see how it works through an exam
         input_file="/workspace/input.jsonl",
         ctx=wrap_arguments(
             "++prompt_config=/workspace/prompt.yaml "
-            "++prompt_template=qwen-instruct "
         ),
     )
     ```

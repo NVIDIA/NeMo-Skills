@@ -60,7 +60,6 @@ stages:
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/math-tir-detailed.yaml
       ++code_execution=true
       ++server.code_execution.max_code_executions=8
-      ++prompt_template=qwen-instruct
       ++inference.tokens_to_generate=16384
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
@@ -89,7 +88,7 @@ stages:
     input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    inline_args: "++prompt_template=qwen-instruct"
+    inline_args: ""
     stage_kwargs:
       <<: *generate_kwargs
 
@@ -121,7 +120,6 @@ stages:
   judge_novelty:
     output_dir: ${directories.step-6-judge-novelty}
     input_dir: ${directories.step-5-extract-fragments}
-    prompt_template: qwen-instruct
     prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-novelty.yaml
     dependencies:
       - extract_python_fragments
@@ -133,7 +131,6 @@ stages:
   judge_significance:
     output_dir: ${directories.step-7-judge-significance}
     input_dir: ${directories.step-5-extract-fragments}
-    prompt_template: qwen-instruct
     prompt_config: /nemo_run/code/recipes/openmathreasoning/prompts/classify-tir-significance.yaml
     dependencies:
       - extract_python_fragments
@@ -157,7 +154,7 @@ stages:
     output_dir: ${directories.step-9-prepare-sft}
     input_file: ${directories.step-8-filter-fragments}/filtered_output.jsonl
     prompt_config: generic/math
-    prompt_template: qwen-instruct
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
     dependencies:
       - filter_fragments

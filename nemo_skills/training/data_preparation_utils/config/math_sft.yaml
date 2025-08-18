@@ -2,7 +2,6 @@ processors_to_run: all
 
 output_path: ???
 prompt_config: null
-prompt_template: null
 code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
@@ -24,9 +23,9 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
-# Params for length-based filtering
-# Unit of length - Tokens
-hf_model_name: null
+# Needed to format the data and also for length-based filtering
+tokenizer: null
+system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
 min_problem_length: 0
@@ -37,7 +36,6 @@ min_solution_length: 0
 max_solution_length: 2048
 use_chars_for_min_length: false
 
-chat_format: null  # null/nemotron/llama
 
 input_key: problem
 output_key: generation
@@ -149,11 +147,10 @@ processors:
         should_run: ${filters.remove_no_think_tags}
         text_key: ${output_key}
         regex_patterns:
-          - '<think>'
           - '</think>'
         test_cases:
-          - {input: {generation: "My solution:\n---<think>---\nSomething else"}, output: null}
-          - {input: {generation: "My solution:\n</think>\nSomething else"}, output: null}
+          - {input: {generation: "My solution:\n---</think>---\nSomething else"}, output: {generation: "My solution:\n---</think>---\nSomething else"}}
+          - {input: {generation: "<think>My solution:\n\nSomething else"}, output: null}
           - {input: {generation: "<think>thinking</think>summary"}, output: {generation: "<think>thinking</think>summary"}}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfRegexMatch
@@ -219,14 +216,14 @@ processors:
         property_key: ${input_key}
         min_length: ${min_problem_length}
         max_length: ${max_problem_length}
-        hf_model_name: ${hf_model_name}
+        tokenizer: ${tokenizer}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
         should_run: ${filters.remove_len_outlier_solutions}
         property_key: ${output_key}
         min_length: ${min_solution_length}
         max_length: ${max_solution_length}
-        hf_model_name: ${hf_model_name}
+        tokenizer: ${tokenizer}
         use_chars_for_min_length: ${use_chars_for_min_length}
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.AddCodeExecutionsCounts
@@ -251,10 +248,10 @@ processors:
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
-    prompt_template: ${prompt_template}
+    tokenizer: ${tokenizer}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     input_key: ${input_key}
     output_key: ${output_key}
-    chat_format: ${chat_format}
     metadata: ${metadata}
     exclude_optional_keys: ${exclude_optional_keys}

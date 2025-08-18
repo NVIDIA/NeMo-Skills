@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
   {examples}
   Write a new multiple-choice question inspired by the given one. Make the new question reasonable and solvable.
@@ -9,4 +7,4 @@ user: |-
   Question:
   {question}
   Write another multiple-choice question inspired by this one.
-  Don't just change the numbers and context, but try to create a question that requires another approach to solve. 
+  Don't just change the numbers and context, but try to create a question that requires another approach to solve.

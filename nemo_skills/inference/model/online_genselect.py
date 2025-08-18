@@ -16,7 +16,6 @@ import asyncio
 import logging
 import random
 import re
-from dataclasses import field
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
@@ -32,7 +31,8 @@ class OnlineGenSelectConfig:
     max_concurrent_requests: int = 8
     max_num_solutions: int = 8
     prompt_config: str = "generic/genselect"
-    prompt_template: str | None = None
+    use_completions_api: bool = False
+    tokenizer: str | None = None
     temperature: float = 0.6
     tokens_to_generate: int = 2048
     comparison_key: str = "generation"  # Key used for comparing the different solutions
@@ -53,7 +53,12 @@ class OnlineGenSelectWrapper:
         self.cfg = cfg
 
         # Load GenSelect prompt
-        self.genselect_prompt = get_prompt(self.cfg.prompt_config, prompt_template=self.cfg.prompt_template)
+        if self.cfg.use_completions_api:
+            tokenizer = self.cfg.tokenizer or self.model.model_name_or_path
+        else:
+            tokenizer = None
+        self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
+
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:

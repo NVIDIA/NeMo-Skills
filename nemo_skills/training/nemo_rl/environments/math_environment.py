@@ -1,4 +1,5 @@
 # Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -188,7 +189,8 @@ class MathEnvironment(EnvironmentInterface):
             # "table": table, TODO @sahilj WIP
             "accuracy": batch["rewards"].mean().item(),
             "pass@samples_per_prompt": calculate_pass_rate_per_prompt(batch["text"], batch["rewards"]),
-            "num_problems_in_batch": batch["rewards"].shape[0],
+            "fraction_of_samples_properly_ended": batch["is_end"].float().mean().item(),
+            "num_problems_in_batch": batch["is_end"].shape[0],
             "generation_lengths": batch["generation_lengths"].float().mean().item(),
             "prompt_lengths": batch["prompt_lengths"].float().mean().item(),
             "correct_solution_generation_lengths": correct_solution_generation_lengths,

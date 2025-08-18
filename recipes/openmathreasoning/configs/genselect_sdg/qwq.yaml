@@ -69,7 +69,6 @@ stages:
 
     inline_args: >-
       ++prompt_config=openmath/genselect
-      ++prompt_template=qwen-instruct
       ++generation_key=genselect_comparison
       ++inference.tokens_to_generate=16_384
       ++inference.temperature=0.6
@@ -91,7 +90,6 @@ stages:
       - extract_judgment
     inline_args: >-
       ++prompt_config=/nemo_run/code/recipes/openmathreasoning/prompts/summarize-genselect.yaml
-      ++prompt_template=qwen-instruct
       ++inference.temperature=0.7
       ++inference.tokens_to_generate=2048
     stage_kwargs: ${generate_new_summaries_kwargs}
@@ -108,7 +106,7 @@ stages:
     input_file: ${directories.step-5-merge-new-summaries}/output.jsonl
     output_dir: ${directories.step-6-prepare-sft}
     prompt_config: openmath/genselect
-    prompt_template: qwen-instruct
+    tokenizer: Qwen/Qwen2.5-32B-Instruct
     contamination_file: ${contamination_file}
 
     dependencies:
