@@ -38,15 +38,11 @@ class OpenAIModel(OpenAIAPIModel):
         if base_url is None:
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
-        if api_key is None:
-            if 'api.nvidia.com' in base_url:
-                api_key = os.getenv("NVIDIA_API_KEY")
-                if not api_key:
-                    raise ValueError("NVIDIA_API_KEY is required for NVIDIA models and could not be found.")
-            elif 'api.openai.com' in base_url:
-                api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
-                    raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
+        if api_key and "OPENAI_API_KEY" in os.environ:
+            api_key = os.getenv("OPENAI_API_KEY")
+
+        # Remove the /chat/completions part if needed
+        base_url = re.sub(r"/chat/completions$", "", base_url)
 
         super().__init__(
             model=model,
