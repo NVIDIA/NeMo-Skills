@@ -15,6 +15,7 @@
 # copied from https://github.com/NVIDIA/NeMo-RL/blob/main/examples/run_sft.py
 
 import argparse
+import json
 import os
 import pprint
 import warnings
@@ -71,16 +72,21 @@ class PromptResponseDataset:
 
     def load_or_process_split(self, path: str, split_name: str) -> Dataset:
         data_path = Path(path)
-
-        # Build cache dir using split name + file stem
         cache_dir = data_path.parent / ".cache" / f"{split_name}_{data_path.stem}"
+        sig_file = cache_dir / "signature.json"
 
-        # If cache exists and reprocessing is not forced, load from cache
-        if cache_dir.exists() and not self.force_reprocess:
-            print(f"[Cache] Loading {split_name} dataset from: {cache_dir}")
-            return load_from_disk(str(cache_dir))
+        file_size = str(data_path.stat().st_size)
 
-        # Otherwise, process from scratch
+        if cache_dir.exists() and sig_file.exists() and not self.force_reprocess:
+            with open(sig_file) as f:
+                old_sig = json.load(f).get("size", "")
+            if old_sig == file_size:
+                print(f"[Cache] Loading {split_name} dataset from: {cache_dir}")
+                return load_from_disk(str(cache_dir))
+            else:
+                print(f"[Cache] Invalidated (file size changed): {path}")
+
+        # Re-process dataset
         print(f"[Map] Processing {split_name} dataset from: {path}")
         raw_dataset = load_dataset("json", data_files=str(path))["train"]
 
@@ -89,11 +95,13 @@ class PromptResponseDataset:
             batched=True,
             num_proc=self.num_proc,
         )
-
+        # Save dataset + new size signature
         cache_dir.mkdir(parents=True, exist_ok=True)
         mapped_dataset.save_to_disk(str(cache_dir))
-        print(f"[Cache] Saved {split_name} dataset to: {cache_dir}")
+        with open(sig_file, "w") as f:
+            json.dump({"size": file_size}, f)
 
+        print(f"[Cache] Saved {split_name} dataset to: {cache_dir}")
         return mapped_dataset
 
     def add_messages_key(self, examples: dict[str, list[Any]]) -> dict[str, list[list[dict[str, Any]]]]:
