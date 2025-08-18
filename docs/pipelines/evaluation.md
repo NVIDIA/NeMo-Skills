@@ -151,8 +151,7 @@ Here is an example evaluation command for ruler that uses data_dir parameter
 from nemo_skills.pipeline.cli import eval, wrap_arguments
 
 eval(
-    # using a low number of concurrent requests since it's almost entirely prefill stage
-    ctx=wrap_arguments("++max_concurrent_requests=32"),
+    ctx=wrap_arguments(""),
     cluster="slurm",
     model="/hf_models/Meta-Llama-3.1-8B-Instruct",
     server_type="sglang",
