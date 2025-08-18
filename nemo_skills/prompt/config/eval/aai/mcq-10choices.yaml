@@ -1,8 +1,7 @@
 # Default prompt for multuple choice benchmarks with ten answer choices (e.g. MMLU-Pro). It's intended for instruction-following models.
 # Based on https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
-system: ""
 
 user: |-
-  Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D/E/F/G/H/I/J' (e.g. 'Answer: A'). 
+  Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D/E/F/G/H/I/J' (e.g. 'Answer: A').
 
   {problem}

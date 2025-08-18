@@ -28,29 +28,6 @@ pip install -U "huggingface_hub[cli]"
 huggingface-cli download nvidia/OpenMath-Nemotron-1.5B --local-dir OpenMath-Nemotron-1.5B
 ```
 
-## Convert to TensorRT-LLM
-
-Convert the model to TensorRT-LLM format. This is optional, but highly recommended for more exact
-results and faster inference. If you skip it, replace `--server_type trtllm` with `--server-type vllm` (or sglang)
-in the commands below and change model path to `/workspace/OpenMath-Nemotron-1.5B`.
-
-```bash
-ns convert \
-    --cluster=local \
-    --input_model=/workspace/OpenMath-Nemotron-1.5B \
-    --output_model=/workspace/openmath-nemotron-1.5b-trtllm \
-    --convert_from=hf \
-    --convert_to=trtllm \
-    --model_type=qwen \
-    --num_gpus=1 \
-    --hf_model_name=nvidia/OpenMath-Nemotron-1.5B \
-    --max_input_len 50000 \
-    --max_seq_len 50000
-```
-
-We are converted with longer length since HLE-math benchmark has a few very long prompts.
-You can change the number of GPUs if you have more than 1, but don't use more than 4 for 1.5B and 7B models.
-
 ## Prepare evaluation data
 
 ```bash
@@ -62,27 +39,25 @@ ns prepare_data comp-math-24-25 hle
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath-nemotron-1.5b-trtllm \
+    --model=/workspace/OpenMath-Nemotron-1.5B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
     --benchmarks=comp-math-24-25:64 \
     --server_gpus=1 \
     --num_jobs=1 \
-    ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6
 
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath-nemotron-1.5b-trtllm \
+    --model=/workspace/OpenMath-Nemotron-1.5B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
     --benchmarks=hle:64 \
     --server_gpus=1 \
     --num_jobs=1 \
     --split=math \
-    ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6
@@ -108,7 +83,7 @@ or on cluster.
 ns generate \
     --generation_type=math_judge \
     --cluster=local \
-    --model=/trt_models/qwen2.5-32b-instruct \
+    --model=/hf_models/Qwen2.5-32B-Instruct \
     --server_type=trtllm \
     --server_gpus=4 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle \
@@ -144,7 +119,7 @@ To get TIR evaluation numbers, replace the generation commands like this
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath-nemotron-1.5b-trtllm \
+    --model=/workspace/OpenMath-Nemotron-1.5B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-tir \
     --benchmarks=comp-math-24-25:64 \
@@ -152,7 +127,6 @@ ns eval \
     --num_jobs=1 \
     --with_sandbox \
     ++code_tags=openmath \
-    ++prompt_template=qwen-instruct \
     ++prompt_config=openmath/tir \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -175,7 +149,6 @@ ns eval \
     --num_jobs=1 \
     --with_sandbox \
     ++code_tags=openmath \
-    ++prompt_template=qwen-instruct \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -193,7 +166,6 @@ Here is a sample command to run GenSelect evaluation:
 ns genselect \
     --preprocess_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
     --model=/trt_models/openmath-nemotron-1.5b \
-    ++prompt_template=qwen-instruct \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \
     --cluster=local \
     --server_type=trtllm \

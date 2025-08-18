@@ -40,3 +40,20 @@ if __name__ == "__main__":
         with open(output_file, "wt", encoding="utf-8") as fout:
             for entry in data:
                 fout.write(json.dumps(entry) + "\n")
+
+    # Concate the two to make test_aai
+    dev_file = data_dir / "dev.jsonl"
+    test_file = data_dir / "test.jsonl"
+    test_aai_file = data_dir / "test_aai.jsonl"
+
+    with open(dev_file, "rt", encoding="utf-8") as fin:
+        dev_data = [json.loads(line) for line in fin]
+    with open(test_file, "rt", encoding="utf-8") as fin:
+        test_data = [json.loads(line) for line in fin]
+
+    test_aai_data = []
+    test_aai_data.extend(dev_data)
+    test_aai_data.extend(test_data)
+    with open(test_aai_file, "w", encoding="utf-8") as fout:
+        for entry in test_aai_data:
+            fout.write(json.dumps(entry) + "\n")

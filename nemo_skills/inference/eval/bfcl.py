@@ -20,6 +20,7 @@ from dataclasses import asdict, field
 from functools import partial
 
 import hydra
+import openai
 from omegaconf import OmegaConf
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
@@ -59,7 +60,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
 
         if self.prompt_format == "openai":
             assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
-            assert self.prompt_template is None, "prompt_template is not supported for prompt_format == 'openai'"
 
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
@@ -108,7 +108,6 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
         return [
             ("prompt_config", None),
-            ("prompt_template", None),
         ]
 
 
@@ -118,25 +117,16 @@ cs.store(name="base_bfcl_generation_config", node=BFCLGenerationConfig)
 
 class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
-        self.cfg = cfg
-        self.llm = self.setup_llm()
-        self.extra_stop_phrases = OmegaConf.to_container(self.cfg.extra_stop_phrases, resolve=True)
-
-        # TODO: Need a better way to handle this
-        self.extra_generate_params = {}
-
-        self.use_async_loop = True  # Set it to True as the default
-        LOG.info(
-            "Async loop is maintaining %d generations in parallel. "
-            "Use max_concurrent_requests to control the number of concurrent requests.",
-            self.cfg.max_concurrent_requests,
-        )
+        super().__init__(cfg)
 
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
         return
 
-    def _generate_single_assistant_turn(self, inference_state_dict):
+    def setup_prompt(self):
+        return None
+
+    async def _generate_single_assistant_turn(self, inference_state_dict):
         """Generate for a single assistant turn."""
         messages = inference_state_dict["messages"]
         tools = inference_state_dict["tools"]
@@ -144,15 +134,42 @@ class BFCLGenerationTask(GenerationTask):
         if self.cfg.system_message:
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
+        # Step 1: Construct the prompt
         if self.cfg.use_client_parsing:
             fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
             input_dict = {
-                "prompts": [fmted_prompt],
+                "prompt": fmted_prompt,
                 "include_response": True,
                 **asdict(self.cfg.inference),
                 **self.extra_generate_params,
             }
-            output = self.llm.generate(**input_dict)[0]
+        else:
+            input_dict = {
+                "prompt": messages,
+                "tools": tools,
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
+
+        # Step 2: Query the LLM server
+        # Enable soft-fail when the models run out of context
+        try:
+            output = await self.llm.generate_async(**input_dict)
+        # TODO: Currently we're assuming an openai interface which is not true for all servers
+        except openai.BadRequestError as e:
+            error_str = str(e)
+            context_error = "is longer than the model's context length" in error_str
+            token_error = "Requested token count exceeds model's maximum context length" in error_str
+
+            if context_error or token_error:
+                LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
+                return {"message": None, "generation": ""}
+            else:
+                raise
+
+        # Step 3: Parse the generated output. In case of server side parsing, merely getting the response message
+        if self.cfg.use_client_parsing:
             parsed_response = self.cfg.response_parser(output["response"])["model_responses_message_for_chat_history"]
 
             model_response = {
@@ -170,36 +187,31 @@ class BFCLGenerationTask(GenerationTask):
                 "tool_calls": parsed_response.get("tool_calls", []),
                 "num_generated_tokens": output["num_generated_tokens"],
             }
-
         else:
-            input_dict = {
-                "prompts": [messages],
-                "tools": [tools],
-                "include_response": True,
-                **asdict(self.cfg.inference),
-                **self.extra_generate_params,
-            }
-
-            output = self.llm.generate(**input_dict)[0]
-            if "tool_calls" not in output:
-                output["tool_calls"] = []
             output["message"] = output["response"].choices[0].message
+            output["tool_calls"] = []
+            if output["message"].tool_calls:
+                output["tool_calls"] = output["message"].tool_calls
+
             return output
 
-    def generate_single_data_point_single_turn(self, data_point):
+    async def generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
-        model_response = self._generate_single_assistant_turn(state_dict)
-        proc_model_response = self._process_model_response(model_response)
+        model_response = await self._generate_single_assistant_turn(state_dict)
 
-        return {
-            "id": data_point["id"],
-            "generation": proc_model_response["generation"],
-            "num_generated_tokens": model_response.get("num_generated_tokens", 0),
-        }
+        if model_response["message"] is None:
+            # Ran out of context
+            return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}
+        else:
+            proc_model_response = self._process_model_response(model_response)
+            return {
+                "generation": proc_model_response["generation"],
+                "num_generated_tokens": model_response.get("num_generated_tokens", 0),
+            }
 
-    def generate_single_data_point_multi_turn(self, data_point):
+    async def generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
 
         initial_config: dict = data_point["initial_config"]
@@ -214,6 +226,7 @@ class BFCLGenerationTask(GenerationTask):
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
         output_dict = {"result": [], "num_generated_tokens": 0, "log_dict_list": []}
+        out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_response = []
@@ -237,7 +250,13 @@ class BFCLGenerationTask(GenerationTask):
             state_dict["messages"].extend(current_turn_message)
 
             while True:
-                model_response = self._generate_single_assistant_turn(state_dict)
+                model_response = await self._generate_single_assistant_turn(state_dict)
+                if model_response["message"] is None:
+                    # Ran out of context
+                    out_of_context = True
+                    LOG.info("Quitting the multi-turn generation due to running out of context.")
+                    break
+
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 output_dict["log_dict_list"].append(model_response)
 
@@ -300,33 +319,22 @@ class BFCLGenerationTask(GenerationTask):
             # Add to the total list
             all_model_response.append(current_turn_response)
 
-            if force_quit:
+            if force_quit or out_of_context:
                 break
 
-        return {"generation": all_model_response, "num_generated_tokens": output_dict["num_generated_tokens"]}
+        output_dict["generation"] = all_model_response
 
-    def llm_generate(self, data_points, data, is_async=True):
-        """Depending on whether the instances are single turn or multi-turn, we use different methods to generate."""
-        futures = []
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                if data_point["single_turn"]:
-                    method = self.generate_single_data_point_single_turn
-                else:
-                    method = self.generate_single_data_point_multi_turn
-                future = executor.submit(method, data_point)
-                futures.append(future)
+        if out_of_context:
+            output_dict["error"] = "_ran_out_of_context_"
 
-        return futures
+        return output_dict
 
-    def get_llm_generations(self, requests_in_progress, generations):
-        for dp_idx, future in requests_in_progress.items():
-            if future.done():
-                generations[dp_idx] = future.result()
-            else:
-                generations[dp_idx] = {'generation': None}
-
-        return requests_in_progress, generations
+    async def process_single_datapoint(self, data_point, all_data):
+        """Process a single data point and return the result."""
+        if data_point["single_turn"]:
+            return await self.generate_single_data_point_single_turn(data_point)
+        else:
+            return await self.generate_single_data_point_multi_turn(data_point)
 
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""

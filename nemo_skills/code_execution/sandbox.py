@@ -13,16 +13,16 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import glob
 import json
 import logging
 import os
+import re
 import uuid
-from concurrent.futures import ThreadPoolExecutor
-from itertools import zip_longest
 from typing import Dict, List, Optional, Tuple
 
-import requests
+import httpx
 import tqdm
 
 from nemo_skills.code_execution.utils import clean_formal_generation
@@ -32,63 +32,58 @@ from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help, unroll_fi
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-class DummyFuture:
-    def __init__(self, return_value):
-        self.return_value = return_value
-
-    def result(self):
-        return self.return_value
-
-
 def unroll_files(input_files):
     for manifest_pattern in input_files:
         for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
             yield manifest
 
 
-def cleanup_tmp_files(input_files):
-    # removing any potentially present tmp files
-    for manifest in unroll_files(input_files):
-        try:
-            os.remove(manifest + "-tmp")
-        except OSError:
-            pass
+def extract_proof_only(lean_code: str) -> str:
+    lines = lean_code.strip().splitlines()
+    if not lines:
+        return ""
 
+    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_idx = None
 
-def dump_data(input_files, data, map_to_future):
-    LOG.info("Waiting for current results and dumping to tmp files")
-    tmp_file_handles = [
-        open(manifest + f"-tmp", "at", encoding="utf-8", buffering=1) for manifest in unroll_files(input_files)
-    ]
+    # 1. Find where the theorem starts
+    for i, line in enumerate(lines):
+        if header_start_pattern.match(line):
+            header_start_idx = i
+            break
 
-    for line_data in data:
-        for file_data, file_handle in zip(line_data, tmp_file_handles):
-            if file_data is None:
-                continue
-            line_dict = json.loads(file_data)
-            if not line_dict:
-                file_handle.write("\n")
-                continue
-            line_dict["proof_status"] = map_to_future[(line_dict["predicted_proof"])].result()
-            file_handle.write(json.dumps(line_dict) + "\n")
+    if header_start_idx is None:
+        return lean_code.strip()
 
-    for file_handle in tmp_file_handles:
-        file_handle.close()
+    # 2. Find where ':=' occurs, starting from the header
+    header_end_idx = None
+    for i in range(header_start_idx, len(lines)):
+        if ":=" in lines[i]:
+            header_end_idx = i
+            break
 
+    if header_end_idx is None:
+        return lean_code.strip()
 
-def write_tmp_files_back(input_files):
-    """Will gracefully handle early exits on errors by properly merging files"""
-    LOG.info("Writing temporary files back into original files")
-    for manifest in unroll_files(input_files):
-        # copying the rest of the results unchanged if any to tmp file
-        with open(manifest + "-tmp", "rt") as fin:
-            processed_lines = sum(1 for _ in fin)
-        with open(manifest, "rt", encoding="utf-8") as fin, open(manifest + "-tmp", "at", encoding="utf-8") as fout:
-            for line_idx, line in enumerate(fin):
-                if line_idx >= processed_lines:
-                    fout.write(line)
-        # then replacing original file with tmp file
-        os.replace(manifest + "-tmp", manifest)
+    # 3. Extract the line after ':='
+    header_line, after = lines[header_end_idx].split(":=", 1)
+    proof_first_line = after.strip()
+
+    # 4. Collect proof lines
+    if proof_first_line:
+        proof_lines = [proof_first_line] + lines[header_end_idx + 1 :]
+    else:
+        proof_lines = lines[header_end_idx + 1 :]
+
+    # 5. Remove leading 'by' (with or without indentation)
+    if proof_lines:
+        first = proof_lines[0].lstrip()
+        if first == "by":
+            proof_lines = proof_lines[1:]
+        elif first.startswith("by "):
+            proof_lines[0] = first[3:]  # Strip 'by '
+
+    return "\n".join(proof_lines).rstrip()
 
 
 class Sandbox(abc.ABC):
@@ -115,11 +110,10 @@ class Sandbox(abc.ABC):
     ):
         self.host = host
         self.port = port
-        session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
-        session.mount('http://', adapter)
-        session.mount('https://', adapter)
-        self.http_session = session
+        # Create async HTTP client with high limits
+        self.http_session = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=2048, max_connections=2048),
+        )
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
         # will keep state of code sessions
@@ -128,27 +122,37 @@ class Sandbox(abc.ABC):
     def clear_session(self, session_id):
         del self.sessions[session_id]
 
-    def _send_request(self, request, timeout):
+    async def close(self):
+        """Close the HTTP session."""
+        await self.http_session.aclose()
+
+    async def _send_request(self, request, timeout):
         if self.ssh_server and self.ssh_key_path:
+            # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
 
-            sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-            output = sshtunnel_request.post(
-                url=self._get_execute_url(),
-                data=json.dumps(request),
-                timeout=timeout,
-                headers={"Content-Type": "application/json"},
-            )
+            def ssh_request():
+                sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
+                return sshtunnel_request.post(
+                    url=self._get_execute_url(),
+                    data=json.dumps(request),
+                    timeout=timeout,
+                    headers={"Content-Type": "application/json"},
+                )
+
+            # Native async requires more lines of code, so we use to_thread
+            # Should be ok since this is a debug mode
+            output = await asyncio.to_thread(ssh_request)
         else:
-            output = self.http_session.post(
+            output = await self.http_session.post(
                 url=self._get_execute_url(),
-                data=json.dumps(request),
+                content=json.dumps(request),
                 timeout=timeout,
                 headers={"Content-Type": "application/json"},
             )
         # retrying 502 errors
         if output.status_code == 502:
-            raise requests.exceptions.Timeout
+            raise httpx.TimeoutException("502 error")
         return self._parse_request_output(output)
 
     @abc.abstractmethod
@@ -163,25 +167,25 @@ class Sandbox(abc.ABC):
     def _prepare_request(self, generated_code, timeout):
         pass
 
-    def execute_code(
+    async def execute_code(
         self,
         generated_code: str,
-        language: str = 'python',
+        std_input: str = "",
+        language: str = 'ipython',
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
         traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-
-        if session_id is None and language == "python":  # creating a new session with empty state
+        if session_id is None and language == "ipython":  # creating a new session with empty state
             session_id = uuid.uuid4()
             self.sessions[session_id] = []
 
         if session_id is not None:
             self.sessions[session_id].append(generated_code)
 
-        if language == 'python':
+        if language == 'ipython':
             TO_EXECUTE = """
 import traceback
 import json
@@ -246,7 +250,7 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language == 'lean4':
+        elif language in ["python", "pypy3", "python3", "lean4"]:
             if session_id is not None:
                 raise RuntimeError(
                     f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
@@ -255,116 +259,112 @@ print(json.dumps(to_return))
         else:
             raise ValueError(f"Unsupported language: {language}")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language)
+        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
         try:
-            output = self._send_request(request, timeout)
-        except requests.exceptions.Timeout:
+            output = await self._send_request(request, timeout)
+        except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         # removing last state to not re-execute code with errors
         if session_id is not None:
-            if output['stderr'] or 'Traceback (most recent call last)' in output['stdout']:
+            if output['process_status'] != "completed":
                 self.sessions[session_id] = self.sessions[session_id][:-1]
         return output, session_id
 
-    def is_proof_correct(self, pred_output, timeout=30.0):
+    async def is_proof_correct(self, pred_output, timeout=30.0):
         TO_EXECUTE = pred_output
 
         request = self._prepare_request(TO_EXECUTE, timeout, "lean4")
         try:
-            output = self._send_request(request, timeout)
-        except requests.exceptions.Timeout:
+            output = await self._send_request(request, timeout)
+        except httpx.TimeoutException:
             return "timeout"
+        if output['process_status'] == 'completed' and output['stdout'] != '':
+            return 'has_sorry'
         return output["process_status"]
 
-    def batch_evaluate_results(
+    async def batch_evaluate_results(
         self,
         input_files: List[str],
         num_parallel_requests=10,
-        in_memory_lines=500,
         timeout=30.0,
         answer_format="lean4-proof",
-        ignore_cache: bool = False,
         use_predicted_proof_key: bool = False,
         final_answer_key: str = "**FINAL ANSWER**",
         restate_formal_statement: bool = True,
+        strip_theorem_from_proof: bool = True,
     ):
-        """Will write if the results are correct back into the original files."""
+        """Evaluate results and write back to original files."""
 
-        file_handles = [open(manifest, "rt", encoding="utf-8") for manifest in unroll_files(input_files)]
-        cleanup_tmp_files(input_files)
+        semaphore = asyncio.Semaphore(num_parallel_requests)
 
-        data = []
-        with ThreadPoolExecutor(max_workers=num_parallel_requests) as executor:
-            for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
-                if line_idx % in_memory_lines == 0:
-                    if line_idx > 0:  # dumping into tmp files
-                        dump_data(input_files, data, map_to_future)
-                    # new in-memory buffer
-                    data = []
-                    map_to_future = {}
+        async def process_line(line_data):
+            """Process a single line and return updated line data."""
+            if not line_data or not line_data.strip():
+                return line_data
 
-                data.append([])
-                for file_line in lines:
-                    data[-1].append(file_line)
-                    if file_line is None:  # if different files have different number of lines
-                        continue
-                    line_dict = json.loads(file_line)
-                    if not line_dict:  # can be empty for incomplete generations
-                        continue
+            line_dict = json.loads(line_data)
+            if not line_dict:
+                return line_data
 
-                    if answer_format == "lean4-proof":
-                        if not use_predicted_proof_key:
-                            generation = clean_formal_generation(
-                                line_dict["generation"], final_answer_key=final_answer_key
-                            )
-                            line_dict["predicted_proof"] = (
-                                line_dict["header"]
-                                + (line_dict["formal_statement"] if restate_formal_statement else '')
-                                + generation
-                            )
-                        else:
-                            if "predicted_proof" not in line_dict:
-                                raise ValueError(
-                                    "predicted_proof key not found in the line_dict. "
-                                    "Set use_predicted_proof_key=False to re-combine"
-                                )
-                    elif answer_format == "lean4-statement":
-                        if not use_predicted_proof_key:
-                            generation = clean_formal_generation(line_dict["generation"])
-                            header = get_lean4_header()
-                            line_dict["predicted_proof"] = header + generation + "\n sorry"
-                        else:
-                            if "predicted_proof" not in line_dict:
-                                raise ValueError(
-                                    "predicted_proof key not found in the line_dict. "
-                                    "Set use_predicted_proof_key=False to re-combine"
-                                )
-                    else:
-                        raise ValueError(f'Unknown answer_format: {answer_format}')
-
-                    data[-1][-1] = json.dumps(line_dict)
-
-                    predicted_proof = line_dict["predicted_proof"]
-
-                    if predicted_proof in map_to_future:
-                        continue
-
-                    if ignore_cache or line_dict.get("proof_status") is None:
-                        map_to_future[predicted_proof] = executor.submit(
-                            self.is_proof_correct,
-                            predicted_proof,
-                            timeout=timeout,
+            # Prepare predicted_proof based on format
+            if answer_format == "lean4-proof":
+                if not use_predicted_proof_key:
+                    generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
+                    line_dict["predicted_proof"] = (
+                        line_dict["header"]
+                        + (line_dict["formal_statement"] if restate_formal_statement else '')
+                        + extract_proof_only(generation)
+                        if strip_theorem_from_proof
+                        else generation
+                    )
+                else:
+                    if "predicted_proof" not in line_dict:
+                        raise ValueError(
+                            "predicted_proof key not found in the line_dict. "
+                            "Set use_predicted_proof_key=False to re-combine"
                         )
-                    else:
-                        map_to_future[predicted_proof] = DummyFuture(line_dict["proof_status"])
+            elif answer_format == "lean4-statement":
+                if not use_predicted_proof_key:
+                    generation = clean_formal_generation(line_dict["generation"])
+                    header = get_lean4_header()
+                    line_dict["predicted_proof"] = header + generation + "\n sorry"
+                else:
+                    if "predicted_proof" not in line_dict:
+                        raise ValueError(
+                            "predicted_proof key not found in the line_dict. "
+                            "Set use_predicted_proof_key=False to re-combine"
+                        )
+            else:
+                raise ValueError(f'Unknown answer_format: {answer_format}')
 
-            for file_handle in file_handles:
-                file_handle.close()
+            # Evaluate proof with concurrency control
+            async with semaphore:
+                proof_status = await self.is_proof_correct(line_dict["predicted_proof"], timeout=timeout)
+                line_dict["proof_status"] = proof_status
 
-            if len(data) > 0:
-                dump_data(input_files, data, map_to_future)
+            return json.dumps(line_dict)
 
-        write_tmp_files_back(input_files)
+        # Process each file
+        for input_file in unroll_files(input_files):
+            # Read all lines
+            with open(input_file, "rt", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            # Process lines concurrently with progress bar
+            print(f"Processing {input_file}...")
+            processed_lines = []
+            for line in tqdm.tqdm(lines):
+                result = await process_line(line.rstrip('\n'))
+                processed_lines.append(result)
+
+            # Write to temp file then replace original
+            temp_file = input_file + "-tmp"
+            with open(temp_file, "wt", encoding="utf-8") as f:
+                for line in processed_lines:
+                    f.write(line + "\n")
+
+            # Replace original with temp file
+            os.replace(temp_file, input_file)
 
 
 class LocalSandbox(Sandbox):
@@ -380,46 +380,17 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
 
-    def _prepare_request(self, generated_code, timeout, language='python'):
+    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
         return {
             "generated_code": generated_code,
+            "std_input": std_input,
             "timeout": timeout,
             "language": language,
         }
 
 
-class PistonSandbox(Sandbox):
-    """Piston sandbox (https://github.com/engineer-man/piston)"""
-
-    def _get_execute_url(self):
-        return f"{self.host}/execute"
-
-    def _parse_request_output(self, output):
-        output = output.json()
-        if output['run']['signal'] == "SIGKILL":
-            return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
-        return json.loads(output['run']['output'])
-
-    def _prepare_request(self, generated_code, timeout):
-        return {
-            "language": "py",
-            "version": "3.10.0",
-            "files": [
-                {
-                    "content": generated_code,
-                }
-            ],
-            "stdin": "",
-            "args": [],
-            "run_timeout": timeout * 1000.0,  # milliseconds
-            "compile_memory_limit": -1,
-            "run_memory_limit": -1,
-        }
-
-
 sandboxes = {
     'local': LocalSandbox,
-    'piston': PistonSandbox,
 }
 
 

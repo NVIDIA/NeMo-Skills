@@ -2,7 +2,6 @@ processors_to_run: all
 
 output_path: ???
 prompt_config: null
-prompt_template: null
 code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
@@ -16,9 +15,9 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
-# Params for length-based filtering
-# Unit of length - Tokens
-hf_model_name: null
+# Needed to format the data and also for length-based filtering
+tokenizer: null
+system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
 min_problem_length: 0
@@ -77,12 +76,13 @@ processors:
         property_key: ${input_key}
         min_length: ${min_problem_length}
         max_length: ${max_problem_length}
-        hf_model_name: ${hf_model_name}
+        tokenizer: ${tokenizer}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalRLManifest
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
-    prompt_template: ${prompt_template}
+    tokenizer: ${tokenizer}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     task_name: math
     input_key: ${input_key}

@@ -12,7 +12,7 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
 - Formal proofs in Lean: minif2f, proofnet
 - Coding skills: livecodebench, human-eval, mbpp
-- Chat/instruction following: ifeval, arena-hard, mt-bench
+- Chat/instruction following: ifeval, arena-hard
 - General knowledge: mmlu, mmlu-pro, gpqa
 - Long context: ruler
 
@@ -182,11 +182,10 @@ Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeM
 
 ```python
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
 EVAL_ARGS = "++eval_type=math"
-GENERATION_ARGS = ""
+GENERATION_ARGS = "++prompt_config=generic/math"
 ```
 
 The prompt config and default generation arguments are passed to the
