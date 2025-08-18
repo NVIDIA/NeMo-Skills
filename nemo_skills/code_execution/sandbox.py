@@ -349,24 +349,34 @@ class LocalSandbox(Sandbox):
 
     async def delete_session(self, session_id: str) -> None:
         """Delete an IPython session on the local sandbox server."""
-        try:
-            response = await self.http_session.delete(
-                url=f"http://{self.host}:{self.port}/sessions/{session_id}",
-                timeout=30.0,
-                headers={"X-Session-ID": session_id},
-            )
-            LOG.warning(f"Delete response status: {response.status_code}")
-            LOG.warning(f"Delete response content: {response.text}")
-            response.raise_for_status()
-        except Exception as e:
-            LOG.warning(
-                "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
-                session_id,
-                e,
-                type(e).__name__,
-                e,
-                traceback.format_exc(),
-            )
+        max_retries = 3
+        retry_delay = 5
+
+        for attempt in range(max_retries):
+            try:
+                response = await self.http_session.delete(
+                    url=f"http://{self.host}:{self.port}/sessions/{session_id}",
+                    timeout=5.0,
+                    headers={"X-Session-ID": session_id},
+                )
+                response.raise_for_status()
+                return  # Success
+            except httpx.ReadTimeout as e:
+                LOG.warning(f"ReadTimeout during session deletion (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    LOG.warning(f"Failed to delete session {session_id} after {max_retries} attempts. ")
+            except Exception as e:
+                LOG.warning(
+                    "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
+                    session_id,
+                    e,
+                    type(e).__name__,
+                    e,
+                    traceback.format_exc(),
+                )
+                raise  # Re-raise non-timeout exceptions
 
 
 sandboxes = {
