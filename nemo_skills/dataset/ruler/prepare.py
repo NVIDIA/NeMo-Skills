@@ -51,7 +51,7 @@ def prepare_task_for_ns(task, data_dir, setup):
                 "question": original_entry["input"],
                 "expected_answer": original_entry["outputs"],
                 "length": original_entry["length"],
-                "generation": original_entry['answer_prefix'],
+                "generation": original_entry['answer_prefix'].strip(),
             }
             fout.write(json.dumps(new_entry) + "\n")
 
