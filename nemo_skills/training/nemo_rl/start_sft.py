@@ -72,15 +72,15 @@ class PromptResponseDataset:
     def load_or_process_split(self, path: str, split_name: str) -> Dataset:
         data_path = Path(path)
 
-        # Cache path: same folder as data file
-        cache_dir = data_path.parent / ".cache" / split_name
+        # Build cache dir using split name + file stem
+        cache_dir = data_path.parent / ".cache" / f"{split_name}_{data_path.stem}"
 
-        # Use cached version unless forced to reprocess
+        # If cache exists and reprocessing is not forced, load from cache
         if cache_dir.exists() and not self.force_reprocess:
             print(f"[Cache] Loading {split_name} dataset from: {cache_dir}")
             return load_from_disk(str(cache_dir))
 
-        # Reprocess and save
+        # Otherwise, process from scratch
         print(f"[Map] Processing {split_name} dataset from: {path}")
         raw_dataset = load_dataset("json", data_files=str(path))["train"]
 
