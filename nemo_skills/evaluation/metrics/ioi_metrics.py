@@ -22,14 +22,12 @@ class IOIMetrics(BaseMetrics):
 
     def update(self, predictions):
         super().update(predictions)
-        self.max_k = len(predictions)
-        if self.max_k == 1:
-            self.agg_mode = "pass@1"
-        else:
-            self.agg_mode = f"pass@{self.max_k}"
-        for pred in predictions:
-            problem_name = pred["name"]
-            self.predictions_by_problem[problem_name].append(pred)
+        self._compute_pass_at_k(predictions)
+        if predictions:
+            self.predictions_by_problem[predictions[0]["name"]].extend(predictions)
+
+    def _get_score_dict(self, p):
+        return {"correct": all(r["score"]>0 for r in p["test_case_results"].values())}
 
     def get_problem_score(self, submissions) -> float:
         """
@@ -88,18 +86,15 @@ class IOIMetrics(BaseMetrics):
              in simulate_round_robin_score (which limits the submissions to 50 per problem).
         Returns a dict with both metrics.
         """
-        total_score = 0.0
-        total_round_robin = 0.0
-        for problem, submissions in self.predictions_by_problem.items():
-            score, subtask_scores = self.get_problem_score(submissions)
+        total_score = total_round_robin = 0.0
+        for _, submissions in self.predictions_by_problem.items():
+            score, _ = self.get_problem_score(submissions)
             total_score += score
             total_round_robin += self.simulate_round_robin_score(submissions)
-        return {
-            self.agg_mode: {
-                "total_score": str(total_score),
-                "round_robin_score": str(total_round_robin)
-            }
-        }
+        metrics_dict = super().get_metrics()
+        for m in metrics_dict.values():
+            m["total_score"], m["round_robin_score"] = str(total_score), str(total_round_robin)
+        return metrics_dict
 
     def reset(self):
         super().reset()
