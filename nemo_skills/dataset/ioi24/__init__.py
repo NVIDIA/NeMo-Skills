@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/default'
+GENERATION_ARGS = f"++prompt_config=generic/default"
 DATASET_GROUP = 'code'
 METRICS_TYPE = "ioi"
 EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi24"
