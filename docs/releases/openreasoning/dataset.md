@@ -1,5 +1,10 @@
 # Dataset construction
 
+!!! note
+
+    This page has instructions for how to re-generate datasets from scratch. If you just want to download existing
+    data that we released, you can use the scripts in the [training documentation](./training.md#download-data-and-convert-to-sft-format).
+
 Here are the commands you can run to re-create our synthetic dataset.
 We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
 running commands with a Slurm config. Change all commands accordingly if running locally or using different paths.
@@ -155,7 +160,7 @@ generate(
 # This script will also filter anything not judged as correct
 cmd = (
     "python -m nemo_skills.training.prepare_data "
-    "    ++prompt_template=qwen-instruct "
+    "    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
     "    ++prompt_config=generic/math "
     "    ++input_files='/workspace/open-reasoning/sdg/maj-if-no-correct-judged/output-rs*.jsonl' "
     "    ++output_path=/workspace/open-reasoning/sft-data-math.jsonl "
@@ -189,4 +194,16 @@ except the solutions are generated with [DeepSeek-R1-0528](https://huggingface.c
 
 ## Science data
 
-Coming soon!
+We generate science problems using [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) and [Qwen3-235B-A22B](https://huggingface.co/Qwen/Qwen3-235B-A22B) LLMs with the [prompt for science question generation](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openreasoning/prompts/science_question_generation_prompt.yaml), using few-shot examples to demonstrate the format.
+Questions are generated based on difficulty level, topic, and subtopic.
+Full dataset used for this effort is available at [HuggingFace](https://huggingface.co/datasets/nvidia/OpenScience).
+Note: HuggingFace version includes questions generated with [Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct), which are not used for OpenReasoning.
+
+The next step is to augment these problems using the [prompt for science question augmentation](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openreasoning/prompts/science_question_augmentation_prompt.yaml), with few-shot examples to demonstrate the format of the output.
+
+Next, we generate solutions for these problems.
+We use [DeepSeek-R1-0528](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528) to generate solutions with parameters as described in the math section above.
+
+The final step is to apply majority voting over the solutions generated in the previous step to obtain the final dataset.
+
+The resulting dataset, OpenScienceReasoning-2, is available for download on Hugging Face [here](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).

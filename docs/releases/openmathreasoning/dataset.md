@@ -5,9 +5,9 @@ OpenMathReasoning-1 dataset consists of mathematical problems collected from [Ao
 
 If you don't have a slurm cluster with a large number of GPUs,
 you can still try out all the steps of our pipeline by using [Nvidia NIM models](https://build.nvidia.com/). We include
-a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/example-data.txt) and you can
+a 10-sample subset of the raw data in [configs/example-data.txt](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/problem_sdg/example-data.txt) and you can
 switch to that data and NIM models by adding `--mode demo` to all the pipeline commands. We also use different models
-in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/demo.yaml) to pick
+in this "demo" mode to make it faster, but you can change [configs/demo.yaml](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openmathreasoning/configs/problem_sdg/demo.yaml) to pick
 any other models supported in https://build.nvidia.com. Make sure to define `NVIDIA_API_KEY` environment variable for this to work
 (and ignore scraping and model preparation steps as they are not needed when using NIM models).
 
@@ -51,35 +51,6 @@ pip install -U "huggingface_hub[cli]"
 huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir Qwen2.5-32B-Instruct
 huggingface-cli download Qwen/QwQ-32B --local-dir QwQ-32B
 huggingface-cli download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
-```
-
-Convert the model to TensorRT-LLM with the following (you can skip this and make corresponding changes in the pipeline
-scripts to run with `server_type=vllm` or `server_type=sglang`)
-
-```bash
-ns convert \
-   --cluster=slurm \
-   --input_model=/hf_models/Qwen2.5-32B-Instruct \
-   --output_model=/trt_models/qwen2.5-32b-instruct \
-   --convert_from=hf \
-   --convert_to=trtllm \
-   --num_gpus=8 \
-   --model_type=qwen \
-   --hf_model_name=Qwen/Qwen2.5-32B-Instruct \
-   --max_input_len 24580 \
-   --max_seq_len 32768
-
-ns convert \
-   --cluster=slurm \
-   --input_model=/hf_models/QwQ-32B \
-   --output_model=/trt_models/qwq-32b \
-   --convert_from=hf \
-   --convert_to=trtllm \
-   --num_gpus=8 \
-   --model_type=qwen \
-   --hf_model_name=Qwen/QwQ-32B \
-   --max_input_len 24580 \
-   --max_seq_len 32768
 ```
 
 At the time of our experiments serving DeepSeek-R1 model with sglang was faster than with TensorRT-LLM, so

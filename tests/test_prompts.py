@@ -17,9 +17,14 @@ from nemo_skills.prompt.utils import get_prompt
 
 
 def test_generic_math_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation', 'llama3-instruct', examples_type='math_problem_augmentation')
+    prompt = get_prompt(
+        'generic/problem-augmentation', 'meta-llama/Llama-3.1-8B-Instruct', examples_type='math_problem_augmentation'
+    )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -100,160 +105,6 @@ After the problem is completed finish your response right away.<|eot_id|><|start
     assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
 
 
-def test_qwen_math_prompt_dict():
-    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
-
-    filled = prompt.fill({'problem': "What's the meaning of life?"}, return_templated_dict=True)
-    expected_result = [
-        {
-            'role': 'system',
-            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
-        },
-
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
-        }
-    ]
-    assert filled == expected_result
-
-def test_qwen_math_prompt_dict_multi_turn():
-    prompt = get_prompt('qwen/math-cot', 'qwen-instruct')
-
-    input_dict = {
-        'turns': [
-            {
-                'problem': 'What\'s the meaning of life?',
-                'assistant': 'The meaning of life is 42',
-            },
-            {
-                'problem': 'Why do you think that\'s the case?',
-            },
-        ]
-    }
-    filled = prompt.fill(input_dict, return_templated_dict=True, multi_turn_key='turns')
-    expected_result = [
-        {
-            'role': 'system',
-            'content': '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n',
-        },
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhat's the meaning of life?<|im_end|>\n<|im_start|>assistant\n",
-        },
-        {
-            'role': 'assistant',
-            'content': 'The meaning of life is 42<|im_end|>\n',
-        },
-        {
-            'role': 'user',
-            'content': "<|im_start|>user\nWhy do you think that's the case?<|im_end|>\n<|im_start|>assistant\n",
-        }
-    ]
-    assert filled == expected_result
-
-
-def test_generic_gsm8k_problem_augmentation_prompt():
-    prompt = get_prompt('generic/problem-augmentation-similar', 'nemotron-instruct', examples_type='gsm8k_problem_augmentation')
-
-    expected_prompt = """<extra_id_0>System
-
-<extra_id_1>User
-Write a new math problem similar to a given one. Make the new problem reasonable and solvable.
-
-Here are some examples of how to complete this task.
-
-Original problem:
-Olivia has $23. She bought five bagels for $3 each. How much money does she have left?
-
-New problem:
-Aiden has $35. He purchased eight pencils for $2 each and a notebook for $5. How much money does he have remaining?
-
-
-
-
-
-Original problem:
-Michael had 58 golf balls. On tuesday, he lost 23 golf balls. On wednesday, he lost 2 more. How many golf balls did he have at the end of wednesday?
-
-New problem:
-Sarah collected 72 seashells during her beach vacation. On Thursday, she gave 15 seashells to her friend as a souvenir. On Friday, she found 8 more seashells while exploring the shore. How many seashells did Sarah have at the end of Friday?
-
-
-
-
-
-Original problem:
-Angelo and Melanie want to plan how many hours over the next week they should study together for their test next week. They have 2 chapters of their textbook to study and 4 worksheets to memorize. They figure out that they should dedicate 3 hours to each chapter of their textbook and 1.5 hours for each worksheet. If they plan to study no more than 4 hours each day, how many days should they plan to study total over the next week if they take a 10-minute break every hour, include 3 10-minute snack breaks each day, and 30 minutes for lunch each day?
-
-New problem:
-Samantha and David are preparing for their upcoming science fair project. They have four different experiments to conduct and a research paper to write. Each experiment is estimated to take 2 hours, and the research paper will require 8 hours to complete. To stay focused and productive, they plan to take a 15-minute break for every 1.5 hours of work and have three 20-minute snack breaks each day. Additionally, they allocate 45 minutes for lunch each day. If they want to limit their daily study time to 5 hours, how many days should they plan to work on their project over the next two weeks?
-
-
-
-
-
-Original problem:
-Leah had 32 chocolates and her sister had 42. If they ate 35, how many pieces do they have left in total?
-
-New problem:
-Tom has 50 marbles, and his friend Jerry has 65 marbles. If they decide to play a game and bet 20 marbles each, how many marbles will they have left in total after the game?
-
-
-
-
-
-Original problem:
-There were nine computers in the server room. Five more computers were installed each day, from monday to thursday. How many computers are now in the server room?
-
-New problem:
-In a garden, there were 12 flowers. Every morning for a week (from Monday to Sunday), 3 more flowers were planted. How many flowers are there in the garden now?
-
-
-
-
-
-Original problem:
-Jason had 20 lollipops. He gave Denny some lollipops. Now Jason has 12 lollipops. How many lollipops did Jason give to Denny?
-
-New problem:
-Sarah had 35 marbles. She gave some marbles to her friend Emma. Now Sarah has 18 marbles left. How many marbles did Sarah give to Emma?
-
-
-
-
-
-Original problem:
-Sam bought a dozen boxes, each with 30 highlighter pens inside, for $10 each box. He rearranged five of these boxes into packages of six highlighters each and sold them for $3 per package. He sold the rest of the highlighters separately at the rate of three pens for $2. How much profit did he make in total, in dollars?
-
-New problem:
-Amy purchased 8 crates, each containing 24 colorful markers, for $12 per crate. She decided to create sets of 4 markers each and sell them for $2 per set. The remaining markers she sold individually at a rate of 5 markers for $3. Calculate the total profit Amy made, in dollars.
-
-
-
-
-
-Original problem:
-There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?
-
-New problem:
-In a garden, there are 25 rose bushes. The gardener plans to plant some more rose bushes today. After planting, there will be a total of 40 rose bushes in the garden. How many rose bushes will the gardener plant today?
-
-
-
-
-
-Original problem:
-What's the meaning of life?
-
-Write another problem similar to this one.
-Start directly with the problem statement and DO NOT include any phrases such as "Here is a new math problem similar to a given one".
-After the problem is completed finish your response right away.
-<extra_id_1>Assistant
-"""
-    assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
-
-
 def test_generic_codegen_prompt():
     prompt = get_prompt('generic/codegen')
 
@@ -289,9 +140,12 @@ def test_generic_default_prompt():
 
 
 def test_generic_math_prompt():
-    prompt = get_prompt('generic/math', 'llama3-instruct')
+    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -304,7 +158,7 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt('generic/math', 'llama3-base', 'nemotron', examples_type='math_text_with_code')
+    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B', 'nemotron', examples_type='math_text_with_code')
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -479,9 +333,14 @@ Here is the problem you need to solve:
 
 
 def test_llama_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'llama3-instruct', 'llama3', examples_type='math_text_with_code')
+    prompt = get_prompt(
+        'generic/math', 'meta-llama/Llama-3.1-8B-Instruct', 'llama3', examples_type='math_text_with_code'
+    )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -670,7 +529,8 @@ Here is the problem you need to solve:
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'qwen-instruct', 'qwen', examples_type='math_text_with_code')
+    prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct', 'qwen', examples_type='math_text_with_code')
+    prompt.config.system = ''
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -847,39 +707,6 @@ Here is the problem you need to solve:
 <|im_start|>assistant
 """
     assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
-
-
-def test_llama3_instruct_math_prompt():
-    prompt = get_prompt('llama3-instruct/math', 'llama3-instruct-nosys')
-
-    expected_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
-
-Solve the following math problem efficiently and clearly:
-
-- For simple problems (2 steps or fewer):
-Provide a concise solution with minimal explanation.
-
-- For complex problems (3 steps or more):
-Use this step-by-step format:
-
-## Step 1: [Concise description]
-[Brief explanation and calculations]
-
-## Step 2: [Concise description]
-[Brief explanation and calculations]
-
-...
-
-Regardless of the approach, always conclude with:
-
-Therefore, the final answer is: $\\boxed{answer}$. I hope it is correct.
-
-Where [answer] is just the final number or expression that solves the problem.
-
-Problem: 3 + 5?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-    assert prompt.fill({'problem': '3 + 5?'}) == expected_prompt
 
 
 def test_judge_arena():
@@ -1064,179 +891,13 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
     )
 
 
-def test_generic_formal_proof_prompt():
-    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover')
-
-    expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
-
-```lean4
-import Mathlib
-import Aesop
-
-set_option maxHeartbeats 0
-
-open BigOperators Real Nat Topology Rat
-
-/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/
-theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))
-    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by
-"""
-
-    assert (
-        prompt.fill(
-            {
-                "header": "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n",
-                "informal_prefix": "/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/\n",
-                "formal_statement": "theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))\n    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by\n",
-            }
-        )
-        == expected_prompt
-    )
-
-
-def test_minif2f_deepseek_fewshot_prompt():
-    prompt = get_prompt('lean4/formal-proof', 'deepseek-prover', examples_type='minif2f_deepseek_fewshot')
-
-    expected_prompt = """<｜begin▁of▁sentence｜>Complete the proof of the following Lean 4 statement. Start with the proof code right away and DO NOT repeat the given statement.
-
-Here are some examples of Lean4 statements and corresponding proofs you can refer to.
-
-Lean 4 statement:
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-/-- Expand the following expression: $7(3y+2)$ Show that it is 21y+14.-/
-theorem mathd_algebra_182 (y : ℂ) : 7 * (3 * y + 2) = 21 * y + 14 := by
-
-Expected response with the proof:
-/- We apply the distributive property to get\\begin{align*}
-  7(3y+2) &= 7\cdot 3y+7\cdot 2\\\\
-  &= 21y+14.
-  \end{align*}
-  -/
-ring```
-
-
-
-
-
-Lean 4 statement:
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-/-- What is the units digit of $19^{19}+99^{99}$? Show that it is 8.-/
-theorem mathd_numbertheory_202 : (19 ^ 19 + 99 ^ 99) % 10 = 8 := by
-
-Expected response with the proof:
-/- The units digit of a power of an integer is determined by the units digit of the integer; that is, the tens digit, hundreds digit, etc... of the integer have no effect on the units digit of the result. In this problem, the units digit of $19^{19}$ is the units digit of $9^{19}$. Note that $9^1=9$ ends in 9, $9^2=81$ ends in 1, $9^3=729$ ends in 9, and, in general, the units digit of odd powers of 9 is 9, whereas the units digit of even powers of 9 is 1. Since both exponents are odd, the sum of their units digits is $9+9=18$, the units digit of which is $8.$
-  -/
-apply Eq.refl```
-
-
-
-
-
-Lean 4 statement:
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-/-- At each basketball practice last week, Jenny made twice as many free throws as she made at the previous practice.  At her fifth practice she made 48 free throws.  How many free throws did she make at the first practice? Show that it is 3.-/
-theorem mathd_algebra_455 (x : ℝ) (h₀ : 2 * (2 * (2 * (2 * x))) = 48) : x = 3 := by
-
-Expected response with the proof:
-/- At Jenny's fourth practice she made $\\frac{1}{2}(48)=24$ free throws. At her third practice she made 12, at her second practice she made 6, and at her first practice she made $3$.
-  -/
-linarith```
-
-
-
-
-
-Lean 4 statement:
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-/-- A group of $N$ students, where $N < 50$, is on a field trip. If their teacher puts them in groups of 8, the last group has 5 students. If their teacher instead puts them in groups of 6, the last group has 3 students. What is the sum of all possible values of $N$? Show that it is 66.-/
-theorem mathd_numbertheory_149 :
-  (∑ k in Finset.filter (fun x => x % 8 = 5 ∧ x % 6 = 3) (Finset.range 50), k) = 66 := by
-
-Expected response with the proof:
-/- We are given that $N\equiv 5\pmod{8}$ and $N\equiv 3\pmod{6}$.  We begin checking numbers which are 5 more than a multiple of 8, and we find that 5 and 13 are not 3 more than a multiple of 6, but 21 is 3 more than a multiple of 6. Thus 21 is one possible value of $N$. By the Chinese Remainder Theorem, the integers $x$ satisfying $x\equiv 5\pmod{8}$ and $x\equiv 3\pmod{6}$ are those of the form $x=21+\\text{lcm}(6,8)k = 21 + 24 k$, where $k$ is an integer. Thus the 2 solutions less than $50$ are 21 and $21+24(1) = 45$, and their sum is $21+45=66$.
-  -/
-apply Eq.refl```
-
-
-
-
-
-Lean 4 statement:
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-/-- Evaluate: $\left( \\frac{1}{2} + \\frac{1}{3} \\right) \left( \\frac{1}{2} - \\frac{1}{3} \\right)$ Show that it is \\frac{5}{36}.-/
-theorem mathd_algebra_462 : ((1 : ℚ) / 2 + 1 / 3) * (1 / 2 - 1 / 3) = 5 / 36 := by
-
-Expected response with the proof:
-/- For any $x$ and $y$, $(x+y)(x-y)=x^2-y^2+xy-xy=x^2-y^2$, so \\begin{align*}
-  \left( \\frac{1}{2} + \\frac{1}{3} \\right) \left( \\frac{1}{2} - \\frac{1}{3} \\right)&=\left(\\frac12\\right)^2-\left(\\frac13\\right)^2\\\\
-  &=\\frac14-\\frac19\\\\
-  &=\\frac{9}{36}-\\frac{4}{36}\\\\
-  &=\\frac{5}{36}
-  \end{align*}
-  -/
-simp_all only [one_div]
-norm_num```
-
-
-
-
-
-Here is the the statement that you need to complete with the proof. Start with the Lean code right away and DO NOT repeat the given statement.
-
-```lean4
-import Mathlib
-import Aesop
-
-set_option maxHeartbeats 0
-
-open BigOperators Real Nat Topology Rat
-
-/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/
-theorem mathd_algebra_478 (b h v : ℝ) (h₀ : 0 < b ∧ 0 < h ∧ 0 < v) (h₁ : v = 1 / 3 * (b * h))
-    (h₂ : b = 30) (h₃ : h = 13 / 2) : v = 65 := by
-"""
-
-    assert (
-        prompt.fill(
-            {
-                "header": "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n",
-                "informal_prefix": "/-- The volume of a cone is given by the formula $V = \\frac{1}{3}Bh$, where $B$ is the area of the base and $h$ is the height. The area of the base of a cone is 30 square units, and its height is 6.5 units. What is the number of cubic units in its volume? Show that it is 65.-/\n",
-                "formal_statement": "theorem mathd_algebra_478 (b h v : \u211d) (h\u2080 : 0 < b \u2227 0 < h \u2227 0 < v) (h\u2081 : v = 1 / 3 * (b * h))\n    (h\u2082 : b = 30) (h\u2083 : h = 13 / 2) : v = 65 := by\n",
-            }
-        )
-        == expected_prompt
-    )
-
-
 def test_generic_general_boxed_prompt():
-    prompt = get_prompt('generic/general-boxed', 'llama3-instruct')
+    prompt = get_prompt('generic/general-boxed', 'meta-llama/Llama-3.1-8B-Instruct')
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -1265,37 +926,15 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     )
 
 
-def test_nat_to_lean4_prompt():
-    prompt = get_prompt('lean4/nat-to-lean4', 'deepseek-prover')
-
-    expected_prompt = """<｜begin▁of▁sentence｜>Translate the problem to a Lean 4 theorem (only the core declaration). Use `sorry` as a placeholder for the proof and `user_theorem` as the theorem name.
-
-If $\sqrt{5+n}=7$, then what is the value of $n$?
-Answer is: 44
-```lean4
-import Mathlib
-
-open Complex Filter Function Metric Finset
-open scoped BigOperators Topology
-
-"""
-
-    assert (
-        prompt.fill(
-            {
-                "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
-                "predicted_answer": "44",
-                "header": "import Mathlib\n\nopen Complex Filter Function Metric Finset\nopen scoped BigOperators Topology\n\n",
-            }
-        )
-        == expected_prompt
-    )
-
-
 def test_llm_as_judge_hle_original_prompt():
-    prompt = get_prompt('judge/hle', 'llama3-instruct')
+    prompt = get_prompt('judge/hle', 'meta-llama/Llama-3.1-8B-Instruct')
 
-    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>
+    expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 26 Jul 2024
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Judge whether the following [response] to [question] is correct or not based on the precise and unambiguous [correct_answer] below.
 

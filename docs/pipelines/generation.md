@@ -7,7 +7,7 @@
     All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
 
 Generation pipeline can be used for large-scale data generation
-using LLMs. You provide an input jsonl file as well as the prompt config/template and we run LLM for each line
+using LLMs. You provide an input jsonl file as well as the prompt config and we run LLM for each line
 of the input using the dictionary there to format the prompt. You input file keys need to match the prompt config
 but otherwise there is no restrictions on what data you can use for input. See [prompt format](../basics/prompt-format.md)
 documentation for more details on how to create new prompts.
@@ -67,20 +67,16 @@ Here is an example of a self-hosted model call:
 ns generate \
     --cluster=local \
     --server_type=vllm \
-    --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
+    --model=meta-llama/Llama-3.1-8B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/test-generate \
     --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=llama3-instruct \
     ++skip_filled=False
 ```
 
 Note the `++skip_filled=False` which you need to add if you're rerunning some generation and don't want
-to reuse existing output. And since we are hosting the model ourselves, we need to specify the template
-to use ([llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-instruct.yaml)
-in this case). You can have
-a custom template as well if you need to (just reference a full path to it same as we do with config above).
+to reuse existing output.
 
 Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
 
@@ -130,7 +126,9 @@ ns generate \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
-       ++prompt_template=llama3-base
+       ++use_completions_api=True \
+       ++tokenizer=meta-llama/Llama-3.1-405B \
+       ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B
@@ -140,7 +138,7 @@ models to different formats.
 
 Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
-and a [template for the base model](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
+and a tokenizer for the base model
 (we found Llama 3.1 follows few-shots much better without chat tokens).
 Finally, we are specifying few shot examples which come from
 [here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)

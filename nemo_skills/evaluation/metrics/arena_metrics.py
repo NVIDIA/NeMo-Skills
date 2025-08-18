@@ -103,5 +103,5 @@ class ArenaMetrics(BaseMetrics):
         self.scores = []  # list of lists
         self.lengths = 0
         # TODO: the class should support pass@k, but this forces it to report as pass@1.
-        #       There is some error here for k>1 and the same for mt-bench
+        #       There is some error here for k>1
         self.agg_mode = "pass@1"

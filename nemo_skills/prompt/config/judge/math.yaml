@@ -1,7 +1,5 @@
 # adapted from https://github.com/openai/simple-evals/blob/main/common.py
 
-system: ""
-
 user: |-
     You will be asked to look at the two answers (predicted and expected) to a math problem and to judge whether they are equivalent within the context of the problem.
 

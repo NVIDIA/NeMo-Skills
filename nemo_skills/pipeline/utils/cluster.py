@@ -170,12 +170,6 @@ def read_config(config_file):
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
         set_nemorun_home(cluster_config["job_dir"])
 
-    if 'trtllm' in cluster_config['containers']:
-        # automatically setting same container for trtllm-serve
-        if 'trtllm-serve' not in cluster_config['containers']:
-            LOG.info("Setting trtllm-serve container to be the same as trtllm.")
-            cluster_config['containers']['trtllm-serve'] = cluster_config['containers']['trtllm']
-
     return cluster_config
 
 

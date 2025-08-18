@@ -127,7 +127,6 @@ postprocess_cmd = (
 generate(
     ctx=wrap_arguments(
         f"++prompt_config=/workspace/extract-problems.yaml "
-        f"++prompt_template=qwen-instruct "
     ),
     cluster=cluster,
     input_file="/workspace/data.jsonl",
@@ -144,28 +143,9 @@ generate(
 )
 ```
 
-You can inspect sdg/extracted-problems.yaml to see the outputs. There should be a new field containing the extracted problems. Let's use the QwQ-32B model to generate solutions to these problems. Since this model produces long reasoning solutions that contain many tokens, [convert the checkpoint](https://nvidia.github.io/NeMo-Skills/pipelines/checkpoint-conversion/) to [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/) format for the fastest inference.
+You can inspect sdg/extracted-problems.yaml to see the outputs. There should be a new field containing the extracted problems. Let's use the QwQ-32B model to generate solutions to these problems.
 
-```shell
-# download the model
-ns run_cmd --expname=download-qwq --log_dir=/workspace/QwQ-32B --cluster=local \
-    huggingface-cli download Qwen/QwQ-32B --local-dir /workspace/QwQ-32B
-# convert to trtllm format
-ns convert \
-    --cluster=local \
-    --expname=convert-qwq-trtllm \
-    --run_after=download-qwq \
-    --input_model=/workspace/QwQ-32B \
-    --output_model=/workspace/qwq32b-trtllm \
-    --convert_from=hf \
-    --convert_to=trtllm \
-    --num_gpus=8 \
-    --model_type=qwen \
-    --hf_model_name=Qwen/QwQ-32B \
-    --max_seq_len 10000
-```
-
-The next step is to generate solutions. Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because NeMo-Skills can detect if the generation has already finished.
+Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because NeMo-Skills can detect if the generation has already finished.
 
 ```py
 generate(
@@ -173,14 +153,13 @@ generate(
         f"++prompt_config=generic/math "
         f"++inference.temperature=0.6 "
         f"++inference.tokens_to_generate=8192 "
-        f"++prompt_template=qwen-instruct "
     ),
     cluster=cluster,
     input_file="/workspace/sdg/extracted-problems.jsonl",
     output_dir="/workspace/sdg/solutions",
     expname="solution-generation",
-    run_after=["problem-extraction", "convert-qwq-trtllm"],
-    model="/workspace/qwq32b-trtllm",
+    run_after="problem-extraction",
+    model="/workspace/QwQ-32B",
     server_type="trtllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
@@ -209,7 +188,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
       ++input_files=/workspace/sdg/solutions/output.jsonl \
       ++output_path=/workspace/sft-data.jsonl \
       ++prompt_config=generic/math \
-      ++prompt_template=qwen-instruct \
+      ++tokenizer=Qwen/Qwen2.5-32B-Instruct \
       ++filters.remove_contaminated=false \
       ++add_unlabeled=true \
       ++filters.remove_no_think_tags=true \
@@ -266,7 +245,7 @@ ns nemo_rl sft \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
-    --cache_dir=/workspace/nemo-rl-cache \
+    --backend=fsdp \
     --final_hf_path=/workspace/training/qwen2.5-14b-improved-hf \
     ++sft.max_num_epochs=4 \
     ++policy.dtensor_cfg.tensor_parallel_size=8 \
