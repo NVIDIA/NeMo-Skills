@@ -91,6 +91,7 @@ class SweBenchGenerationConfig:
     output_file: str  # Where to save the generations
 
     agent_framework: SupportedAgentFrameworks  # Which agentic framework to use
+    agent_framework_commit: str = "HEAD"  # Which commit to use when cloning the SWE-agent/OpenHands repo
 
     # SWE-agent/OpenHands configuration file path. Can be specified in the same way as ns prompt configs
     # If None, will use the default for the chosen framework
@@ -256,6 +257,7 @@ class SweBenchGenerationTask(GenerationTask):
             "cd /root && "
             "git clone https://github.com/SWE-agent/SWE-agent.git && "
             "cd SWE-agent && "
+            f"git checkout {self.cfg.agent_framework_commit} && "
             "uv venv --python 3.12 venv && "
             "source venv/bin/activate && "
             "uv pip install -e . && "
@@ -346,6 +348,7 @@ class SweBenchGenerationTask(GenerationTask):
             "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
             "git clone https://github.com/All-Hands-AI/OpenHands.git && "
             "cd OpenHands && "
+            f"git checkout {self.cfg.agent_framework_commit} && "
             "export INSTALL_DOCKER=0 && "
             "make build && "
             "poetry run python -m pip install datasets && "
@@ -359,7 +362,7 @@ class SweBenchGenerationTask(GenerationTask):
             # run the agent
             f"./evaluation/benchmarks/swe_bench/scripts/run_infer.sh "
             f"    llm.model "  # name of llm config section in config.toml
-            f"    HEAD "  # openhands commit
+            f"    {self.cfg.agent_framework_commit} "  # openhands commit
             f"    CodeActAgent "  # agent
             f"    1 "  # number of instances
             f"    {self.cfg.agent_max_turns} "  # max agent iterations
