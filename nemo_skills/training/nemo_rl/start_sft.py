@@ -79,7 +79,7 @@ class PromptResponseDataset:
 
         if cache_dir.exists() and sig_file.exists() and not self.force_reprocess:
             with open(sig_file) as f:
-                old_sig = json.load(f).get("size", "")
+                old_sig = json.load(f)["size"]
             if old_sig == file_size:
                 print(f"[Cache] Loading {split_name} dataset from: {cache_dir}")
                 return load_from_disk(str(cache_dir))
