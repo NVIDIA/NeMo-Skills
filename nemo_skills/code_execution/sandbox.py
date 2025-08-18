@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+import traceback
 import uuid
 from typing import Dict, List, Optional, Tuple
 
@@ -351,14 +352,21 @@ class LocalSandbox(Sandbox):
         try:
             response = await self.http_session.delete(
                 url=f"http://{self.host}:{self.port}/sessions/{session_id}",
-                timeout=5.0,
+                timeout=30.0,
                 headers={"X-Session-ID": session_id},
             )
             LOG.warning(f"Delete response status: {response.status_code}")
             LOG.warning(f"Delete response content: {response.text}")
             response.raise_for_status()
         except Exception as e:
-            LOG.warning("Failed to delete session %s: %s", session_id, e)
+            LOG.warning(
+                "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
+                session_id,
+                e,
+                type(e).__name__,
+                e,
+                traceback.format_exc(),
+            )
 
 
 sandboxes = {
