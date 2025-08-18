@@ -24,3 +24,5 @@ scipy
 sympy
 tqdm
 psutil
+# added by me
+scikit-learn
