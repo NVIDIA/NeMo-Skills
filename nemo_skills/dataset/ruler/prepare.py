@@ -179,7 +179,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--template_tokens',
         type=int,
-        default=10,
+        default=50,
         help='Number of tokens in chat template (will be subtracted from max_seq_length to not exceed max context)',
     )
     parser.add_argument(
