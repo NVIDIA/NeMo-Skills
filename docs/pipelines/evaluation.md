@@ -12,7 +12,7 @@ We support many popular benchmarks and it's easy to add new in the future. E.g. 
 - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
 - Formal proofs in Lean: minif2f, proofnet
 - Coding skills: livecodebench, human-eval, mbpp
-- Chat/instruction following: ifeval, arena-hard, mt-bench
+- Chat/instruction following: ifeval, arena-hard
 - General knowledge: mmlu, mmlu-pro, gpqa
 - Long context: ruler
 
@@ -60,7 +60,7 @@ ns eval \
     --server_type=openai \
     --model=meta/llama-3.1-8b-instruct \
     --server_address=https://integrate.api.nvidia.com/v1 \
-    --benchmarks=gsm8k:0,human-eval:0 \
+    --benchmarks=gsm8k,human-eval \
     --output_dir=/workspace/test-eval
 ```
 
@@ -77,14 +77,14 @@ ns summarize_results --cluster local /workspace/test-eval
 Which should print the following
 
 ```
---------------------------------- gsm8k ---------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-greedy          | 1319        | 169        | 83.40%           | 1.97%
+---------------------------------------- gsm8k ----------------------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1          | 1319        | 180        | 164         | 81.96%           | 4.93%
 
 
------------------------------------- human-eval ------------------------------------
-evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
-greedy          | 164         | 228        | 70.12%             | 62.80%
+------------------------------------------- human-eval -------------------------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_plus_tests
+pass@1          | 164         | 199        | 29          | 64.63%             | 60.37%
 ```
 
 The [summarize_results](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/summarize_results.py) script
@@ -99,8 +99,7 @@ will fetch the results from cluster automatically if you ran the job there.
 
 ## Using multiple samples
 
-The `:0` part after benchmark name means that we only want to run
-greedy decoding, but if you set `:4` it will run 4 samples with high temperature
+You can add `:<num repeats>` after the benchmark name to repeat evaluation multiple times with high temperature
 that can be used for majority voting or estimating pass@k. E.g. if we run with
 
 ```bash
@@ -116,17 +115,17 @@ ns eval \
 you will see the following output after summarizing results
 
 ```
---------------------------------- gsm8k ---------------------------------
-evaluation_mode | num_entries | avg_tokens | symbolic_correct | no_answer
-pass@1[4]       | 1319        | 161        | 78.96%           | 6.01%
-majority@4      | 1319        | 161        | 88.10%           | 0.08%
-pass@4          | 1319        | 161        | 93.25%           | 0.08%
+---------------------------------------- gsm8k -----------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-4] | 1319        | 180        | 680         | 80.44%           | 6.31%
+majority@4       | 1319        | 180        | 680         | 88.40%           | 0.15%
+pass@4           | 1319        | 180        | 680         | 93.63%           | 0.15%
 
 
------------------------------------- human-eval ------------------------------------
-evaluation_mode | num_entries | avg_tokens | passing_base_tests | passing_plus_tests
-pass@1[4]       | 164         | 251        | 64.18%             | 59.30%
-pass@4          | 164         | 251        | 82.32%             | 78.05%
+-------------------------------------------- human-eval -------------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_plus_tests
+pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 59.30%
+pass@4           | 164         | 215        | 219         | 79.27%             | 74.39%
 ```
 
 
@@ -183,11 +182,10 @@ Inside [nemo_skills/dataset/gsm8k/\_\_init\_\_.py](https://github.com/NVIDIA/NeM
 
 ```python
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/math'
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
 EVAL_ARGS = "++eval_type=math"
-GENERATION_ARGS = ""
+GENERATION_ARGS = "++prompt_config=generic/math"
 ```
 
 The prompt config and default generation arguments are passed to the

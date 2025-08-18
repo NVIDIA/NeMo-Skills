@@ -16,7 +16,7 @@ python -m nemo_skills.training.prepare_data \
     ++input_files="<path to the generated synthetic data>/output-rs*.jsonl"> \
     ++output_path=sft-data.jsonl \
     ++prompt_config=generic/math \
-    ++prompt_template=llama3-instruct
+    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct
 ```
 
 !!! tip
@@ -26,7 +26,7 @@ python -m nemo_skills.training.prepare_data \
 
 If you want to run that command inside container or on cluster, add `ns run_cmd --cluster=...` in the beginning.
 
-You need to pass in the config/template files so that we can format the data accordingly. There are many more parameters
+You need to pass in the config and tokenizer so that we can format the data accordingly. There are many more parameters
 that data preparation script supports which you can see
 [here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/data_preparation_utils/config/math_sft.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
@@ -85,26 +85,11 @@ only average a subset of checkpoint, add `--average_steps` parameter (e.g. if yo
 want to disable averaging, set it to the last training step). If you only want
 to average the checkpoints of the finished job, set `--num_training_jobs=0`.
 
-Typically after training we want to follow up with evaluation. You can schedule
-an evaluation job right away by providing a `--run_after=my-training-job` argument
-which will appropriately set slurm dependencies.
-
-```bash
-ns eval \
-    --cluster=slurm \
-    --model=/workspace/my-training-job/checkpoints/model-averaged-nemo \
-    --server_type=nemo \
-    --output_dir=/workspace/my-training-job/results/ \
-    --benchmarks gsm8k:0,math:0 \
-    --server_gpus=8 \
-    --run_after=my-training-job \
-    ++prompt_template=llama3-instruct
-```
-
 ## Chaining pipelines with Python
 
-In general we don't recommend to run inference using NeMo checkpoints as it is
-much slower than other server formats. Here is how you can chain the commands
+Typically after training we want to follow up with evaluation. You can schedule
+an evaluation job right away by providing a `--run_after=my-training-job` argument
+which will appropriately set slurm dependencies. Here is how you can chain the commands
 to schedule checkpoint conversion and evaluation after training
 (whenever you need to run multiple commands, it's more convenient to use python interface)
 
@@ -138,31 +123,18 @@ convert(
     convert_to="hf",
     model_type="llama",
     num_gpus=8,
-    hf_model_name="meta-llama/Meta-Llama-3.1-8B",
-)
-
-convert(
-    ctx=wrap_arguments(""),
-    cluster=cluster,
-    input_model=f"{output_dir}/model-averaged-hf",
-    output_model=f"{output_dir}/model-averaged-trtllm",
-    expname=f"{expname}-to-trtllm",
-    run_after=f"{expname}-to-hf",
-    convert_from="hf",
-    convert_to="trtllm",
-    model_type="llama",
-    num_gpus=8,
+    tokenizer="meta-llama/Meta-Llama-3.1-8B",
 )
 
 eval(
-    ctx=wrap_arguments("++prompt_template=llama3-instruct"),
+    ctx=wrap_arguments(""),
     cluster=cluster,
-    model=f"{output_dir}/model-averaged-trtllm",
+    model=f"{output_dir}/model-averaged-hf",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
-    benchmarks="gsm8k:0,math:0",
+    benchmarks="gsm8k,math",
     server_gpus=8,
-    run_after=f"{expname}-to-trtllm",
+    run_after=f"{expname}-to-hf",
 )
 ```
 

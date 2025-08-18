@@ -29,7 +29,7 @@ from torchx.specs.api import AppState
 
 from nemo_skills.pipeline.utils.cluster import get_env_variables, get_tunnel, temporary_env_update, tunnel_hash
 from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
-from nemo_skills.pipeline.utils.packager import get_packager
+from nemo_skills.pipeline.utils.packager import get_packager, get_registered_external_repo
 from nemo_skills.pipeline.utils.server import get_free_port, get_server_command
 from nemo_skills.utils import get_logger_name, remove_handlers
 
@@ -57,13 +57,21 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
           is called, but finish before nemo-run submits a new job (which might take minutes)
     """
 
-    def _get_handles(exp):
+    def _get_handles(exp: run.Experiment):
         handles = []
-        for job in exp.jobs:
+        status_dict = exp.status(return_dict=True)
+        assert status_dict, f"No status found for experiment {exp._id}"
+        for _, status_info in status_dict.items():
             if not ignore_finished or (
-                job.status(exp._runner) in [AppState.RUNNING, AppState.PENDING, AppState.SUBMITTED, AppState.UNKNOWN]
+                status_info['status']
+                in [
+                    AppState.RUNNING,
+                    AppState.PENDING,
+                    AppState.SUBMITTED,
+                    AppState.UNKNOWN,
+                ]
             ):
-                handles.append(job.handle)
+                handles.append(status_info['handle'])
                 continue
         return handles
 
@@ -179,6 +187,7 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
+            privileged=bool(os.getenv('NEMO_SKILLS_PRIVILEGED_DOCKER', 0)),
             # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
             num_gpus=-1 if gpus_per_node is not None else None,
             network="host",
@@ -381,7 +390,7 @@ def add_task(
     else:
         dependencies = None
 
-    if num_gpus is None and cluster_config['executor'] == "slurm":
+    if server_config is None and num_gpus is None and cluster_config['executor'] == "slurm":
         if not cluster_config.get('cpu_partition'):
             num_gpus = 1
 
@@ -462,7 +471,7 @@ def add_task(
                         heterogeneous=heterogeneous,
                         het_group=het_group,
                         total_het_groups=total_het_groups,
-                        overlap=server_config is not None,
+                        overlap=(server_config is not None) or with_sandbox,
                         with_ray=with_ray,
                     )
                 )
@@ -500,7 +509,7 @@ def add_task(
                 heterogeneous=heterogeneous,
                 het_group=het_group,
                 total_het_groups=total_het_groups,
-                overlap=server_config is not None,
+                overlap=True,
                 with_ray=with_ray,
             )
             executors.append(sandbox_executor)
@@ -508,9 +517,9 @@ def add_task(
         het_group += 1
         LOG.info("Sandbox command: %s", commands[-1])
 
-    if cluster_config["executor"] != "local":
+    if cluster_config["executor"] != "none":
         tunnel = get_tunnel(cluster_config)
-        if isinstance(tunnel, run.SSHTunnel) and reuse_code:
+        if reuse_code:
             reuse_code_exp = reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
             if reuse_code_exp is not None:
                 if isinstance(reuse_code_exp, str):
@@ -531,12 +540,17 @@ def add_task(
                 else:
                     LOG.warning("Relevant packaging job not found for experiment %s", reuse_code_exp._title)
         # if current is not reused, we are refreshing the cache as there is a reason to believe it's outdated
-        elif isinstance(tunnel, run.SSHTunnel):
+        else:
             REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
     # no mounting here, so assuming /nemo_run/code can be replaced with the current dir
     if cluster_config["executor"] == "none":
+        # replacing /nemo_run/code/nemo_skills with the installed location
+
         for idx in range(len(commands)):
+            commands[idx] = commands[idx].replace(
+                '/nemo_run/code/nemo_skills', str(get_registered_external_repo('nemo_skills').path)
+            )
             commands[idx] = commands[idx].replace('/nemo_run/code', './')
 
     if with_ray and cluster_config["executor"] == "slurm":
@@ -598,10 +612,9 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
 
         # caching the experiment code for reuse
         tunnel = get_tunnel(cluster_config)
-        if isinstance(tunnel, run.SSHTunnel):
-            ssh_hash = tunnel_hash(tunnel)
-            if ssh_hash not in REUSE_CODE_EXP:
-                REUSE_CODE_EXP[ssh_hash] = exp
+        cur_tunnel_hash = tunnel_hash(tunnel)
+        if cur_tunnel_hash not in REUSE_CODE_EXP:
+            REUSE_CODE_EXP[cur_tunnel_hash] = exp
 
 
 def get_exp(expname, cluster_config, _reuse_exp=None):
@@ -611,8 +624,24 @@ def get_exp(expname, cluster_config, _reuse_exp=None):
     # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
     remove_handlers()
     if cluster_config['executor'] == 'slurm':
-        return run.Experiment(expname)
+        return run.Experiment(
+            expname,
+            skip_status_at_exit=True,
+            serialize_metadata_for_scripts=False,
+            threadpool_workers=cluster_config.get('num_workers', 4),
+        )
     # hiding all nemo-run logs otherwise as they are not useful locally
     if cluster_config['executor'] == 'local':
         return run.Experiment(expname, clean_mode=True)
     return run.Experiment(expname, clean_mode=True, log_level="WARN")
+
+
+def get_nsight_cmd(profile_step_range):
+    cmd = ''
+    if profile_step_range is not None:
+        cmd = (
+            f'export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/lib/x86_64-linux-gnu" && '
+            f"export NRL_NSYS_PROFILE_STEP_RANGE={profile_step_range} && "
+            'export NRL_NSYS_WORKER_PATTERNS="*policy*,*vllm*" && '
+        )
+    return cmd

@@ -57,8 +57,8 @@ class ComputeMetrics:
     def compute_metrics(self, input_files):
         """Computing metrics based on the provided input files."""
         # only calling setup on the main one
-        self.calculators = {'all': self.get_metrics_calculator()}
-        self.calculators['all'].setup(input_files)
+        self.calculators = {'_all_': self.get_metrics_calculator()}
+        self.calculators['_all_'].setup(input_files)
 
         # sorting input files to ensure consistent order
         input_files = sorted(input_files)
@@ -77,30 +77,25 @@ class ComputeMetrics:
                     for i in range(len(data)):
                         if int(data[i]['num_generated_tokens']) <= self.max_seq_len:
                             continue
-                        data[i] = self.calculators['all'].get_incorrect_sample(data[i])
+                        data[i] = self.calculators['_all_'].get_incorrect_sample(data[i])
                 # checking if we need to create a new metrics calculator
-                data_subset = data[0].get('subset_for_metrics', 'all')
+                data_subset = data[0].get('subset_for_metrics', '_all_')
                 if data_subset not in self.calculators:
                     self.calculators[data_subset] = self.get_metrics_calculator()
-                self.calculators['all'].update(data)
-                if data_subset != 'all':
+                self.calculators['_all_'].update(data)
+                if data_subset != '_all_':
                     self.calculators[data_subset].update(data)
 
         # collecting metrics from all calculators
         metrics = {}
         for data_subset, calculator in self.calculators.items():
             metrics[data_subset] = calculator.get_metrics()
-            # if there is only a single prediction output.jsonl
-            # we are renaming pass@1 to greedy to be consistent with ns eval logic
-            if len(input_files) == 1 and input_files[0].endswith('output.jsonl'):
-                if 'pass@1[1]' in metrics[data_subset]:
-                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1[1]')
-                if 'pass@1' in metrics[data_subset]:
-                    metrics[data_subset]['greedy'] = metrics[data_subset].pop('pass@1')
+            # we are removing pass@1[avg-of-1] as it's the same as pass@1
+            metrics[data_subset].pop('pass@1[avg-of-1]', None)
         return metrics
 
     def metrics_to_print(self):
-        return self.calculators['all'].metrics_to_print()
+        return self.calculators['_all_'].metrics_to_print()
 
     def evaluations_to_print(self):
-        return self.calculators['all'].evaluations_to_print()
+        return self.calculators['_all_'].evaluations_to_print()

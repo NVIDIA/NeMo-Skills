@@ -22,135 +22,169 @@ from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.prompt.few_shot_examples import examples_map
 
 
-def _get_sandbox(sandbox_type):
-    if sandbox_type == 'local':
-        host = os.getenv('NEMO_SKILLS_SANDBOX_HOST')
-        if not host:
-            pytest.skip("Define NEMO_SKILLS_SANDBOX_HOST to run this test")
+def _get_sandbox():
+    host = os.getenv('NEMO_SKILLS_SANDBOX_HOST')
+    if not host:
+        pytest.skip("Define NEMO_SKILLS_SANDBOX_HOST to run this test")
 
-    if sandbox_type == 'piston':
-        host = os.getenv('NEMO_SKILLS_PISTON_SANDBOX_URL')
-        if not host:
-            pytest.skip("Define NEMO_SKILLS_PISTON_SANDBOX_URL to run this test")
-
-    return get_sandbox(sandbox_type, host=host)
+    return get_sandbox(host=host)
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_multiple_code_blocks(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_triple_quotes(language):
+    sandbox = _get_sandbox()
+    code = '''
+def my_func():
+    """Test function"""
+    print("asdf")
+my_func()
+'''
+    output, _ = await sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'asdf\n'}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_no_output(language):
+    sandbox = _get_sandbox()
+
+    code = """a = 2"""
+
+    output, _ = await sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': ''}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_execution_error(language):
+    sandbox = _get_sandbox()
+
+    code = """1 / 0"""
+
+    output, _ = await sandbox.execute_code(code, language=language)
+    # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
+    if language == 'ipython':
+        assert output == {
+            'process_status': 'error',
+            'stderr': '',
+            'stdout': 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n',
+        }
+    else:
+        assert output == {
+            'process_status': 'completed',
+            'stderr': 'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\nZeroDivisionError: division by zero\n',
+            'stdout': '',
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_syntax_error(language):
+    sandbox = _get_sandbox()
+
+    code = """a = 2\n b = 3"""
+
+    output, _ = await sandbox.execute_code(code, language=language)
+    if language == 'ipython':
+        assert output == {
+            'process_status': 'error',
+            'stderr': '',
+            'stdout': '    b = 3\n    ^\nIndentationError: unexpected indent\n',
+        }
+    else:
+        assert output == {
+            'process_status': 'completed',
+            'stderr': '  File "<string>", line 2\n    b = 3\nIndentationError: unexpected indent\n',
+            'stdout': '',
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'ipython', 'pypy3'])
+async def test_timeout_error(language):
+    sandbox = _get_sandbox()
+
+    code = """import time\ntime.sleep(1)\nprint("done")"""
+
+    output, session_id = await sandbox.execute_code(code, timeout=1, language=language)
+    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+    output, session_id = await sandbox.execute_code(code, timeout=2, session_id=session_id, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'done\n'}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'pypy3'])
+async def test_std_input(language):
+    sandbox = _get_sandbox()
+    code = 'print(input("something "))'
+    std_input = "new"
+
+    output, _ = await sandbox.execute_code(code, language=language, std_input=std_input)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'something new\n'}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ['python', 'pypy3'])
+async def test_multiple_prints_python(language):
+    sandbox = _get_sandbox()
+
+    code = """
+print("1")
+print("2x3")
+    """
+
+    output, _ = await sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n2x3\n'}
+
+    code = "print(2)\nprint(15)"
+    output, _ = await sandbox.execute_code(code, language=language)
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '2\n15\n'}
+
+
+@pytest.mark.asyncio
+async def test_multiple_code_blocks_ipython():
+    sandbox = _get_sandbox()
 
     code = """
     a = 1
     a
     """
 
-    output, session_id = sandbox.execute_code(code)
+    output, session_id = await sandbox.execute_code(code)
     print(output)
     assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n'}
     assert session_id is not None
 
     code = "a + 5"
-    output, session_id2 = sandbox.execute_code(code, session_id=session_id)
+    output, session_id2 = await sandbox.execute_code(code, session_id=session_id)
     assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '6\n'}
     assert session_id == session_id2
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_triple_quotes(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-    code = '''
-    def my_func():
-        """Test function"""
-        print("asdf")
-    my_func()
-'''
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'asdf\n'}
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_multiple_prints(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_multiple_code_blocks():
+    sandbox = _get_sandbox()
 
     code = """
-    print("1")
-    print("2x3")
+    a = 1
+    a
     """
 
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n2x3\n'}
+    output, session_id = await sandbox.execute_code(code, language="ipython")
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '1\n'}
     assert session_id is not None
 
-    code = "print(2)\n15"
-    output, session_id2 = sandbox.execute_code(code, session_id=session_id)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '2\n15\n'}
+    code = "a + 5"
+    output, session_id2 = await sandbox.execute_code(code, session_id=session_id, language="ipython")
+    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': '6\n'}
     assert session_id == session_id2
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_no_output(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """a = 2"""
-
-    output, session_id = sandbox.execute_code(code)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': ''}
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_execution_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """1 / 0"""
-
-    output, session_id = sandbox.execute_code(code)
-    # TODO: somehow in our current implementation errors also go to stdout. How to fix this?
-    error = 'Traceback (most recent call last):\n    1 / 0\nZeroDivisionError: division by zero\n'
-    assert output == {
-        'process_status': 'error',
-        'stderr': '',
-        'stdout': error,
-    }
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_syntax_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """a = 2\n b = 3"""
-
-    output, session_id = sandbox.execute_code(code)
-    error = '    b = 3\n    ^\nIndentationError: unexpected indent\n'
-    assert output == {
-        'process_status': 'error',
-        'stderr': '',
-        'stdout': error,
-    }
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_timeout_error(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
-
-    code = """import time\ntime.sleep(1)\nprint("done")"""
-
-    output, session_id = sandbox.execute_code(code, timeout=1)
-    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-    assert session_id is not None
-
-    output, session_id = sandbox.execute_code(code, timeout=2, session_id=session_id)
-    assert output == {'process_status': 'completed', 'stderr': '', 'stdout': 'done\n'}
-    assert session_id is not None
-
-
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_real_generations(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_real_generations():
+    sandbox = _get_sandbox()
 
     code = """
 # height of bamboo in inches
@@ -166,7 +200,7 @@ x
         "height_after_x_days = height_in_inches + 30 * x\n"
         "NameError: name 'x' is not defined\n"
     )
-    output, session_id = sandbox.execute_code(code)
+    output, session_id = await sandbox.execute_code(code)
     assert output == {
         'process_status': 'error',
         'stderr': '',
@@ -175,7 +209,7 @@ x
     assert session_id is not None
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "code_begin,code_end,code_output_begin,code_output_end,code_output_format",
     [
@@ -189,7 +223,7 @@ x
         ),
     ],
 )
-def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_output_end, code_output_format):
+async def test_few_shots(code_begin, code_end, code_output_begin, code_output_end, code_output_format):
     def replace_code_output(match):
         code_output = match.group(2)
         formatted_output = format_code_output(
@@ -200,7 +234,7 @@ def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_o
         )
         return formatted_output
 
-    sandbox = _get_sandbox(sandbox_type)
+    sandbox = _get_sandbox()
 
     for example_name, example_list in examples_map.items():
         for example in example_list:
@@ -229,7 +263,7 @@ def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_o
                 for code_snippet, (expected_output, expected_error) in zip(code_snippets, expected_outputs):
                     if not expected_error:
                         expected_error = None
-                    output, session_id = sandbox.execute_code(code_snippet, session_id=session_id)
+                    output, session_id = await sandbox.execute_code(code_snippet, session_id=session_id)
                     execution_dict = {
                         "process_status": "completed",
                         "stdout": expected_output,
@@ -244,9 +278,9 @@ def test_few_shots(sandbox_type, code_begin, code_end, code_output_begin, code_o
                     assert generated_output == extracted_output, f"{example_name} few shots are failing"
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_lean4_basic_code_execution(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_lean4_basic_code_execution():
+    sandbox = _get_sandbox()
 
     # Test case for correct basic Lean4 code execution
     correct_code = """
@@ -258,7 +292,7 @@ def test_lean4_basic_code_execution(sandbox_type):
     """
     expected_output = "7\n"
 
-    output, session_id = sandbox.execute_code(correct_code, language="lean4")
+    output, session_id = await sandbox.execute_code(correct_code, language="lean4")
 
     # Assertions for the correct code
     assert session_id == None
@@ -267,9 +301,9 @@ def test_lean4_basic_code_execution(sandbox_type):
     assert output["stderr"] == "", "Expected no error output"
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_lean4_mathlib_code_execution(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_lean4_mathlib_code_execution():
+    sandbox = _get_sandbox()
 
     # Test case for Lean4 code that imports mathlib
     correct_code_mathlib = """
@@ -279,7 +313,7 @@ def test_lean4_mathlib_code_execution(sandbox_type):
     """
     expected_output = "7\n"
 
-    output, session_id = sandbox.execute_code(correct_code_mathlib, language="lean4")
+    output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4")
 
     # Assertions for the mathlib code
     assert session_id == None
@@ -288,9 +322,9 @@ def test_lean4_mathlib_code_execution(sandbox_type):
     assert output["stderr"] == "", "Expected no error output"
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_lean4_code_execution_failure(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_lean4_code_execution_failure():
+    sandbox = _get_sandbox()
 
     # Test case for Lean4 code with syntax error
     incorrect_code = """
@@ -301,7 +335,7 @@ def test_lean4_code_execution_failure(sandbox_type):
     #eval add 3 4
     """
 
-    error_output, session_id = sandbox.execute_code(incorrect_code, language="lean4")
+    error_output, session_id = await sandbox.execute_code(incorrect_code, language="lean4")
 
     # Assertions for the error case
     assert session_id == None
@@ -312,9 +346,9 @@ def test_lean4_code_execution_failure(sandbox_type):
     ), "Expected the error output to mention an unexpected token '#eval"
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_minif2f_deepseek_fewshots(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_minif2f_deepseek_fewshots():
+    sandbox = _get_sandbox()
 
     from nemo_skills.prompt.few_shot_examples.lean4 import minif2f_deepseek_fewshot
 
@@ -327,7 +361,7 @@ def test_minif2f_deepseek_fewshots(sandbox_type):
     for i, entry in enumerate(minif2f_deepseek_fewshot):
         code = entry["header"] + entry["informal_prefix"] + entry["formal_statement"] + entry["formal_proof"]
 
-        output, session_id = sandbox.execute_code(code, language="lean4")
+        output, session_id = await sandbox.execute_code(code, language="lean4")
 
         if session_id is not None:
             session_id_list.append(i)
@@ -353,9 +387,9 @@ def test_minif2f_deepseek_fewshots(sandbox_type):
     ), f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."
 
 
-@pytest.mark.parametrize("sandbox_type", ['local', 'piston'])
-def test_math_to_lean4_fewshots(sandbox_type):
-    sandbox = _get_sandbox(sandbox_type)
+@pytest.mark.asyncio
+async def test_math_to_lean4_fewshots():
+    sandbox = _get_sandbox()
 
     from nemo_skills.prompt.few_shot_examples.lean4 import math_to_lean4_fewshot
 
@@ -368,7 +402,7 @@ def test_math_to_lean4_fewshots(sandbox_type):
     for i, entry in enumerate(math_to_lean4_fewshot):
         code = entry["header"] + entry["formal_statement"] + entry["formal_proof"]
 
-        output, session_id = sandbox.execute_code(code, language="lean4")
+        output, session_id = await sandbox.execute_code(code, language="lean4")
 
         if session_id is not None:
             session_id_list.append(i)

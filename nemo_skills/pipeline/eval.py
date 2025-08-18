@@ -22,6 +22,7 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import ExtraDatasetType
+from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
 from nemo_skills.pipeline.utils.eval import prepare_eval_commands
@@ -47,11 +48,20 @@ def eval(
     ),
     benchmarks: str = typer.Option(
         ...,
-        help="Need to be in a format <benchmark>:<num samples for majority voting>. "
-        "Use <benchmark>:0 to only run greedy decoding. Has to be comma-separated "
-        "if providing multiple benchmarks. E.g. gsm8k:4,human-eval:0",
+        help="Need to be in a format <benchmark>:<number of repeats (to average scores or compute majority voting)>. "
+        "Using <benchmark> or <benchmark>:0 will default to greedy decoding "
+        "(can override with ++inference.temperature=X), but otherwise is equivalent to "
+        "<benchmark>:1 (which defaults to T=0.7). "
+        "If you want to use multiple benchmarks, separate them with comma. E.g. gsm8k:4,human-eval",
     ),
     expname: str = typer.Option("eval", help="Name of the experiment"),
+    generation_type: GenerationType | None = typer.Option(None, help="Type of generation to perform"),
+    generation_module: str = typer.Option(
+        None,
+        help="Path to the generation module to use. "
+        "If not specified, will use the registered generation module for the "
+        "generation type (which is required in this case).",
+    ),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
     server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
@@ -259,6 +269,8 @@ def eval(
         with_sandbox,
         wandb_parameters,
         extra_eval_args,
+        generation_type=generation_type,
+        generation_module=generation_module,
     )
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local

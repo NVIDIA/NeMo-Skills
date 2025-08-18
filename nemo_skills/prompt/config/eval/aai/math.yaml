@@ -1,5 +1,4 @@
 # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
-system: ""
 
 user: |-
   Solve the following math problem step by step. Put your answer inside \boxed{{}}.

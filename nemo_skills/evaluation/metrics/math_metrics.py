@@ -61,8 +61,8 @@ class MathMetrics(BaseMetrics):
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         correctness_dict = {}
-        if 'is_correct' in prediction:
-            correctness_dict["symbolic_correct"] = prediction['is_correct']
+        if 'symbolic_correct' in prediction:
+            correctness_dict["symbolic_correct"] = prediction['symbolic_correct']
         if 'judgement' in prediction:
             correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
         if 'judge_correct' in correctness_dict and 'symbolic_correct' in correctness_dict:
@@ -76,8 +76,8 @@ class MathMetrics(BaseMetrics):
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
         prediction = prediction.copy()
-        if 'is_correct' in prediction:
-            prediction['is_correct'] = False
+        if 'symbolic_correct' in prediction:
+            prediction['symbolic_correct'] = False
         if 'judgement' in prediction:
             prediction['judgement'] = 'Judgement: No'
         prediction['predicted_answer'] = None
@@ -116,9 +116,9 @@ class MathMetrics(BaseMetrics):
                 )
 
     def evaluations_to_print(self):
-        """We will log all majority/rm/pass/pass@1[k] up to k, but only report the kth one."""
+        """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
         return [
-            f'pass@1[{self.max_k}]',
+            f'pass@1[avg-of-{self.max_k}]',
             f'majority@{self.max_k}',
             f'rm_best@{self.max_k}',
             f'rm_majority@{self.max_k}',
@@ -129,6 +129,7 @@ class MathMetrics(BaseMetrics):
         return {
             'num_entries': as_int,
             'avg_tokens': as_int,
+            'gen_seconds': as_int,
             'judge_correct': as_percentage,
             'symbolic_correct': as_percentage,
             'no_answer': as_percentage,

@@ -1,8 +1,6 @@
 # Prompt Config used for generation of reasoning prompts using reasoning capable models
 # Note the use of "{instruction}" key in user prompt
 
-system: ""
-
 user: |-
   You are a helpful and harmless assistant. You should think step-by-step before responding to the instruction below.
 
@@ -12,5 +10,5 @@ user: |-
   ```cpp
   // Your code here
   ```
-  
+
   {question}

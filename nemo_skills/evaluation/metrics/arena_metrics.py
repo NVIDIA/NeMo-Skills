@@ -94,12 +94,14 @@ class ArenaMetrics(BaseMetrics):
 
         metrics = {'num_entries': self.total}
         metrics.update(get_aggregate_score(self.scores))
-        if self.lengths > 0:
-            metrics['avg_response_tokens'] = int(self.lengths / self.total)
-        return {self.agg_mode: metrics}
+        metrics_dict = {self.agg_mode: metrics}
+        self.update_common_metrics(metrics_dict[self.agg_mode])
+        return metrics_dict
 
     def reset(self):
         super().reset()
         self.scores = []  # list of lists
         self.lengths = 0
+        # TODO: the class should support pass@k, but this forces it to report as pass@1.
+        #       There is some error here for k>1
         self.agg_mode = "pass@1"

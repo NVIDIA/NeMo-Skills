@@ -6,20 +6,31 @@ Here are some of the features we support:
 
 - [Flexible LLM inference](https://nvidia.github.io/NeMo-Skills/pipelines/generation/):
   - Seamlessly switch between API providers, local server and large-scale slurm jobs for LLM inference.
-  - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang), [Megatron](https://github.com/NVIDIA/Megatron-LM) or [NeMo](https://github.com/NVIDIA/NeMo).
+  - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang) or [Megatron](https://github.com/NVIDIA/Megatron-LM).
   - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a slurm cluster.
 - [Model evaluation](https://nvidia.github.io/NeMo-Skills/pipelines/evaluation):
   - Evaluate your models on many popular benchmarks.
     - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
     - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: scicode, livecodebench, human-eval, mbpp
-    - Chat/instruction following: ifeval, arena-hard, mt-bench
+    - Coding skills: swe-bench, scicode, livecodebench, human-eval, mbpp
+    - Chat/instruction following: ifbench, ifeval, arena-hard
     - General knowledge: mmlu, mmlu-pro, gpqa
-    - Long context: ruler
+    - Long context: ruler, mrcr
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
 ## News
+* [08/15/2025]: Added details for [reproducing evals](https://nvidia.github.io/NeMo-Skills/tutorials/2025/08/15/reproducing-llama-nemotron-super-49b-v15-evals/) for the [Llama-3_3-Nemotron-Super-49B-v1_5](nvidia/Llama-3_3-Nemotron-Super-49B-v1_5) model by NVIDIA.
+* [07/30/2025]: The datasets used to train OpenReasoning models are released! Math and code are available as part of [Nemotron-Post-Training-Dataset-v1](https://huggingface.co/datasets/nvidia/Nemotron-Post-Training-Dataset-v1) and science is available in
+[OpenScienceReasoning-2](https://huggingface.co/datasets/nvidia/OpenScienceReasoning-2).
+See our [documentation](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/training) for more details.
+
+* [07/18/2025]: We released [OpenReasoning](https://nvidia.github.io/NeMo-Skills/releases/openreasoning/) models! SOTA scores on math, coding and science benchmarks.
+
+![Evaluation Results with pass@1](docs/releases/openreasoning/pass-1.png)
+
+![Evaluation Results with GenSelect](docs/releases/openreasoning/genselect.png)
+
 
 * [04/23/2025]: We released [OpenMathReasoning](https://nvidia.github.io/NeMo-Skills/openmathreasoning1) dataset and models!
 
@@ -45,6 +56,11 @@ You can find more examples of how to use NeMo-Skills in the [tutorials](https://
 We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
 
 You can find the full documentation [here](https://nvidia.github.io/NeMo-Skills/).
+
+
+## Contributing
+
+We welcome contributions to NeMo-Skills! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for more information on how to get involved.
 
 
 Disclaimer: This project is strictly for research purposes, and not an official product from NVIDIA.

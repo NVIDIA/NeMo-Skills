@@ -15,13 +15,13 @@
 import importlib
 import logging
 import os
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import get_dataset_module
+from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
 
@@ -106,9 +106,11 @@ def get_benchmark_args_from_module(
                 "Did you forget to run prepare data commands?"
             )
 
-    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", override_dict=override_dict)
+    # this is deprecated, should remove in the future
+    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", "", override_dict=override_dict)
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
-    generation_args = f"++prompt_config={prompt_config} {generation_args}"
+    if prompt_config:
+        generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
 
     generation_module = get_arg_from_module_or_dict(
@@ -134,6 +136,12 @@ def get_benchmark_args_from_module(
     if benchmark_group:
         eval_subfolder += f"{benchmark_group}/"
     eval_subfolder += benchmark
+
+    # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
+    # TODO: is there a better way to handle this?
+    if benchmark == "swe-bench" and cluster_config['executor'] == 'local':
+        LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
+        os.environ['NEMO_SKILLS_PRIVILEGED_DOCKER'] = '1'
 
     return BenchmarkArgs(
         name=benchmark,
@@ -218,10 +226,18 @@ def prepare_eval_commands(
     with_sandbox,
     wandb_parameters,
     extra_eval_args,
+    generation_type=None,
+    generation_module=None,
 ):
     # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
 
     # TODO: should we allow setting num chunks per benchmark when not using groups? Maybe benchmark:rs_num:num_chunks?
+
+    if generation_type is not None:
+        if generation_module is not None:
+            raise ValueError("Cannot specify both generation_module and generation_type. ")
+
+        generation_module = GENERATION_MODULE_MAP[generation_type]
 
     benchmarks_or_groups = {
         k: int(v) for k, v in [b.split(":") if ":" in b else (b, -1) for b in benchmarks_or_groups.split(",")]
@@ -338,10 +354,10 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                generation_task = importlib.import_module(benchmark_args.generation_module)
+                generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
                 if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
                     raise ValueError(
-                        f"Module {benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+                        f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
                         "Please provide a valid generation module."
                     )
                 generation_task = generation_task.GENERATION_TASK_CLASS
@@ -366,7 +382,7 @@ def prepare_eval_commands(
                     eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=benchmark_args.num_chunks,
-                    script=benchmark_args.generation_module,
+                    script=generation_module or benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )

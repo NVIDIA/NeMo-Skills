@@ -76,7 +76,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
     # If random_seeds has more than N elements, split commands into groups of N
     request_size = len(check_commands[0]) // 10
-    if len(random_seeds) > request_size:
+    if len(expected_files) > request_size:
         outputs = []
         for i in range(0, len(check_commands), request_size):
             group = check_commands[i : i + request_size]
@@ -188,7 +188,7 @@ def get_generation_cmd(
         cmd += (
             f"    ++inference.random_seed={random_seed} "
             f"    ++inference.temperature=0.7 "
-            f"    ++inference.top_k=0 "
+            f"    ++inference.top_k=-1 "
             f"    ++inference.top_p=0.95 "
         )
 
@@ -317,8 +317,8 @@ def configure_client(
             "server_port": server_port,
         }
         extra_arguments = (
-            f"{extra_arguments} ++server.server_type={server_type} "
-            f"++server.host=localhost ++server.port={server_port} "
+            f"{extra_arguments} ++server.server_type={server_type} ++server.host=127.0.0.1 "
+            f"++server.port={server_port} ++server.model={model} "
         )
     else:  # model is hosted elsewhere
         server_config = None

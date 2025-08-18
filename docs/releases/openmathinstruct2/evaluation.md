@@ -15,26 +15,6 @@ pip install -U "huggingface_hub[cli]"
 huggingface-cli download nvidia/OpenMath2-Llama3.1-8B --local-dir OpenMath2-Llama3.1-8B
 ```
 
-## Convert to TensorRT-LLM
-
-Convert the model to TensorRT-LLM format. This is optional, but highly recommended for more exact
-results and faster inference. If you skip it, replace `--server_type trtllm` with `--server-type vllm`
-in the commands below and change model path to `/workspace/OpenMath2-Llama3.1-8B`.
-
-```bash
-ns convert \
-    --cluster=local \
-    --input_model=/workspace/OpenMath2-Llama3.1-8B \
-    --output_model=/workspace/openmath2-llama3.1-8b-trtllm \
-    --convert_from=hf \
-    --convert_to=trtllm \
-    --model_type=llama \
-    --num_gpus=1 \
-    --hf_model_name=nvidia/OpenMath2-Llama3.1-8B
-```
-
-Change the number of GPUs if you have more than 1 (required for 70B model).
-
 ## Prepare evaluation data
 
 ```bash
@@ -46,13 +26,12 @@ ns prepare_data gsm8k math amc23 aime24 omni-math
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath2-llama3.1-8b-trtllm \
+    --model=/workspace/OpenMath2-Llama3.1-8B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath2-llama3.1-8b-eval \
-    --benchmarks=aime24:0,amc23:0,math:0,gsm8k:0,omni-math:0 \
+    --benchmarks=aime24,amc23,math,gsm8k,omni-math \
     --server_gpus=1 \
     --num_jobs=1 \
-    ++prompt_template=llama3-instruct \
     ++inference.tokens_to_generate=4096
 ```
 
@@ -88,27 +67,27 @@ This should print the metrics including both symbolic and judge evaluation. The 
 ```
 ------------------------------------------------- aime24 ------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 30          | 10.00            | 10.00         | 10.00        | 10.00       | 6.67
+pass@1          | 30          | 10.00            | 10.00         | 10.00        | 10.00       | 6.67
 
 
 ------------------------------------------------- gsm8k -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 1319        | 90.75            | 91.70         | 90.75        | 91.70       | 0.00
+pass@1          | 1319        | 90.75            | 91.70         | 90.75        | 91.70       | 0.00
 
 
 ----------------------------------------------- omni-math -----------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 4428        | 18.97            | 22.22         | 18.11        | 23.08       | 2.55
+pass@1          | 4428        | 18.97            | 22.22         | 18.11        | 23.08       | 2.55
 
 
 -------------------------------------------------- math -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 5000        | 67.70            | 68.10         | 67.50        | 68.30       | 1.36
+pass@1          | 5000        | 67.70            | 68.10         | 67.50        | 68.30       | 1.36
 
 
 ------------------------------------------------- amc23 -------------------------------------------------
 evaluation_mode | num_entries | symbolic_correct | judge_correct | both_correct | any_correct | no_answer
-greedy          | 40          | 32.50            | 40.00         | 32.50        | 40.00       | 0.00
+pass@1          | 40          | 32.50            | 40.00         | 32.50        | 40.00       | 0.00
 ```
 
 The numbers may vary by 1-2% depending on the server type, number of GPUs and batch size used.
@@ -118,13 +97,12 @@ The numbers may vary by 1-2% depending on the server type, number of GPUs and ba
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/openmath2-llama3.1-8b-trtllm \
+    --model=/workspace/OpenMath2-Llama3.1-8B \
     --server_type=trtllm \
     --output_dir=/workspace/openmath2-llama3.1-8b-eval \
     --benchmarks=aime24:256,amc23:256,math:256,gsm8k:256,omni-math:256 \
     --server_gpus=1 \
     --num_jobs=1 \
-    ++prompt_template=llama3-instruct \
     ++inference.tokens_to_generate=4096
 ```
 
