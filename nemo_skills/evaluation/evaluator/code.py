@@ -15,11 +15,8 @@
 
 import json
 import logging
-import os
 import re
 import shutil
-import subprocess
-import sys
 from argparse import Namespace
 from dataclasses import field
 
@@ -85,7 +82,8 @@ def preprocess_code(generation_dict: dict, language="python"):
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
     language: str = "python"  # "cpp" is another option now
-    timeout: float = 30.0
+    test_file: str = None
+    timeout: float = 6.0
 
 
 def eval_livecodebench(cfg):
@@ -110,44 +108,41 @@ def eval_livecodebench(cfg):
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        script_to_run = os.path.join(base_dir, 'livecodebench', 'evaluate.py')
-
         code = f"""
+import sys
 import subprocess
 
-command = [
-    'pypy3',
-    '{script_to_run}',
-    '--custom_output_file',
-    '{jsonl_file}',
-    '--release_version',
-    'release_{release_version}',
-    '--k_list',
-    '1',
-    '--language',
-    '{eval_config.language}',
-    '--test_file',
-    '{jsonl_file}',
-    '--num_process_evaluate',
-    '12',
-     '--timeout',
-    '{eval_config.timeout}'
-]
+def install_from_git(git_url):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", git_url])
+        print("Package installed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during installation: {{e}}")
+        
 try:
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=True
-    )
-    print(result.stdout)
-except subprocess.CalledProcessError as e:
-    print("--- Stderr ---")
-    print(e.stderr)
+    from livecodebench.evaluate import evaluate
+except ImportError:
+    print("Package 'livecodebench' not found. Attempting to install...")
+    install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
+    try:
+        from livecodebench.evaluate import evaluate
+    except ImportError:
+        print("Failed to install 'livecodebench'. Please install it manually.")
+        raise
+
+evaluate(
+    custom_output_file={jsonl_file},
+    test_file={eval_config.test_file},
+    k_list=[1],
+    language={eval_config.language},
+    num_process_evaluate=12,
+    timeout={eval_config.timeout},
+)
 """
         sandbox = get_sandbox(**eval_config.sandbox)
-        output_dict, _ = sandbox.execute_code(code, timeout=eval_config.timeout, max_output_characters=100000)
+        output_dict, _ = sandbox.execute_code(
+            code, timeout=eval_config.timeout * len(samples), max_output_characters=100000
+        )
 
         with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
             eval_grades = json.load(fin)

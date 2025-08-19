@@ -81,17 +81,6 @@ def clean_data(dataset):
 
     dataset = dataset.cast_column("public_test_cases", Value("large_string"))
     dataset = dataset.cast_column("private_test_cases", Value("large_string"))
-    # remove_columns = [
-    #     'question_title',
-    #     'contest_id',
-    #     'public_test_cases',
-    #     'private_test_cases',
-    #     'metadata',
-    #     'question_content',
-    #     'platform',
-    #     'question_id',
-    #     'starter_code',
-    # ]
     remove_columns = []
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
