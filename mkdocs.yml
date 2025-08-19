@@ -69,6 +69,16 @@ nav:
     - Training (NeMo-Aligner): pipelines/training.md
     - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
     - Arbitrary commands: pipelines/run-cmd.md
+  - Evaluation:
+    - evaluation/index.md
+    - evaluation/natural-math.md
+    - evaluation/formal-math.md
+    - evaluation/code.md
+    - evaluation/general-knowledge.md
+    - evaluation/instruction-following.md
+    - evaluation/long-context.md
+    - evaluation/tool-calling.md
+    - evaluation/other-benchmarks.md
   - Tutorials:
     - tutorials/index.md
   - Papers & Releases:
