@@ -134,7 +134,7 @@ start_worker() {
     local i=$1
     SOCKET_PATH="${SOCKET_DIR}/worker${i}.sock"
 
-    echo "Starting worker $i on socket $SOCKET_PATH..."
+    echo "Starting worker $i on socket $SOCKET_PATH..." >&2
 
     # Ensure old socket is removed if present
     if [ -S "$SOCKET_PATH" ]; then
@@ -166,20 +166,24 @@ socket-timeout = 300
 disable-logging = false
 log-date = true
 log-prefix = [worker${i}]
+logto = /var/log/worker${i}.log
 EOF
 
     if [ -n "$UWSGI_CHEAPER" ]; then
         echo "cheaper = ${UWSGI_CHEAPER}" >> /tmp/worker${i}_uwsgi.ini
     fi
 
-    echo "Created custom uwsgi config for worker $i (HTTP unix socket ${SOCKET_PATH})"
+    echo "Created custom uwsgi config for worker $i (HTTP unix socket ${SOCKET_PATH})" >&2
 
     # Start worker with custom config
-    cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini &
+    (
+        # Run uwsgi from /app in a subshell so the current directory of the main script is unaffected
+        cd /app && env WORKER_NUM=$i uwsgi --ini /tmp/worker${i}_uwsgi.ini
+    ) &
 
     local pid=$!
-    echo "Worker $i started with PID $pid on socket $SOCKET_PATH"
-    return $pid
+    echo "Worker $i started with PID $pid on socket $SOCKET_PATH" >&2
+    echo $pid
 }
 
 # Start all workers simultaneously
