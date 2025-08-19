@@ -56,9 +56,10 @@ def main():
 
     # 2) Schedule a dependent check job ON THE CLUSTER.
     #    This downloads the checker into the workspace and runs it there.
+
     checker = (
         f"cd {args.workspace} && "
-        f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA/NeMo-Skills/refs/heads/wedu/unit-test-slurm/tests && "
+        f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA/NeMo-Skills/refs/heads/main/tests && "
         f"wget $DOWNLOAD_PREFIX/slurm-tests/check_sft_results.py && "
         f"python check_sft_results.py --workspace {args.workspace}"
     )
