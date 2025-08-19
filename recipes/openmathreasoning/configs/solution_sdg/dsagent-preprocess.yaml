@@ -66,7 +66,7 @@ stages:
     stage_kwargs:
       model: gpt-4.1 
       with_sandbox: true
-      server_type: openai
+      server_type: azureopenai
       server_address: https://prod.api.nvidia.com/llm/v1/azure
       num_random_seeds: ${num_random_seeds_to_generate}
 
