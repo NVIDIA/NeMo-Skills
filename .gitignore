@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-!data/
-!data/**
-!data/**/*.json
-!data/**/*.jsonl
-!data/**/*.csv
-!data/**/*.npy
+!
 *.json
 *.tar.gz
 *.tar
@@ -47,5 +42,3 @@ nemo_skills/dataset/ruler/*/
 nemo_skills/dataset/bfcl_v3/*/
 .idea/
 .idea/*
-
-
