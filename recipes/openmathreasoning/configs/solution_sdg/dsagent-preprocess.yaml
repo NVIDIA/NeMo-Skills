@@ -1,7 +1,7 @@
 cluster: local
 base_output_dir: /workspace/dsagent_get_num_samples
-expname: gpt-4-1
-suffix: gpt-4-1
+expname: gpt4-1
+suffix: gpt4-1
 
 
 # Input file for the first stage (generate_solutions)
@@ -67,7 +67,7 @@ stages:
       model: gpt-4.1 
       with_sandbox: true
       server_type: openai
-      server_address: https://api.openai.com/v1 
+      server_address: https://prod.api.nvidia.com/llm/v1/azure
       num_random_seeds: ${num_random_seeds_to_generate}
 
   fill_majority_answer:
