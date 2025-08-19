@@ -498,7 +498,7 @@ def add_task(
                 gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=[],  # we don't want to mount anything
+                mounts=["/home/ubuntu/pi-coder/mnt:/data"],  # we don't want to mount anything
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,
