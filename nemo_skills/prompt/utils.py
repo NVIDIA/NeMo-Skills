@@ -314,8 +314,33 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     config_path = get_config_path(config, config_dir)
 
+    # Read the file content first to check for single curly braces
     with open(config_path, "rt", encoding="utf-8") as fin:
-        return yaml.safe_load(fin)
+        content = fin.read()
+    
+    # Check for single curly braces that should be doubled in YAML
+    # This regex finds single { or } that are not part of {{ or }}
+    single_brace_pattern = r'(?<!{){(?!{)|(?<!})}(?!})'
+    if re.search(single_brace_pattern, content):
+        # Find all lines with single braces for better error reporting
+        lines_with_issues = []
+        for i, line in enumerate(content.split('\n'), 1):
+            if re.search(single_brace_pattern, line):
+                lines_with_issues.append(f"  Line {i}: {line.strip()}")
+        
+        error_msg = (
+            f"ERROR: Single curly braces found in prompt config file: {config_path}\n"
+            f"In YAML, curly braces must be doubled to escape them properly.\n"
+            f"Replace '{{' with '{{{{' and '}}' with '}}}}' in the following lines:\n" +
+            '\n'.join(lines_with_issues[:10])  # Show max 10 lines
+        )
+        if len(lines_with_issues) > 10:
+            error_msg += f"\n  ... and {len(lines_with_issues) - 10} more lines"
+        
+        raise ValueError(error_msg)
+    
+    # If validation passes, parse the YAML
+    return yaml.safe_load(content)
 
 
 def get_prompt(
