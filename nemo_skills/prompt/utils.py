@@ -298,6 +298,81 @@ def get_config_path(config: str, config_dir: str | None = None, config_extension
     return config_path
 
 
+def validate_yaml_literal_blocks(content: str, config_path: Path) -> None:
+    """
+    Validates that single curly braces in YAML literal block scalars are properly escaped.
+    
+    In YAML literal blocks (|, |-, |+), single curly braces must be doubled
+    because they have special meaning in Python string formatting.
+    
+    Args:
+        content (str): The YAML file content to validate.
+        config_path (Path): Path to the config file (for error reporting).
+        
+    Raises:
+        ValueError: If single curly braces are found in literal block scalars.
+    """
+    # This regex finds single { or } that are not part of {{ or }}
+    single_brace_pattern = r'(?<!{){(?!{)|(?<!})}(?!})'
+    
+    # Pattern to match a key followed by | (with optional -, +) for literal blocks
+    # This covers |, |-, |+, etc.
+    literal_block_pattern = r'^(\s*)(\w+):\s*\|[+-]?\s*$'
+    
+    lines = content.split('\n')
+    lines_with_issues = []
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i]
+        match = re.match(literal_block_pattern, line)
+        
+        if match:
+            # Found a literal block scalar
+            indent = len(match.group(1))
+            key = match.group(2)
+            block_start = i + 1
+            
+            # Find the end of the literal block by looking for a line with same or less indentation
+            block_lines = []
+            j = block_start
+            while j < len(lines):
+                if lines[j].strip() == '':  # Empty lines are part of the block
+                    block_lines.append(lines[j])
+                elif len(lines[j]) - len(lines[j].lstrip()) <= indent:
+                    # Found a line with same or less indentation, block ends
+                    break
+                else:
+                    block_lines.append(lines[j])
+                j += 1
+            
+            # Check the block content for single braces
+            block_content = '\n'.join(block_lines)
+            if re.search(single_brace_pattern, block_content):
+                # Report issues line by line within the block
+                for k, block_line in enumerate(block_lines):
+                    if re.search(single_brace_pattern, block_line):
+                        actual_line_num = block_start + k + 1  # +1 for 1-based line numbers
+                        lines_with_issues.append(f"  Line {actual_line_num} (in '{key}' block): {block_line.strip()}")
+            
+            # Skip to the end of the block
+            i = j - 1
+        
+        i += 1
+    
+    if lines_with_issues:
+        error_msg = (
+            f"ERROR: Single curly braces found in literal block scalars in: {config_path}\n"
+            f"In YAML literal blocks (|, |-, |+), curly braces must be doubled to escape them.\n"
+            f"Replace '{{' with '{{{{' and '}}' with '}}}}' in the following lines:\n" +
+            '\n'.join(lines_with_issues[:10])  # Show max 10 lines
+        )
+        if len(lines_with_issues) > 10:
+            error_msg += f"\n  ... and {len(lines_with_issues) - 10} more lines"
+        
+        raise ValueError(error_msg)
+
+
 def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     Reads the prompt config/template from the yaml file.
@@ -314,32 +389,10 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
     """
     config_path = get_config_path(config, config_dir)
 
-    # Read the file content first to check for single curly braces
     with open(config_path, "rt", encoding="utf-8") as fin:
-        content = fin.read()
-    
-    # Check for single curly braces that should be doubled in YAML
-    # This regex finds single { or } that are not part of {{ or }}
-    single_brace_pattern = r'(?<!{){(?!{)|(?<!})}(?!})'
-    if re.search(single_brace_pattern, content):
-        # Find all lines with single braces for better error reporting
-        lines_with_issues = []
-        for i, line in enumerate(content.split('\n'), 1):
-            if re.search(single_brace_pattern, line):
-                lines_with_issues.append(f"  Line {i}: {line.strip()}")
-        
-        error_msg = (
-            f"ERROR: Single curly braces found in prompt config file: {config_path}\n"
-            f"In YAML, curly braces must be doubled to escape them properly.\n"
-            f"Replace '{{' with '{{{{' and '}}' with '}}}}' in the following lines:\n" +
-            '\n'.join(lines_with_issues[:10])  # Show max 10 lines
-        )
-        if len(lines_with_issues) > 10:
-            error_msg += f"\n  ... and {len(lines_with_issues) - 10} more lines"
-        
-        raise ValueError(error_msg)
-    
-    # If validation passes, parse the YAML
+        content = fin.read()    
+    validate_yaml_literal_blocks(content, config_path)
+
     return yaml.safe_load(content)
 
 
