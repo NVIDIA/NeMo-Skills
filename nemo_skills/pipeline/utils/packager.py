@@ -136,6 +136,8 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
         else:
             # picking up local dataset files if we are in the right repo
             include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
+            include_patterns.append(str(nemo_skills_dir / "dataset/**/*.csv"))  # Include CSV files
+            include_patterns.append(str(nemo_skills_dir / "dataset/**/*.txt"))  # Include TXT files
             subfolder_datasets = ["ruler", "bfcl_v3"]  # TODO: read this from init.py in a dataset folder
             # special logic for any dataset that creates subfolders
             for subfolder_dataset in subfolder_datasets:

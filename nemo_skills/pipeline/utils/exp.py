@@ -498,7 +498,7 @@ def add_task(
                 gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=None,  # Use the cluster config mounts instead of hardcoded mount
+                mounts=[],  # Use the cluster config mounts instead of hardcoded mount
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,
