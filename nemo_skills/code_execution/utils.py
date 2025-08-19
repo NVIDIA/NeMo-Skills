@@ -59,8 +59,6 @@ def format_code_output(
             output += f"{execution_dict['stdout']}"
         if execution_dict['stderr']:
             output += f"{execution_dict['stderr']}"
-        if execution_dict['stderr'] and execution_dict['stdout']:
-            LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
         output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
