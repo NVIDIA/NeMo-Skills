@@ -7,6 +7,8 @@ to put inside a `\boxed{}` field.
 By default all benchmarks in this group use
 [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) prompt config.
 
+## How we compare answers
+
 Most answers in these benchmarks can be compared using a
 [symbolic checker](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py#L47)
 but a few require using LLM-as-a-judge. By default those benchmarks will use GPT-4.1 and thus require OPENAI_API_KEY
@@ -30,6 +32,24 @@ The following benchmarks require LLM-as-a-judge:
 - [omni-math](#omni-math)
 - [math-odyssey](#math-odyssey)
 - [gaokao2023en](#gaokao2023en)
+
+## How we extract answers
+
+By default we will extract the answer from the last `\boxed{}` field in the generated solution. This is consistent
+with our default [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) prompt config.
+
+We also support arbitrary regex based extraction. E.g., if you use a custom prompt that asks an LLM to put an answer after `Final answer:`
+at the end of the solution, you can use this parameter to match the extraction logic to that prompt
+
+```bash
+    ++eval_config.extract_from_boxed=False
+    ++eval_config.extract_regex='Final answer: (.+)$'
+```
+
+!!! warning
+    Most LLMs are trained to put an answer for math problems inside `\boxed{}` field. For many models even if you ask
+    for a different answer format in the prompt, they might not follow this instruction. We thus generally do not
+    recommend changing extraction logic for these benchmarks.
 
 ## Supported benchmarks
 
