@@ -55,7 +55,7 @@ exclude = ["tests", "tests.*"]
 [tool.setuptools.dynamic]
 version = { attr = "nemo_skills.version.__version__" }
 dependencies = {file = ["requirements/main.txt"]}
-optional-dependencies = {core = { file = ["requirements/main.txt"] }, all = { file = ["requirements/main.txt"] }}
+optional-dependencies = {dev = { file = ["requirements/common-tests.txt", "requirements/common-dev.txt"] } }
 
 [tool.isort]
 profile = "black"  # black-compatible

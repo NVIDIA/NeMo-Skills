@@ -2,10 +2,6 @@
 
 Thanks for your interest in contributing to Nemo-Skills!
 
-## Running Tests
-
-TBD
-
 ## Code Quality
 
 - Follow the existing code style and conventions
@@ -14,6 +10,24 @@ TBD
 - Ensure all tests pass before submitting a PR
 - Do not add arbitrary defaults for configs, be as explicit as possible.
 
+### Setup
+
+Install the dependencies, including development dependencies as,
+
+```shell
+pip install -e .[dev]
+```
+
+### Pre-Commit Hooks
+
+We use [`pre-commit`](https://pre-commit.com/) to manage pre-commit hooks. 
+To install, run
+
+```shell
+pre-commit install
+```
+
+All subsequent commits will be checked according to configuration in [`.pre-commit-config.yaml`](./.pre-commit-config.yaml).
 
 ## Signing Your Work
 
@@ -68,3 +82,11 @@ TBD
       maintained indefinitely and may be redistributed consistent with
       this project or the open source license(s) involved.
   ```
+
+## Running Tests
+
+TBD
+
+**TIP**: Our CI depends on some secret variables only accessible to developers of the repository.
+To run the full suite of tests, please create pull requests from a branch instead of a fork whenever
+possible.
