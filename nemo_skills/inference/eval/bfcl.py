@@ -218,6 +218,8 @@ class BFCLGenerationTask(GenerationTask):
         involved_classes: list = data_point["involved_classes"]
         test_entry_id: str = data_point["id"]
         test_category: str = data_point["id"].rsplit("_", 1)[0]
+
+        # This is a dictionary specifically for BFCLv3 test category "multi_turn_miss_func"
         holdout_function: dict[int, list] = data_point.get("missed_function", {})
 
         all_model_response: list[list] = []  # The model response that will be used for later evaluation
@@ -264,8 +266,9 @@ class BFCLGenerationTask(GenerationTask):
                     # Test if the content itself is directly serializable
                     json.dumps(model_response["message"].content)
                     output_dict["log_dict_list"].append(model_response["message"].content)
-                except Exception as e:
+                except (TypeError, ValueError) as e:
                     # If the content is not json serializable, we don't add it to the log dict list
+                    LOG.warning(f"Model response content is not JSON serializable: {e}")
                     pass
 
                 if self.cfg.remove_thinking:
@@ -373,6 +376,7 @@ class BFCLGenerationTask(GenerationTask):
         }
 
     def _process_model_response_text(self, model_response_text):
+        """If specified, remove the thinking part of the model response text."""
         if self.cfg.thinking_end in model_response_text:
             return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
         else:
