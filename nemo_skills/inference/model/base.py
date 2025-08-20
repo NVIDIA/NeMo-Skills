@@ -47,6 +47,7 @@ class BaseModel:
         self,
         model: str,
         api_key: str = "EMPTY",
+        api_key_env_var: str = None,
         base_url: str | None = None,
         max_retries: int = 3,
         use_v1_endpoint: bool = True,
@@ -88,6 +89,9 @@ class BaseModel:
         if base_url is None:
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+
+        if api_key_env_var:
+            api_key = os.getenv(api_key_env_var)
 
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
