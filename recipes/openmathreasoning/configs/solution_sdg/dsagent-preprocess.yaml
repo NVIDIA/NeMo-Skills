@@ -21,6 +21,7 @@ generate_kwargs: &generate_kwargs
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - generate_solutions          # Generate initial TIR solutions
+  - fill_majority_answer        # Fill missing ground truth answers if any
   - judge_answers               # Judge correctness based on final answer
   - postprocess_tir_generations  # Applies basic filtering and changes code blocks separator tags
 
