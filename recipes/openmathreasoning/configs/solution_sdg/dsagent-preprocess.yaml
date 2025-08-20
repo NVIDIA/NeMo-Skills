@@ -62,6 +62,8 @@ stages:
   judge_answers:
     output_dir: ${directories.step-3-judge-answers}
     input_dir: ${directories.step-2-fill-majority}
+    inline_args: >-
+      ++prompt_config=judge/dsagent-eq
     dependencies:
       - fill_majority_answer
     stage_kwargs: ${generate_kwargs}

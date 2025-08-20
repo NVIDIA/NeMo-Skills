@@ -1,0 +1,88 @@
+# adapted from https://github.com/openai/simple-evals/blob/main/common.py
+
+system: ""
+
+user: |-
+    You will be asked to look at the two answers (predicted and expected) to a coding problem and to judge whether they are equivalent within the context of the problem.
+
+    # General Guidelines
+    Briefly explain your reasoning in two to three sentences. Then, provide your final judgment on whether the two answers are equivalent by stating only: `Judgement: Yes` or `Judgement: No`.
+
+    # Judgement Criteria
+    1. Judge correctness based on the content of the predicted answer, not formatting or style.
+    2. If any part of the expected answer is missing from the prediction, the prediction is incorrect.
+    3. If the prediction contains extra information but fully includes all expected components, it is correct.
+    4. When comparing floating-point numbers, decide based on context whether rounding is appropriate unless a specific precision or tolerance is given. For deterministic problems, differences within 0.01 are typically acceptable. For non-deterministic problems or model predictions, use your judgment.
+    5. When comparing math expressions, only allow trivial simplifications.
+
+    # Examples
+    Here are a few examples.
+
+    Example 1:
+    Problem: Count the number of samples in the dataset.
+    Predicted answer: Answer: The number of samples in this datasetis 66645
+    Expected answer: Answer: Number of samples: 66645
+
+    Example of your output: 
+    Reasoning: The predicted answer is a rephrase of the expected answer, even though the format is different.
+    Judgement: Yes
+
+    Example 2:
+    Problem: A rectangle has a length of 6 meters and a width of 2 meters. If the length is reduced by 3 meters and the width is halved, what is the new area of the rectangle in square meters?
+    Predicted answer: 3/2
+    Expected answer: 1.5
+
+    Example of your output: 
+    Reasoning: 3/2 is the same as 1.5
+    Judgement: Yes
+
+    Example 3:
+    Problem: Describe the statistics of the dataset
+    Predicted answer: Smallest mean value across all numeric features: 0.3482
+    Expected answer: Smallest mean value across all numeric features: 0.3482, Largest mean value across all numeric features: 23.4029,
+
+    Example of your output: 
+    Reasoning: The predicted answer is missing the largest mean value across all numeric features.
+    Judgement: No
+
+    Example 4:
+    Problem: Describe the statistics of the dataset
+    Predicted answer: The number of normally distributed features is 0, the number of not normally distributed features is 8. The mean value is 11.5
+    Expected answer: Normally_Distributed_Features: 0, Not_Normally_Distributed_Features: 8
+
+    Example of your output: 
+    Reasoning: The predicted answer is a rephrase. It also describes the mean value, which is not part of the expected answer, but that is OK. 
+    Judgement: Yes
+
+    Example 5:
+    Problem: A line segment of length $5$ has one endpoint at $(1, 2)$ and the other endpoint at $(4, b)$. Find all possible values of $b$, separated by commas.
+    Predicted answer:  -2, 6
+    Expected answer: 6, -2
+
+    Example of your output: 
+    Reasoning: The order doesn't matter in the context of the problem.
+    Judgement: Yes
+
+    Example 6:
+    Problem: What is the mean value of age column?
+    Predicted answer: 35.212
+    Expected answer: The mean value of age column is 35.2
+
+    Example of your output: 
+    Reasoning: Calculation of the age statistic is likely a deterministic problem. The difference between 35.212 and 35.2 is less than 0.01, so it is correct.
+    Judgement: Yes
+    
+    Example 7:
+    Problem: What is the RMSD value of the predicted protein structure against ground truth PDB structure? For this problem, we want RMSD to be less than 0.001
+    Predicted answer: 0.003
+    Expected answer: RMSD: 0.001
+
+    Example of your output: 
+    Reasoning: The problem sets a specific tolerance for RMSD, so the predicted answer is not less than 0.001 from the expected answer, so it is incorrect.
+    Judgement: No
+    
+    # Your task
+    Now, here is your task: 
+    Problem: {problem}
+    Predicted answer: {predicted_answer}
+    Expected answer: {expected_answer}

@@ -30,5 +30,4 @@ user: |-
   {dataset}
   {problem}
   {dataset_alt}
-  {problem_alt}
   {noise_alt}
