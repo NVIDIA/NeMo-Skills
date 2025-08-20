@@ -15,6 +15,7 @@
 from nemo_skills.utils import python_doc_to_cmd_help
 
 from .azure import AzureOpenAIModel
+from .gemini import GeminiModel
 
 # Base classes
 from .base import BaseModel
@@ -39,6 +40,7 @@ models = {
     'megatron': MegatronModel,
     'openai': OpenAIModel,
     'azureopenai': AzureOpenAIModel,
+    'gemini': GeminiModel,
     'vllm': VLLMModel,
     'sglang': VLLMModel,
 }
