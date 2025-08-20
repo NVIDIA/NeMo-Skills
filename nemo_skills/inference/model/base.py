@@ -140,6 +140,14 @@ class BaseModel:
         extra_body: dict = None,
     ) -> dict:
         """Native async version of generate for single prompt."""
+
+        # Check tool calls are a list of dict
+        if tools is not None:
+            for tool in tools:
+                # TODO: We may want to add additional checks for tools in the future
+                if not isinstance(tool, dict):
+                    raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
+
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,
@@ -200,6 +208,13 @@ class BaseModel:
         Synchronous version of generate for single prompt.
         See generate_async for full list of parameters.
         """
+        # Check tool calls are a list of dict
+        if tools is not None:
+            for tool in tools:
+                # TODO: We may want to add additional checks for tools in the future
+                if not isinstance(tool, dict):
+                    raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
+                    
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,
