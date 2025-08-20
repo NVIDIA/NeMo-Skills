@@ -20,7 +20,7 @@ pip install -e .[dev]
 
 ### Pre-Commit Hooks
 
-We use [`pre-commit`](https://pre-commit.com/) to manage pre-commit hooks. 
+We use [`pre-commit`](https://pre-commit.com/) to manage pre-commit hooks.
 To install, run
 
 ```shell
