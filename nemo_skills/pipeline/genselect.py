@@ -33,6 +33,7 @@ def genselect(
         help="One of the configs inside config_dir or NEMO_SKILLS_CONFIG_DIR or ./cluster_configs. "
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
+    input_dir: str = typer.Option(..., help="Where to find the input data"),
     output_dir: str = typer.Option(..., help="Where to put results"),
     expname: str = typer.Option("generate", help="Nemo run experiment name"),
     model: str = typer.Option(None, help="Path to the model or model name in API"),
@@ -68,6 +69,11 @@ def genselect(
         help="List of explicit chunk ids to run. Separate with , or .. to specify range. "
         "Can provide a list directly when using through Python",
     ),
+    competition_rounds: str = typer.Option(
+        None, 
+        help="Comma separated list of competition rounds to run. Overwrites max_soln_samples."
+        "Integer values are the selection size of that round and number of integers is the number of rounds."
+        ),
     preprocess_cmd: str = typer.Option(None, help="Command to run before generation"),
     postprocess_cmd: str = typer.Option(None, help="Command to run after generation"),
     partition: str = typer.Option(
@@ -199,6 +205,7 @@ def genselect(
     )
 
     all_tasks = []
+    prev_tasks = []
     has_tasks = False
     if _task_dependencies is None:
         _task_dependencies = []
@@ -209,103 +216,119 @@ def genselect(
         f" ++answer_key={answer_key} "
         f" ++benchmark={benchmark} "  
     )
+
+    competition_rounds = [int(round) for round in competition_rounds.split(",")] if competition_rounds else []
+
     extra_arguments_original = extra_arguments + extra_eval_args
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
-        # Add the preprocessing command for genselect
-        preprocess_args = (
-            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " 
-            + extra_eval_args
-            + (preprocess_args if preprocess_args is not None else "")
-        )
-        task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
+        for round_idx, round in enumerate(competition_rounds):
 
-        preprocess_task = pipeline_utils.add_task(
-            exp,
-            cmd=task_preprocess_cmd,
-            task_name=f"{expname}-preprocess_genselect",
-            log_dir=f"{output_dir}/preprocess-logs",
-            container=cluster_config["containers"]["nemo-skills"],
-            cluster_config=cluster_config,
-            partition=partition,
-            time_min=time_min,
-            task_dependencies=_task_dependencies,
-            run_after=run_after,
-            reuse_code=reuse_code,
-            reuse_code_exp=reuse_code_exp,
-            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-            installation_command=installation_command,
-        )
-        
-        for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
-            if wandb_parameters:
-                # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
-                    output_dir,
-                    random_seed=seed,
-                    chunk_id=None,
-                )
-            for chunk_id in chunk_ids:
-                has_tasks = True
-                server_config, server_address, extra_arguments = pipeline_utils.configure_client(
-                    model=model,
-                    server_type=server_type,
-                    server_address=original_server_address,
-                    server_gpus=server_gpus,
-                    server_nodes=server_nodes,
-                    server_args=server_args,
-                    server_entrypoint=server_entrypoint,
-                    extra_arguments=extra_arguments_original,
-                    get_random_port=get_random_port,
-                )
+            input_dir = f"{input_dir}/round_{round_idx - 1}/{benchmark}" if round_idx > 0 else input_dir
+            output_dir = f"{output_dir}/round_{round_idx}"
 
-                prev_tasks = [preprocess_task]
-                generation_cmd = pipeline_utils.get_generation_cmd(
-                    input_file=f"{output_dir}/comparison_instances/output-rs{seed}.jsonl",
-                    random_seed=seed,
-                    output_dir=f"{output_dir}/comparison_judgment",
-                    extra_arguments=extra_arguments,
-                    chunk_id=chunk_id,
-                    num_chunks=num_chunks,
-                    preprocess_cmd=preprocess_cmd,
-                    postprocess_cmd=postprocess_cmd,
-                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    script="nemo_skills.inference.genselect",
-                )
+            # Add the preprocessing command for genselect
+            preprocess_args = (
+                f" ++num_random_seeds={len(random_seeds)} ++input_dir={input_dir} ++output_dir={output_dir} " 
+                + extra_eval_args
+                + (preprocess_args if preprocess_args is not None else "")
+                + f" ++max_soln_samples={round}"
+                + f" ++competition_idx={round_idx}"
+            )
 
-                for _ in range(dependent_jobs + 1):
-                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
-                    if chunk_id is not None:
-                        task_name += f'-chunk{chunk_id}'
-                    new_task = pipeline_utils.add_task(
-                        exp,
-                        cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=generation_cmd),
-                        task_name=task_name,
-                        log_dir=log_dir,
-                        container=cluster_config["containers"]["nemo-skills"],
-                        cluster_config=cluster_config,
-                        partition=partition,
-                        time_min=time_min,
-                        server_config=server_config,
-                        with_sandbox=with_sandbox,
-                        sandbox_port=None if get_random_port else 6000,
-                        run_after=run_after,
-                        reuse_code=reuse_code,
-                        reuse_code_exp=reuse_code_exp,
-                        task_dependencies=(
-                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
-                        ),
-                        get_server_command=get_server_command,
-                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        installation_command=installation_command,
+            task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
+
+            preprocess_task = pipeline_utils.add_task(
+                exp,
+                cmd=task_preprocess_cmd,
+                task_name=f"{expname}-preprocess_genselect",
+                log_dir=f"{output_dir}/preprocess-logs",
+                container=cluster_config["containers"]["nemo-skills"],
+                cluster_config=cluster_config,
+                partition=partition,
+                time_min=time_min,
+                task_dependencies=(
+                    all_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                ),
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
+            )
+            
+            for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+                
+                if wandb_parameters:
+                    # no need for chunks as it will run after merging
+                    wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                        output_dir,
+                        random_seed=seed,
+                        chunk_id=None,
                     )
-                    prev_tasks = [new_task]
-                    all_tasks.append(new_task)
+                for chunk_id in chunk_ids:
+                    has_tasks = True
+                    server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+                        model=model,
+                        server_type=server_type,
+                        server_address=original_server_address,
+                        server_gpus=server_gpus,
+                        server_nodes=server_nodes,
+                        server_args=server_args,
+                        server_entrypoint=server_entrypoint,
+                        extra_arguments=extra_arguments_original,
+                        get_random_port=get_random_port,
+                    )
+
+                    prev_tasks = [preprocess_task]
+                    all_tasks.append(preprocess_task)
+                    generation_cmd = pipeline_utils.get_generation_cmd(
+                        input_file=f"{output_dir}/comparison_instances/output-rs{seed}-cr{round_idx}.jsonl",
+                        random_seed=seed,
+                        output_dir=f"{output_dir}/comparison_judgment",
+                        extra_arguments=extra_arguments,
+                        chunk_id=chunk_id,
+                        num_chunks=num_chunks,
+                        preprocess_cmd=preprocess_cmd,
+                        postprocess_cmd=postprocess_cmd,
+                        wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                        script="nemo_skills.inference.genselect",
+                    )
+
+                    for _ in range(dependent_jobs + 1):
+                        task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                        if chunk_id is not None:
+                            task_name += f'-chunk{chunk_id}'
+                        new_task = pipeline_utils.add_task(
+                            exp,
+                            cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=generation_cmd),
+                            task_name=task_name,
+                            log_dir=log_dir,
+                            container=cluster_config["containers"]["nemo-skills"],
+                            cluster_config=cluster_config,
+                            partition=partition,
+                            time_min=time_min,
+                            server_config=server_config,
+                            with_sandbox=with_sandbox,
+                            sandbox_port=None if get_random_port else 6000,
+                            run_after=run_after,
+                            reuse_code=reuse_code,
+                            reuse_code_exp=reuse_code_exp,
+                            task_dependencies=(
+                                prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                            ),
+                            get_server_command=get_server_command,
+                            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                            installation_command=installation_command,
+                        )
+                        prev_tasks = [new_task]
+                        all_tasks.append(new_task)
+                        
         if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
     if _reuse_exp:
-        return prev_tasks
+        return all_tasks
     else:
         if has_tasks:
             return exp

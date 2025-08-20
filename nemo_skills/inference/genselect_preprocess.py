@@ -40,7 +40,7 @@ class GenSelectPreprocessConfig:
     answer_key: str
     cluster_key: str | None = None
     max_soln_samples: int = 16
-    is_competition: bool = False
+    competition_idx: int = 0
     sampling_strategy: str = "linear"
     num_random_seeds: int | None = None
     num_input_samples: int | None = None
@@ -65,9 +65,11 @@ class GenSelectPreprocessor:
         self.answer_key = cfg.answer_key  # Key which determines the correctness of the response
         self.cluster_key = cfg.cluster_key  # Key which determines the cluster of the instances
         self.max_soln_samples = cfg.max_soln_samples
+        self.competition_idx = cfg.competition_idx
         self.sampling_strategy = cfg.sampling_strategy
         self.num_random_seeds = cfg.num_random_seeds
         self.num_input_samples = cfg.num_input_samples
+
 
         # Initialize the class
         self._post_init()
@@ -136,6 +138,7 @@ class GenSelectPreprocessor:
             for problem, instance_list in problem_to_instances.items():
                 correctness_vals = set([self.get_instance_correctness(instance) for instance in instance_list])
                 LOG.info(f"Correctness values for problem\n {correctness_vals}")
+                rem_problems.append(problem)
                 if len(correctness_vals) == 1 and None not in correctness_vals:
                     # Single correctness
                     f.write(json.dumps(instance_list[0]) + "\n")
@@ -226,7 +229,7 @@ class GenSelectPreprocessor:
 
         for random_seed in range(self.num_random_seeds):
             random.seed(random_seed)
-            with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
+            with open(os.path.join(output_dir, f"output-rs{random_seed}-cr{self.competition_idx}.jsonl"), "w") as f:
                 for _, clustered_instances in problem_to_clustered_instances.items():
                     comparison_instance = self.create_comparison_instance(clustered_instances)
                     f.write(json.dumps(comparison_instance) + "\n")
