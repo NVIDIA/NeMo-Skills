@@ -46,8 +46,8 @@ class BaseModel:
     def __init__(
         self,
         model: str,
-        api_key: str = "EMPTY",
-        api_key_env_var: str = None,
+        api_key: str | None = None,
+        api_key_env_var: str | None = None,
         base_url: str | None = None,
         max_retries: int = 3,
         use_v1_endpoint: bool = True,
@@ -90,8 +90,9 @@ class BaseModel:
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
 
-        if api_key_env_var:
-            api_key = os.getenv(api_key_env_var)
+        api_key = self._get_api_key(api_key, api_key_env_var, base_url)
+        if api_key is None:  # self-hosted models don't need the key, but still require the parameter
+            api_key = "EMPTY"
 
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
@@ -104,6 +105,11 @@ class BaseModel:
         httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+
+    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
+        if api_key:  # explicit cmd argument always takes precedence
+            return api_key
+        return os.getenv(api_key_env_var)
 
     def __del__(self):
         if self._tunnel:
