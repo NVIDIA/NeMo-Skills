@@ -1,4 +1,4 @@
-# Long context
+# Long-context
 
 More details are coming soon!
 
@@ -6,10 +6,10 @@ More details are coming soon!
 
 ### ruler
 
-- Benchmark defined in [`nemo_skills/dataset/ruler/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ruler/__init__.py)
+- Benchmark is defined in [`nemo_skills/dataset/ruler/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ruler/__init__.py)
 - Original benchmark source is [here](https://github.com/NVIDIA/RULER).
 
 ### mrcr
 
-- Benchmark defined in [`nemo_skills/dataset/mrcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mrcr/__init__.py)
+- Benchmark is defined in [`nemo_skills/dataset/mrcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mrcr/__init__.py)
 - Original benchmark source is [here](https://huggingface.co/datasets/openai/mrcr).

@@ -7,7 +7,7 @@ We support many popular benchmarks and it's easy to add new in the future. The f
 - [**Code**](./code.md): e.g. [swe-bench](./code.md#swe-bench), [livecodebench](./code.md#livecodebench)
 - [**Scientific knowledge**](./scientific-knowledge.md): e.g., [hle](./scientific-knowledge.md#hle), [scicode](./scientific-knowledge.md#scicode), [gpqa](./scientific-knowledge.md#gpqa)
 - [**Instruction following**](./instruction-following.md): e.g. [ifbench](./instruction-following.md#ifbench), [ifeval](./instruction-following.md#ifeval)
-- [**Long context**](./long-context.md): e.g. [ruler](./long-context.md#ruler), [mrcr](./long-context.md#mrcr)
+- [**Long-context**](./long-context.md): e.g. [ruler](./long-context.md#ruler), [mrcr](./long-context.md#mrcr)
 - [**Tool-calling**](./tool-calling.md): e.g. [bfcl_v3](./tool-calling.md#bfcl_v3)
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
@@ -140,6 +140,8 @@ You can also commit a new prompt file to your git repository and reference it as
     ++prompt_config=/nemo_run/code/<path to committed .yaml>
 ```
 
+Note that in this case the full path needs to end with `.yaml`!
+
 ### Customize evaluation parameters
 
 Different benchmarks have different evaluation options that you can customize. Here is an example of how to adjust
@@ -215,6 +217,8 @@ The dataset group is used by [nemo_skills/dataset/prepare.py](https://github.com
 to help download only benchmarks from a particular group if `--dataset_groups` parameter is used.
 Finally, the metrics type is used to pick a metrics class from [nemo_skills/evaluation/metrics/map_metrics.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/metrics/map_metrics.py)
 which is called at the end of the evaluation to compute final scores.
+
+## Adding new benchmarks
 
 To create a new benchmark follow this process:
 

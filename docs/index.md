@@ -19,7 +19,7 @@ Here are some of the features we support:
         - [**Code**](./evaluation/code.md): e.g. [swe-bench](./evaluation/code.md#swe-bench), [livecodebench](./evaluation/code.md#livecodebench)
         - [**Scientific knowledge**](./evaluation/scientific-knowledge.md): e.g., [hle](./evaluation/scientific-knowledge.md#hle), [scicode](./evaluation/scientific-knowledge.md#scicode), [gpqa](./evaluation/scientific-knowledge.md#gpqa)
         - [**Instruction following**](./evaluation/instruction-following.md): e.g. [ifbench](./evaluation/instruction-following.md#ifbench), [ifeval](./evaluation/instruction-following.md#ifeval)
-        - [**Long context**](./evaluation/long-context.md): e.g. [ruler](./evaluation/long-context.md#ruler), [mrcr](./evaluation/long-context.md#mrcr)
+        - [**Long-context**](./evaluation/long-context.md): e.g. [ruler](./evaluation/long-context.md#ruler), [mrcr](./evaluation/long-context.md#mrcr)
         - [**Tool-calling**](./evaluation/tool-calling.md): e.g. [bfcl_v3](./evaluation/tool-calling.md#bfcl_v3)
     - Easily parallelize each evaluation across many Slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](pipelines/training.md): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
