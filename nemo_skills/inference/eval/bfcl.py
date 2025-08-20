@@ -258,7 +258,15 @@ class BFCLGenerationTask(GenerationTask):
                     break
 
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
-                output_dict["log_dict_list"].append(model_response)
+                try:
+                    # Log dict list is additional logs for debugging
+                    # But we want to make sure that the content is json serializable
+                    # Test if the content itself is directly serializable
+                    json.dumps(model_response["message"].content)
+                    output_dict["log_dict_list"].append(model_response["message"].content)
+                except Exception as e:
+                    # If the content is not json serializable, we don't add it to the log dict list
+                    pass
 
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
@@ -352,9 +360,11 @@ class BFCLGenerationTask(GenerationTask):
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
         except:
-            generation = model_response["generation"]
+            # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
+            # We just check to limit the generation to a string
+            generation = (model_response["generation"] if isinstance(model_response["generation"], str) else "")
             tool_call_ids = []
-
+        
         return {
             "generation": generation,
             "tool_call_ids": tool_call_ids,
