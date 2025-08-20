@@ -233,7 +233,7 @@ def genselect(
                 + extra_eval_args
                 + (preprocess_args if preprocess_args is not None else "")
                 + f" ++max_soln_samples={round}"
-                + f" ++competition_idx={round_idx}"
+                + f" ++round_idx={round_idx}"
             )
 
             task_preprocess_cmd = f"python -m nemo_skills.inference.genselect_preprocess {preprocess_args}"
@@ -283,7 +283,7 @@ def genselect(
                     prev_tasks = [preprocess_task]
                     all_tasks.append(preprocess_task)
                     generation_cmd = pipeline_utils.get_generation_cmd(
-                        input_file=f"{output_dir}/comparison_instances/output-rs{seed}-cr{round_idx}.jsonl",
+                        input_file=f"{output_dir}/comparison_instances/output-rs{seed}-ci{round_idx}.jsonl",
                         random_seed=seed,
                         output_dir=f"{output_dir}/comparison_judgment",
                         extra_arguments=extra_arguments,

@@ -229,7 +229,7 @@ class GenSelectPreprocessor:
 
         for random_seed in range(self.num_random_seeds):
             random.seed(random_seed)
-            with open(os.path.join(output_dir, f"output-rs{random_seed}-cr{self.competition_idx}.jsonl"), "w") as f:
+            with open(os.path.join(output_dir, f"output-rs{random_seed}.jsonl"), "w") as f:
                 for _, clustered_instances in problem_to_clustered_instances.items():
                     comparison_instance = self.create_comparison_instance(clustered_instances)
                     f.write(json.dumps(comparison_instance) + "\n")
