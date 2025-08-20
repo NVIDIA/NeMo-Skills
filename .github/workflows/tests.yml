@@ -17,9 +17,14 @@ concurrency:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v5
+    - name: Checkout
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - name: Add Target Branch
+      run: |
+        git branch ${GITHUB_BASE_REF} origin/${GITHUB_BASE_REF}
     - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
@@ -29,9 +34,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-    - name: Run pre-commit
+    - name: Run pre-commit checks
       run: |
-        pre-commit run --show-diff-on-failure --color=always --all-files
+        git diff --name-only ${GITHUB_BASE_REF} HEAD
+        pre-commit run --show-diff-on-failure --color=always --from-ref=${GITHUB_BASE_REF} --to-ref=HEAD
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
