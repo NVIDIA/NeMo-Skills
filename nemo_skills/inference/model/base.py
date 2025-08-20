@@ -109,7 +109,15 @@ class BaseModel:
     def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
         if api_key:  # explicit cmd argument always takes precedence
             return api_key
-        return os.getenv(api_key_env_var)
+        if api_key_env_var:
+            api_key = os.getenv(api_key_env_var)
+            if not api_key:
+                raise ValueError(
+                    f"You defined api_key_env_var={api_key_env_var} but the value is not set. "
+                    f"Either remove api_key_env_var or set {api_key_env_var}=<some value>. "
+                    "Did you forget to add it to your cluster config?"
+                )
+        return api_key
 
     def __del__(self):
         if self._tunnel:
