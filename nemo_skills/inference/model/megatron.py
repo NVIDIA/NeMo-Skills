@@ -19,6 +19,13 @@ class MegatronModel(BaseModel):
     def __init__(self, **kwargs):
         # Megatron uses a non-standard base URL (no /v1) and a fixed model name.
         super().__init__(use_v1_endpoint=False, **kwargs)
+    
+    def _ensure_server_ready(self) -> None:
+        """
+        Megatron servers need readiness checking as they are local servers.
+        """
+        # For Megatron, we typically have a model name, so just check readiness
+        self._wait_for_server_ready()
 
     def _build_chat_request_params(self, **kwargs) -> dict:
         raise NotImplementedError("Megatron server does not support chat completions.")

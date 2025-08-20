@@ -58,6 +58,12 @@ class OpenAIModel(BaseModel):
             max_retries=max_retries,
             **kwargs,
         )
+    
+    def _ensure_server_ready(self) -> None:
+        """
+        OpenAI API is always ready - no server readiness check needed.
+        """
+        pass
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         return re.match(r"^o\d", model_name)

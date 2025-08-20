@@ -15,9 +15,11 @@
 import abc
 import logging
 import os
+import time
 
 import httpx
 import litellm
+import requests
 
 from nemo_skills.utils import get_logger_name
 
@@ -100,6 +102,16 @@ class BaseModel:
         httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+        
+        # Store parameters for potential server readiness checks
+        self._api_key = api_key
+        self._base_url = base_url
+        self._max_retries = max_retries
+        self._use_v1_endpoint = use_v1_endpoint
+        self.model = model
+        
+        # Let each model type decide if it needs server readiness checking
+        self._ensure_server_ready()
 
     def __del__(self):
         if self._tunnel:
@@ -117,6 +129,16 @@ class BaseModel:
 
     @abc.abstractmethod
     def _build_completion_request_params(self, **kwargs) -> dict:
+        pass
+
+    @abc.abstractmethod
+    def _ensure_server_ready(self) -> None:
+        """
+        Ensure the server is ready for this model type.
+        Each model implementation should define its own server readiness logic.
+        For external APIs (OpenAI, etc.), this can be a no-op.
+        For local servers, this should implement appropriate waiting logic.
+        """
         pass
 
     async def generate_async(
@@ -239,7 +261,7 @@ class BaseModel:
         return result
 
     def _parse_completion_response(
-        self, response: "openai.types.Completion", include_response: bool = False, **kwargs
+        self, response, include_response: bool = False, **kwargs
     ) -> dict:
         choice = response.choices[0]
         output = choice.text
@@ -387,3 +409,156 @@ class BaseModel:
             results = self._process_chat_chunk(chunk)
             for result in results:
                 yield result
+
+    def get_model_name_from_server(self, timeout: int = 300, retry_interval: int = 5) -> str:
+        """
+        Get the model name from the server and wait for server readiness.
+        This base implementation just waits for server readiness.
+        Individual model types should override this if they need model discovery logic.
+        
+        Args:
+            timeout: Maximum time to wait for server readiness (seconds)
+            retry_interval: Time between retries (seconds)
+            
+        Returns:
+            str: The model name from the server
+            
+        Raises:
+            Exception: If server is not ready after timeout period or no model provided
+        """
+        # If model name is already provided, do a quick readiness check and return it
+        if self.model:
+            LOG.info("Waiting for server to be ready at %s:%s...", self.server_host, self.server_port)
+            self._wait_for_server_ready(timeout, retry_interval)
+            return self.model
+            
+        # Base implementation doesn't know how to discover models - subclasses should override
+        raise NotImplementedError(
+            "No model name provided and this model type doesn't support model discovery. "
+            "Either provide a model name or override get_model_name_from_server() in the subclass."
+        )
+    
+    def _wait_for_server_ready(self, timeout: int = 300, retry_interval: int = 5):
+        """
+        Generic server readiness waiting with basic HTTP check.
+        Individual model types should override this if they need specific readiness logic.
+        
+        Args:
+            timeout: Maximum time to wait for server readiness (seconds)
+            retry_interval: Time between retries (seconds)
+            
+        Raises:
+            Exception: If server is not ready after timeout period
+        """
+        start_time = time.time()
+        attempt = 0
+        
+        while time.time() - start_time < timeout:
+            attempt += 1
+            try:
+                if self._check_http_server_ready():
+                    LOG.info("Server is ready!")
+                    return
+                    
+            except Exception as e:
+                # Log the specific error for debugging
+                if attempt == 1:
+                    LOG.debug("Server readiness check failed: %s", e)
+                
+            # Log progress every 30 seconds
+            if attempt % 6 == 0:  # Log every 30 seconds (6 * 5 second intervals)
+                LOG.info("Still waiting for server... (attempt %d/60)", attempt)
+            
+            time.sleep(retry_interval)
+        
+        # Timeout reached
+        LOG.error("Server not ready after %d seconds", timeout)
+        raise Exception(f"Server not ready after {timeout} seconds")
+    
+    def _should_check_server_readiness_REMOVED(self, base_url: str) -> bool:
+        """
+        Determine if we should check server readiness.
+        
+        Skip for external APIs that are always ready:
+        - OpenAI API (api.openai.com)
+        - NVIDIA API (api.nvidia.com)
+        - Other cloud APIs
+        
+        Args:
+            base_url: The base URL of the server
+            
+        Returns:
+            bool: True if we should check server readiness, False otherwise
+        """
+        if not base_url:
+            return False
+            
+        # List of external API patterns that don't need readiness checks
+        external_apis = [
+            'api.openai.com',
+            'api.nvidia.com',
+            'api.anthropic.com',
+            'api.cohere.ai',
+            'api.ai21.com',
+            '.openai.azure.com',  # Azure OpenAI
+            'generativelanguage.googleapis.com',  # Google
+        ]
+        
+        # Check if this is an external API
+        for api_pattern in external_apis:
+            if api_pattern in base_url:
+                return False
+        
+        # For local servers (localhost, 127.0.0.1, or any other host), check readiness
+        return True
+    
+    def _check_http_server_ready(self) -> bool:
+        """
+        Generic HTTP server readiness check.
+        This is a basic fallback that just checks if the server is responding.
+        Individual model types should implement more specific checks if needed.
+        """
+        try:
+            response = requests.get(self._base_url, timeout=5)
+            return response.status_code < 500  # Accept any non-server-error response
+        except Exception:
+            return False
+    
+
+    
+    def _should_check_server_readiness_REMOVED(self, base_url: str) -> bool:
+        """
+        Determine if we should check server readiness.
+        
+        Skip for external APIs that are always ready:
+        - OpenAI API (api.openai.com)
+        - NVIDIA API (api.nvidia.com)
+        - Other cloud APIs
+        
+        Args:
+            base_url: The base URL of the server
+            
+        Returns:
+            bool: True if we should check server readiness, False otherwise
+        """
+        if not base_url:
+            return False
+            
+        # List of external API patterns that don't need readiness checks
+        external_apis = [
+            'api.openai.com',
+            'api.nvidia.com',
+            'api.anthropic.com',
+            'api.cohere.ai',
+            'api.ai21.com',
+            '.openai.azure.com',  # Azure OpenAI
+            'generativelanguage.googleapis.com',  # Google
+        ]
+        
+        # Check if this is an external API
+        for api_pattern in external_apis:
+            if api_pattern in base_url:
+                return False
+        
+        # For local servers (localhost, 127.0.0.1, or any other host), check readiness
+        return True

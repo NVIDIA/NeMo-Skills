@@ -14,6 +14,7 @@
 
 import logging
 import math
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openai
@@ -30,6 +31,135 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+    
+    def _ensure_server_ready(self) -> None:
+        """
+        VLLM/SGLANG/TensorRT-LLM servers need readiness checking as they take time to start up.
+        """
+        if not self.model:
+            # No model name provided, discover it from server (this also checks readiness)
+            self.model = self.get_model_name_from_server()
+        else:
+            # Model name provided, but still check server readiness
+            self._wait_for_server_ready()
+    
+    def get_model_name_from_server(self, timeout: int = 300, retry_interval: int = 5) -> str:
+        """
+        Get the model name from VLLM/SGLANG server using OpenAI-compatible API.
+        
+        Args:
+            timeout: Maximum time to wait for server readiness (seconds)
+            retry_interval: Time between retries (seconds)
+            
+        Returns:
+            str: The model name from the server
+            
+        Raises:
+            Exception: If server is not ready after timeout period or no model found
+        """
+        # If model name is already provided, do a quick readiness check and return it
+        if self.model:
+            LOG.info("Waiting for server to be ready at %s:%s...", self.server_host, self.server_port)
+            self._wait_for_vllm_server_ready(timeout, retry_interval)
+            return self.model
+            
+        # Otherwise, try to get model name from server using OpenAI-compatible API
+        LOG.info("Waiting for server to be ready at %s:%s...", self.server_host, self.server_port)
+        return self._discover_model_from_vllm_server(timeout, retry_interval)
+    
+    def _wait_for_vllm_server_ready(self, timeout: int = 300, retry_interval: int = 5):
+        """
+        Wait for VLLM/SGLANG server to be ready using OpenAI-compatible /v1/models endpoint.
+        """
+        start_time = time.time()
+        attempt = 0
+        
+        while time.time() - start_time < timeout:
+            attempt += 1
+            try:
+                if self._check_vllm_server_ready():
+                    LOG.info("Server is ready!")
+                    return
+                    
+            except Exception as e:
+                # Log the specific error for debugging
+                if attempt == 1:
+                    LOG.debug("Server readiness check failed: %s", e)
+                
+            # Log progress every 30 seconds
+            if attempt % 6 == 0:  # Log every 30 seconds (6 * 5 second intervals)
+                LOG.info("Still waiting for server... (attempt %d/60)", attempt)
+            
+            time.sleep(retry_interval)
+        
+        # Timeout reached
+        LOG.error("Server not ready after %d seconds", timeout)
+        raise Exception(f"Server not ready after {timeout} seconds")
+    
+    def _check_vllm_server_ready(self) -> bool:
+        """Check VLLM/SGLANG server readiness using OpenAI-compatible /v1/models endpoint."""
+        import openai
+        
+        # Create a temporary OpenAI client for checking
+        client = openai.OpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            max_retries=0  # Don't retry, we handle retries ourselves
+        )
+        
+        model_list = client.models.list()
+        return model_list.data is not None and len(model_list.data) > 0
+    
+    def _discover_model_from_vllm_server(self, timeout: int = 300, retry_interval: int = 5) -> str:
+        """
+        Discover the model name from VLLM/SGLANG server using OpenAI-compatible API.
+        """
+        import openai
+        
+        start_time = time.time()
+        attempt = 0
+        
+        while time.time() - start_time < timeout:
+            attempt += 1
+            try:
+                # Try to get the model list from the server using OpenAI-compatible API
+                client = openai.OpenAI(
+                    api_key=self._api_key,
+                    base_url=self._base_url,
+                    max_retries=0
+                )
+                
+                model_list = client.models.list()
+                if model_list.data:
+                    model_name = model_list.data[0].id
+                    LOG.info("Server is ready! Found model: %s", model_name)
+                    return model_name
+                else:
+                    LOG.warning("Server responded but no models found")
+                    
+            except openai.NotFoundError:
+                # 404 error - server might not be fully ready yet
+                pass
+            except (openai.APIConnectionError, ConnectionError):
+                # Connection error - server not ready yet
+                pass
+            except Exception as e:
+                # Other errors - log and continue
+                LOG.debug("Error discovering model: %s", e)
+            
+            # Log progress every 30 seconds
+            if attempt % 6 == 0:
+                LOG.info("Still waiting for server... (attempt %d/60)", attempt)
+            
+            time.sleep(retry_interval)
+        
+        # Timeout reached
+        LOG.error("Server not ready after %d seconds", timeout)
+        raise Exception(f"Server not ready after {timeout} seconds")
+    
+    def _wait_for_server_ready(self, timeout: int = 300, retry_interval: int = 5):
+        """Override base class to use VLLM-specific readiness check."""
+        self._wait_for_vllm_server_ready(timeout, retry_interval)
 
     def _build_request_body(self, top_k, min_p, repetition_penalty, extra_body: dict = None):
         full_extra_body = {
