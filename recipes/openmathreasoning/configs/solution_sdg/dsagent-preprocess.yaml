@@ -59,13 +59,11 @@ stages:
       - generate_solutions
 
   judge_answers:
-    output_dir: ${directories.step-2-judge-answers}
-    input_dir: ${directories.step-1-generate-solutions}
+    output_dir: ${directories.step-3-judge-answers}
+    input_dir: ${directories.step-2-fill-majority}
     dependencies:
       - fill_majority_answer
-    # inline_args: "++prompt_template=qwen-instruct"
-    stage_kwargs:
-      <<: *generate_kwargs
+    stage_kwargs: ${generate_kwargs}
 
   postprocess_tir_generations:
     output_dir: ${directories.step-4-postprocess-tir}
