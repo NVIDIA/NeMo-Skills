@@ -39,11 +39,10 @@ By default we will extract the answer from the last `\boxed{}` field in the gene
 with our default [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) prompt config.
 
 We also support arbitrary regex based extraction. E.g., if you use a custom prompt that asks an LLM to put an answer after `Final answer:`
-at the end of the solution, you can use this parameter to match the extraction logic to that prompt
+at the end of the solution, you can use these parameters to match the extraction logic to that prompt
 
 ```bash
-    ++eval_config.extract_from_boxed=False
-    ++eval_config.extract_regex='Final answer: (.+)$'
+    --extra_eval_args="++eval_config.extract_from_boxed=False ++eval_config.extract_regex='Final answer: (.+)$'"
 ```
 
 !!! warning

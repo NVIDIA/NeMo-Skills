@@ -74,7 +74,7 @@ nav:
     - evaluation/natural-math.md
     - evaluation/formal-math.md
     - evaluation/code.md
-    - evaluation/general-knowledge.md
+    - evaluation/scientific-knowledge.md
     - evaluation/instruction-following.md
     - evaluation/long-context.md
     - evaluation/tool-calling.md
