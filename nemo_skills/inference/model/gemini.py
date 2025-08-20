@@ -28,8 +28,15 @@ class GeminiModel(OpenAIModel):
         max_retries: int = 3,
         **kwargs,
     ):
+        """
+        model:
+            - gemini-2.5-pro: thinking budget 128-32768 (default: dynamic thinking)
+            - gemini-2.5-flash: thinking budget 0-24576 (default: dynamic thinking)
+            - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
+        """
         assert os.getenv("GEMINI_API_KEY") is not None, "GEMINI_API_KEY is not set"
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
+        self.model = model
         self.litellm_kwargs = dict(
             model=model_litellm,
             max_retries=max_retries,
@@ -61,7 +68,7 @@ class GeminiModel(OpenAIModel):
         """
         https://github.com/BerriAI/litellm/blob/v1.75.0-nightly/litellm/constants.py#L45-L56
         reasoning_effort:
-            - disable: thinking budget tokens: 0
+            - None: thinking budget tokens: 0
             - low: maximum thinking budget tokens: 1024 (env var: DEFAULT_REASONING_EFFORT_LOW_THINKING_BUDGET)
             - medium: maximum thinking budget tokens: 2048 (env var: DEFAULT_REASONING_EFFORT_MEDIUM_THINKING_BUDGET)
             - high: maximum thinking budget tokens: 4096 (env var: DEFAULT_REASONING_EFFORT_HIGH_THINKING_BUDGET)
@@ -88,12 +95,20 @@ class GeminiModel(OpenAIModel):
             "allowed_openai_params": ['top_k', 'seed', 'presence_penalty', 'top_logprobs'],
         }
 
-        if reasoning_effort == "dynamic":
+        if reasoning_effort is None:
+            # https://github.com/BerriAI/litellm/blob/v1.75.0-nightly/litellm/llms/vertex_ai/gemini/vertex_and_google_ai_studio_gemini.py#L438-L442
+            reasoning_effort = "disable"
+
+        elif reasoning_effort == "dynamic":
             reasoning_effort = None
+            # https://github.com/BerriAI/litellm/blob/v1.75.0-nightly/litellm/llms/vertex_ai/gemini/vertex_and_google_ai_studio_gemini.py#L451-L465
             params["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": -1,
             }
+        
+        if self.model == "gemini-2.5-pro":
+            assert reasoning_effort != "disable", "Gemini 2.5 Pro cannnot disable reasoning, please set reasoning_effort to ['dynamic', 'low', 'medium', 'high']"
         
         params["reasoning_effort"] = reasoning_effort
         
