@@ -184,7 +184,7 @@ For RULER we need to use the same `data_dir` in the evaluation command as we use
 need to use the data preparation `setup` as part of the benchmark name. Finally it's important not to specify
 `++inference.tokens_to_generate` as RULER has a fixed value of this parameter for each task.
 
-```bash
+```bash hl_lines="6-7"
 ns eval \
     --cluster=local \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
@@ -193,7 +193,6 @@ ns eval \
     --benchmarks=ruler.nemotron_super_128k \
     --data_dir=/workspace/ns-data \
     --server_gpus=2 \
-    ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++system_message=''
