@@ -62,6 +62,20 @@ def test_eval_gsm8k_api(tmp_path):
     assert metrics['symbolic_correct'] >= 80
 
 
+def test_fail_on_api_key_env_var(tmp_path):
+    cmd = (
+        f"ns eval "
+        f"    --server_type=azureopenai "
+        f"    --model=gpt-4.1-20250414 "
+        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --benchmarks=gsm8k "
+        f"    --output_dir={tmp_path} "
+        f"    ++max_samples=2 "
+        f"    ++api_key_env_var=MY_CUSTOM_KEY "
+    )
+    subprocess.run(cmd, shell=True, check=True)
+
+
 @pytest.mark.parametrize("format", ["list", "dict"])
 def test_generate_openai_format(tmp_path, format):
     if not os.getenv('NVIDIA_API_KEY'):

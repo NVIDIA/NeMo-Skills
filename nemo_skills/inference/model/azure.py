@@ -36,5 +36,5 @@ class AzureOpenAIModel(OpenAIModel):
             api_key = os.getenv("AZURE_OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("AZURE_OPENAI_API_KEY is required for Azure models and could not be found.")
-
+        print(api_key)
         return api_key

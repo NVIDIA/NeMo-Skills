@@ -57,9 +57,6 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("OPENAI_API_KEY")
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
-            else:
-                api_key = "EMPTY"
-                logging.warning("No API key provided, using a dummy string as API key.")
         return api_key
 
     def _is_reasoning_model(self, model_name: str) -> bool:
