@@ -21,6 +21,7 @@ import litellm
 
 from nemo_skills.utils import get_logger_name
 
+from .context_retry import ContextLengthRetry, with_context_retry
 from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -54,6 +55,7 @@ class BaseModel:
         port: str = '5000',
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
+        context_retry_config: ContextLengthRetry | None = None,
     ):
         self._tunnel = None
         self.model_name_or_path = model
@@ -87,7 +89,12 @@ class BaseModel:
 
         if base_url is None:
             v1_suffix = "/v1" if use_v1_endpoint else ""
-            base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+            self.base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+        else:
+            self.base_url = base_url
+
+        # Get the tokenizer endpoint if available
+        self.tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, model)
 
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
@@ -95,7 +102,7 @@ class BaseModel:
             model=model_litellm,
             max_retries=max_retries,
             api_key=api_key,
-            base_url=base_url,
+            base_url=self.base_url,
         )
         httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
@@ -119,6 +126,17 @@ class BaseModel:
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
+    def _build_request_params(self, prompt: str | list[dict], stream: bool, **kwargs) -> dict:
+        if isinstance(prompt, str):
+            return self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+        elif isinstance(prompt, list):
+            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+            request_params['skip_special_tokens'] = False
+            return request_params
+        else:
+            raise ValueError("Either prompt or messages must be provided")
+
+    @with_context_retry
     async def generate_async(
         self,
         prompt: str | list[dict],
@@ -155,27 +173,32 @@ class BaseModel:
             'tools': tools,
             'extra_body': extra_body,
         }
-        if isinstance(prompt, list):
-            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_chat_chunks_async(response)
-            else:
-                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
+        try:
+            request_params = self._build_request_params(prompt=prompt, stream=stream, **kwargs)
+            if isinstance(prompt, list):
+                response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+                if stream:
+                    result = self._stream_chat_chunks_async(response)
+                else:
+                    result = self._parse_chat_completion_response(
+                        response, include_response=include_response, **kwargs
+                    )
 
-        elif isinstance(prompt, str):
-            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-            response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_completion_chunks_async(response)
+            elif isinstance(prompt, str):
+                response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
+                if stream:
+                    result = self._stream_completion_chunks_async(response)
+                else:
+                    result = self._parse_completion_response(response, include_response=include_response, **kwargs)
             else:
-                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-        else:
-            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+                raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+        except Exception as e:
+            raise e
 
         self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
 
+    @with_context_retry
     def generate_sync(
         self,
         prompt: str | list[dict],
@@ -215,9 +238,8 @@ class BaseModel:
             'tools': tools,
             'extra_body': extra_body,
         }
-
+        request_params = self._build_request_params(prompt=prompt, stream=stream, **kwargs)
         if isinstance(prompt, list):
-            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
             response = litellm.completion(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_chat_chunks_sync(response)
@@ -225,8 +247,6 @@ class BaseModel:
                 result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
 
         elif isinstance(prompt, str):
-            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-            request_params['skip_special_tokens'] = False
             response = litellm.text_completion(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_completion_chunks_sync(response)
