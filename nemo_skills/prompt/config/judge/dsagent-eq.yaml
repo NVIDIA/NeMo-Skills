@@ -9,11 +9,12 @@ user: |-
     Briefly explain your reasoning in two to three sentences. Then, provide your final judgment on whether the two answers are equivalent by stating only: `Judgement: Yes` or `Judgement: No`.
 
     # Judgement Criteria
-    1. Judge correctness based on the content of the predicted answer, not formatting or style.
-    2. If any part of the expected answer is missing from the prediction, the prediction is incorrect.
-    3. If the prediction contains extra information but fully includes all expected components, it is correct.
-    4. When comparing floating-point numbers, decide based on context whether rounding is appropriate unless a specific precision or tolerance is given. For deterministic problems, differences within 0.01 are typically acceptable. For non-deterministic problems or model predictions, use your judgment.
-    5. When comparing math expressions, only allow trivial simplifications.
+    1. Judge correctness by the content of the predicted answer, not its formatting or style.
+    2. If any part of the expected answer is missing, the prediction is incorrect.
+    3. If any value in the prediction differs from its corresponding value in the expected answer, the prediction is incorrect. That is, partially correct answers are not considered correct.
+    4. If the prediction includes extra information but fully contains all expected components with correct values, it is correct.
+    5. When comparing floating-point numbers, apply rounding based on your judgement, unless precision/tolerance is explicitly specified in the problem. As a general rule of thumb, for deterministic problems, usually differences within 0.01 are acceptable. For non-deterministic problems or model predictions, use your ownjudgment.
+    6. When comparing mathematical expressions, allow only trivial simplifications.
 
     # Examples
     Here are a few examples.
@@ -79,6 +80,15 @@ user: |-
 
     Example of your output: 
     Reasoning: The problem sets a specific tolerance for RMSD, so the predicted answer is not less than 0.001 from the expected answer, so it is incorrect.
+    Judgement: No
+
+    Example 8: 
+    Problem: What are the mean and max value of the year column?
+    Predicted answer: Mean: 1990, Max: 1990
+    Expected answer: Mean: 1990, Max: 1993
+
+    Example of your output: 
+    Reasoning: The predicted answer is incorrect because the max value is 1990, which is not the same as 1993. Partially correct answers are not considered correct.
     Judgement: No
     
     # Your task
