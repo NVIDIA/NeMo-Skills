@@ -5,6 +5,7 @@ user: |-
 
   # Guideline
   Write Python code to solve the task, integrating natural language reasoning with Python code executions.
+  Be detailed in your planning and reasoning process. 
   You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
   
