@@ -2,13 +2,13 @@
 
 We support many popular benchmarks and it's easy to add new in the future. The following categories of benchmarks are supported
 
-- [Math (natural language)](./natural-math.md): e.g. [aime24](./natural-math.md#aime24), [aime25](./natural-math.md#aime25), [hmmt_feb25](./natural-math.md#hmmt_feb25)
-- [Math (format language)](./formal-math.md): e.g. [minif2f](./formal-math.md#minif2f), [proofnet](./formal-math.md#proofnet), [putnam-bench](./formal-math.md#putnam-bench)
-- [Code](./code.md): e.g. [swe-bench](./code#swe-bench), [livecodebench](./code#livecodebench)
-- [Scientific knowledge](./scientific-knowledge.md): e.g., [hle](./scientific), scicode, gpqa
-- [Instruction following](./instruction-following.md): e.g. ifbench, ifeval
-- [Long context](./long-context.md): e.g. ruler, mrcr
-- [Tool-calling](./tool-calling.md): e.g. bfcl_v3
+- [**Math (natural language**)](./natural-math.md): e.g. [aime24](./natural-math.md#aime24), [aime25](./natural-math.md#aime25), [hmmt_feb25](./natural-math.md#hmmt_feb25)
+- [**Math (formal language)**](./formal-math.md): e.g. [minif2f](./formal-math.md#minif2f), [proofnet](./formal-math.md#proofnet), [putnam-bench](./formal-math.md#putnam-bench)
+- [**Code**](./code.md): e.g. [swe-bench](./code.md#swe-bench), [livecodebench](./code.md#livecodebench)
+- [**Scientific knowledge**](./scientific-knowledge.md): e.g., [hle](./scientific-knowledge.md#hle), [scicode](./scientific-knowledge.md#scicode), [gpqa](./scientific-knowledge.md#gpqa)
+- [**Instruction following**](./instruction-following.md): e.g. [ifbench](./instruction-following.md#ifbench), [ifeval](./instruction-following.md#ifeval)
+- [**Long context**](./long-context.md): e.g. [ruler](./long-context.md#ruler), [mrcr](./long-context.md#mrcr)
+- [**Tool-calling**](./tool-calling.md): e.g. [bfcl_v3](./tool-calling.md#bfcl_v3)
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 

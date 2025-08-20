@@ -26,5 +26,11 @@ More details are coming soon!
 
 ### mmlu
 
-- Benchmark defined in [`nemo_skills/dataset/mmlu/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/gpmmluqa/__init__.py)
+- Benchmark defined in [`nemo_skills/dataset/mmlu/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mmlu/__init__.py)
 - Original benchmark source is [here](https://github.com/hendrycks/test).
+
+### mmlu-redux
+
+- Benchmark defined in [`nemo_skills/dataset/mmlu-redux/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mmlu-redux/__init__.py)
+- Original benchmark source is [here](https://github.com/aryopg/mmlu-redux).
+

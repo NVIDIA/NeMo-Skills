@@ -8,14 +8,15 @@ Here are some of the features we support:
   - Seamlessly switch between API providers, local server and large-scale slurm jobs for LLM inference.
   - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang) or [Megatron](https://github.com/NVIDIA/Megatron-LM).
   - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a slurm cluster.
-- [Model evaluation](https://nvidia.github.io/NeMo-Skills/pipelines/evaluation):
+- [Model evaluation](https://nvidia.github.io/NeMo-Skills/evaluation):
   - Evaluate your models on many popular benchmarks.
-    - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
-    - Formal proofs in Lean: minif2f, proofnet
-    - Coding skills: swe-bench, scicode, livecodebench, human-eval, mbpp
-    - Chat/instruction following: ifbench, ifeval, arena-hard
-    - General knowledge: mmlu, mmlu-pro, gpqa
-    - Long context: ruler, mrcr
+    - [**Math (natural language**)](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math): e.g. [aime24](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math/#aime24), [aime25](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math/#aime25), [hmmt_feb25](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math/#hmmt_feb25)
+    - [**Math (formal language)**](https://nvidia.github.io/NeMo-Skills/evaluation/formal-math): e.g. [minif2f](https://nvidia.github.io/NeMo-Skills/evaluation/formal-math/#minif2f), [proofnet](https://nvidia.github.io/NeMo-Skills/evaluation/formal-math/#proofnet), [putnam-bench](https://nvidia.github.io/NeMo-Skills/evaluation/formal-math/#putnam-bench)
+    - [**Code**](https://nvidia.github.io/NeMo-Skills/evaluation/code): e.g. [swe-bench](https://nvidia.github.io/NeMo-Skills/evaluation/code/#swe-bench), [livecodebench](https://nvidia.github.io/NeMo-Skills/evaluation/code/#livecodebench)
+    - [**Scientific knowledge**](https://nvidia.github.io/NeMo-Skills/evaluation/scientific-knowledge): e.g., [hle](https://nvidia.github.io/NeMo-Skills/evaluation/scientific-knowledge/#hle), [scicode](https://nvidia.github.io/NeMo-Skills/evaluation/scientific-knowledge/#scicode), [gpqa](https://nvidia.github.io/NeMo-Skills/evaluation/scientific-knowledge/#gpqa)
+    - [**Instruction following**](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following): e.g. [ifbench](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following/#ifbench), [ifeval](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following/#ifeval)
+    - [**Long context**](https://nvidia.github.io/NeMo-Skills/evaluation/long-context): e.g. [ruler](https://nvidia.github.io/NeMo-Skills/evaluation/long-context/#ruler), [mrcr](https://nvidia.github.io/NeMo-Skills/evaluation/long-context/#mrcr)
+    - [**Tool-calling**](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling): e.g. [bfcl_v3](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling/#bfcl_v3)
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
