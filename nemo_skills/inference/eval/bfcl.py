@@ -227,7 +227,7 @@ class BFCLGenerationTask(GenerationTask):
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
-        output_dict = {"num_generated_tokens": 0, "log_dict_list": []}
+        output_dict = {"num_generated_tokens": 0}
         out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
@@ -260,19 +260,6 @@ class BFCLGenerationTask(GenerationTask):
                     break
 
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
-                try:
-                    # Log dict list is just an additional log for debugging
-                    # But we want to make sure that the message content is json serializable
-                    if self.cfg.use_client_parsing:
-                        json.dumps(model_response["message"])
-                        output_dict["log_dict_list"].append(model_response["message"])
-                    else:
-                        json.dumps(model_response["message"].content)
-                        output_dict["log_dict_list"].append(model_response["message"].content)
-                except (TypeError, ValueError) as e:
-                    # If the content is not json serializable, we don't add it to the log dict list
-                    LOG.warning(f"Model response content is not JSON serializable: {e}")
-                    pass
 
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
@@ -322,6 +309,11 @@ class BFCLGenerationTask(GenerationTask):
                         "content": execution_result,
                         "tool_call_id": tool_call_id,
                     }
+                    try:
+                        print("L325:", json.dumps(tool_message, indent=4))
+                    except Exception as e:
+                        print("L328:", tool_message)
+                        print("L329:", e)
                     state_dict["messages"].append(tool_message)
 
                 count += 1
