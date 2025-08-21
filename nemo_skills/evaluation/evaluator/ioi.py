@@ -27,8 +27,8 @@ class IOIEvaluatorConfig:
     dataset: str = "ioi24"
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
-    # where test cases are stored in automatically mounted eval datasets folder.
-    test_file: str = "/eval_dataset/ioi24/test_metadata.json"
+    # File where test cases are stored.
+    test_file: str = "/datasets/ioi24/test_metadata.json"
 
 
 def init_worker(sandbox_arg):
@@ -93,7 +93,7 @@ _EOT_
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(setup_script, language='shell')
+            worker_sandbox.execute_code(setup_script, language='shell', timeout=120)
         )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
@@ -101,7 +101,7 @@ _EOT_
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(compile_command, language='shell')
+            worker_sandbox.execute_code(compile_command, language='shell', timeout=120)
         )
 
         result = {
@@ -119,7 +119,7 @@ _EOT_
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
         run_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(run_command, language='shell')
+            worker_sandbox.execute_code(run_command, language='shell', timeout=120)
         )
 
         run_stdout = run_result.get('stdout', '')
@@ -143,7 +143,7 @@ _EOT_
     finally:
         try:
             worker_loop.run_until_complete(
-                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell', timeout=120)
             )
         except Exception:
             pass
@@ -170,7 +170,16 @@ def add_includes(code: str, problem_id: str) -> str:
     # use namespace std since models forget std:: often
     if "using namespace std;" not in code and "std::" not in code:
         code_header += "\nusing namespace std;\n\n"
-    return code_header + code
+    # add missing dummy implementations for IOI 25 triples problem
+    dummy = ""
+    if problem_id == "triples":
+        has_count = re.search(r"\bcount_triples\s*\(", code) is not None
+        has_construct = re.search(r"\bconstruct_range\s*\(", code) is not None
+        if has_construct and not has_count:
+            dummy += "long long count_triples(std::vector<int> H){return 0LL;}\n"
+        elif has_count and not has_construct:
+            dummy += "std::vector<int> construct_range(int M,int K){return {};}\n"
+    return code_header + code + ("\n" + dummy if dummy else "")
 
 
 def eval_ioi(cfg):
