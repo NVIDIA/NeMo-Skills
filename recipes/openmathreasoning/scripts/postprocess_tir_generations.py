@@ -96,18 +96,20 @@ def filter_code_solution(sample, args):
         return "Incomplete code execution found"
     if "judgement" in sample and "judgement: no" in sample["judgement"].lower():
         return "Incorrect final answer"
-    if sample["generation"].find("\\boxed{") != -1 and sample["generation"].find("\\boxed{") < sample[
-        "generation"
-    ].find(args.code_begin):
-        return "Boxed before code"
+    # if sample["generation"].find("\\boxed{") != -1 and sample["generation"].find("\\boxed{") < sample[
+    #     "generation"
+    # ].find(args.code_begin):
+    #     return "Boxed before code"
     if sample["generation"].find(sample["predicted_answer"]) != -1 and sample["generation"].find(
         sample["predicted_answer"]
     ) < sample["generation"].find(args.code_begin):
         return "Predicted answer before code"
 
-    generation = cut_final_answer_part(sample["generation"])
-    if generation is None:
-        return "Final answer not found"
+    # generation = cut_final_answer_part(sample["generation"])
+    # if generation is None:
+    #     return "Final answer not found"
+
+    generation = sample["generation"]
 
     if args.new_code_begin and args.new_code_end:
         generation = replace_code_tags(generation, args)
