@@ -68,10 +68,11 @@ def wait_for_server(server_address, generation_commands):
         # might be required if we are not hosting server ourselves
         # this will try to handshake in a loop and unblock when the server responds
         f"echo 'Waiting for the server to start at {server_address}' && "
-        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
-        # will run in a single task always (no need to check mpi env vars)
-        f"{generation_commands}"
     )
+    if server_address is not None:
+        cmd += f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
+        # will run in a single task always (no need to check mpi env vars)
+    cmd += f"{generation_commands}"
     return cmd
 
 
