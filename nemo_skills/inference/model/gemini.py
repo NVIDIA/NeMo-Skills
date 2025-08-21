@@ -82,7 +82,7 @@ class GeminiModel(BaseModel):
             "temperature": temperature,
             "top_p": top_p,
             "logprobs": top_logprobs is not None,
-            "top_k": top_k,
+            "top_k": top_k if top_k > 0 else None,
             "seed": random_seed,
             "presence_penalty": repetition_penalty,
             "top_logprobs": top_logprobs,
