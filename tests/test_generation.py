@@ -31,14 +31,14 @@ for dataset, split in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test
 
 
 def test_eval_gsm8k_api(tmp_path):
-    if not os.getenv('AZURE_OPENAI_API_KEY'):
-        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
 
     cmd = (
         f"ns eval "
-        f"    --server_type=azureopenai "
-        f"    --model=gpt-4.1-20250414 "
-        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --server_type=openai "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
         f"    ++max_samples=2 "
@@ -65,9 +65,9 @@ def test_eval_gsm8k_api(tmp_path):
 def test_fail_on_api_key_env_var(tmp_path):
     cmd = (
         f"ns eval "
-        f"    --server_type=azureopenai "
-        f"    --model=gpt-4.1-20250414 "
-        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --server_type=openai "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
         f"    ++max_samples=2 "
@@ -82,16 +82,16 @@ def test_fail_on_api_key_env_var(tmp_path):
 
 
 def test_succeed_on_api_key_env_var(tmp_path):
-    if not os.getenv('AZURE_OPENAI_API_KEY'):
-        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
 
     cmd = (
-        f"export MY_CUSTOM_KEY=$AZURE_OPENAI_API_KEY && "
-        f"unset AZURE_OPENAI_API_KEY && "
+        f"export MY_CUSTOM_KEY=$NVIDIA_API_KEY && "
+        f"unset NVIDIA_API_KEY && "
         f"ns eval "
-        f"    --server_type=azureopenai "
-        f"    --model=gpt-4.1-20250414 "
-        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --server_type=openai "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
         f"    ++max_samples=2 "
@@ -118,14 +118,14 @@ def test_succeed_on_api_key_env_var(tmp_path):
 
 @pytest.mark.parametrize("format", ["list", "dict"])
 def test_generate_openai_format(tmp_path, format):
-    if not os.getenv('AZURE_OPENAI_API_KEY'):
-        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
+    if not os.getenv('NVIDIA_API_KEY'):
+        pytest.skip("Define NVIDIA_API_KEY to run this test")
 
     cmd = (
         f"ns generate "
-        f"    --server_type=azureopenai "
-        f"    --model=gpt-4.1-20250414 "
-        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --server_type=openai "
+        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --input_file=/nemo_run/code/tests/data/openai-input-{format}.test "
         f"    --output_dir={tmp_path} "
         f"    ++prompt_format=openai "

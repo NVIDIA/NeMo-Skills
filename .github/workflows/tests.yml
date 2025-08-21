@@ -31,7 +31,7 @@ jobs:
         pip install -r requirements/common-tests.txt
     - name: Run all tests
       env:
-        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+        NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
         docker pull igitman/nemo-skills:0.7.0
