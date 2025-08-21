@@ -25,7 +25,7 @@ class GeminiModel(BaseModel):
         self,
         *args,
         model: str,
-        max_retries: int = 3,
+        api_key: str | None = None,
         **kwargs,
     ):
         """
@@ -34,18 +34,12 @@ class GeminiModel(BaseModel):
             - gemini-2.5-flash: thinking budget 0-24576 (default: dynamic thinking)
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
-        assert os.getenv("GEMINI_API_KEY") is not None, "GEMINI_API_KEY is not set"
-        model_litellm = f"{self.MODEL_PROVIDER}/{model}"
-        self.model = model
-        self.litellm_kwargs = dict(
-            model=model_litellm,
-            max_retries=max_retries,
-        )
-        httpx_limits = httpx.Limits(
-            max_keepalive_connections=2048, max_connections=2048
-        )
-        litellm.client_session = httpx.Client(limits=httpx_limits)
-        litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+        if api_key is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY is required for Gemini models and could not be found.")
+        super().__init__(*args, model=model, api_key=api_key, base_url="", **kwargs)
+
 
     def _build_chat_request_params(
         self,

@@ -59,12 +59,8 @@ class BaseModel:
         self.model_name_or_path = model
         self.server_host = host
         self.server_port = port
-        self.ssh_server = ssh_server
-        self.ssh_key_path = ssh_key_path
-        if ssh_server is None:
-            self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
-        if ssh_key_path is None:
-            self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
+        self.ssh_server = ssh_server or os.getenv("NEMO_SKILLS_SSH_SERVER")
+        self.ssh_key_path = ssh_key_path or os.getenv("NEMO_SKILLS_SSH_KEY_PATH")
 
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel
@@ -88,6 +84,10 @@ class BaseModel:
         if base_url is None:
             v1_suffix = "/v1" if use_v1_endpoint else ""
             base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+
+        elif base_url == "":
+            # We don't want to use base_url if it is an empty string
+            base_url = None
 
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
