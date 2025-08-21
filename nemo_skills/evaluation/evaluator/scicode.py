@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
-import asyncio
+import re
 from dataclasses import field
 
 from nemo_skills.code_execution.sandbox import get_sandbox
@@ -38,10 +39,20 @@ async def _execute_single_test(args):
     # step_id is always problem_id.subtask_step
     step_number = json_content["sub_steps"][int(subtask_step) - 1]["step_number"]
     test_lst = json_content["sub_steps"][int(subtask_step) - 1]["test_cases"]
+    # Remove any external scicode import lines; we provide local helpers in eval_prefix
+    sanitized_tests = []
+    for tc in test_lst:
+        lines = []
+        for line in tc.split('\n'):
+            if re.match(r"^\s*(from\s+scicode\.|import\s+scicode)\b", line):
+                continue
+            lines.append(line)
+        sanitized_tests.append('\n'.join(lines))
+
     code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_number}', {len(test_lst)})\n"
-    for idx in range(len(test_lst)):
+    for idx in range(len(sanitized_tests)):
         code += f"target = targets[{idx}]\n\n"
-        for line in test_lst[idx].split('\n'):
+        for line in sanitized_tests[idx].split('\n'):
             code += line + '\n'
 
     sandbox = get_sandbox(**eval_config.sandbox)
@@ -71,10 +82,13 @@ def test_code(eval_config, scicode_data):
     # Execute tasks in parallel using asyncio with a semaphore for num_parallel_requests
     async def run_tasks():
         semaphore = asyncio.Semaphore(eval_config.num_parallel_requests)
+
         async def execute_with_semaphore(task_args):
             async with semaphore:
                 return await _execute_single_test(task_args)
+
         return await asyncio.gather(*[execute_with_semaphore(task) for task in tasks])
+
     results = asyncio.run(run_tasks())
 
     # Organize results back into the original structure
