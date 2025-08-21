@@ -5,11 +5,11 @@ readtime: 20
 
 # Building an Efficient Inference Engine for Math Problems
 
-This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO24 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 5× faster batched inference compared to BF16 on two H100 GPUs. 
+This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO24 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 5× faster batched inference compared to BF16 on two H100 GPUs.
 
-We will leverage [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) for optimized model serving, including an advanced technique called ReDrafter for speculative decoding.  
+We will leverage [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) for optimized model serving, including an advanced technique called ReDrafter for speculative decoding.
 
-By the end of this tutorial, you'll have a local setup capable of running efficient inference with a large language model (LLM) integrated with a code execution sandbox. 
+By the end of this tutorial and companion notebook, you will have a local setup capable of running efficient inference with a large language model (LLM) integrated with a code execution sandbox.
 
 ## What We'll Cover
 
@@ -19,14 +19,14 @@ By the end of this tutorial, you'll have a local setup capable of running effici
 4.  **Launching the Inference Server**: Set up the LLM server and a parallel code execution sandbox to handle the tool-use capabilities of our model.
 5.  **Running Inference**: Finally, we'll send math problems to our custom inference engine and observe its problem-solving abilities.
 
-See the [companion notebook](../notebooks/demo_aimo_inference.ipynb) for launching the inference server and benchmarking. 
+See the [companion notebook](../notebooks/demo_aimo_inference.ipynb) for launching the inference server and benchmarking.
 
 -----
 
 ## 1\. Setting Up Your Environment
 
 Our first step is to establish a consistent and isolated environment. We will use a NVIDIA PyTorch NGC container and install the essential libraries: TensorRT-LLM for model optimization and NeMo-Skills for the overall pipeline management.
-FP8 inference requires a GPU that supports FP8 inference such as Ada Lovelace or Hopper architecture or later. For this example we assume two GPUs are available. 
+FP8 inference requires a GPU that supports FP8 inference such as Ada Lovelace or Hopper architecture or later. For this example we assume two GPUs are available.
 
 ### Container Setup and Library Installation
 
@@ -46,7 +46,7 @@ pip install git+https://github.com/NVIDIA/NeMo-Skills.git@dc32d6a
 
 ## 2\. Preparing Model Weights
 
-Now that our environment is ready, the next step is to prepare our Large Language Model (LLM). We'll download the `nvidia/OpenMath-Nemotron-14B-Kaggle` model and transform it into an optimized TensorRT-LLM engine using FP8 quantization. 
+Now that our environment is ready, the next step is to prepare our Large Language Model (LLM). We'll download the `nvidia/OpenMath-Nemotron-14B-Kaggle` model and transform it into an optimized TensorRT-LLM engine using FP8 quantization.
 
 **Note on FP8 Quantization:** FP8 (8-bit floating point) quantization is highly efficient but requires GPUs that support `E4M3 FP8` (like NVIDIA Hopper GPUs). For other GPUs, `int8_wo` (8-bit integer with weight-only quantization) is recommended and does not require calibration.
 
@@ -138,11 +138,11 @@ After this command, your FP8 LLM engine is ready for deployment.
 
 ## 3\. Accelerating Inference with ReDrafter
 
-To push our inference efficiency further, we will integrate [ReDrafter](https://machinelearning.apple.com/research/redrafter-nvidia-tensorrt-llm). This speculative decoding technique uses a smaller "draft" model to predict tokens, allowing the main LLM to generate responses much faster. ReDrafter is an RNN-based inference method developed by Apple. In [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/redrafter) it is compatible with most models supported within TensorRT-LLM.
+To push our inference efficiency further, we will integrate [ReDrafter](https://machinelearning.apple.com/research/redrafter-nvidia-tensorrt-llm). This speculative decoding technique uses a smaller "draft" model to predict tokens, allowing the main LLM to generate responses much faster. ReDrafter is an RNN-based inference method developed by Apple. The ReDrafter [implementation](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/redrafter) is compatible with most models supported within the TensorRT-LLM library.
 
 ### Installing and Training ReDrafter
 
-First, install the ReDrafter library. The tokenizer and training data for the draft model should be the same as those used for the base model. If the original training data is not available, base model generations can also be used for training the draft model. 
+First, install the ReDrafter library. The tokenizer and training data for the draft model should be the same as those used for the base model. If the original training data is not available, base model generations can also be used for training the draft model.
 
 ```bash
 # Install the ReDrafter library
@@ -176,7 +176,7 @@ torchrun --nproc_per_node=2 -m nemo_skills.training.train_redrafter \
     --report_to wandb # Remove if not using wandb
 ```
 
-During training, observe the `redrafter2_top1` score; aiming for above `0.6` indicates good performance (60% of steps accept the next three drafted tokens).
+During training, observe the `redrafter2_top1` score. Aiming for above `0.6` indicates good performance (60% of steps accept the next three drafted tokens).
 
 ### Building the TensorRT-LLM Engine for the Draft Model
 
@@ -191,7 +191,9 @@ git clone https://github.com/NVIDIA/TensorRT-LLM/
 Next, convert the trained ReDrafter PyTorch checkpoint to a TensorRT-LLM checkpoint.
 
 ```bash
+# Base model intermediate checkpoint from FP8 quantisation step
 export BASE_TRTLLM_CKPT=$(pwd)/OpenMath-Nemotron-14B-kaggle-fp8-trtllm-tmp-ckpt
+# Trained draft checkpoint
 export REDRAFTER_PYTORCH_CKPT=$(pwd)/redrafter_output/redrafter__redrafter_OpenMath-Nemotron-14B-kaggle_n_3_lr_0.001_layers_2
 export REDRAFTER_TRTLLM_CKPT=$(pwd)/OpenMath-Nemotron-14B-kaggle-fp8-draft-ckpt
 
@@ -207,8 +209,7 @@ python convert_checkpoint.py \
 cd ../../../
 ```
 
-Finally, build the combined TensorRT-LLM engine that includes both the main model and the ReDrafter for speculative decoding.
-
+Finally, build the combined TensorRT-LLM engine - base model with a draft head for speculative decoding.
 ```bash
 trtllm-build \
     --checkpoint_dir $REDRAFTER_TRTLLM_CKPT \
@@ -230,15 +231,15 @@ Your TensorRT-LLM engine, now supercharged with ReDrafter, is ready to be served
 
 ## 4\. Benchmarking and results
 
-We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference. 
-In the notebook, you can:  
+We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference.
+In the notebook, you can:
 
-- Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).  
-- Compare performance benchmarks such as **time-to-first-token** and **throughput per device**.  
+- Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).
+- Compare performance benchmarks such as **time-to-first-token** and **throughput per device**.
 - Explore advanced controls like **early stopping after a fixed time** or **terminating after the first N generations complete**.
-- Run inference with tool-calling. 
+- Run inference with tool-calling.
 
-Here’s a sample of the kind of benchmark results you’ll see:  
+Here’s a sample of the kind of benchmark results you’ll see:
 
 | Metric                        | FP8+ReDrafter | FP8   | BF16  |
 |-------------------------------|---------------|-------|-------|
@@ -246,13 +247,13 @@ Here’s a sample of the kind of benchmark results you’ll see:
 | Batch Throughput (Tok/sec)          | 2036          | 1029   | 518   |
 | Average Sample Throughput (Tok/sec) | 175.7           | 89.9    | 44.1    |
 
-*(full benchmarks and code available in the notebook)*  
+*(full benchmarks and code available in the notebook)*
 
 -----
 
 ## 5\. Optional: Enabling tool-calling and the code execution sandbox
 
-Our LLM is a powerful tool-instruction reasoning model. This means it doesn't just generate text; it can also write and execute Python code in a secure sandbox to solve problems. Below we provide an example how to launch both the LLM server and its accompanying code execution sandbox.
+The OpenMath LLM is a powerful tool-instruction reasoning model. This means it doesn't just generate text; it can also write and execute Python code in a secure sandbox to solve problems. In the companion notebook, we provide an example how to launch both the LLM server and its accompanying code execution sandbox.
 
 The interaction works like this:
 
@@ -268,4 +269,6 @@ Here's an example of such an interaction:
 Therefore, b = k - 7 = 21 or 49. So, same result. Therefore, sum is 70.\n\nAlternatively, maybe I can write a small program to check for all bases b > 9, compute 9b + 7 and b + 7, check if the latter divides the former, and collect all such bases. Then sum them. Let\'s do that to verify.\n\nHere\'s a Python code to perform the check:\n\n<tool_call>\n# Initialize a list to store valid bases\nvalid_bases = []\n\n# Check bases from 10 upwards\nfor b in range(10, 10000):  # Arbitrary large upper limit\n    num1 = 9 * b + 7\n    num2 = b + 7\n    if num1 % num2 == 0:\n        valid_bases.append(b)\n        print(f"Found base: {b}")\n\n# Sum the valid bases\nsum_bases = sum(valid_bases)\nprint(f"Sum: {sum_bases}")\n\n# If sum is over 1000, take modulo 1000\nif sum_bases > 1000:\n    result = sum_bases % 1000\nelse:\n    result = sum_bases\n\nprint(f"Final Result: {result}")\n</tool_call>\n```output\nFound base: 21\nFound base: 49\nSum: 70\nFinal Result: 70\n```\nThe code confirms that the valid bases are 21 and 49, summing to 70.
 ```
 
-To turn off tool-calling in the [companion notebook](../notebooks/demo_aimo_inference.ipynb) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/). 
+</details>
+
+To turn off tool-calling in the [companion notebook](../notebooks/demo_aimo_inference.ipynb) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/).
