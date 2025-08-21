@@ -7,7 +7,7 @@ hide:
 
 # Reproducing Llama-Nemotron-Super-49B-V1.5 Evals
 
-In this tutorial, we will reproduce the evals for the [Llama-3.3-Nemotron-Super-49B-v1.5](nvidia/Llama-3_3-Nemotron-Super-49B-v1_5){target="_blank"} model using NeMo-Skills.
+In this tutorial, we will reproduce the evals for the Llama-3.3-Nemotron-Super-49B-v1.5 model using NeMo-Skills.
 For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
 
 
