@@ -47,7 +47,8 @@ class BaseModel:
     def __init__(
         self,
         model: str,
-        api_key: str = "EMPTY",
+        api_key: str | None = None,
+        api_key_env_var: str | None = None,
         base_url: str | None = None,
         max_retries: int = 3,
         use_v1_endpoint: bool = True,
@@ -96,6 +97,10 @@ class BaseModel:
         # Get the tokenizer endpoint if available
         self.tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, model)
 
+        api_key = self._get_api_key(api_key, api_key_env_var, base_url)
+        if api_key is None:  # self-hosted models don't need the key, but still require the parameter
+            api_key = "EMPTY"
+
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it
         self.litellm_kwargs = dict(
@@ -107,6 +112,19 @@ class BaseModel:
         httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+
+    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
+        if api_key:  # explicit cmd argument always takes precedence
+            return api_key
+        if api_key_env_var:
+            api_key = os.getenv(api_key_env_var)
+            if not api_key:
+                raise ValueError(
+                    f"You defined api_key_env_var={api_key_env_var} but the value is not set. "
+                    f"Either remove api_key_env_var or set {api_key_env_var}=<some value>. "
+                    "Did you forget to add it to your cluster config?"
+                )
+        return api_key
 
     def __del__(self):
         if self._tunnel:
@@ -158,6 +176,14 @@ class BaseModel:
         extra_body: dict = None,
     ) -> dict:
         """Native async version of generate for single prompt."""
+
+        # Check tool calls are a list of dict
+        if tools is not None:
+            for tool in tools:
+                # TODO: We may want to add additional checks for tools in the future
+                if not isinstance(tool, dict):
+                    raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
+
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,
@@ -223,6 +249,13 @@ class BaseModel:
         Synchronous version of generate for single prompt.
         See generate_async for full list of parameters.
         """
+        # Check tool calls are a list of dict
+        if tools is not None:
+            for tool in tools:
+                # TODO: We may want to add additional checks for tools in the future
+                if not isinstance(tool, dict):
+                    raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
+                    
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,

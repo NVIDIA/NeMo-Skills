@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import abc
+import math
+import random
 from collections import Counter, defaultdict
 
 
@@ -174,10 +176,17 @@ class BaseMetrics(abc.ABC):
                     majority_score = 0
                     majority_answer = None
                 else:
-                    # sorting to ensure reproducible scores in case of ties in majority
-                    valid_answers_and_results = sorted(valid_answers_and_results)
                     # Find the most common answer and its correctness
-                    majority_answer, majority_score = Counter(valid_answers_and_results).most_common(1)[0][0]
+                    majority_count = Counter(valid_answers_and_results).most_common(1)[0][1]
+                    majority_answer_list = [
+                        (answer, score)
+                        for (answer, score), count in Counter(valid_answers_and_results).items()
+                        if count == majority_count
+                    ]
+                    # Majority score is the average of the scores of the most common answers
+                    majority_score = sum(score for answer, score in majority_answer_list) / len(majority_answer_list)
+                    # Choose a deterministic answer from the most common answers for reproducibility
+                    majority_answer = sorted(majority_answer_list)[0][0]
 
                 eval_dict[f"majority@{k}"][score_method] += majority_score
 
@@ -257,37 +266,60 @@ class BaseMetrics(abc.ABC):
             eval_dict = self.eval_dict
         score_dicts = [self._get_score_dict(pred) for pred in predictions]
 
-        for k in range(1, len(predictions) + 1):
-            for score_method in score_dicts[0].keys():
+        for score_method in score_dicts[0].keys():
+            scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
+
+            # Check if the task/instance has binary scores
+            # For tasks like IF, the probabilistic logic for pass@k is not applicable
+            is_binary_score = (max(scores_list) == 1) and (min(scores_list) == 0)
+
+            if is_binary_score:
+                total_correct = sum(scores_list)
+                total = len(scores_list)
+                total_incorrect = total - total_correct
+
+            for k in range(1, len(predictions) + 1):
                 # TODO: implement "avg_correct_tokens", "avg_incorrect_tokens" metrics
 
-                scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts[:k]]
-                pass_score = max(scores_list)
-                eval_dict[f"pass@{k}"][score_method] += pass_score
+                if is_binary_score:
+                    # Pass@k is (1 - ((total -correct) choose k) / (total choose k))
+                    # Probability of picking all incorrect answers
+                    if total_incorrect < k:
+                        # If fewer incorrect answers than k, impossible to pick all incorrect
+                        prob_all_incorrect = 0
+                    else:
+                        prob_all_incorrect = math.comb(total_incorrect, k) / math.comb(total, k)
+                    # Probability of picking at least one correct answer
+                    instance_pass_score = 1 - prob_all_incorrect
+                else:
+                    instance_pass_score = max(scores_list[:k])
+
+                eval_dict[f"pass@{k}"][score_method] += instance_pass_score
 
                 # pass@1[avg-of-k] - mean of pass@1 across all generations
-                eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list) / k
+                eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list[:k]) / k
 
                 self._update_score_metrics_for_pass(
                     eval_dict=eval_dict,
                     k=k,
                     score_method=score_method,
                     score_dicts=score_dicts,
-                    pass_score=pass_score,
+                    pass_score=instance_pass_score,
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                 )
-            if predicted_answers is not None:
-                no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
-                eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
-                eval_dict[f"pass@1[avg-of-{k}]"]["no_answer"] += sum(no_answer_list) / k
 
-            self._update_metrics_for_pass(
-                eval_dict=eval_dict,
-                k=k,
-                predictions=predictions,
-                predicted_answers=predicted_answers,
-            )
+                if predicted_answers is not None:
+                    no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
+                    eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
+                    eval_dict[f"pass@1[avg-of-{k}]"]["no_answer"] += sum(no_answer_list) / k
+
+                self._update_metrics_for_pass(
+                    eval_dict=eval_dict,
+                    k=k,
+                    predictions=predictions,
+                    predicted_answers=predicted_answers,
+                )
 
     def setup(self, input_files):
         pass
