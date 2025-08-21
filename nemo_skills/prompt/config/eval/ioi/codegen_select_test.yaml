@@ -1,0 +1,14 @@
+system: ""
+
+user: |-
+  You are a competitive programmer. You are given a problem, list of test scripts and the execution output from a test file using a proposed solution. 
+  
+  Select the test script that provides the most useful information for improving the proposed solution by looking at the execution output.
+
+  The final improved solution should be the index of the test script that wrapped in \\boxed{}.
+
+  ## Problem
+  {question}
+  
+  ## Test Scripts
+  {test_scripts}

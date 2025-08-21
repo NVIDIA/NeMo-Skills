@@ -1,0 +1,25 @@
+# default prompt for all python based code benchmark evaluations
+
+system: ""
+
+user: |-
+  You are a competitive programmer. You are given a proposed solution, and the execution output from a test file. Make improvements to the solution based on the feedback and propose a new solution.
+  
+  The final improved solution should be in the following format:
+  ```python
+  # Your code here
+  ```
+
+  Here is the problem for which you need to generate/complete code:
+
+  ## Problem
+  {question}
+  
+  ## Proposed Solution
+  {solution}
+  
+  ## Test Script
+  {script}
+  
+  ## Execution Results
+  {output}
