@@ -34,10 +34,8 @@ class GeminiModel(BaseModel):
             - gemini-2.5-flash: thinking budget 0-24576 (default: dynamic thinking)
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
-        if api_key is None:
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY is required for Gemini models and could not be found.")
+
+        api_key = self._get_api_key(api_key, api_key_env_var="GEMINI_API_KEY", base_url=None)
         super().__init__(*args, model=model, api_key=api_key, base_url="", **kwargs)
 
 
@@ -100,9 +98,6 @@ class GeminiModel(BaseModel):
                 "type": "enabled",
                 "budget_tokens": -1,
             }
-        
-        if self.model == "gemini-2.5-pro":
-            assert reasoning_effort != "disable", "Gemini 2.5 Pro cannnot disable reasoning, please set reasoning_effort to ['dynamic', 'low', 'medium', 'high']"
         
         params["reasoning_effort"] = reasoning_effort
         
