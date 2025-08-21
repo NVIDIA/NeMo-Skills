@@ -35,9 +35,16 @@ class GeminiModel(BaseModel):
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
 
-        api_key = self._get_api_key(api_key, api_key_env_var="GEMINI_API_KEY", base_url=None)
         super().__init__(*args, model=model, api_key=api_key, base_url="", **kwargs)
 
+    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
+        api_key = super()._get_api_key(api_key, api_key_env_var, base_url)
+
+        if api_key is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY is required for Gemini models and could not be found.")
+        return api_key
 
     def _build_chat_request_params(
         self,
