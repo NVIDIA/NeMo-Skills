@@ -23,8 +23,8 @@ See the [companion notebook](../notebooks/demo_aimo_inference.ipynb) for launchi
 
 ## 1\. Setting Up Your Environment
 
-Our first step is to establish a consistent and isolated environment. We'll use an NVIDIA PyTorch NGC container and install the essential libraries: TensorRT-LLM for model optimization and NeMo-Skills for the overall pipeline management.
-FP8 inference requires a GPU with which supports FP8 inference such as Ada Lovelace or Hopper architecture or later. For this example we assume two gpus are available. 
+Our first step is to establish a consistent and isolated environment. We will use a NVIDIA PyTorch NGC container and install the essential libraries: TensorRT-LLM for model optimization and NeMo-Skills for the overall pipeline management.
+FP8 inference requires a GPU that supports FP8 inference such as Ada Lovelace or Hopper architecture or later. For this example we assume two GPUs are available. 
 
 ### Container Setup and Library Installation
 
@@ -61,9 +61,6 @@ pip install -U "huggingface_hub[cli]"
 
 # Download the 14B parameter main model
 huggingface-cli download nvidia/OpenMath-Nemotron-14B-kaggle --local-dir OpenMath-Nemotron-14B-kaggle
-
-# Download a smaller model to demo ReDrafter training
-huggingface-cli download nvidia/OpenMath-Nemotron-1.5B --local-dir OpenMath-Nemotron-1.5B
 
 # Download the OpenMathReasoning dataset for calibration
 huggingface-cli download nvidia/OpenMathReasoning --repo-type dataset --local-dir OpenMathReasoning
@@ -137,12 +134,11 @@ After this command, your FP8 LLM engine is ready for deployment.
 
 ## 3\. Accelerating Inference with ReDrafter
 
-To push our inference efficiency further, we will integrate [ReDrafter](https://machinelearning.apple.com/research/redrafter-nvidia-tensorrt-llm). This speculative decoding technique uses a smaller "draft" model to predict tokens, allowing the main LLM to generate responses much faster. ReDrafter is an RNN based inference method developed by Apple. In [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/redrafter) it is compatible with most models supported within Tensorrt-LLM.
+To push our inference efficiency further, we will integrate [ReDrafter](https://machinelearning.apple.com/research/redrafter-nvidia-tensorrt-llm). This speculative decoding technique uses a smaller "draft" model to predict tokens, allowing the main LLM to generate responses much faster. ReDrafter is an RNN-based inference method developed by Apple. In [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/redrafter) it is compatible with most models supported within TensorRT-LLM.
 
 ### Installing and Training ReDrafter
 
-First, install the ReDrafter library. To demonstrate, we'll train the ReDrafter model using the `OpenMath-Nemotron-1.5B` model as its base and the `OpenMathReasoning` dataset. The base model used below in training, `OpenMath-Nemotron-1.5B`, can be swapped out for whichever base model is used during inference. 
-In the below example the tokenizer and training data for the draft model is the same as used for the base model. If this data is not available, base model generations can also be used for training the draft model. 
+First, install the ReDrafter library. The tokenizer and training data for the draft model should be the same as those used for the base model. If the original training data is not available, base model generations can also be used for training the draft model. 
 
 ```bash
 # Install the ReDrafter library
@@ -152,7 +148,7 @@ pip install --no-binary=protobuf --ignore-requires-python \
 # Train the ReDrafter model
 ns run_cmd --log_dir ./logs/ \
 torchrun --nproc_per_node=2 -m nemo_skills.training.train_redrafter \
-    --llm_name_or_path 'OpenMath-Nemotron-1.5B' \
+    --llm_name_or_path 'OpenMath-Nemotron-14B-kaggle' \
     --dataset "OpenMathReasoning" \
     --dataset_split "tir" \
     --bf16 True \
@@ -168,7 +164,7 @@ torchrun --nproc_per_node=2 -m nemo_skills.training.train_redrafter \
     --logging_steps 20 \
     --tf32 True \
     --model_max_length 2048 \
-    --dataset_nrows 100000 \
+    --dataset_nrows 50000 \
     --drafter_predict_n_tokens 3 \
     --drafter_num_layers 2 \
     --rnn True \
@@ -191,8 +187,8 @@ git clone https://github.com/NVIDIA/TensorRT-LLM/
 Next, convert the trained ReDrafter PyTorch checkpoint to a TensorRT-LLM checkpoint.
 
 ```bash
-export BASE_TRTLLM_CKPT=$(pwd)/OpenMath-Nemotron-14B-kaggle-fp8-trtllm/tmp-ckpt
-export REDRAFTER_PYTORCH_CKPT=$(pwd)/redrafter_output/redrafter_OpenMath-Nemotron-1.5B_n_3_lr_0.001_layers_2
+export BASE_TRTLLM_CKPT=$(pwd)/OpenMath-Nemotron-14B-kaggle-fp8-trtllm-tmp-ckpt
+export REDRAFTER_PYTORCH_CKPT=$(pwd)/redrafter_output/redrafter__redrafter_OpenMath-Nemotron-14B-kaggle_n_3_lr_0.001_layers_2
 export REDRAFTER_TRTLLM_CKPT=$(pwd)/OpenMath-Nemotron-14B-kaggle-fp8-draft-ckpt
 
 cd ./TensorRT-LLM/examples/redrafter
@@ -228,7 +224,7 @@ Your TensorRT-LLM engine, now supercharged with ReDrafter, is ready to be served
 
 ## 4\. Benchmarking and results
 
-We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 gpus for inference. 
+We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference. 
 In the notebook, you can:  
 
 - Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).  
@@ -242,7 +238,7 @@ Here’s a sample of the kind of benchmark results you’ll see:
 |-------------------------------|---------------|-------|-------|
 | Total Generation Time (s)     | 33.8          | 72.9  |  170.4 |
 | Batch Throughput (Tok/sec)          | 2036          | 1029   | 518   |
-| Average Sample Throughput (Tok/s) | 175.7           | 89.9    | 44.1    |
+| Average Sample Throughput (Tok/sec) | 175.7           | 89.9    | 44.1    |
 
 *(full benchmarks and code available in the notebook)*  
 
@@ -265,4 +261,4 @@ Here's an example of such an interaction:
 Therefore, b = k - 7 = 21 or 49. So, same result. Therefore, sum is 70.\n\nAlternatively, maybe I can write a small program to check for all bases b > 9, compute 9b + 7 and b + 7, check if the latter divides the former, and collect all such bases. Then sum them. Let\'s do that to verify.\n\nHere\'s a Python code to perform the check:\n\n<tool_call>\n# Initialize a list to store valid bases\nvalid_bases = []\n\n# Check bases from 10 upwards\nfor b in range(10, 10000):  # Arbitrary large upper limit\n    num1 = 9 * b + 7\n    num2 = b + 7\n    if num1 % num2 == 0:\n        valid_bases.append(b)\n        print(f"Found base: {b}")\n\n# Sum the valid bases\nsum_bases = sum(valid_bases)\nprint(f"Sum: {sum_bases}")\n\n# If sum is over 1000, take modulo 1000\nif sum_bases > 1000:\n    result = sum_bases % 1000\nelse:\n    result = sum_bases\n\nprint(f"Final Result: {result}")\n</tool_call>\n```output\nFound base: 21\nFound base: 49\nSum: 70\nFinal Result: 70\n```\nThe code confirms that the valid bases are 21 and 49, summing to 70.
 ```
 
-To turn off tool-calling in the [companion notebook](link) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/). 
+To turn off tool-calling in the [companion notebook](../notebooks/demo_aimo_inference.ipynb) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/). 
