@@ -20,14 +20,14 @@ from .base import BaseModel
 class GeminiModel(BaseModel):
     MODEL_PROVIDER = "gemini"
 
-    def __init__(self, base_url: str = "", *args, **kwargs):
+    def __init__(self, base_url: str | None = None, *args, **kwargs):
         """
         model:
             - gemini-2.5-pro: thinking budget 128-32768 (default: no thinking, we should enable thinking to prevent errors.)
             - gemini-2.5-flash: thinking budget 0-24576 (default: no thinking)
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
-        super().__init__(base_url=base_url, *args, **kwargs)
+        super().__init__(base_url="", *args, **kwargs)
 
     def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
         api_key = super()._get_api_key(api_key, api_key_env_var, base_url)
