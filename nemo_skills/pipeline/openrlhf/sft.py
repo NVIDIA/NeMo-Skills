@@ -244,7 +244,7 @@ def sft_openrlhf(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
-    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
+    skip_hf_home_check: bool = typer.Option(True, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "

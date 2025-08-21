@@ -163,7 +163,7 @@ def eval(
         'nemo-skills',
         help="Name of the wandb project to sync samples to.",
     ),
-    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
+    skip_hf_home_check: bool = typer.Option(True, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "

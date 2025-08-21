@@ -290,7 +290,7 @@ def ppo_verl(
     script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
-    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
+    skip_hf_home_check: bool = typer.Option(True, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
