@@ -97,8 +97,7 @@ def test_succeed_on_api_key_env_var(tmp_path):
         f"    ++max_samples=2 "
         f"    ++server.api_key_env_var=MY_CUSTOM_KEY "
     )
-    # capturing output to not accidentally leak the key in the logs
-    subprocess.run(cmd, shell=True, check=True, capture_output=True)
+    subprocess.run(cmd, shell=True, check=True)
 
     # checking that summarize results works (just that there are no errors, but can inspect the output as well)
     subprocess.run(
