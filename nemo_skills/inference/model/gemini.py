@@ -15,10 +15,10 @@
 import os
 import httpx
 import litellm
-from .openai import OpenAIModel
+from .base import BaseModel
 
 
-class GeminiModel(OpenAIModel):
+class GeminiModel(BaseModel):
     MODEL_PROVIDER = "gemini"
 
     def __init__(
