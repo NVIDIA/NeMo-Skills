@@ -295,7 +295,7 @@ def ppo_openrlhf(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
-    hf_home_check: bool = typer.Option(True, help="If False, skip checking HF_HOME in cluster_config."),
+    hf_home_check: bool = typer.Option(False, help="If False, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
