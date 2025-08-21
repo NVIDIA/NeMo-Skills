@@ -55,18 +55,13 @@ exclude = ["tests", "tests.*"]
 [tool.setuptools.dynamic]
 version = { attr = "nemo_skills.version.__version__" }
 dependencies = {file = ["requirements/main.txt"]}
-optional-dependencies = {core = { file = ["requirements/main.txt"] }, all = { file = ["requirements/main.txt"] }}
-
-[tool.isort]
-profile = "black"  # black-compatible
-line_length = 119  # should match black parameters
-py_version = 310  # python 3.10 as a target version
-
-[tool.black]
-line_length = 119
-skip_string_normalization = true
+optional-dependencies = {dev = { file = ["requirements/common-tests.txt", "requirements/common-dev.txt"] } }
 
 [tool.pytest.ini_options]
 markers = [
     "gpu: tests that require a GPU to run",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 119
