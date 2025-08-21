@@ -68,13 +68,13 @@ class ReadData(BaseProcessor):
                 self.keys_to_keep.add("judgement")
 
         if isinstance(self.input_files, str):
-            if ',' in self.input_files:
+            if "," in self.input_files:
                 self.input_files = self.input_files.split(",")
             else:
                 self.input_files = self.input_files.split(" ")
 
         if isinstance(self.preprocessed_dataset_files, str):
-            if ',' in self.preprocessed_dataset_files:
+            if "," in self.preprocessed_dataset_files:
                 self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(",")
             else:
                 self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(" ")
@@ -141,7 +141,7 @@ class ReadData(BaseProcessor):
                     if not self.add_incorrect and not is_correct_judgement(line_dict["judgement"]):
                         continue
 
-            line_dict['filename'] = file_handle.name
+            line_dict["filename"] = file_handle.name
 
             if self.keys_to_keep:
                 line_dict = {k: v for k, v in line_dict.items() if k in self.keys_to_keep}
@@ -219,7 +219,7 @@ class ReadData(BaseProcessor):
 
 
 class GroupSamples(BaseProcessor):
-    def __init__(self, group_key='input', **kwargs):
+    def __init__(self, group_key="input", **kwargs):
         super().__init__(**kwargs)
         self.group_key = group_key
 
@@ -361,8 +361,8 @@ class WriteFinalSftManifest(BaseProcessor):
                 if elem[self.output_key] in seen_predictions[question]:
                     continue
                 seen_predictions[question].add(elem[self.output_key])
-                if 'expected_answer' in elem:
-                    elem['expected_answer'] = str(elem['expected_answer'])
+                if "expected_answer" in elem:
+                    elem["expected_answer"] = str(elem["expected_answer"])
                 # take only required keys from the input if exclude_optional_keys is True
                 output_sample = {}
                 if not self.exclude_optional_keys:
@@ -380,6 +380,11 @@ class WriteFinalSftManifest(BaseProcessor):
                 else:
                     output_sample["input"] = elem[self.input_key]
                     output_sample["output"] = generation
+
+                if "reasoning_content" in elem:
+                    output_sample["output"] = (
+                        self.thinking_begin + elem["reasoning_content"] + self.thinking_end
+                    ) + output_sample["output"]
 
                 output_sample.update(self.metadata)
                 fout.write(json.dumps(output_sample) + "\n")
@@ -439,12 +444,14 @@ class WriteFinalRLManifest(BaseProcessor):
     def process(self):
         samples_count = 0
         all_data = []
-        with (open(self.input_manifest_file, "rt", encoding="utf-8") as fin,):
+        with (
+            open(self.input_manifest_file, "rt", encoding="utf-8") as fin,
+        ):
             # only looping over the correct samples (unless asked for incorrect)
             for line in fin:
                 elem = json.loads(line)
-                if 'expected_answer' in elem:
-                    elem['expected_answer'] = str(elem['expected_answer'])
+                if "expected_answer" in elem:
+                    elem["expected_answer"] = str(elem["expected_answer"])
                 # take only required keys from the input if exclude_optional_keys is True
                 output_sample = {}
                 if not self.exclude_optional_keys:

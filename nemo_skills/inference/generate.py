@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -230,7 +230,8 @@ class GenerationTask:
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
                         "You can only use one of them!"
                     )
-                self.cfg.inference.extra_body["chat_template_kwargs"] = self.cfg.chat_template_kwargs
+                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
         self.llm = self.setup_llm()
