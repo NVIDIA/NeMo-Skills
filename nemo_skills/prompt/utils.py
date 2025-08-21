@@ -206,17 +206,21 @@ class Prompt:
             "code_output_format": self.config.code_tags.code_output_format,
         }
 
-    def add_assistant_end_suffix(self, assistant_response: str) -> str:
-        """Adds special tokens to the end of assistant response."""
+    def format_assistant_response(
+        self, content: str, thinking: str | None = None, chat_template_kwargs: dict | None = None
+    ) -> str:
+        """Adds special tokens to the end of assistant response and formats thinking if provided"""
         if self.tokenizer is None:
             raise ValueError("Tokenizer is not set.")
 
         messages = [{"role": "user", "content": ""}]
 
-        user_string = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        user_string = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True, **chat_template_kwargs
+        )
 
-        messages.append({"role": "assistant", "content": assistant_response})
-        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        messages.append({"role": "assistant", "content": content, "thinking": thinking})
+        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False, **chat_template_kwargs)
 
         assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
 

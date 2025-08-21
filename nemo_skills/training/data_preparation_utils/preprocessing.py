@@ -310,6 +310,7 @@ class WriteFinalSftManifest(BaseProcessor):
         self,
         prompt_config: str,
         tokenizer: str | None = None,
+        chat_template_kwargs: dict | None = None,
         system_message: str | None = None,
         code_tags: str | None = None,
         input_key: str = "input",
@@ -346,6 +347,8 @@ class WriteFinalSftManifest(BaseProcessor):
         if system_message is not None:
             self.prompt.config.system = system_message
 
+        self.chat_template_kwargs = chat_template_kwargs
+
     def process(self):
         samples_count = 0
         seen_predictions = defaultdict(set)
@@ -372,19 +375,25 @@ class WriteFinalSftManifest(BaseProcessor):
 
                 generation = elem.pop(self.output_key)
                 if self.prompt:
-                    output_sample["input"] = self.prompt.fill(input_dict=elem)
-                    output_sample["output"] = generation
+                    output_sample["input"] = self.prompt.fill(
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                    )
                     # not adding end-of-turn for incomplete generations
                     if output_sample.get("finish_reason", "stop") == "stop":
-                        output_sample["output"] = self.prompt.add_assistant_end_suffix(output_sample["output"])
+                        output_sample["output"] = self.prompt.format_assistant_response(
+                            content=generation,
+                            thinking=elem.get("reasoning_content"),
+                            chat_template_kwargs=self.chat_template_kwargs,
+                        )
+                    else:
+                        # this doesn't work properly with reasoning_content, so let's fail for now. TODO: fix this
+                        if elem.get("reasoning_content"):
+                            raise ValueError("Reasoning content is not supported yet for incomplete generations")
+                        output_sample["output"] = generation
+
                 else:
                     output_sample["input"] = elem[self.input_key]
                     output_sample["output"] = generation
-
-                if "reasoning_content" in elem:
-                    output_sample["output"] = (
-                        self.thinking_begin + elem["reasoning_content"] + self.thinking_end
-                    ) + output_sample["output"]
 
                 output_sample.update(self.metadata)
                 fout.write(json.dumps(output_sample) + "\n")
@@ -398,6 +407,7 @@ class WriteFinalRLManifest(BaseProcessor):
         self,
         prompt_config: str,
         tokenizer: str | None = None,
+        chat_template_kwargs: dict | None = None,
         system_message: str | None = None,
         code_tags: str | None = None,
         task_name: str | None = None,
@@ -436,6 +446,7 @@ class WriteFinalRLManifest(BaseProcessor):
         if system_message is not None:
             self.prompt.config.system = system_message
 
+        self.chat_template_kwargs = chat_template_kwargs
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle
         self.num_output_samples = num_output_samples
@@ -444,9 +455,7 @@ class WriteFinalRLManifest(BaseProcessor):
     def process(self):
         samples_count = 0
         all_data = []
-        with (
-            open(self.input_manifest_file, "rt", encoding="utf-8") as fin,
-        ):
+        with open(self.input_manifest_file, "rt", encoding="utf-8") as fin:
             # only looping over the correct samples (unless asked for incorrect)
             for line in fin:
                 elem = json.loads(line)
@@ -464,7 +473,9 @@ class WriteFinalRLManifest(BaseProcessor):
                         output_sample["problem"] = elem["problem"]
 
                 if self.prompt:
-                    output_sample["input"] = self.prompt.fill(input_dict=elem)
+                    output_sample["input"] = self.prompt.fill(
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                    )
                 else:
                     output_sample["input"] = elem[self.input_key]
 

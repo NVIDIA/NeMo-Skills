@@ -25,6 +25,7 @@ num_output_samples: null
 
 # Needed to format the data and also for length-based filtering
 tokenizer: null
+chat_template_kwargs: null
 system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
@@ -249,6 +250,7 @@ processors:
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
     tokenizer: ${tokenizer}
+    chat_template_kwargs: ${chat_template_kwargs}
     system_message: ${system_message}
     code_tags: ${code_tags}
     input_key: ${input_key}
