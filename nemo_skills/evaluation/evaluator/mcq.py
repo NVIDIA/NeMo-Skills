@@ -57,8 +57,8 @@ def eval_mcq_aai(cfg):
         # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
         match = re.findall(r"(?i)[\*\_]{0,2}Answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
         if match:
-            parsed = match[-1].strip()
-        return parsed
+            return match[-1].strip()
+        return None
     
     __process_mcq(cfg, extract_letter)
 
