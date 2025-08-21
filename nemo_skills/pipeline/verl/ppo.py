@@ -290,7 +290,7 @@ def ppo_verl(
     script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
-    skip_hf_home_check: bool = typer.Option(True, help="If True, skip checking HF_HOME in cluster_config."),
+    hf_home_check: bool = typer.Option(True, help="If False, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -416,7 +416,7 @@ def ppo_verl(
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,
-                skip_hf_home_check=skip_hf_home_check,
+                hf_home_check=hf_home_check,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
