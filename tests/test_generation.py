@@ -13,27 +13,16 @@
 # limitations under the License.
 
 import json
-import os
 
 # running most things through subprocess since that's how it's usually used
 import subprocess
-from pathlib import Path
 
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
 
-DATA_TO_TEST = []
-template_folder = Path(__file__).parents[1] / 'nemo_skills' / 'prompt' / 'template'
-
-for dataset, split in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test')]:
-    DATA_TO_TEST.append((dataset, split))
-
 
 def test_eval_gsm8k_api(tmp_path):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
-
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
@@ -82,9 +71,6 @@ def test_fail_on_api_key_env_var(tmp_path):
 
 
 def test_succeed_on_api_key_env_var(tmp_path):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
-
     cmd = (
         f"export MY_CUSTOM_KEY=$NVIDIA_API_KEY && "
         f"unset NVIDIA_API_KEY && "
@@ -118,9 +104,6 @@ def test_succeed_on_api_key_env_var(tmp_path):
 
 @pytest.mark.parametrize("format", ["list", "dict"])
 def test_generate_openai_format(tmp_path, format):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
-
     cmd = (
         f"ns generate "
         f"    --server_type=openai "
