@@ -23,9 +23,18 @@ from nemo_skills.utils import get_logger_name, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+def __process_mcq(cfg, extract_fn):
+    for file in unroll_files(cfg.input_files):
+        with open(file, 'rt', encoding='utf-8') as fin:
+            data = [json.loads(line) for line in fin]
+        with open(file, 'wt', encoding='utf-8') as fout:
+            for sample in tqdm(data):
+                sample['predicted_answer'] = extract_fn(sample["generation"])
+                sample['symbolic_correct'] = sample['predicted_answer'] == sample['expected_answer']
+                fout.write(json.dumps(sample) + "\n")
 
-def eval_mcq(cfg):
-    def extract_letter(text):
+def eval_mcq_boxed(cfg):
+    def extract_letter_boxed(text):
         # extract prediction from boxed{}
         parsed = extract_answer(text)
         if parsed is not None and len(parsed) != 1:
@@ -40,11 +49,17 @@ def eval_mcq(cfg):
                 parsed = match[-1].strip()
         return parsed
 
-    for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
-            data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
-            for sample in tqdm(data):
-                sample['predicted_answer'] = extract_letter(sample["generation"])
-                sample['symbolic_correct'] = sample['predicted_answer'] == sample['expected_answer']
-                fout.write(json.dumps(sample) + "\n")
+    __process_mcq(cfg, extract_letter_boxed)
+
+
+def eval_mcq_aai(cfg):
+    def extract_letter(text):
+        # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+        match = re.findall(r"(?i)[\*\_]{0,2}Answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
+        if match:
+            parsed = match[-1].strip()
+        return parsed
+    
+    __process_mcq(cfg, extract_letter)
+
+
