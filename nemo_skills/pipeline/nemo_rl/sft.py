@@ -244,7 +244,7 @@ def sft_nemo_rl(
     ),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
-    hf_home_check: bool = typer.Option(False, help="If False, skip checking HF_HOME in cluster_config."),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -344,7 +344,7 @@ def sft_nemo_rl(
                     with_sandbox=False,
                     with_ray=True,
                     installation_command=installation_command,
-                    hf_home_check=hf_home_check,
+                    skip_hf_home_check=skip_hf_home_check,
                 )
 
         prev_task = add_task(

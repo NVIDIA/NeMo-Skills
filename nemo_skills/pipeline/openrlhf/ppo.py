@@ -295,7 +295,7 @@ def ppo_openrlhf(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
-    hf_home_check: bool = typer.Option(False, help="If False, skip checking HF_HOME in cluster_config."),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -408,7 +408,7 @@ def ppo_openrlhf(
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,
-                hf_home_check=hf_home_check,
+                skip_hf_home_check=skip_hf_home_check,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
