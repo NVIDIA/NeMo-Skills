@@ -261,11 +261,14 @@ class BFCLGenerationTask(GenerationTask):
 
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
                 try:
-                    # Log dict list is additional logs for debugging
-                    # But we want to make sure that the content is json serializable
-                    # Test if the content itself is directly serializable
-                    json.dumps(model_response["message"].content)
-                    output_dict["log_dict_list"].append(model_response["message"].content)
+                    # Log dict list is just an additional log for debugging
+                    # But we want to make sure that the message content is json serializable
+                    if self.cfg.use_client_parsing:
+                        json.dumps(model_response["message"])
+                        output_dict["log_dict_list"].append(model_response["message"])
+                    else:
+                        json.dumps(model_response["message"].content)
+                        output_dict["log_dict_list"].append(model_response["message"].content)
                 except (TypeError, ValueError) as e:
                     # If the content is not json serializable, we don't add it to the log dict list
                     LOG.warning(f"Model response content is not JSON serializable: {e}")
