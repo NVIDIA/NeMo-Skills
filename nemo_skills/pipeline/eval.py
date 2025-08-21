@@ -315,7 +315,7 @@ def eval(
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     installation_command=installation_command,
-                    hf_home_check=hf_home_check,
+                    skip_hf_home_check=skip_hf_home_check,
                 )
                 prev_tasks = [new_task]
                 all_tasks.append(new_task)
