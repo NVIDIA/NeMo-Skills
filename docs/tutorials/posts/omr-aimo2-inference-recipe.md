@@ -241,11 +241,11 @@ In the notebook, you can:
 
 Here’s a sample of the kind of benchmark results you’ll see:
 
-| Metric                        | FP8+ReDrafter | FP8   | BF16  |
+| Metric                        | BF16 | FP8   | FP8+ReDrafter  |
 |-------------------------------|---------------|-------|-------|
-| Total Generation Time (s)     | 33.8          | 72.9  |  170.4 |
-| Batch Throughput (Tok/sec)          | 2036          | 1029   | 518   |
-| Average Sample Throughput (Tok/sec) | 175.7           | 89.9    | 44.1    |
+| Total Generation Time (s)     | 170.4 | 72.9  |  33.8 |
+| Batch Throughput (Tok/s)          | 518 | 1029   |  2036  |
+| Average Sample Throughput (Tok/s) | 44.1 | 89.9    |  175.7   |
 
 *(full benchmarks and code available in the notebook)*
 
