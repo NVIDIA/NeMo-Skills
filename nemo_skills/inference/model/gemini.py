@@ -30,8 +30,8 @@ class GeminiModel(BaseModel):
     ):
         """
         model:
-            - gemini-2.5-pro: thinking budget 128-32768 (default: dynamic thinking)
-            - gemini-2.5-flash: thinking budget 0-24576 (default: dynamic thinking)
+            - gemini-2.5-pro: thinking budget 128-32768 (default: no thinking, we should enable thinking to prevent errors.)
+            - gemini-2.5-flash: thinking budget 0-24576 (default: no thinking)
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
 
