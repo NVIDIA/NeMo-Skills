@@ -236,6 +236,7 @@ def convert(
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -352,6 +353,7 @@ def convert(
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
             task_dependencies=_task_dependencies,
+            skip_hf_home_check=skip_hf_home_check,
         )
         run_exp(exp, cluster_config, dry_run=dry_run)
 

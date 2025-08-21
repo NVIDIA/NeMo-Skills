@@ -99,6 +99,7 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -186,6 +187,7 @@ def run_cmd(
                 num_tasks=[1] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config, dry_run=dry_run)

@@ -357,6 +357,7 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
+    skip_hf_home_check: bool = False,
     dry_run: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
@@ -404,6 +405,14 @@ def add_task(
 
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
+
+    env_vars = get_env_variables(cluster_config)
+    if skip_hf_home_check and "HF_HOME" not in env_vars:
+        raise RuntimeError(
+            "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=True.\n"
+            f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
+            "Expected something like: HF_HOME=/path/to/your/hf_home"
+        )
 
     het_group = 0
     het_group_indices = []

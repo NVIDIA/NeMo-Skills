@@ -244,6 +244,7 @@ def sft_openrlhf(
         "--not_exclusive",
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -315,6 +316,7 @@ def sft_openrlhf(
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
 
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)

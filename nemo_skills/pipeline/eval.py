@@ -163,6 +163,7 @@ def eval(
         'nemo-skills',
         help="Name of the wandb project to sync samples to.",
     ),
+    skip_hf_home_check: bool = typer.Option(False, help="If True, skip checking HF_HOME in cluster_config."),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -314,6 +315,7 @@ def eval(
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
                 )
                 prev_tasks = [new_task]
                 all_tasks.append(new_task)
@@ -431,6 +433,7 @@ def eval(
                     dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
                 ),
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             all_tasks.append(summarize_task)
             if benchmark_args.benchmark_group:
@@ -463,6 +466,7 @@ def eval(
                     group_tasks[group] if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
                 ),
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             all_tasks.append(score_task)
 
