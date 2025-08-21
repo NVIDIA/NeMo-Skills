@@ -151,3 +151,8 @@ at the end of the solution, you can use these parameters to match the extraction
 
 - Benchmark is defined in [`nemo_skills/dataset/svamp/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/svamp/__init__.py)
 - Original benchmark source is [here](https://github.com/arkilpatel/SVAMP).
+
+### beyondaime
+
+- Benchmark is defined in [`nemo_skills/dataset/svamp/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/beyondaime/__init__.py)
+- Original benchmark source is [here](https://huggingface.co/datasets/ByteDance-Seed/BeyondAIME).
