@@ -75,7 +75,8 @@ class GenerateSolutionsConfig:
     use_completions_api: bool = False
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
-    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+    # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(default_factory=dict)
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
@@ -161,7 +162,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.use_completions_api = True
+            self.cfg.use_completions_api = True
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -223,7 +224,7 @@ class GenerationTask:
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
-            if not self.use_completions_api:
+            if not self.cfg.use_completions_api:
                 if "chat_template_kwargs" in self.cfg.inference.extra_body:
                     raise ValueError(
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
