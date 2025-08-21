@@ -19,7 +19,7 @@ from nemo_skills.evaluation.evaluator.code import eval_evalplus, eval_livecodebe
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_statement, eval_math
-from nemo_skills.evaluation.evaluator.mcq import eval_mcq_boxed, eval_mcq_aai
+from nemo_skills.evaluation.evaluator.mcq import eval_mcq_boxed, eval_mcq_aai, eval_mcq_the_final_answer, eval_mcq_the_answer_is, eval_mcq_the_best_answer_is
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
@@ -40,6 +40,11 @@ EVALUATOR_MAP = {
     'lean4-statement': eval_lean4_statement,
     'multichoice-boxed': eval_mcq_boxed,
     'multichoice-aai': eval_mcq_aai,
+    'robustness-mcq4-0': eval_mcq_aai,
+    'robustness-mcq4-1': eval_mcq_boxed,
+    'robustness-mcq4-2': eval_mcq_the_final_answer,
+    'robustness-mcq4-3': eval_mcq_the_answer_is,
+    'robustness-mcq4-4': eval_mcq_the_best_answer_is,
     'ruler': eval_ruler,
     'livecodebench': eval_livecodebench,
     'livecodebench_pro': eval_livecodebench_pro,

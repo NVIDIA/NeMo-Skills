@@ -1,0 +1,4 @@
+user: |-
+  {problem}
+  Examine the question and choose the correct answer from the options 'A', 'B', 'C', 'D'. End your answer with:\nThe best answer is [the_answer_letter].\nwhere the [the_answer_letter] is a letter from A to D.".
+  

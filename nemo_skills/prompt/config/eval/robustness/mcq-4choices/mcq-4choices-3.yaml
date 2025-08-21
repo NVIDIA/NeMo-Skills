@@ -1,0 +1,4 @@
+user: |-
+  Here is a multiple-choice question. {problem}
+  Respond by first explaining your reasoning and then, on the very last line, providing your answer in this format: "The answer is: A/B/C/D."
+  

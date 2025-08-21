@@ -1,0 +1,4 @@
+user: |-
+  Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A').
+
+  {problem}

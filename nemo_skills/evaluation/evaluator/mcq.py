@@ -63,3 +63,34 @@ def eval_mcq_aai(cfg):
     __process_mcq(cfg, extract_letter)
 
 
+def eval_mcq_the_final_answer(cfg):
+    def extract_letter(text):
+        # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+        match = re.findall(r"(?i)[\*\_]{0,2}The final answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
+        if match:
+            return match[-1].strip()
+        return None
+    
+    __process_mcq(cfg, extract_letter)
+
+def eval_mcq_the_answer_is(cfg):
+    def extract_letter(text):
+        # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+        match = re.findall(r"(?i)[\*\_]{0,2}The answer is[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
+        if match:
+            return match[-1].strip()
+        return None
+    
+    __process_mcq(cfg, extract_letter)
+
+def eval_mcq_the_best_answer_is(cfg):
+    def extract_letter(text):
+        # https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
+        match = re.findall(r"The best answer is\s*([A-D])\.", text)
+        if match:
+            return match[-1].strip()
+        return None
+    
+    __process_mcq(cfg, extract_letter)
+
+

@@ -1,0 +1,3 @@
+user: |-
+  Your task is to answer the following multiple-choice question. Please think step-by-step and use the following format for your final answer: 'The final answer: A/B/C/D,'. {problem}
+  
