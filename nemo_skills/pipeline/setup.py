@@ -110,6 +110,29 @@ def setup():
         if not config['env_vars']:
             config.pop('env_vars')
 
+        typer.echo(
+            "\nHF_HOME (Hugging Face cache) is REQUIRED by default. "
+            "You can opt out later when running commands with --skip-hf-home-check."
+        )
+
+        set_hf_home = typer.confirm("Would you like to set HF_HOME now?", default=True)
+
+        if set_hf_home:
+            default_hf = os.environ.get("HF_HOME")
+            if not default_hf:
+                if config_type == "slurm":
+                    default_hf = "/<your_group>/<your_user>/hf_home"
+                else:
+                    default_hf = str(Path.home() / ".cache" / "huggingface")
+
+            hf_home = typer.prompt("Enter HF_HOME path", default=default_hf)
+            config.setdefault("env_vars", []).append(f"HF_HOME={hf_home}")
+        else:
+            typer.echo(
+                "Note: You chose not to set HF_HOME. "
+                "Commands will fail the default check unless you pass --skip-hf-home-check."
+            )
+
         if config_type == 'slurm':
             ssh_access = typer.confirm(
                 "\nIt's recommended to run ns commands from a local workstation (not on the cluster) "
