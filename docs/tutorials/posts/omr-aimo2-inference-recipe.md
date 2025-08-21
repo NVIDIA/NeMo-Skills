@@ -21,6 +21,8 @@ By the end of this tutorial, you'll have a local setup capable of running effici
 
 See the [companion notebook](../notebooks/demo_aimo_inference.ipynb) for launching the inference server and benchmarking. 
 
+-----
+
 ## 1\. Setting Up Your Environment
 
 Our first step is to establish a consistent and isolated environment. We will use a NVIDIA PyTorch NGC container and install the essential libraries: TensorRT-LLM for model optimization and NeMo-Skills for the overall pipeline management.
@@ -132,6 +134,8 @@ ns convert \
 
 After this command, your FP8 LLM engine is ready for deployment.
 
+-----
+
 ## 3\. Accelerating Inference with ReDrafter
 
 To push our inference efficiency further, we will integrate [ReDrafter](https://machinelearning.apple.com/research/redrafter-nvidia-tensorrt-llm). This speculative decoding technique uses a smaller "draft" model to predict tokens, allowing the main LLM to generate responses much faster. ReDrafter is an RNN-based inference method developed by Apple. In [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/redrafter) it is compatible with most models supported within TensorRT-LLM.
@@ -222,6 +226,8 @@ trtllm-build \
 
 Your TensorRT-LLM engine, now supercharged with ReDrafter, is ready to be served!
 
+-----
+
 ## 4\. Benchmarking and results
 
 We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference. 
@@ -242,6 +248,7 @@ Here’s a sample of the kind of benchmark results you’ll see:
 
 *(full benchmarks and code available in the notebook)*  
 
+-----
 
 ## 5\. Optional: Enabling tool-calling and the code execution sandbox
 
