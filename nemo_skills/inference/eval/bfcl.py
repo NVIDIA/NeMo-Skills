@@ -362,9 +362,11 @@ class BFCLGenerationTask(GenerationTask):
                     for func_call in model_response["tool_calls"]
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
+                print("L365:", tool_call_ids)
         except:
             # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
             # We just check to limit the generation to a string
+            print("L369:", model_response["generation"])
             generation = (model_response["generation"] if isinstance(model_response["generation"], str) else "")
             tool_call_ids = []
         
