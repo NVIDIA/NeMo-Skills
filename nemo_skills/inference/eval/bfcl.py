@@ -227,7 +227,7 @@ class BFCLGenerationTask(GenerationTask):
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
-        output_dict = {"result": [], "num_generated_tokens": 0, "log_dict_list": []}
+        output_dict = {"num_generated_tokens": 0, "log_dict_list": []}
         out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
@@ -277,11 +277,12 @@ class BFCLGenerationTask(GenerationTask):
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
                         if model_response["message"]["content"] is not None:
-                            trimmed_content = self._process_model_response_text(model_response["message"]["content"])
-                            model_response["message"]["content"] = trimmed_content
+                            model_response["message"]["content"] = self._remove_thinking_from_message_content(
+                                model_response["message"]["content"]
+                            )
                     else:
                         if model_response["message"].content is not None:
-                            model_response["message"].content = self._process_model_response_text(
+                            model_response["message"].content = self._remove_thinking_from_message_content(
                                 model_response["message"].content
                             )
 
@@ -365,10 +366,13 @@ class BFCLGenerationTask(GenerationTask):
                     for func_call in model_response["tool_calls"]
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
-                print("L365:", tool_call_ids)
-        except:
+            
+            print("L365:", tool_call_ids)
+            print("L366:", model_response["tool_calls"])
+        except Exception as e:
             # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
             # We just check to limit the generation to a string
+            LOG.error(f"Failed to parse function calls from the model response: {e}")
             print("L369:", model_response["generation"])
             generation = (model_response["generation"] if isinstance(model_response["generation"], str) else "")
             tool_call_ids = []
@@ -380,7 +384,7 @@ class BFCLGenerationTask(GenerationTask):
             "message": model_response["message"],
         }
 
-    def _process_model_response_text(self, model_response_text):
+    def _remove_thinking_from_message_content(self, model_response_text):
         """If specified, remove the thinking part of the model response text."""
         if self.cfg.thinking_end in model_response_text:
             return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
