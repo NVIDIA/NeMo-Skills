@@ -13,21 +13,14 @@
 # limitations under the License.
 
 import os
-import httpx
-import litellm
+
 from .base import BaseModel
 
 
 class GeminiModel(BaseModel):
     MODEL_PROVIDER = "gemini"
 
-    def __init__(
-        self,
-        *args,
-        model: str,
-        api_key: str | None = None,
-        **kwargs,
-    ):
+    def __init__(self, *args, **kwargs):
         """
         model:
             - gemini-2.5-pro: thinking budget 128-32768 (default: no thinking, we should enable thinking to prevent errors.)
@@ -35,7 +28,7 @@ class GeminiModel(BaseModel):
             - gemini-2.5-flash-lite: thinking budget 0-24576 (default: no thinking)
         """
 
-        super().__init__(*args, model=model, api_key=api_key, base_url="", **kwargs)
+        super().__init__(*args, base_url="", **kwargs)
 
     def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
         api_key = super()._get_api_key(api_key, api_key_env_var, base_url)
@@ -74,6 +67,9 @@ class GeminiModel(BaseModel):
             - dynamic: maximum thinking budget tokens: -1
         """
 
+        assert min_p == 0.0, "`min_p` is not supported by Gemini API, please set it to 0.0."
+        assert not extra_body, "`extra_body` is not supported by Gemini API, please set it to None or empty dict"
+
         # Vertext AI params: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference
         # litellm default params: https://github.com/BerriAI/litellm/blob/v1.75.0-nightly/litellm/llms/gemini/chat/transformation.py#L73-L90
         # litellm other params: https://github.com/BerriAI/litellm/blob/v1.75.0-nightly/litellm/llms/vertex_ai/gemini/vertex_and_google_ai_studio_gemini.py#L147-L174
@@ -105,7 +101,7 @@ class GeminiModel(BaseModel):
                 "type": "enabled",
                 "budget_tokens": -1,
             }
-        
+
         params["reasoning_effort"] = reasoning_effort
-        
+
         return params

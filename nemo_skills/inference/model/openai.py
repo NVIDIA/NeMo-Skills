@@ -107,6 +107,7 @@ class OpenAIModel(BaseModel):
             raise ValueError("`min_p` is not supported by OpenAI API, please set it to 0.0.")
         if stream and top_logprobs is not None:
             raise ValueError("`top_logprobs` is not supported with stream=True.")
+        assert not extra_body, "`extra_body` is not supported by Gemini API, please set it to None or empty dict"
 
         params = {
             "messages": messages,
