@@ -409,7 +409,7 @@ def add_task(
     env_vars = get_env_variables(cluster_config)
     if skip_hf_home_check is False and "HF_HOME" not in env_vars:
         raise RuntimeError(
-            "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=True.\n"
+            "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
             f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
             "Expected something like: HF_HOME=/path/to/your/hf_home"
         )
