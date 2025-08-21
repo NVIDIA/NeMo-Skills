@@ -357,7 +357,7 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
-    skip_hf_home_check: bool = True,
+    skip_hf_home_check: bool = False,
     dry_run: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
