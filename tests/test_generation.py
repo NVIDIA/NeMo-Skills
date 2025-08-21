@@ -31,8 +31,8 @@ for dataset, split in [('gsm8k', 'train'), ('gsm8k', 'test'), ('math-500', 'test
 
 
 def test_eval_gsm8k_api(tmp_path):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
+    if not os.getenv('AZURE_OPENAI_API_KEY'):
+        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
 
     cmd = (
         f"ns eval "
@@ -71,15 +71,56 @@ def test_fail_on_api_key_env_var(tmp_path):
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
         f"    ++max_samples=2 "
-        f"    ++api_key_env_var=MY_CUSTOM_KEY "
+        f"    ++server.api_key_env_var=MY_CUSTOM_KEY "
     )
-    subprocess.run(cmd, shell=True, check=True)
+    result = subprocess.run(cmd, shell=True, check=True, capture_output=True)
+
+    # nemo-run always finishes with 0 error code, so just checking that expected exception is in the output
+    assert (
+        "ValueError: You defined api_key_env_var=MY_CUSTOM_KEY but the value is not set" in result.stdout.decode()
+    ), result.stdout.decode()
+
+
+def test_succeed_on_api_key_env_var(tmp_path):
+    if not os.getenv('AZURE_OPENAI_API_KEY'):
+        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
+
+    cmd = (
+        f"export MY_CUSTOM_KEY=$AZURE_OPENAI_API_KEY && "
+        f"unset AZURE_OPENAI_API_KEY && "
+        f"ns eval "
+        f"    --server_type=azureopenai "
+        f"    --model=gpt-4.1-20250414 "
+        f"    --server_address=https://llm-proxy.perflab.nvidia.com "
+        f"    --benchmarks=gsm8k "
+        f"    --output_dir={tmp_path} "
+        f"    ++max_samples=2 "
+        f"    ++server.api_key_env_var=MY_CUSTOM_KEY "
+    )
+    # capturing output to not accidentally leak the key in the logs
+    subprocess.run(cmd, shell=True, check=True, capture_output=True)
+
+    # checking that summarize results works (just that there are no errors, but can inspect the output as well)
+    subprocess.run(
+        f"ns summarize_results {tmp_path}",
+        shell=True,
+        check=True,
+    )
+
+    # running compute_metrics to check that results are expected
+    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+        [f"{tmp_path}/eval-results/gsm8k/output.jsonl"],
+    )[
+        "_all_"
+    ]["pass@1"]
+
+    assert metrics['symbolic_correct'] >= 80
 
 
 @pytest.mark.parametrize("format", ["list", "dict"])
 def test_generate_openai_format(tmp_path, format):
-    if not os.getenv('NVIDIA_API_KEY'):
-        pytest.skip("Define NVIDIA_API_KEY to run this test")
+    if not os.getenv('AZURE_OPENAI_API_KEY'):
+        pytest.skip("Define AZURE_OPENAI_API_KEY to run this test")
 
     cmd = (
         f"ns generate "
