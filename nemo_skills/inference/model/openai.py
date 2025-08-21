@@ -60,7 +60,7 @@ class OpenAIModel(BaseModel):
         )
 
     def _is_reasoning_model(self, model_name: str) -> bool:
-        return re.match(r"^o\d", model_name)
+        return re.match(r"^o\d", model_name) or model_name.startswith("gpt-5")
 
     def _build_completion_request_params(self, **kwargs) -> dict:
         kwargs = copy.deepcopy(kwargs)

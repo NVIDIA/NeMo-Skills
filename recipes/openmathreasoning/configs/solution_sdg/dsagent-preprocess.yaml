@@ -1,7 +1,7 @@
 cluster: local
 base_output_dir: /workspace/dsagent_get_num_samples
-expname: gpt4-1
-suffix: gpt4-1
+expname: gpt5
+suffix: gpt5
 
 
 # Input file for the first stage (generate_solutions)
@@ -12,7 +12,7 @@ num_random_seeds_to_generate: 1
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
-  model: gpt-4.1 
+  model: gpt-5 
   server_type: azureopenai
   server_address: https://prod.api.nvidia.com/llm/v1/azure
   # Number of generated solutions per problem to judge
