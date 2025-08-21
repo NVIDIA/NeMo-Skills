@@ -195,7 +195,7 @@ class BFCLGenerationTask(GenerationTask):
 
             return output
 
-    async def generate_single_data_point_single_turn(self, data_point):
+    async def _generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
@@ -211,7 +211,7 @@ class BFCLGenerationTask(GenerationTask):
                 "num_generated_tokens": model_response.get("num_generated_tokens", 0),
             }
 
-    async def generate_single_data_point_multi_turn(self, data_point):
+    async def _generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
 
         initial_config: dict = data_point["initial_config"]
@@ -309,11 +309,6 @@ class BFCLGenerationTask(GenerationTask):
                         "content": execution_result,
                         "tool_call_id": tool_call_id,
                     }
-                    try:
-                        print("L325:", json.dumps(tool_message, indent=4))
-                    except Exception as e:
-                        print("L328:", tool_message)
-                        print("L329:", e)
                     state_dict["messages"].append(tool_message)
 
                 count += 1
@@ -336,13 +331,6 @@ class BFCLGenerationTask(GenerationTask):
 
         return output_dict
 
-    async def process_single_datapoint(self, data_point, all_data):
-        """Process a single data point and return the result."""
-        if data_point["single_turn"]:
-            return await self.generate_single_data_point_single_turn(data_point)
-        else:
-            return await self.generate_single_data_point_multi_turn(data_point)
-
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""
         try:
@@ -359,13 +347,10 @@ class BFCLGenerationTask(GenerationTask):
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
             
-            print("L365:", tool_call_ids)
-            print("L366:", model_response["tool_calls"])
         except Exception as e:
             # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
             # We just check to limit the generation to a string
             LOG.error(f"Failed to parse function calls from the model response: {e}")
-            print("L369:", model_response["generation"])
             generation = (model_response["generation"] if isinstance(model_response["generation"], str) else "")
             tool_call_ids = []
         
@@ -383,6 +368,13 @@ class BFCLGenerationTask(GenerationTask):
         else:
             # If the thinking didn't finish, we can keep it empty
             return ""
+
+    async def process_single_datapoint(self, data_point, all_data):
+        """Process a single data point and return the result."""
+        if data_point["single_turn"]:
+            return await self._generate_single_data_point_single_turn(data_point)
+        else:
+            return await self._generate_single_data_point_multi_turn(data_point)
 
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
