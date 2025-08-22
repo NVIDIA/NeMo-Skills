@@ -25,6 +25,7 @@ from nemo_skills.evaluation.metrics import ComputeMetrics
 def test_eval_gsm8k_api(tmp_path):
     cmd = (
         f"ns eval "
+        f"    --skip-hf-home-check "
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
@@ -54,6 +55,7 @@ def test_eval_gsm8k_api(tmp_path):
 def test_fail_on_api_key_env_var(tmp_path):
     cmd = (
         f"ns eval "
+        f"    --skip-hf-home-check "
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
@@ -75,6 +77,7 @@ def test_succeed_on_api_key_env_var(tmp_path):
         f"export MY_CUSTOM_KEY=$NVIDIA_API_KEY && "
         f"unset NVIDIA_API_KEY && "
         f"ns eval "
+        f"    --skip-hf-home-check "
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
@@ -106,6 +109,7 @@ def test_succeed_on_api_key_env_var(tmp_path):
 def test_generate_openai_format(tmp_path, format):
     cmd = (
         f"ns generate "
+        f"    --skip-hf-home-check "
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
