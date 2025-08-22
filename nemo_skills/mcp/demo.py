@@ -14,7 +14,12 @@
 
 import asyncio
 from nemo_skills.inference.model.vllm import VLLMModel
-from nemo_skills.mcp.clients import MCPHttpClient, MCPClientManager, MCPStreamableHttpClient
+from nemo_skills.mcp.clients import (
+    MCPHttpClient,
+    MCPClientManager,
+    MCPStreamableHttpClient,
+    MCPStdioClient,
+)
 from nemo_skills.mcp.adapters import registry
 
 # Initialize the VLLMModel with your local vLLM instance
@@ -29,11 +34,13 @@ async def run_demo():
     math_client = MCPHttpClient("http://localhost:8001")
     string_client = MCPHttpClient("http://localhost:8002")
     plane_client = MCPStreamableHttpClient("http://localhost:8003/plane/mcp")
+    python_client = MCPStdioClient("python", ["-m", "nemo_skills.mcp.servers.python_tool"])
 
     manager = MCPClientManager()
-    manager.register("math", math_client)
-    manager.register("string", string_client)
-    manager.register("plane", plane_client)
+    # manager.register("math", math_client)
+    # manager.register("string", string_client)
+    # manager.register("plane", plane_client)
+    manager.register("python", python_client)
 
     tools = await manager.list_all_tools()
     tools = registry.get_schema(model_type).convert(tools)

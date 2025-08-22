@@ -13,8 +13,9 @@
 # limitations under the License.
 import aiohttp
 from typing import Dict, Any, List
-from mcp import ClientSession
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.stdio import stdio_client
 
 class MCPHttpClient:
     def __init__(self, base_url: str):
@@ -65,6 +66,41 @@ class MCPStreamableHttpClient:
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
+                return result.structuredContent
+
+class MCPStdioClient:
+    def __init__(self, command: str, args: list[str] | None = None):
+        if args is None:
+            args = []
+        self.server_params = StdioServerParameters(command=command, args=args)
+        self.tools: List[Dict[str, Any]] = []
+
+    async def list_tools(self):
+        async with stdio_client(self.server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                tools_resp = await session.list_tools()
+                tools_list: List[Dict[str, Any]] = []
+                for t in getattr(tools_resp, "tools", []) or []:
+                    input_schema = getattr(t, "input_schema", None)
+                    if input_schema is None:
+                        input_schema = getattr(t, "inputSchema", None)
+                    tools_list.append(
+                        {
+                            "name": getattr(t, "name", None),
+                            "description": getattr(t, "description", ""),
+                            "input_schema": input_schema,
+                        }
+                    )
+                self.tools = tools_list
+                return self.tools
+
+    async def call_tool(self, tool: str, args: dict) -> Any:
+        async with stdio_client(self.server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(tool, arguments=args)
+                print(f'STDIO client result {result}')
                 return result.structuredContent
 
 class MCPClientManager:
