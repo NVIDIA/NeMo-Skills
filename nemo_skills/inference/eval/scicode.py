@@ -17,7 +17,7 @@ import sys
 from dataclasses import field
 
 import hydra
-import openai
+import litellm
 
 from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -87,17 +87,15 @@ class SciCodeGenerationTask(GenerationTask):
                 llm_output = await super().process_single_datapoint(prepare_data_point, all_data)
             # TODO: this is a hack (as not all servers return that),
             # but eventually we should support handling errors like this globally for all generations
-            except openai.BadRequestError as e:
-                if 'Please reduce the length of the messages or completion' in str(e):
-                    LOG.warning(
-                        "SciCode generation failed due to running out of context. "
-                        "Failing for subsequent subtasks automatically.",
-                    )
-                    out_of_context = True
-                    task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
-                    continue
-                else:
-                    raise
+            except litellm.exceptions.ContextWindowExceededError as e:
+                LOG.warning(
+                    "SciCode generation failed due to running out of context. "
+                    "Failing for subsequent subtasks automatically.",
+                )
+                out_of_context = True
+                task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                continue
+
 
             full_outputs[f"{problem_id}.{cur_step}"] = llm_output
             total_generated_tokens += llm_output.get('num_generated_tokens', 0)

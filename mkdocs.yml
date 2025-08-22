@@ -10,6 +10,7 @@ plugins:
       redirect_maps:
         'openmathinstruct2/index.md': 'releases/openmathinstruct2/index.md'
         'openmathreasoning1/index.md': 'releases/openmathreasoning/index.md'
+        'openmathreasoning1/dataset.md': 'releases/openmathreasoning/dataset.md'
 theme:
   name: material
   logo: favicon.ico
