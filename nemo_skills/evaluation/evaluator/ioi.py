@@ -24,11 +24,11 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 @nested_dataclass(kw_only=True)
 class IOIEvaluatorConfig:
-    dataset: str = "ioi24"
+    dataset: str = "ioi"
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
     # File where test cases are stored.
-    test_file: str = "/datasets/ioi24/test_metadata.json"
+    test_file: str = "/datasets/ioi/test_metadata.json"
 
 
 def init_worker(sandbox_arg):
@@ -105,21 +105,21 @@ _EOT_
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(setup_script, language='shell', timeout=120)
+            worker_sandbox.execute_code(setup_script, language="shell", timeout=120)
         )
-        if setup_result.get('stderr'):
+        if setup_result.get("stderr"):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(compile_command, language='shell', timeout=120)
+            worker_sandbox.execute_code(compile_command, language="shell", timeout=120)
         )
 
         result = {
-            "compile_success": not compile_result.get('stderr'),
-            "compile_stdout": compile_result.get('stdout', ''),
-            "compile_stderr": compile_result.get('stderr', ''),
+            "compile_success": not compile_result.get("stderr"),
+            "compile_stdout": compile_result.get("stdout", ""),
+            "compile_stderr": compile_result.get("stderr", ""),
             "run_stdout": "",
             "run_stderr": "",
             "score": 0.0,
@@ -131,11 +131,11 @@ _EOT_
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
         run_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(run_command, language='shell', timeout=120)
+            worker_sandbox.execute_code(run_command, language="shell", timeout=120)
         )
 
-        run_stdout = run_result.get('stdout', '')
-        run_stderr = run_result.get('stderr', '')
+        run_stdout = run_result.get("stdout", "")
+        run_stderr = run_result.get("stderr", "")
 
         result.update(
             {
@@ -157,7 +157,7 @@ _EOT_
     finally:
         try:
             worker_loop.run_until_complete(
-                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell', timeout=120)
+                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language="shell", timeout=120)
             )
         except Exception:
             pass
@@ -176,11 +176,11 @@ def add_includes(code: str, problem_id: str) -> str:
     if not code:
         return code
     # has most of the useful functions
-    code_header = '#include <bits/stdc++.h>\n'
+    code_header = "#include <bits/stdc++.h>\n"
     # include the problem header
     problem_header_include = f'#include "{problem_id}.h"'
     if problem_header_include not in code:
-        code_header += problem_header_include + '\n'
+        code_header += problem_header_include + "\n"
     # use namespace std since models forget std:: often
     if "using namespace std;" not in code and "std::" not in code:
         code_header += "\nusing namespace std;\n\n"
@@ -208,11 +208,11 @@ def eval_ioi(cfg):
 
         split_name = Path(cfg.input_files[0]).stem
     if not split_name:
-        split_name = 'test'
+        split_name = "test"
     metadata_filename = f"{split_name}_metadata.json"
 
-    if getattr(cfg, 'data_dir', ''):
-        candidate = os.path.join(cfg.data_dir.rstrip('/'), 'ioi', metadata_filename)
+    if getattr(cfg, "data_dir", ""):
+        candidate = os.path.join(cfg.data_dir.rstrip("/"), "ioi", metadata_filename)
         eval_config.test_file = candidate
     else:
         # Original default path for backward compatibility
@@ -247,16 +247,16 @@ def eval_ioi(cfg):
         outputs = []
         for x, entry in enumerate(samples):
             print(f"Evaluating {x}/{len(samples)}")
-            completion = extract_final_cpp_block(entry['generation'])
-            completion = add_includes(completion, entry['ioi_id'])
+            completion = extract_final_cpp_block(entry["generation"])
+            completion = add_includes(completion, entry["ioi_id"])
 
             test_case_results = {}
-            problem_name = entry['name']
+            problem_name = entry["name"]
             problem_metadata = metadata[problem_name]
             for subtask, subtask_data in problem_metadata.items():
-                tests = subtask_data['tests']
-                subtask_score = subtask_data['score']
-                subtask_score_precision = subtask_data['score_precision']
+                tests = subtask_data["tests"]
+                subtask_score = subtask_data["score"]
+                subtask_score_precision = subtask_data["score_precision"]
                 subtask_passed = True
                 subtask_outputs = []
                 test_items = list(tests.items())
@@ -268,22 +268,22 @@ def eval_ioi(cfg):
                     for local_idx, (test_name, test_data) in enumerate(batch):
                         task_args = {
                             "generated_code": completion,
-                            "problem_id": entry['ioi_id'],
-                            "grader_files": entry['grader_files'],
-                            "run_code": entry['run'],
-                            "compile_code": entry['compile'],
-                            "test_input": test_data['input'],
-                            "test_output": test_data['output'],
+                            "problem_id": entry["ioi_id"],
+                            "grader_files": entry["grader_files"],
+                            "run_code": entry["run"],
+                            "compile_code": entry["compile"],
+                            "test_input": test_data["input"],
+                            "test_output": test_data["output"],
                         }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
 
                     for (test_name, _), result in zip(batch, results):
                         result_with_name = dict(result)
-                        result_with_name['test_name'] = test_name
+                        result_with_name["test_name"] = test_name
                         subtask_outputs.append(result_with_name)
-                        scores.append(float(result['score']))
-                        if float(result['score']) == 0.0:
+                        scores.append(float(result["score"]))
+                        if float(result["score"]) == 0.0:
                             # break early as we failed this test case.
                             subtask_passed = False
                             break
@@ -295,15 +295,15 @@ def eval_ioi(cfg):
 
             outputs.append(
                 {
-                    "name": entry['name'],
-                    "subtask": entry['subtask'],
+                    "name": entry["name"],
+                    "subtask": entry["subtask"],
                     "test_case_results": test_case_results,
                 }
             )
 
         for s, o in zip(samples, outputs):
-            s['test_case_results'] = o['test_case_results']
-        jdump(samples, jsonl_file, mode='wt')
+            s["test_case_results"] = o["test_case_results"]
+        jdump(samples, jsonl_file, mode="wt")
 
         total_passed = 0
         total_problems = len(outputs)

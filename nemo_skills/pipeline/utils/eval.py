@@ -79,11 +79,11 @@ def get_benchmark_args_from_module(
         if pipeline_utils.is_mounted_filepath(cluster_config, data_path):
             input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
             unmounted_input_file = pipeline_utils.get_unmounted_path(cluster_config, input_file)
-            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace('/nemo_run/code/', ''))
+            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace("/nemo_run/code/", ""))
         else:
             # will be copied over in this case as it must come from extra datasets
             input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark.replace('.', '/')}/{split}.jsonl"
-            unmounted_path = Path(data_path) / benchmark.replace('.', '/') / f"{split}.jsonl"
+            unmounted_path = Path(data_path) / benchmark.replace(".", "/") / f"{split}.jsonl"
     else:
         # on cluster we will always use the mounted path
         input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
@@ -139,9 +139,9 @@ def get_benchmark_args_from_module(
 
     # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
     # TODO: is there a better way to handle this?
-    if benchmark == "swe-bench" and cluster_config['executor'] == 'local':
+    if benchmark == "swe-bench" and cluster_config["executor"] == "local":
         LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
-        os.environ['NEMO_SKILLS_PRIVILEGED_DOCKER'] = '1'
+        os.environ["NEMO_SKILLS_PRIVILEGED_DOCKER"] = "1"
 
     return BenchmarkArgs(
         name=benchmark,
@@ -198,16 +198,19 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
 
     # Single benchmark
     benchmark = benchmark_or_group
-    return [
-        get_benchmark_args_from_module(
-            benchmark_module=benchmark_or_group_module,
-            benchmark=benchmark,
-            split=split,
-            cluster_config=cluster_config,
-            data_path=data_path,
-            is_on_cluster=is_on_cluster,
-        )
-    ]
+    benchmark_args = get_benchmark_args_from_module(
+        benchmark_module=benchmark_or_group_module,
+        benchmark=benchmark,
+        split=split,
+        cluster_config=cluster_config,
+        data_path=data_path,
+        is_on_cluster=is_on_cluster,
+    )
+
+    if data_dir:
+        benchmark_args.eval_args = f"{benchmark_args.eval_args} ++data_dir={data_dir}"
+
+    return [benchmark_args]
 
 
 def prepare_eval_commands(
@@ -249,7 +252,7 @@ def prepare_eval_commands(
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
     if num_jobs is None:
-        if cluster_config['executor'] == 'slurm':
+        if cluster_config["executor"] == "slurm":
             num_jobs = -1  # -1 means run all benchmarks in parallel
         else:
             # for local executor, it makes no sense to use other values
@@ -326,7 +329,7 @@ def prepare_eval_commands(
 
     cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters['server_gpus'], exclusive, server_parameters['server_type']
+        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
     )
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
@@ -349,7 +352,7 @@ def prepare_eval_commands(
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     benchmark_output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -358,7 +361,7 @@ def prepare_eval_commands(
                 job_benchmarks.add(benchmark)
 
                 generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
-                if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+                if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
                     raise ValueError(
                         f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
                         "Please provide a valid generation module."
