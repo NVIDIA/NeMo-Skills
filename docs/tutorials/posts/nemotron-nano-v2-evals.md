@@ -1,6 +1,6 @@
 ---
-date: 2025-08-15
-readtime: 15
+date: 2025-08-22
+readtime: 10
 hide:
   - toc
 ---
@@ -66,8 +66,8 @@ as ruler test files are very large and we want to avoid copying them from your l
 
 ```bash
 ns prepare_data --cluster=local ruler \
-    --setup nemotron_super_128k \
-    --tokenizer_path nvidia/NVIDIA-Nemotron-Nano-9B-v2\
+    --setup nemotron_nano_128k \
+    --tokenizer_path nvidia/NVIDIA-Nemotron-Nano-9B-v2 \
     --max_seq_length 131072 \
     --data_dir /workspace/ns-data
 ```
@@ -101,16 +101,22 @@ We evaluate all benchmarks in the reasoning on mode, except for RULER, which is 
 - system message to '/no_think'
 
 
-Importantly, the NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers.
-To run the model without quality degradation, the vllm server needs to be run with the option `--mamba_ssm_cache_dtype float32`.
-With NeMo-Skills, we can accomplish this by setting `--server_args="--mamba_ssm_cache_dtype float32 "` when performing generations.
+!!!note
+    The NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers. 
+    The model requires the latest version of vllm:
+    ```
+    pip install -U "vllm>=0.10.1"
+    ```
+
+    Additionally, to run the model without quality degradation, the vllm server needs to be run with the option `--mamba_ssm_cache_dtype float32`.
+    With NeMo-Skills, we can accomplish this by setting `--server_args="--mamba_ssm_cache_dtype float32 "` when performing generations.
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning on)
 
-The following command evaluates the model on MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
+The following command evaluates the model on MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across eight different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
 
 
-```bash hl_lines="8-12"
+```bash hl_lines="9-12"
 ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
@@ -127,12 +133,12 @@ ns eval \
 
 For GPQA, we use the [generic/general-boxed](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/general-boxed.yaml) prompt which can be specified as follows:
 
-```bash hl_lines="12"
+```bash hl_lines="13"
 ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
-    --benchmarks=mmlu-pro:8,scicode:8,math-500:8,aime24:8,aime25:8 \
+    --benchmarks=gpqa:8 \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
@@ -187,7 +193,7 @@ ns eval \
 ```
 
 !!! note
-    The difference in judge models can result in almost 1% performance difference in our experience. This can explain why [AAI reports a performance of 4.6%](https://artificialanalysis.ai/models/nvidia-nemotron-nano-9b-v2-reasoning#intelligence-evaluations){target="_blank"} vs our reproduced performance of 7.75%.
+    The difference in judge models can result in almost 1% performance difference in our experience. This can explain why [AAI reports a performance of 4.6%](https://artificialanalysis.ai/models/nvidia-nemotron-nano-9b-v2-reasoning#intelligence-evaluations){target="_blank"} vs our reproduced performance of 5.94%.
 
 !!! note
     If the OpenAI API throws the `Rate limit exceeded` error, please reduce the `max_concurrent_requests` value in the `extra_judge_args` argument and restart the job.
@@ -196,40 +202,44 @@ ns eval \
 #### Command for BFCL Eval
 
 Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
-```bash hl_lines="12-16"
+```bash hl_lines="8-12"
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2/ \
+    --output_dir=/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/ \
     --server_gpus=1 \
     --server_type=vllm \
-    --server_args="--mamba_ssm_cache_dtype float32 " \
-    --output_dir=/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/ \
+    --server_args="--mamba_ssm_cache_dtype float32 \
+                   --tool-parser-plugin \"/workspace/NVIDIA-Nemotron-Nano-9B-v2/nemotron_toolcall_parser_no_streaming.py\" \
+                   --tool-call-parser \"nemotron_json\" \
+                   --enable-auto-tool-choice" \
+    ++use_client_parsing=False \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message='/think' \
-    ++use_client_parsing=False \
-    --server_args="--tool-parser-plugin \"/workspace/NVIDIA-Nemotron-Nano-9B-v2/nemotron_toolcall_parser_no_streaming.py\" \
-                    --tool-call-parser \"nemotron_json\" \
-                    --enable-auto-tool-choice"
+    ++system_message='/think'
 ```
 
 #### Command for RULER Eval (Reasoning OFF)
 
-For RULER we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
-need to use the data preparation `setup` as part of the benchmark name. Finally it's important not to specify
+For RULER, we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
+need to use the data preparation `setup` as part of the benchmark name. 
+
+We also test the model in the reasoning off mode as mentioned above. 
+Finally it's important not to specify
 `++inference.tokens_to_generate` as RULER has a fixed value of this parameter for each task.
 
-```bash hl_lines="6-7"
+```bash hl_lines="6-7 10-12" 
 ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
     --server_type=vllm \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2_ruler/ \
-    --benchmarks=ruler.nemotron_super_128k \
+    --benchmarks=ruler.nemotron_nano_128k \
     --data_dir=/workspace/ns-data \
     --server_gpus=1 \
+    --server_args="--mamba_ssm_cache_dtype float32 " \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
     ++system_message='/no_think'
@@ -262,15 +272,15 @@ pass@1[avg-of-8] | 12032       | 2534       | 7824        | 73.95%           | 0
 majority@8       | 12032       | 2534       | 7824        | 76.30%           | 0.00%
 pass@8           | 12032       | 2534       | 7824        | 86.44%           | 0.00%
 
-------------------------------------------------- hle --------------------------------------------------
-evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
-pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%            | 160.01%
-majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%            | 26.69%
-pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%           | 106.77%
+------------------------------------------------- hle --------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct  
+pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%             
+majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%            
+pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%           
 ```
 
 !!!note
-    When testing on smaller benchmarks like GPQA, we observed significant performance variance -— results varied from 53 to 65 across different random seeds, and the model showed high sensitivity to prompt changes.
+    When testing on smaller benchmarks like GPQA, we observed significant performance variance --- results varied from 53 to 65 across different random seeds, and the model showed high sensitivity to prompt changes.
 
 !!!note
     The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
@@ -312,7 +322,17 @@ pass@8           | 30          | 19107      | 698         | 90.00%           | 6
 ```
 
 
-#### Results for Tool Calling
+#### Results for Instruction Following (IFBench)
+
+```
+------------------------------------------------------------------------------------------------------ ifbench -------------------------------------------------------------------------------------------------------
+evaluation_mode  | num_prompts | num_instructions | average_score | prompt_strict_accuracy | instruction_strict_accuracy | prompt_loose_accuracy | instruction_loose_accuracy | num_entries | avg_tokens | gen_seconds
+pass@1[avg-of-8] | 294         | 335              | 37.02%        | 33.50%                 | 34.37%                      | 39.03%                | 41.19%                     | 294         | 2822       | 66198
+pass@8           | 294         | 335              | 55.41%        | 51.02%                 | 53.13%                      | 57.48%                | 60.00%                     | 294         | 2822       | 66198
+```
+
+
+#### Results for Tool Calling (BFCLv3)
 
 ```
 ----------------------- bfcl_v3 ------------------------
