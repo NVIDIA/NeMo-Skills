@@ -139,13 +139,13 @@ class GenSelectPreprocessor:
                 correctness_vals = set([self.get_instance_correctness(instance) for instance in instance_list])
                 LOG.info(f"Correctness values for problem\n {correctness_vals}")
                 rem_problems.append(problem)
-                if len(correctness_vals) == 1 and None not in correctness_vals:
-                    # Single correctness
-                    f.write(json.dumps(instance_list[0]) + "\n")
-                    continue
-                else:
-                    # Need to cluster these instances
-                    rem_problems.append(problem)
+                # if len(correctness_vals) == 1 and None not in correctness_vals:
+                #     # Single correctness
+                #     f.write(json.dumps(instance_list[0]) + "\n")
+                #     continue
+                # else:
+                #     # Need to cluster these instances
+                #     rem_problems.append(problem)
         
         # Now cluster the instances by the cluster key
         problem_to_clustered_instances = {}
