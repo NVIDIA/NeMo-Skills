@@ -9,7 +9,7 @@ user: |-
   You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
   
-  When using python code, you must use the following format. 
+  When using python code, you must use the following this exact format with the <tool_call></tool_call> tags wrapping the code. 
   <tool_call>
   # Your Python code here
   </tool_call>
