@@ -208,7 +208,14 @@ def get_generation_cmd(
         random_seed=random_seed,
     )
     cmd = "export HYDRA_FULL_ERROR=1 && "
-    cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+    # Handle file paths vs module names
+    if os.sep in script:
+        # It's a file path, run it directly with .py extension
+        script_path = script if script.endswith('.py') else f"{script}.py"
+        cmd += f"python {script_path} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+    else:
+        # It's a module name, use -m flag
+        cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations
