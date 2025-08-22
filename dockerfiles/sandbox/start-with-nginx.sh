@@ -102,10 +102,16 @@ mkdir -p /var/log/nginx
 rm -f /var/log/nginx/access.log /var/log/nginx/error.log
 touch /var/log/nginx/access.log /var/log/nginx/error.log
 chmod 644 /var/log/nginx/*.log
+# Pre-create per-worker log files so uWSGI writes to regular files
+for i in $(seq 1 $NUM_WORKERS); do
+    touch /var/log/worker${i}.log
+done
+chmod 644 /var/log/worker*.log || true
 
 # Mirror logs to stdout/stderr for docker logs
 tail -f /var/log/nginx/access.log &> /dev/stdout &
 tail -f /var/log/nginx/error.log &> /dev/stderr &
+tail -f /var/log/worker*.log &> /dev/stderr &
 
 # Start workers as background processes
 echo "Starting $NUM_WORKERS workers in parallel..."
