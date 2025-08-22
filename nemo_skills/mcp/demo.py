@@ -28,7 +28,7 @@ async def run_demo():
     model_type = 'qwen'
     math_client = MCPHttpClient("http://localhost:8001")
     string_client = MCPHttpClient("http://localhost:8002")
-    plane_client = MCPStreamableHttpClient("http://localhost:8003/mcp")
+    plane_client = MCPStreamableHttpClient("http://localhost:8003/plane/mcp")
 
     manager = MCPClientManager()
     manager.register("math", math_client)
