@@ -22,11 +22,11 @@ from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_
 
 
 def download_models_ruler_data(workspace, cluster, expname_prefix):
-    # data preparation needs to run locally without container, so not wrapping with run_cmd
+    # step1: local data preparation
     prepare_datasets(["aime24", "aime25"])
 
-    # download the models
-    cmd = f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 "
+    # step2: download model
+    cmd = f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
     run_cmd(
         ctx=wrap_arguments(cmd),
         cluster=cluster,
@@ -34,12 +34,12 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         log_dir=f"{workspace}/download-assets",
     )
 
-    # Prepare ruler data on local cluster using subprocess
+    # step3: prepare ruler data on local cluster
     ruler_cmd = [
         "ns",
         "prepare_data",
         "--cluster",
-        f"{cluster}",
+        cluster,
         "ruler",
         "--setup",
         "nemotron_super_128k",
@@ -54,14 +54,24 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-download-ruler-data",
     ]
+    subprocess.run(ruler_cmd, check=True)
 
-    subprocess.run(ruler_cmd, check=True, capture_output=False)
 
-
-def eval(workspace, cluster, expname_prefix):
+def eval_reasoning_on(workspace, cluster, expname_prefix):
+    """
+    Run evals in Reasoning ON mode
+    """
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
-    # ========== Math / Code / Science Reasoning ==========
+    # Common settings for reasoning ON
+    common_infer = [
+        "++inference.tokens_to_generate=65536",
+        "++inference.temperature=0.6",
+        "++inference.top_p=0.95",
+        "++system_message=",
+    ]
+
+    # Math / Code / Science (Reasoning ON)
     cmd_reasoning = [
         "ns",
         "eval",
@@ -72,22 +82,19 @@ def eval(workspace, cluster, expname_prefix):
         "--server_type",
         "vllm",
         "--output_dir",
-        f"{workspace}/llama_nemotron_49b_1_5",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
         "--benchmarks",
         "gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16",
-        "--server_gpus=2",
-        "++inference.tokens_to_generate=65536",
-        "++inference.temperature=0.6",
-        "++inference.top_p=0.95",
-        "++system_message=",
+        "--server_gpus=8",
+        *common_infer,
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
-        f"{expname_prefix}-math-code-science-reasoning-on",
+        f"{expname_prefix}-math-code-science-on",
     ]
     subprocess.run(cmd_reasoning, check=True)
 
-    # ========== LiveCodeBench ==========
+    # LiveCodeBench (Reasoning ON)
     cmd_livecode = [
         "ns",
         "eval",
@@ -98,24 +105,21 @@ def eval(workspace, cluster, expname_prefix):
         "--server_type",
         "vllm",
         "--output_dir",
-        f"{workspace}/llama_nemotron_49b_1_5",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
         "--benchmarks",
         "livecodebench:16",
         "--split",
         "test_v5_2410_2502",
-        "--server_gpus=2",
-        "++inference.tokens_to_generate=65536",
-        "++inference.temperature=0.6",
-        "++inference.top_p=0.95",
-        "++system_message=",
+        "--server_gpus=8",
+        *common_infer,
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
-        f"{expname_prefix}-livecode-reasoning-on",
+        f"{expname_prefix}-livecode-on",
     ]
     subprocess.run(cmd_livecode, check=True)
 
-    # ========== HLE ==========
+    # HLE (Reasoning ON)
     cmd_hle = [
         "ns",
         "eval",
@@ -126,24 +130,21 @@ def eval(workspace, cluster, expname_prefix):
         "--server_type",
         "vllm",
         "--output_dir",
-        f"{workspace}/llama_nemotron_49b_1_5",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
         "--benchmarks",
         "hle:16",
-        "--server_gpus=2",
+        "--server_gpus=8",
         "--judge_model=o3-mini-20250131",
         "--extra_judge_args=++inference.tokens_to_generate=4096 ++max_concurrent_requests=8",
-        "++inference.tokens_to_generate=65536",
-        "++inference.temperature=0.6",
-        "++inference.top_p=0.95",
-        "++system_message=",
+        *common_infer,
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
-        f"{expname_prefix}-hle-reasoning-on",
+        f"{expname_prefix}-hle-on",
     ]
     subprocess.run(cmd_hle, check=True)
 
-    # ========== BFCL ==========
+    # BFCL (Reasoning ON)
     cmd_bfcl = [
         "ns",
         "eval",
@@ -153,27 +154,24 @@ def eval(workspace, cluster, expname_prefix):
         "bfcl_v3",
         "--model",
         base_model,
-        "--server_gpus=2",
-        "--server_type=vllm",
+        "--server_gpus=8",
+        "--server_type",
+        "vllm",
         "--output_dir",
-        f"{workspace}/llama_nemotron_49b_1_5_tool_calling",
-        "++inference.tokens_to_generate=65536",
-        "++inference.temperature=0.6",
-        "++inference.top_p=0.95",
-        "++system_message=",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_tool_calling",
+        *common_infer,
         "++use_client_parsing=False",
-        "--server_args=--tool-parser-plugin "
-        f'"{base_model}/llama_nemotron_toolcall_parser_no_streaming.py" '
-        "--tool-call-parser llama_nemotron_json "
-        "--enable-auto-tool-choice",
+        '--server_args=--tool-parser-plugin "{}" --tool-call-parser llama_nemotron_json --enable-auto-tool-choice'.format(
+            f"{base_model}/llama_nemotron_toolcall_parser_no_streaming.py"
+        ),
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
-        f"{expname_prefix}-bfcl-reasoning-on",
+        f"{expname_prefix}-bfcl-on",
     ]
     subprocess.run(cmd_bfcl, check=True)
 
-    # ========== RULER ==========
+    # RULER (Reasoning ON)  Note: no tokens_to_generate
     cmd_ruler = [
         "ns",
         "eval",
@@ -184,21 +182,165 @@ def eval(workspace, cluster, expname_prefix):
         "--server_type",
         "vllm",
         "--output_dir",
-        f"{workspace}/llama_nemotron_49b_1_5_ruler",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_ruler",
         "--benchmarks",
         "ruler.nemotron_super_128k",
         "--data_dir",
         f"{workspace}/ns-data",
-        "--server_gpus=2",
+        "--server_gpus=8",
         "++inference.temperature=0.6",
         "++inference.top_p=0.95",
         "++system_message=",
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
-        f"{expname_prefix}-ruler-reasoning-on",
+        f"{expname_prefix}-ruler-on",
     ]
     subprocess.run(cmd_ruler, check=True)
+
+
+def eval_reasoning_off(workspace, cluster, expname_prefix):
+    """
+    Run evals in Reasoning OFF mode
+    temperature=0.0, top_p=1.0, system_message=/no_think
+    Keep tokens_to_generate=65536 (except RULER)
+    """
+    base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
+
+    # Common settings for reasoning OFF
+    common_infer = [
+        "++inference.tokens_to_generate=65536",
+        "++inference.temperature=0.0",
+        "++inference.top_p=1.0",
+        "++system_message=/no_think",
+    ]
+
+    # Math / Code / Science (Reasoning OFF)
+    cmd_reasoning_off = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--model",
+        base_model,
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        "--benchmarks",
+        "gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16",
+        "--server_gpus=8",
+        *common_infer,
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-math-code-science-off",
+    ]
+    subprocess.run(cmd_reasoning_off, check=True)
+
+    # LiveCodeBench (Reasoning OFF)
+    cmd_livecode_off = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--model",
+        base_model,
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        "--benchmarks",
+        "livecodebench:16",
+        "--split",
+        "test_v5_2410_2502",
+        "--server_gpus=8",
+        *common_infer,
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-livecode-off",
+    ]
+    subprocess.run(cmd_livecode_off, check=True)
+
+    # HLE (Reasoning OFF)
+    cmd_hle_off = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--model",
+        base_model,
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        "--benchmarks",
+        "hle:16",
+        "--server_gpus=8",
+        "--judge_model=o3-mini-20250131",
+        "--extra_judge_args=++inference.tokens_to_generate=4096 ++max_concurrent_requests=8",
+        *common_infer,
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-hle-off",
+    ]
+    subprocess.run(cmd_hle_off, check=True)
+
+    # BFCL (Reasoning OFF)
+    cmd_bfcl_off = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--benchmarks",
+        "bfcl_v3",
+        "--model",
+        base_model,
+        "--server_gpus=8",
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_tool_calling",
+        *common_infer,
+        "++use_client_parsing=False",
+        '--server_args=--tool-parser-plugin "{}" --tool-call-parser llama_nemotron_json --enable-auto-tool-choice'.format(
+            f"{base_model}/llama_nemotron_toolcall_parser_no_streaming.py"
+        ),
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-bfcl-off",
+    ]
+    subprocess.run(cmd_bfcl_off, check=True)
+
+    # RULER (Reasoning OFF)  Note: no tokens_to_generate
+    cmd_ruler_off = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--model",
+        base_model,
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_ruler",
+        "--benchmarks",
+        "ruler.nemotron_super_128k",
+        "--data_dir",
+        f"{workspace}/ns-data",
+        "--server_gpus=8",
+        "++inference.temperature=0.0",
+        "++inference.top_p=1.0",
+        "++system_message=/no_think",
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-ruler-off",
+    ]
+    subprocess.run(cmd_ruler_off, check=True)
 
 
 # Prepare evaluation data locally first
@@ -215,10 +357,12 @@ cmd = [
     "aime24",
     "aime25",
 ]
-# subprocess.run(cmd, capture_output=False)
+subprocess.run(cmd, capture_output=False)
 
 
 workspace = "/lustre/fsw/portfolios/llmservice/users/wedu/llm/test-49b"
 cluster = "oci"
 expname_prefix = "test-49b"
-eval(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
+download_models_ruler_data(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
+eval_reasoning_on(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
+eval_reasoning_off(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
