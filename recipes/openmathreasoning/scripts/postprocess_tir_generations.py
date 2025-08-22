@@ -141,7 +141,7 @@ def preprocess_code_judge(args):
                         sample["original_index"] = idx
                         failed_samples.append(sample)
     # NOTE: added to save the failed samples to a separate file
-    with open(args.output_file.replace(".jsonl", "_failed.jsonl"), "w") as fout:
+    with open(args.output_file.replace(".jsonl", "_rejected.jsonl"), "w") as fout:
         for sample in failed_samples:
             fout.write(json.dumps(sample) + "\n")
 
