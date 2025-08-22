@@ -217,7 +217,8 @@ def genselect(
         f" ++benchmark={benchmark} "  
     )
 
-    competition_rounds = [int(round) for round in competition_rounds.split(",")] if competition_rounds else []
+    # competition_rounds = [int(round) for round in competition_rounds.split(",")] if competition_rounds else []
+    competition_rounds = [int(competition_rounds)]
 
     extra_arguments_original = extra_arguments + extra_eval_args
 
