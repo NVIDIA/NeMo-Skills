@@ -20,6 +20,7 @@ prompt_config: null
 tokenizer: null
 chat_template_kwargs: null
 system_message: null  # can be used to override default from the tokenizer
+assistant_end: null  # can be used to not use jinja and just add this suffix
 
 code_tags: null
 
@@ -55,6 +56,7 @@ processors:
     tokenizer: ${tokenizer}
     chat_template_kwargs: ${chat_template_kwargs}
     system_message: ${system_message}
+    assistant_end: ${assistant_end}
     code_tags: ${code_tags}
     input_key: question
     output_key: ${output_key}

@@ -66,6 +66,7 @@ class ReadData(BaseProcessor):
                 self.keys_to_keep.add(self.output_key)
                 self.keys_to_keep.add("symbolic_correct")
                 self.keys_to_keep.add("judgement")
+                self.keys_to_keep.add("reasoning_content")
 
         if isinstance(self.input_files, str):
             if "," in self.input_files:
@@ -312,6 +313,7 @@ class WriteFinalSftManifest(BaseProcessor):
         tokenizer: str | None = None,
         chat_template_kwargs: dict | None = None,
         system_message: str | None = None,
+        assistant_end: str | None = None,
         code_tags: str | None = None,
         input_key: str = "input",
         output_key: str = "output",
@@ -348,6 +350,7 @@ class WriteFinalSftManifest(BaseProcessor):
             self.prompt.config.system = system_message
 
         self.chat_template_kwargs = chat_template_kwargs
+        self.assistant_end = assistant_end
 
     def process(self):
         samples_count = 0
@@ -380,15 +383,20 @@ class WriteFinalSftManifest(BaseProcessor):
                     )
                     # not adding end-of-turn for incomplete generations
                     if output_sample.get("finish_reason", "stop") == "stop":
-                        output_sample["output"] = self.prompt.format_assistant_response(
-                            content=generation,
-                            thinking=elem.get("reasoning_content"),
-                            chat_template_kwargs=self.chat_template_kwargs,
-                        )
+                        if self.assistant_end is None:
+                            output_sample["output"] = self.prompt.format_assistant_response(
+                                content=generation,
+                                thinking=elem.get("reasoning_content"),
+                                chat_template_kwargs=self.chat_template_kwargs,
+                            )
+                        else:
+                            if elem.get("reasoning_content"):
+                                raise ValueError("reasoning_content is not supported with assistant_end parameter")
+                            output_sample["output"] = generation + self.assistant_end
                     else:
                         # this doesn't work properly with reasoning_content, so let's fail for now. TODO: fix this
                         if elem.get("reasoning_content"):
-                            raise ValueError("Reasoning content is not supported yet for incomplete generations")
+                            raise ValueError("reasoning_content is not supported yet for incomplete generations")
                         output_sample["output"] = generation
 
                 else:
