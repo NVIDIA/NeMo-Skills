@@ -9,7 +9,7 @@ user: |-
   You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
   
-  When using python code, you must use the following format:
+  When using python code, you must use the following format, wrapping the code in a <tool_call> </tool_call> tag:
   <tool_call>
   # Your Python code here
   </tool_call>
@@ -18,9 +18,9 @@ user: |-
   # Code execution output will appear here
   ```
   For example:
-  ```python
+  <tool_call>
   print("Hello, world!")
-  ```
+  </tool_call>
   ```output
   Hello, world!
   ```
