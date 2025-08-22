@@ -29,7 +29,7 @@ def save_data():
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            entry['expected_answer'] = entry.pop('answer')
+            entry["expected_answer"] = entry.pop("answer")
             json.dump(entry, fout)
             fout.write("\n")
 
