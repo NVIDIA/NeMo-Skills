@@ -66,7 +66,9 @@ class GeminiModel(BaseModel):
             - dynamic: maximum thinking budget tokens: -1
         """
         assert min_p == 0.0, "`min_p` is not supported by Gemini API, please set it to 0.0."
-        assert repetition_penalty == 1.0, "`repetition_penalty` is not supported by Gemini API, please set it to default value `1.0`."
+        assert repetition_penalty == 1.0, (
+            "`repetition_penalty` is not supported by Gemini API, please set it to default value `1.0`."
+        )
         assert not extra_body, "`extra_body` is not supported by Gemini API, please set it to None or empty dict"
 
         # Vertext AI params: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference
@@ -85,7 +87,7 @@ class GeminiModel(BaseModel):
             "top_k": top_k if top_k > 0 else None,
             "seed": random_seed,
             "top_logprobs": top_logprobs,
-            "allowed_openai_params": ['top_k', 'seed', 'top_logprobs'],
+            "allowed_openai_params": ["top_k", "seed", "top_logprobs"],
         }
 
         if reasoning_effort is None:

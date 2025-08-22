@@ -62,10 +62,7 @@ def should_get_random_port(server_gpus, exclusive, server_type):
 
 
 def wait_for_server(server_address, generation_commands):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"cd /nemo_run/code && "
-    )
+    cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
     if server_address is not None:
         cmd += (
             # might be required if we are not hosting server ourselves
@@ -91,7 +88,7 @@ def get_ray_server_cmd(start_cmd):
     )
 
     ray_start_cmd = (
-        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        'if [ "${SLURM_PROCID:-0}" = 0 ]; then '
         "    echo 'Starting head node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
         "    ray start "
@@ -102,7 +99,7 @@ def get_ray_server_cmd(start_cmd):
         "else "
         "    echo 'Starting worker node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
-        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        '    echo "Connecting to head node at $SLURM_MASTER_NODE" && '
         "    ray start "
         "        --block "
         "        --address=$SLURM_MASTER_NODE:6379 "
@@ -133,7 +130,7 @@ def get_server_command(
     elif model_path.startswith("/"):
         check_if_mounted(cluster_config, model_path)
 
-    if server_type == 'megatron':
+    if server_type == "megatron":
         if cluster_config["executor"] != "slurm":
             num_tasks = 1
             prefix = f"torchrun --nproc_per_node {num_gpus}"
@@ -155,7 +152,7 @@ def get_server_command(
             f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
             f"    {server_args} "
         )
-    elif server_type == 'vllm':
+    elif server_type == "vllm":
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
             f"python3 {server_entrypoint} "
@@ -169,7 +166,7 @@ def get_server_command(
         else:
             server_start_cmd = start_vllm_cmd
         num_tasks = 1
-    elif server_type == 'sglang':
+    elif server_type == "sglang":
         if num_nodes > 1:
             multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
@@ -185,7 +182,7 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = 1
-    elif server_type == 'trtllm':
+    elif server_type == "trtllm":
         server_entrypoint = server_entrypoint or "trtllm-serve"
         if num_nodes > 1 and server_entrypoint == "trtllm":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
@@ -206,9 +203,6 @@ def get_server_command(
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
     server_cmd = (
-        f"nvidia-smi && "
-        f"cd /nemo_run/code && "
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"{server_start_cmd} "
+        f"nvidia-smi && cd /nemo_run/code && export PYTHONPATH=$PYTHONPATH:/nemo_run/code && {server_start_cmd} "
     )
     return server_cmd, num_tasks
