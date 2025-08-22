@@ -98,8 +98,8 @@ config might look like
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.7.0
-  vllm: igitman/nemo-skills-vllm:0.7.0
+  trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
+  vllm: vllm/vllm-openai:v0.10.1.1
   nemo: igitman/nemo-skills-nemo:0.7.0
   # ... there are some more containers defined here
 
