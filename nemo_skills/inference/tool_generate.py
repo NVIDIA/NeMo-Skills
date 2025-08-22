@@ -101,15 +101,27 @@ class ToolGenerationTask(GenerationTask):
         )
 
         for match in tool_exp.finditer(generation):
-            func_name, func_args = match.groups()
+            tool_name, tool_args = match.groups()
             try:
-                func_args = json.loads(func_args)
+                tool_args = json.loads(tool_args)
             except json.decoder.JSONDecodeError as e:
-                raise ValueError("Unable to parse JSON function arguments from generation.") from e
+                if self.cfg.tool_errors_in_context:
+                    LOG.error(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}")
+                    LOG.error(e)
 
-            return func_name, func_args
+                    tool_args = {}
+                    return tool_name, tool_args
+                else:
+                    raise ValueError(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}") from e
 
-        raise ValueError("Unable to parse tool call from generation.")
+            return tool_name, tool_args
+
+        if self.cfg.tool_errors_in_context:
+            LOG.error(f"Unable to parse tool call from generation:\n{generation}")
+
+            return "error", {}
+
+        raise ValueError(f"Unable to parse tool call from generation:\n{generation}")
 
     ## FIXME: make configurable.
     async def execute_tool_call(self, tool_name, tool_args):
@@ -127,12 +139,22 @@ class ToolGenerationTask(GenerationTask):
             """
             )
         else:
-            raise NotImplementedError(f"Tool not supported.")
+            if self.cfg.tool_errors_in_context:
+                LOG.error(f"Tool not available or unsupported: {tool_name}/{tool_args}")
+
+                return {"error": "Tool not available or unsupported"}
+            else:
+                raise NotImplementedError(f"Tool not available or unsupported: {tool_name}/{tool_args}")
 
         tool_output, _ = await self.sandbox.execute_code(generated_code=tool_code, language="python")
 
         if tool_output["process_status"] != "completed":
-            raise ValueError(f"Execution failed {tool_output}")
+            if self.cfg.tool_errors_in_context:
+                LOG.error(f"Error executing tool {tool_name}/{tool_args}: {tool_output['stderr']}")
+
+                return {"error": tool_output["stderr"]}
+            else:
+                raise ValueError(f"Error executing tool {tool_name}/{tool_args}:\n{tool_output['stderr']}")
 
         return {"result": tool_output["stdout"]}
 
@@ -187,18 +209,8 @@ class ToolGenerationTask(GenerationTask):
             if not generation_steps[-1].endswith("<|call|>"):
                 generation_steps[-1] += "<|call|>"
 
-            try:
-                tool_name, tool_args = await self.parse_tool_call(generation_steps[-1])
-                tool_out = await self.execute_tool_call(tool_name, tool_args)
-            except Exception as e:
-                if self.cfg.tool_errors_in_context:
-                    LOG.error(f"Tool {tool_name}/{tool_args} failed.")
-                    LOG.error(e)
-
-                    tool_out = {"result": str(e)}
-                else:
-                    raise
-
+            tool_name, tool_args = await self.parse_tool_call(generation_steps[-1])
+            tool_out = await self.execute_tool_call(tool_name, tool_args)
             tool_output_generation = await self.process_tool_output(tool_name, tool_args, tool_out)
             generation_steps.append(tool_output_generation)
 
