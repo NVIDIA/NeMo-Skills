@@ -60,7 +60,9 @@ class OpenAIModel(BaseModel):
         )
 
     def _is_reasoning_model(self, model_name: str) -> bool:
-        return re.match(r"^o\d", model_name) or model_name.startswith("gpt-5")
+        # additional reaosning model names to filter out
+        reasoning_model_names = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
+        return re.match(r"^o\d", model_name) or model_name in reasoning_model_names
 
     def _build_completion_request_params(self, **kwargs) -> dict:
         kwargs = copy.deepcopy(kwargs)
@@ -115,11 +117,6 @@ class OpenAIModel(BaseModel):
 
         if self._is_reasoning_model(self.model):
             # Reasoning model specific validations and parameters
-            temperature = 0.0
-            top_p = 0.95
-            repetition_penalty = 1.0
-            top_logprobs = None
-            
             if temperature != 0.0:
                 raise ValueError(
                     "`temperature` is not supported by reasoning models, please set it to default value `0.0`."
