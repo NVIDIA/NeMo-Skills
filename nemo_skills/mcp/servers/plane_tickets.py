@@ -23,10 +23,13 @@ from starlette.applications import Starlette
 from starlette.routing import Mount
 from mcp.server.fastmcp import FastMCP
 
+"""
+Run with:
+    uvicorn nemo_skills.mcp.servers.plane_tickets:app --reload --port 8003
+"""
 
 # Initialize FastMCP server
 mcp = FastMCP(name="plane_tickets", stateless_http=True)
-
 
 # Simple city graph for demo purposes
 CITIES: dict[str, list[str]] = {
