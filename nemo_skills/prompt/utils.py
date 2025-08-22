@@ -343,6 +343,9 @@ class Prompt:
     def stop_phrases(self):
         """Returns the stop phrases from the template if it exists, otherwise None."""
         if self.config.template:
+            print("-----------------------DEBUG: Stop Phrases-----------------------")
+            print(self.config.template.stop_phrases)
+            print("-----------------------DEBUG-----------------------")
             return list(self.config.template.stop_phrases)
 
         return None
