@@ -50,7 +50,7 @@ stages:
       model: nvdev/openai/gpt-oss-120b # gpt-4.1 
       with_sandbox: true
       server_type: openai # azureopenai
-      server_address: https://integrate.api.nvidia.com/v1 # https://prod.api.nvidia.com/llm/v1/azure
+      server_address: https://integrate.api.nvidia.com/v1 # https://prod.api.nvidia.com/llm/v1/azure 
       num_random_seeds: ${num_random_seeds_to_generate}
 
   fill_majority_answer:
