@@ -27,7 +27,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # TODO: read this from init.py
-DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi"]
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -74,6 +74,13 @@ def prepare_data(
                     f"Dataset {dataset} contains very large input data and requires a data_dir to be specified. "
                     "Please provide --data_dir argument."
                 )
+
+    if data_dir and cluster is None:
+        raise ValueError(
+            "Please use 'cluster' parameter when specifying data_dir. "
+            "You can set it to 'local' if preparing data locally assuming "
+            "you have a corresponding 'local.yaml' cluster config."
+        )
 
     if data_dir:
         command += f" && mkdir -p {data_dir} && cp -r /nemo_run/code/nemo_skills/dataset/* {data_dir}"
