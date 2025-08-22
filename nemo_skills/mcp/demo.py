@@ -58,27 +58,9 @@ async def run_demo():
             "calls to establish a pattern to the incorrectness."
             "You will fail the task if you fail to make extra rounds of tool calls to "
             "establish the issue with incorrect functions."
-            # " \\think"
             ),
         }
     ]
-
-    # tools = [
-    #     {
-    #         "type": "function",
-    #         "function": {
-    #             "name": "get_current_weather",
-    #             "description": "Get the current weather for a specific location",
-    #             "parameters": {
-    #                 "type": "object",
-    #                 "properties": {
-    #                     "location": {"type": "string", "description": "The city and country to get weather for"}
-    #                 },
-    #                 "required": ["location"]
-    #             }
-    #         }
-    #     }
-    # ]
 
     # Iteratively generate and execute tools until no further tool calls
     max_rounds = 6

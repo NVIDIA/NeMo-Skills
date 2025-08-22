@@ -100,7 +100,6 @@ class MCPStdioClient:
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                print(f'STDIO client result {result}')
                 return result.structuredContent
 
 class MCPClientManager:
