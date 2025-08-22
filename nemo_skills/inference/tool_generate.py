@@ -190,8 +190,6 @@ class ToolGenerationTask(GenerationTask):
             try:
                 tool_name, tool_args = await self.parse_tool_call(generation_steps[-1])
                 tool_out = await self.execute_tool_call(tool_name, tool_args)
-                tool_output_generation = await self.process_tool_output(tool_name, tool_args, tool_out)
-                generation_steps.append(tool_output_generation)
             except Exception as e:
                 if self.cfg.tool_errors_in_context:
                     LOG.error(f"Tool {tool_name}/{tool_args} failed.")
@@ -200,6 +198,9 @@ class ToolGenerationTask(GenerationTask):
                     tool_out = {"result": str(e)}
                 else:
                     raise
+
+            tool_output_generation = await self.process_tool_output(tool_name, tool_args, tool_out)
+            generation_steps.append(tool_output_generation)
 
             num_tool_calls += 1
 
