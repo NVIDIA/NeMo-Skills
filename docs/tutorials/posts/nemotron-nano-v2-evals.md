@@ -74,9 +74,9 @@ ns prepare_data --cluster=local ruler \
 
 ## Evaluation commands
 
-NVIDIA-Nemotron-Nano-9B-v2 is a reasoning model where the thinking budget can be specified. 
-We first perform evaluations without specifying any thinking budget, and then we perform evals for a subset of benchmarks with varying thinking budgets. 
-We detail the commands and results for all our evaluations. 
+NVIDIA-Nemotron-Nano-9B-v2 is a reasoning model where the thinking budget can be specified.
+We first perform evaluations without specifying any thinking budget, and then we perform evals for a subset of benchmarks with varying thinking budgets.
+We detail the commands and results for all our evaluations.
 Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations.
 
 !!! note
@@ -94,7 +94,7 @@ For the reasoning mode evals, we follow the recommended recipe of setting:
 - system_message to empty i.e. ''
 - maximum number of generated tokens to 32768
 
-Importantly, the NVIDIA-Nemotron-Nano-9B-v2 model uses 
+Importantly, the NVIDIA-Nemotron-Nano-9B-v2 model uses
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning on)
 
@@ -108,7 +108,7 @@ ns eval \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
     --benchmarks=gpqa:8,mmlu-pro:8,scicode:8,math-500:8,aime24:8,aime25:8 \
     --server_type=vllm \
-    --server_gpus=2 \
+    --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -126,7 +126,7 @@ ns eval \
     --benchmarks=livecodebench:8 \
     --split=test_v5_2407_2412 \
     --server_type=vllm \
-    --server_gpus=2 \
+    --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -136,10 +136,9 @@ ns eval \
 
 #### Command for HLE Eval (Reasoning on)
 
-
 For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
 
-Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/Llama-3_3-Nemotron-Super-49B-v1_5"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 2` will use the `Llama-3_3-Nemotron-Super-49B-v1_5` itself as a judge.
+Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/NVIDIA-Nemotron-Nano-9B-v2"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 1` will use the `NVIDIA-Nemotron-Nano-9B-v2` itself as a judge.
 
 
 ```bash hl_lines="9-10"
@@ -149,7 +148,7 @@ ns eval \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
     --benchmarks=hle:16 \
     --server_type=vllm \
-    --server_gpus=2 \
+    --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     --judge_model="o3-mini-20250131" \
     --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
@@ -173,17 +172,17 @@ Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills sup
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
-    --server_gpus=2 \
+    --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2/ \
+    --server_gpus=1 \
     --server_type=vllm \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/ \
-    ++inference.tokens_to_generate=65536 \
+    ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++system_message='' \
     ++use_client_parsing=False \
-    --server_args="--tool-parser-plugin \"/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/llama_nemotron_toolcall_parser_no_streaming.py\" \
+    --server_args="--tool-parser-plugin \"/workspace/NVIDIA-Nemotron-Nano-9B-v2/nemotron_toolcall_parser_no_streaming.py\" \
                     --tool-call-parser \"llama_nemotron_json\" \
                     --enable-auto-tool-choice"
 ```
@@ -197,12 +196,12 @@ need to use the data preparation `setup` as part of the benchmark name. Finally 
 ```bash hl_lines="6-7"
 ns eval \
     --cluster=local \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
     --server_type=vllm \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2_ruler/ \
     --benchmarks=ruler.nemotron_super_128k \
     --data_dir=/workspace/ns-data \
-    --server_gpus=2 \
+    --server_gpus=1 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++system_message=''
@@ -223,24 +222,27 @@ ns summarize_results --cluster=local /workspace/llama_nemotron_49b_1_5/eval-resu
 #### Results for Science & General Reasoning benchmarks
 
 ```
------------------------------------------- gpqa -----------------------------------------
-evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
-pass@1[avg-of-16] | 198         | 11046      | 1986        | 74.65%           | 0.60%
-majority@16       | 198         | 11046      | 1986        | 78.28%           | 0.00%
-pass@16           | 198         | 11046      | 1986        | 92.93%           | 0.00%
+----------------------------------------- gpqa -----------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-8] | 198         | 12893      | 1324        | 59.85%           | 3.35%
+majority@8       | 198         | 12893      | 1324        | 66.08%           | 0.51%
+pass@8           | 198         | 12893      | 1324        | 85.35%           | 0.51%
 
----------------------------------------- mmlu-pro ---------------------------------------
-evaluation_mode   | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
-pass@1[avg-of-16] | 12032       | 4879       | 12516       | 81.44%           | 0.05%
-majority@16       | 12032       | 4879       | 12516       | 83.05%           | 0.00%
-pass@16           | 12032       | 4879       | 12516       | 91.32%           | 0.00%
+--------------------------------------- mmlu-pro ---------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-8] | 12032       | 2534       | 7824        | 73.95%           | 0.60%
+majority@8       | 12032       | 2534       | 7824        | 76.30%           | 0.00%
+pass@8           | 12032       | 2534       | 7824        | 86.44%           | 0.00%
 
--------------------------------------------------- hle --------------------------------------------------
-evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
-pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%            | 64.13%
-majority@16       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
-pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
+------------------------------------------------- hle --------------------------------------------------
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
+pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%            | 160.01%
+majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%            | 26.69%
+pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%           | 106.77%
 ```
+
+!!!note
+    In our experiments with smaller benchmarks like GPQA, we found significant performance variance across random seeds (performance swings from 53 to 65), and also found the model to be quite prompt-sensitive.
 
 !!!note
     The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
@@ -253,10 +255,10 @@ evaluation_mode  | num_entries | avg_tokens | gen_seconds | accuracy
 pass@1[avg-of-8] | 315         | 14059      | 3207        | 67.38%
 pass@8           | 315         | 14059      | 3207        | 81.59%
 
---------------------------------------------------- scicode ----------------------------------------------------
-evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 42970      | 2414        | 3.46%            | 31.14%           | 65           | 288
-pass@16           | 42970      | 2414        | 9.23%            | 43.40%           | 65           | 288
+--------------------------------------------------- scicode ---------------------------------------------------
+evaluation_mode  | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
+pass@1[avg-of-8] | 29461      | 3053        | 0.96%            | 18.58%           | 65           | 288
+pass@8           | 29461      | 3053        | 3.08%            | 28.82%           | 65           | 288
 ```
 
 #### Results for Math Reasoning benchmarks
@@ -288,40 +290,39 @@ pass@8           | 30          | 19107      | 698         | 90.00%           | 6
 ----------------------- bfcl_v3 ------------------------
 | Category                    | num_entries | accuracy |
 |-----------------------------|-------------|----------|
-| overall_accuracy            | 4441        | 72.64%   |
-| overall_non_live            | 1390        | 88.20%   |
-| non_live_ast                | 1150        | 88.58%   |
-| irrelevance                 | 240         | 86.67%   |
-| overall_live                | 2251        | 83.34%   |
-| live_ast                    | 1351        | 82.68%   |
-| live_irrelevance            | 882         | 84.47%   |
-| live_relevance              | 18          | 77.78%   |
-| overall_multi_turn          | 800         | 46.38%   |
-
+| overall_accuracy            | 4441        | 67.03%   |
+| overall_non_live            | 1390        | 85.28%   |
+| non_live_ast                | 1150        | 85.15%   |
+| irrelevance                 | 240         | 85.83%   |
+| overall_live                | 2251        | 82.05%   |
+| live_ast                    | 1351        | 80.24%   |
+| live_irrelevance            | 882         | 85.15%   |
+| live_relevance              | 18          | 66.67%   |
+| overall_multi_turn          | 800         | 33.75%   |
 ```
 
 !!! note
-    Currently `summarize_results` doesn't support benchmarks like BFCL v3 or RULER which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.
+    Currently `summarize_results` doesn't support benchmarks like BFCL v3 or RULER which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/bfcl_v3/metrics.json`.
 
 #### Results for RULER
 
 ```
-| Task                                | Accuracy |
-|-------------------------------------|----------|
-| ruler.nemotron_128k                 | 66.7     |
-| ruler.nemotron_128k.niah_single_1   | 100.0    |
-| ruler.nemotron_128k.niah_single_2   | 96.4     |
-| ruler.nemotron_128k.niah_single_3   | 99.6     |
-| ruler.nemotron_128k.niah_multikey_1 | 72.8     |
-| ruler.nemotron_128k.niah_multikey_2 | 57.6     |
-| ruler.nemotron_128k.niah_multikey_3 | 21.8     |
-| ruler.nemotron_128k.niah_multivalue | 94.4     |
-| ruler.nemotron_128k.niah_multiquery | 90.5     |
-| ruler.nemotron_128k.vt              | 56.8     |
-| ruler.nemotron_128k.cwe             | 0.8      |
-| ruler.nemotron_128k.fwe             | 87.7     |
-| ruler.nemotron_128k.qa_1            | 46.6     |
-| ruler.nemotron_128k.qa_2            | 41.6     |
+| Task                                     | Accuracy |
+|------------------------------------------|----------|
+| ruler.nemotron_nano_128k                 | 79.1     |
+| ruler.nemotron_nano_128k.niah_single_1   | 100.0    |
+| ruler.nemotron_nano_128k.niah_single_2   | 95.2     |
+| ruler.nemotron_nano_128k.niah_single_3   | 96.0     |
+| ruler.nemotron_nano_128k.niah_multikey_1 | 87.2     |
+| ruler.nemotron_nano_128k.niah_multikey_2 | 83.2     |
+| ruler.nemotron_nano_128k.niah_multikey_3 | 81.8     |
+| ruler.nemotron_nano_128k.niah_multivalue | 66.6     |
+| ruler.nemotron_nano_128k.niah_multiquery | 88.7     |
+| ruler.nemotron_nano_128k.vt              | 83.4     |
+| ruler.nemotron_nano_128k.cwe             | 52.6     |
+| ruler.nemotron_nano_128k.fwe             | 91.8     |
+| ruler.nemotron_nano_128k.qa_1            | 60.0     |
+| ruler.nemotron_nano_128k.qa_2            | 41.6     |
 ```
 
 
