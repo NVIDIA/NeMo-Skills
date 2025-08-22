@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig
+from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -75,6 +75,8 @@ class GenerateSolutionsConfig:
     use_completions_api: bool = False
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
+    # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(default_factory=dict)
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
@@ -160,7 +162,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.use_completions_api = True
+            self.cfg.use_completions_api = True
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -220,6 +222,18 @@ class GenerationTask:
         """
         self.cfg = cfg
 
+        # chat template kwargs goes either into extra body of inference or as a prompt parameter
+        if self.cfg.chat_template_kwargs:
+            if not self.cfg.use_completions_api:
+                if "chat_template_kwargs" in self.cfg.inference.extra_body:
+                    raise ValueError(
+                        "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
+                        "You can only use one of them!"
+                    )
+                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
+                self.cfg.chat_template_kwargs = None
+
         self.llm = self.setup_llm()
         self.prompt = self.setup_prompt()
 
@@ -251,9 +265,10 @@ class GenerationTask:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
         elif self.cfg.online_genselect:
-            # Use the same prompt template for genselect as the one used for generation
+            # Use the same prompt parameters for genselect as the one used for generation
             self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
             self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
+            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
@@ -269,7 +284,7 @@ class GenerationTask:
             return None
 
         if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.cfg.server['model']
+            tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
         else:
             tokenizer = None
 
@@ -333,7 +348,7 @@ class GenerationTask:
                     LOG.warning(f"File `{base_output_file}` exists, skipping generation")
                     return []
             try:
-                with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+                with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
                     for line in fin:
                         filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
             except FileNotFoundError:
@@ -369,15 +384,16 @@ class GenerationTask:
             if isinstance(total_code_executions_in_prompt, (list, tuple)):
                 min_val, max_val = total_code_executions_in_prompt
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
-            data_point['total_code_executions'] = total_code_executions_in_prompt
+            data_point["total_code_executions"] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
         filled_prompt = self.prompt.fill(
             data_point,
             start_assistant_response_key=self.cfg.start_assistant_response_key,
+            chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
         if self.cfg.prompt_suffix:
             if isinstance(filled_prompt, list):
-                filled_prompt[-1]['content'] += self.cfg.prompt_suffix
+                filled_prompt[-1]["content"] += self.cfg.prompt_suffix
             else:
                 filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
@@ -390,21 +406,21 @@ class GenerationTask:
 
             # calculating total generation time
             if self.cfg.add_generation_stats:
-                output['generation_end_time'] = time.time()
+                output["generation_end_time"] = time.time()
                 # TODO: start time is saved in data_point, not output, need to fix that
-                output['generation_time'] = (
-                    output['generation_end_time'] - original_data_point['generation_start_time']
+                output["generation_time"] = (
+                    output["generation_end_time"] - original_data_point["generation_start_time"]
                 )
             else:
                 # generation_start_time was overriden, so restoring it from end and total
                 # TODO: this is a bit hacky, need a rewrite
-                if 'generation_end_time' in original_data_point and 'generation_time' in original_data_point:
-                    output['generation_start_time'] = (
-                        original_data_point['generation_end_time'] - original_data_point['generation_time']
+                if "generation_end_time" in original_data_point and "generation_time" in original_data_point:
+                    output["generation_start_time"] = (
+                        original_data_point["generation_end_time"] - original_data_point["generation_time"]
                     )
                 else:
-                    output.pop('generation_start_time', None)
-                output.pop('num_generated_tokens', None)
+                    output.pop("generation_start_time", None)
+                output.pop("num_generated_tokens", None)
 
             for key in output:
                 original_data_point.pop(key, None)
@@ -428,7 +444,7 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                generation_params['max_code_executions'] = data_point['total_code_executions']
+                generation_params["max_code_executions"] = data_point["total_code_executions"]
 
         return await self.llm.generate_async(**generation_params)
 
@@ -436,7 +452,7 @@ class GenerationTask:
         """Process a single data point with semaphore control."""
         async with self.semaphore:
             # registering current time to calculate total generation time
-            data_point['generation_start_time'] = time.time()
+            data_point["generation_start_time"] = time.time()
 
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
@@ -489,7 +505,7 @@ class GenerationTask:
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
-        with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+        with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
 
         ordered_generations = [None] * len(generations)
@@ -501,7 +517,7 @@ class GenerationTask:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
 
-        Path(self.cfg.output_file + '-async').unlink()
+        Path(self.cfg.output_file + "-async").unlink()
 
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -536,7 +552,7 @@ GENERATION_TASK_CLASS = GenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_generation_config')
+@hydra.main(version_base=None, config_name="base_generation_config")
 def generate(cfg: GenerateSolutionsConfig):
     cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -553,7 +569,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()
