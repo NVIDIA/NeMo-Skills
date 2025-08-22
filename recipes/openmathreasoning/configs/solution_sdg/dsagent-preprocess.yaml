@@ -41,7 +41,7 @@ stages:
       ++prompt_config=dsagent_openai/tir
       ++code_tags=qwen
       ++inference.tokens_to_generate=16384
-      ++inference.reasoning_effort=high
+      ++inference.extra_body.reasoning_effort=high
       ++inference.temperature=0
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
