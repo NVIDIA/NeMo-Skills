@@ -213,7 +213,7 @@ def eval_ioi(cfg):
             search_dirs.append(eval_config.test_dir.rstrip("/"))
         if getattr(cfg, "data_dir", ""):
             search_dirs.append(os.path.join(cfg.data_dir.rstrip("/"), "ioi"))
-        search_dirs.append("/nemo_run/code/nemo_skills/dataset/ioi")  # legacy
+        search_dirs.append("/nemo_run/code/nemo_skills/dataset/ioi")
 
         for d in search_dirs:
             candidate = os.path.join(d, fname)
