@@ -17,18 +17,19 @@ import json
 import os.path
 from collections import defaultdict
 from pathlib import Path
+
 import requests
 from datasets import load_dataset
-from collections import defaultdict
 
 run_url = "https://raw.githubusercontent.com/huggingface/ioi/refs/heads/main/run_tests/custom_setup/run"
 compile_url = "https://raw.githubusercontent.com/huggingface/ioi/refs/heads/main/run_tests/custom_setup/compile"
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_dir', type=str, default='.')
-    parser.add_argument('--split', type=str, default='test')
+    parser.add_argument("--split", type=str, default="test")
     args = parser.parse_args()
+
+    data_dir = Path(__file__).absolute().parent
 
     run_code = requests.get(run_url).text
     compile_code = requests.get(compile_url).text
@@ -37,23 +38,23 @@ if __name__ == '__main__':
     entries = []
     for x, item in enumerate(ds):
         # remove the examples for the test split, as we do not need to compute evaluation for them.
-        if item['score'] != 0 and args.split == 'test':
+        if item["score"] != 0 and args.split == "test":
             entries.append(
                 {
-                    'id': x,
-                    'run': run_code,
-                    'compile': compile_code,
-                    'name': item['name'],
-                    'ioi_id': item['id'],
-                    'subtask': item['subtask'],
-                    'question': item['problem'],
-                    'score': item['score'],
-                    'grader_files': item['grader_files'],
+                    "id": x,
+                    "run": run_code,
+                    "compile": compile_code,
+                    "name": item["name"],
+                    "ioi_id": item["id"],
+                    "subtask": item["subtask"],
+                    "question": item["problem"],
+                    "score": item["score"],
+                    "grader_files": item["grader_files"],
                 }
             )
 
-    with open(os.path.join(args.output_dir, f'{args.split}.jsonl'), 'w') as f:
-        f.write('\n'.join(json.dumps(x) for x in entries))
+    with open(os.path.join(data_dir, f"{args.split}.jsonl"), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in entries))
 
     tests_dataset = load_dataset("open-r1/ioi-test-cases", name="2024", split="train")
 
@@ -61,25 +62,25 @@ if __name__ == '__main__':
     #   problem_id -> test_name -> {input, output}
     test_cases = defaultdict(dict)
     for test_case in tests_dataset:
-        tname = test_case['test_name']
-        problem_id = test_case['problem_name']
-        test_cases[problem_id][tname] = {"input": test_case['test_input'], "output": test_case['test_output']}
+        tname = test_case["test_name"]
+        problem_id = test_case["problem_name"]
+        test_cases[problem_id][tname] = {"input": test_case["test_input"], "output": test_case["test_output"]}
 
     final_structure = defaultdict(lambda: defaultdict(dict))
     for entry in ds:
-        problem_id = entry['name']
-        subtask = entry['subtask']
+        problem_id = entry["name"]
+        subtask = entry["subtask"]
         if subtask == "00-samples":  # skip the sample subtasks.
             continue
-        test_names = entry['test_names']
+        test_names = entry["test_names"]
         tests = {}
         for test_name in test_names:
             tests[test_name] = test_cases[problem_id][test_name]
         final_structure[problem_id][subtask] = {
             "tests": tests,
-            "score": entry['score'],
+            "score": entry["score"],
             "score_precision": entry["score_precision"],
         }
 
-    with open(os.path.join(args.output_dir, f'{args.split}_metadata.json'), 'w') as f:
+    with open(os.path.join(data_dir, f"{args.split}_metadata.json"), "w") as f:
         json.dump(final_structure, f)
