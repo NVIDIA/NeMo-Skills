@@ -26,6 +26,10 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+# TODO: read this from init.py
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
+
+
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def prepare_data(
@@ -60,22 +64,37 @@ def prepare_data(
     Run `python -m nemo_skills.dataset.prepare --help` to see other supported arguments.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
+
+    if not data_dir:
+        for dataset in DATASETS_REQUIRE_DATA_DIR:
+            if dataset in extra_arguments:
+                raise ValueError(
+                    f"Dataset {dataset} contains very large input data and requires a data_dir to be specified. "
+                    "Please provide --data_dir argument."
+                )
+
+    if data_dir and cluster is None:
+        raise ValueError(
+            "Please use 'cluster' parameter when specifying data_dir. "
+            "You can set it to 'local' if preparing data locally assuming "
+            "you have a corresponding 'local.yaml' cluster config."
+        )
+
     if data_dir:
         command += f" && mkdir -p {data_dir} && cp -r /nemo_run/code/nemo_skills/dataset/* {data_dir}"
 
     cluster_config = get_cluster_config(cluster, config_dir=config_dir)
-    if cluster_config['executor'] == 'local' and not data_dir:
+    if cluster_config["executor"] == "local" and not data_dir:
         # in this case we need to put the results in the current folder
         # if we use container, it will mess up permissions, so as a workaround
-        # setting executore to none
-        cluster_config['executor'] = 'none'
+        # setting executor to none
+        cluster_config["executor"] = "none"
 
-    if cluster_config['executor'] == 'slurm' and not data_dir:
+    if cluster_config["executor"] == "slurm" and not data_dir:
         raise ValueError(
-            "Data directory is required to be specified when using slurm executor. "
-            "Please provide --data_dir argument."
+            "Data directory is required to be specified when using slurm executor. Please provide --data_dir argument."
         )
 
     log_dir = log_dir or data_dir
