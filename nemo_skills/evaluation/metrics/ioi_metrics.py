@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.evaluation.metrics.base import BaseMetrics
 from collections import defaultdict
+
+from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class IOIMetrics(BaseMetrics):
@@ -27,7 +28,7 @@ class IOIMetrics(BaseMetrics):
             self.predictions_by_problem[predictions[0]["name"]].extend(predictions)
 
     def _get_score_dict(self, p):
-        return {"correct": all(r["score"]>0 for r in p["test_case_results"].values())}
+        return {"correct": all(r["score"] > 0 for r in p["test_case_results"].values())}
 
     def get_problem_score(self, submissions) -> float:
         """
