@@ -24,7 +24,6 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 @nested_dataclass(kw_only=True)
 class IOIEvaluatorConfig:
-    dataset: str = "ioi"
     # Directory where metadata files are located.
     test_dir: str = ""
 

@@ -16,4 +16,4 @@
 GENERATION_ARGS = f"++prompt_config=generic/default"
 DATASET_GROUP = "code"
 METRICS_TYPE = "ioi"
-EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi"
+EVAL_ARGS = "++eval_type=ioi"
