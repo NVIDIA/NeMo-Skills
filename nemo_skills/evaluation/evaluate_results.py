@@ -54,7 +54,8 @@ class EvaluateResultsConfig:
     # generation key in the jsonl file
     generation_key: str = "generation"
 
-    data_dir: str = ""
+    data_dir: str | None = None
+    split: str = "test"
 
     def __post_init__(self):
         if isinstance(self.input_files, str):
@@ -99,7 +100,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

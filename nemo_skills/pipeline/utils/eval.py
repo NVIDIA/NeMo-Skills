@@ -143,6 +143,8 @@ def get_benchmark_args_from_module(
         LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
         os.environ["NEMO_SKILLS_PRIVILEGED_DOCKER"] = "1"
 
+    eval_args += f" ++split={split} "
+
     return BenchmarkArgs(
         name=benchmark,
         input_file=input_file,
@@ -189,7 +191,7 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
                 override_dict=override_dict,
             )
             if data_dir:
-                benchmark_args.eval_args = f"{benchmark_args.eval_args} ++data_dir={data_dir}"
+                benchmark_args.eval_args += f" ++data_dir={data_dir} "
 
             # TODO: should it be optional?
             benchmark_args.score_module = benchmark_or_group_module.SCORE_MODULE
@@ -208,7 +210,7 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
     )
 
     if data_dir:
-        benchmark_args.eval_args = f"{benchmark_args.eval_args} ++data_dir={data_dir}"
+        benchmark_args.eval_args += f" ++data_dir={data_dir} "
 
     return [benchmark_args]
 

@@ -28,8 +28,8 @@ class IOIEvaluatorConfig:
     # Directory where metadata files are located.
     test_dir: str = ""
 
-    # Metadata file name or absolute path (default: test_metadata.json).
-    test_file: str = "test_metadata.json"
+    # Metadata file name or absolute path (default: {split}_metadata.json).
+    test_file: str = "{split}_metadata.json"
 
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
@@ -207,26 +207,20 @@ def eval_ioi(cfg):
 
     # Resolve metadata path.
     if not (os.path.isabs(eval_config.test_file) and os.path.exists(eval_config.test_file)):
-        fname = os.path.basename(eval_config.test_file)
-        search_dirs = []
+        fname = eval_config.test_file.format(split=cfg.split)
+        search_dir = None
         if eval_config.test_dir:
-            search_dirs.append(eval_config.test_dir.rstrip("/"))
-        if getattr(cfg, "data_dir", ""):
-            search_dirs.append(os.path.join(cfg.data_dir.rstrip("/"), "ioi"))
-        search_dirs.append("/nemo_run/code/nemo_skills/dataset/ioi")
-
-        for d in search_dirs:
-            candidate = os.path.join(d, fname)
-            if os.path.exists(candidate):
-                eval_config.test_file = candidate
-                break
-        else:
-            raise ValueError(f"Could not find {fname}. Provide an absolute path, test_dir, or data_dir.")
+            search_dir = eval_config.test_dir
+        if cfg.data_dir:
+            search_dir = os.path.join(cfg.data_dir, "ioi24")
+        if search_dir is None:
+            raise ValueError("Either data_dir or eval_config.test_dir must be specified.")
+        eval_config.test_file = os.path.join(search_dir, fname)
 
     if not os.path.exists(eval_config.test_file):
         raise ValueError(
-            f"Failed to find test cases file {eval_config.test_file}. "
-            "Please verify the path or supply the correct configuration."
+            f"Could not find tests file at {eval_config.test_file}. "
+            "Provide an absolute path as eval_config.test_file, eval_config.test_dir, or data_dir."
         )
 
     with open(eval_config.test_file) as f:
