@@ -25,10 +25,14 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 @nested_dataclass(kw_only=True)
 class IOIEvaluatorConfig:
     dataset: str = "ioi"
+    # Directory where metadata files are located.
+    test_dir: str = ""
+
+    # Metadata file name or absolute path (default: test_metadata.json).
+    test_file: str = "test_metadata.json"
+
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
-    # File where test cases are stored.
-    test_file: str = "/datasets/ioi/test_metadata.json"
 
 
 def init_worker(sandbox_arg):
@@ -201,28 +205,28 @@ def eval_ioi(cfg):
     sandbox = LocalSandbox()
     batch_size = eval_config.test_batch_size
 
-    # derive split name from first input file to select corresponding metadata file
-    split_name = None
-    if cfg.input_files:
-        from pathlib import Path
+    # Resolve metadata path.
+    if not (os.path.isabs(eval_config.test_file) and os.path.exists(eval_config.test_file)):
+        fname = os.path.basename(eval_config.test_file)
+        search_dirs = []
+        if eval_config.test_dir:
+            search_dirs.append(eval_config.test_dir.rstrip("/"))
+        if getattr(cfg, "data_dir", ""):
+            search_dirs.append(os.path.join(cfg.data_dir.rstrip("/"), "ioi"))
+        search_dirs.append("/nemo_run/code/nemo_skills/dataset/ioi")  # legacy
 
-        split_name = Path(cfg.input_files[0]).stem
-    if not split_name:
-        split_name = "test"
-    metadata_filename = f"{split_name}_metadata.json"
-
-    if getattr(cfg, "data_dir", ""):
-        candidate = os.path.join(cfg.data_dir.rstrip("/"), "ioi", metadata_filename)
-        eval_config.test_file = candidate
-    else:
-        # Original default path for backward compatibility
-        default_candidate = f"/nemo_run/code/nemo_skills/dataset/ioi/{metadata_filename}"
-        if os.path.exists(default_candidate):
-            eval_config.test_file = default_candidate
+        for d in search_dirs:
+            candidate = os.path.join(d, fname)
+            if os.path.exists(candidate):
+                eval_config.test_file = candidate
+                break
+        else:
+            raise ValueError(f"Could not find {fname}. Provide an absolute path, test_dir, or data_dir.")
 
     if not os.path.exists(eval_config.test_file):
         raise ValueError(
-            f"Failed to find test cases file {eval_config.test_file}. Provide --data_dir or valid eval_config.test_file."
+            f"Failed to find test cases file {eval_config.test_file}. "
+            "Please verify the path or supply the correct configuration."
         )
 
     with open(eval_config.test_file) as f:
