@@ -1,7 +1,7 @@
 cluster: local
 base_output_dir: /workspace/dsagent_get_num_features # change this for each task!
-expname: gpt4.1
-suffix: gpt4.1
+expname: gpt5-chat
+suffix: gpt5-chat
 
 
 # Input file for the first stage (generate_solutions)
@@ -12,9 +12,9 @@ num_random_seeds_to_generate: 3
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
-  model: gpt-5-chat
-  server_type: azureopenai
-  server_address: https://prod.api.nvidia.com/llm/v1/azure
+  model: nvdev/openai/gpt-oss-120b # gpt-5-chat
+  server_type: openai # azureopenai
+  server_address: https://integrate.api.nvidia.com/v1 # https://prod.api.nvidia.com/llm/v1/azure
   # Number of generated solutions per problem to judge
   num_random_seeds: ${num_random_seeds_to_generate}
 
@@ -47,7 +47,7 @@ stages:
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
     stage_kwargs:
-      model: gpt-4.1 
+      model: gpt-5-chat 
       with_sandbox: true
       server_type: azureopenai
       server_address: https://prod.api.nvidia.com/llm/v1/azure
