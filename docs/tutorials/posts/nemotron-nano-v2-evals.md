@@ -74,9 +74,9 @@ ns prepare_data --cluster=local ruler \
 
 ## Evaluation commands
 
-NVIDIA-Nemotron-Nano-9B-v2 is a reasoning model where the thinking budget can be specified.
-We first perform evaluations without specifying any thinking budget, and then we perform evals for a subset of benchmarks with varying thinking budgets.
-We detail the commands and results for all our evaluations.
+NVIDIA-Nemotron-Nano-9B-v2 is a model which can perform inference in both reasoning and non-reasoning mode.
+We perform evaluations primarily with the reasoning mode. We detail the commands and results for all our evaluations.
+<!-- without specifying any thinking budget, and then we show how to perform evals for `AIME25` with varying thinking budgets. -->
 Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations.
 
 !!! note
@@ -91,14 +91,23 @@ For the reasoning mode evals, we follow the recommended recipe of setting:
 
 - temperature to 0.6
 - top-p to 0.95
-- system_message to empty i.e. ''
+- system_message to '/think'
 - maximum number of generated tokens to 32768
 
-Importantly, the NVIDIA-Nemotron-Nano-9B-v2 model uses
+We evaluate all benchmarks in the reasoning on mode, except for RULER, which is evaluated in the reasoning off mode via setting:
+
+- temperature to 0.0
+- top-p to 1.0
+- system message to '/no_think'
+
+
+Importantly, the NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers.
+To run the model without quality degradation, the vllm server needs to be run with the option `--mamba_ssm_cache_dtype float32`.
+With NeMo-Skills, we can accomplish this by setting `--server_args="--mamba_ssm_cache_dtype float32 "` when performing generations.
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning on)
 
-The following command evaluates the model on GPQA, MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
+The following command evaluates the model on MMLU-Pro, Scicode, MATH-500, AIME24, and AIME25 across 16 different runs for all benchmarks. We have highlighted the inference settings recommended above in the following command:
 
 
 ```bash hl_lines="8-12"
@@ -106,17 +115,35 @@ ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
-    --benchmarks=gpqa:8,mmlu-pro:8,scicode:8,math-500:8,aime24:8,aime25:8 \
+    --benchmarks=mmlu-pro:8,scicode:8,math-500:8,aime24:8,aime25:8 \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message=''
+    ++system_message='/think'
 ```
 
-For LiveCodeBench, we additionally specify the exact split on which we evaluate the benchmark. In the following command, we evaluate the model on the Artificial Analysis Index (AAI) split which has 315 problems from the 1 July 2024 to 31 December 2024 subset from release_v5, referred as `test_v5_2407_2412`:
+For GPQA, we use the [generic/general-boxed](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/general-boxed.yaml) prompt which can be specified as follows:
+
+```bash hl_lines="12"
+ns eval \
+    --cluster=local \
+    --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
+    --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
+    --benchmarks=mmlu-pro:8,scicode:8,math-500:8,aime24:8,aime25:8 \
+    --server_type=vllm \
+    --server_gpus=1 \
+    --server_args="--mamba_ssm_cache_dtype float32 " \
+    ++inference.tokens_to_generate=32768 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++system_message='/think' \
+    ++prompt_config=generic/general-boxed
+```
+
+For LiveCodeBench, we evaluate the model on the Artificial Analysis Index (AAI) split which has 315 problems from the 1 July 2024 to 31 December 2024 subset from release_v5, referred to as `test_v5_2407_2412`:
 
 ```bash hl_lines="6"
 ns eval \
@@ -131,10 +158,11 @@ ns eval \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message=''
+    ++system_message='/think'
 ```
 
-#### Command for HLE Eval (Reasoning on)
+
+#### Command for HLE Eval
 
 For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
 
@@ -146,7 +174,7 @@ ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
     --output_dir=/workspace/nvidia_nemotron_nano_9b_v2/ \
-    --benchmarks=hle:16 \
+    --benchmarks=hle:8 \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
@@ -155,7 +183,7 @@ ns eval \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message=''
+    ++system_message='/think'
 ```
 
 !!! note
@@ -165,7 +193,7 @@ ns eval \
     If the OpenAI API throws the `Rate limit exceeded` error, please reduce the `max_concurrent_requests` value in the `extra_judge_args` argument and restart the job.
 
 
-#### Command for BFCL Eval (Reasoning on)
+#### Command for BFCL Eval
 
 Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
 ```bash hl_lines="12-16"
@@ -180,14 +208,14 @@ ns eval \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message='' \
+    ++system_message='/think' \
     ++use_client_parsing=False \
     --server_args="--tool-parser-plugin \"/workspace/NVIDIA-Nemotron-Nano-9B-v2/nemotron_toolcall_parser_no_streaming.py\" \
-                    --tool-call-parser \"llama_nemotron_json\" \
+                    --tool-call-parser \"nemotron_json\" \
                     --enable-auto-tool-choice"
 ```
 
-#### Command for RULER Eval (Reasoning on)
+#### Command for RULER Eval (Reasoning OFF)
 
 For RULER we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
 need to use the data preparation `setup` as part of the benchmark name. Finally it's important not to specify
@@ -202,20 +230,20 @@ ns eval \
     --benchmarks=ruler.nemotron_super_128k \
     --data_dir=/workspace/ns-data \
     --server_gpus=1 \
-    ++inference.temperature=0.6 \
-    ++inference.top_p=0.95 \
-    ++system_message=''
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
 ```
 
-### Reasoning-on Results
+### Results
 
 The eval jobs also launch a dependent job to perform metrics calculation and store the result in a file called `metrics.json`.
-In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/llama_nemotron_49b_1_5/eval-results/aime25/metrics.json`.
+In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/nvidia_nemotron_nano_9b_v2/eval-results/aime25/metrics.json`.
 This metrics calculation is done typically by the `summarize_results` pipeline, except in the case of BFCL where the metrics are calculated by a BFCL specific script because BFCL has a specific way of combining subtask accuracy to obtain the overall accuracy.
 
 To print the results for these benchmarks (except for BFCL), we could rerun the `summarize_results` script manually as follows:
 ```bash
-ns summarize_results --cluster=local /workspace/llama_nemotron_49b_1_5/eval-results/{BENCHMARK}
+ns summarize_results --cluster=local /workspace/nvidia_nemotron_nano_9b_v2/eval-results/{BENCHMARK}
 ```
 
 
@@ -242,7 +270,7 @@ pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.1
 ```
 
 !!!note
-    In our experiments with smaller benchmarks like GPQA, we found significant performance variance across random seeds (performance swings from 53 to 65), and also found the model to be quite prompt-sensitive.
+    When testing on smaller benchmarks like GPQA, we observed significant performance variance -— results varied from 53 to 65 across different random seeds, and the model showed high sensitivity to prompt changes.
 
 !!!note
     The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
@@ -324,5 +352,4 @@ pass@8           | 30          | 19107      | 698         | 90.00%           | 6
 | ruler.nemotron_nano_128k.qa_1            | 60.0     |
 | ruler.nemotron_nano_128k.qa_2            | 41.6     |
 ```
-
 
