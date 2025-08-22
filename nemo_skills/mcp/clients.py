@@ -65,22 +65,7 @@ class MCPStreamableHttpClient:
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                # result.content is a list of content items (e.g., text or json)
-                content = getattr(result, "content", None)
-                if isinstance(content, list) and content:
-                    # Prefer JSON content if present
-                    for item in content:
-                        item_type = getattr(item, "type", None)
-                        if item_type == "json" and hasattr(item, "json"):
-                            return item.json
-                    # Fallback to first text block
-                    for item in content:
-                        if getattr(item, "type", None) == "text" and hasattr(item, "text"):
-                            return item.text
-                    # If unknown structure, return the raw content list as best-effort
-                    return content
-                # If result is already a primitive or dict
-                return result
+                return result.structuredContent
 
 class MCPClientManager:
     def __init__(self):
