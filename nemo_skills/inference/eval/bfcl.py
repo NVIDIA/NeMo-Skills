@@ -20,7 +20,7 @@ from dataclasses import asdict, field
 from functools import partial
 
 import hydra
-import openai
+import litellm
 from omegaconf import OmegaConf
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
@@ -157,16 +157,10 @@ class BFCLGenerationTask(GenerationTask):
         try:
             output = await self.llm.generate_async(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
-        except openai.BadRequestError as e:
+        except litellm.exceptions.ContextWindowExceededError as e:
             error_str = str(e)
-            context_error = "is longer than the model's context length" in error_str
-            token_error = "Requested token count exceeds model's maximum context length" in error_str
-
-            if context_error or token_error:
-                LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
-                return {"message": None, "generation": ""}
-            else:
-                raise
+            LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
+            return {"message": None, "generation": ""}
 
         # Step 3: Parse the generated output. In case of server side parsing, merely getting the response message
         if self.cfg.use_client_parsing:

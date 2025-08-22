@@ -21,6 +21,7 @@ from .base import BaseModel
 
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
+from .gemini import GeminiModel
 from .megatron import MegatronModel
 
 # Online GenSelect
@@ -35,12 +36,13 @@ from .vllm import VLLMModel
 
 # Model registry
 models = {
-    'trtllm': VLLMModel,
-    'megatron': MegatronModel,
-    'openai': OpenAIModel,
-    'azureopenai': AzureOpenAIModel,
-    'vllm': VLLMModel,
-    'sglang': VLLMModel,
+    "trtllm": VLLMModel,
+    "megatron": MegatronModel,
+    "openai": OpenAIModel,
+    "azureopenai": AzureOpenAIModel,
+    "gemini": GeminiModel,
+    "vllm": VLLMModel,
+    "sglang": VLLMModel,
 }
 
 
@@ -70,5 +72,5 @@ def get_online_genselect_model(server_type, online_genselect_config=None, **kwar
 def server_params():
     """Returns server documentation (to include in cmd help)."""
     # TODO: This needs a fix now
-    prefix = f'\n        server_type: str = MISSING - Choices: {list(models.keys())}'
+    prefix = f"\n        server_type: str = MISSING - Choices: {list(models.keys())}"
     return python_doc_to_cmd_help(BaseModel, docs_prefix=prefix, arg_prefix="server.")
