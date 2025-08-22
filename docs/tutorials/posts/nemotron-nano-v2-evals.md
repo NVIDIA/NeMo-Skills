@@ -102,7 +102,7 @@ We evaluate all benchmarks in the reasoning on mode, except for RULER, which is 
 
 
 !!!note
-    The NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers. 
+    The NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers.
     The model requires the latest version of vllm:
     ```
     pip install -U "vllm>=0.10.1"
@@ -224,13 +224,13 @@ ns eval \
 #### Command for RULER Eval (Reasoning OFF)
 
 For RULER, we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
-need to use the data preparation `setup` as part of the benchmark name. 
+need to use the data preparation `setup` as part of the benchmark name.
 
-We also test the model in the reasoning off mode as mentioned above. 
+We also test the model in the reasoning off mode as mentioned above.
 Finally it's important not to specify
 `++inference.tokens_to_generate` as RULER has a fixed value of this parameter for each task.
 
-```bash hl_lines="6-7 10-12" 
+```bash hl_lines="6-7 10-12"
 ns eval \
     --cluster=local \
     --model=/workspace/NVIDIA-Nemotron-Nano-9B-v2 \
@@ -244,6 +244,7 @@ ns eval \
     ++inference.top_p=1.0 \
     ++system_message='/no_think'
 ```
+
 
 ### Results
 
@@ -273,10 +274,10 @@ majority@8       | 12032       | 2534       | 7824        | 76.30%           | 0
 pass@8           | 12032       | 2534       | 7824        | 86.44%           | 0.00%
 
 ------------------------------------------------- hle --------------------------------------
-evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct  
-pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%             
-majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%            
-pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%           
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct
+pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%
+majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%
+pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%
 ```
 
 !!!note
