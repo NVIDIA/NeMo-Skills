@@ -10,9 +10,9 @@ user: |-
   Do not generate more than {total_code_executions} tool calls.
   
   When using python code, you must use the following format:
-  ```python
+  <tool_call>
   # Your Python code here
-  ```
+  </tool_call>
   The output of the code will be displayed in the following format:
   ```output
   # Code execution output will appear here
