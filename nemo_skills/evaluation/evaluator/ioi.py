@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 import multiprocessing
 import os
 import re
-import asyncio
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.file_utils import jdump
@@ -49,47 +49,59 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         grader_files = task_args.get("grader_files", [])
         file_creation_commands = [f"mkdir -p {unique_dir}/graders"]
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/graders/{task_args["problem_id"]}.cpp
 {task_args["generated_code"]}
 _EOT_
-""")
+"""
+        )
 
         for filepath, content in grader_files:
             dir_name = os.path.dirname(filepath)
             if dir_name:
                 file_creation_commands.append(f"mkdir -p {unique_dir}/{dir_name}")
-            file_creation_commands.append(f"""
+            file_creation_commands.append(
+                f"""
 cat <<'_EOT_' > {unique_dir}/{filepath}
 {content}
 _EOT_
-""")
+"""
+            )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/compile.sh
 {task_args["compile_code"]}
 _EOT_
 chmod +x {unique_dir}/compile.sh
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/run.sh
 {task_args["run_code"]}
 _EOT_
 chmod +x {unique_dir}/run.sh
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/input.txt
 {task_args["test_input"]}
 _EOT_
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/correct_output.txt
 {task_args["test_output"]}
 _EOT_
-""")
+"""
+        )
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
@@ -125,10 +137,12 @@ _EOT_
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
 
-        result.update({
-            "run_stdout": run_stdout,
-            "run_stderr": run_stderr,
-        })
+        result.update(
+            {
+                "run_stdout": run_stdout,
+                "run_stderr": run_stderr,
+            }
+        )
 
         try:
             result["score"] = float(result["run_stdout"].strip())
@@ -157,7 +171,7 @@ def extract_final_cpp_block(text):
 
 def add_includes(code: str, problem_id: str) -> str:
     """
-        Fix common compilation errors for IOI problems.
+    Fix common compilation errors for IOI problems.
     """
     if not code:
         return code
@@ -186,8 +200,30 @@ def eval_ioi(cfg):
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg.eval_config)
     sandbox = LocalSandbox()
     batch_size = eval_config.test_batch_size
+
+    # derive split name from first input file to select corresponding metadata file
+    split_name = None
+    if cfg.input_files:
+        from pathlib import Path
+
+        split_name = Path(cfg.input_files[0]).stem
+    if not split_name:
+        split_name = 'test'
+    metadata_filename = f"{split_name}_metadata.json"
+
+    if getattr(cfg, 'data_dir', ''):
+        candidate = os.path.join(cfg.data_dir.rstrip('/'), 'ioi', metadata_filename)
+        eval_config.test_file = candidate
+    else:
+        # Original default path for backward compatibility
+        default_candidate = f"/nemo_run/code/nemo_skills/dataset/ioi/{metadata_filename}"
+        if os.path.exists(default_candidate):
+            eval_config.test_file = default_candidate
+
     if not os.path.exists(eval_config.test_file):
-        raise ValueError(f"Failed to find test cases in eval dataset directory: {eval_config.test_file}")
+        raise ValueError(
+            f"Failed to find test cases file {eval_config.test_file}. Provide --data_dir or valid eval_config.test_file."
+        )
 
     with open(eval_config.test_file) as f:
         metadata = json.load(f)
@@ -227,7 +263,7 @@ def eval_ioi(cfg):
 
                 scores = []
                 for i in range(0, len(test_items), batch_size):
-                    batch = test_items[i:i + batch_size]
+                    batch = test_items[i : i + batch_size]
                     tasks = []
                     for local_idx, (test_name, test_data) in enumerate(batch):
                         task_args = {
@@ -237,7 +273,7 @@ def eval_ioi(cfg):
                             "run_code": entry['run'],
                             "compile_code": entry['compile'],
                             "test_input": test_data['input'],
-                            "test_output": test_data['output']
+                            "test_output": test_data['output'],
                         }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
@@ -257,11 +293,13 @@ def eval_ioi(cfg):
                 effective_score = round(min([score for score in scores]) * subtask_score, subtask_score_precision)
                 test_case_results[subtask] = {"score": effective_score, "outputs": subtask_outputs}
 
-            outputs.append({
-                "name": entry['name'],
-                "subtask": entry['subtask'],
-                "test_case_results": test_case_results,
-            })
+            outputs.append(
+                {
+                    "name": entry['name'],
+                    "subtask": entry['subtask'],
+                    "test_case_results": test_case_results,
+                }
+            )
 
         for s, o in zip(samples, outputs):
             s['test_case_results'] = o['test_case_results']

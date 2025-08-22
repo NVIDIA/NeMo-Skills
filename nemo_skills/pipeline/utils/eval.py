@@ -188,6 +188,9 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
                 is_on_cluster=is_on_cluster,
                 override_dict=override_dict,
             )
+            if data_dir:
+                benchmark_args.eval_args = f"{benchmark_args.eval_args} ++data_dir={data_dir}"
+
             # TODO: should it be optional?
             benchmark_args.score_module = benchmark_or_group_module.SCORE_MODULE
             benchmarks_args.append(benchmark_args)

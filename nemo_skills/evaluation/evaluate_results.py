@@ -54,6 +54,8 @@ class EvaluateResultsConfig:
     # generation key in the jsonl file
     generation_key: str = "generation"
 
+    data_dir: str = ""
+
     def __post_init__(self):
         if isinstance(self.input_files, str):
             self.input_files = self.input_files.split(" ")
