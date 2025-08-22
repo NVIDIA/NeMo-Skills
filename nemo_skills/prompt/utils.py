@@ -215,11 +215,14 @@ class Prompt:
 
         messages = [{"role": "user", "content": ""}]
 
+        chat_template_kwargs = chat_template_kwargs or {}
         user_string = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True, **chat_template_kwargs
         )
 
-        messages.append({"role": "assistant", "content": content, "thinking": thinking})
+        messages.append({"role": "assistant", "content": content})
+        if thinking is not None:
+            messages[-1]["thinking"] = thinking
         assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False, **chat_template_kwargs)
 
         assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
