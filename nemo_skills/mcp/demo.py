@@ -34,12 +34,16 @@ async def run_demo():
     math_client = MCPHttpClient("http://localhost:8001")
     string_client = MCPHttpClient("http://localhost:8002")
     plane_client = MCPStreamableHttpClient("http://localhost:8003/plane/mcp")
-    python_client = MCPStdioClient("python", ["-m", "nemo_skills.mcp.servers.python_tool"])
+    python_client = MCPStdioClient(
+        "python",
+        ["-m", "nemo_skills.mcp.servers.python_tool"],
+        hide_args={'execute': ['session_id', 'timeout']}
+    )
 
     manager = MCPClientManager()
-    # manager.register("math", math_client)
-    # manager.register("string", string_client)
-    # manager.register("plane", plane_client)
+    manager.register("math", math_client)
+    manager.register("string", string_client)
+    manager.register("plane", plane_client)
     manager.register("python", python_client)
 
     tools = await manager.list_all_tools()
@@ -49,7 +53,6 @@ async def run_demo():
     # Define the messages and tools
     messages = [
         {"role": "system", "content": "You are a helpful assistant. You may invoke tools liberally to solve your task."},
-        # {"role": "user", "content": "What is the weather in London and Paris right now?"}
         {"role": "user", "content": (
             "Try an example of each tool available to you. "
             "Carefully inspect the outputs. "
