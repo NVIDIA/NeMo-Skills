@@ -96,14 +96,14 @@ def get_benchmark_args_from_module(
             raise ValueError(
                 f"Data file {unmounted_path} does not exist on cluster. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
     else:
         if not Path(unmounted_path).exists():
             raise ValueError(
                 f"Data file {unmounted_path} does not exist locally. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
 
     # this is deprecated, should remove in the future
