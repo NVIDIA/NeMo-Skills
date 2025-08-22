@@ -1,7 +1,7 @@
 cluster: local
 base_output_dir: /workspace/dsagent_get_num_samples
-expname: gpt4_1
-suffix: gpt4_1
+expname: gpt-oss-120b
+suffix: gpt-oss-120b
 
 
 # Input file for the first stage (generate_solutions)
@@ -47,10 +47,10 @@ stages:
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
     stage_kwargs:
-      model: gpt-4.1 
+      model: nvdev/openai/gpt-oss-120b # gpt-4.1 
       with_sandbox: true
-      server_type: azureopenai
-      server_address: https://prod.api.nvidia.com/llm/v1/azure
+      server_type: openai # azureopenai
+      server_address: https://integrate.api.nvidia.com/v1 # https://prod.api.nvidia.com/llm/v1/azure
       num_random_seeds: ${num_random_seeds_to_generate}
 
   fill_majority_answer:
