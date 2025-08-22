@@ -74,27 +74,27 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         seed_str = "NONE" if seed is None else str(seed)
         chunk_str = "NONE" if chunk_id is None else str(chunk_id)
         check_commands.append(f'if [ ! -f "{unmounted_path}" ]; then echo "MISSING:{seed_str}:{chunk_str}"; fi')
-    
+
     # Process commands in batches to avoid "Argument list too long" error
     # Use a conservative batch size that works well even with long paths
     batch_size = 30  # Very conservative to handle long file paths
-    
+
     outputs = []
     total_files = len(check_commands)
     LOG.info(f"Checking {total_files} files in batches of {batch_size}...")
-    
+
     for i in range(0, len(check_commands), batch_size):
         batch = check_commands[i : i + batch_size]
         batch_num = i // batch_size + 1
         total_batches = (len(check_commands) + batch_size - 1) // batch_size
-        
+
         if total_files > 100:  # Show progress for large file sets
             LOG.info(f"Processing batch {batch_num}/{total_batches}...")
-        
+
         command = f"bash -c '{'; '.join(batch)}'"
-        
+
         try:
-            if cluster_config['executor'] == 'slurm':
+            if cluster_config["executor"] == "slurm":
                 out = get_tunnel(cluster_config).run(command).stdout.strip()
             else:
                 out = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
@@ -106,17 +106,19 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
             for j, cmd in enumerate(batch):
                 single_command = f"bash -c '{cmd}'"
                 try:
-                    if cluster_config['executor'] == 'slurm':
+                    if cluster_config["executor"] == "slurm":
                         out = get_tunnel(cluster_config).run(single_command).stdout.strip()
                     else:
-                        out = subprocess.run(single_command, shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+                        out = subprocess.run(
+                            single_command, shell=True, check=True, stdout=subprocess.PIPE
+                        ).stdout.decode("utf-8")
                     if out:
                         outputs.append(out)
                 except Exception as inner_e:
-                    error_msg = f"Failed to check file {i+j+1}/{total_files}: {inner_e}"
+                    error_msg = f"Failed to check file {i + j + 1}/{total_files}: {inner_e}"
                     LOG.error(error_msg)
                     raise RuntimeError(f"{error_msg}. Unable to determine job status reliably.")
-    
+
     output = "\n".join(outputs)
 
     # Parse results into a mapping of missing jobs
@@ -185,7 +187,7 @@ def get_generation_cmd(
     preprocess_cmd=None,
     postprocess_cmd=None,
     wandb_parameters=None,
-    script: str = 'nemo_skills.inference.generate',
+    script: str = "nemo_skills.inference.generate",
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -259,9 +261,7 @@ def get_generation_cmd(
 
     if eval_args:
         cmd += (
-            f" && python -m nemo_skills.evaluation.evaluate_results "
-            f"    ++input_files={output_file} "
-            f"    {eval_args} "
+            f" && python -m nemo_skills.evaluation.evaluate_results     ++input_files={output_file}     {eval_args} "
         )
 
     return wrap_cmd(
@@ -289,7 +289,7 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_param
             f"    --name={wandb_parameters['name']} "
             f"    --project={wandb_parameters['project']} "
         )
-        if wandb_parameters['group'] is not None:
+        if wandb_parameters["group"] is not None:
             log_wandb_cmd += f" --group={wandb_parameters['group']} "
         cmd = f"{cmd} && {log_wandb_cmd} "
     return cmd
@@ -327,7 +327,7 @@ def configure_client(
             - server_address: Address of the server.
             - extra_arguments: Updated extra arguments for the command.
     """
-    if server_address is None:  # we need to host the model
+    if server_gpus:  # we need to host the model
         server_port = get_free_port(strategy="random") if get_random_port else 5000
         assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
         server_address = f"localhost:{server_port}"
