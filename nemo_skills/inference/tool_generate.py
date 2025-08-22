@@ -15,7 +15,6 @@ from nemo_skills.inference.generate import (
     GenerateSolutionsConfig,
     GenerationTask,
     InferenceConfig,
-    combine_stop_phrases,
 )
 from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
@@ -29,8 +28,6 @@ class ToolGenerationConfig(GenerateSolutionsConfig):
     """HuggingFace model ID, or path to tokenizer model folder"""
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)
-
-    extra_stop_phrases: list = field(default_factory=lambda: ["<|call|>", "<|return|>"])
 
     prompt_config: Optional[str] = field(default=None)
 
@@ -184,10 +181,7 @@ class ToolGenerationTask(GenerationTask):
         generation_params = {
             **asdict(self.cfg.inference),
             **self.extra_generate_params,
-            "stop_phrases": combine_stop_phrases(
-                self.prompt.stop_phrases if self.prompt is not None else None,
-                self.extra_stop_phrases,
-            ),
+            "stop_phrases": ["<|call|>", "<|return|>"],
             "include_response": True,
             "remove_stop_phrases": False,
         }
