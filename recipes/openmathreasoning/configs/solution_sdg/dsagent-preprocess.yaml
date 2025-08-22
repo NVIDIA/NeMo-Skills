@@ -48,7 +48,7 @@ stages:
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
     stage_kwargs:
-      model: gpt-5-chat-latest 
+      model: gpt-5-chat 
       with_sandbox: true
       server_type: azureopenai
       server_address: https://prod.api.nvidia.com/llm/v1/azure
