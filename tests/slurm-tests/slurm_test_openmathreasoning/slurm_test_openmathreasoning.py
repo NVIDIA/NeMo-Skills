@@ -58,10 +58,8 @@ def main():
     #    This downloads the checker into the workspace and runs it there.
 
     checker = (
-        f"cd {args.workspace} && "
-        f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA/NeMo-Skills/refs/heads/main/tests && "
-        f"wget $DOWNLOAD_PREFIX/slurm-tests/NeMo-Skills/tests/slurm-tests/slurm_test_openmathreasoning/check_sft_results.py && "
-        f"python check_sft_results.py --workspace {args.workspace}"
+        f"cd /nemo-run/code/tests/slurm-tests/slurm_test_openmathreasoning && "
+        f"python check_sft_results.py --workspace {args.workspace} "
     )
 
     run_cmd(
