@@ -39,9 +39,19 @@ async def run_demo():
 
     # Define the messages and tools
     messages = [
-        {"role": "system", "content": "You are a helpful assistant. You may invoke tools when required."},
+        {"role": "system", "content": "You are a helpful assistant. You may invoke tools liberally to solve your task."},
         # {"role": "user", "content": "What is the weather in London and Paris right now?"}
-        {"role": "user", "content": "Try an example of each tool available to you. Carefully inspect the outputs. Then, explain the outputs and whether they are correct or not."}
+        {"role": "user", "content": (
+            "Try an example of each tool available to you. "
+            "Carefully inspect the outputs. "
+            "Then, explain the outputs and whether they are correct or not. "
+            "If they are incorrect, you must try a few more rounds of tool "
+            "calls to establish a pattern to the incorrectness."
+            "You will fail the task if you fail to make extra rounds of tool calls to "
+            "establish the issue with incorrect functions."
+            # " \\think"
+            ),
+        }
     ]
 
     # tools = [
@@ -69,8 +79,8 @@ async def run_demo():
         response = model.generate_sync(
             prompt=messages,
             tools=tools,
-            temperature=0.0,
-            tokens_to_generate=512
+            temperature=0.6,
+            tokens_to_generate=4096
         )
 
         print("Generated response:")
@@ -78,6 +88,9 @@ async def run_demo():
 
         # Append assistant message (including tool_calls if present) to the conversation
         assistant_msg = {"role": "assistant", "content": response["generation"]}
+        if "reasoning_content" in response:
+            # You can choose to prepend or append it
+            assistant_msg["content"] = response["reasoning_content"] + assistant_msg["content"]
         if "tool_calls" in response:
             assistant_msg["tool_calls"] = response["tool_calls"]
         messages.append(assistant_msg)

@@ -13,6 +13,8 @@
 # limitations under the License.
 import aiohttp
 from typing import Dict, Any, List
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 
 class MCPHttpClient:
     def __init__(self, base_url: str):
@@ -21,15 +23,64 @@ class MCPHttpClient:
 
     async def list_tools(self):
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{self.base_url}/tools") as resp:
+            async with session.get(f"{self.base_url}/list_tools") as resp:
                 self.tools = await resp.json()
                 return self.tools
 
     async def call_tool(self, tool: str, args: dict) -> Any:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.base_url}/call", json={"tool": tool, "args": args}) as resp:
+            async with session.post(f"{self.base_url}/call_tool", json={"tool": tool, "args": args}) as resp:
                 return await resp.json()
 
+
+class MCPStreamableHttpClient:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.tools: List[Dict[str, Any]] = []
+
+    async def list_tools(self):
+        async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                tools_resp = await session.list_tools()
+                tools_list: List[Dict[str, Any]] = []
+                # tools_resp.tools is expected to be a list of Tool objects
+                for t in getattr(tools_resp, "tools", []) or []:
+                    # Support both input_schema (python) and inputSchema (wire)
+                    input_schema = getattr(t, "input_schema", None)
+                    if input_schema is None:
+                        input_schema = getattr(t, "inputSchema", None)
+                    tools_list.append(
+                        {
+                            "name": getattr(t, "name", None),
+                            "description": getattr(t, "description", ""),
+                            "input_schema": input_schema,
+                        }
+                    )
+                self.tools = tools_list
+                return self.tools
+
+    async def call_tool(self, tool: str, args: dict) -> Any:
+        async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(tool, arguments=args)
+                # result.content is a list of content items (e.g., text or json)
+                content = getattr(result, "content", None)
+                if isinstance(content, list) and content:
+                    # Prefer JSON content if present
+                    for item in content:
+                        item_type = getattr(item, "type", None)
+                        if item_type == "json" and hasattr(item, "json"):
+                            return item.json
+                    # Fallback to first text block
+                    for item in content:
+                        if getattr(item, "type", None) == "text" and hasattr(item, "text"):
+                            return item.text
+                    # If unknown structure, return the raw content list as best-effort
+                    return content
+                # If result is already a primitive or dict
+                return result
 
 class MCPClientManager:
     def __init__(self):

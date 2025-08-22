@@ -39,11 +39,11 @@ class ToolCallRequest(BaseModel):
     tool: str
     args: Dict[str, Any]
 
-@app.get("/tools")
+@app.get("/list_tools")
 async def list_tools():
     return [{"server": "string", "name": name, **meta} for name, meta in TOOLS.items()]
 
-@app.post("/call")
+@app.post("/call_tool")
 async def call_tool(request: ToolCallRequest):
     tool_name = request.tool
     args = request.args
