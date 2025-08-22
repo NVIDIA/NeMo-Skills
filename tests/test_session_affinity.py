@@ -16,6 +16,7 @@
 Pytest-compatible session affinity tests for the multi-worker sandbox server.
 Tests verify that session state persists across requests and that session routing works correctly.
 """
+
 import json
 import random
 import threading
@@ -36,7 +37,7 @@ class SessionAffinityTester:
         self.base_url = base_url
         self.lock = threading.Lock()
 
-    def execute_code(self, code, session_id, timeout=30, language='ipython'):
+    def execute_code(self, code, session_id, timeout=30, language="ipython"):
         """Execute code with session and return result with timing info"""
         start_time = time.time()
         try:
@@ -77,8 +78,8 @@ class SessionAffinityTester:
                     "timestamp": end_time,
                 }
 
-            result['response_time'] = end_time - start_time
-            result['timestamp'] = end_time
+            result["response_time"] = end_time - start_time
+            result["timestamp"] = end_time
 
             return result
 
@@ -101,9 +102,9 @@ class SessionAffinityTester:
 print(f'Session {session_suffix} initialized')"""
 
         result = self.execute_code(init_code, session_id)
-        operations.append(('init', result))
+        operations.append(("init", result))
 
-        if result['process_status'] != 'completed':
+        if result["process_status"] != "completed":
             return operations, False, "Session initialization failed"
 
         # 2. Add imports that should persist
@@ -111,9 +112,9 @@ print(f'Session {session_suffix} initialized')"""
 import math
 print('Imports added')"""
         result = self.execute_code(import_code, session_id)
-        operations.append(('import', result))
+        operations.append(("import", result))
 
-        if result['process_status'] != 'completed':
+        if result["process_status"] != "completed":
             return operations, False, "Import failed"
 
         # 3. Define a function that should persist
@@ -123,9 +124,9 @@ print('Imports added')"""
 print(f'Function defined for session {session_suffix}')"""
 
         result = self.execute_code(func_code, session_id)
-        operations.append(('func_def', result))
+        operations.append(("func_def", result))
 
-        if result['process_status'] != 'completed':
+        if result["process_status"] != "completed":
             return operations, False, "Function definition failed"
 
         # 4. Test operations using persistent state
@@ -161,19 +162,19 @@ except Exception as e:
     raise e"""
 
             result = self.execute_code(test_code, session_id)
-            operations.append((f'op_{operation_num}', result))
+            operations.append((f"op_{operation_num}", result))
 
             # Check for session miss
             if (
-                'SESSION MISS DETECTED' in result.get('stdout', '')
-                or 'NameError' in result.get('stderr', '')
-                or result.get('process_status') != 'completed'
+                "SESSION MISS DETECTED" in result.get("stdout", "")
+                or "NameError" in result.get("stderr", "")
+                or result.get("process_status") != "completed"
             ):
                 return operations, False, f"Session miss in operation {operation_num}"
 
         return operations, True, "All operations successful"
 
-    def get_worker_info(self, session_id=None, language='ipython'):
+    def get_worker_info(self, session_id=None, language="ipython"):
         """Get worker info by executing code that reveals worker details"""
         code = """
 import os
@@ -190,37 +191,37 @@ print(f"WORKER_INFO: port={worker_port}, num={worker_num}, pid={process_id}")
         result = self.execute_code(code, session_id, language=language)  # Will use headers via execute_code
 
         # For session requests, we get JSON response with stdout
-        if result.get('process_status') == 'completed':
-            stdout = result.get('stdout', '')
-            if 'WORKER_INFO:' in stdout:
-                info_line = [line for line in stdout.split('\n') if 'WORKER_INFO:' in line][0]
+        if result.get("process_status") == "completed":
+            stdout = result.get("stdout", "")
+            if "WORKER_INFO:" in stdout:
+                info_line = [line for line in stdout.split("\n") if "WORKER_INFO:" in line][0]
                 # Parse: port=6001, num=1, pid=12345
-                parts = info_line.replace('WORKER_INFO: ', '').split(', ')
+                parts = info_line.replace("WORKER_INFO: ", "").split(", ")
                 info = {}
                 for part in parts:
-                    if '=' in part:
-                        key, value = part.split('=', 1)
+                    if "=" in part:
+                        key, value = part.split("=", 1)
                         info[key] = value
                 return info
 
         # For non-session requests (session_id=None), we get HTML response as json_error
-        elif result.get('process_status') == 'json_error':
+        elif result.get("process_status") == "json_error":
             # Extract worker info from HTML body in stderr message
-            stderr = result.get('stderr', '')
-            if 'Body:' in stderr and 'WORKER_INFO:' in stderr:
+            stderr = result.get("stderr", "")
+            if "Body:" in stderr and "WORKER_INFO:" in stderr:
                 # Extract the body content: "Body: 'WORKER_INFO: port=6047, num=47, pid=4075\n'"
                 body_start = stderr.find("Body: '") + len("Body: '")
                 body_end = stderr.find("'", body_start)
                 if body_start > len("Body: '") - 1 and body_end > body_start:
                     body_content = stderr[body_start:body_end]
-                    if 'WORKER_INFO:' in body_content:
-                        info_line = [line for line in body_content.split('\n') if 'WORKER_INFO:' in line][0]
+                    if "WORKER_INFO:" in body_content:
+                        info_line = [line for line in body_content.split("\n") if "WORKER_INFO:" in line][0]
                         # Parse: port=6001, num=1, pid=12345
-                        parts = info_line.replace('WORKER_INFO: ', '').split(', ')
+                        parts = info_line.replace("WORKER_INFO: ", "").split(", ")
                         info = {}
                         for part in parts:
-                            if '=' in part:
-                                key, value = part.split('=', 1)
+                            if "=" in part:
+                                key, value = part.split("=", 1)
                                 info[key] = value
                         return info
         return None
@@ -280,9 +281,9 @@ class TestSessionAffinity:
 
         # Verify all operations completed successfully
         for op_name, result in operations:
-            assert (
-                result['process_status'] == 'completed'
-            ), f"Operation {op_name} failed: {result.get('stderr', 'Unknown error')}"
+            assert result["process_status"] == "completed", (
+                f"Operation {op_name} failed: {result.get('stderr', 'Unknown error')}"
+            )
 
     @pytest.mark.parametrize("num_operations", [3, 5, 8])
     def test_session_persistence_various_lengths(self, tester, server_health_check, num_operations):
@@ -330,14 +331,14 @@ class TestSessionAffinity:
 
         for i in range(num_requests):
             worker_info = tester.get_worker_info(session_id)
-            if worker_info and 'port' in worker_info:
-                workers_hit.add(worker_info['port'])
+            if worker_info and "port" in worker_info:
+                workers_hit.add(worker_info["port"])
             time.sleep(0.1)  # Small delay between requests
 
         # All requests with same session_id should hit the same worker
-        assert (
-            len(workers_hit) == 1
-        ), f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
+        assert len(workers_hit) == 1, (
+            f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
+        )
 
     def test_session_persistence_large_payload(self, tester, server_health_check):
         """Test session persistence with large payloads exceeding nginx body buffer"""
@@ -345,18 +346,18 @@ class TestSessionAffinity:
         session_id = f"test_large_payload_{uuid.uuid4()}"
 
         # Generate large code string (>128KB)
-        large_var = 'x' * (LARGE_PAYLOAD_SIZE // 2)  # Roughly half size for string
+        large_var = "x" * (LARGE_PAYLOAD_SIZE // 2)  # Roughly half size for string
         init_code = f"""
 large_var = '{large_var}'
 print('Large variable initialized')
 """
 
         result = tester.execute_code(init_code, session_id)
-        assert result['process_status'] == 'completed', "Failed to initialize large variable"
-        assert 'Large variable initialized' in result['stdout']
+        assert result["process_status"] == "completed", "Failed to initialize large variable"
+        assert "Large variable initialized" in result["stdout"]
 
         # Second request: use the large variable and add more data
-        large_addition = 'y' * (LARGE_PAYLOAD_SIZE // 2)
+        large_addition = "y" * (LARGE_PAYLOAD_SIZE // 2)
         use_code = f"""
 try:
     combined = large_var + '{large_addition}'
@@ -367,9 +368,9 @@ except NameError:
 """
 
         result = tester.execute_code(use_code, session_id)
-        assert result['process_status'] == 'completed', "Failed to use large variable"
-        assert 'Large payload test successful' in result['stdout']
-        assert 'SESSION MISS' not in result['stdout']
+        assert result["process_status"] == "completed", "Failed to use large variable"
+        assert "Large payload test successful" in result["stdout"]
+        assert "SESSION MISS" not in result["stdout"]
 
     def test_multiple_large_payloads_concurrent(self, tester, server_health_check):
         """Test concurrent sessions with large payloads"""
@@ -379,7 +380,7 @@ except NameError:
         def test_large_session(i):
             session_id = f"concurrent_large_{i}_{uuid.uuid4()}"
 
-            large_var = 'z' * LARGE_PAYLOAD_SIZE
+            large_var = "z" * LARGE_PAYLOAD_SIZE
             code1 = f"large_var = '{large_var}'; print('Initialized')"
             res1 = tester.execute_code(code1, session_id)
 
@@ -387,9 +388,9 @@ except NameError:
             res2 = tester.execute_code(code2, session_id)
 
             return (
-                res1['process_status'] == 'completed'
-                and res2['process_status'] == 'completed'
-                and str(LARGE_PAYLOAD_SIZE) in res2['stdout']
+                res1["process_status"] == "completed"
+                and res2["process_status"] == "completed"
+                and str(LARGE_PAYLOAD_SIZE) in res2["stdout"]
             )
 
         with ThreadPoolExecutor(max_workers=num_sessions) as executor:
@@ -405,8 +406,8 @@ except NameError:
         for i in range(num_sessions):
             session_id = f"test_distribution_{i}_{int(time.time())}"
             worker_info = tester.get_worker_info(session_id)
-            if worker_info and 'port' in worker_info:
-                workers_hit.add(worker_info['port'])
+            if worker_info and "port" in worker_info:
+                workers_hit.add(worker_info["port"])
 
         # We should see some distribution across workers (unless there's only 1 worker)
         # This test might pass even with 1 worker, which is okay
@@ -418,9 +419,9 @@ except NameError:
         num_requests = 20
 
         for i in range(num_requests):
-            worker_info = tester.get_worker_info(session_id=None, language='python')  # No session_id
-            if worker_info and 'port' in worker_info:
-                workers_hit.add(worker_info['port'])
+            worker_info = tester.get_worker_info(session_id=None, language="python")  # No session_id
+            if worker_info and "port" in worker_info:
+                workers_hit.add(worker_info["port"])
             time.sleep(0.05)
 
         # Without session affinity, we should see some distribution
@@ -462,16 +463,16 @@ except NameError:
                 session_misses += 1
 
         # Assert no session misses (critical for session affinity)
-        assert (
-            session_misses == 0
-        ), f"Session affinity failure: {session_misses} session misses detected in {session_config['name']}"
+        assert session_misses == 0, (
+            f"Session affinity failure: {session_misses} session misses detected in {session_config['name']}"
+        )
 
         # Assert reasonable success rate (allowing for some other types of failures)
         success_rate = successful_sessions / num_sessions
         assert success_rate >= 1.0, f"Success rate too low for {session_config['name']}: {success_rate:.1%}"
 
         print(
-            f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time-start_time:.1f}s"
+            f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time - start_time:.1f}s"
         )
 
     def test_session_cleanup_endpoint(self, tester, server_health_check):
@@ -480,12 +481,12 @@ except NameError:
 
         # Create a session by executing some code
         result = tester.execute_code("test_var = 'cleanup_test'", session_id)
-        assert result['process_status'] == 'completed'
+        assert result["process_status"] == "completed"
 
         # Verify session exists by using the variable
         result = tester.execute_code("print(test_var)", session_id)
-        assert result['process_status'] == 'completed'
-        assert 'cleanup_test' in result.get('stdout', '')
+        assert result["process_status"] == "completed"
+        assert "cleanup_test" in result.get("stdout", "")
 
         # Delete the session - include session_id in header for proper routing
         delete_response = requests.delete(f"{BASE_URL}/sessions/{session_id}", headers={"X-Session-ID": session_id})
@@ -494,7 +495,7 @@ except NameError:
         # Verify session is gone (this should fail with NameError)
         result = tester.execute_code("print(test_var)", session_id)
         # Note: After deletion, a new session will be created, so test_var won't exist
-        assert 'NameError' in result.get('stderr', '') or result['process_status'] == 'error'
+        assert "NameError" in result.get("stderr", "") or result["process_status"] == "error"
 
     def test_session_list_endpoint(self, server_health_check):
         """Test that we can list active sessions"""
@@ -539,19 +540,19 @@ except NameError:
         for _ in range(num_requests):
             resp = requests.get(f"{BASE_URL}/health")
             assert resp.status_code == 200
-            workers.append(resp.json()['worker'])
+            workers.append(resp.json()["worker"])
         unique_workers = set(workers)
         assert len(unique_workers) > 1, f"All requests went to the same worker: {unique_workers}"
         counts = Counter(workers)
 
         # Check for and identify the full range of active workers
-        int_keys = sorted(int(k) for k in counts if k != 'unknown')
+        int_keys = sorted(int(k) for k in counts if k != "unknown")
         min_key = min(int_keys)
         max_key = max(int_keys)
         expected_keys = list(range(min_key, max_key + 1))
-        assert len(int_keys) == len(
-            expected_keys
-        ), f"Gaps in worker numbers: missing {set(expected_keys) - set(int_keys)}"
+        assert len(int_keys) == len(expected_keys), (
+            f"Gaps in worker numbers: missing {set(expected_keys) - set(int_keys)}"
+        )
 
         # Chi-Squared Goodness-of-Fit Test
         num_workers = len(expected_keys)

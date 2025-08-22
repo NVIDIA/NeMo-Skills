@@ -45,7 +45,7 @@ def extract_proof_only(lean_code: str) -> str:
     if not lines:
         return ""
 
-    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_pattern = re.compile(r"^\s*(theorem|example)\b")
     header_start_idx = None
 
     # 1. Find where the theorem starts
@@ -125,10 +125,10 @@ class Sandbox(abc.ABC):
         await self.http_session.aclose()
 
     async def _send_request(self, request, timeout):
-        session_id = request.pop('session_id', None)
+        session_id = request.pop("session_id", None)
         extra_headers = {}
         if session_id is not None:
-            extra_headers['X-Session-ID'] = str(session_id)
+            extra_headers["X-Session-ID"] = str(session_id)
 
         if self.ssh_server and self.ssh_key_path:
             # For SSH tunneling, use threads since there's no async version
@@ -171,10 +171,10 @@ class Sandbox(abc.ABC):
         self,
         generated_code,
         timeout,
-        language='ipython',
+        language="ipython",
         std_input="",
         max_output_characters=1000,
-        traceback_verbosity='Plain',
+        traceback_verbosity="Plain",
     ):
         pass
 
@@ -187,11 +187,11 @@ class Sandbox(abc.ABC):
         self,
         generated_code: str,
         std_input: str = "",
-        language: str = 'ipython',
+        language: str = "ipython",
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
-        traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
+        traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
         if language in ["python", "pypy3", "python3", "lean4"] and session_id is not None:
@@ -211,7 +211,7 @@ class Sandbox(abc.ABC):
         request = self._prepare_request(
             TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
         )
-        request['session_id'] = request_session_id if request_session_id is None else str(request_session_id)
+        request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
@@ -221,18 +221,18 @@ class Sandbox(abc.ABC):
         # Rebuild state by executing concatenated history
         if session_id is not None and new_session_created:
             history = self.session_histories.get(session_id, [])
-            combined_code = '\n'.join(history) + ('\n' if history else '') + generated_code
+            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
             request = self._prepare_request(
                 combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
             )
-            request['session_id'] = request_session_id if request_session_id is None else str(request_session_id)
+            request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
             try:
                 output = await self._send_request(request, timeout)
             except httpx.TimeoutException:
                 output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
         # Append to history if successful execution (process_status == 'completed')
-        if output.get('process_status') == 'completed':
+        if output.get("process_status") == "completed":
             self.session_histories[request_session_id].append(generated_code)
 
         return output, request_session_id
@@ -245,8 +245,8 @@ class Sandbox(abc.ABC):
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             return "timeout"
-        if output['process_status'] == 'completed' and output['stdout'] != '':
-            return 'has_sorry'
+        if output["process_status"] == "completed" and output["stdout"] != "":
+            return "has_sorry"
         return output["process_status"]
 
     async def batch_evaluate_results(
@@ -279,7 +279,7 @@ class Sandbox(abc.ABC):
                     generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
                     line_dict["predicted_proof"] = (
                         line_dict["header"]
-                        + (line_dict["formal_statement"] if restate_formal_statement else '')
+                        + (line_dict["formal_statement"] if restate_formal_statement else "")
                         + extract_proof_only(generation)
                         if strip_theorem_from_proof
                         else generation
@@ -302,7 +302,7 @@ class Sandbox(abc.ABC):
                             "Set use_predicted_proof_key=False to re-combine"
                         )
             else:
-                raise ValueError(f'Unknown answer_format: {answer_format}')
+                raise ValueError(f"Unknown answer_format: {answer_format}")
 
             # Evaluate proof with concurrency control
             async with semaphore:
@@ -321,7 +321,7 @@ class Sandbox(abc.ABC):
             print(f"Processing {input_file}...")
             processed_lines = []
             for line in tqdm.tqdm(lines):
-                result = await process_line(line.rstrip('\n'))
+                result = await process_line(line.rstrip("\n"))
                 processed_lines.append(result)
 
             # Write to temp file then replace original
@@ -345,16 +345,16 @@ class LocalSandbox(Sandbox):
             return output.json()
         except json.JSONDecodeError:
             LOG.error("Error during parsing output: %s", output.text)
-            return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
+            return {"process_status": "error", "stdout": "", "stderr": "Unknown error"}
 
     def _prepare_request(
         self,
         generated_code,
         timeout,
-        language='ipython',
+        language="ipython",
         std_input="",
         max_output_characters=1000,
-        traceback_verbosity='Plain',
+        traceback_verbosity="Plain",
     ):
         return {
             "generated_code": generated_code,
@@ -412,7 +412,7 @@ class LocalSandbox(Sandbox):
 
 
 sandboxes = {
-    'local': LocalSandbox,
+    "local": LocalSandbox,
 }
 
 
@@ -424,5 +424,5 @@ def get_sandbox(sandbox_type: str = "local", **kwargs):
 
 def sandbox_params():
     """Returns sandbox documentation (to include in cmd help)."""
-    prefix = f'\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}'
+    prefix = f"\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}"
     return python_doc_to_cmd_help(Sandbox, docs_prefix=prefix, arg_prefix="sandbox.")
