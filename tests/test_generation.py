@@ -43,13 +43,11 @@ def test_eval_gsm8k_api(tmp_path):
     )
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+    metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
         [f"{tmp_path}/eval-results/gsm8k/output.jsonl"],
-    )[
-        "_all_"
-    ]["pass@1"]
+    )["_all_"]["pass@1"]
 
-    assert metrics['symbolic_correct'] >= 80
+    assert metrics["symbolic_correct"] >= 80
 
 
 def test_fail_on_api_key_env_var(tmp_path):
@@ -96,13 +94,11 @@ def test_succeed_on_api_key_env_var(tmp_path):
     )
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark='gsm8k').compute_metrics(
+    metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
         [f"{tmp_path}/eval-results/gsm8k/output.jsonl"],
-    )[
-        "_all_"
-    ]["pass@1"]
+    )["_all_"]["pass@1"]
 
-    assert metrics['symbolic_correct'] >= 80
+    assert metrics["symbolic_correct"] >= 80
 
 
 @pytest.mark.parametrize("format", ["list", "dict"])
@@ -123,5 +119,5 @@ def test_generate_openai_format(tmp_path, format):
     with open(f"{tmp_path}/output.jsonl") as fin:
         data = [json.loads(line) for line in fin.readlines()]
     assert len(data) == 2
-    assert len(data[0]['generation']) > 0
-    assert len(data[1]['generation']) > 0
+    assert len(data[0]["generation"]) > 0
+    assert len(data[1]["generation"]) > 0

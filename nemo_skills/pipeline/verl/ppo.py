@@ -52,11 +52,11 @@ class PPOVerlTask:
 
     def format_train_args(self):
         verl_config = (
-            ''
+            ""
             if ((self.verl_config_dir is None) and (self.verl_config_name is None))
             else f" --config-path {self.verl_config_dir} --config-name {self.verl_config_name} "
         )
-        if verl_config == '':
+        if verl_config == "":
             cmd = (
                 "   algorithm.adv_estimator=grpo "
                 "   data.train_batch_size=128 "
@@ -117,7 +117,7 @@ class PPOVerlTask:
         return cmd
 
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
-        cmd = f" trainer.project_name='{wandb_project}' " f" trainer.experiment_name='{expname}' "
+        cmd = f" trainer.project_name='{wandb_project}'  trainer.experiment_name='{expname}' "
 
         if disable_wandb:
             cmd = f"{cmd} trainer.logger=['console'] "
@@ -146,7 +146,6 @@ class PPOVerlTask:
         return ray_job_cmd
 
     def get_cmd(self):
-
         self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
         preamble_cmd = self.get_preamble_cmd()
 
@@ -221,7 +220,7 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
 
 
-@verl_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@verl_app.command(name="ppo", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def ppo_verl(
     ctx: typer.Context,
@@ -307,7 +306,7 @@ def ppo_verl(
 ):
     """Runs Verl PPO training (verl.trainer.main_ppo)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -330,8 +329,8 @@ def ppo_verl(
             pipeline_utils.check_if_mounted(cluster_config, prompt_data)
 
     # Check if custom PPOVerlTask is provided via ctx.obj['ppo_task'], use that if available
-    if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
-        ppo_task = ctx.obj['ppo_task']  # type: type(PPOVerlTask)
+    if hasattr(ctx, "obj") and ctx.obj is not None and isinstance(ctx.obj, dict) and "ppo_task" in ctx.obj:
+        ppo_task = ctx.obj["ppo_task"]  # type: type(PPOVerlTask)
         assert isinstance(ppo_task, PPOVerlTask), "`ppo_task` must be a subclass of PPOVerlTask"
     else:
         ppo_task = None
@@ -396,11 +395,11 @@ def ppo_verl(
                 hf_input = f"{actor_dir}/huggingface"
                 cp_last_ckpt_cmd = f'cp -r "{hf_input}" "{final_ckpt_path}"/'
 
-                train_cmd = f'{train_cmd} && {convert_cmd} && {cp_last_ckpt_cmd}'
+                train_cmd = f"{train_cmd} && {convert_cmd} && {cp_last_ckpt_cmd}"
             prev_task = pipeline_utils.add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-ppo-{job_id}',
+                task_name=f"{expname}-ppo-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["verl"],
                 num_gpus=num_gpus,

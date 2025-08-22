@@ -172,7 +172,7 @@ def get_training_cmd(
 
 def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
     if not disable_wandb:
-        if os.getenv('WANDB_API_KEY') is None:
+        if os.getenv("WANDB_API_KEY") is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
         wandb_id = expname + ("-" + wandb_group if wandb_group else "") + "-" + wandb_project
         logging_params = (
@@ -191,9 +191,9 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
 
 def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
     if average_steps is not None:
-        average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else ''
+        average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != "all" else ""
         entrypoint = "nemo_skills.training.average_checkpoints"
-        name = "model" + ("-".join(average_steps[len('--steps ') :].split()) if average_steps else '') + "-averaged"
+        name = "model" + ("-".join(average_steps[len("--steps ") :].split()) if average_steps else "") + "-averaged"
     else:
         entrypoint = "nemo_skills.training.copy_checkpoint"
         name = "model-last"
@@ -233,7 +233,7 @@ def train(
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
-    config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
+    config_path: str = typer.Option("/nemo_run/code/nemo_skills/training/", help="Config path"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -241,9 +241,8 @@ def train(
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
-        'all',
-        help="List of commas separated checkpoint steps to average. E.g 1000,5000. "
-        "If None, skip prepare eval stage.",
+        "all",
+        help="List of commas separated checkpoint steps to average. E.g 1000,5000. If None, skip prepare eval stage.",
     ),
     save_last_ckpt: bool = typer.Option(
         False,
@@ -291,7 +290,7 @@ def train(
     (need to be prefixed with ++, since NeMo uses Hydra).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -358,7 +357,7 @@ def train(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-{training_algo}-{job_id}',
+                task_name=f"{expname}-{training_algo}-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=container,
                 num_gpus=num_gpus,
@@ -390,7 +389,7 @@ def train(
                 cmd=cmd,
                 task_name=f"{expname}-prepare-eval",
                 log_dir=f"{log_dir}/prepare-eval-logs",
-                container=cluster_config["containers"]['nemo'],
+                container=cluster_config["containers"]["nemo"],
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,

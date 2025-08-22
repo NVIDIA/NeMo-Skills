@@ -110,7 +110,7 @@ def run_cmd(
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
 
     # Assert that either command or extra_arguments is provided, not both
     if command and extra_arguments:

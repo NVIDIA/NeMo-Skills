@@ -158,11 +158,7 @@ def get_training_cmd(
 
 
 def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export UV_PROJECT=/opt/NeMo-RL && "
-        f"cd /nemo_run/code && "
-    )
+    cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
     if backend == "fsdp":
         cmd += "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
     elif backend == "megatron":
@@ -179,7 +175,7 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     return cmd
 
 
-@nemo_rl_app.command(name='grpo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@nemo_rl_app.command(name="grpo", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def grpo_nemo_rl(
     ctx: typer.Context,
@@ -216,7 +212,9 @@ def grpo_nemo_rl(
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
-        ..., "--backend", help="Choose backend. Supported options: fsdp, megatron"  # Required
+        ...,
+        "--backend",
+        help="Choose backend. Supported options: fsdp, megatron",  # Required
     ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -267,7 +265,7 @@ def grpo_nemo_rl(
     All extra arguments are passed directly to the NeMo-RL GRPO script.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -331,7 +329,7 @@ def grpo_nemo_rl(
                 prev_task = add_task(
                     exp,
                     cmd=train_cmd,
-                    task_name=f'{expname}-grpo-{job_id}',
+                    task_name=f"{expname}-grpo-{job_id}",
                     log_dir=f"{log_dir}/training-logs",
                     container=cluster_config["containers"]["nemo-rl"],
                     num_gpus=num_gpus,
@@ -362,7 +360,7 @@ def grpo_nemo_rl(
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",
-            container=cluster_config["containers"]['nemo-rl'],
+            container=cluster_config["containers"]["nemo-rl"],
             cluster_config=cluster_config,
             partition=partition,
             time_min=time_min,

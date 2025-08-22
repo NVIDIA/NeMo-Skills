@@ -45,19 +45,19 @@ class TrainingParams:
 
 def get_torchrun_cmd(cluster_config, params: TrainingParams):
     format_dict = {}
-    if cluster_config['executor'] != 'slurm':
+    if cluster_config["executor"] != "slurm":
         assert params.num_nodes == 1, "Local executor only supports single node training"
-        format_dict['nnodes'] = 1
-        format_dict['nproc_per_node'] = params.num_gpus
-        format_dict['node_rank'] = 0
-        format_dict['master_addr'] = "localhost"
+        format_dict["nnodes"] = 1
+        format_dict["nproc_per_node"] = params.num_gpus
+        format_dict["node_rank"] = 0
+        format_dict["master_addr"] = "localhost"
     else:
-        format_dict['nnodes'] = params.num_nodes
-        format_dict['nproc_per_node'] = params.num_gpus
-        format_dict['node_rank'] = "$SLURM_PROCID"
-        format_dict['master_addr'] = "$SLURM_MASTER_NODE"
+        format_dict["nnodes"] = params.num_nodes
+        format_dict["nproc_per_node"] = params.num_gpus
+        format_dict["node_rank"] = "$SLURM_PROCID"
+        format_dict["master_addr"] = "$SLURM_MASTER_NODE"
 
-    format_dict['master_port'] = 9901
+    format_dict["master_port"] = 9901
 
     cmd = (
         "torchrun --nproc_per_node {nproc_per_node} --nnodes {nnodes} --node-rank {node_rank} "
@@ -67,7 +67,6 @@ def get_torchrun_cmd(cluster_config, params: TrainingParams):
 
 
 def format_train_args(cluster_config, params: TrainingParams):
-
     # NOTE:
     # `ckpt` refers to deepspeed intermediate checkpoints (the equivalent of nemo checkpoints saved during training,
     # with optim states)
@@ -91,12 +90,7 @@ def format_data_args(cluster_config, params: TrainingParams):
     # Option - "$'User: {}\nAssistant: '"
     # TODO: Validation data isn't used as of now
     # TODO: change defaults after verifying that it works with our data
-    cmd = (
-        f" --dataset {params.training_data} "
-        f" --input_key input "
-        f" --output_key output "
-        f" --input_template None "
-    )
+    cmd = f" --dataset {params.training_data}  --input_key input  --output_key output  --input_template None "
 
     return cmd
 
@@ -121,7 +115,7 @@ def get_common_arg_overrides(cluster_config, params: TrainingParams):
 
 def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
     if not disable_wandb:
-        if os.getenv('WANDB_API_KEY') is None:
+        if os.getenv("WANDB_API_KEY") is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
         cmd = (
@@ -195,7 +189,7 @@ def get_training_cmd(
     return get_cmd(cluster_config, training_params)
 
 
-@openrlhf_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@openrlhf_app.command(name="sft", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def sft_openrlhf(
     ctx: typer.Context,
@@ -205,7 +199,7 @@ def sft_openrlhf(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
-    expname: str = typer.Option('openrlhf-sft', help="Nemo run experiment name"),
+    expname: str = typer.Option("openrlhf-sft", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the NeMo model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
     validation_data: str = typer.Option(None, help="Path to the validation data"),
@@ -261,7 +255,7 @@ def sft_openrlhf(
 ):
     """Runs OpenRLHF SFT training (openrlhf.cli.train_sft)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -303,7 +297,7 @@ def sft_openrlhf(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-sft-{job_id}',
+                task_name=f"{expname}-sft-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,

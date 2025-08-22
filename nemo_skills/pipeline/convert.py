@@ -256,7 +256,7 @@ def convert(
     All extra arguments are passed directly to the underlying conversion script (see their docs).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting conversion job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -300,7 +300,7 @@ def convert(
     input_model, output_model, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={input_model: '/input_model', output_model: '/output_model'},
+        mount_map={input_model: "/input_model", output_model: "/output_model"},
         check_mounted_paths=check_mounted_paths,
     )
 

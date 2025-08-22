@@ -65,22 +65,21 @@ def prepare_data(
     Run `python -m nemo_skills.dataset.prepare --help` to see other supported arguments.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
     if data_dir:
         command += f" && mkdir -p {data_dir} && cp -r /nemo_run/code/nemo_skills/dataset/* {data_dir}"
 
     cluster_config = get_cluster_config(cluster, config_dir=config_dir)
-    if cluster_config['executor'] == 'local' and not data_dir:
+    if cluster_config["executor"] == "local" and not data_dir:
         # in this case we need to put the results in the current folder
         # if we use container, it will mess up permissions, so as a workaround
         # setting executore to none
-        cluster_config['executor'] = 'none'
+        cluster_config["executor"] = "none"
 
-    if cluster_config['executor'] == 'slurm' and not data_dir:
+    if cluster_config["executor"] == "slurm" and not data_dir:
         raise ValueError(
-            "Data directory is required to be specified when using slurm executor. "
-            "Please provide --data_dir argument."
+            "Data directory is required to be specified when using slurm executor. Please provide --data_dir argument."
         )
 
     log_dir = log_dir or data_dir

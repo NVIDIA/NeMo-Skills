@@ -129,7 +129,7 @@ def genselect(
     (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -221,7 +221,7 @@ def genselect(
             )
             prev_tasks = [preprocess_task]
             for _ in range(dependent_jobs + 1):
-                task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                task_name = f"{expname}-rs{seed}" if seed is not None else expname
                 new_task = pipeline_utils.add_task(
                     exp,
                     cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),

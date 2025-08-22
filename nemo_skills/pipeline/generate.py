@@ -132,7 +132,7 @@ def generate(
     ),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync samples to.",
     ),
     installation_command: str | None = typer.Option(
@@ -156,7 +156,7 @@ def generate(
     (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -167,9 +167,9 @@ def generate(
 
     if log_samples:
         wandb_parameters = {
-            'name': wandb_name or expname,
-            'project': wandb_project,
-            'group': wandb_group,
+            "name": wandb_name or expname,
+            "project": wandb_project,
+            "group": wandb_group,
         }
     else:
         wandb_parameters = None
@@ -212,7 +212,7 @@ def generate(
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
     generation_task = importlib.import_module(generation_module)
-    if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+    if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
         raise ValueError(
             f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
             "Please provide a valid generation module."
@@ -240,7 +240,7 @@ def generate(
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -274,9 +274,9 @@ def generate(
                 )
                 prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):
-                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                    task_name = f"{expname}-rs{seed}" if seed is not None else expname
                     if chunk_id is not None:
-                        task_name += f'-chunk{chunk_id}'
+                        task_name += f"-chunk{chunk_id}"
                     new_task = pipeline_utils.add_task(
                         exp,
                         cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
@@ -293,7 +293,7 @@ def generate(
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=(
-                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                            prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                         ),
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
