@@ -121,6 +121,9 @@ def filter_code_solution(sample, args):
 
 def preprocess_code_judge(args):
     cnt = Counter()
+
+    # NOTE: collect failed samples
+    failed_samples = []
     with open(args.output_file, "w") as fout:
         for input_file in glob.glob(args.input_files):
             with open(input_file, "r") as fin:
@@ -132,6 +135,15 @@ def preprocess_code_judge(args):
                     if filt_reason == "Accepted":
                         sample["original_index"] = idx
                         fout.write(json.dumps(sample) + "\n")
+                    
+                    # NOTE: add code to save the failed samples: 
+                    else:
+                        sample["original_index"] = idx
+                        failed_samples.append(sample)
+    # NOTE: added to save the failed samples to a separate file
+    with open(args.output_file.replace(".jsonl", "_failed.jsonl"), "w") as fout:
+        for sample in failed_samples:
+            fout.write(json.dumps(sample) + "\n")
 
     print("Filtered samples:")
     for key, value in cnt.items():
