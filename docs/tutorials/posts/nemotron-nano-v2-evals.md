@@ -103,13 +103,9 @@ We evaluate all benchmarks in the reasoning on mode, except for RULER, which is 
 
 !!!note
     The NVIDIA-Nemotron-Nano-9B-v2 is a hybrid model which uses mamba layers along with transformer layers.
-    The model requires the latest version of vllm:
-    ```
-    pip install -U "vllm>=0.10.1"
-    ```
-
-    Additionally, to run the model without quality degradation, the vllm server needs to be run with the option `--mamba_ssm_cache_dtype float32`.
-    With NeMo-Skills, we can accomplish this by setting `--server_args="--mamba_ssm_cache_dtype float32 "` when performing generations.
+    To run the model without quality degradation, the vllm server needs to be run with the option `--mamba_ssm_cache_dtype float32`.
+    With NeMo-Skills, we can accomplish this by setting ```--server_args="--mamba_ssm_cache_dtype float32 "```
+    when performing generations.
 
 #### Command for Math, Code, and Science Reasoning Eval (Reasoning on)
 
@@ -250,9 +246,9 @@ ns eval \
 
 The eval jobs also launch a dependent job to perform metrics calculation and store the result in a file called `metrics.json`.
 In our running example, for a benchmark such as aime25, the `metrics.json` would be located at `/workspace/nvidia_nemotron_nano_9b_v2/eval-results/aime25/metrics.json`.
-This metrics calculation is done typically by the `summarize_results` pipeline, except in the case of BFCL where the metrics are calculated by a BFCL specific script because BFCL has a specific way of combining subtask accuracy to obtain the overall accuracy.
+This metrics calculation is done typically by the `summarize_results` pipeline. However, BFCL and RULER are exceptions and use their own specialized scripts, since they need to combine subtask accuracy scores in task-specific ways to determine overall accuracy.
 
-To print the results for these benchmarks (except for BFCL), we could rerun the `summarize_results` script manually as follows:
+To print the results for these benchmarks (except for BFCL and RULER), we could rerun the `summarize_results` script manually as follows:
 ```bash
 ns summarize_results --cluster=local /workspace/nvidia_nemotron_nano_9b_v2/eval-results/{BENCHMARK}
 ```
@@ -351,7 +347,7 @@ pass@8           | 294         | 335              | 55.41%        | 51.02%      
 ```
 
 !!! note
-    Currently `summarize_results` doesn't support benchmarks like BFCL v3 or RULER which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/bfcl_v3/metrics.json`.
+    Currently `summarize_results` doesn't support benchmarks like BFCLv3 or RULER which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/nvidia_nemotron_nano_9b_v2_tool_calling/bfcl_v3/metrics.json`.
 
 #### Results for RULER
 
