@@ -18,11 +18,12 @@ import os
 
 import httpx
 import litellm
+import openai
 
 from nemo_skills.utils import get_logger_name
 
 from .context_retry import ContextLengthRetry, with_context_retry
-from .utils import trim_after_stop_phrases
+from .utils import get_tokenizer_endpoint, trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -52,8 +53,8 @@ class BaseModel:
         base_url: str | None = None,
         max_retries: int = 3,
         use_v1_endpoint: bool = True,
-        host: str = '127.0.0.1',
-        port: str = '5000',
+        host: str = "127.0.0.1",
+        port: str = "5000",
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
         context_retry_config: ContextLengthRetry | None = None,
@@ -72,8 +73,8 @@ class BaseModel:
         if self.ssh_server and self.ssh_key_path:
             import sshtunnel
 
-            if '@' in self.ssh_server:
-                ssh_username, ssh_server = self.ssh_server.split('@')
+            if "@" in self.ssh_server:
+                ssh_username, ssh_server = self.ssh_server.split("@")
             else:
                 ssh_server = self.ssh_server
                 ssh_username = None
@@ -85,17 +86,20 @@ class BaseModel:
                 remote_bind_address=(self.server_host, int(self.server_port)),
             )
             self._tunnel.start()
-            self.server_host = '127.0.0.1'
+            self.server_host = "127.0.0.1"
             self.server_port = str(self._tunnel.local_bind_port)
 
         if base_url is None:
             v1_suffix = "/v1" if use_v1_endpoint else ""
             self.base_url = f"http://{self.server_host}:{self.server_port}{v1_suffix}"
+        elif base_url == "":
+            # We don't want to use base_url if it is an empty string
+            base_url = None
         else:
             self.base_url = base_url
 
         # Get the tokenizer endpoint if available
-        self.tokenizer_endpoint = self._get_tokenizer_endpoint(model)
+        self.tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, model)
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -134,7 +138,7 @@ class BaseModel:
         self, result: dict, remove_stop_phrases: bool, stop_phrases: list[str] | None
     ) -> None:
         if remove_stop_phrases:
-            result['generation'] = trim_after_stop_phrases(result['generation'], stop_phrases)
+            result["generation"] = trim_after_stop_phrases(result["generation"], stop_phrases)
 
     @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:
@@ -144,21 +148,17 @@ class BaseModel:
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
-    @abc.abstractmethod
-    def _get_tokenizer_endpoint(self, model_name):
-        pass
-
     def _build_request_params(self, prompt: str | list[dict], stream: bool, **kwargs) -> dict:
         if isinstance(prompt, str):
             return self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
         elif isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            request_params['skip_special_tokens'] = False
+            request_params["skip_special_tokens"] = False
             return request_params
         else:
             raise ValueError("Either prompt or messages must be provided")
 
-    # @with_context_retry
+    @with_context_retry
     async def generate_async(
         self,
         prompt: str | list[dict],
@@ -189,43 +189,58 @@ class BaseModel:
                     raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
 
         kwargs = {
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'random_seed': random_seed,
-            'stop_phrases': stop_phrases,
-            'top_logprobs': top_logprobs,
-            'timeout': timeout,
-            'reasoning_effort': reasoning_effort,
-            'tools': tools,
-            'extra_body': extra_body,
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+            "random_seed": random_seed,
+            "stop_phrases": stop_phrases,
+            "top_logprobs": top_logprobs,
+            "timeout": timeout,
+            "reasoning_effort": reasoning_effort,
+            "tools": tools,
+            "extra_body": extra_body,
         }
-        try:
-            request_params = self._build_request_params(prompt=prompt, stream=stream, **kwargs)
-            if isinstance(prompt, list):
-                response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
-                if stream:
-                    result = self._stream_chat_chunks_async(response)
-                else:
-                    result = self._parse_chat_completion_response(
-                        response, include_response=include_response, **kwargs
-                    )
 
-            elif isinstance(prompt, str):
-                response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
-                if stream:
-                    result = self._stream_completion_chunks_async(response)
-                else:
-                    result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-            else:
-                raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-        except Exception as e:
-            raise e
+        # TODO: remove this after we no longer use gpt-oss or it's fixed in vllm
+        max_retries = 2
+        retry_count = 0
 
-        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
+        while retry_count <= max_retries:
+            try:
+                if isinstance(prompt, list):
+                    request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+                    response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+                    if stream:
+                        result = self._stream_chat_chunks_async(response)
+                    else:
+                        result = self._parse_chat_completion_response(
+                            response, include_response=include_response, **kwargs
+                        )
+
+                elif isinstance(prompt, str):
+                    request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+                    response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
+                    if stream:
+                        result = self._stream_completion_chunks_async(response)
+                    else:
+                        result = self._parse_completion_response(response, include_response=include_response, **kwargs)
+                else:
+                    raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+
+                self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
+                return result
+
+            except openai.BadRequestError as e:
+                if "output messages (reasoning and final)" in str(e) and retry_count < max_retries:
+                    retry_count += 1
+                    LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
+                    continue
+                else:
+                    LOG.error(f"BadRequestError after {max_retries} retries, returning empty response: {e}")
+                    return {"generation": "", "reasoning_content": "", "num_generated_tokens": 0}
         return result
 
     @with_context_retry
@@ -261,19 +276,19 @@ class BaseModel:
                     raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
 
         kwargs = {
-            'tokens_to_generate': tokens_to_generate,
-            'temperature': temperature,
-            'top_p': top_p,
-            'top_k': top_k,
-            'min_p': min_p,
-            'repetition_penalty': repetition_penalty,
-            'random_seed': random_seed,
-            'stop_phrases': stop_phrases,
-            'top_logprobs': top_logprobs,
-            'timeout': timeout,
-            'reasoning_effort': reasoning_effort,
-            'tools': tools,
-            'extra_body': extra_body,
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+            "random_seed": random_seed,
+            "stop_phrases": stop_phrases,
+            "top_logprobs": top_logprobs,
+            "timeout": timeout,
+            "reasoning_effort": reasoning_effort,
+            "tools": tools,
+            "extra_body": extra_body,
         }
         request_params = self._build_request_params(prompt=prompt, stream=stream, **kwargs)
         if isinstance(prompt, list):
@@ -311,11 +326,11 @@ class BaseModel:
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
 
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
-        if getattr(choice, 'logprobs', None):
-            result['logprobs'] = choice.logprobs.token_logprobs
-            result['tokens'] = choice.logprobs.tokens
-            result['top_logprobs'] = choice.logprobs.top_logprobs
+        result = {"generation": output, "num_generated_tokens": response.usage.completion_tokens}
+        if getattr(choice, "logprobs", None):
+            result["logprobs"] = choice.logprobs.token_logprobs
+            result["tokens"] = choice.logprobs.tokens
+            result["top_logprobs"] = choice.logprobs.top_logprobs
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
 
@@ -329,21 +344,21 @@ class BaseModel:
         output = choice.message.content
         if output is None:
             output = ""
-        result = {'generation': output, 'num_generated_tokens': response.usage.completion_tokens}
+        result = {"generation": output, "num_generated_tokens": response.usage.completion_tokens}
 
         # Add reasoning_content if available
-        if hasattr(choice.message, 'reasoning_content') and choice.message.reasoning_content:
-            result['reasoning_content'] = choice.message.reasoning_content
+        if hasattr(choice.message, "reasoning_content") and choice.message.reasoning_content:
+            result["reasoning_content"] = choice.message.reasoning_content
 
-        if getattr(choice, 'logprobs', None) and choice.logprobs.content:
-            result['logprobs'] = [tok.logprob for tok in choice.logprobs.content]
-            result['tokens'] = [tok.token for tok in choice.logprobs.content]
-            result['top_logprobs'] = []
+        if getattr(choice, "logprobs", None) and choice.logprobs.content:
+            result["logprobs"] = [tok.logprob for tok in choice.logprobs.content]
+            result["tokens"] = [tok.token for tok in choice.logprobs.content]
+            result["top_logprobs"] = []
             for token_logprob in choice.logprobs.content:
                 logprob = {entry.token: entry.logprob for entry in token_logprob.top_logprobs}
                 if token_logprob.token not in logprob:
                     logprob[token_logprob.token] = token_logprob.logprob
-                result['top_logprobs'].append(logprob)
+                result["top_logprobs"].append(logprob)
         if choice.finish_reason:
             result["finish_reason"] = choice.finish_reason
         if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
@@ -393,8 +408,8 @@ class BaseModel:
             cur_delta = chunk.choices[0].delta.content
             # Check for reasoning_content in delta
             reasoning_delta = (
-                getattr(chunk.choices[0].delta, 'reasoning_content', None)
-                if hasattr(chunk.choices[0].delta, 'reasoning_content')
+                getattr(chunk.choices[0].delta, "reasoning_content", None)
+                if hasattr(chunk.choices[0].delta, "reasoning_content")
                 else None
             )
         else:

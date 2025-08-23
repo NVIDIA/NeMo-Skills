@@ -9,6 +9,11 @@ More details are coming soon!
 - Benchmark is defined in [`nemo_skills/dataset/swe-bench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/swe-bench/__init__.py)
 - Original benchmark source is [here](https://github.com/SWE-bench/SWE-bench).
 
+### ioi24
+
+- Benchmark is defined in [`nemo_skills/dataset/ioi24/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ioi24/__init__.py)
+- Original benchmark source is [here](https://huggingface.co/collections/open-r1/ioi-67cee324e60b1346a6ab73e2).
+
 ### livecodebench
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench/__init__.py)

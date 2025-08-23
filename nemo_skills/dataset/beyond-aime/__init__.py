@@ -12,17 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.version import __version__
 
-# only used in ns setup command to initialize with defaults
-_containers = {
-    "trtllm": "nvcr.io/nvidia/tensorrt-llm/release:0.21.0",
-    "vllm": "vllm/vllm-openai:v0.10.1.1",
-    "sglang": "igitman/nemo-skills-sglang:0.7.0",
-    "nemo": "igitman/nemo-skills-nemo:0.7.0",
-    "megatron": "igitman/nemo-skills-megatron:0.7.0",
-    "sandbox": "igitman/nemo-skills-sandbox:0.7.0",
-    "nemo-skills": "igitman/nemo-skills:0.7.0",
-    "verl": "igitman/nemo-skills-verl:0.7.0",
-    "nemo-rl": "igitman/nemo-skills-nemo-rl:0.7.0",
-}
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+
+DATASET_GROUP = "math"
+METRICS_TYPE = "math"
+EVAL_ARGS = "++eval_type=math"
+GENERATION_ARGS = "++prompt_config=generic/math"
