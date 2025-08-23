@@ -43,7 +43,7 @@ def extract_proof_only(lean_code: str) -> str:
     if not lines:
         return ""
 
-    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_pattern = re.compile(r"^\s*(theorem|example)\b")
     header_start_idx = None
 
     # 1. Find where the theorem starts
@@ -171,11 +171,11 @@ class Sandbox(abc.ABC):
         self,
         generated_code: str,
         std_input: str = "",
-        language: str = 'ipython',
+        language: str = "ipython",
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
-        traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
+        traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
         if session_id is None and language == "ipython":  # creating a new session with empty state
@@ -185,7 +185,7 @@ class Sandbox(abc.ABC):
         if session_id is not None:
             self.sessions[session_id].append(generated_code)
 
-        if language == 'ipython':
+        if language == "ipython":
             TO_EXECUTE = """
 import traceback
 import json
@@ -214,7 +214,7 @@ def simplify_errors(error_text):
 code_snippets = []
 """
             for code_snippet in self.sessions[session_id]:
-                TO_EXECUTE += f'\ncode_snippets.append({repr(code_snippet)})\n'
+                TO_EXECUTE += f"\ncode_snippets.append({repr(code_snippet)})\n"
 
             # we do `strip() + \\n` below to ensure that `print(res)` and `res` return the same output
             TO_EXECUTE += f"""
@@ -250,7 +250,7 @@ except Exception:
     }}
 print(json.dumps(to_return))
 """
-        elif language in ["python", "pypy3", "python3", "lean4"]:
+        elif language in ["python", "pypy3", "python3", "lean4", "shell"]:
             if session_id is not None:
                 raise RuntimeError(
                     f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
@@ -266,7 +266,7 @@ print(json.dumps(to_return))
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         # removing last state to not re-execute code with errors
         if session_id is not None:
-            if output['process_status'] != "completed":
+            if output["process_status"] != "completed":
                 self.sessions[session_id] = self.sessions[session_id][:-1]
         return output, session_id
 
@@ -278,8 +278,8 @@ print(json.dumps(to_return))
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             return "timeout"
-        if output['process_status'] == 'completed' and output['stdout'] != '':
-            return 'has_sorry'
+        if output["process_status"] == "completed" and output["stdout"] != "":
+            return "has_sorry"
         return output["process_status"]
 
     async def batch_evaluate_results(
@@ -312,7 +312,7 @@ print(json.dumps(to_return))
                     generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
                     line_dict["predicted_proof"] = (
                         line_dict["header"]
-                        + (line_dict["formal_statement"] if restate_formal_statement else '')
+                        + (line_dict["formal_statement"] if restate_formal_statement else "")
                         + extract_proof_only(generation)
                         if strip_theorem_from_proof
                         else generation
@@ -335,7 +335,7 @@ print(json.dumps(to_return))
                             "Set use_predicted_proof_key=False to re-combine"
                         )
             else:
-                raise ValueError(f'Unknown answer_format: {answer_format}')
+                raise ValueError(f"Unknown answer_format: {answer_format}")
 
             # Evaluate proof with concurrency control
             async with semaphore:
@@ -354,7 +354,7 @@ print(json.dumps(to_return))
             print(f"Processing {input_file}...")
             processed_lines = []
             for line in tqdm.tqdm(lines):
-                result = await process_line(line.rstrip('\n'))
+                result = await process_line(line.rstrip("\n"))
                 processed_lines.append(result)
 
             # Write to temp file then replace original
@@ -378,9 +378,9 @@ class LocalSandbox(Sandbox):
             return output.json()
         except json.JSONDecodeError:
             LOG.error("Error during parsing output: %s", output.text)
-            return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
+            return {"process_status": "error", "stdout": "", "stderr": "Unknown error"}
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
+    def _prepare_request(self, generated_code, timeout, language="ipython", std_input=""):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
@@ -390,7 +390,7 @@ class LocalSandbox(Sandbox):
 
 
 sandboxes = {
-    'local': LocalSandbox,
+    "local": LocalSandbox,
 }
 
 
@@ -402,5 +402,5 @@ def get_sandbox(sandbox_type: str = "local", **kwargs):
 
 def sandbox_params():
     """Returns sandbox documentation (to include in cmd help)."""
-    prefix = f'\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}'
+    prefix = f"\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}"
     return python_doc_to_cmd_help(Sandbox, docs_prefix=prefix, arg_prefix="sandbox.")
