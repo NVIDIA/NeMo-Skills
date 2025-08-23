@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import copy
 import functools
 import logging
 import re
@@ -20,7 +21,6 @@ from dataclasses import asdict, dataclass
 from typing import Callable, Union
 
 import litellm
-from litellm import decode, encode
 
 from nemo_skills.utils import get_logger_name
 
@@ -108,10 +108,10 @@ def with_context_retry(func: Callable) -> Callable:
     Uses the model's context_retry_config attribute.
     """
 
-    @functools.wraps(func)
-    async def async_wrapper(self, *args, **kwargs):
-        config = getattr(self, 'context_retry_config', ContextLengthRetry())
-        return await _handle_context_retries_async(func, self, args, kwargs, config)
+    # @functools.wraps(func)
+    # async def async_wrapper(self, *args, **kwargs):
+    #     config = getattr(self, 'context_retry_config', ContextLengthRetry())
+    #     return await _handle_context_retries_async(func, self, args, kwargs, config)
 
     @functools.wraps(func)
     def sync_wrapper(self, *args, **kwargs):
@@ -125,103 +125,83 @@ def with_context_retry(func: Callable) -> Callable:
         return sync_wrapper
 
 
-async def _handle_context_retries_async(
-    func: Callable, self, args: tuple, kwargs: dict, config: ContextLengthRetry
-) -> dict:
-    """Async version of context retry logic - mirrors sync behavior."""
-    original_tokens_to_generate = kwargs.get('tokens_to_generate', 2048)
+# async def _handle_context_retries_async(
+#     func: Callable, self, args: tuple, kwargs: dict, config: ContextLengthRetry
+# ) -> dict:
+#     """Async version of context retry logic - mirrors sync behavior."""
+#     original_tokens_to_generate = kwargs.get('tokens_to_generate', 2048)
 
-    try:
-        result = await func(self, *args, **kwargs)
-        return result
+#     try:
+#         result = await func(self, *args, **kwargs)
+#         return result
 
-    except litellm.ContextWindowExceededError as e:
-        if not config.enable_soft_fail:
-            raise e
-        else:
-            # Soft fail is enabled. We will try to reduce the number of requested tokens.
-            context_error = parse_context_window_exceeded_error(e)
-            if context_error is None:
-                # Not able to parse the result. We will just return an empty generation
-                LOG.warning("Not able to parse the context window exceeded error. Returning empty generation.")
-                return {
-                    "generation": "",
-                    "num_generated_tokens": 0,
-                    "error": "context_window_exceeded",
-                    "detailed_error": str(e),
-                }
-            else:
-                # We were able to parse the result. We will try to reduce the number of requested tokens.
-                max_context_length = context_error['max_context_length']
-                message_tokens = context_error['message_tokens']
-                completion_tokens = context_error['completion_tokens']
+#     except litellm.ContextWindowExceededError as e:
+#         if not config.enable_soft_fail:
+#             raise e
+#         else:
+#             # Soft fail is enabled. We will try to reduce the number of requested tokens.
+#             context_error = parse_context_window_exceeded_error(e)
+#             if context_error is None:
+#                 # Not able to parse the result. We will just return an empty generation
+#                 LOG.warning("Not able to parse the context window exceeded error. Returning empty generation.")
+#                 return {
+#                     "generation": "",
+#                     "num_generated_tokens": 0,
+#                     "error": "context_window_exceeded",
+#                     "detailed_error": str(e),
+#                 }
+#             else:
+#                 # We were able to parse the result. We will try to reduce the number of requested tokens.
+#                 max_context_length = context_error['max_context_length']
+#                 message_tokens = context_error['message_tokens']
+#                 completion_tokens = context_error['completion_tokens']
 
-                # Strategy 1: Reduce the number of tokens to generate
-                if config.reduce_generate_tokens:
-                    # First let's check if token reduction is even feasible for the current config
-                    if message_tokens >= max_context_length:
-                        LOG.warning(
-                            "Messages tokens are already at the max context length. " "Cannot reduce generate tokens."
-                        )
-                        return {
-                            "generation": "",
-                            "num_generated_tokens": 0,
-                            "error": "context_window_exceeded",
-                            "detailed_error": "prompt tokens already exceed the max context length\n" + str(e),
-                        }
+#                 # Strategy 1: Reduce the number of tokens to generate
+#                 if config.reduce_generate_tokens:
+#                     # First let's check if token reduction is even feasible for the current config
+#                     if message_tokens >= max_context_length:
+#                         LOG.warning(
+#                             "Messages tokens are already at the max context length. " "Cannot reduce generate tokens."
+#                         )
+#                         return {
+#                             "generation": "",
+#                             "num_generated_tokens": 0,
+#                             "error": "context_window_exceeded",
+#                             "detailed_error": "prompt tokens already exceed the max context length\n" + str(e),
+#                         }
 
-                    # We can reduce the number of tokens to generate
-                    reduced_generation_budget = max_context_length - message_tokens
-                    # This min operation is probably not needed but just in case
-                    reduced_tokens_to_generate = min(original_tokens_to_generate, reduced_generation_budget)
-                    LOG.warning(
-                        f"Reducing tokens_to_generate from {original_tokens_to_generate} to {reduced_tokens_to_generate} to stay within the context window."
-                    )
-                    kwargs['tokens_to_generate'] = reduced_tokens_to_generate
-                    return await func(self, *args, **kwargs)
+#                     # We can reduce the number of tokens to generate
+#                     reduced_generation_budget = max_context_length - message_tokens
+#                     # This min operation is probably not needed but just in case
+#                     reduced_tokens_to_generate = min(original_tokens_to_generate, reduced_generation_budget)
+#                     LOG.warning(
+#                         f"Reducing tokens_to_generate from {original_tokens_to_generate} to {reduced_tokens_to_generate} to stay within the context window."
+#                     )
+#                     kwargs['tokens_to_generate'] = reduced_tokens_to_generate
+#                     return await func(self, *args, **kwargs)
 
-                # Strategy 2: Reduce the number of tokens in the prompt
-                if config.reduce_prompt_tokens_start or config.reduce_prompt_tokens_end:
-                    # First let's check if token reduction is even feasible for the current config
-                    if completion_tokens >= max_context_length:
-                        LOG.warning(
-                            "Completion tokens are already at the max context length. " "Cannot reduce prompt tokens."
-                        )
-                        return {
-                            "generation": "",
-                            "num_generated_tokens": 0,
-                            "error": "context_window_exceeded",
-                            "detailed_error": "tokens_to_generate exceed the max context length\n" + str(e),
-                        }
+#                 # Strategy 2: Reduce the number of tokens in the prompt
+#                 if config.reduce_prompt_tokens_start or config.reduce_prompt_tokens_end:
+#                     # First let's check if token reduction is even feasible for the current config
+#                     if completion_tokens >= max_context_length:
+#                         LOG.warning(
+#                             "Completion tokens are already at the max context length. " "Cannot reduce prompt tokens."
+#                         )
+#                         return {
+#                             "generation": "",
+#                             "num_generated_tokens": 0,
+#                             "error": "context_window_exceeded",
+#                             "detailed_error": "tokens_to_generate exceed the max context length\n" + str(e),
+#                         }
 
-                    prompt_tokens_to_keep = max_context_length - completion_tokens
-                    # We don't have access to the tokenizer
-                    # We can do linear interpolation on the number of characters to keep.
-                    reduction_factor = prompt_tokens_to_keep / message_tokens
+#                     num_prompt_tokens_to_keep = max_context_length - completion_tokens
+#                     # Calculate tokens using the tokenizer endpoint
+#                     if self.tokenizer_endpoint is not None:
+#                         # tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, self.model_name)
+#                         # prompt_tokens_to_keep = self.tokenizer_endpoint.encode(kwargs['prompt'], add_special_tokens=True)
+#                         pass
 
-                    # Create a copy of args to avoid mutating the original
-                    args_list = list(args)
-                    prompt = args_list[0]
-                    if isinstance(prompt, str):
-                        # To be on the safe side, we will reduce the number of tokens to keep by a factor of prompt_tokens_reduction_factor
-                        prompt_tokens_to_keep = int(
-                            len(prompt) * reduction_factor * config.prompt_tokens_reduction_factor
-                        )
-                        if config.reduce_prompt_tokens_start:
-                            prompt = prompt[-prompt_tokens_to_keep:]
-                        elif config.reduce_prompt_tokens_end:
-                            prompt = prompt[:prompt_tokens_to_keep]
-                        args_list[0] = prompt
-
-                    elif isinstance(prompt, list):
-                        messages_to_keep = int(len(prompt) * reduction_factor * config.prompt_tokens_reduction_factor)
-                        if config.reduce_prompt_tokens_start:
-                            prompt = prompt[-messages_to_keep:]
-                        elif config.reduce_prompt_tokens_end:
-                            prompt = prompt[:messages_to_keep]
-                        args_list[0] = prompt
-
-                    return await func(self, *tuple(args_list), **kwargs)
+#                     return await func(self, *tuple(args), **kwargs)
 
 
 def _handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict, config: ContextLengthRetry) -> dict:
@@ -232,9 +212,7 @@ def _handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict
         result = func(self, *args, **kwargs)
         return result
 
-    except Exception as e:
-        print(e)
-
+    except litellm.exceptions.ContextWindowExceededError as e:
         if not config.enable_soft_fail:
             raise e
         else:
@@ -242,13 +220,11 @@ def _handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict
             context_error = parse_context_window_exceeded_error(e)
             if context_error is None:
                 # Not able to parse the result. We will just return an empty generation
-                LOG.warning("Not able to parse the context window exceeded error. Returning empty generation.")
-                return {
-                    "generation": "",
-                    "num_generated_tokens": 0,
-                    "error": "context_window_exceeded",
-                    "detailed_error": str(e),
-                }
+                detailed_error = (
+                    "Not able to parse the context window exceeded error. Returning empty generation.\n\n" + str(e)
+                )
+                LOG.warning(detailed_error)
+                return return_empty_generation_with_error(str(e))
             else:
                 # We were able to parse the result. We will try to reduce the number of requested tokens.
                 max_context_length = context_error['max_context_length']
@@ -259,15 +235,12 @@ def _handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict
                 if config.reduce_generate_tokens:
                     # First let's check if token reduction is even feasible for the current config
                     if message_tokens >= max_context_length:
-                        LOG.warning(
-                            "Messages tokens are already at the max context length. " "Cannot reduce generate tokens."
+                        detailed_error = (
+                            "Messages tokens are already at the max context length. Cannot reduce generate tokens.\n\n"
+                            + str(e)
                         )
-                        return {
-                            "generation": "",
-                            "num_generated_tokens": 0,
-                            "error": "context_window_exceeded",
-                            "detailed_error": "prompt tokens already exceed the max context length\n" + str(e),
-                        }
+                        LOG.warning(detailed_error)
+                        return return_empty_generation_with_error(detailed_error)
 
                     # We can reduce the number of tokens to generate
                     reduced_generation_budget = max_context_length - message_tokens
@@ -283,45 +256,67 @@ def _handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict
                 if config.reduce_prompt_tokens_start or config.reduce_prompt_tokens_end:
                     # First let's check if token reduction is even feasible for the current config
                     if completion_tokens >= max_context_length:
-                        LOG.warning(
-                            "Completion tokens are already at the max context length. " "Cannot reduce prompt tokens."
+                        detailed_error = (
+                            "Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n"
+                            + str(e)
                         )
-                        return {
-                            "generation": "",
-                            "num_generated_tokens": 0,
-                            "error": "context_window_exceeded",
-                            "detailed_error": "tokens_to_generate exceed the max context length\n" + str(e),
-                        }
-
-                    prompt_tokens_to_keep = max_context_length - completion_tokens
-                    # We don't have access to the tokenizer
-                    # We can do linear interpolation on the number of characters to keep.
-                    reduction_factor = prompt_tokens_to_keep / message_tokens
-
-                    if self.tokenizer_endpoint is not None:
-                        # We have access to the tokenizer endpoint
-                        tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, self.model_name)
+                        LOG.warning(detailed_error)
+                        return return_empty_generation_with_error(detailed_error)
 
                     # Create a copy of args to avoid mutating the original
-                    args_list = list(args)
-                    prompt = args_list[0]
+                    prompt = copy.deepcopy(args[0])
+                    encoded_prompt = self.tokenizer_endpoint.encode(prompt)
+                    LOG.info(f"Length of encoded prompt: {len(encoded_prompt)}")
+
+                    num_prompt_tokens_to_keep = max_context_length - completion_tokens
+
+                    # Reduce the number of tokens in the prompt
+                    # If the prompt is a string, we will trim the string
+                    # If the prompt is a list, we will remove individual messages from the end or start of the list
                     if isinstance(prompt, str):
-                        # To be on the safe side, we will reduce the number of tokens to keep by a factor of prompt_tokens_reduction_factor
-                        prompt_tokens_to_keep = int(
-                            len(prompt) * reduction_factor * config.prompt_tokens_reduction_factor
-                        )
+                        # Reduce the number of tokens in the prompt
                         if config.reduce_prompt_tokens_start:
-                            prompt = prompt[-prompt_tokens_to_keep:]
+                            trimmed_encoded_prompt = encoded_prompt[-num_prompt_tokens_to_keep:]
                         elif config.reduce_prompt_tokens_end:
-                            prompt = prompt[:prompt_tokens_to_keep]
-                        args_list[0] = prompt
+                            trimmed_encoded_prompt = encoded_prompt[:num_prompt_tokens_to_keep]
+                        trimmed_prompt = self.tokenizer_endpoint.decode(trimmed_encoded_prompt)
+                        args[0] = trimmed_prompt
 
                     elif isinstance(prompt, list):
-                        messages_to_keep = int(len(prompt) * reduction_factor * config.prompt_tokens_reduction_factor)
-                        if config.reduce_prompt_tokens_start:
-                            prompt = prompt[-messages_to_keep:]
-                        elif config.reduce_prompt_tokens_end:
-                            prompt = prompt[:messages_to_keep]
-                        args_list[0] = prompt
+                        # If the prompt is a list, we will remove individual messages from the end or start of the list
+                        # Gather length of all prefixes, and then decide where to trim the list
+                        prefix_length_list = []
+                        trimmed_prompt_messages = None
+                        if config.reduce_prompt_tokens_end:
+                            for idx in range(len(prompt)):
+                                prefix_length = self.tokenizer_endpoint.encode(prompt[:idx])
+                                if prefix_length is not None:
+                                    if prefix_length > num_prompt_tokens_to_keep:
+                                        # Can't add any more messages
+                                        if prefix_length_list:
+                                            # We have a list of prefixes, so we can trim the last message
+                                            trimmed_prompt_messages = prefix_length_list[-1]["prompt"]
+                                        break
 
-                    return func(self, *tuple(args_list), **kwargs)
+                                    prefix_length_list.append({"prompt": prompt[:idx], "length": prefix_length})
+                        elif config.reduce_prompt_tokens_start:
+                            for num_last_messages in range(len(prompt)):
+                                pass
+
+                        if trimmed_prompt_messages is not None:
+                            args[0] = trimmed_prompt_messages
+                        else:
+                            detailed_error = "Not able to trim the prompt. Returning empty generation.\n\n" + str(e)
+                            LOG.warning(detailed_error)
+                            return return_empty_generation_with_error(detailed_error)
+
+                    return func(self, *args, **kwargs)
+
+
+def return_empty_generation_with_error(detailed_error: str):
+    return {
+        "generation": "",
+        "num_generated_tokens": 0,
+        "error": "context_window_exceeded",
+        "detailed_error": detailed_error,
+    }

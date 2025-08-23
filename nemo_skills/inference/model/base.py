@@ -95,7 +95,7 @@ class BaseModel:
             self.base_url = base_url
 
         # Get the tokenizer endpoint if available
-        self.tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, model)
+        self.tokenizer_endpoint = self._get_tokenizer_endpoint(model)
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -144,6 +144,10 @@ class BaseModel:
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
+    @abc.abstractmethod
+    def _get_tokenizer_endpoint(self, model_name):
+        pass
+
     def _build_request_params(self, prompt: str | list[dict], stream: bool, **kwargs) -> dict:
         if isinstance(prompt, str):
             return self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
@@ -154,7 +158,7 @@ class BaseModel:
         else:
             raise ValueError("Either prompt or messages must be provided")
 
-    @with_context_retry
+    # @with_context_retry
     async def generate_async(
         self,
         prompt: str | list[dict],
@@ -255,7 +259,7 @@ class BaseModel:
                 # TODO: We may want to add additional checks for tools in the future
                 if not isinstance(tool, dict):
                     raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
-                    
+
         kwargs = {
             'tokens_to_generate': tokens_to_generate,
             'temperature': temperature,

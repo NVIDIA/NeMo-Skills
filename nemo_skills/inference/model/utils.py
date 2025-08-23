@@ -19,6 +19,8 @@ from typing import Union
 import litellm
 import requests
 
+from nemo_skills.utils import get_logger_name
+
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
@@ -31,43 +33,50 @@ def trim_after_stop_phrases(text: str, stop_phrases: list[str]) -> str:
     return re.split("|".join(escaped_stop_phrases), text, maxsplit=1)[0]
 
 
-def get_tokenizer_endpoint(base_url, model_name):
-    """
-    Returns the tokenizer endpoint if available, otherwise returns None.
-    """
-    tokenize_url = base_url.replace("/v1", "/tokenize")
-    payload = {"model": model_name, "messages": [{"role": "user", "content": "Test prompt"}]}
+class ServerTokenizer:
+    """Class to encode and decode prompts via POST requests to the tokenizer endpoint."""
 
-    try:
-        response = requests.post(tokenize_url, json=payload)
-        if response.status_code == 200:
-            LOG.info(f"Tokenize endpoint is available! - {tokenize_url}")
-            return tokenize_url
-        else:
+    def __init__(self, url):
+        self.url = url
+
+    def encode(self, prompt: str | list[dict]) -> list:
+        """Encode the prompt using the tokenizer endpoint."""
+        try:
+            if isinstance(prompt, str):
+                payload = {"prompt": prompt}
+            elif isinstance(prompt, list):
+                payload = {"messages": prompt}
+            else:
+                raise ValueError(f"Unsupported prompt type: {type(prompt)}")
+
+            response = requests.post(self.url, json=payload, timeout=30)
+            response.raise_for_status()
+
+            tokens = response.json()['tokens']
+            return tokens
+
+        except requests.exceptions.RequestException as e:
+            LOG.error(f"Request failed: {e}")
             return None
-    except requests.exceptions.RequestException as e:
-        return None
-
-
-def encode(prompt, model, tokenizer_endpoint):
-    """
-    Encode a prompt using the tokenizer endpoint.
-    """
-    if isinstance(prompt, str):
-        payload = {"model": model, "messages": [{"role": "user", "content": prompt}]}
-    elif isinstance(prompt, list):
-        payload = {"model": model, "messages": prompt}
-    else:
-        raise ValueError(f"Unsupported prompt type: {type(prompt)}")
-
-    try:
-        response = requests.post(tokenize_url, json=payload)
-        if response.status_code == 200:
-            return response.json()['tokens']
-        else:
+        except (KeyError, ValueError, TypeError) as e:
+            LOG.error(f"Failed to encode prompt: {e}")
             return None
-    except requests.exceptions.RequestException as e:
-        return None
+
+    def decode(self, tokens: list) -> str:
+        """Decode a list of tokens using the tokenizer endpoint."""
+        try:
+            payload = {"tokens": tokens}
+            response = requests.post(self.url, json=payload, timeout=30)
+            response.raise_for_status()
+
+            text = response.json()['text']
+            return text
+        except requests.exceptions.RequestException as e:
+            LOG.error(f"Request failed: {e}")
+            return None
+        except (KeyError, ValueError, TypeError) as e:
+            LOG.error(f"Failed to decode tokens {tokens} due to {e}")
+            return None
 
 
 class RequestException(RuntimeError):
