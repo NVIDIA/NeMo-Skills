@@ -208,8 +208,8 @@ class BaseModel:
                         result = self._parse_completion_response(response, include_response=include_response, **kwargs)
                 else:
                     raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-
-                self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
+                if not stream:
+                    self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
                 return result
 
             except openai.BadRequestError as e:
@@ -355,7 +355,7 @@ class BaseModel:
 
         results_to_yield = []
         if cur_delta:
-            results_to_yield.append({"generation": cur_delta})
+            results_to_yield.append({"generation": cur_delta, "chunk": chunk.choices[0]})
 
         # vllm variant
         stop_reason = getattr(chunk.choices[0], "stop_reason", None)
