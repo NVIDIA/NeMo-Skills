@@ -130,6 +130,11 @@ class CodeExecutionWrapper:
         generation_time = 0
         code_execution_time = 0
         stopped_on_repetition = False
+
+        #NOTE: add a parameter for model who likes to pause
+        max_consecutive_no_code_generations = 3
+        consecutive_no_code_generations = 0
+
         # adding plus one to make sure there is always some completion after the last requested code block
         for generation_index in range(effective_max_code_executions + 1):
 
@@ -214,11 +219,17 @@ class CodeExecutionWrapper:
 
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
-            # else:  # if no code was generated, we need to finish
-            #     break
-            # NOTE: Commented out the above break statement as it was causing premature termination
-            # The model should continue generating even if no code is present in this round
-            # (e.g., for explanatory text, analysis, import statements, etc.)
+
+                # NOTE: reset the consecutive_no_code_generations
+                consecutive_no_code_generations = 0
+            
+            # NOTE: if no code was generated, we need to finish
+            else: 
+                consecutive_no_code_generations += 1
+                if consecutive_no_code_generations >= max_consecutive_no_code_generations:
+                    break
+                else:
+                    continue
 
         # removing original prompt and returning the generation
         if is_openai_format:
