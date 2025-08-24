@@ -45,6 +45,7 @@ stages:
       ++max_concurrent_requests=1024
       ++prompt_config=dsagent_openai/tir-gpt-oss
       ++prompt_template=gpt-oss-high-python
+      ++prompt_format=ns
       ++code_tags=gpt-oss
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
@@ -54,10 +55,11 @@ stages:
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
       with_sandbox: true
-      model: /hf_models/gpt-oss-120b
-      server_type: vllm
-      server_gpus: 2
-      server_args: "--async-scheduling --max-num-seqs=1024"
+      model: openai/gpt-oss-120b # /hf_models/gpt-oss-120b
+      server_type: openai # vllm
+      # server_gpus: 2
+      # server_args: "--async-scheduling --max-num-seqs=1024"
+      server_address: http://localhost:8000/v1
       num_random_seeds: ${num_random_seeds_to_generate}
 
   fill_majority_answer:
