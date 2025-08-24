@@ -448,8 +448,8 @@ class CodeExecutionWrapper:
                     current_full_prompt[-2]['content'] += formatted_code_output
                 else:
                     current_full_prompt += formatted_code_output
-            # else:
-            #     break
-            # NOTE: Commented out the above break statement as it was causing premature termination
-            # The model should continue generating even if no code is present in this round
-            # (e.g., for explanatory text, analysis, import statements, etc.)
+
+            # NOTE: I didn't not implement the parllel funciton to limit the max_consecutive_no_code_generations
+            # as in _generate_single, because it's not needed for streaming generation
+            else:
+                break
