@@ -100,10 +100,10 @@ def filter_code_solution(sample, args):
     #     "generation"
     # ].find(args.code_begin):
     #     return "Boxed before code"
-    if sample["generation"].find(sample["predicted_answer"]) != -1 and sample["generation"].find(
-        sample["predicted_answer"]
-    ) < sample["generation"].find(args.code_begin):
-        return "Predicted answer before code"
+    # if sample["generation"].find(sample["predicted_answer"]) != -1 and sample["generation"].find(
+    #     sample["predicted_answer"]
+    # ) < sample["generation"].find(args.code_begin):
+    #     return "Predicted answer before code"
 
     # generation = cut_final_answer_part(sample["generation"])
     # if generation is None:
