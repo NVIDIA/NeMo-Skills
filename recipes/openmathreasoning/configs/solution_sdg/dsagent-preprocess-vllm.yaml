@@ -1,7 +1,7 @@
 cluster: local
 base_output_dir: /workspace/dsagent_detect_numeric_outliers # TODO: change this for each task!
-expname: gpt-4.1 # TODO change this
-suffix: gpt-4.1 # TODO change this
+expname: gpt-oss-120b # TODO change this
+suffix: gpt-oss-120b # TODO change this
 
 
 # Input file for the first stage (generate_solutions)
@@ -37,20 +37,29 @@ stages:
   generate_solutions:
     output_dir: ${directories.step-1-generate-solutions}
     input_file: ${input_file}
+    # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
-      ++prompt_config=dsagent_openai/tir
-      ++code_tags=qwen
-      ++inference.tokens_to_generate=16384
+      ++inference.tokens_to_generate=120000
+      ++inference.temperature=1.0
+      ++inference.top_p=1.0
+      ++max_concurrent_requests=1024
+      ++prompt_config=dsagent_openai/tir-gpt-oss
+      ++prompt_template=gpt-oss-high-python
+      ++code_tags=gpt-oss
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
       ++server.code_execution.add_remaining_code_executions=true
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
+    # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
-      model: gpt-4.1 # TODO change this
+      # you can take our published model from HF and use it as data generator
+      # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
-      server_type: azureopenai
-      server_address: https://prod.api.nvidia.com/llm/v1/azure
+      model: /hf_models/gpt-oss-120b
+      server_type: vllm
+      server_gpus: 2
+      server_args: "--async-scheduling --max-num-seqs=1024"
       num_random_seeds: ${num_random_seeds_to_generate}
 
   fill_majority_answer:

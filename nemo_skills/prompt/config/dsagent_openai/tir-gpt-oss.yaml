@@ -9,21 +9,18 @@ user: |-
   You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
   
-  When using python code, you must use the following this exact format with the tags wrapping the code. 
-  ```python
-  # Your Python code here
-  ```
-  The output of the code will be displayed in the following format:
-  ```output
-  # Code execution output will appear here
-  ```
-  For example:
-  ```python
-  print("Hello, world!")
-  ```
-  ```output
-  Hello, world!
-  ```
+  When generating python code, you must use the following format:
+  code_begin: <|start|>assistant<|channel|>analysis to=python code<|message|>
+  code_end: <|call|>
+  You must use the following format for the code output:
+  code_output_begin: <|start|>python code to=assistant<|channel|>analysis<|message|>
+  code_output_end: <|end|><|start|>assistant
+
+  For example, here is a valid code block:
+  <|start|>assistant<|channel|>analysis to=python code<|message|>print("Hello, world!")<|call|>
+  And this is a valid code output block:
+  <|start|>python code to=assistant<|channel|>analysis<|message|>Hello, world!<|end|><|start|>assistant
+
   Each output block must be preceded by an actual tool call. Do not write output block yourself, without an actual tool call. 
 
   {noise}
