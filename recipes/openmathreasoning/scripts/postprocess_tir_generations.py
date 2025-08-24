@@ -20,7 +20,7 @@ import re
 from collections import Counter
 
 
-def validate_code_execution(text, code_begin="```python", code_end="```"):
+def validate_code_execution(text, code_begin="```python", code_end="```", output_begin="```output", output_end="```"):
     lines = text.split('\n')
     i = 0
 
@@ -35,12 +35,12 @@ def validate_code_execution(text, code_begin="```python", code_end="```"):
             if code_end_idx == -1:
                 return False
 
-            if code_end_idx + 1 >= len(lines) or lines[code_end_idx + 1] != "```output":
+            if code_end_idx + 1 >= len(lines) or lines[code_end_idx + 1] != output_begin:
                 return False
 
             output_end_idx = -1
             for j in range(code_end_idx + 2, len(lines)):
-                if lines[j] == "```":
+                if lines[j] == output_end:
                     output_end_idx = j
                     break
 
@@ -92,7 +92,7 @@ def filter_code_solution(sample, args):
     # Make some initial filtering to speed up the next llm judgement stage
     if args.code_begin not in sample["generation"]:
         return "No code blocks found"
-    if not validate_code_execution(sample["generation"], args.code_begin.strip(), args.code_end.strip()):
+    if not validate_code_execution(sample["generation"], args.code_begin.strip(), args.code_end.strip(), args.output_begin.strip(), args.output_end.strip()):
         return "Incomplete code execution found"
     if "judgement" in sample and "judgement: no" in sample["judgement"].lower():
         return "Incorrect final answer"
@@ -166,6 +166,8 @@ if __name__ == "__main__":
         "--new_code_end", type=str, default=None,
         help="New end of code block tag, to replace the original one. If not specified, will not replace"
     )
+    parser.add_argument("--output_begin", type=str, default="```output", help="Start of output block tag")
+    parser.add_argument("--output_end", type=str, default="```", help="End of output block tag")
     args = parser.parse_args()
 
     output_dir = os.path.dirname(args.output_file)

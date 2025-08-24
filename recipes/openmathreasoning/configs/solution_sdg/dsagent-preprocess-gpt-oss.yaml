@@ -80,8 +80,8 @@ stages:
     input_dir: ${directories.step-3-judge-answers}
     code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
     code_end: "<|call|>" 
-    new_code_begin: "```python\n"
-    new_code_end: "```\n"
+    output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
+    output_end: "<|end|><|start|>assistant"
     dependencies:
       - judge_answers
     # You can use CPU partition for this script, if available
