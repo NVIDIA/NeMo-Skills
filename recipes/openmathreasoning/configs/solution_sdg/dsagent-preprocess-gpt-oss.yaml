@@ -56,7 +56,7 @@ stages:
     stage_kwargs:
       with_sandbox: true
       model: openai/gpt-oss-120b # /hf_models/gpt-oss-120b
-      server_type: openai # vllm
+      server_type: vllm # vllm
       # server_gpus: 2
       # server_args: "--async-scheduling --max-num-seqs=1024"
       server_address: http://localhost:8000/v1
