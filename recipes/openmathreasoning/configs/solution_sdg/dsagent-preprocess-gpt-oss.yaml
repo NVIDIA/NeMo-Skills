@@ -53,8 +53,6 @@ stages:
       ++override_max_code_executions=true
     # Arguments passed as kwargs to the pipeline function (e.g. generate())
     stage_kwargs:
-      # you can take our published model from HF and use it as data generator
-      # https://huggingface.co/nvidia/OpenMath-Nemotron-14B
       with_sandbox: true
       model: /hf_models/gpt-oss-120b
       server_type: vllm
