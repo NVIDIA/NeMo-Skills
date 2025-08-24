@@ -78,8 +78,8 @@ stages:
   postprocess_tir_generations:
     output_dir: ${directories.step-4-postprocess-tir}
     input_dir: ${directories.step-3-judge-answers}
-    code_begin: "<tool_call>\n" # "<|start|>assistant<|channel|>analysis to=python code<|message|>"
-    code_end: "</tool_call>\n" #"<|call|>" 
+    code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
+    code_end: "<|call|>" 
     new_code_begin: "```python\n"
     new_code_end: "```\n"
     dependencies:
