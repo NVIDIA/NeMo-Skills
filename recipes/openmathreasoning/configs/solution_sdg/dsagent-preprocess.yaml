@@ -47,7 +47,7 @@ stages:
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
     stage_kwargs:
-      model: gpt-oss-120b # gpt-5-chat # TODO change this
+      model: openai/gpt-oss-120b # gpt-5-chat # TODO change this
       with_sandbox: true
       server_type: openai # azureopenai
       server_address: http://localhost:8000/v1 # https://prod.api.nvidia.com/llm/v1/azure
