@@ -154,7 +154,9 @@ class CodeExecutionWrapper:
 
             # openai don't show what stop word was triggered, so we assume that it was `code_end`
             # if there's an unfinished code block
-            if is_openai_format and output_dict.get('finish_reason') == 'stop':
+            # if is_openai_format and output_dict.get('finish_reason') == 'stop':
+            # NOTE: change this to accomondate gpt-oss
+            if output_dict.get('finish_reason') == 'stop':
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
 
