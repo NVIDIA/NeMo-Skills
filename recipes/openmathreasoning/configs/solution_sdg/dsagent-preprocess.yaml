@@ -39,7 +39,7 @@ stages:
     input_file: ${input_file}
     inline_args: >-
       ++prompt_config=dsagent_openai/tir
-      ++code_tags=openmath
+      ++code_tags=qwen
       ++inference.tokens_to_generate=16384
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
