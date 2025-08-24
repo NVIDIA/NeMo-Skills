@@ -214,8 +214,11 @@ class CodeExecutionWrapper:
 
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
-            else:  # if no code was generated, we need to finish
-                break
+            # else:  # if no code was generated, we need to finish
+            #     break
+            # NOTE: Commented out the above break statement as it was causing premature termination
+            # The model should continue generating even if no code is present in this round
+            # (e.g., for explanatory text, analysis, import statements, etc.)
 
         # removing original prompt and returning the generation
         if is_openai_format:
@@ -434,5 +437,8 @@ class CodeExecutionWrapper:
                     current_full_prompt[-2]['content'] += formatted_code_output
                 else:
                     current_full_prompt += formatted_code_output
-            else:
-                break
+            # else:
+            #     break
+            # NOTE: Commented out the above break statement as it was causing premature termination
+            # The model should continue generating even if no code is present in this round
+            # (e.g., for explanatory text, analysis, import statements, etc.)
