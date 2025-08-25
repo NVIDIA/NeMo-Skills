@@ -50,7 +50,7 @@ def log_session_count(prefix: str = "") -> None:
 # Global dictionary to store IPython shells by session_id
 sessions = {}
 session_lock = threading.Lock()
-SESSION_TIMEOUT = float(os.getenv("SANDBOX_SESSION_TIMEOUT", 1800))  # 1 hour
+SESSION_TIMEOUT = float(os.getenv("SANDBOX_SESSION_TIMEOUT", 0))
 
 
 def cleanup_expired_sessions():
