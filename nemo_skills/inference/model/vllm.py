@@ -32,7 +32,7 @@ class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def _get_tokenizer_endpoint(self, model_name):
+    def _get_tokenizer_endpoint(self):
         """
         Returns the tokenizer endpoint if available, otherwise returns None.
         """

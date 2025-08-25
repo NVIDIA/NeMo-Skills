@@ -29,6 +29,7 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
+    ContextLimitRetryConfig,
     OnlineGenSelectConfig,
     get_code_execution_model,
     get_model,
@@ -275,6 +276,7 @@ class GenerationTask:
                 **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
             )
         else:
+            # Extract context retry config from server dict
             llm = get_model(**self.cfg.server)
 
         return llm

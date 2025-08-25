@@ -57,7 +57,10 @@ class BaseModel:
         port: str = "5000",
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
-        context_limit_retry_config: ContextLimitRetryConfig | None = None,
+        # Context limit retry config variables
+        enable_soft_fail: bool = False,
+        context_limit_retry_strategy: str = "reduce_generation",
+        num_special_tokens_budget: int = 10,
     ):
         self._tunnel = None
         self.model_name_or_path = model
@@ -65,7 +68,11 @@ class BaseModel:
         self.server_port = port
         self.ssh_server = ssh_server
         self.ssh_key_path = ssh_key_path
-        self.context_limit_retry_config = context_limit_retry_config
+        self.context_limit_retry_config = ContextLimitRetryConfig(
+            enable_soft_fail=enable_soft_fail,
+            strategy=context_limit_retry_strategy,
+            num_special_tokens_budget=10,
+        )
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
         if ssh_key_path is None:
@@ -100,7 +107,7 @@ class BaseModel:
             self.base_url = base_url
 
         # Get the tokenizer endpoint if available
-        self.tokenizer = self._get_tokenizer_endpoint(model)
+        self.tokenizer = self._get_tokenizer_endpoint()
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
