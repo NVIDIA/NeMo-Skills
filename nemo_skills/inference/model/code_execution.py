@@ -132,7 +132,7 @@ class CodeExecutionWrapper:
         stopped_on_repetition = False
 
         #NOTE: add a parameter for model who likes to pause
-        max_consecutive_no_code_generations = 4
+        max_consecutive_no_code_generations = 5
         consecutive_no_code_generations = 0
 
         # adding plus one to make sure there is always some completion after the last requested code block
