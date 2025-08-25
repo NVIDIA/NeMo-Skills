@@ -420,7 +420,7 @@ def main():
 
     checker = (
         f"cd /nemo_run/code/tests/slurm-tests/slurm_test_llama_nemotron_super_49B_v1._5_evals && "
-        f"python receipe.py --workspace {args.workspace} "
+        f"python check.py --workspace {args.workspace} "
     )
 
     run_cmd(
