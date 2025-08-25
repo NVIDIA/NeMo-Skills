@@ -44,10 +44,10 @@ async def execute(
     """Executes the given python code"""
     language = "ipython"
     output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
-    logger.info('Ran request with status: %s', output["process_status"])
+    logger.info("Ran request with status: %s", output["process_status"])
     return output
 
 
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport='stdio')
+    mcp.run(transport="stdio")

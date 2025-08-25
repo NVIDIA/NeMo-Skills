@@ -26,15 +26,15 @@ def _process_hide_args(result, hide_args):
     if hide_args:
         output = []
         for entry in result:
-            method_name = entry.get('name')
-            schema = copy.deepcopy(entry.get('input_schema', {}))
-            if method_name in hide_args and 'properties' in schema:
+            method_name = entry.get("name")
+            schema = copy.deepcopy(entry.get("input_schema", {}))
+            if method_name in hide_args and "properties" in schema:
                 for arg in hide_args[method_name]:
-                    schema['properties'].pop(arg, None)
-                    if 'required' in schema and arg in schema['required']:
-                        schema['required'].remove(arg)
+                    schema["properties"].pop(arg, None)
+                    if "required" in schema and arg in schema["required"]:
+                        schema["required"].remove(arg)
             new_entry = dict(entry)
-            new_entry['input_schema'] = schema
+            new_entry["input_schema"] = schema
             output.append(new_entry)
         return output
     return result
@@ -42,9 +42,9 @@ def _process_hide_args(result, hide_args):
 
 def async_wrapper(method):
     async def wrapped(self, *args, **kwargs):
-        hide_args = kwargs.pop('hide_args', None)
+        hide_args = kwargs.pop("hide_args", None)
         if hide_args is None:
-            hide_args = getattr(self, '_hide_args', {})
+            hide_args = getattr(self, "_hide_args", {})
         result = await method(self, *args, **kwargs)
         return _process_hide_args(result, hide_args)
 
@@ -116,9 +116,9 @@ class MCPClientMeta(type):
     """
 
     def __new__(mcls, name, bases, namespace):
-        orig_init = namespace.get('__init__')
+        orig_init = namespace.get("__init__")
         if orig_init is not None:
-            namespace['__init__'] = inject_hide_args(orig_init)
+            namespace["__init__"] = inject_hide_args(orig_init)
         # Wrap list_tools for hide_args masking (async or sync)
         orig_list = namespace.get("list_tools")
         if orig_list is not None:
@@ -131,7 +131,7 @@ class MCPClientMeta(type):
         # Create the instance using normal init flow
         instance = super().__call__(*args, **kwargs)
         # Add default attributes if they do not exist yet
-        if not hasattr(instance, '_hide_args'):
+        if not hasattr(instance, "_hide_args"):
             instance._hide_args = {}
         return instance
 
