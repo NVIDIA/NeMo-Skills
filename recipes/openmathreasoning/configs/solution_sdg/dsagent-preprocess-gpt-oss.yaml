@@ -40,8 +40,6 @@ stages:
     # Arguments passed inside the generate context string (e.g., ++param=value)
     inline_args: >-
       ++inference.tokens_to_generate=120000
-      ++inference.temperature=1.0
-      ++inference.top_p=1.0
       ++max_concurrent_requests=1024
       ++prompt_config=dsagent_openai/tir-gpt-oss
       ++prompt_template=gpt-oss-high-python
