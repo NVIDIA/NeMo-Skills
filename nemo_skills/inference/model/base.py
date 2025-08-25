@@ -22,7 +22,7 @@ import openai
 
 from nemo_skills.utils import get_logger_name
 
-from .context_retry import ContextLengthRetry, with_context_retry
+from .context_retry import ContextLimitRetryConfig, with_context_retry
 from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -57,7 +57,7 @@ class BaseModel:
         port: str = "5000",
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
-        context_retry_config: ContextLengthRetry | None = None,
+        context_limit_retry_config: ContextLimitRetryConfig | None = None,
     ):
         self._tunnel = None
         self.model_name_or_path = model
@@ -65,7 +65,7 @@ class BaseModel:
         self.server_port = port
         self.ssh_server = ssh_server
         self.ssh_key_path = ssh_key_path
-        self.context_retry_config = context_retry_config
+        self.context_limit_retry_config = context_limit_retry_config
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
         if ssh_key_path is None:

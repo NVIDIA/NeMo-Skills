@@ -71,12 +71,12 @@ def parse_context_window_exceeded_error(error: litellm.ContextWindowExceededErro
 
 
 @dataclass
-class ContextLengthRetry:
-    """Configuration for context window retry behavior."""
+class ContextLimitRetryConfig:
+    """Configuration for context limit retry behavior i.e. when the context limit is exceeded."""
 
-    enable_soft_fail: bool = False
-    strategy: str = "reduce_generation"
-    num_special_tokens_budget: int = 10
+    enable_soft_fail: bool = False  # If True, will try to reduce the context by reducing the number of tokens to generate or the prompt or in the worst case return an empty generation, otherwise will raise the error
+    strategy: str = "reduce_generation"  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
+    num_special_tokens_budget: int = 10  # Used when reducing the content of a message in the message list
 
     def __post_init__(self):
         """Validate configuration."""
@@ -108,19 +108,19 @@ class ContextLengthRetry:
 
 def with_context_retry(func: Callable) -> Callable:
     """
-    Decorator to add context window retry logic to generate functions.
-    Uses the model's context_retry_config attribute.
+    Decorator to add context limit retry logic to generate functions.
+    Uses the model's context_limit_retry_config attribute.
     """
-    default_config = ContextLengthRetry()
+    default_config = ContextLimitRetryConfig()
 
     @functools.wraps(func)
     async def async_wrapper(self, *args, **kwargs):
-        config = getattr(self, "context_retry_config", default_config)
+        config = getattr(self, "context_limit_retry_config", default_config)
         return await handle_context_retries_async(func, self, args, kwargs, config)
 
     @functools.wraps(func)
     def sync_wrapper(self, *args, **kwargs):
-        config = getattr(self, "context_retry_config", default_config)
+        config = getattr(self, "context_limit_retry_config", default_config)
         return handle_context_retries_sync(func, self, args, kwargs, config)
 
     # Return the appropriate wrapper based on whether the function is async
@@ -131,361 +131,253 @@ def with_context_retry(func: Callable) -> Callable:
 
 
 async def handle_context_retries_async(
-    func: Callable, self, args: tuple, kwargs: dict, config: ContextLengthRetry
+    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig
 ) -> dict:
-    """Sync version of context retry logic."""
-    original_tokens_to_generate = kwargs.get("tokens_to_generate", 2048)
-
+    """Async version of context retry logic."""
     try:
         result = await func(self, *args, **kwargs)
         return result
-
     except litellm.exceptions.ContextWindowExceededError as e:
-        if not config.enable_soft_fail:
-            raise e
-        else:
-            # Soft fail is enabled. We will try to reduce the number of requested tokens.
-            context_error = parse_context_window_exceeded_error(e)
-            if context_error is None:
-                # Not able to parse the result. We will just return an empty generation
-                detailed_error = (
-                    "Not able to parse the context window exceeded error. Returning empty generation.\n\n" + str(e)
-                )
-                LOG.warning(detailed_error)
-                return return_empty_generation_with_error(str(e))
-            else:
-                # We were able to parse the result. We will try to reduce the number of requested tokens.
-                max_context_length = context_error["max_context_length"]
-                message_tokens = context_error["message_tokens"]
-                completion_tokens = context_error["completion_tokens"]
-
-                # Strategy 1: Reduce the number of tokens to generate
-                if config.reduce_generate_tokens:
-                    # First let's check if token reduction is even feasible for the current config
-                    if message_tokens >= max_context_length:
-                        detailed_error = (
-                            "Messages tokens are already at the max context length. Cannot reduce generate tokens.\n\n"
-                            + str(e)
-                        )
-                        LOG.warning(detailed_error)
-                        return return_empty_generation_with_error(detailed_error)
-
-                    # We can reduce the number of tokens to generate
-                    reduced_generation_budget = max_context_length - message_tokens
-                    # This min operation is probably not needed but just in case
-                    reduced_tokens_to_generate = min(original_tokens_to_generate, reduced_generation_budget)
-                    LOG.warning(
-                        f"Reducing tokens_to_generate from {original_tokens_to_generate} to {reduced_tokens_to_generate} to stay within the context window."
-                    )
-                    kwargs["tokens_to_generate"] = reduced_tokens_to_generate
-                    return await func(self, *args, **kwargs)
-
-                # Strategy 2: Reduce the number of tokens in the prompt
-                if config.reduce_prompt_from_start or config.reduce_prompt_from_end:
-                    # First let's check if token reduction is even feasible for the current config
-                    if completion_tokens >= max_context_length:
-                        detailed_error = (
-                            "Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n"
-                            + str(e)
-                        )
-                        LOG.warning(detailed_error)
-                        return return_empty_generation_with_error(detailed_error)
-
-                    # Create a copy of args to avoid mutating the original
-                    encoded_prompt = self.tokenizer.encode(kwargs["prompt"])
-                    LOG.info(f"Length of encoded prompt: {len(encoded_prompt)}")
-
-                    num_prompt_tokens_to_keep = max_context_length - completion_tokens
-
-                    # Reduce the number of tokens in the prompt
-                    # If the prompt is a string, we will trim the string
-                    # If the prompt is a list, we will remove individual messages from the end or start of the list
-
-                    if isinstance(kwargs["prompt"], str):
-                        # Reduce the number of tokens in the prompt
-                        if config.reduce_prompt_from_start:
-                            trimmed_encoded_prompt = encoded_prompt[-num_prompt_tokens_to_keep:]
-                        elif config.reduce_prompt_from_end:
-                            trimmed_encoded_prompt = encoded_prompt[:num_prompt_tokens_to_keep]
-                        trimmed_prompt = self.tokenizer.decode(trimmed_encoded_prompt)
-                        kwargs["prompt"] = trimmed_prompt
-
-                    elif isinstance(kwargs["prompt"], list):
-                        # If the prompt is a list, we will remove individual messages from the end or start of the list
-                        # Gather length of all prefixes, and then decide where to trim the list
-
-                        # Create a copy of the prompt list to avoid mutating the original
-                        prompt_list = copy.deepcopy(kwargs["prompt"])
-
-                        # Iterate over the prompt list and trim the messages
-                        prefix_length_list = []
-                        trimmed_prompt_messages = []
-                        trimmed_prefix_length = 0
-                        if config.reduce_prompt_from_end:
-                            for idx in range(len(prompt_list)):
-                                # Encode messages up to the current message
-                                encoded_prefix = self.tokenizer.encode(prompt_list[: idx + 1])
-                                if encoded_prefix is None:
-                                    continue
-
-                                prefix_length = len(encoded_prefix)
-                                if prefix_length > num_prompt_tokens_to_keep:
-                                    # Can't add any more messages
-                                    # If we have a list of prefixes, we can trim the last message
-                                    if prefix_length_list:
-                                        # We have a list of prefixes, so we can trim the last message
-                                        trimmed_prompt_message_idx, trimmed_prefix_length = prefix_length_list[-1]
-                                        trimmed_prompt_messages = prompt_list[:trimmed_prompt_message_idx]
-
-                                    # Trim the current message
-                                    # Remaining tokens for the current message
-                                    num_rem_tokens = num_prompt_tokens_to_keep - trimmed_prefix_length
-                                    cur_trimmed_content = get_trimmed_content(
-                                        content=prompt_list[idx]["content"],
-                                        num_rem_tokens=num_rem_tokens,
-                                        num_special_tokens_budget=config.num_special_tokens_budget,
-                                        tokenizer=self.tokenizer,
-                                        trim_suffix=True,  # Trim the suffix of the message
-                                    )
-                                    if cur_trimmed_content is not None:
-                                        # We can add the current message by trimming its content
-                                        prompt_list[idx]["content"] = cur_trimmed_content
-                                        trimmed_prompt_messages.append(prompt_list[idx])
-
-                                    break
-
-                                else:
-                                    # Add details to the prefix length list
-                                    # We are adding the index of the message corresponding to the prefix length
-                                    # This index is necessary to avoid errors in case the subsequent prefix_lengths are None
-                                    prefix_length_list.append((idx + 1, prefix_length))
-
-                        elif config.reduce_prompt_from_start:
-                            for idx in range(len(prompt_list)):
-                                # Encode messages up to the current message
-                                encoded_prefix = self.tokenizer.encode(prompt_list[-(idx + 1) :])
-
-                                if encoded_prefix is None:
-                                    continue
-
-                                prefix_length = len(encoded_prefix)
-                                if prefix_length > num_prompt_tokens_to_keep:
-                                    # Can't add any more messages
-                                    if prefix_length_list:
-                                        # We have a list of prefixes, so we can trim the last message
-                                        trimmed_prompt_message_idx, trimmed_prefix_length = prefix_length_list[-1]
-                                        trimmed_prompt_messages = prompt_list[trimmed_prompt_message_idx:]
-
-                                    # Trim the current message
-                                    # Remaining tokens for the current message
-                                    num_rem_tokens = num_prompt_tokens_to_keep - trimmed_prefix_length
-                                    cur_trimmed_content = get_trimmed_content(
-                                        content=prompt_list[-(idx + 1)]["content"],
-                                        num_rem_tokens=num_rem_tokens,
-                                        num_special_tokens_budget=config.num_special_tokens_budget,
-                                        tokenizer=self.tokenizer,
-                                        trim_suffix=False,  # Trim the suffix of the message
-                                    )
-                                    if cur_trimmed_content is not None:
-                                        # We can add the current message by trimming its content
-                                        prompt_list[-(idx + 1)]["content"] = cur_trimmed_content
-                                        trimmed_prompt_messages.insert(0, prompt_list[-(idx + 1)])
-
-                                    break
-
-                                else:
-                                    # Add details to the prefix length list
-                                    # We are adding the index of the message corresponding to the prefix length
-                                    # This index is necessary to avoid errors in case the subsequent prefix_lengths are None
-                                    prefix_length_list.append((-(idx + 1), prefix_length))
-
-                        if trimmed_prompt_messages:
-                            # Set the prompt to be the reduced list of messages
-                            kwargs["prompt"] = trimmed_prompt_messages
-                        else:
-                            detailed_error = "Not able to trim the prompt. Returning empty generation.\n\n" + str(e)
-                            LOG.warning(detailed_error)
-                            return return_empty_generation_with_error(detailed_error)
-
-                    return await func(self, *args, **kwargs)
+        return await _handle_context_error_async(func, self, args, kwargs, config, e)
 
 
-def handle_context_retries_sync(func: Callable, self, args: tuple, kwargs: dict, config: ContextLengthRetry) -> dict:
+def handle_context_retries_sync(
+    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig
+) -> dict:
     """Sync version of context retry logic."""
-    original_tokens_to_generate = kwargs.get("tokens_to_generate", 2048)
-
     try:
         result = func(self, *args, **kwargs)
         return result
-
     except litellm.exceptions.ContextWindowExceededError as e:
-        if not config.enable_soft_fail:
-            raise e
+        return _handle_context_error_sync(func, self, args, kwargs, config, e)
+
+
+def _handle_context_error_sync(
+    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig, error: Exception
+) -> dict:
+    """Common logic for handling context window errors."""
+    if not config.enable_soft_fail:
+        raise error
+
+    modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+    if modified_kwargs is None:
+        return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+
+    return func(self, *args, **modified_kwargs)
+
+
+async def _handle_context_error_async(
+    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig, error: Exception
+) -> dict:
+    """Common logic for handling context window errors."""
+    if not config.enable_soft_fail:
+        raise error
+
+    modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+    if modified_kwargs is None:
+        return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+
+    return await func(self, *args, **modified_kwargs)
+
+
+def _prepare_context_error_retry(
+    kwargs: dict, config: ContextLimitRetryConfig, tokenizer, error: Exception
+) -> dict | None:
+    """Prepare kwargs for context error retry based on configured strategy.
+
+    Returns:
+        Modified kwargs dict if successful, None if strategy couldn't be applied
+    """
+    parsed_error = parse_context_window_exceeded_error(error)
+    if parsed_error is None:
+        detailed_error = f"Not able to parse the context window exceeded error. Returning empty generation.\n\n{error}"
+        LOG.warning(detailed_error)
+        return None
+
+    # Apply the configured strategy
+    if config.reduce_generate_tokens:
+        return _try_reduce_generation_tokens(kwargs, parsed_error, error)
+    elif config.reduce_prompt_from_start or config.reduce_prompt_from_end:
+        return _try_reduce_prompt_tokens(kwargs, parsed_error, config, tokenizer, error)
+    else:
+        detailed_error = f"No valid strategy configured. Returning empty generation.\n\n{error}"
+        LOG.warning(detailed_error)
+        return None
+
+
+def _try_reduce_generation_tokens(kwargs: dict, parsed_error: dict, original_error: Exception) -> dict:
+    """Try to reduce the number of tokens to generate."""
+    original_tokens = kwargs.get("tokens_to_generate", 2048)
+    max_context_length = parsed_error["max_context_length"]
+    message_tokens = parsed_error["message_tokens"]
+
+    if message_tokens >= max_context_length:
+        detailed_error = f"Messages tokens are already at the max context length. Cannot reduce generate tokens.\n\n{original_error}"
+        LOG.warning(detailed_error)
+        return None
+
+    reduced_generation_budget = max_context_length - message_tokens
+    # This min operation is probably not needed but just in case
+    reduced_tokens = min(original_tokens, reduced_generation_budget)
+
+    LOG.warning(
+        f"Reducing tokens_to_generate from {original_tokens} to {reduced_tokens} to stay within the context window."
+    )
+
+    modified_kwargs = kwargs.copy()
+    modified_kwargs["tokens_to_generate"] = reduced_tokens
+    return modified_kwargs
+
+
+def _try_reduce_prompt_tokens(
+    kwargs: dict,
+    parsed_error: dict,
+    config: ContextLimitRetryConfig,
+    tokenizer: ServerTokenizer,
+    original_error: Exception,
+) -> dict:
+    """Try to reduce the number of tokens in the prompt."""
+    max_context_length = parsed_error["max_context_length"]
+    completion_tokens = parsed_error["completion_tokens"]
+
+    if completion_tokens >= max_context_length:
+        detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
+        LOG.warning(detailed_error)
+        return None
+
+    num_prompt_tokens_to_keep = max_context_length - completion_tokens
+    prompt = kwargs["prompt"]
+
+    if isinstance(prompt, str):
+        return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)
+    elif isinstance(prompt, list):
+        return _trim_list_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer, original_error)
+    else:
+        LOG.warning(f"Unsupported prompt type: {type(prompt)}")
+        return None
+
+
+def _trim_string_prompt(
+    kwargs: dict, prompt: str, num_tokens_to_keep: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+) -> dict:
+    """Trim a string prompt to fit within token limits."""
+    encoded_prompt = tokenizer.encode(prompt)
+    LOG.info(f"Length of encoded prompt: {len(encoded_prompt)}")
+
+    if config.reduce_prompt_from_start:
+        trimmed_encoded = encoded_prompt[-num_tokens_to_keep:]
+    else:  # reduce_prompt_from_end
+        trimmed_encoded = encoded_prompt[:num_tokens_to_keep]
+
+    trimmed_prompt = tokenizer.decode(trimmed_encoded)
+    modified_kwargs = kwargs.copy()
+    modified_kwargs["prompt"] = trimmed_prompt
+    return modified_kwargs
+
+
+def _trim_list_prompt(
+    kwargs: dict,
+    prompt_list: list,
+    num_tokens_to_keep: int,
+    config: ContextLimitRetryConfig,
+    tokenizer: ServerTokenizer,
+    original_error: Exception,
+) -> dict:
+    """Trim a list-based prompt to fit within token limits."""
+    prompt_copy = copy.deepcopy(prompt_list)
+
+    if config.reduce_prompt_from_end:
+        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, config, tokenizer)
+    else:  # reduce_prompt_from_start
+        trimmed_messages = _trim_messages_from_start(prompt_copy, num_tokens_to_keep, config, tokenizer)
+
+    if not trimmed_messages:
+        detailed_error = f"Not able to trim the prompt. Returning empty generation.\n\n{original_error}"
+        LOG.warning(detailed_error)
+        return None
+
+    modified_kwargs = kwargs.copy()
+    modified_kwargs["prompt"] = trimmed_messages
+    return modified_kwargs
+
+
+def _trim_messages_from_end(
+    messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+) -> list:
+    """Trim messages from the end of the list."""
+    trimmed_messages = []
+    cumulative_tokens = 0  # Number of tokens in the previous messages
+
+    for idx, message in enumerate(messages):
+        # Check if adding this full message would exceed the limit
+        test_messages = messages[: idx + 1]
+        encoded = tokenizer.encode(test_messages)
+        if encoded is None:
+            continue
+
+        prefix_token_count = len(encoded)
+
+        if prefix_token_count > rem_token_budget:
+            # Try to partially include this message: Remove tokens from the previous messages -> cumulative_tokens
+            remaining_tokens = rem_token_budget - cumulative_tokens
+            trimmed_content = get_trimmed_content(
+                content=message["content"],
+                num_rem_tokens=remaining_tokens,
+                num_special_tokens_budget=config.num_special_tokens_budget,
+                tokenizer=tokenizer,
+                trim_suffix=True,  # Since we're trimming from the end, we want to trim the suffix of the current message
+            )
+            if trimmed_content:  # Successfully trimmed the content of the current message
+                message_copy = message.copy()
+                message_copy["content"] = trimmed_content
+                trimmed_messages.append(message_copy)
+            break
         else:
-            # Soft fail is enabled. We will try to reduce the number of requested tokens.
-            context_error = parse_context_window_exceeded_error(e)
-            if context_error is None:
-                # Not able to parse the result. We will just return an empty generation
-                detailed_error = (
-                    "Not able to parse the context window exceeded error. Returning empty generation.\n\n" + str(e)
-                )
-                LOG.warning(detailed_error)
-                return return_empty_generation_with_error(str(e))
+            trimmed_messages.append(message)
+            cumulative_tokens = prefix_token_count
+
+    return trimmed_messages
+
+
+def _trim_messages_from_start(
+    messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+) -> list:
+    """Returns the suffix of the current message list that fits within the token budget."""
+    total_messages = len(messages)
+    cumulative_tokens = 0  # For tracking the length of the previous suffix
+
+    for idx in range(total_messages):
+        # Test messages from this index to the end
+        suffix_start_idx = -(idx + 1)
+        test_messages = messages[suffix_start_idx:]
+        encoded = tokenizer.encode(test_messages)
+        if encoded is None:
+            continue
+
+        suffix_token_count = len(encoded)
+
+        if suffix_token_count > rem_token_budget:
+            # Try to partially include the first message of this slice
+            remaining_tokens = rem_token_budget - cumulative_tokens
+            trimmed_content = get_trimmed_content(
+                content=messages[suffix_start_idx]["content"],
+                num_rem_tokens=remaining_tokens,
+                num_special_tokens_budget=config.num_special_tokens_budget,
+                tokenizer=tokenizer,
+                trim_suffix=False,  # Since we're trimming from the start, we want to trim the prefix of the current message
+            )
+            if trimmed_content:  # Successfully trimmed the content of the current message
+                message_copy = messages[suffix_start_idx].copy()
+                message_copy["content"] = trimmed_content
+                return [message_copy] + messages[suffix_start_idx + 1 :]
             else:
-                # We were able to parse the result. We will try to reduce the number of requested tokens.
-                max_context_length = context_error["max_context_length"]
-                message_tokens = context_error["message_tokens"]
-                completion_tokens = context_error["completion_tokens"]
+                return messages[suffix_start_idx + 1 :]
 
-                # Strategy 1: Reduce the number of tokens to generate
-                if config.reduce_generate_tokens:
-                    # First let's check if token reduction is even feasible for the current config
-                    if message_tokens >= max_context_length:
-                        detailed_error = (
-                            "Messages tokens are already at the max context length. Cannot reduce generate tokens.\n\n"
-                            + str(e)
-                        )
-                        LOG.warning(detailed_error)
-                        return return_empty_generation_with_error(detailed_error)
+        else:
+            # Track the length of the current suffix
+            cumulative_tokens = suffix_token_count
 
-                    # We can reduce the number of tokens to generate
-                    reduced_generation_budget = max_context_length - message_tokens
-                    # This min operation is probably not needed but just in case
-                    reduced_tokens_to_generate = min(original_tokens_to_generate, reduced_generation_budget)
-                    LOG.warning(
-                        f"Reducing tokens_to_generate from {original_tokens_to_generate} to {reduced_tokens_to_generate} to stay within the context window."
-                    )
-                    kwargs["tokens_to_generate"] = reduced_tokens_to_generate
-                    return func(self, *args, **kwargs)
-
-                # Strategy 2: Reduce the number of tokens in the prompt
-                if config.reduce_prompt_from_start or config.reduce_prompt_from_end:
-                    # First let's check if token reduction is even feasible for the current config
-                    if completion_tokens >= max_context_length:
-                        detailed_error = (
-                            "Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n"
-                            + str(e)
-                        )
-                        LOG.warning(detailed_error)
-                        return return_empty_generation_with_error(detailed_error)
-
-                    # Create a copy of args to avoid mutating the original
-                    encoded_prompt = self.tokenizer.encode(kwargs["prompt"])
-                    LOG.info(f"Length of encoded prompt: {len(encoded_prompt)}")
-
-                    num_prompt_tokens_to_keep = max_context_length - completion_tokens
-
-                    # Reduce the number of tokens in the prompt
-                    # If the prompt is a string, we will trim the string
-                    # If the prompt is a list, we will remove individual messages from the end or start of the list
-
-                    if isinstance(kwargs["prompt"], str):
-                        # Reduce the number of tokens in the prompt
-                        if config.reduce_prompt_from_start:
-                            trimmed_encoded_prompt = encoded_prompt[-num_prompt_tokens_to_keep:]
-                        elif config.reduce_prompt_from_end:
-                            trimmed_encoded_prompt = encoded_prompt[:num_prompt_tokens_to_keep]
-                        trimmed_prompt = self.tokenizer.decode(trimmed_encoded_prompt)
-                        kwargs["prompt"] = trimmed_prompt
-
-                    elif isinstance(kwargs["prompt"], list):
-                        # If the prompt is a list, we will remove individual messages from the end or start of the list
-                        # Gather length of all prefixes, and then decide where to trim the list
-
-                        # Create a copy of the prompt list to avoid mutating the original
-                        prompt_list = copy.deepcopy(kwargs["prompt"])
-
-                        # Iterate over the prompt list and trim the messages
-                        prefix_length_list = []
-                        trimmed_prompt_messages = []
-                        trimmed_prefix_length = 0
-                        if config.reduce_prompt_from_end:
-                            for idx in range(len(prompt_list)):
-                                # Encode messages up to the current message
-                                encoded_prefix = self.tokenizer.encode(prompt_list[: idx + 1])
-                                if encoded_prefix is None:
-                                    continue
-
-                                prefix_length = len(encoded_prefix)
-                                if prefix_length > num_prompt_tokens_to_keep:
-                                    # Can't add any more messages
-                                    # If we have a list of prefixes, we can trim the last message
-                                    if prefix_length_list:
-                                        # We have a list of prefixes, so we can trim the last message
-                                        trimmed_prompt_message_idx, trimmed_prefix_length = prefix_length_list[-1]
-                                        trimmed_prompt_messages = prompt_list[:trimmed_prompt_message_idx]
-
-                                    # Trim the current message
-                                    # Remaining tokens for the current message
-                                    num_rem_tokens = num_prompt_tokens_to_keep - trimmed_prefix_length
-                                    cur_trimmed_content = get_trimmed_content(
-                                        content=prompt_list[idx]["content"],
-                                        num_rem_tokens=num_rem_tokens,
-                                        num_special_tokens_budget=config.num_special_tokens_budget,
-                                        tokenizer=self.tokenizer,
-                                        trim_suffix=True,  # Trim the suffix of the message
-                                    )
-                                    if cur_trimmed_content is not None:
-                                        # We can add the current message by trimming its content
-                                        prompt_list[idx]["content"] = cur_trimmed_content
-                                        trimmed_prompt_messages.append(prompt_list[idx])
-
-                                    break
-
-                                else:
-                                    # Add details to the prefix length list
-                                    # We are adding the index of the message corresponding to the prefix length
-                                    # This index is necessary to avoid errors in case the subsequent prefix_lengths are None
-                                    prefix_length_list.append((idx + 1, prefix_length))
-
-                        elif config.reduce_prompt_from_start:
-                            for idx in range(len(prompt_list)):
-                                # Encode messages up to the current message
-                                encoded_prefix = self.tokenizer.encode(prompt_list[-(idx + 1) :])
-
-                                if encoded_prefix is None:
-                                    continue
-
-                                prefix_length = len(encoded_prefix)
-                                if prefix_length > num_prompt_tokens_to_keep:
-                                    # Can't add any more messages
-                                    if prefix_length_list:
-                                        # We have a list of prefixes, so we can trim the last message
-                                        trimmed_prompt_message_idx, trimmed_prefix_length = prefix_length_list[-1]
-                                        trimmed_prompt_messages = prompt_list[trimmed_prompt_message_idx:]
-
-                                    # Trim the current message
-                                    # Remaining tokens for the current message
-                                    num_rem_tokens = num_prompt_tokens_to_keep - trimmed_prefix_length
-                                    cur_trimmed_content = get_trimmed_content(
-                                        content=prompt_list[-(idx + 1)]["content"],
-                                        num_rem_tokens=num_rem_tokens,
-                                        num_special_tokens_budget=config.num_special_tokens_budget,
-                                        tokenizer=self.tokenizer,
-                                        trim_suffix=False,  # Trim the suffix of the message
-                                    )
-                                    if cur_trimmed_content is not None:
-                                        # We can add the current message by trimming its content
-                                        prompt_list[-(idx + 1)]["content"] = cur_trimmed_content
-                                        trimmed_prompt_messages.insert(0, prompt_list[-(idx + 1)])
-
-                                    break
-
-                                else:
-                                    # Add details to the prefix length list
-                                    # We are adding the index of the message corresponding to the prefix length
-                                    # This index is necessary to avoid errors in case the subsequent prefix_lengths are None
-                                    prefix_length_list.append((-(idx + 1), prefix_length))
-
-                        if trimmed_prompt_messages:
-                            # Set the prompt to be the reduced list of messages
-                            kwargs["prompt"] = trimmed_prompt_messages
-                        else:
-                            detailed_error = "Not able to trim the prompt. Returning empty generation.\n\n" + str(e)
-                            LOG.warning(detailed_error)
-                            return return_empty_generation_with_error(detailed_error)
-
-                    return func(self, *args, **kwargs)
+    return []
 
 
 def get_trimmed_content(
