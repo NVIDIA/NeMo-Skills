@@ -6,6 +6,8 @@ user: |-
   # Guideline
   Write Python code to solve the task, integrating natural language reasoning with Python code executions.
   You must explain your reasoning step by step, with details.
+  There will be no human supervision in the process, so you must carry it out all by yourself.
+  Therefore, do not pause or stop generation until you think you have completed the task.   
   You may perform up to {total_code_executions} tool calls to a python environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
   

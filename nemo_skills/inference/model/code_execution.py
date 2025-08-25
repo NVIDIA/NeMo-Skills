@@ -179,6 +179,7 @@ class CodeExecutionWrapper:
             print(effective_max_code_executions)
 
             if generation_index == effective_max_code_executions:
+                print("--------------DEBUGGING: reached max code executions, breaking out of the loop-------------")
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
@@ -187,6 +188,7 @@ class CodeExecutionWrapper:
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
+                print("--------------DEBUGGING: reached max tokens, breaking out of the loop-------------")
                 break
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
@@ -221,12 +223,15 @@ class CodeExecutionWrapper:
                 code_rounds_executed += 1
 
                 # NOTE: reset the consecutive_no_code_generations
+                print("--------------DEBUGGING: RESET consecutive_no_code_generations-------------")
                 consecutive_no_code_generations = 0
             
             # NOTE: if no code was generated, we need to finish
             else: 
+                print("--------------DEBUGGING: No code generated, increasing consecutive_no_code_generations-------------")
                 consecutive_no_code_generations += 1
                 if consecutive_no_code_generations >= max_consecutive_no_code_generations:
+                    print("--------------DEBUGGING: reached max consecutive no code generations, breaking out of the loop-------------")
                     break
                 else:
                     continue
