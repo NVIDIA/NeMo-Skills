@@ -25,8 +25,11 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
     # step1: local data preparation
     prepare_datasets(["aime24", "aime25"])
 
-    # step2: download model
-    cmd = f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
+    # step2: download models
+    cmd = (
+        f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
+        f"huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
+    )
     run_cmd(
         ctx=wrap_arguments(cmd),
         cluster=cluster,
@@ -68,6 +71,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "++inference.tokens_to_generate=65536",
         "++inference.temperature=0.6",
         "++inference.top_p=0.95",
+        "++skip_filled=True",
         "++system_message=",
     ]
 
@@ -84,7 +88,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--output_dir",
         f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
         "--benchmarks",
-        "gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16",
+        "gpqa:16,scicode:16,math-500:16,aime24:16,aime25:16",
         "--server_gpus=8",
         *common_infer,
         "--run_after",
@@ -92,7 +96,31 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-math-code-science-on",
     ]
-    subprocess.run(cmd_reasoning, check=True)
+    # subprocess.run(cmd_reasoning, check=True)
+
+    # MMLU needs two continous jobs run on A100 GPU
+    cmd_reasoning = [
+        "ns",
+        "eval",
+        "--cluster",
+        cluster,
+        "--model",
+        base_model,
+        "--server_type",
+        "vllm",
+        "--output_dir",
+        f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        "--benchmarks",
+        "mmlu-pro:16",
+        "--server_gpus=8",
+        "--dependent_jobs=1",
+        *common_infer,
+        "--run_after",
+        f"{expname_prefix}-download-ruler-data",
+        "--expname",
+        f"{expname_prefix}-math-code-science-on",
+    ]
+    # subprocess.run(cmd_reasoning, check=True)
 
     # LiveCodeBench (Reasoning ON)
     cmd_livecode = [
@@ -117,7 +145,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-livecode-on",
     ]
-    subprocess.run(cmd_livecode, check=True)
+    # subprocess.run(cmd_livecode, check=True)
 
     # HLE (Reasoning ON)
     cmd_hle = [
@@ -134,8 +162,12 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--benchmarks",
         "hle:16",
         "--server_gpus=8",
-        "--judge_model=o3-mini-20250131",
-        "--extra_judge_args=++inference.tokens_to_generate=4096 ++max_concurrent_requests=8",
+        "--dependent_jobs=1",
+        "--judge_model",
+        f"{workspace}/Qwen2.5-32B-Instruct",
+        "--judge_server_type=vllm",
+        "--judge_server_gpus=8",
+        "--extra_judge_args=++inference.tokens_to_generate=4096 ",
         *common_infer,
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
@@ -169,7 +201,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-bfcl-on",
     ]
-    subprocess.run(cmd_bfcl, check=True)
+    # subprocess.run(cmd_bfcl, check=True)
 
     # RULER (Reasoning ON)  Note: no tokens_to_generate
     cmd_ruler = [
@@ -188,15 +220,17 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--data_dir",
         f"{workspace}/ns-data",
         "--server_gpus=8",
+        "--dependent_jobs=1",
         "++inference.temperature=0.6",
         "++inference.top_p=0.95",
+        "++skip_filled=True",
         "++system_message=",
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
         f"{expname_prefix}-ruler-on",
     ]
-    subprocess.run(cmd_ruler, check=True)
+    # subprocess.run(cmd_ruler, check=True)
 
 
 def eval_reasoning_off(workspace, cluster, expname_prefix):
@@ -212,6 +246,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "++inference.tokens_to_generate=65536",
         "++inference.temperature=0.0",
         "++inference.top_p=1.0",
+        "++skip_filled=True",
         "++system_message=/no_think",
     ]
 
@@ -236,7 +271,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-math-code-science-off",
     ]
-    subprocess.run(cmd_reasoning_off, check=True)
+    # subprocess.run(cmd_reasoning_off, check=True)
 
     # LiveCodeBench (Reasoning OFF)
     cmd_livecode_off = [
@@ -261,7 +296,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-livecode-off",
     ]
-    subprocess.run(cmd_livecode_off, check=True)
+    # subprocess.run(cmd_livecode_off, check=True)
 
     # HLE (Reasoning OFF)
     cmd_hle_off = [
@@ -278,8 +313,12 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--benchmarks",
         "hle:16",
         "--server_gpus=8",
-        "--judge_model=o3-mini-20250131",
-        "--extra_judge_args=++inference.tokens_to_generate=4096 ++max_concurrent_requests=8",
+        "--dependent_jobs=1",
+        "--judge_model",
+        f"{workspace}/Qwen2.5-32B-Instruct",
+        "--judge_server_type=vllm",
+        "--judge_server_gpus=8",
+        "--extra_judge_args=++inference.tokens_to_generate=4096 ",
         *common_infer,
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
@@ -313,7 +352,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-bfcl-off",
     ]
-    subprocess.run(cmd_bfcl_off, check=True)
+    # subprocess.run(cmd_bfcl_off, check=True)
 
     # RULER (Reasoning OFF)  Note: no tokens_to_generate
     cmd_ruler_off = [
@@ -332,37 +371,77 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--data_dir",
         f"{workspace}/ns-data",
         "--server_gpus=8",
+        "--dependent_jobs=1",
         "++inference.temperature=0.0",
         "++inference.top_p=1.0",
+        "++skip_filled=True",
         "++system_message=/no_think",
         "--run_after",
         f"{expname_prefix}-download-ruler-data",
         "--expname",
         f"{expname_prefix}-ruler-off",
     ]
-    subprocess.run(cmd_ruler_off, check=True)
+    # subprocess.run(cmd_ruler_off, check=True)
 
 
 # Prepare evaluation data locally first
-cmd = [
-    "ns",
-    "prepare_data",
-    "gpqa",
-    "mmlu-pro",
-    "hle",
-    "livecodebench",
-    "scicode",
-    "bfcl_v3",
-    "math-500",
-    "aime24",
-    "aime25",
-]
-subprocess.run(cmd, capture_output=False)
+def prepare_data_locally():
+    cmd = [
+        "ns",
+        "prepare_data",
+        "gpqa",
+        "mmlu-pro",
+        "hle",
+        "livecodebench",
+        "scicode",
+        "bfcl_v3",
+        "math-500",
+        "aime24",
+        "aime25",
+    ]
+    subprocess.run(cmd, capture_output=False)
 
 
-workspace = "/lustre/fsw/portfolios/llmservice/users/wedu/llm/test-49b"
-cluster = "oci"
-expname_prefix = "test-49b"
-download_models_ruler_data(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
-eval_reasoning_on(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
-eval_reasoning_off(workspace=workspace, cluster=cluster, expname_prefix=expname_prefix)
+def main():
+    parser = argparse.ArgumentParser(description="Run Nemotron eval pipeline")
+    parser.add_argument("--workspace", required=True, help="Workspace directory containing all experiment data")
+    parser.add_argument("--cluster", required=True, help="Cluster name, e.g. oci")
+    parser.add_argument("--expname_prefix", required=True, help="Experiment name prefix")
+
+    args = parser.parse_args()
+
+    # launch for eval jobs
+    # prepare_data_locally()
+    # download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    # eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+
+    # Schedule a dependent check job on the cluster and check if the results are as expected
+
+    checker = (
+        f"cd /nemo_run/code/tests/slurm-tests/slurm_test_llama_nemotron_super_49B_v1._5_evals && "
+        f"python receipe.py --workspace {args.workspace} "
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(checker),
+        cluster=args.cluster,
+        expname=f"check-eval-results-for-llama-49b",
+        log_dir=f"{args.workspace}/logs",
+        run_after=[
+            f"{args.expname_prefix}-math-code-science-on",
+            f"{args.expname_prefix}-livecode-on",
+            f"{args.expname_prefix}-hle-on",
+            f"{args.expname_prefix}-bfcl-on",
+            f"{args.expname_prefix}-ruler-on",
+            f"{args.expname_prefix}-math-code-science-off",
+            f"{args.expname_prefix}-livecode-off",
+            f"{args.expname_prefix}-hle-off",
+            f"{args.expname_prefix}-bfcl-off",
+            f"{args.expname_prefix}-ruler-off",
+        ],
+    )
+
+
+if __name__ == "__main__":
+    main()

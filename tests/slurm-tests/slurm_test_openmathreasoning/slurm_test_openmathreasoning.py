@@ -58,7 +58,7 @@ def main():
     #    This downloads the checker into the workspace and runs it there.
 
     checker = (
-        f"cd /nemo-run/code/tests/slurm-tests/slurm_test_openmathreasoning && "
+        f"cd /nemo_run/code/tests/slurm-tests/slurm_test_openmathreasoning && "
         f"python check_sft_results.py --workspace {args.workspace} "
     )
 
