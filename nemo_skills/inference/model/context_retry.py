@@ -34,7 +34,7 @@ def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowE
     Extract token information from LiteLLM context window error messages.
 
     Returns:
-        Dict with keys: max_context_length, total_requested_tokens, message_tokens, completion_tokens
+        Dict with keys: max_context_length, message_tokens, completion_tokens
         None if parsing fails
     """
     # Handle both patterns: with and without parentheses
@@ -62,7 +62,6 @@ def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowE
     if match:
         return {
             "max_context_length": int(match.group(1)),
-            "total_requested_tokens": int(match.group(2)),
             "message_tokens": int(match.group(3)),
             "completion_tokens": int(match.group(4)),
         }
