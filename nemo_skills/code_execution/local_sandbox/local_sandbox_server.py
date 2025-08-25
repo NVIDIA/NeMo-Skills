@@ -307,6 +307,31 @@ def execute_lean4(generated_code, timeout):
             os.remove(temp_file_name)
 
 
+def execute_shell(command, timeout):
+    tmp_path = None
+    try:
+        # Write the full script to a temp file so /bin/bash can read it from disk
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".sh", mode="w") as tmp:
+            tmp.write(command)
+            tmp_path = tmp.name
+        os.chmod(tmp_path, 0o755)
+
+        result = subprocess.run(
+            ["/bin/bash", tmp_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            preexec_fn=set_limits,
+        )
+        return {"stdout": result.stdout, "stderr": result.stderr}
+    except subprocess.TimeoutExpired:
+        return {"stdout": "", "stderr": "Timed out\n"}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 # Main Flask endpoint to handle execution requests
 @app.route("/execute", methods=["POST"])
 def execute():
@@ -325,6 +350,8 @@ def execute():
         result = execute_ipython_session(generated_code, session_id, traceback_verbosity)
     elif language == "lean4":
         result = execute_lean4(generated_code, timeout)
+    elif language == "shell":
+        return execute_shell(generated_code, timeout)
     else:
         result = execute_python(generated_code, std_input, timeout, language)
 

@@ -194,11 +194,11 @@ class Sandbox(abc.ABC):
         traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-        if language in ["python", "pypy3", "python3", "lean4"] and session_id is not None:
+        if language in ["python", "pypy3", "python3", "lean4", "shell"] and session_id is not None:
             raise RuntimeError(
                 f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
             )
-        if language not in ["ipython", "python", "pypy3", "python3", "lean4"]:
+        if language not in ["ipython", "python", "pypy3", "python3", "lean4", "shell"]:
             raise ValueError(f"Unsupported language: {language}")
         if language != "ipython" and traceback_verbosity != "Plain":
             raise ValueError("Configurable traceback_verbosity is only supported for ipython")
