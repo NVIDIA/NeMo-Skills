@@ -35,4 +35,7 @@ user_end: "<|end|>"
 assistant_begin: "<|start|>assistant"
 assistant_end: "<|end|>"
 
+final_answer_begin: "<|start|>assistant<|channel|>final<|message|>"
+final_answer_end: "<|return|>"
+
 stop_phrases: ['<|return|>'] 

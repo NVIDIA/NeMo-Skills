@@ -29,7 +29,7 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import get_code_execution_model, get_model, server_params
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.prompt.utils import get_prompt, load_config # NOTE load template
 from nemo_skills.utils import (
     chunk_data,
     get_help_message,
@@ -258,7 +258,9 @@ class GenerationTask:
     def setup_llm(self):
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+            # NOTE load prompt template
+            prompt_template = load_config(self.cfg.prompt_template)
+            llm = get_code_execution_model(**self.cfg.server, **prompt_template, sandbox=sandbox)
         else:
             llm = get_model(**self.cfg.server)
 
