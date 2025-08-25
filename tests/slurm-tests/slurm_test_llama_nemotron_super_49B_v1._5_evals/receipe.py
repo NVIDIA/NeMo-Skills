@@ -439,29 +439,23 @@ def main():
         f"python check.py --workspace {args.workspace} "
     )
 
-    # run_cmd(
-    #     ctx=wrap_arguments(checker),
-    #     cluster=args.cluster,
-    #     expname=f"check-eval-results-for-llama-49b",
-    #     log_dir=f"{args.workspace}/logs",
-    #     run_after=[
-    #         f"{args.expname_prefix}-math-code-science-on",
-    #         f"{args.expname_prefix}-livecode-on",
-    #         f"{args.expname_prefix}-hle-on",
-    #         f"{args.expname_prefix}-bfcl-on",
-    #         f"{args.expname_prefix}-ruler-on",
-    #         f"{args.expname_prefix}-math-code-science-off",
-    #         f"{args.expname_prefix}-livecode-off",
-    #         f"{args.expname_prefix}-hle-off",
-    #         f"{args.expname_prefix}-bfcl-off",
-    #         f"{args.expname_prefix}-ruler-off",
-    #     ],
-    # )
     run_cmd(
         ctx=wrap_arguments(checker),
         cluster=args.cluster,
         expname=f"check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/logs",
+        run_after=[
+            f"{args.expname_prefix}-math-code-science-on",
+            f"{args.expname_prefix}-livecode-on",
+            f"{args.expname_prefix}-hle-on",
+            f"{args.expname_prefix}-bfcl-on",
+            f"{args.expname_prefix}-ruler-on",
+            f"{args.expname_prefix}-math-code-science-off",
+            f"{args.expname_prefix}-livecode-off",
+            f"{args.expname_prefix}-hle-off",
+            f"{args.expname_prefix}-bfcl-off",
+            f"{args.expname_prefix}-ruler-off",
+        ],
     )
 
 
