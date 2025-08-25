@@ -39,6 +39,8 @@ def _process_hide_args(result, hide_args):
     return result
 
 
+
+
 def async_wrapper(method):
     async def wrapped(self, *args, **kwargs):
         hide_args = kwargs.pop('hide_args', None)
@@ -48,6 +50,20 @@ def async_wrapper(method):
         return _process_hide_args(result, hide_args)
     return wrapped
 
+
+def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
+    """Remove hidden-argument keys from the model-supplied tool args.
+
+    Only top-level keys are removed, matching how schemas are exposed. Returns
+    a new dict when sanitization is needed; otherwise returns the original.
+    """
+    if not tool_name or not hide_args or not isinstance(args_dict, dict):
+        return args_dict
+    hidden_keys = set(hide_args.get(tool_name, []) or [])
+    if not hidden_keys:
+        return args_dict
+    return {k: v for k, v in args_dict.items() if k not in hidden_keys}
+
 def inject_hide_args(init_func):
     @functools.wraps(init_func)
     def wrapper(self, *args, hide_args=None, **kwargs):
@@ -56,12 +72,46 @@ def inject_hide_args(init_func):
     return wrapper
 
 class MCPClientMeta(type):
+    """Metaclass that adds `hide_args` support to MCP client implementations.
+
+    Responsibilities:
+    - Wraps `__init__` to accept an optional `hide_args` mapping and stores it
+      on instances as `_hide_args`.
+    - Wraps `list_tools` so its returned tool schemas are post-processed to
+      remove arguments specified in `_hide_args` (by pruning properties and
+      updating `required`).
+    - Input sanitization is available via `sanitize` method on the client.
+    - Ensures every instance has a default `_hide_args` attribute even when
+      subclasses do not define/override `__init__`.
+
+    Example:
+    ```python
+    from typing import Any, Dict
+
+    # Inherit from any MCPClient class (its class was created with MCPClientMeta)
+    class MyClient(MCPClient):
+        # No need to add `hide_args` to the signature or handle masking yourself
+        ...
+
+    # Consumers can now pass `hide_args` seamlessly. The metaclass-injected
+    # logic ensures hidden parameters are pruned from tool input schemas
+    # returned by list_tools.
+    client = MyClient(base_url="https://mcp.example.com", hide_args={
+        "tool_name": ["timeout"],
+    })
+    tools: list[Dict[str, Any]] = await client.list_tools()
+    # The input_schema for "tool_name" will no longer expose
+    # the "timeout" parameter.
+    #
+    # The model could still hypothetically call the tool with the hidden argument,
+    # but as long as the sanitize method is called, the hidden argument will be
+    # removed from the input schema.
+    safe_args = client.sanitize("tool_name", {"timeout": 100000, "x": 1})
+    result = await client.call_tool("tool_name", timeout=10, **safe_args)
+
+    ```
+    """
     def __new__(mcls, name, bases, namespace):
-        # orig = namespace.get("list_tools")
-        # if orig is not None:
-        #     namespace["list_tools"] = async_wrapper(orig)
-        # return super().__new__(mcls, name, bases, namespace)
-                # Wrap __init__ for _hide_args injection
         orig_init = namespace.get('__init__')
         if orig_init is not None:
             namespace['__init__'] = inject_hide_args(orig_init)
@@ -85,6 +135,11 @@ class MCPClient(metaclass=MCPClientMeta):
     def __init__(self, hide_args=None, **kwargs):
         self._hide_args = hide_args or {}
         super().__init__(**kwargs)
+
+    # Manual sanitization helpers (input-only)
+    def sanitize(self, tool: str, args: dict) -> dict:
+        """Return a copy of args with hidden keys removed for the given tool."""
+        return _sanitize_input_args_for_tool(args, tool, self._hide_args)
 
     @abstractmethod
     async def list_tools(self):
