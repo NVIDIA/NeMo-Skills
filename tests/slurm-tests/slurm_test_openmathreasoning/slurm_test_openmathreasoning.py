@@ -32,8 +32,6 @@ def main():
     args = ap.parse_args()
 
     # 1) Run simplified_recipe
-    os.environ.setdefault("NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK", "1")
-
     cmd = [
         sys.executable,
         "-m",
