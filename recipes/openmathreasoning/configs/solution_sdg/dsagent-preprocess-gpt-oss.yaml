@@ -48,6 +48,8 @@ stages:
       ++code_execution=true
       ++server.code_execution.max_code_executions=null
       ++server.code_execution.add_remaining_code_executions=true
+      ++server.code_execution.user_begin="<|start|>user<|message|>"
+      ++server.code_execution.user_end="<|end|>"
       ++total_code_executions_in_prompt='[10, 30]'
       ++override_max_code_executions=true
     # Arguments passed as kwargs to the pipeline function (e.g. generate())

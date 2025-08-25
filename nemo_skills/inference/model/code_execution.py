@@ -40,6 +40,9 @@ class CodeExecutionConfig:
     max_code_executions: int = 8
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
+    # NOTE: 
+    user_begin: str = None
+    user_end: str = None
 
 
 class CodeExecutionWrapper:
@@ -174,6 +177,10 @@ class CodeExecutionWrapper:
                 request['prompt'].append({'role': 'user', 'content': "continue"})
             else:
                 request['prompt'] += output
+                # construct the continue signal from user
+                assert self.config.user_begin is not None and self.config.user_end is not None, "You must set ++server.code_execution.user_begin and ++server.code_execution.user_end in the config"
+                continue_signal = f"{self.config.user_begin}{output}{self.config.user_end}"
+                request['prompt'] += continue_signal
             
             print(f"--------------DEBUGGING generation_index: {generation_index}: New request['prompt'] for next round------------")
             print(request['prompt'])
