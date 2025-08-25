@@ -146,12 +146,12 @@ class CodeExecutionWrapper:
         while code_rounds_executed <= effective_max_code_executions and generation_index <= max_generation_rounds:
 
             generation_time_start = time.time()
-            if timeout is not None:
-                # updating timeout to account for the time already spent
-                new_timeout = int(timeout - (time.time() - start_time))
-                request["timeout"] = new_timeout
-                if request['timeout'] <= 0:
-                    break
+            # if timeout is not None:
+            #     # updating timeout to account for the time already spent
+            #     new_timeout = int(timeout - (time.time() - start_time))
+            #     request["timeout"] = new_timeout
+            #     if request['timeout'] <= 0:
+            #         break
 
             output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
             print(f"--------------DEBUGGING generation_index: {generation_index}: output_dict-------------")
@@ -250,7 +250,9 @@ class CodeExecutionWrapper:
         if is_openai_format:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
-            generation = request['prompt'][len(prompt) :]
+            # generation = request['prompt'][len(prompt) :]
+            # NOTE: cut off the prompt, and remove the final continue signal string from the user
+            generation = request['prompt'][len(prompt):-len(continue_signal)]
 
         print(f"--------------DEBUGGING generation_index: {generation_index}: Final generation-------------")
         print(generation)
