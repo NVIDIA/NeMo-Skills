@@ -259,7 +259,7 @@ class GenerationTask:
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             # NOTE load prompt template
-            prompt_template = load_config(config = self.cfg.prompt_template, config_dir = Path(__file__).parent.absolute() / 'template')
+            prompt_template = load_config(config = self.cfg.prompt_template, config_dir = '/nemo_run/code/nemo_skills/prompt/template')
             llm = get_code_execution_model(**self.cfg.server, **prompt_template, sandbox=sandbox)
         else:
             llm = get_model(**self.cfg.server)
