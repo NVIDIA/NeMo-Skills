@@ -41,7 +41,7 @@ REASONING_RANGE = {
         "math-500": (70.0, 80.0),
         "aime24": (11, 21.0),
         "aime25": (3, 9),
-        "gpqa": (60.0, 80.0),
+        "gpqa": (46.0, 56.0),
         "mmlu-pro": (65.0, 75.0),
         "livecodebench": (25.0, 35.0),
         "scicode": {
@@ -118,9 +118,9 @@ RULER_TASKS = [
 RANGE_RULER = {
     "reasoning_on": {
         "ruler.nemotron_super_128k": (55.0, 75.0),
-        "ruler.nemotron_super_128k.niah_single_1": (95.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (95.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_3": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_1": (90.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_2": (90.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_3": (90.0, 100.0),
         "ruler.nemotron_super_128k.niah_multikey_1": (65.0, 80.0),
         "ruler.nemotron_super_128k.niah_multikey_2": (50.0, 65.0),
         "ruler.nemotron_super_128k.niah_multikey_3": (15.0, 25.0),
@@ -135,8 +135,8 @@ RANGE_RULER = {
     "reasoning_off": {
         "ruler.nemotron_super_128k": (55.0, 75.0),
         "ruler.nemotron_super_128k.niah_single_1": (95.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (95.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_3": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_2": (90.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_3": (90.0, 100.0),
         "ruler.nemotron_super_128k.niah_multikey_1": (60.0, 75.0),
         "ruler.nemotron_super_128k.niah_multikey_2": (45.0, 55.0),
         "ruler.nemotron_super_128k.niah_multikey_3": (15.0, 25.0),

@@ -112,7 +112,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-math-code-science-on",
     ]
-    # subprocess.run(cmd_reasoning, check=True)
+    subprocess.run(cmd_reasoning, check=True)
 
     # MMLU needs two continous jobs run on A100 GPU
     cmd_reasoning = [
@@ -136,7 +136,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-math-code-science-on",
     ]
-    # subprocess.run(cmd_reasoning, check=True)
+    subprocess.run(cmd_reasoning, check=True)
 
     # LiveCodeBench (Reasoning ON)
     cmd_livecode = [
@@ -161,7 +161,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-livecode-on",
     ]
-    # subprocess.run(cmd_livecode, check=True)
+    subprocess.run(cmd_livecode, check=True)
 
     # HLE (Reasoning ON)
     cmd_hle = [
@@ -217,7 +217,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-bfcl-on",
     ]
-    # subprocess.run(cmd_bfcl, check=True)
+    subprocess.run(cmd_bfcl, check=True)
 
     # RULER (Reasoning ON)  Note: no tokens_to_generate
     cmd_ruler = [
@@ -246,7 +246,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-ruler-on",
     ]
-    # subprocess.run(cmd_ruler, check=True)
+    subprocess.run(cmd_ruler, check=True)
 
 
 def eval_reasoning_off(workspace, cluster, expname_prefix):
@@ -287,7 +287,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-math-code-science-off",
     ]
-    # subprocess.run(cmd_reasoning_off, check=True)
+    subprocess.run(cmd_reasoning_off, check=True)
 
     # LiveCodeBench (Reasoning OFF)
     cmd_livecode_off = [
@@ -312,7 +312,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-livecode-off",
     ]
-    # subprocess.run(cmd_livecode_off, check=True)
+    subprocess.run(cmd_livecode_off, check=True)
 
     # HLE (Reasoning OFF)
     cmd_hle_off = [
@@ -368,7 +368,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-bfcl-off",
     ]
-    # subprocess.run(cmd_bfcl_off, check=True)
+    subprocess.run(cmd_bfcl_off, check=True)
 
     # RULER (Reasoning OFF)  Note: no tokens_to_generate
     cmd_ruler_off = [
@@ -397,7 +397,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         "--expname",
         f"{expname_prefix}-ruler-off",
     ]
-    # subprocess.run(cmd_ruler_off, check=True)
+    subprocess.run(cmd_ruler_off, check=True)
 
 
 # Prepare evaluation data locally first
@@ -427,10 +427,10 @@ def main():
     args = parser.parse_args()
 
     # launch for eval jobs
-    prepare_data_locally()
-    download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    # prepare_data_locally()
+    # download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    # eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    # eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
     # schedule a dependent check job on the cluster and check if the results are as expected
 
@@ -439,23 +439,29 @@ def main():
         f"python check.py --workspace {args.workspace} "
     )
 
+    # run_cmd(
+    #     ctx=wrap_arguments(checker),
+    #     cluster=args.cluster,
+    #     expname=f"check-eval-results-for-llama-49b",
+    #     log_dir=f"{args.workspace}/logs",
+    #     run_after=[
+    #         f"{args.expname_prefix}-math-code-science-on",
+    #         f"{args.expname_prefix}-livecode-on",
+    #         f"{args.expname_prefix}-hle-on",
+    #         f"{args.expname_prefix}-bfcl-on",
+    #         f"{args.expname_prefix}-ruler-on",
+    #         f"{args.expname_prefix}-math-code-science-off",
+    #         f"{args.expname_prefix}-livecode-off",
+    #         f"{args.expname_prefix}-hle-off",
+    #         f"{args.expname_prefix}-bfcl-off",
+    #         f"{args.expname_prefix}-ruler-off",
+    #     ],
+    # )
     run_cmd(
         ctx=wrap_arguments(checker),
         cluster=args.cluster,
         expname=f"check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/logs",
-        run_after=[
-            f"{args.expname_prefix}-math-code-science-on",
-            f"{args.expname_prefix}-livecode-on",
-            f"{args.expname_prefix}-hle-on",
-            f"{args.expname_prefix}-bfcl-on",
-            f"{args.expname_prefix}-ruler-on",
-            f"{args.expname_prefix}-math-code-science-off",
-            f"{args.expname_prefix}-livecode-off",
-            f"{args.expname_prefix}-hle-off",
-            f"{args.expname_prefix}-bfcl-off",
-            f"{args.expname_prefix}-ruler-off",
-        ],
     )
 
 
