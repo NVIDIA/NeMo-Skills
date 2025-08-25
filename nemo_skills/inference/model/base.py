@@ -71,7 +71,7 @@ class BaseModel:
         self.context_limit_retry_config = ContextLimitRetryConfig(
             enable_soft_fail=enable_soft_fail,
             strategy=context_limit_retry_strategy,
-            num_special_tokens_budget=10,
+            num_special_tokens_budget=num_special_tokens_budget,
         )
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
@@ -242,6 +242,7 @@ class BaseModel:
                 return result
 
             except litellm.exceptions.ContextWindowExceededError as e:
+                LOG.error(f"ContextWindowExceededError: {e}")
                 raise e
 
             except openai.BadRequestError as e:

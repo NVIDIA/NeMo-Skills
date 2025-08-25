@@ -50,7 +50,6 @@ models = {
 def get_model(server_type, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    print(kwargs)
     return model_class(**kwargs)
 
 

@@ -18,7 +18,7 @@ import functools
 import logging
 import re
 from dataclasses import dataclass
-from typing import Callable, Union
+from typing import Callable, Dict, Union
 
 import litellm
 
@@ -29,7 +29,7 @@ from .utils import ServerTokenizer
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowExceededError) -> Union[dict, None]:
+def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
     """
     Extract token information from LiteLLM context window error messages.
 
@@ -37,15 +37,19 @@ def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowE
         Dict with keys: max_context_length, message_tokens, completion_tokens
         None if parsing fails
     """
-    # Handle both patterns: with and without parentheses
+
+    error_str = str(error)
+
+    # Pattern 1: Handle the format from your example
+    # "maximum context length is 40960 tokens and your request has 142 input tokens (1000000 > 40960 - 142)"
     pattern1 = re.compile(
         r"maximum context length is (\d+) tokens.*?"
-        r"you requested (\d+) tokens.*?"
-        r"\((\d+) in the messages, (\d+) in the completion\)",
+        r"request has (\d+) input tokens.*?"
+        r"\((\d+) > \d+ - \d+\)",
         re.IGNORECASE | re.DOTALL,
     )
 
-    # Alternative pattern for messages like: "45008 in the messages, 2048 in the completion"
+    # Pattern 2: Handle format like "45008 in the messages, 2048 in the completion"
     pattern2 = re.compile(
         r"maximum context length is (\d+) tokens.*?"
         r"you requested (\d+) tokens.*?"
@@ -53,12 +57,20 @@ def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowE
         re.IGNORECASE | re.DOTALL,
     )
 
-    error_str = str(error)
-
+    # Try pattern 1 first (matches your example)
     match = pattern1.search(error_str)
-    if not match:
-        match = pattern2.search(error_str)
+    if match:
+        max_context = int(match.group(1))
+        message_tokens = int(match.group(2))
+        completion_tokens = int(match.group(3)) - max_context + message_tokens
+        return {
+            "max_context_length": max_context,
+            "message_tokens": message_tokens,
+            "completion_tokens": completion_tokens,
+        }
 
+    # Try pattern 2
+    match = pattern2.search(error_str)
     if match:
         return {
             "max_context_length": int(match.group(1)),
