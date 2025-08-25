@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import json
+from typing import Any, Dict
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
 
 app = FastAPI(title="Math MCP Server")
 
@@ -25,12 +26,9 @@ TOOLS = {
         "input_schema": {
             "type": "object",
             "title": "AddInput",
-            "properties": {
-                "a": {"type": "integer"},
-                "b": {"type": "integer"}
-            },
+            "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
             "required": ["a", "b"],
-            "additionalProperties": False
+            "additionalProperties": False,
         },
     },
     "mul": {
@@ -38,23 +36,23 @@ TOOLS = {
         "input_schema": {
             "type": "object",
             "title": "MultiplyInput",
-            "properties": {
-                "a": {"type": "integer"},
-                "b": {"type": "integer"}
-            },
+            "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
             "required": ["a", "b"],
-            "additionalProperties": False
+            "additionalProperties": False,
         },
     },
 }
+
 
 class ToolCallRequest(BaseModel):
     tool: str
     args: Dict[str, Any]
 
+
 @app.get("/list_tools")
 async def list_tools():
     return [{"server": "math", "name": name, **meta} for name, meta in TOOLS.items()]
+
 
 @app.post("/call_tool")
 async def call_tool(request: ToolCallRequest):

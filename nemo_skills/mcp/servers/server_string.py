@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import json
+from typing import Any, Dict
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
 
 app = FastAPI(title="String MCP Server")
 
@@ -25,23 +26,23 @@ TOOLS = {
         "input_schema": {
             "type": "object",
             "title": "ConcatInput",
-            "properties": {
-                "x": {"type": "string"},
-                "y": {"type": "string"}
-            },
+            "properties": {"x": {"type": "string"}, "y": {"type": "string"}},
             "required": ["x", "y"],
-            "additionalProperties": False
+            "additionalProperties": False,
         },
     },
 }
+
 
 class ToolCallRequest(BaseModel):
     tool: str
     args: Dict[str, Any]
 
+
 @app.get("/list_tools")
 async def list_tools():
     return [{"server": "string", "name": name, **meta} for name, meta in TOOLS.items()]
+
 
 @app.post("/call_tool")
 async def call_tool(request: ToolCallRequest):

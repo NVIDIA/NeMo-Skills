@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
+
 import json
+from abc import ABC, abstractmethod
+
 from openai.types.chat import ChatCompletionMessageToolCall
+
 
 # ==============================
 # ADAPTER INTERFACES
@@ -43,6 +46,7 @@ class ToolResponseFormatter(ABC):
 # ADAPTER IMPLEMENTATIONS
 # ==============================
 
+
 class OpenAISchemaAdapter(ToolSchemaAdapter):
     # https://platform.openai.com/docs/guides/function-calling#defining-functions
     def convert(self, tools):
@@ -53,7 +57,7 @@ class OpenAISchemaAdapter(ToolSchemaAdapter):
                     "name": f"{t['name']}",
                     "description": t["description"],
                     "parameters": t["input_schema"],
-                }
+                },
             }
             for t in tools
         ]
@@ -75,6 +79,7 @@ class OpenAIResponseFormatter(ToolResponseFormatter):
             "output": json.dumps(result),
         }
 
+
 class QwenResponseFormatter(ToolResponseFormatter):
     # https://qwen.readthedocs.io/en/latest/framework/function_call.html#id2
     def format(self, tool_call: ChatCompletionMessageToolCall, result):
@@ -83,6 +88,7 @@ class QwenResponseFormatter(ToolResponseFormatter):
             "content": json.dumps(result),
             "tool_call_id": tool_call.id,
         }
+
 
 # ==============================
 # REGISTRY

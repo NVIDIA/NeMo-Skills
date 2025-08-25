@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from abc import abstractmethod, ABC
-import aiohttp
-import functools
-from typing import Dict, Any, List
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.streamable_http import streamablehttp_client
-from mcp.client.stdio import stdio_client
-
 import copy
+import functools
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List
+
+import aiohttp
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamablehttp_client
+
 
 def _process_hide_args(result, hide_args):
     if hide_args:
@@ -39,8 +40,6 @@ def _process_hide_args(result, hide_args):
     return result
 
 
-
-
 def async_wrapper(method):
     async def wrapped(self, *args, **kwargs):
         hide_args = kwargs.pop('hide_args', None)
@@ -48,6 +47,7 @@ def async_wrapper(method):
             hide_args = getattr(self, '_hide_args', {})
         result = await method(self, *args, **kwargs)
         return _process_hide_args(result, hide_args)
+
     return wrapped
 
 
@@ -64,12 +64,15 @@ def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
         return args_dict
     return {k: v for k, v in args_dict.items() if k not in hidden_keys}
 
+
 def inject_hide_args(init_func):
     @functools.wraps(init_func)
     def wrapper(self, *args, hide_args=None, **kwargs):
         self._hide_args = hide_args or {}
         return init_func(self, *args, **kwargs)
+
     return wrapper
+
 
 class MCPClientMeta(type):
     """Metaclass that adds `hide_args` support to MCP client implementations.
@@ -111,6 +114,7 @@ class MCPClientMeta(type):
 
     ```
     """
+
     def __new__(mcls, name, bases, namespace):
         orig_init = namespace.get('__init__')
         if orig_init is not None:
@@ -130,6 +134,7 @@ class MCPClientMeta(type):
         if not hasattr(instance, '_hide_args'):
             instance._hide_args = {}
         return instance
+
 
 class MCPClient(metaclass=MCPClientMeta):
     def __init__(self, hide_args=None, **kwargs):
@@ -201,6 +206,7 @@ class MCPStreamableHttpClient(MCPClient):
                 result = await session.call_tool(tool, arguments=args)
                 return result.structuredContent
 
+
 class MCPStdioClient(MCPClient):
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
@@ -234,6 +240,7 @@ class MCPStdioClient(MCPClient):
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
                 return result.structuredContent
+
 
 class MCPClientManager:
     def __init__(self):
@@ -281,4 +288,3 @@ class MCPClientManager:
     async def execute_tool(self, tool_name: str, args: dict):
         client = self.get_client_for_tool(tool_name)
         return await client.call_tool(tool_name, args)
-

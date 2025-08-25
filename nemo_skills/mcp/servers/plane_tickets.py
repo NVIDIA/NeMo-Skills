@@ -15,13 +15,13 @@
 # Example motivated by https://github.com/modelcontextprotocol/python-sdk/blob/main/examples/snippets/servers/streamable_starlette_mount.py
 from __future__ import annotations
 
+import contextlib
 import uuid
 from typing import Any
-import contextlib
 
+from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.routing import Mount
-from mcp.server.fastmcp import FastMCP
 
 """
 Run with:
@@ -119,5 +119,3 @@ app = Starlette(
 if __name__ == "__main__":
     # Run as stdio MCP server
     mcp.run(transport="stdio")
-
-

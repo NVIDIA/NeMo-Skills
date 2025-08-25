@@ -13,31 +13,22 @@
 # limitations under the License.
 
 import asyncio
+
 from nemo_skills.inference.model.vllm import VLLMModel
-from nemo_skills.mcp.clients import (
-    MCPHttpClient,
-    MCPClientManager,
-    MCPStreamableHttpClient,
-    MCPStdioClient,
-)
 from nemo_skills.mcp.adapters import registry
+from nemo_skills.mcp.clients import MCPClientManager, MCPHttpClient, MCPStdioClient, MCPStreamableHttpClient
+
 
 # Initialize the VLLMModel with your local vLLM instance
 # Adjust model name and port as configured in your vLLM server
 async def run_demo():
-    model = VLLMModel(
-        model="Qwen/Qwen3-8B",
-        host="127.0.0.1",
-        port="8000"
-    )
+    model = VLLMModel(model="Qwen/Qwen3-8B", host="127.0.0.1", port="8000")
     model_type = 'qwen'
     math_client = MCPHttpClient("http://localhost:8001")
     string_client = MCPHttpClient("http://localhost:8002")
     plane_client = MCPStreamableHttpClient("http://localhost:8003/plane/mcp")
     python_client = MCPStdioClient(
-        "python",
-        ["-m", "nemo_skills.mcp.servers.python_tool"],
-        hide_args={'execute': ['session_id', 'timeout']}
+        "python", ["-m", "nemo_skills.mcp.servers.python_tool"], hide_args={'execute': ['session_id', 'timeout']}
     )
 
     manager = MCPClientManager()
@@ -52,17 +43,22 @@ async def run_demo():
 
     # Define the messages and tools
     messages = [
-        {"role": "system", "content": "You are a helpful assistant. You may invoke tools liberally to solve your task."},
-        {"role": "user", "content": (
-            "Try an example of each tool available to you. "
-            "Carefully inspect the outputs. "
-            "Then, explain the outputs and whether they are correct or not. "
-            "If they are incorrect, you must try a few more rounds of tool "
-            "calls to establish a pattern to the incorrectness."
-            "You will fail the task if you fail to make extra rounds of tool calls to "
-            "establish the issue with incorrect functions."
+        {
+            "role": "system",
+            "content": "You are a helpful assistant. You may invoke tools liberally to solve your task.",
+        },
+        {
+            "role": "user",
+            "content": (
+                "Try an example of each tool available to you. "
+                "Carefully inspect the outputs. "
+                "Then, explain the outputs and whether they are correct or not. "
+                "If they are incorrect, you must try a few more rounds of tool "
+                "calls to establish a pattern to the incorrectness."
+                "You will fail the task if you fail to make extra rounds of tool calls to "
+                "establish the issue with incorrect functions."
             ),
-        }
+        },
     ]
 
     # Iteratively generate and execute tools until no further tool calls
@@ -70,12 +66,7 @@ async def run_demo():
     round_idx = 0
     while True:
         # Generate response using VLLMModel
-        response = model.generate_sync(
-            prompt=messages,
-            tools=tools,
-            temperature=0.6,
-            tokens_to_generate=4096
-        )
+        response = model.generate_sync(prompt=messages, tools=tools, temperature=0.6, tokens_to_generate=4096)
 
         print("Generated response:")
         print(response["generation"])

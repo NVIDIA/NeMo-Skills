@@ -14,9 +14,11 @@
 
 import logging
 from dataclasses import dataclass
-from pydantic import Field
 from typing import Annotated, Optional
+
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
 from nemo_skills.code_execution.sandbox import LocalSandbox
 
 logger = logging.getLogger(__name__)
@@ -32,12 +34,13 @@ class ExecutionResult:
     stderr: str
     stdout: str
 
+
 @mcp.tool()
 async def execute(
-        code: Annotated[str, Field(description="Code to run in python interpretter")],
-        session_id: Annotated[str | None, Field(description="Session id for session persistence")] = None,
-        timeout: Annotated[float, Field(description="Time in seconds to allow the job to run")] = 10,
-    ) -> ExecutionResult:
+    code: Annotated[str, Field(description="Code to run in python interpretter")],
+    session_id: Annotated[str | None, Field(description="Session id for session persistence")] = None,
+    timeout: Annotated[float, Field(description="Time in seconds to allow the job to run")] = 10,
+) -> ExecutionResult:
     """Executes the given python code"""
     language = "ipython"
     output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
