@@ -24,17 +24,11 @@ from nemo_skills.mcp.clients import MCPClientManager, MCPHttpClient, MCPStdioCli
 async def run_demo():
     model = VLLMModel(model="Qwen/Qwen3-8B", host="127.0.0.1", port="8000")
     model_type = "qwen"
-    math_client = MCPHttpClient("http://localhost:8001")
-    string_client = MCPHttpClient("http://localhost:8002")
-    plane_client = MCPStreamableHttpClient("http://localhost:8003/plane/mcp")
     python_client = MCPStdioClient(
         "python", ["-m", "nemo_skills.mcp.servers.python_tool"], hide_args={"execute": ["session_id", "timeout"]}
     )
 
     manager = MCPClientManager()
-    manager.register("math", math_client)
-    manager.register("string", string_client)
-    manager.register("plane", plane_client)
     manager.register("python", python_client)
 
     tools = await manager.list_all_tools()
