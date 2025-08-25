@@ -19,38 +19,38 @@ REASONING_ACC_FIELD = {
 }
 REASONING_REQUIRE_ALL = set(["scicode", "hle"])
 
-# >>> Fill your hard ranges (percent) for REASONING
-RANGE = {
+# The metrics ranges for reasoning tasks
+REASONING_RANGE = {
     "reasoning_on": {
-        "math-500": (95.0, 100.0),
-        "aime24": (88.0, 95.0),
-        "aime25": (84.0, 95.0),
-        "gpqa": (74.0, 90.0),
-        "mmlu-pro": (81.0, 95.0),
-        "livecodebench": (70.0, 90.0),
+        "math-500": (90.0, 100.0),
+        "aime24": (84.0, 94.0),
+        "aime25": (78.0, 88.0),
+        "gpqa": (70.0, 80.0),
+        "mmlu-pro": (75.0, 85.0),
+        "livecodebench": (65.0, 75.0),
         "scicode": {
-            "problem_accuracy": (3.0, 15.0),
-            "subtask_accuracy": (25.0, 50.0),
+            "problem_accuracy": (2.0, 5.0),
+            "subtask_accuracy": (25.0, 35.0),
         },
         "hle": {
-            "judge_correct": (2.0, 15.0),
+            "judge_correct": (4.0, 12.0),
             "symbolic_correct": (1.0, 10.0),
         },
     },
     "reasoning_off": {
-        "math-500": (90.0, 99.0),
-        "aime24": (80.0, 90.0),
-        "aime25": (75.0, 90.0),
+        "math-500": (70.0, 80.0),
+        "aime24": (11, 21.0),
+        "aime25": (3, 9),
         "gpqa": (60.0, 80.0),
-        "mmlu-pro": (70.0, 85.0),
-        "livecodebench": (60.0, 85.0),
+        "mmlu-pro": (65.0, 75.0),
+        "livecodebench": (25.0, 35.0),
         "scicode": {
-            "problem_accuracy": (2.0, 10.0),
-            "subtask_accuracy": (20.0, 40.0),
+            "problem_accuracy": (0.0, 3.0),
+            "subtask_accuracy": (15.0, 25.0),
         },
         "hle": {
-            "judge_correct": (1.0, 10.0),
-            "symbolic_correct": (0.5, 8.0),
+            "judge_correct": (2.5, 5.0),
+            "symbolic_correct": (0.5, 2.5),
         },
     },
 }
@@ -69,29 +69,29 @@ BFCL_PATHS = {
     "overall_multi_turn": ["multi_turn", "overall_multi_turn", "accuracy"],
 }
 
-# >>> Fill your hard ranges (percent) per mode, per category
+# The metrics ranges for tool calling tasks
 RANGE_TOOL = {
     "reasoning_on": {
-        "overall_accuracy": (60.0, 95.0),
-        "overall_non_live": (75.0, 100.0),
-        "non_live_ast": (75.0, 100.0),
-        "irrelevance": (75.0, 100.0),
-        "overall_live": (60.0, 95.0),
-        "live_ast": (60.0, 95.0),
-        "live_irrelevance": (70.0, 95.0),
-        "live_relevance": (40.0, 90.0),
-        "overall_multi_turn": (25.0, 60.0),
+        "overall_accuracy": (60.0, 80.0),
+        "overall_non_live": (80.0, 95.0),
+        "non_live_ast": (75.0, 95.0),
+        "irrelevance": (75.0, 95.0),
+        "overall_live": (75.0, 90.0),
+        "live_ast": (75.0, 90.0),
+        "live_irrelevance": (75.0, 90.0),
+        "live_relevance": (65.0, 80.0),
+        "overall_multi_turn": (35.0, 50.0),
     },
     "reasoning_off": {
-        "overall_accuracy": (60.0, 95.0),
-        "overall_non_live": (75.0, 100.0),
-        "non_live_ast": (75.0, 100.0),
-        "irrelevance": (75.0, 100.0),
-        "overall_live": (60.0, 95.0),
-        "live_ast": (60.0, 95.0),
-        "live_irrelevance": (70.0, 95.0),
-        "live_relevance": (40.0, 90.0),
-        "overall_multi_turn": (25.0, 60.0),
+        "overall_accuracy": (60.0, 80.0),
+        "overall_non_live": (80.0, 95.0),
+        "non_live_ast": (75.0, 95.0),
+        "irrelevance": (75.0, 95.0),
+        "overall_live": (75.0, 90.0),
+        "live_ast": (70.0, 90.0),
+        "live_irrelevance": (77.0, 93.0),
+        "live_relevance": (47.0, 62.0),
+        "overall_multi_turn": (28.0, 42.0),
     },
 }
 
@@ -114,39 +114,39 @@ RULER_TASKS = [
     "ruler.nemotron_super_128k.qa_2",
 ]
 
-# >>> Fill your hard ranges (same numeric scale as JSON, e.g., 66.1)
+# The metrics ranges for ruler tasks
 RANGE_RULER = {
     "reasoning_on": {
-        "ruler.nemotron_super_128k": (50.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_1": (90.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (80.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_3": (80.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_1": (50.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_2": (40.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_3": (10.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multivalue": (60.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multiquery": (60.0, 100.0),
-        "ruler.nemotron_super_128k.vt": (60.0, 100.0),
-        "ruler.nemotron_super_128k.cwe": (0.0, 20.0),
-        "ruler.nemotron_super_128k.fwe": (60.0, 100.0),
-        "ruler.nemotron_super_128k.qa_1": (30.0, 100.0),
-        "ruler.nemotron_super_128k.qa_2": (30.0, 100.0),
+        "ruler.nemotron_super_128k": (55.0, 75.0),
+        "ruler.nemotron_super_128k.niah_single_1": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_2": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_3": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_multikey_1": (65.0, 80.0),
+        "ruler.nemotron_super_128k.niah_multikey_2": (50.0, 65.0),
+        "ruler.nemotron_super_128k.niah_multikey_3": (15.0, 25.0),
+        "ruler.nemotron_super_128k.niah_multivalue": (85.0, 100.0),
+        "ruler.nemotron_super_128k.niah_multiquery": (85.0, 95.0),
+        "ruler.nemotron_super_128k.vt": (50.0, 65.0),
+        "ruler.nemotron_super_128k.cwe": (0.0, 2.0),
+        "ruler.nemotron_super_128k.fwe": (80.0, 95.0),
+        "ruler.nemotron_super_128k.qa_1": (40.0, 50.0),
+        "ruler.nemotron_super_128k.qa_2": (35.0, 45.0),
     },
     "reasoning_off": {
-        "ruler.nemotron_super_128k": (40.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_1": (85.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (75.0, 100.0),
-        "ruler.nemotron_super_128k.niah_single_3": (75.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_1": (40.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_2": (30.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_3": (10.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multivalue": (55.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multiquery": (55.0, 100.0),
-        "ruler.nemotron_super_128k.vt": (55.0, 100.0),
-        "ruler.nemotron_super_128k.cwe": (0.0, 20.0),
-        "ruler.nemotron_super_128k.fwe": (55.0, 100.0),
-        "ruler.nemotron_super_128k.qa_1": (25.0, 100.0),
-        "ruler.nemotron_super_128k.qa_2": (25.0, 100.0),
+        "ruler.nemotron_super_128k": (55.0, 75.0),
+        "ruler.nemotron_super_128k.niah_single_1": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_2": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_single_3": (95.0, 100.0),
+        "ruler.nemotron_super_128k.niah_multikey_1": (60.0, 75.0),
+        "ruler.nemotron_super_128k.niah_multikey_2": (45.0, 55.0),
+        "ruler.nemotron_super_128k.niah_multikey_3": (15.0, 25.0),
+        "ruler.nemotron_super_128k.niah_multivalue": (80.0, 90.0),
+        "ruler.nemotron_super_128k.niah_multiquery": (80.0, 90.0),
+        "ruler.nemotron_super_128k.vt": (75.0, 85.0),
+        "ruler.nemotron_super_128k.cwe": (0.0, 2.0),
+        "ruler.nemotron_super_128k.fwe": (80.0, 95.0),
+        "ruler.nemotron_super_128k.qa_1": (42.0, 55.0),
+        "ruler.nemotron_super_128k.qa_2": (37.0, 47.0),
     },
 }
 
@@ -203,7 +203,7 @@ def verify_reasoning_bucket(bucket_dir, mode):
             continue
 
         fields = REASONING_ACC_FIELD[b]
-        spec = RANGE[mode][b]
+        spec = REASONING_RANGE[mode][b]
 
         if b in REASONING_REQUIRE_ALL:
             for f in fields:

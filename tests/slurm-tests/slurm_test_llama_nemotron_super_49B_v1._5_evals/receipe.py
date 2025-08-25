@@ -30,12 +30,12 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
         f"huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
     )
-    # run_cmd(
-    #     ctx=wrap_arguments(cmd),
-    #     cluster=cluster,
-    #     expname=f"{expname_prefix}-download-models",
-    #     log_dir=f"{workspace}/download-assets",
-    # )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        expname=f"{expname_prefix}-download-models",
+        log_dir=f"{workspace}/download-assets",
+    )
 
     # Update config to support 128k
     cmd = (
@@ -69,11 +69,11 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         "--data_dir",
         f"{workspace}/ns-data",
         "--run_after",
-        f"{expname_prefix}-download-models",
+        f"{expname_prefix}-patch-qwen-config",
         "--expname",
-        [f"{expname_prefix}-download-ruler-data", f"{expname_prefix}-patch-qwen-config"],
+        f"{expname_prefix}-download-ruler-data",
     ]
-    # subprocess.run(ruler_cmd, check=True)
+    subprocess.run(ruler_cmd, check=True)
 
 
 def eval_reasoning_on(workspace, cluster, expname_prefix):
@@ -427,12 +427,12 @@ def main():
     args = parser.parse_args()
 
     # launch for eval jobs
-    # prepare_data_locally()
+    prepare_data_locally()
     download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    # eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    # eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
-    # Schedule a dependent check job on the cluster and check if the results are as expected
+    # schedule a dependent check job on the cluster and check if the results are as expected
 
     checker = (
         f"cd /nemo_run/code/tests/slurm-tests/slurm_test_llama_nemotron_super_49B_v1._5_evals && "
