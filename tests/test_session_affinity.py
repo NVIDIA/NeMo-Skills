@@ -233,45 +233,16 @@ def tester():
     return SessionAffinityTester()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def check_server_availability():
-    """Check server availability once at the start of the test session"""
-    try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
-        if response.status_code != 200:
-            pytest.skip(f"Server not available: HTTP {response.status_code}")
-    except Exception as e:
-        pytest.skip(f"Cannot connect to server: {e}")
-
-
-@pytest.fixture
-def server_health_check():
-    """Fixture to ensure server is healthy before running tests"""
-    try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
-        if response.status_code != 200:
-            pytest.skip(f"Server health check failed: HTTP {response.status_code}")
-    except Exception as e:
-        pytest.skip(f"Cannot connect to server: {e}")
-
-
 class TestSessionAffinity:
     """Test class for session affinity functionality"""
 
     def test_server_health(self):
         """Test that the server is responding to health checks"""
-        try:
-            response = requests.get(f"{BASE_URL}/health", timeout=5)
-            if response.status_code != 200:
-                pytest.skip(f"Server health check failed: HTTP {response.status_code}")
+        response = requests.get(f"{BASE_URL}/health", timeout=5)
+        if response.status_code != 200:
+            raise RuntimeError(f"Server not available: HTTP {response.status_code}")
 
-            health_data = response.json()
-            assert health_data.get("status") == "healthy"
-
-        except Exception as e:
-            pytest.skip(f"Cannot connect to server: {e}")
-
-    def test_basic_session_persistence(self, tester, server_health_check):
+    def test_basic_session_persistence(self, tester):
         """Test that a single session maintains state across requests"""
         session_id = f"test_basic_{int(time.time())}"
         operations, success, message = tester.test_session_persistence(session_id, num_operations=3)
@@ -286,7 +257,7 @@ class TestSessionAffinity:
             )
 
     @pytest.mark.parametrize("num_operations", [3, 5, 8])
-    def test_session_persistence_various_lengths(self, tester, server_health_check, num_operations):
+    def test_session_persistence_various_lengths(self, tester, num_operations):
         """Test session persistence with different numbers of operations"""
         session_id = f"test_length_{num_operations}_{int(time.time())}"
         operations, success, message = tester.test_session_persistence(session_id, num_operations)
@@ -294,7 +265,7 @@ class TestSessionAffinity:
         assert success, f"Session persistence failed with {num_operations} operations: {message}"
         assert len(operations) == num_operations
 
-    def test_multiple_concurrent_sessions(self, tester, server_health_check):
+    def test_multiple_concurrent_sessions(self, tester):
         """Test that multiple concurrent sessions don't interfere with each other"""
         num_sessions = 10
         operations_per_session = 4
@@ -322,7 +293,7 @@ class TestSessionAffinity:
         success_rate = successful_sessions / num_sessions
         assert success_rate >= 1.0, f"Success rate too low: {success_rate:.1%}. Failed sessions: {failed_sessions}"
 
-    def test_session_affinity_routing(self, tester, server_health_check):
+    def test_session_affinity_routing(self, tester):
         """Test that the same session_id consistently routes to the same worker"""
         session_id = f"test_routing_{int(time.time())}"
 
@@ -340,7 +311,7 @@ class TestSessionAffinity:
             f"Session affinity broken: session hit {len(workers_hit)} different workers: {workers_hit}"
         )
 
-    def test_session_persistence_large_payload(self, tester, server_health_check):
+    def test_session_persistence_large_payload(self, tester):
         """Test session persistence with large payloads exceeding nginx body buffer"""
         LARGE_PAYLOAD_SIZE = 1024 * 1024 + 1024  # 257KB to exceed 128KB buffer
         session_id = f"test_large_payload_{uuid.uuid4()}"
@@ -372,7 +343,7 @@ except NameError:
         assert "Large payload test successful" in result["stdout"]
         assert "SESSION MISS" not in result["stdout"]
 
-    def test_multiple_large_payloads_concurrent(self, tester, server_health_check):
+    def test_multiple_large_payloads_concurrent(self, tester):
         """Test concurrent sessions with large payloads"""
         LARGE_PAYLOAD_SIZE = 1024 * 1024 + 1024  # 257KB to exceed 128KB buffer
         num_sessions = 3
@@ -398,7 +369,7 @@ except NameError:
 
         assert all(results), f"{results.count(False)} concurrent large payload sessions failed"
 
-    def test_different_sessions_can_hit_different_workers(self, tester, server_health_check):
+    def test_different_sessions_can_hit_different_workers(self, tester):
         """Test that different session_ids can potentially hit different workers"""
         num_sessions = 10
         workers_hit = set()
@@ -413,7 +384,7 @@ except NameError:
         # This test might pass even with 1 worker, which is okay
         assert len(workers_hit) >= 1, "No workers responded to requests"
 
-    def test_load_balancing_without_session_id(self, tester, server_health_check):
+    def test_load_balancing_without_session_id(self, tester):
         """Test that requests without session_id distribute across workers"""
         workers_hit = set()
         num_requests = 20
@@ -436,7 +407,7 @@ except NameError:
             {"sessions": 20, "ops": 3, "workers": 8, "name": "Heavy Load"},
         ],
     )
-    def test_session_affinity_under_load(self, tester, server_health_check, session_config):
+    def test_session_affinity_under_load(self, tester, session_config):
         """Test session affinity under various load conditions"""
         num_sessions = session_config["sessions"]
         operations_per_session = session_config["ops"]
@@ -475,7 +446,7 @@ except NameError:
             f"{session_config['name']}: {successful_sessions}/{num_sessions} sessions successful in {end_time - start_time:.1f}s"
         )
 
-    def test_session_cleanup_endpoint(self, tester, server_health_check):
+    def test_session_cleanup_endpoint(self, tester):
         """Test that session management endpoints work correctly"""
         session_id = f"test_cleanup_{int(time.time())}"
 
@@ -497,7 +468,7 @@ except NameError:
         # Note: After deletion, a new session will be created, so test_var won't exist
         assert "NameError" in result.get("stderr", "") or result["process_status"] == "error"
 
-    def test_session_list_endpoint(self, server_health_check):
+    def test_session_list_endpoint(self):
         """Test that we can list active sessions"""
         # Create a few sessions
         session_ids = []
@@ -533,7 +504,7 @@ except NameError:
                 assert "last_used" in session_info
                 assert "alive" in session_info
 
-    def test_load_balancing(self, server_health_check):
+    def test_load_balancing(self):
         """Test that requests without session ID are distributed across multiple workers"""
         num_requests = 2560
         workers = []
@@ -567,9 +538,10 @@ except NameError:
         critical_value = 0.5 * (z_score + np.sqrt(2 * degrees_of_freedom - 1)) ** 2
         assert chi2_stat <= critical_value, (
             f"Uneven distribution of jobs across uwsgi workers. "
-            f"Observed counts: {sorted(counts.items())} (min={np.min(observed_counts)}, max={np.max(observed_counts)}, avg={expected_count:.1f}). "
+            f"Observed counts: {sorted(counts.items())} (min={np.min(observed_counts)}, "
+            f"max={np.max(observed_counts)}, avg={expected_count:.1f}). "
             f"Chi-squared statistic ({chi2_stat:.2f}) > Critical Value ({critical_value:.2f}) "
-            f"for {degrees_of_freedom} degrees of freedom at p={p_value_threshold}."
+            f"for {degrees_of_freedom} degrees of freedom"
         )
 
 

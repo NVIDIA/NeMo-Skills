@@ -27,10 +27,7 @@ from nemo_skills.prompt.few_shot_examples import examples_map
 
 
 def _get_sandbox():
-    host = os.getenv("NEMO_SKILLS_SANDBOX_HOST")
-    if not host:
-        pytest.skip("Define NEMO_SKILLS_SANDBOX_HOST to run this test")
-
+    host = os.getenv("NEMO_SKILLS_SANDBOX_HOST", "127.0.0.1")
     return get_sandbox(host=host)
 
 
