@@ -8,7 +8,7 @@ suffix: gpt-5-chat # TODO change this
 # This should be the output of the problem_generation.py pipeline
 input_file: ${base_output_dir}/input/input.jsonl
 # Number of solutions per each problem from the input file to generate
-num_random_seeds_to_generate: 3
+num_random_seeds_to_generate: 1
 
 # Define judge model server parameters
 generate_kwargs: &generate_kwargs
