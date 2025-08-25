@@ -13,19 +13,17 @@
 # limitations under the License.
 
 import logging
-from dataclasses import dataclass
-from typing import Annotated, Optional
+from dataclasses import dataclass, field
+from typing import Annotated
 
+import hydra
+from hydra.core.config_store import ConfigStore
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from nemo_skills.code_execution.sandbox import LocalSandbox
+from nemo_skills.code_execution.sandbox import get_sandbox
 
 logger = logging.getLogger(__name__)
-
-mcp = FastMCP(name="python_tool")
-
-sandbox = LocalSandbox()
 
 
 @dataclass
@@ -33,6 +31,12 @@ class ExecutionResult:
     process_status: str
     stderr: str
     stdout: str
+
+
+mcp = FastMCP(name="python_tool")
+
+# Initialized from Hydra config in main()
+sandbox = None
 
 
 @mcp.tool()
@@ -48,6 +52,23 @@ async def execute(
     return output
 
 
-if __name__ == "__main__":
+@dataclass
+class PythonToolConfig:
+    # Arbitrary sandbox config; e.g. {sandbox_type: local, host: 127.0.0.1, port: 6000}
+    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
+
+
+cs = ConfigStore.instance()
+cs.store(name="base_python_tool_config", node=PythonToolConfig)
+
+
+@hydra.main(version_base=None, config_name="base_python_tool_config")
+def main(cfg: PythonToolConfig):
+    global sandbox
+    sandbox = get_sandbox(**cfg.sandbox)
     # Initialize and run the server
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()
