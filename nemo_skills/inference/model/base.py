@@ -242,7 +242,6 @@ class BaseModel:
                 return result
 
             except litellm.exceptions.ContextWindowExceededError as e:
-                LOG.error(f"ContextWindowExceededError: {e}")
                 raise e
 
             except openai.BadRequestError as e:

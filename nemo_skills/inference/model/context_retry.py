@@ -40,7 +40,6 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
 
     error_str = str(error)
 
-    # Pattern 1: Handle the format from your example
     # "maximum context length is 40960 tokens and your request has 142 input tokens (1000000 > 40960 - 142)"
     pattern1 = re.compile(
         r"maximum context length is (\d+) tokens.*?"
