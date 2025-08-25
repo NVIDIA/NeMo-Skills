@@ -132,14 +132,15 @@ class CodeExecutionWrapper:
         stopped_on_repetition = False
 
         #NOTE: add a parameter for model who likes to pause
-        max_consecutive_no_code_generations = 2
-        consecutive_no_code_generations = 0
+        # max_consecutive_no_code_generations = 6
+        # consecutive_no_code_generations = 0
+        generation_index = 0
+        max_generation_rounds=40
 
         # adding plus one to make sure there is always some completion after the last requested code block
-        for generation_index in range(effective_max_code_executions + 1):
-
-            print("--------------DEBUGGING: generation_index-------------")
-            print(generation_index)
+        # for generation_index in range(effective_max_code_executions + 1):
+        # NOTE: because some models like to pause and think, we will only track the number of code round executed. 
+        while code_rounds_executed <= effective_max_code_executions and generation_index <= max_generation_rounds:
 
             generation_time_start = time.time()
             if timeout is not None:
@@ -150,7 +151,7 @@ class CodeExecutionWrapper:
                     break
 
             output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
-            print("--------------DEBUGGING: output_dict-------------")
+            print(f"--------------DEBUGGING generation_index: {generation_index}: output_dict-------------")
             print(output_dict)
 
             output, num_generated_tokens = output_dict['generation'], output_dict.get('num_generated_tokens', 0)
@@ -165,7 +166,7 @@ class CodeExecutionWrapper:
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
 
-            print("--------------DEBUGGING: output-------------")
+            print(f"--------------DEBUGGING generation_index: {generation_index}: output-------------")
             print(output)
             # Update the prompt based on format
             if is_openai_format:
@@ -173,15 +174,13 @@ class CodeExecutionWrapper:
                 request['prompt'].append({'role': 'user', 'content': "continue"})
             else:
                 request['prompt'] += output
-            print("--------------DEBUGGING: New request['prompt'] for next round------------")
+            
+            print(f"--------------DEBUGGING generation_index: {generation_index}: New request['prompt'] for next round------------")
             print(request['prompt'])
 
             # if it's the extra iteration, we don't execute the code block and just finish
-            print("--------------DEBUGGING: effective_max_code_executions-------------")
-            print(effective_max_code_executions)
-
             if generation_index == effective_max_code_executions:
-                print("--------------DEBUGGING: reached max code executions, breaking out of the loop-------------")
+                print(f"--------------DEBUGGING generation_index: {generation_index}: reached effective_max_code_executions, break-------------")
                 break
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
@@ -190,17 +189,16 @@ class CodeExecutionWrapper:
             # TODO: currently we don't account for tokens in the code output that we add to the prompt
             #       in most cases the output should be small though
             if request['tokens_to_generate'] <= 0:
-                print("--------------DEBUGGING: reached max tokens, breaking out of the loop-------------")
+                print(f"--------------DEBUGGING generation_index: {generation_index}: reached max tokens, break-------------")
                 break
             # .rfind(code_end, 0, -1) searches for the second-to-last occurrence of code_end and checks
             # that the last code_begin is not closed to ensure that we are inside the code block
-            print("--------------DEBUGGING: Checking if code is in output-------------")
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
-                print("--------------DEBUGGING: found code in output------------")
+                print(f"--------------DEBUGGING generation_index: {generation_index}: Found code------------")
                 code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
-                print("--------------DEBUGGING: execution_dict-------------")
+                print(f"--------------DEBUGGING generation_index: {generation_index}: code execution_dict-------------")
                 print(execution_dict)
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
@@ -209,34 +207,38 @@ class CodeExecutionWrapper:
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
                 )
-                print("--------------DEBUGGING: code_output-------------")
+                print(f"--------------DEBUGGING generation_index: {generation_index}: code_output-------------")
                 print(code_output)
 
                 if is_openai_format:
                     request['prompt'][-2]['content'] += code_output
-                    print("--------------DEBUGGING: request['prompt'] after code output-------------")
-                    print(request['prompt'][-2]['content'])
                 else:
                     request['prompt'] += code_output
-                    print("--------------DEBUGGING: request['prompt'] after code output-------------")
-                    print(request['prompt'])
 
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
 
                 # NOTE: reset the consecutive_no_code_generations
-                print("--------------DEBUGGING: RESET consecutive_no_code_generations-------------")
-                consecutive_no_code_generations = 0
-            
+                print(f"--------------DEBUGGING generation_index: {generation_index}: RESET consecutive_no_code_generations-------------")
+                # consecutive_no_code_generations = 0
+
             # NOTE: if no code was generated, we need to finish
             else: 
-                print("--------------DEBUGGING: No code generated, increasing consecutive_no_code_generations-------------")
-                consecutive_no_code_generations += 1
-                if consecutive_no_code_generations >= max_consecutive_no_code_generations:
-                    print("--------------DEBUGGING: reached max consecutive no code generations, breaking out of the loop-------------")
-                    break
-                else:
-                    continue
+                pass
+                # print("--------------DEBUGGING: No code generated, increasing consecutive_no_code_generations-------------")
+                # consecutive_no_code_generations += 1
+                # if consecutive_no_code_generations >= max_consecutive_no_code_generations:
+                #     print("--------------DEBUGGING: reached max consecutive no code generations, breaking out of the loop-------------")
+                #     break
+                # else:
+                #     generation_index += 1
+                #     continue
+            
+            # NOTE: increase generation index
+            generation_index += 1
+            if "final answer:" in output.lower():
+                print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
+                break
 
         # removing original prompt and returning the generation
         if is_openai_format:
@@ -244,7 +246,7 @@ class CodeExecutionWrapper:
         else:
             generation = request['prompt'][len(prompt) :]
 
-        print("--------------DEBUGGING: Final generation-------------")
+        print(f"--------------DEBUGGING generation_index: {generation_index}: Final generation-------------")
         print(generation)
 
         return {
