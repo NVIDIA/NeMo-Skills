@@ -427,10 +427,10 @@ def main():
     args = parser.parse_args()
 
     # launch for eval jobs
-    # prepare_data_locally()
-    # download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    # eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    # eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    prepare_data_locally()
+    download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
     # schedule a dependent check job on the cluster and check if the results are as expected
 
