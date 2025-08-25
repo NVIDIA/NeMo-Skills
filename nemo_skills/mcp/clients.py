@@ -40,13 +40,48 @@ def _process_hide_args(result, hide_args):
     return result
 
 
+def _filter_tools(result, disabled_tools, enabled_tools):
+    if not isinstance(result, list):
+        return result
+    disabled_set = set(disabled_tools or [])
+    enabled_set = set(enabled_tools or [])
+
+    filtered = []
+    names_seen = set()
+    for entry in result:
+        name = entry.get("name")
+        if name is None:
+            continue
+        names_seen.add(name)
+        if name in disabled_set:
+            continue
+        if enabled_set and name not in enabled_set:
+            continue
+        filtered.append(entry)
+
+    if enabled_set:
+        missing = enabled_set - names_seen
+        if missing:
+            raise ValueError(f"Enabled tools not found: {sorted(missing)}")
+
+    return filtered
+
+
 def async_wrapper(method):
     async def wrapped(self, *args, **kwargs):
         hide_args = kwargs.pop("hide_args", None)
         if hide_args is None:
             hide_args = getattr(self, "_hide_args", {})
+        disabled_tools = kwargs.pop("disabled_tools", None)
+        if disabled_tools is None:
+            disabled_tools = getattr(self, "_disabled_tools", set())
+        enabled_tools = kwargs.pop("enabled_tools", None)
+        if enabled_tools is None:
+            enabled_tools = getattr(self, "_enabled_tools", set())
         result = await method(self, *args, **kwargs)
-        return _process_hide_args(result, hide_args)
+        result = _process_hide_args(result, hide_args)
+        result = _filter_tools(result, disabled_tools, enabled_tools)
+        return result
 
     return wrapped
 
@@ -67,8 +102,11 @@ def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
 
 def inject_hide_args(init_func):
     @functools.wraps(init_func)
-    def wrapper(self, *args, hide_args=None, **kwargs):
+    def wrapper(self, *args, hide_args=None, disabled_tools=None, enabled_tools=None, **kwargs):
         self._hide_args = hide_args or {}
+        # Store as sets for fast membership checks
+        self._disabled_tools = set(disabled_tools or [])
+        self._enabled_tools = set(enabled_tools or [])
         return init_func(self, *args, **kwargs)
 
     return wrapper
@@ -98,10 +136,14 @@ class MCPClientMeta(type):
 
     # Consumers can now pass `hide_args` seamlessly. The metaclass-injected
     # logic ensures hidden parameters are pruned from tool input schemas
-    # returned by list_tools.
-    client = MyClient(base_url="https://mcp.example.com", hide_args={
-        "tool_name": ["timeout"],
-    })
+    # returned by list_tools. You can also disable specific tools or allow only
+    # a subset using `disabled_tools` or `enabled_tools`.
+    client = MyClient(
+        base_url="https://mcp.example.com",
+        hide_args={"tool_name": ["timeout"]},
+        disabled_tools=["disallowed_tool"],
+        enabled_tools=["tool_name", "safe_other_tool"],
+    )
     tools: list[Dict[str, Any]] = await client.list_tools()
     # The input_schema for "tool_name" will no longer expose
     # the "timeout" parameter.
@@ -133,14 +175,14 @@ class MCPClientMeta(type):
         # Add default attributes if they do not exist yet
         if not hasattr(instance, "_hide_args"):
             instance._hide_args = {}
+        if not hasattr(instance, "_disabled_tools"):
+            instance._disabled_tools = set()
+        if not hasattr(instance, "_enabled_tools"):
+            instance._enabled_tools = set()
         return instance
 
 
 class MCPClient(metaclass=MCPClientMeta):
-    def __init__(self, hide_args=None, **kwargs):
-        self._hide_args = hide_args or {}
-        super().__init__(**kwargs)
-
     # Manual sanitization helpers (input-only)
     def sanitize(self, tool: str, args: dict) -> dict:
         """Return a copy of args with hidden keys removed for the given tool."""
@@ -153,6 +195,14 @@ class MCPClient(metaclass=MCPClientMeta):
     @abstractmethod
     async def call_tool(self, tool: str, args: dict) -> Any:
         pass
+
+    # Enforcement helpers
+    def _assert_tool_allowed(self, tool: str):
+        if tool in getattr(self, "_disabled_tools", set()):
+            raise PermissionError(f"Tool '{tool}' is disabled")
+        enabled = getattr(self, "_enabled_tools", set())
+        if enabled and tool not in enabled:
+            raise PermissionError(f"Tool '{tool}' is not in enabled_tools: {sorted(enabled)}")
 
 
 class MCPHttpClient(MCPClient):
@@ -167,13 +217,14 @@ class MCPHttpClient(MCPClient):
                 return self.tools
 
     async def call_tool(self, tool: str, args: dict) -> Any:
+        self._assert_tool_allowed(tool)
         async with aiohttp.ClientSession() as session:
             async with session.post(f"{self.base_url}/call_tool", json={"tool": tool, "args": args}) as resp:
                 return await resp.json()
 
 
 class MCPStreamableHttpClient(MCPClient):
-    def __init__(self, base_url: str, output_formatter: Callable | None = None, **kwargs):
+    def __init__(self, base_url: str, output_formatter: Callable | None = None):
         self.output_formatter = output_formatter
         self.base_url = base_url
         self.tools: List[Dict[str, Any]] = []
@@ -201,6 +252,7 @@ class MCPStreamableHttpClient(MCPClient):
                 return self.tools
 
     async def call_tool(self, tool: str, args: dict) -> Any:
+        self._assert_tool_allowed(tool)
         async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
@@ -239,6 +291,7 @@ class MCPStdioClient(MCPClient):
                 return self.tools
 
     async def call_tool(self, tool: str, args: dict) -> Any:
+        self._assert_tool_allowed(tool)
         async with stdio_client(self.server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
