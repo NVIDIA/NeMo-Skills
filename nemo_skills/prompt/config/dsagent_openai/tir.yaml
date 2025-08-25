@@ -9,8 +9,7 @@ user: |-
   There will be no human supervision in the process, so you must carry it out all by yourself.
   Therefore, do not pause or stop generation until you think you have completed the task.   
   You may perform up to {total_code_executions} tool calls to a IPython environment to assist your reasoning. 
-  Try to utilize tool calls as much as possible. 
-  Do not generate more than {total_code_executions} tool calls.
+  Try to utilize tool calls as much as possible, but do not generate more than {total_code_executions} tool calls.
   
   When using python code, you must use the following this exact format with the tags wrapping the code. 
   ```python
