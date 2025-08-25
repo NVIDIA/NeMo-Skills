@@ -14,7 +14,7 @@
 import copy
 import functools
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 import aiohttp
 from mcp import ClientSession, StdioServerParameters
@@ -173,7 +173,8 @@ class MCPHttpClient(MCPClient):
 
 
 class MCPStreamableHttpClient(MCPClient):
-    def __init__(self, base_url: str, **kwargs):
+    def __init__(self, base_url: str, output_formatter: Callable | None = None, **kwargs):
+        self.output_formatter = output_formatter
         self.base_url = base_url
         self.tools: List[Dict[str, Any]] = []
 
@@ -204,7 +205,10 @@ class MCPStreamableHttpClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                return result.structuredContent
+                if self.output_formatter is None:
+                    return struct if (struct := result.structuredContent) is not None else result.content
+                else:
+                    return self.output_formatter(result)
 
 
 class MCPStdioClient(MCPClient):
