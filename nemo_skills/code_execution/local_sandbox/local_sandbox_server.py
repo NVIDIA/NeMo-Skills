@@ -191,9 +191,10 @@ def execute_shell(command, timeout):
             timeout=timeout,
             preexec_fn=set_limits,
         )
-        return {"stdout": result.stdout, "stderr": result.stderr}
+        process_status = "completed" if result.returncode == 0 else "error"
+        return {"process_status": process_status, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.TimeoutExpired:
-        return {"stdout": "", "stderr": "Timed out\n"}
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
