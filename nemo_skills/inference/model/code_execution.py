@@ -173,6 +173,8 @@ class CodeExecutionWrapper:
                 request['prompt'].append({'role': 'user', 'content': "continue"})
             else:
                 request['prompt'] += output
+            print("--------------DEBUGGING: New request['prompt'] for next round------------")
+            print(request['prompt'])
 
             # if it's the extra iteration, we don't execute the code block and just finish
             print("--------------DEBUGGING: effective_max_code_executions-------------")

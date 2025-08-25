@@ -9,9 +9,10 @@ user: |-
   Do not pause or stop generation until you think you have completed the task.  
   You may perform up to {total_code_executions} tool calls to a IPython environment to assist your reasoning. 
   Do not generate more than {total_code_executions} tool calls.
-  Try to generate at least 1 block of python code each time you respond, unless you have completed the task, or run out of tool calls.
+  In addition, you only have a total of {total_code_executions} rounds of interaction, regardless you use tool calls or not. 
+  So each time you generate a message, you're strongly encouraged to utilize the opporutnity to write a code block. 
   
-  When generating python code, you must use the following this exact format with the tags wrapping the code. 
+  When generating the Python tool call, you must use the following this exact format with the tags wrapping the code. 
   ```python
   # Your Python code here
   ```
