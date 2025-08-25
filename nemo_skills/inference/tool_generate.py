@@ -106,8 +106,7 @@ class ToolGenerationTask(GenerationTask):
                     LOG.error(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}")
                     LOG.error(e)
 
-                    tool_args = {}
-                    return tool_name, tool_args
+                    return "error", {"error": "Unable to parse JSON arguments"}
                 else:
                     raise ValueError(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}") from e
 
@@ -116,23 +115,27 @@ class ToolGenerationTask(GenerationTask):
         if self.cfg.tool_errors_in_context:
             LOG.error(f"Unable to parse tool call from generation:\n{generation}")
 
-            return "error", {}
+            return "error", {"error": "Unable to parse tool call"}
 
         raise ValueError(f"Unable to parse tool call from generation:\n{generation}")
 
     ## FIXME: make configurable.
     async def execute_tool_call(self, tool_name, tool_args):
-        if tool_name == "exa_websearch":
+        if tool_name == "error":
+            return tool_args
+        elif tool_name == "exa_websearch":
             tool_code = textwrap.dedent(
                 f"""
                 from exa_py import Exa
                 import os
 
-                exa = Exa(os.getenv("EXA_API_KEY"))
-
-                result = exa.answer({repr(tool_args['query'])})
-
-                print(result.answer)
+                api_key = os.getenv("EXA_API_KEY")
+                if api_key:
+                    exa = Exa(api_key)
+                    result = exa.answer({repr(tool_args["query"])})
+                    print(result.answer)
+                else:
+                    print("Missing API key.")
             """
             )
         else:
@@ -169,13 +172,12 @@ class ToolGenerationTask(GenerationTask):
             {"role": "tool", "name": tool_name, "content": tool_out},
         ]
         tool_output_generation = self.prompt_formatter(_tool_conv)
-        
+
         ## FIXME: hack to get the correct tool output format.
         _start_idx = [m.start() for m in re.finditer("\<\|start\|\>", tool_output_generation)][-2]
         tool_output_generation = tool_output_generation[_start_idx:]
-        
-        return tool_output_generation
 
+        return tool_output_generation
 
     async def process_single_datapoint(self, data_point, all_data):
         generation_params = {
