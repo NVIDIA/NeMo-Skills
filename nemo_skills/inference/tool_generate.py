@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 import sys
 import textwrap
@@ -124,20 +125,21 @@ class ToolGenerationTask(GenerationTask):
         if tool_name == "error":
             return tool_args
         elif tool_name == "exa_websearch":
-            tool_code = textwrap.dedent(
-                f"""
-                from exa_py import Exa
-                import os
+            if os.getenv("EXA_API_KEY"):
+                tool_code = textwrap.dedent(
+                    f"""
+                    from exa_py import Exa
+                    import os
 
-                api_key = os.getenv("EXA_API_KEY")
-                if api_key:
-                    exa = Exa(api_key)
+                    exa = Exa(os.getenv("EXA_API_KEY"))
                     result = exa.answer({repr(tool_args["query"])})
                     print(result.answer)
-                else:
-                    print("Missing API key.")
-            """
-            )
+                """
+                )
+            else:
+                LOG.error(f"Missing EXA_API_KEY: {tool_name}/{tool_args}")
+
+                return {"error": "Tool not available or unsupported"}
         else:
             if self.cfg.tool_errors_in_context:
                 LOG.error(f"Tool not available or unsupported: {tool_name}/{tool_args}")
@@ -148,7 +150,7 @@ class ToolGenerationTask(GenerationTask):
 
         tool_output, _ = await self.sandbox.execute_code(generated_code=tool_code, language="python")
 
-        if tool_output["process_status"] != "completed":
+        if tool_output["stderr"] and not tool_output["stdout"].strip():
             if self.cfg.tool_errors_in_context:
                 LOG.error(f"Error executing tool {tool_name}/{tool_args}: {tool_output['stderr']}")
 
