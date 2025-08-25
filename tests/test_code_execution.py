@@ -331,7 +331,7 @@ async def test_shell_code_execution():
     sandbox = _get_sandbox()
 
     # Test case for shell code
-    correct_code_shell = """echo "Hello, World!"""
+    correct_code_shell = 'echo "Hello, World!"'
     expected_output = "Hello, World!\n"
 
     output, session_id = await sandbox.execute_code(correct_code_shell, language="shell")

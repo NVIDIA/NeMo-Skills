@@ -324,9 +324,10 @@ def execute_shell(command, timeout):
             timeout=timeout,
             preexec_fn=set_limits,
         )
-        return {"stdout": result.stdout, "stderr": result.stderr}
+        process_status = "completed" if result.returncode == 0 else "error"
+        return {"process_status": process_status, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.TimeoutExpired:
-        return {"stdout": "", "stderr": "Timed out\n"}
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -351,7 +352,7 @@ def execute():
     elif language == "lean4":
         result = execute_lean4(generated_code, timeout)
     elif language == "shell":
-        return execute_shell(generated_code, timeout)
+        result = execute_shell(generated_code, timeout)
     else:
         result = execute_python(generated_code, std_input, timeout, language)
 
