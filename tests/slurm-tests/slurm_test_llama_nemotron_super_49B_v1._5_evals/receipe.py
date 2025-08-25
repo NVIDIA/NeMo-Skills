@@ -30,11 +30,27 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
         f"huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
     )
+    # run_cmd(
+    #     ctx=wrap_arguments(cmd),
+    #     cluster=cluster,
+    #     expname=f"{expname_prefix}-download-models",
+    #     log_dir=f"{workspace}/download-assets",
+    # )
+
+    # Update config to support 128k
+    cmd = (
+        f'jq \'. + {{"rope_scaling": {{"type": "yarn", "factor": 4.0, "original_max_position_embeddings": 32768}}}}\' '
+        f"{workspace}/Qwen2.5-32B-Instruct/config.json > {workspace}/Qwen2.5-32B-Instruct/config_tmp.json && "
+        f"mv {workspace}/Qwen2.5-32B-Instruct/config_tmp.json {workspace}/Qwen2.5-32B-Instruct/config.json"
+    )
+
     run_cmd(
         ctx=wrap_arguments(cmd),
         cluster=cluster,
-        expname=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-patch-qwen-config",
         log_dir=f"{workspace}/download-assets",
+        run_after=f"{expname_prefix}-download-models",
+        container="nemo",
     )
 
     # step3: prepare ruler data on local cluster
@@ -55,9 +71,9 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         "--run_after",
         f"{expname_prefix}-download-models",
         "--expname",
-        f"{expname_prefix}-download-ruler-data",
+        [f"{expname_prefix}-download-ruler-data", f"{expname_prefix}-patch-qwen-config"],
     ]
-    subprocess.run(ruler_cmd, check=True)
+    # subprocess.run(ruler_cmd, check=True)
 
 
 def eval_reasoning_on(workspace, cluster, expname_prefix):
@@ -412,9 +428,9 @@ def main():
 
     # launch for eval jobs
     # prepare_data_locally()
-    # download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
     # eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    # eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
     # Schedule a dependent check job on the cluster and check if the results are as expected
 
