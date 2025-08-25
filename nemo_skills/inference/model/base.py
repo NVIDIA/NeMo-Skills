@@ -23,7 +23,7 @@ import openai
 from nemo_skills.utils import get_logger_name
 
 from .context_retry import ContextLengthRetry, with_context_retry
-from .utils import get_tokenizer_endpoint, trim_after_stop_phrases
+from .utils import trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -65,6 +65,7 @@ class BaseModel:
         self.server_port = port
         self.ssh_server = ssh_server
         self.ssh_key_path = ssh_key_path
+        self.context_retry_config = context_retry_config
         if ssh_server is None:
             self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER")
         if ssh_key_path is None:
@@ -99,7 +100,7 @@ class BaseModel:
             self.base_url = base_url
 
         # Get the tokenizer endpoint if available
-        self.tokenizer_endpoint = get_tokenizer_endpoint(self.base_url, model)
+        self.tokenizer = self._get_tokenizer_endpoint(model)
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -232,6 +233,9 @@ class BaseModel:
 
                 self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
                 return result
+
+            except litellm.exceptions.ContextWindowExceededError as e:
+                raise e
 
             except openai.BadRequestError as e:
                 if "output messages (reasoning and final)" in str(e) and retry_count < max_retries:

@@ -16,7 +16,6 @@ import logging
 import re
 from typing import Union
 
-import litellm
 import requests
 
 from nemo_skills.utils import get_logger_name
@@ -37,7 +36,8 @@ class ServerTokenizer:
     """Class to encode and decode prompts via POST requests to the tokenizer endpoint."""
 
     def __init__(self, url):
-        self.url = url
+        self.tokenizer_url = url
+        self.detokenizer_url = url.replace("/tokenize", "/detokenize")
 
     def encode(self, prompt: str | list[dict]) -> list:
         """Encode the prompt using the tokenizer endpoint."""
@@ -49,10 +49,10 @@ class ServerTokenizer:
             else:
                 raise ValueError(f"Unsupported prompt type: {type(prompt)}")
 
-            response = requests.post(self.url, json=payload, timeout=30)
+            response = requests.post(self.tokenizer_url, json=payload, timeout=30)
             response.raise_for_status()
 
-            tokens = response.json()['tokens']
+            tokens = response.json()["tokens"]
             return tokens
 
         except requests.exceptions.RequestException as e:
@@ -66,10 +66,10 @@ class ServerTokenizer:
         """Decode a list of tokens using the tokenizer endpoint."""
         try:
             payload = {"tokens": tokens}
-            response = requests.post(self.url, json=payload, timeout=30)
+            response = requests.post(self.detokenizer_url, json=payload, timeout=30)
             response.raise_for_status()
 
-            text = response.json()['text']
+            text = response.json()["prompt"]
             return text
         except requests.exceptions.RequestException as e:
             LOG.error(f"Request failed: {e}")
