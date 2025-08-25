@@ -125,21 +125,26 @@ class ToolGenerationTask(GenerationTask):
         if tool_name == "error":
             return tool_args
         elif tool_name == "exa_websearch":
-            if os.getenv("EXA_API_KEY"):
-                tool_code = textwrap.dedent(
-                    f"""
-                    from exa_py import Exa
-                    import os
-
-                    exa = Exa(os.getenv("EXA_API_KEY"))
-                    result = exa.answer({repr(tool_args["query"])})
-                    print(result.answer)
-                """
-                )
-            else:
+            if not os.getenv("EXA_API_KEY"):
                 LOG.error(f"Missing EXA_API_KEY: {tool_name}/{tool_args}")
 
                 return {"error": "Tool not available or unsupported"}
+
+            if "query" not in tool_args:
+                LOG.error(f"Missing query: {tool_name}/{tool_args}")
+
+                return {"error": "Tool not available or unsupported"}
+
+            tool_code = textwrap.dedent(
+                f"""
+                from exa_py import Exa
+                import os
+
+                exa = Exa(os.getenv("EXA_API_KEY"))
+                result = exa.answer({repr(tool_args["query"])})
+                print(result.answer)
+            """
+            )
         else:
             if self.cfg.tool_errors_in_context:
                 LOG.error(f"Tool not available or unsupported: {tool_name}/{tool_args}")
