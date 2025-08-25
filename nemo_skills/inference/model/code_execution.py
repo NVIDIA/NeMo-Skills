@@ -41,7 +41,8 @@ class CodeExecutionConfig:
     sandbox_traceback_verbosity: str = 'plain'  # could be plain, context, verbose, or minimal
     add_remaining_code_executions: bool = False
 
-    # NOTE: required for properly format harmony prompt 
+    # NOTE: prompt template is required for properly format harmony prompt in text completion
+    # look at your prompt template, add the fields here. 
     text_begin: str = ""
     system_begin: str = ""
     system_end: str = ""
@@ -83,6 +84,12 @@ class CodeExecutionWrapper:
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
+
+        # sanity check 
+        if not is_openai_format:
+            assert self.config.user_begin !="", "user_begin is required for harmony response in text completion. Add the field `user_begin` to your prompt template"
+            assert self.config.user_end !="", "user_end is required for harmony response in text completion. Add the field `user_end` to your prompt template"
+            assert self.config.final_answer_begin !="", "final_answer_begin is required for harmony response in text completion. Add the field `final_answer_begin` to your prompt template"
 
         if top_logprobs is not None:  # TODO: add this
             raise NotImplementedError("top_logprobs is not supported yet.")
@@ -235,9 +242,10 @@ class CodeExecutionWrapper:
 
             # NOTE: we need to check if the final answer has been generated. 
             # If so, we should break out the loop to prevent furthur interactions with the LLM
-            if self.config.final_answer_begin in output:
-                print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
-                break
+            if not is_openai_format:
+                if self.config.final_answer_begin in output:
+                    print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
+                    break
 
             # NOTE: some models (like gpt-oss) require a confirmation signal from the user so that LLM can continue generating
             if is_openai_format:
@@ -252,6 +260,8 @@ class CodeExecutionWrapper:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
             # NOTE: cut off the prompt, and remove the final continue signal string from the user
+            # generation = request['prompt'][len(prompt):].replace(continue_signal, "")
+            # for deugging, retain the use interactions in the generation: 
             generation = request['prompt'][len(prompt):]
 
         return {
