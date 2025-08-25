@@ -4,6 +4,8 @@
 
 set -e
 
+export NUM_WORKERS=${NUM_WORKERS:-$(nproc --all)}
+
 echo "Starting multi-worker deployment with nginx (unix sockets upstream)..."
 echo "Workers: $NUM_WORKERS, Nginx port: $NGINX_PORT"
 
