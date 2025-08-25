@@ -14,13 +14,11 @@
 
 
 import logging
-import multiprocessing
 import os
 import re
 import resource
 import signal
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -50,7 +48,7 @@ def log_session_count(prefix: str = "") -> None:
 # Global dictionary to store IPython shells by session_id
 sessions = {}
 session_lock = threading.Lock()
-SESSION_TIMEOUT = float(os.getenv("SANDBOX_SESSION_TIMEOUT", 0))
+SESSION_TIMEOUT = float(os.getenv("NEMO_SKILLS_SANDBOX_SESSION_TIMEOUT", 0))  # disabled by default
 
 
 def cleanup_expired_sessions():
