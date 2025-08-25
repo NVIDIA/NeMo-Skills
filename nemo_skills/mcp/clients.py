@@ -224,10 +224,15 @@ class MCPHttpClient(MCPClient):
 
 
 class MCPStreamableHttpClient(MCPClient):
-    def __init__(self, base_url: str, output_formatter: Callable | None = None):
+    def __init__(
+        self, base_url: str, output_formatter: Callable | None = None, auth_connector: Callable | None = None
+    ):
         self.output_formatter = output_formatter
         self.base_url = base_url
+        self.auth_connector = auth_connector
         self.tools: List[Dict[str, Any]] = []
+        if self.auth_connector is not None:
+            self.auth_connector(self)
 
     async def list_tools(self):
         async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):

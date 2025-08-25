@@ -13,23 +13,44 @@
 # limitations under the License.
 
 import asyncio
+import json
+import os
+from typing import Serializable
+
+from mcp.types import CallToolResult
 
 from nemo_skills.inference.model.vllm import VLLMModel
 from nemo_skills.mcp.adapters import registry
-from nemo_skills.mcp.clients import MCPClientManager, MCPHttpClient, MCPStdioClient, MCPStreamableHttpClient
-
+from nemo_skills.mcp.clients import MCPClientManager, MCPStdioClient, MCPStreamableHttpClient
 
 # Initialize the VLLMModel with your local vLLM instance
 # Adjust model name and port as configured in your vLLM server
+
+
+def exa_auth_connector(client: MCPStreamableHttpClient):
+    client.base_url = f"{client.base_url}?exaApiKey={os.getenv('EXA_API_KEY')}"
+
+
+def exa_output_formatter(result: CallToolResult) -> Serializable:
+    return json.loads(result.content[0].text)["results"]
+
+
 async def run_demo():
     model = VLLMModel(model="Qwen/Qwen3-8B", host="127.0.0.1", port="8000")
     model_type = "qwen"
     python_client = MCPStdioClient(
         "python", ["-m", "nemo_skills.mcp.servers.python_tool"], hide_args={"execute": ["session_id", "timeout"]}
     )
+    exa_client = MCPStreamableHttpClient(
+        base_url="https://mcp.exa.ai/mcp",
+        enabled_tools=["web_search_exa"],
+        output_formatter=exa_output_formatter,
+        auth_connector=exa_auth_connector,
+    )
 
     manager = MCPClientManager()
     manager.register("python", python_client)
+    manager.register("exa", exa_client)
 
     tools = await manager.list_all_tools()
     tools = registry.get_schema(model_type).convert(tools)
