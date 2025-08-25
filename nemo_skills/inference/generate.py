@@ -258,9 +258,17 @@ class GenerationTask:
     def setup_llm(self):
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            # NOTE load prompt template
+            # NOTE load prompt template for harmony format
             prompt_template = load_config(config = self.cfg.prompt_template, config_dir = '/nemo_run/code/nemo_skills/prompt/template')
-            llm = get_code_execution_model(**self.cfg.server, **prompt_template, sandbox=sandbox)
+            harmony_prompt_config = {
+                "user_begin": prompt_template.user_begin,
+                'user_end': prompt_template.user_end,
+                'assistant_begin': prompt_template.assistant_begin,
+                'assistant_end': prompt_template.assistant_end,
+                'final_answer_begin': prompt_template.final_answer_begin,
+                'final_answer_end': prompt_template.final_answer_end,
+            }
+            llm = get_code_execution_model(**self.cfg.server, harmony_prompt_config=harmony_prompt_config, sandbox=sandbox)
         else:
             llm = get_model(**self.cfg.server)
 

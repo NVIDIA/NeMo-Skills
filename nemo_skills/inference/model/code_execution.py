@@ -42,17 +42,12 @@ class CodeExecutionConfig:
     add_remaining_code_executions: bool = False
 
     # NOTE: prompt template is required for properly format harmony prompt in text completion
-    # look at your prompt template, add the fields here. 
-    text_begin: str = ""
-    system_begin: str = ""
-    system_end: str = ""
     user_begin: str = ""
     user_end: str = ""
     assistant_begin: str = ""
     assistant_end: str = ""
     final_answer_begin: str = ""
     final_answer_end: str = ""
-    stop_phrases: str = ""
 
 class CodeExecutionWrapper:
     def __init__(self, model: BaseModel, sandbox: Sandbox, config: CodeExecutionConfig):

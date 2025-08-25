@@ -47,12 +47,12 @@ def get_model(server_type, **kwargs):
     return model_class(**kwargs)
 
 
-def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
+def get_code_execution_model(server_type, code_execution=None, sandbox=None, harmony_prompt_config=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model = get_model(server_type=server_type, **kwargs)
     if code_execution is None:
         code_execution = {}
-    code_execution_config = CodeExecutionConfig(**code_execution)
+    code_execution_config = CodeExecutionConfig(**code_execution, **harmony_prompt_config)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
