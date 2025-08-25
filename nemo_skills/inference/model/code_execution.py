@@ -43,6 +43,8 @@ class CodeExecutionConfig:
     # NOTE: 
     user_begin: str = "<|start|>user<|message|>"
     user_end: str = "<|end|>"
+    final_answer_begin: str = "<|start|>assistant<|channel|>final<|message|>"
+    final_answer_end: str = "<|return|>"
 
 
 class CodeExecutionWrapper:
@@ -171,18 +173,12 @@ class CodeExecutionWrapper:
 
             print(f"--------------DEBUGGING generation_index: {generation_index}: output-------------")
             print(output)
+
             # Update the prompt based on format
             if is_openai_format:
                 request['prompt'].append({'role': 'assistant', 'content': output})
-                request['prompt'].append({'role': 'user', 'content': "continue"})
             else:
                 request['prompt'] += output
-                # construct the continue signal from user
-                continue_signal = f"{self.config.user_begin}continue{self.config.user_end}"
-                request['prompt'] += continue_signal
-            
-            print(f"--------------DEBUGGING generation_index: {generation_index}: Prompt for next round------------")
-            print(request['prompt'])
 
             # if it's the extra iteration, we don't execute the code block and just finish
             if generation_index == effective_max_code_executions:
@@ -217,7 +213,8 @@ class CodeExecutionWrapper:
                 print(code_output)
 
                 if is_openai_format:
-                    request['prompt'][-2]['content'] += code_output
+                    # change to -1 for the assistant message
+                    request['prompt'][-1]['content'] += code_output
                 else:
                     request['prompt'] += code_output
 
@@ -225,7 +222,7 @@ class CodeExecutionWrapper:
                 code_rounds_executed += 1
 
                 # NOTE: reset the consecutive_no_code_generations
-                print(f"--------------DEBUGGING generation_index: {generation_index}: RESET consecutive_no_code_generations-------------")
+                # print(f"--------------DEBUGGING generation_index: {generation_index}: RESET consecutive_no_code_generations-------------")
                 # consecutive_no_code_generations = 0
 
             # NOTE: if no code was generated, we need to finish
@@ -242,20 +239,22 @@ class CodeExecutionWrapper:
             
             # NOTE: increase generation index
             generation_index += 1
-            if "final answer: " in output.lower():
+            if self.config.final_answer_begin in output:
                 print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
                 break
-
+            if is_openai_format:
+                request['prompt'].append({'role': 'user', 'content': "continue"})
+            else:
+                continue_signal = f"{self.config.user_begin}continue{self.config.user_end}"
+                request['prompt'] += continue_signal
+        
+        # clean up after generaiton is done
         # removing original prompt and returning the generation
         if is_openai_format:
             generation = "\n".join(msg['content'] for msg in request['prompt'] if msg['role'] == 'assistant')
         else:
-            # generation = request['prompt'][len(prompt) :]
             # NOTE: cut off the prompt, and remove the final continue signal string from the user
-            generation = request['prompt'][len(prompt):-len(continue_signal)]
-
-        print(f"--------------DEBUGGING generation_index: {generation_index}: Final generation-------------")
-        print(generation)
+            generation = request['prompt'][len(prompt):]
 
         return {
             'generation': generation,
