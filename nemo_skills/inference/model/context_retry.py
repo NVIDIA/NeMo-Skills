@@ -137,8 +137,15 @@ async def handle_context_retries_async(
     try:
         result = await func(self, *args, **kwargs)
         return result
-    except litellm.exceptions.ContextWindowExceededError as e:
-        return await _handle_context_error_async(func, self, args, kwargs, config, e)
+    except litellm.exceptions.ContextWindowExceededError as error:
+        if not config.enable_soft_fail:
+            raise error
+
+        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+        if modified_kwargs is None:
+            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+
+        return await func(self, *args, **modified_kwargs)
 
 
 def handle_context_retries_sync(
@@ -148,36 +155,15 @@ def handle_context_retries_sync(
     try:
         result = func(self, *args, **kwargs)
         return result
-    except litellm.exceptions.ContextWindowExceededError as e:
-        return _handle_context_error_sync(func, self, args, kwargs, config, e)
+    except litellm.exceptions.ContextWindowExceededError as error:
+        if not config.enable_soft_fail:
+            raise error
 
+        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+        if modified_kwargs is None:
+            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
 
-def _handle_context_error_sync(
-    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig, error: Exception
-) -> dict:
-    """Common logic for handling context window errors."""
-    if not config.enable_soft_fail:
-        raise error
-
-    modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-    if modified_kwargs is None:
-        return return_empty_generation_with_error(f"Could not apply strategy. {error}")
-
-    return func(self, *args, **modified_kwargs)
-
-
-async def _handle_context_error_async(
-    func: Callable, self, args: tuple, kwargs: dict, config: ContextLimitRetryConfig, error: Exception
-) -> dict:
-    """Common logic for handling context window errors."""
-    if not config.enable_soft_fail:
-        raise error
-
-    modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-    if modified_kwargs is None:
-        return return_empty_generation_with_error(f"Could not apply strategy. {error}")
-
-    return await func(self, *args, **modified_kwargs)
+        return func(self, *args, **modified_kwargs)
 
 
 def _prepare_context_error_retry(
