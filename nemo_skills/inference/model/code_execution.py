@@ -135,7 +135,7 @@ class CodeExecutionWrapper:
         # max_consecutive_no_code_generations = 6
         # consecutive_no_code_generations = 0
         generation_index = 0
-        max_generation_rounds = effective_max_code_executions + 5
+        max_generation_rounds= effective_max_code_executions + 5
 
         # adding plus one to make sure there is always some completion after the last requested code block
         # for generation_index in range(effective_max_code_executions + 1):
@@ -236,6 +236,9 @@ class CodeExecutionWrapper:
             
             # NOTE: increase generation index
             generation_index += 1
+            if "final answer: " in output.lower():
+                print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
+                break
 
         # removing original prompt and returning the generation
         if is_openai_format:
