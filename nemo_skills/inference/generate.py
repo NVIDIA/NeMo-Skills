@@ -260,7 +260,6 @@ class GenerationTask:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
             # NOTE load prompt template for harmony format
             prompt_template = load_config(config = self.cfg.prompt_template, config_dir = '/nemo_run/code/nemo_skills/prompt/template')
-            print(f"--------------DEBUGGING prompt_template: {prompt_template}-------------")
             harmony_prompt_config = {
                 "user_begin": prompt_template['user_begin'],
                 'user_end': prompt_template['user_end'],

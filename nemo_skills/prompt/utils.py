@@ -103,6 +103,9 @@ class PromptTemplate:
     user_end: str
     assistant_begin: str
     assistant_end: str
+    # NOTE: for harmony format
+    final_answer_begin: str
+    final_answer_end: str
 
     # TODO: should stop phrases not be here?
     stop_phrases: List[str]
