@@ -17,7 +17,7 @@ import copy
 import functools
 import logging
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Callable, Union
 
 import litellm
@@ -29,7 +29,7 @@ from .utils import ServerTokenizer
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def parse_context_window_exceeded_error(error: litellm.ContextWindowExceededError) -> Union[dict, None]:
+def parse_context_window_exceeded_error(error: litellm.exceptions.ContextWindowExceededError) -> Union[dict, None]:
     """
     Extract token information from LiteLLM context window error messages.
 
