@@ -455,53 +455,82 @@ class GenerationTask:
             data_point["generation_start_time"] = time.time()
 
             # Generate output for this single data point
+            print("Start process", data_point, flush=True)
             output = await self.process_single_datapoint(data_point, all_data)
+            # output = {"generation": "dummy"}
+            print("End process", data_point, flush=True)
 
             # Thread-safe output writing
             async with self.output_lock:
                 self.dump_outputs([output], [data_point], fout)
                 pbar.update(1)
+            print("Done dumping", data_point, flush=True)
+
+    async def cleanup_async_resources(self):
+        # Close LLM client if it exposes an async/sync close
+        aclose = getattr(self.llm, "aclose", None)
+        close = getattr(self.llm, "close", None)
+        try:
+            if callable(aclose):
+                await aclose()
+            elif callable(close):
+                close()
+        except Exception:
+            pass
+        # Drop loop-bound primitives to avoid cross-loop refs
+        self.output_lock = None
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
+        try:
+            # Initialize output lock for thread-safe writing
+            if self.output_lock is None:
+                self.output_lock = asyncio.Lock()
 
-        # Initialize output lock for thread-safe writing
-        if self.output_lock is None:
-            self.output_lock = asyncio.Lock()
+            # We first segregate the data into prefilled and non-prefilled data points
+            prefilled_data_points, prefilled_outputs = [], []
+            remaining_data_points = []
 
-        # We first segregate the data into prefilled and non-prefilled data points
-        prefilled_data_points, prefilled_outputs = [], []
-        remaining_data_points = []
+            for data_point in data:
+                prefill_output = self.prefill_generation(data_point)
+                if prefill_output is not None:
+                    prefilled_outputs.append(prefill_output)
+                    prefilled_data_points.append(data_point)
+                else:
+                    remaining_data_points.append(data_point)
 
-        for data_point in data:
-            prefill_output = self.prefill_generation(data_point)
-            if prefill_output is not None:
-                prefilled_outputs.append(prefill_output)
-                prefilled_data_points.append(data_point)
-            else:
-                remaining_data_points.append(data_point)
+            pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
 
-        pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
+            with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
+                # Dump prefilled data first
+                if len(prefilled_data_points) > 0:
+                    async with self.output_lock:
+                        self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
-        with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
-            # Dump prefilled data first
-            if len(prefilled_data_points) > 0:
-                async with self.output_lock:
-                    self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
+                # Create tasks for all remaining data points
+                tasks = []
+                for data_point in remaining_data_points:
+                    task = asyncio.create_task(
+                        self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar)
+                    )
+                    tasks.append(task)
 
-            # Create tasks for all remaining data points
-            tasks = []
-            for data_point in remaining_data_points:
-                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
-                tasks.append(task)
+                # Wait for all tasks to complete
+                if tasks:
+                    print("Starting wait", flush=True)
+                    await asyncio.gather(*tasks)
+                    print("Done wait", flush=True)
 
-            # Wait for all tasks to complete
-            if tasks:
-                await asyncio.gather(*tasks)
-
-            pbar.close()
-
-        self.restore_async_order()
+                pbar.close()
+            print("Close file", flush=True)
+            self.restore_async_order()
+            print("Restored order", flush=True)
+        finally:
+            # Ensure all async clients and loop-bound objects are cleaned up
+            await self.cleanup_async_resources()
+            # Give the loop a tick to process cancellations/closures
+            await asyncio.sleep(0)
+            del self.llm
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
@@ -542,10 +571,11 @@ class GenerationTask:
             for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
                 if output_path.exists():
                     output_path.unlink()
-
-        asyncio.run(self.async_loop(data))
-
+        print("**************", 1, flush=True)
+        asyncio.run(self.async_loop(data), debug=True)
+        print("**************", 2, flush=True)
         self.postprocess()
+        print("**************", 3, flush=True)
 
 
 GENERATION_TASK_CLASS = GenerationTask

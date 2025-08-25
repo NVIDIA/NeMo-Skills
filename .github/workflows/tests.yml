@@ -20,10 +20,10 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
-    - name: Set up Python 3.10
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.11"
         cache: pip
     - name: Install dependencies
       run: |
@@ -34,7 +34,6 @@ jobs:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-        docker pull igitman/nemo-skills:0.7.0
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
-        ns prepare_data gsm8k math-500
+        ns prepare_data gsm8k
         python -m pytest tests/test_generation.py -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -s -vvv
