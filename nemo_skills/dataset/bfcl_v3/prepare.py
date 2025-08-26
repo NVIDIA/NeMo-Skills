@@ -41,7 +41,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 # Github paths for BFCL
 REPO_URL = "https://github.com/ShishirPatil/gorilla.git"
 
-
 # Define the configuration as a dictionary
 DEFAULT_SETTINGS = """
 DATASET_GROUP = "tool"
@@ -130,7 +129,10 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
         try:
             # Clone repository with minimal depth
             print(f"Cloning repository {repo_url} to {temp_dir}")
-            subprocess.run(["git", "clone", "--depth=1", repo_url, temp_dir], check=True, capture_output=True)
+            # v1.3 corresponds the release version for BFCL v3
+            subprocess.run(
+                ["git", "clone", "-b", "v1.3", "--depth=1", repo_url, temp_dir], check=True, capture_output=True
+            )
 
             # Find the target folder
             target_folder = Path(temp_dir) / subfolder_path
