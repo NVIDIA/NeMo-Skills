@@ -36,3 +36,7 @@ containers:
 #   - /home/<username>/workspace:/workspace
 #   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
 #   - <...>/NeMo-Aligner:/opt/NeMo-Aligner
+
+# define any environment variables. Note that HF_HOME is required by default and needs to be a mounted path!
+# env_vars:
+#   - HF_HOME=/models/hf-cache
