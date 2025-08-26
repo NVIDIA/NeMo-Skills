@@ -43,7 +43,7 @@ class TestEnvironment:
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
 
-    def __post_init__(self):
+    def validate_environment(self):
         """Validate required environment variables"""
         if not self.model_path:
             pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
@@ -189,6 +189,7 @@ class ContextRetryTestSuite:
 
     def __init__(self):
         self.env = TestEnvironment()
+        self.env.validate_environment()  # validate environment before initializing other objects
         self.config = TestConfig()
         self.cmd_builder = CommandBuilder(self.env, self.config)
         self.output_manager = OutputManager()
