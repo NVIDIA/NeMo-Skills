@@ -93,39 +93,4 @@ class QwenResponseFormatter(ToolResponseFormatter):
 # ==============================
 # REGISTRY
 # ==============================
-class AdapterRegistry:
-    def __init__(self):
-        self.schemas = {}
-        self.interpreters = {}
-        self.response_formatters = {}
-
-    def register_schema(self, model_type: str, adapter: ToolSchemaAdapter):
-        self.schemas[model_type] = adapter
-
-    def register_interpreter(self, model_type: str, adapter: ToolCallInterpreter):
-        self.interpreters[model_type] = adapter
-
-    def register_response_formatter(self, model_type: str, adapter: ToolResponseFormatter):
-        self.response_formatters[model_type] = adapter
-
-    def get_schema(self, model_type: str):
-        return self.schemas[model_type]
-
-    def get_interpreter(self, model_type: str):
-        return self.interpreters[model_type]
-
-    def get_response_formatter(self, model_type: str):
-        return self.response_formatters[model_type]
-
-
-# ---- Example setup
-registry = AdapterRegistry()
-
-registry.register_schema("openai", OpenAISchemaAdapter())
-registry.register_interpreter("openai", OpenAICallInterpreter())
-registry.register_response_formatter("openai", OpenAIResponseFormatter())
-
-# Qwen can reuse OpenAI
-registry.register_schema("qwen", OpenAISchemaAdapter())
-registry.register_interpreter("qwen", OpenAICallInterpreter())
-registry.register_response_formatter("qwen", QwenResponseFormatter())
+# Registry removed in favor of locate/dynamic resolution in callers.

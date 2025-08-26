@@ -14,14 +14,15 @@
 
 import asyncio
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 from nemo_skills.inference.model.vllm import VLLMModel
-from nemo_skills.mcp.adapters import registry
+
+# Adapter classes are resolved via locate at runtime
 from nemo_skills.mcp.clients import MCPClientManager, MCPStdioClient, MCPStreamableHttpClient
 from nemo_skills.mcp.utils import hydra_config_connector_factory, locate
 
@@ -39,10 +40,13 @@ class PythonToolMCPConfig:
 @dataclass
 class DemoConfig:
     model: str = "Qwen/Qwen3-8B"
-    model_type: str = "qwen"
     vllm_host: str = "127.0.0.1"
     vllm_port: str = "8000"
     python_tool: PythonToolMCPConfig = field(default_factory=PythonToolMCPConfig)
+    # Class paths or instances; resolved via locate at runtime
+    schema_adapter: str = "nemo_skills.mcp.adapters.OpenAISchemaAdapter"
+    call_interpreter: str = "nemo_skills.mcp.adapters.OpenAICallInterpreter"
+    response_formatter: str = "nemo_skills.mcp.adapters.QwenResponseFormatter"
     sandbox: dict = field(
         default_factory=lambda: {
             "sandbox_type": "local",
@@ -56,7 +60,6 @@ cs.store(name="base_mcp_demo_config", node=DemoConfig)
 
 async def run_demo(cfg: DemoConfig):
     model = VLLMModel(model=cfg.model, host=cfg.vllm_host, port=cfg.vllm_port)
-    model_type = cfg.model_type
     # Build a Hydra config for the python MCP server and inject via connector
     # Accept whatever object Hydra parsed (dataclass/DictConfig) and convert to plain dict
     python_client = MCPStdioClient(
@@ -77,7 +80,18 @@ async def run_demo(cfg: DemoConfig):
     manager.register("exa", exa_client)
 
     tools = await manager.list_all_tools()
-    tools = registry.get_schema(model_type).convert(tools)
+    # Resolve adapters via locate-only
+    schema_adapter_obj = locate(cfg.schema_adapter)
+    call_interpreter_obj = locate(cfg.call_interpreter)
+    response_formatter_obj = locate(cfg.response_formatter)
+
+    schema_adapter = schema_adapter_obj() if isinstance(schema_adapter_obj, type) else schema_adapter_obj
+    call_interpreter = call_interpreter_obj() if isinstance(call_interpreter_obj, type) else call_interpreter_obj
+    response_formatter = (
+        response_formatter_obj() if isinstance(response_formatter_obj, type) else response_formatter_obj
+    )
+
+    tools = schema_adapter.convert(tools)
     print(tools)
 
     # Define the messages and tools
@@ -130,10 +144,10 @@ async def run_demo(cfg: DemoConfig):
         # Execute tool calls and append their outputs to the conversation
         print("\nTool calls:")
         for tool_call in response["tool_calls"]:
-            tool_args = registry.get_interpreter(model_type).parse(tool_call)
+            tool_args = call_interpreter.parse(tool_call)
             print(f"Executing tool: {tool_args}")
             tool_result = await manager.execute_tool(**tool_args)
-            tool_msg = registry.get_response_formatter(model_type).format(tool_call, tool_result)
+            tool_msg = response_formatter.format(tool_call, tool_result)
             print(tool_msg)
             messages.append(tool_msg)
 
