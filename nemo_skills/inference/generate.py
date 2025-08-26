@@ -284,7 +284,8 @@ class GenerationTask:
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
-                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+                **{**self.cfg.server, "model": llm},
+                online_genselect_config=self.cfg.online_genselect_config,
             )
 
         return llm
