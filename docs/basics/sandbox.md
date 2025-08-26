@@ -18,7 +18,7 @@ Most of the time, the pipeline scripts will launch sandbox automatically when re
 it manually, you can use the following command
 
 ```bash
-docker run --rm --network=host igitman/nemo-skills-sandbox:0.7.0
+docker run --rm --network=host igitman/nemo-skills-sandbox:0.7.1
 ```
 
 If docker is not available, you can still run a sandbox (although less efficient version) like this

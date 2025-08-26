@@ -58,6 +58,10 @@ def prepare_data(
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare.
 
@@ -138,6 +142,7 @@ def prepare_data(
         log_dir=log_dir,
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
+        skip_hf_home_check=skip_hf_home_check,
     )
 
 
