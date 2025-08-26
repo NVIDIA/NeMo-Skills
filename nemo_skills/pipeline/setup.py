@@ -21,6 +21,7 @@ import yaml
 
 from nemo_skills import _containers
 from nemo_skills.pipeline.app import app
+from nemo_skills.pipeline.utils import is_mounted_filepath
 
 
 def is_docker_available():
@@ -94,8 +95,43 @@ def setup():
             default=f"/home/{os.getlogin()}:/workspace" if config_type == "local" else None,
         )
 
+        # parse mounts early so we can validate HF_HOME against them
+        mounts_list = [m.strip() for m in mounts.split(",")]
+
+        # Prompt for HF_HOME and validate it is within one of the mounts. Allow retry.
+        hf_home = ""
+        while True:
+            hf_home = typer.prompt(
+                "By default we require HF_HOME env variable to be defined in your cluster config.\n"
+                "If it's not set, you might be accidentally re-downloading the models every time you run ns commands.\n"
+                "Note that it's not enough to just define it in your environment, you need it to be explicitly listed "
+                "in the config. It should be a mounted path that's consistent with your "
+                "cluster setup and mounts list (e.g. /workspace/...).\n"
+                "If you don't define it, the jobs will fail unless, you can run commands with --skip_hf_home_check."
+                "Set HF_HOME for this cluster now or leave empty to skip.",
+                default="",
+            )
+            if not hf_home:
+                # user chose to skip HF_HOME
+                break
+
+            # validate using provided helper
+            if is_mounted_filepath(cluster_config=None, path=hf_home, mounts=mounts_list):
+                break
+
+            # invalid HF_HOME; ask to retry or skip
+            retry = typer.confirm(
+                f"\nThe path '{hf_home}' does not appear to be inside any of the configured mounts: {mounts_list}.\n"
+                "Would you like to try entering HF_HOME again?",
+                default=True,
+            )
+            if not retry:
+                typer.echo("Skipping HF_HOME setting for this cluster.")
+                hf_home = ""
+                break
+
         env_vars = typer.prompt(
-            "\nYou can also specify any environment variables that you want to be accessible in containers.\n"
+            "\nYou can also specify any other environment variables that you want to be accessible in containers.\n"
             "Can either define just the name (we take value from the current environment), "
             "or name=value to use a fixed value.\n"
             "By default we will always pass "
@@ -105,33 +141,12 @@ def setup():
             default="",
         )
 
-        config["mounts"] = [m.strip() for m in mounts.split(",")]
+        config["mounts"] = mounts_list
         config["env_vars"] = [e.strip() for e in env_vars.split(",") if e.strip()]
+        if hf_home:
+            config["env_vars"].append(f"HF_HOME={hf_home}")
         if not config["env_vars"]:
             config.pop("env_vars")
-
-        typer.echo(
-            "\nHF_HOME (Hugging Face cache) is REQUIRED by default. "
-            "You can opt out later when running commands with --skip-hf-home-check."
-        )
-
-        set_hf_home = typer.confirm("Would you like to set HF_HOME now?", default=True)
-
-        if set_hf_home:
-            default_hf = os.environ.get("HF_HOME")
-            if not default_hf:
-                if config_type == "slurm":
-                    default_hf = "/<your_group>/<your_user>/hf_home"
-                else:
-                    default_hf = str(Path.home() / ".cache" / "huggingface")
-
-            hf_home = typer.prompt("Enter HF_HOME path", default=default_hf)
-            config.setdefault("env_vars", []).append(f"HF_HOME={hf_home}")
-        else:
-            typer.echo(
-                "Note: You chose not to set HF_HOME. "
-                "Commands will fail the default check unless you pass --skip-hf-home-check."
-            )
 
         if config_type == "slurm":
             ssh_access = typer.confirm(

@@ -33,7 +33,7 @@ from nemo_skills.pipeline.utils.cluster import (
     temporary_env_update,
     tunnel_hash,
 )
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
+from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path, is_mounted_filepath
 from nemo_skills.pipeline.utils.packager import (
     get_packager,
     get_registered_external_repo,
@@ -413,12 +413,15 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
-    if skip_hf_home_check is False and "HF_HOME" not in env_vars:
-        raise RuntimeError(
-            "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
-            f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
-            "Expected something like: HF_HOME=/path/to/your/hf_home"
-        )
+    if cluster_config["executor"] != "none" and not skip_hf_home_check:
+        if "HF_HOME" not in env_vars:
+            raise RuntimeError(
+                "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
+                f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
+                "Please add a new variable: HF_HOME=/path/to/your/hf_home"
+            )
+        if not is_mounted_filepath(cluster_config, env_vars["HF_HOME"]):
+            raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
 
     het_group = 0
     het_group_indices = []
