@@ -38,7 +38,7 @@ async def run_demo():
             "adapters": {
                 "schema_adapter": "nemo_skills.mcp.adapters.OpenAISchemaAdapter",
                 "call_interpreter": "nemo_skills.mcp.adapters.OpenAICallInterpreter",
-                "response_formatter": "nemo_skills.mcp.adapters.QwenResponseFormatter",
+                "response_formatter": "nemo_skills.mcp.adapters.CompletionResponseFormatter",
             },
             "tools": [
                 {

@@ -80,7 +80,7 @@ class OpenAIResponseFormatter(ToolResponseFormatter):
         }
 
 
-class QwenResponseFormatter(ToolResponseFormatter):
+class CompletionResponseFormatter(ToolResponseFormatter):
     # https://qwen.readthedocs.io/en/latest/framework/function_call.html#id2
     def format(self, tool_call: ChatCompletionMessageToolCall, result):
         return {
