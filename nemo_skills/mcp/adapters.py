@@ -88,9 +88,3 @@ class CompletionResponseFormatter(ToolResponseFormatter):
             "content": json.dumps(result),
             "tool_call_id": tool_call.id,
         }
-
-
-# ==============================
-# REGISTRY
-# ==============================
-# Registry removed in favor of locate/dynamic resolution in callers.
