@@ -246,24 +246,6 @@ class MCPClient(metaclass=MCPClientMeta):
             raise PermissionError(f"Tool '{tool}' is not in enabled_tools: {sorted(enabled)}")
 
 
-class MCPHttpClient(MCPClient):
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-        self.tools: List[Dict[str, Any]] = []
-
-    async def list_tools(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{self.base_url}/list_tools") as resp:
-                self.tools = await resp.json()
-                return self.tools
-
-    async def call_tool(self, tool: str, args: dict) -> Any:
-        self._assert_tool_allowed(tool)
-        async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.base_url}/call_tool", json={"tool": tool, "args": args}) as resp:
-                return await resp.json()
-
-
 class MCPStreamableHttpClient(MCPClient):
     def __init__(self, base_url: str):
         self.base_url = base_url
