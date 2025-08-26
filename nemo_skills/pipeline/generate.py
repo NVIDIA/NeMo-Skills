@@ -20,7 +20,12 @@ import typer
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
+from nemo_skills.utils import (
+    compute_chunk_ids,
+    get_logger_name,
+    setup_logging,
+    str_ids_to_list,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -142,7 +147,9 @@ def generate(
         "E.g. 'pip install my_package'",
     ),
     skip_hf_home_check: bool = typer.Option(
-        False, "--skip-hf-home-check", help="If True, skip checking HF_HOME in cluster_config."
+        False,
+        "--skip-hf-home-check",
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),

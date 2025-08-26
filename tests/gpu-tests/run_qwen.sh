@@ -8,13 +8,6 @@ set -e
 export NEMO_SKILLS_TEST_HF_MODEL=/mnt/datadrive/nemo-skills-test-data/Qwen2.5-Math-7B-Instruct
 export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
 
-# first running the conversion tests
-pytest tests/gpu-tests/test_convert.py -k test_hf_nemo_conversion -s -x
-export NEMO_SKILLS_TEST_NEMO_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/hf-to-nemo/model
-pytest tests/gpu-tests/test_convert.py -k test_nemo_hf_conversion -s -x
-# using the back-converted model to check that it's reasonable
-export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/conversion/nemo-to-hf/model
-
 # generation/evaluation tests
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x

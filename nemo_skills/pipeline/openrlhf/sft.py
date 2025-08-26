@@ -21,7 +21,14 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.openrlhf import openrlhf_app
-from nemo_skills.pipeline.utils import add_task, check_if_mounted, get_cluster_config, get_exp, get_timeout, run_exp
+from nemo_skills.pipeline.utils import (
+    add_task,
+    check_if_mounted,
+    get_cluster_config,
+    get_exp,
+    get_timeout,
+    run_exp,
+)
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -239,7 +246,9 @@ def sft_openrlhf(
         help="If --not_exclusive is used, will NOT use --exclusive flag for slurm",
     ),
     skip_hf_home_check: bool = typer.Option(
-        False, "--skip-hf-home-check", help="If True, skip checking HF_HOME in cluster_config."
+        False,
+        "--skip-hf-home-check",
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
         None,

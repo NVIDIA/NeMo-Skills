@@ -237,7 +237,9 @@ def convert(
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     skip_hf_home_check: bool = typer.Option(
-        False, "--skip-hf-home-check", help="If True, skip checking HF_HOME in cluster_config."
+        False,
+        "--skip-hf-home-check",
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
         None,

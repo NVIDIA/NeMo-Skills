@@ -290,7 +290,9 @@ def ppo_verl(
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
     skip_hf_home_check: bool = typer.Option(
-        False, "--skip-hf-home-check", help="If True, skip checking HF_HOME in cluster_config."
+        False,
+        "--skip-hf-home-check",
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
         None,

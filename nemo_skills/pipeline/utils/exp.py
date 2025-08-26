@@ -383,6 +383,12 @@ def add_task(
 
     installation_command argument only affects "main" task, not server or sandbox.
     """
+    MAX_TASK_NAME_LEN = 100
+    if len(task_name) > MAX_TASK_NAME_LEN:
+        task_name_cut = f"{task_name[:MAX_TASK_NAME_LEN]}-name-cut"
+        LOG.warning("task_name '%s' is too long (%d). Truncated to '%s'", task_name, len(task_name), task_name_cut)
+        task_name = task_name_cut
+
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, (str, run.Experiment)):
             run_after = [run_after]
