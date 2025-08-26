@@ -153,6 +153,7 @@ class MetricsValidator:
 
 def _create_large_input_file(input_file: str, num_samples: int):
     """Create a fake input jsonl file with long prompts"""
+    # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         try:
             for _ in range(num_samples):
@@ -236,6 +237,7 @@ def test_context_retry_reduce_generation_disabled():
 
 @pytest.mark.gpu
 def test_context_retry_reduce_prompt_start():
+    # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the start."""
     test_suite.run_generation_test(
         test_name="vllm-eval-reduce-prompt-start", retry_strategy="reduce_prompt_from_start"
@@ -244,5 +246,6 @@ def test_context_retry_reduce_prompt_start():
 
 @pytest.mark.gpu
 def test_context_retry_reduce_prompt_end():
+    # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the end."""
     test_suite.run_generation_test(test_name="vllm-eval-reduce-prompt-end", retry_strategy="reduce_prompt_from_end")
