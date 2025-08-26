@@ -14,7 +14,7 @@ user: |-
     3. If any core part of the expected answer is missing, the prediction is incorrect.
     4. If any value in the prediction differs from its corresponding value in the expected answer, the prediction is incorrect. That is, partially correct answers are not considered correct.
     5. If the prediction includes extra information but fully contains all the core components with correct values, it is correct.
-    6. When comparing floating-point numbers, apply rounding based on your judgement, unless precision/tolerance is explicitly specified in the problem. As a general rule of thumb, for deterministic problems, usually differences within 0.01 are acceptable. For non-deterministic problems or model predictions, use your ownjudgment.
+    6. When comparing floating-point numbers, apply rounding based on your judgement, unless precision/tolerance is explicitly specified in the problem. 
     7. When comparing mathematical expressions, allow only trivial simplifications.
 
     # Examples
@@ -56,7 +56,7 @@ user: |-
     - Not_Normally_Distributed_Features: 8
 
     Example of your output: 
-    Reasoning: The predicted answer is a rephrase. Style doesn't matter. We only look at hte core content. It also describes the mean value, which is not part of the expected answer, but that is OK. 
+    Reasoning: The predicted answer is a rephrase. Style doesn't matter. We only look at hte core content. It also describes the mean value, which is not part of the expected answer, but that is fine. 
     Judgement: Yes
 
     Example 5:
@@ -74,16 +74,15 @@ user: |-
     Expected answer: The mean value of age column is 35.2
 
     Example of your output: 
-    Reasoning: Calculation of the age statistic is likely a deterministic problem. The difference between 35.212 and 35.2 is less than 0.01, so it is correct.
+    Reasoning: Differences is likely due to rounding/precision. Count as correct.
     Judgement: Yes
     
     Example 7:
-    Problem: What is the RMSD value of the predicted protein structure against ground truth PDB structure? For this problem, we want RMSD to be less than 0.001
-    Predicted answer: 0.003
-    Expected answer: RMSD: 0.001
+    Predicted answer: The RMSD value is 0.003 (tolerance is 0.0001)
+    Expected answer: RMSD: 0.002
 
     Example of your output: 
-    Reasoning: The problem sets a specific tolerance for RMSD, so the predicted answer is not less than 0.001 from the expected answer, so it is incorrect.
+    Reasoning: The problem sets a specific tolerance, so the predicted answer is not less than 0.0001 from the expected answer, so it is incorrect.
     Judgement: No
 
     Example 8: 
