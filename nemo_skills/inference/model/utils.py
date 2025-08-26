@@ -41,42 +41,25 @@ class ServerTokenizer:
 
     def encode(self, prompt: str | list[dict]) -> list:
         """Encode the prompt using the tokenizer endpoint."""
-        try:
-            if isinstance(prompt, str):
-                payload = {"prompt": prompt}
-            elif isinstance(prompt, list):
-                payload = {"messages": prompt}
-            else:
-                raise ValueError(f"Unsupported prompt type: {type(prompt)}")
+        if isinstance(prompt, str):
+            payload = {"prompt": prompt}
+        elif isinstance(prompt, list):
+            payload = {"messages": prompt}
 
-            response = requests.post(self.tokenizer_url, json=payload, timeout=30)
-            response.raise_for_status()
+        response = requests.post(self.tokenizer_url, json=payload, timeout=30)
+        response.raise_for_status()
 
-            tokens = response.json()["tokens"]
-            return tokens
-
-        except requests.exceptions.RequestException as e:
-            LOG.error(f"Request failed: {e}")
-            return None
-        except (KeyError, ValueError, TypeError) as e:
-            LOG.error(f"Failed to encode prompt: {e}")
-            return None
+        tokens = response.json()["tokens"]
+        return tokens
 
     def decode(self, tokens: list) -> str:
         """Decode a list of tokens using the tokenizer endpoint."""
-        try:
-            payload = {"tokens": tokens}
-            response = requests.post(self.detokenizer_url, json=payload, timeout=30)
-            response.raise_for_status()
+        payload = {"tokens": tokens}
+        response = requests.post(self.detokenizer_url, json=payload, timeout=30)
+        response.raise_for_status()
 
-            text = response.json()["prompt"]
-            return text
-        except requests.exceptions.RequestException as e:
-            LOG.error(f"Request failed: {e}")
-            return None
-        except (KeyError, ValueError, TypeError) as e:
-            LOG.error(f"Failed to decode tokens {tokens} due to {e}")
-            return None
+        text = response.json()["prompt"]
+        return text
 
 
 class RequestException(RuntimeError):
