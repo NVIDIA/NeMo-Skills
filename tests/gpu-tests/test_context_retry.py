@@ -59,21 +59,21 @@ class CommandBuilder:
         self.config = config
         self.base_path = Path(__file__).absolute().parent
 
-    def _build_base_cmd(self, cmd_type: str, output_dir: str) -> str:
+    def _build_base_cmd(self, cmd_type: str, output_dir: str, server_type: str) -> str:
         """Build base command with common parameters"""
         return (
             f"ns {cmd_type} "
             f"    --cluster test-local --config_dir {self.base_path} "
             f"    --model {self.env.model_path} "
-            f"    --server_type vllm "
+            f"    --server_type {server_type} "
             f"    --output_dir {output_dir} "
             f"    --server_gpus {self.config.server_gpus} "
             f"    --server_nodes {self.config.server_nodes} "
         )
 
-    def build_eval_cmd(self, output_dir: str, enable_soft_fail: bool, retry_strategy: str) -> str:
+    def build_eval_cmd(self, output_dir: str, server_type: str, enable_soft_fail: bool, retry_strategy: str) -> str:
         """Build evaluation command"""
-        base = self._build_base_cmd("eval", output_dir)
+        base = self._build_base_cmd("eval", output_dir, server_type)
         return base + (
             f"    --benchmarks gsm8k "
             f"    ++max_samples={self.config.num_samples} "
@@ -82,9 +82,9 @@ class CommandBuilder:
             + (f"    ++server.context_limit_retry_strategy={retry_strategy} " if retry_strategy else "")
         )
 
-    def build_generate_cmd(self, output_dir: str, input_file: str, retry_strategy: str) -> str:
+    def build_generate_cmd(self, output_dir: str, server_type: str, input_file: str, retry_strategy: str) -> str:
         """Build generation command"""
-        base = self._build_base_cmd("generate", output_dir)
+        base = self._build_base_cmd("generate", output_dir, server_type)
         return base + (
             f"    --input_file {input_file} "
             f"    ++prompt_config=generic/default "
@@ -195,20 +195,25 @@ class ContextRetryTestSuite:
         self.output_manager = OutputManager()
         self.validator = MetricsValidator(self.config)
 
-    def run_no_strategy_test(self, test_name: str, enable_soft_fail: bool, retry_strategy: str):
+    def run_no_strategy_test(self, server_type: str, test_name: str, enable_soft_fail: bool, retry_strategy: str):
         """Run evaluation test for completion."""
-        output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
-        cmd = self.cmd_builder.build_eval_cmd(output_dir, enable_soft_fail, retry_strategy)
+        output_dir = self.output_manager.setup_output_dir(server_type, self.env.model_type, test_name)
+        cmd = self.cmd_builder.build_eval_cmd(output_dir, server_type, enable_soft_fail, retry_strategy)
         subprocess.run(cmd, shell=True, check=True)
 
         self.validator.validate_eval_completion_but_empty_generation(output_dir)
 
     def run_reduce_generation_test(
-        self, test_name: str, enable_soft_fail: bool, retry_strategy: str, expect_success: bool = True
+        self,
+        server_type: str,
+        test_name: str,
+        enable_soft_fail: bool,
+        retry_strategy: str,
+        expect_success: bool = True,
     ):
         """Run evaluation test with specified parameters"""
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
-        cmd = self.cmd_builder.build_eval_cmd(output_dir, enable_soft_fail, retry_strategy)
+        cmd = self.cmd_builder.build_eval_cmd(output_dir, server_type, enable_soft_fail, retry_strategy)
 
         subprocess.run(cmd, shell=True, check=True)
 
@@ -217,14 +222,14 @@ class ContextRetryTestSuite:
         else:
             return self.validator.validate_eval_failure(output_dir)
 
-    def run_reduce_prompt_test(self, test_name: str, retry_strategy: str, extra_args: str = ""):
+    def run_reduce_prompt_test(self, server_type: str, test_name: str, retry_strategy: str, extra_args: str = ""):
         """Run generation test with specified retry strategy using reducing the prompt"""
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         input_file, output_file = self.output_manager.setup_io_files(output_dir)
 
         _create_large_input_file(input_file, num_samples=1)
 
-        cmd = self.cmd_builder.build_generate_cmd(output_dir, input_file, retry_strategy) + extra_args
+        cmd = self.cmd_builder.build_generate_cmd(output_dir, server_type, input_file, retry_strategy) + extra_args
         subprocess.run(cmd, shell=True, check=True)
 
         assert self.validator.validate_generation_output(output_file), "Output file not found"
@@ -235,24 +240,36 @@ test_suite = ContextRetryTestSuite()
 
 
 @pytest.mark.gpu
-def test_context_retry_no_strategy():
+@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+def test_context_retry_no_strategy(server_type):
     """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
-    test_suite.run_no_strategy_test(test_name="vllm-eval-no-strategy", enable_soft_fail=True, retry_strategy=None)
-
-
-@pytest.mark.gpu
-def test_context_retry_reduce_generation_enabled():
-    """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
-    test_suite.run_reduce_generation_test(
-        test_name="vllm-eval-reduce-generation-enabled", enable_soft_fail=True, retry_strategy="reduce_generation"
+    test_suite.run_no_strategy_test(
+        server_type=server_type,
+        test_name=f"{server_type}-eval-no-strategy",
+        enable_soft_fail=True,
+        retry_strategy=None,
     )
 
 
 @pytest.mark.gpu
-def test_context_retry_reduce_generation_disabled():
+@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+def test_context_retry_reduce_generation_enabled(server_type):
+    """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
+    test_suite.run_reduce_generation_test(
+        server_type=server_type,
+        test_name=f"{server_type}-eval-reduce-generation-enabled",
+        enable_soft_fail=True,
+        retry_strategy="reduce_generation",
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+def test_context_retry_reduce_generation_disabled(server_type):
     """Test that the generation doesn't finish successfully if soft fail is disabled."""
     result = test_suite.run_reduce_generation_test(
-        test_name="vllm-eval-reduce-generation-disabled",
+        server_type=server_type,
+        test_name=f"{server_type}-eval-reduce-generation-disabled",
         enable_soft_fail=False,
         retry_strategy="reduce_generation",
         expect_success=False,
@@ -261,7 +278,8 @@ def test_context_retry_reduce_generation_disabled():
 
 
 @pytest.mark.gpu
-def test_context_retry_reduce_prompt_start():
+@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+def test_context_retry_reduce_prompt_start(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the start."""
 
@@ -269,17 +287,24 @@ def test_context_retry_reduce_prompt_start():
         " ++inference.tokens_to_generate=2048 "  # Setting this otherwise the prompt reduction strategy will fail
     )
     test_suite.run_reduce_prompt_test(
-        test_name="vllm-eval-reduce-prompt-start", retry_strategy="reduce_prompt_from_start", extra_args=extra_args
+        server_type=server_type,
+        test_name=f"{server_type}-eval-reduce-prompt-start",
+        retry_strategy="reduce_prompt_from_start",
+        extra_args=extra_args,
     )
 
 
 @pytest.mark.gpu
-def test_context_retry_reduce_prompt_end():
+@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+def test_context_retry_reduce_prompt_end(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the end."""
     extra_args = (
         " ++inference.tokens_to_generate=2048 "  # Setting this otherwise the prompt reduction strategy will fail
     )
     test_suite.run_reduce_prompt_test(
-        test_name="vllm-eval-reduce-prompt-end", retry_strategy="reduce_prompt_from_end", extra_args=extra_args
+        server_type=server_type,
+        test_name=f"{server_type}-eval-reduce-prompt-end",
+        retry_strategy="reduce_prompt_from_end",
+        extra_args=extra_args,
     )
