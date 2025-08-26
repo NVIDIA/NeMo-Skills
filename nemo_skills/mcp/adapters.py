@@ -70,16 +70,6 @@ class OpenAICallInterpreter(ToolCallInterpreter):
         return {"tool_name": tool, "args": json.loads(fn.arguments)}
 
 
-class OpenAIResponseFormatter(ToolResponseFormatter):
-    # https://platform.openai.com/docs/guides/function-calling
-    def format(self, tool_call: ChatCompletionMessageToolCall, result):
-        return {
-            "type": "function_call_output",
-            "call_id": tool_call.id,
-            "output": json.dumps(result),
-        }
-
-
 class CompletionResponseFormatter(ToolResponseFormatter):
     # https://qwen.readthedocs.io/en/latest/framework/function_call.html#id2
     def format(self, tool_call: ChatCompletionMessageToolCall, result):
