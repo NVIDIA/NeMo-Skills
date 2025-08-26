@@ -14,17 +14,11 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
 
-import hydra
-from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 from nemo_skills.inference.model.vllm import VLLMModel
-
-# Adapter classes are resolved via locate at runtime
-from nemo_skills.mcp.clients import MCPClientManager, MCPStdioClient, MCPStreamableHttpClient
-from nemo_skills.mcp.utils import hydra_config_connector_factory, locate
+from nemo_skills.mcp.config_loader import build_client_manager, resolve_adapters
 
 logger = logging.getLogger(__name__)
 
@@ -32,64 +26,55 @@ logger = logging.getLogger(__name__)
 # Adjust model name and port as configured in your vLLM server
 
 
-@dataclass
-class PythonToolMCPConfig:
-    pass
-
-
-@dataclass
-class DemoConfig:
-    model: str = "Qwen/Qwen3-8B"
-    vllm_host: str = "127.0.0.1"
-    vllm_port: str = "8000"
-    python_tool: PythonToolMCPConfig = field(default_factory=PythonToolMCPConfig)
-    # Class paths or instances; resolved via locate at runtime
-    schema_adapter: str = "nemo_skills.mcp.adapters.OpenAISchemaAdapter"
-    call_interpreter: str = "nemo_skills.mcp.adapters.OpenAICallInterpreter"
-    response_formatter: str = "nemo_skills.mcp.adapters.QwenResponseFormatter"
-    sandbox: dict = field(
-        default_factory=lambda: {
-            "sandbox_type": "local",
+async def run_demo():
+    # Python-native config converted to OmegaConf
+    cfg = OmegaConf.create(
+        {
+            "model": {
+                "name": "Qwen/Qwen3-8B",
+                "vllm": {"host": "127.0.0.1", "port": "8000"},
+            },
+            "sandbox": {"sandbox_type": "local"},
+            "adapters": {
+                "schema_adapter": "nemo_skills.mcp.adapters.OpenAISchemaAdapter",
+                "call_interpreter": "nemo_skills.mcp.adapters.OpenAICallInterpreter",
+                "response_formatter": "nemo_skills.mcp.adapters.QwenResponseFormatter",
+            },
+            "tools": [
+                {
+                    "id": "python",
+                    "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                    "params": {
+                        "command": "python",
+                        "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
+                        "hide_args": {"execute": ["session_id", "timeout"]},
+                        "init_hook": {
+                            "$locate": "nemo_skills.mcp.utils.hydra_config_connector_factory",
+                            "kwargs": {"config_obj": "@@full_config"},
+                        },
+                    },
+                },
+                {
+                    "id": "exa",
+                    "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
+                    "params": {
+                        "base_url": "https://mcp.exa.ai/mcp",
+                        "enabled_tools": ["web_search_exa"],
+                        "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
+                        "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
+                    },
+                },
+            ],
         }
     )
+    model = VLLMModel(model=cfg.model.name, host=cfg.model.vllm.host, port=cfg.model.vllm.port)
 
-
-cs = ConfigStore.instance()
-cs.store(name="base_mcp_demo_config", node=DemoConfig)
-
-
-async def run_demo(cfg: DemoConfig):
-    model = VLLMModel(model=cfg.model, host=cfg.vllm_host, port=cfg.vllm_port)
-    # Build a Hydra config for the python MCP server and inject via connector
-    # Accept whatever object Hydra parsed (dataclass/DictConfig) and convert to plain dict
-    python_client = MCPStdioClient(
-        "python",
-        ["-m", "nemo_skills.mcp.servers.python_tool"],
-        hide_args={"execute": ["session_id", "timeout"]},
-        init_hook=hydra_config_connector_factory(cfg),
-    )
-    exa_client = MCPStreamableHttpClient(
-        base_url="https://mcp.exa.ai/mcp",
-        enabled_tools=["web_search_exa"],
-        output_formatter=locate("nemo_skills.mcp.utils.exa_output_formatter"),
-        init_hook=locate("nemo_skills.mcp.utils.exa_auth_connector"),
-    )
-
-    manager = MCPClientManager()
-    manager.register("python", python_client)
-    manager.register("exa", exa_client)
+    # Build clients from config
+    manager = build_client_manager(cfg)
 
     tools = await manager.list_all_tools()
-    # Resolve adapters via locate-only
-    schema_adapter_obj = locate(cfg.schema_adapter)
-    call_interpreter_obj = locate(cfg.call_interpreter)
-    response_formatter_obj = locate(cfg.response_formatter)
-
-    schema_adapter = schema_adapter_obj() if isinstance(schema_adapter_obj, type) else schema_adapter_obj
-    call_interpreter = call_interpreter_obj() if isinstance(call_interpreter_obj, type) else call_interpreter_obj
-    response_formatter = (
-        response_formatter_obj() if isinstance(response_formatter_obj, type) else response_formatter_obj
-    )
+    # Resolve adapters via config
+    schema_adapter, call_interpreter, response_formatter = resolve_adapters(cfg)
 
     tools = schema_adapter.convert(tools)
     print(tools)
@@ -157,11 +142,8 @@ async def run_demo(cfg: DemoConfig):
             break
 
 
-# @hydra.main(version_base=None, config_name="base_mcp_demo_config")
-# def main(cfg: DemoConfig):
 def main():
-    cfg = DemoConfig(sandbox={"sandbox_type": "local"})
-    asyncio.run(run_demo(cfg))
+    asyncio.run(run_demo())
 
 
 if __name__ == "__main__":
