@@ -56,7 +56,7 @@ class InferenceConfig:
     top_p: float = 0.95
     min_p: float = 0.0
     random_seed: int = 0
-    tokens_to_generate: int = 2048
+    tokens_to_generate: int | None = None
     repetition_penalty: float = 1.0
     top_logprobs: int | None = None
 
