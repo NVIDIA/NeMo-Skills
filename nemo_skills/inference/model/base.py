@@ -149,6 +149,11 @@ class BaseModel:
             result["generation"] = trim_after_stop_phrases(result["generation"], stop_phrases)
 
     @abc.abstractmethod
+    def _get_tokenizer_endpoint(self) -> str | None:
+        """Get the tokenizer endpoint if available."""
+        return None
+
+    @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:
         pass
 
