@@ -34,6 +34,7 @@ from nemo_skills.pipeline.run_cmd import run_cmd
 from nemo_skills.pipeline.setup import setup
 from nemo_skills.pipeline.start_server import start_server
 from nemo_skills.pipeline.summarize_results import summarize_results
+from nemo_skills.pipeline.summarize_robustness import summarize_robustness
 from nemo_skills.pipeline.train import train
 from nemo_skills.pipeline.verl.ppo import ppo_verl
 
