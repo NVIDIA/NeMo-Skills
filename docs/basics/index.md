@@ -104,26 +104,22 @@ containers:
   # ... there are some more containers defined here
 
 env_vars:
-  - HUGGINGFACE_HUB_CACHE=/hf_models
+  - HF_HOME=/models
 
 mounts:
-  - /mnt/datadrive/hf_models:/hf_models
-  - /mnt/datadrive/trt_models:/trt_models
-  - /mnt/datadrive/nemo_models:/nemo_models
+  - /mnt/datadrive/models:/models
   - /home/igitman/workspace:/workspace
 ```
 
 To generate one for you, run `ns setup` and follow
 the prompts to define your configuration. Choose `local` for the config type/name and define some mount for your `/workspace`
-and another mount[^1] for `/hf_models`, e.g.
+and another mount[^1] for `/models`, e.g.
 
 ```bash
-/home/<username>:/workspace,/home/<username>/models/hf_models:/hf_models
+/home/<username>:/workspace,/home/<username>/models:/models
 ```
 
 [^1]: Of course you can use a single mount if you'd like or define more than 2 mounts
-
-Also add `HUGGINGFACE_HUB_CACHE=/hf_models` when asked to add environment variables.
 
 !!! note
 
