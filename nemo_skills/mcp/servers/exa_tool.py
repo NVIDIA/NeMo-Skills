@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import logging
 import os
 from dataclasses import dataclass, field
@@ -27,10 +28,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionResult:
     error: str | None = None
-    results: str | None = None
+    result: str | None = None
 
 
 mcp = FastMCP(name="exa_tool")
+
+# Populated from CLI args in main()
+EXA_API_KEY: str | None = None
 
 
 @mcp.tool()
@@ -39,14 +43,19 @@ async def exa_websearch(
 ) -> ExecutionResult:
     """Search the web using Exa. Provide relevant links in your answer."""
 
+    # Ensure API key is provided via CLI argument
+    if not EXA_API_KEY:
+        return {"error": "Missing Exa API key."}
+
     url = "https://api.exa.ai/answer"
     headers = {
-        "x-api-key": os.getenv("EXA_API_KEY"),
+        "x-api-key": EXA_API_KEY,
         "Content-Type": "application/json",
     }
     payload = {"query": f"{query}"}
 
     response = requests.post(url, headers=headers, json=payload)
+    logger.info(f"Exa response: {response.json()}")
 
     if response.status_code != 200:
         return {"error": response.json()["error"]}
@@ -54,7 +63,16 @@ async def exa_websearch(
         return {"result": response.json()["answer"]}
 
 
-def main(argv=None):
+def main():
+    # Parse CLI arguments
+    parser = argparse.ArgumentParser(description="MCP server for Exa web search tool")
+    parser.add_argument("--exa-api-key", dest="exa_api_key", type=str, required=False, help="Exa API key")
+    args = parser.parse_args()
+
+    global EXA_API_KEY
+    # Prefer CLI arg; do not fall back to environment unless explicitly desired
+    EXA_API_KEY = args.exa_api_key
+
     # Initialize and run the server
     mcp.run(transport="stdio")
 
