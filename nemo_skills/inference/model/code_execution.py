@@ -144,9 +144,8 @@ class CodeExecutionWrapper:
 
             # openai don't show what stop word was triggered, so we assume that it was `code_end`
             # if there's an unfinished code block
-            if is_openai_format and output_dict.get("finish_reason") == "stop":
-                if output.count(code_end) + 1 == output.count(code_begin):
-                    output += code_end
+            if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
+                current_output_segment += code_end
             # Update the prompt based on format
             if is_openai_format:
                 request["prompt"].append({"role": "assistant", "content": output})
@@ -329,7 +328,6 @@ class CodeExecutionWrapper:
         current_full_prompt = copy.deepcopy(prompt)
         session_id = None  # For sandbox state continuity
         for generation_index in range(effective_max_code_executions + 1):
-            print(generation_index)
             model_token_iterator = await self.model.generate_async(prompt=current_full_prompt, **request)
 
             current_output_segment = ""
@@ -345,11 +343,10 @@ class CodeExecutionWrapper:
             if not current_output_segment:
                 break
 
-            # openai don't show what stop word was triggered, so we assume that it was `code_end`
+            # openai and trtllm-serve don't show what stop word was triggered, so we assume that it was `code_end`
             # if there's an unfinished code block
-            if is_openai_format and chunk.get("finish_reason") == "stop":
-                if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
-                    current_output_segment += code_end
+            if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
+                current_output_segment += code_end
 
             # Update the prompt based on format
             if is_openai_format:
@@ -365,7 +362,6 @@ class CodeExecutionWrapper:
             if current_output_segment.endswith(code_end) and current_output_segment.rfind(
                 code_begin
             ) > current_output_segment.rfind(code_end, 0, -1):
-                print("got code", current_output_segment)
                 execution_dict, session_id = await self.sandbox.execute_code(
                     generated_code=extract_code_to_execute(current_output_segment, code_begin, code_end),
                     language=self.config.code_execution_language,
@@ -386,7 +382,6 @@ class CodeExecutionWrapper:
                     code_output_format,
                     remaining_code_executions,
                 )
-
                 yield {"generation": formatted_code_output}  # Yield the entire formatted code output as one chunk
 
                 # Append executed code's output to the prompt
@@ -395,13 +390,4 @@ class CodeExecutionWrapper:
                 else:
                     current_full_prompt += formatted_code_output
             else:  # if no code was generated, we need to finish
-                print("didn't get code", current_output_segment)
-                print(
-                    "##",
-                    code_begin,
-                    code_end,
-                    current_output_segment.endswith(code_end),
-                    current_output_segment.rfind(code_begin),
-                    current_output_segment.rfind(code_end, 0, -1),
-                )
                 break
