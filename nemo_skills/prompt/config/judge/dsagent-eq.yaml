@@ -9,10 +9,11 @@ user: |-
     Briefly explain your reasoning in two to three sentences. Then, provide your final judgment on whether the two answers are equivalent by stating only: `Judgement: Yes` or `Judgement: No`.
 
     # Judgement Criteria
-    1. Judge correctness by the content of the predicted answer, not its formatting or style.
-    2. If any part of the expected answer is missing, the prediction is incorrect.
+    1. Judge correctness by the core content of the predicted answer
+    2. Do not judge its format, style, tags, phrasing, or other non-essential details
+    2. If any part of the core expected answer is missing, the prediction is incorrect.
     3. If any value in the prediction differs from its corresponding value in the expected answer, the prediction is incorrect. That is, partially correct answers are not considered correct.
-    4. If the prediction includes extra information but fully contains all expected components with correct values, it is correct.
+    4. If the prediction includes extra information but fully contains all expected core components with correct values, it is correct.
     5. When comparing floating-point numbers, apply rounding based on your judgement, unless precision/tolerance is explicitly specified in the problem. As a general rule of thumb, for deterministic problems, usually differences within 0.01 are acceptable. For non-deterministic problems or model predictions, use your ownjudgment.
     6. When comparing mathematical expressions, allow only trivial simplifications.
 
@@ -21,11 +22,11 @@ user: |-
 
     Example 1:
     Problem: Count the number of samples in the dataset.
-    Predicted answer: Answer: The number of samples in this datasetis 66645
-    Expected answer: Answer: Number of samples: 66645
+    Predicted answer: The number of samples in this dataset is 66645
+    Expected answer: Final answer: Number of samples: 66645
 
     Example of your output: 
-    Reasoning: The predicted answer is a rephrase of the expected answer, even though the format is different.
+    Reasoning: The predicted answer is a rephrase of the expected answer, even though the format, style, phrasing is different.
     Judgement: Yes
 
     Example 2:
@@ -48,11 +49,14 @@ user: |-
 
     Example 4:
     Problem: Describe the statistics of the dataset
-    Predicted answer: The number of normally distributed features is 0, the number of not normally distributed features is 8. The mean value is 11.5
-    Expected answer: Normally_Distributed_Features: 0, Not_Normally_Distributed_Features: 8
+    Predicted answer: The number of normally distributed features: 0, the number of not normally distributed features: 8. The mean value is 11.5
+    Expected answer: 
+    Final answer: 
+    - Normally_Distributed_Features: 0
+    - Not_Normally_Distributed_Features: 8
 
     Example of your output: 
-    Reasoning: The predicted answer is a rephrase. It also describes the mean value, which is not part of the expected answer, but that is OK. 
+    Reasoning: The predicted answer is a rephrase. Style doesn't matter. We only look at hte core content. It also describes the mean value, which is not part of the expected answer, but that is OK. 
     Judgement: Yes
 
     Example 5:
@@ -85,7 +89,9 @@ user: |-
     Example 8: 
     Problem: What are the mean and max value of the year column?
     Predicted answer: Mean: 1990, Max: 1990
-    Expected answer: Mean: 1990, Max: 1993
+    Expected answer: Final answer: 
+    - Mean: 1990
+    - Max: 1993
 
     Example of your output: 
     Reasoning: The predicted answer is incorrect because the max value is 1990, which is not the same as 1993. Partially correct answers are not considered correct.
