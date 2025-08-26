@@ -52,6 +52,13 @@ def exa_auth_connector(client: MCPStreamableHttpClient):
     client.base_url = f"{client.base_url}?exaApiKey={os.getenv('EXA_API_KEY')}"
 
 
+def exa_stdio_connector(client: MCPStdioClient):
+    client.server_params = StdioServerParameters(
+        command=client.server_params.command,
+        args=list(client.server_params.args) + ["--exa-api-key", os.getenv("EXA_API_KEY", "")],
+    )
+
+
 def exa_output_formatter(result: CallToolResult):
     if getattr(result, "isError", False):
         logger.error(f"Exa error: {result}")
