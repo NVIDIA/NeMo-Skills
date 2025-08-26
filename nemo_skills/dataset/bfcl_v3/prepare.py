@@ -128,7 +128,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             # Clone repository with minimal depth
-            print(f"Cloning repository {repo_url} to {temp_dir}")
+            LOG.info(f"Cloning repository {repo_url} to {temp_dir}")
             # v1.3 corresponds the release version for BFCL v3
             subprocess.run(
                 ["git", "clone", "-b", "v1.3", "--depth=1", repo_url, temp_dir], check=True, capture_output=True
@@ -138,7 +138,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             target_folder = Path(temp_dir) / subfolder_path
 
             if not os.path.exists(target_folder):
-                print(f"Folder {subfolder_path} not found in repository")
+                LOG.error(f"Folder {subfolder_path} not found in repository")
                 raise FileNotFoundError(
                     f"Folder {subfolder_path} not found in {repo_url} cloned to {temp_dir}. The structure of BFCL has changed!"
                 )
@@ -147,7 +147,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             json_pattern = os.path.join(target_folder, f"{file_prefix}*.json")
             json_files = glob.glob(json_pattern)
 
-            print(f"Found {len(json_files)} JSON files matching pattern")
+            LOG.info(f"Found {len(json_files)} JSON files matching pattern")
 
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
@@ -169,11 +169,11 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
                 shutil.copy(input_file, os.path.join(split_dirname, filename))
                 processed_files += 1
 
-            print(f"Successfully processed {processed_files} JSON files to {output_dir}")
+            LOG.info(f"Successfully processed {processed_files} JSON files to {output_dir}")
 
         except subprocess.CalledProcessError as e:
-            print(f"Git command failed: {e}")
-            print("Make sure git is installed and the repository URL is correct")
+            LOG.error(f"Git command failed: {e}")
+            LOG.error("Make sure git is installed and the repository URL is correct")
 
 
 def main(args):
