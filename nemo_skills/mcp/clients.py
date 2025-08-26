@@ -100,14 +100,45 @@ def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
     return {k: v for k, v in args_dict.items() if k not in hidden_keys}
 
 
+def _wrap_call_tool_output_formatter(method):
+    async def wrapped(self, *args, **kwargs):
+        result = await method(self, *args, **kwargs)
+        output_formatter = getattr(self, "output_formatter", None)
+        if callable(output_formatter):
+            return output_formatter(result)
+        return result
+
+    return wrapped
+
+
 def inject_hide_args(init_func):
     @functools.wraps(init_func)
-    def wrapper(self, *args, hide_args=None, disabled_tools=None, enabled_tools=None, **kwargs):
+    def wrapper(
+        self,
+        *args,
+        hide_args=None,
+        disabled_tools=None,
+        enabled_tools=None,
+        output_formatter: Callable | None = None,
+        init_hook: Callable | None = None,
+        **kwargs,
+    ):
         self._hide_args = hide_args or {}
         # Store as sets for fast membership checks
         self._disabled_tools = set(disabled_tools or [])
         self._enabled_tools = set(enabled_tools or [])
-        return init_func(self, *args, **kwargs)
+        # Optional common behaviors
+        self.output_formatter = output_formatter
+        self._init_hook = init_hook
+        instance = init_func(self, *args, **kwargs)
+        # Run init hook if provided (sync callable)
+        if callable(self._init_hook):
+            try:
+                self._init_hook(self)
+            except Exception:
+                # Propagate to surface hook errors
+                raise
+        return instance
 
     return wrapper
 
@@ -137,12 +168,17 @@ class MCPClientMeta(type):
     # Consumers can now pass `hide_args` seamlessly. The metaclass-injected
     # logic ensures hidden parameters are pruned from tool input schemas
     # returned by list_tools. You can also disable specific tools or allow only
-    # a subset using `disabled_tools` or `enabled_tools`.
+    # a subset using `disabled_tools` or `enabled_tools`. Additionally, all
+    # MCP clients accept `output_formatter` and `init_hook` kwargs:
+    # - output_formatter: Callable that post-processes tool call results
+    # - init_hook: Callable that is invoked after instance initialization
     client = MyClient(
         base_url="https://mcp.example.com",
         hide_args={"tool_name": ["timeout"]},
         disabled_tools=["disallowed_tool"],
         enabled_tools=["tool_name", "safe_other_tool"],
+        output_formatter=lambda r: (r.structuredContent or r.content),
+        init_hook=lambda self: setattr(self, "_ready", True),
     )
     tools: list[Dict[str, Any]] = await client.list_tools()
     # The input_schema for "tool_name" will no longer expose
@@ -166,6 +202,11 @@ class MCPClientMeta(type):
         if orig_list is not None:
             wrapper = async_wrapper(orig_list)
             namespace["list_tools"] = wrapper
+
+        # Wrap call_tool to apply output_formatter automatically
+        orig_call_tool = namespace.get("call_tool")
+        if orig_call_tool is not None:
+            namespace["call_tool"] = _wrap_call_tool_output_formatter(orig_call_tool)
 
         return super().__new__(mcls, name, bases, namespace)
 
@@ -224,13 +265,9 @@ class MCPHttpClient(MCPClient):
 
 
 class MCPStreamableHttpClient(MCPClient):
-    def __init__(self, base_url: str, output_formatter: Callable | None = None, init_hook: Callable | None = None):
-        self.output_formatter = output_formatter
+    def __init__(self, base_url: str):
         self.base_url = base_url
-        self.init_hook = init_hook
         self.tools: List[Dict[str, Any]] = []
-        if self.init_hook is not None:
-            self.init_hook(self)
 
     async def list_tools(self):
         async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):
@@ -260,28 +297,15 @@ class MCPStreamableHttpClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                if self.output_formatter is None:
-                    return struct if (struct := result.structuredContent) is not None else result.content
-                else:
-                    return self.output_formatter(result)
+                return struct if (struct := result.structuredContent) is not None else result
 
 
 class MCPStdioClient(MCPClient):
-    def __init__(
-        self,
-        command: str,
-        args: list[str] | None = None,
-        init_hook: Callable | None = None,
-        output_formatter: Callable | None = None,
-    ):
+    def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
         self.server_params = StdioServerParameters(command=command, args=args)
         self.tools: List[Dict[str, Any]] = []
-        self._command_connector = init_hook
-        self.output_formatter = output_formatter
-        if self._command_connector is not None:
-            self._command_connector(self)
 
     async def list_tools(self):
         async with stdio_client(self.server_params) as (read_stream, write_stream):
@@ -309,8 +333,6 @@ class MCPStdioClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                if self.output_formatter:
-                    return self.output_formatter(result)
                 return result.structuredContent
 
 
