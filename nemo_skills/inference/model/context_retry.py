@@ -267,13 +267,11 @@ def _try_reduce_prompt_tokens(
 
     if completion_tokens is None:
         detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
-        LOG.warning(detailed_error)
-        return None
+        raise ValueError(detailed_error)
 
     if completion_tokens >= max_context_length:
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
-        LOG.warning(detailed_error)
-        return None
+        raise ValueError(detailed_error)
 
     num_prompt_tokens_to_keep = max_context_length - completion_tokens
     prompt = kwargs["prompt"]
