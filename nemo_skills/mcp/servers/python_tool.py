@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 from pydantic import Field
 
 from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.mcp.utils import load_mcp_config
+from nemo_skills.mcp.utils import add_config_args, load_mcp_config
 
 logger = logging.getLogger(__name__)
 
@@ -59,21 +59,7 @@ async def execute(
 
 def main():
     parser = argparse.ArgumentParser(description="MCP server for executing Python code in a sandbox")
-    parser.add_argument("--config", dest="config", type=str, required=False, help="Path to OmegaConf YAML file")
-    parser.add_argument(
-        "--config-dir",
-        dest="config_dir",
-        type=str,
-        required=False,
-        help="Directory containing config file (Hydra-compatible)",
-    )
-    parser.add_argument(
-        "--config-name",
-        dest="config_name",
-        type=str,
-        default="config",
-        help="Config file name without extension (Hydra-compatible)",
-    )
+    add_config_args(parser)
     args = parser.parse_args()
 
     try:

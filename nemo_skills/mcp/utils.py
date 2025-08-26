@@ -119,3 +119,23 @@ def load_mcp_config(
         return OmegaConf.load(config_path)
 
     raise ValueError("No configuration file found. Provide --config or --config-dir/--config-name.")
+
+
+def add_config_args(parser):
+    """Attach standard config args to an ArgumentParser: --config, --config-dir, --config-name."""
+    parser.add_argument("--config", dest="config", type=str, required=False, help="Path to OmegaConf YAML file")
+    parser.add_argument(
+        "--config-dir",
+        dest="config_dir",
+        type=str,
+        required=False,
+        help="Directory containing config file (Hydra-compatible)",
+    )
+    parser.add_argument(
+        "--config-name",
+        dest="config_name",
+        type=str,
+        default="config",
+        help="Config file name without extension (Hydra-compatible)",
+    )
+    return parser
