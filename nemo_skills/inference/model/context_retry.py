@@ -63,7 +63,7 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         re.IGNORECASE | re.DOTALL,
     )
 
-    # Try pattern 1 first (matches your example)
+    # Try pattern 1 first
     match = pattern1.search(error_str)
     if match:
         max_context = int(match.group(1))
