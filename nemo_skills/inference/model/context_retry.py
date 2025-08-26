@@ -56,16 +56,21 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         re.IGNORECASE | re.DOTALL,
     )
 
+    # Pattern 3: This model's maximum context length is 40960 tokens. However, your request has 3000009 input tokens.
+    pattern3 = re.compile(
+        r"maximum context length is (\d+) tokens.*?"
+        r"your request has (\d+) input tokens",
+        re.IGNORECASE | re.DOTALL,
+    )
+
     # Try pattern 1 first (matches your example)
     match = pattern1.search(error_str)
     if match:
         max_context = int(match.group(1))
         message_tokens = int(match.group(2))
-        completion_tokens = int(match.group(3)) - max_context + message_tokens
         return {
             "max_context_length": max_context,
             "message_tokens": message_tokens,
-            "completion_tokens": completion_tokens,
         }
 
     # Try pattern 2
@@ -74,7 +79,14 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         return {
             "max_context_length": int(match.group(1)),
             "message_tokens": int(match.group(3)),
-            "completion_tokens": int(match.group(4)),
+        }
+
+    # Try pattern 3
+    match = pattern3.search(error_str)
+    if match:
+        return {
+            "max_context_length": int(match.group(1)),
+            "message_tokens": int(match.group(2)),
         }
 
     return None
@@ -234,7 +246,8 @@ def _try_reduce_prompt_tokens(
 ) -> dict:
     """Try to reduce the number of tokens in the prompt."""
     max_context_length = parsed_error["max_context_length"]
-    completion_tokens = parsed_error["completion_tokens"]
+    message_tokens = parsed_error["message_tokens"]
+    completion_tokens = kwargs["tokens_to_generate"]
 
     if completion_tokens >= max_context_length:
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
