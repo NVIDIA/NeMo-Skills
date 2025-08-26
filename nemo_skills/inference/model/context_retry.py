@@ -94,7 +94,7 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
 
 @dataclass
 class ContextLimitRetryConfig:
-    """Configuration for context limit retry behavior i.e. when the context limit is exceeded."""
+    """Configuration for context limit retry behavior, i.e., when the context limit is exceeded."""
 
     enable_soft_fail: bool = False  # If True, will try to reduce the context by reducing the number of tokens to generate or the prompt or in the worst case return an empty generation, otherwise will raise the error
     strategy: str = "reduce_generation"  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
@@ -321,7 +321,7 @@ def _trim_list_prompt(
 
 
 def _trim_messages_from_end(
-    messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+    messages: list, remaining_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
 ) -> list:
     """Trim messages from the end of the list."""
     trimmed_messages = []
@@ -336,12 +336,12 @@ def _trim_messages_from_end(
 
         prefix_token_count = len(encoded)
 
-        if prefix_token_count > rem_token_budget:
+        if prefix_token_count > remaining_token_budget:
             # Try to partially include this message: Remove tokens from the previous messages -> cumulative_tokens
-            remaining_tokens = rem_token_budget - cumulative_tokens
+            num_remaining_tokens = remaining_token_budget - cumulative_tokens
             trimmed_content = get_trimmed_content(
                 content=message["content"],
-                num_rem_tokens=remaining_tokens,
+                num_remaining_tokens=num_remaining_tokens,
                 num_special_tokens_budget=config.num_special_tokens_budget,
                 tokenizer=tokenizer,
                 trim_suffix=True,  # Since we're trimming from the end, we want to trim the suffix of the current message
@@ -359,7 +359,7 @@ def _trim_messages_from_end(
 
 
 def _trim_messages_from_start(
-    messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+    messages: list, remaining_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
 ) -> list:
     """Returns the suffix of the current message list that fits within the token budget."""
     trimmed_message_list = []
@@ -378,15 +378,15 @@ def _trim_messages_from_start(
         suffix_token_count = len(encoded)
         LOG.info(f"Length of encoded suffix: {suffix_token_count}")
 
-        if suffix_token_count > rem_token_budget:
+        if suffix_token_count > remaining_token_budget:
             # Try to partially include the first message of this slice
             LOG.info(
-                f"idx: {idx}, suffix_token_count: {suffix_token_count}, rem_token_budget: {rem_token_budget}, cumulative_tokens: {cumulative_tokens}"
+                f"idx: {idx}, suffix_token_count: {suffix_token_count}, remaining_token_budget: {remaining_token_budget}, cumulative_tokens: {cumulative_tokens}"
             )
-            remaining_tokens = rem_token_budget - cumulative_tokens
+            remaining_tokens = remaining_token_budget - cumulative_tokens
             trimmed_content = get_trimmed_content(
                 content=messages[suffix_start_idx]["content"],
-                num_rem_tokens=remaining_tokens,
+                num_remaining_tokens=remaining_tokens,
                 num_special_tokens_budget=config.num_special_tokens_budget,
                 tokenizer=tokenizer,
                 trim_suffix=False,  # Since we're trimming from the start, we want to trim the prefix of the current message
@@ -408,7 +408,7 @@ def _trim_messages_from_start(
 
 def get_trimmed_content(
     content: str,
-    num_rem_tokens: int,
+    num_remaining_tokens: int,
     num_special_tokens_budget: int,
     tokenizer: ServerTokenizer,
     trim_suffix: bool = True,
@@ -417,13 +417,13 @@ def get_trimmed_content(
     Get the trimmed content of a message.
     """
     # Remove the budget for special tokens
-    if num_rem_tokens > num_special_tokens_budget:
-        num_rem_tokens = num_rem_tokens - num_special_tokens_budget
+    if num_remaining_tokens > num_special_tokens_budget:
+        num_remaining_tokens = num_remaining_tokens - num_special_tokens_budget
         encoded_content = tokenizer.encode(content)
         if trim_suffix:
-            encoded_content = encoded_content[:num_rem_tokens]
+            encoded_content = encoded_content[:num_remaining_tokens]
         else:
-            encoded_content = encoded_content[-num_rem_tokens:]
+            encoded_content = encoded_content[-num_remaining_tokens:]
         trimmed_content = tokenizer.decode(encoded_content)
         return trimmed_content
     else:
