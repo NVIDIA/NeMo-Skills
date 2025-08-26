@@ -362,10 +362,11 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                if os.sep in generation_module:
-                    generation_task = import_from_path(generation_module or benchmark_args.generation_module)
+                effective_generation_module = generation_module or benchmark_args.generation_module
+                if effective_generation_module and os.sep in effective_generation_module:
+                    generation_task = import_from_path(effective_generation_module)
                 else:
-                    generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
+                    generation_task = importlib.import_module(effective_generation_module)
                 if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
                     raise ValueError(
                         f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
