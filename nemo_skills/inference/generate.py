@@ -24,12 +24,11 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf
+from omegaconf import ListConfig
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
-    ContextLimitRetryConfig,
     OnlineGenSelectConfig,
     get_code_execution_model,
     get_model,
