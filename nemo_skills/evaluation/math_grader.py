@@ -205,19 +205,21 @@ def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: 
     """Extract everything from 'Answer: ' to the end, or return whole string if 'Answer: ' not found"""
     # Look for "Answer: " pattern (case-insensitive)
 
-    # Attempt 1:  try matching the final answer pattern
-    answer_pattern = r"Final answer:\s*"
-    match = re.search(answer_pattern, string, re.IGNORECASE)
-    if match:
-        # Extract everything from the start of "Answer: " to the end
-        return string[match.start():].strip()
-
-    # Attempt 2: try matching the harmony final answer pattern
+    # Attempt 1: try matching the harmony final answer pattern
+    # this must be placed first, since gpt-oss models like to mumble "final answer" in its planning process, 
+    # even though it hasn't generated the final answer yet. 
     answer_pattern = "<|start|>assistant<|channel|>final<|message|>"
     match = re.search(answer_pattern, string, re.IGNORECASE)
     if match:
         # Extract everything from the start of "Answer: " to the end
         return string[match.end():].strip()
+
+    # Attempt 2:  try matching the final answer pattern
+    answer_pattern = r"Final answer:\s*"
+    match = re.search(answer_pattern, string, re.IGNORECASE)
+    if match:
+        # Extract everything from the start of "Answer: " to the end
+        return string[match.start():].strip()
     else:
         # If "Answer: " not found, return the whole input string or None
         # if returnning None, then this trace will get filtered out as incorrect
