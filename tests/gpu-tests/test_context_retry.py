@@ -79,7 +79,7 @@ class CommandBuilder:
             f"    ++max_samples={self.config.num_samples} "
             f"    ++inference.tokens_to_generate={self.config.num_tokens_to_generate} "
             f"    ++server.enable_soft_fail={enable_soft_fail} "
-            f"    ++server.context_limit_retry_strategy={retry_strategy} "
+            + (f"    ++server.context_limit_retry_strategy={retry_strategy} " if retry_strategy else "")
         )
 
     def build_generate_cmd(self, output_dir: str, input_file: str, retry_strategy: str) -> str:
