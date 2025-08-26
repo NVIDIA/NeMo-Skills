@@ -13,11 +13,13 @@
 # limitations under the License.
 import importlib
 import logging
+import os
 from typing import List
 
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
+from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.utils import (
@@ -217,7 +219,10 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    generation_task = importlib.import_module(generation_module)
+    if os.sep in generation_module:
+        generation_task = import_from_path(generation_module)
+    else:
+        generation_task = importlib.import_module(generation_module)
     if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
         raise ValueError(
             f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
