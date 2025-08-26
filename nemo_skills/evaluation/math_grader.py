@@ -204,12 +204,20 @@ def batch_evaluate_results(
 def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
     """Extract everything from 'Answer: ' to the end, or return whole string if 'Answer: ' not found"""
     # Look for "Answer: " pattern (case-insensitive)
-    answer_pattern = r"Answer:\s*"
+
+    # Attempt 1:  try matching the final answer pattern
+    answer_pattern = r"Final answer:\s*"
     match = re.search(answer_pattern, string, re.IGNORECASE)
-    
     if match:
         # Extract everything from the start of "Answer: " to the end
         return string[match.start():].strip()
+
+    # Attempt 2: try matching the harmony final answer pattern
+    answer_pattern = "<|start|>assistant<|channel|>final<|message|>"
+    match = re.search(answer_pattern, string, re.IGNORECASE)
+    if match:
+        # Extract everything from the start of "Answer: " to the end
+        return string[match.end():].strip()
     else:
         # If "Answer: " not found, return the whole input string or None
         # if returnning None, then this trace will get filtered out as incorrect
