@@ -61,7 +61,7 @@ def prepare_data(
     skip_hf_home_check: bool = typer.Option(
         False,
         "--skip-hf-home-check",
-        help="If True, skip checking HF_HOME in cluster_config.",
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare.
