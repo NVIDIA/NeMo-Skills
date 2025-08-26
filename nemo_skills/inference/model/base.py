@@ -355,7 +355,7 @@ class BaseModel:
 
         results_to_yield = []
         if cur_delta:
-            results_to_yield.append({"generation": cur_delta, "chunk": chunk.choices[0]})
+            results_to_yield.append({"generation": cur_delta})
 
         # vllm variant
         stop_reason = getattr(chunk.choices[0], "stop_reason", None)

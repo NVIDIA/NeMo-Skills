@@ -142,10 +142,14 @@ class CodeExecutionWrapper:
             # no need to do anything with this as the code below should just exit, so that's only for logging
             stopped_on_repetition = output_dict.get("stopped_on_repetition", False)
 
-            # openai don't show what stop word was triggered, so we assume that it was `code_end`
+            # openai and trtllm don't show what stop word was triggered, so we assume that it was `code_end`
             # if there's an unfinished code block
             if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
                 current_output_segment += code_end
+                if is_openai_format:
+                    request["prompt"][-2]["content"] += code_end
+                else:
+                    request["prompt"] += code_end
             # Update the prompt based on format
             if is_openai_format:
                 request["prompt"].append({"role": "assistant", "content": output})
@@ -343,10 +347,14 @@ class CodeExecutionWrapper:
             if not current_output_segment:
                 break
 
-            # openai and trtllm-serve don't show what stop word was triggered, so we assume that it was `code_end`
+            # openai and trtllm don't show what stop word was triggered, so we assume that it was `code_end`
             # if there's an unfinished code block
             if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
                 current_output_segment += code_end
+                if is_openai_format:
+                    current_full_prompt[-2]["content"] += code_end
+                else:
+                    current_full_prompt += code_end
 
             # Update the prompt based on format
             if is_openai_format:
