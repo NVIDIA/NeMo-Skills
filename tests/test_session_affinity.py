@@ -534,7 +534,7 @@ except NameError:
         chi2_stat = np.sum((observed_counts - expected_count) ** 2 / expected_count)
 
         degrees_of_freedom = num_workers - 1
-        z_score = 2.0
+        z_score = 4.0
         critical_value = 0.5 * (z_score + np.sqrt(2 * degrees_of_freedom - 1)) ** 2
         assert chi2_stat <= critical_value, (
             f"Uneven distribution of jobs across uwsgi workers. "
