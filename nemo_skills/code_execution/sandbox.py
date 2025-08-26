@@ -19,7 +19,9 @@ import json
 import logging
 import os
 import re
+import traceback
 import uuid
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -116,17 +118,18 @@ class Sandbox(abc.ABC):
         )
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
-        # will keep state of code sessions
-        self.sessions = {}
-
-    def clear_session(self, session_id):
-        del self.sessions[session_id]
+        self.session_histories = defaultdict(list)  # session_id -> list of generated_code
 
     async def close(self):
         """Close the HTTP session."""
         await self.http_session.aclose()
 
     async def _send_request(self, request, timeout):
+        session_id = request.pop("session_id", None)
+        extra_headers = {}
+        if session_id is not None:
+            extra_headers["X-Session-ID"] = str(session_id)
+
         if self.ssh_server and self.ssh_key_path:
             # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
@@ -137,7 +140,7 @@ class Sandbox(abc.ABC):
                     url=self._get_execute_url(),
                     data=json.dumps(request),
                     timeout=timeout,
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", **extra_headers},
                 )
 
             # Native async requires more lines of code, so we use to_thread
@@ -148,7 +151,7 @@ class Sandbox(abc.ABC):
                 url=self._get_execute_url(),
                 content=json.dumps(request),
                 timeout=timeout,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **extra_headers},
             )
         # retrying 502 errors
         if output.status_code == 502:
@@ -164,7 +167,20 @@ class Sandbox(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _prepare_request(self, generated_code, timeout):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language="ipython",
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity="Plain",
+    ):
+        pass
+
+    @abc.abstractmethod
+    async def delete_session(self, session_id: str) -> None:
+        """Delete a remote execution session if supported by the backend."""
         pass
 
     async def execute_code(
@@ -178,97 +194,48 @@ class Sandbox(abc.ABC):
         traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-        if session_id is None and language == "ipython":  # creating a new session with empty state
-            session_id = uuid.uuid4()
-            self.sessions[session_id] = []
-
-        if session_id is not None:
-            self.sessions[session_id].append(generated_code)
-
-        if language == "ipython":
-            TO_EXECUTE = """
-import traceback
-import json
-import os
-import re
-import warnings
-warnings.filterwarnings('ignore')
-os.environ['OPENBLAS_NUM_THREADS'] = '16'
-
-from IPython.core.interactiveshell import InteractiveShell
-from IPython.utils import io
-
-def simplify_errors(error_text):
-    def strip_ansi_codes(text):
-        ansi_escape = re.compile(r'\\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
-
-    error_text = strip_ansi_codes(error_text)
-    output = []
-    for line in error_text.split('\\n'):
-        if line.strip().startswith('File <ipython-'):
-            continue
-        output.append(line)
-    return '\\n'.join(output)
-
-code_snippets = []
-"""
-            for code_snippet in self.sessions[session_id]:
-                TO_EXECUTE += f"\ncode_snippets.append({repr(code_snippet)})\n"
-
-            # we do `strip() + \\n` below to ensure that `print(res)` and `res` return the same output
-            TO_EXECUTE += f"""
-try:
-    shell = InteractiveShell()
-    shell.InteractiveTB.set_mode(mode='{traceback_verbosity}')
-    for code in code_snippets:
-        with io.capture_output() as captured:
-            exec_result = shell.run_cell(code)
-    stdout = captured.stdout.replace("Out[1]: ", "").strip()
-    stderr = captured.stderr.replace("Out[1]: ", "").strip()
-    if len(stdout) > {max_output_characters}:
-        stdout = stdout[:{max_output_characters}] + "<output cut>"
-    if len(stderr) > {max_output_characters}:
-        stderr = stderr[:{max_output_characters}] + "<output cut>"
-    if stdout:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stdout = simplify_errors(stdout)
-        stdout += "\\n"
-    if stderr:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stderr = simplify_errors(stderr)
-        stderr += "\\n"
-    has_error = exec_result.error_before_exec or exec_result.error_in_exec
-    to_return = {{"process_status": "error" if has_error else "completed", "stdout": stdout, "stderr": stderr}}
-
-except Exception:
-    # removing useless prefix from traceback
-    to_return = {{
-        "process_status": "error",
-        "stdout": "",
-        "stderr": "\\n".join(traceback.format_exc().split("\\n")[3:]),
-    }}
-print(json.dumps(to_return))
-"""
-        elif language in ["python", "pypy3", "python3", "lean4", "shell"]:
-            if session_id is not None:
-                raise RuntimeError(
-                    f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
-                )
-            TO_EXECUTE = generated_code
-        else:
+        if language in ["python", "pypy3", "python3", "lean4", "shell"] and session_id is not None:
+            raise RuntimeError(
+                f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
+            )
+        if language not in ["ipython", "python", "pypy3", "python3", "lean4", "shell"]:
             raise ValueError(f"Unsupported language: {language}")
+        if language != "ipython" and traceback_verbosity != "Plain":
+            raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
+        request_session_id = session_id
+        if request_session_id is None and language == "ipython":  # creating a new session with empty state
+            request_session_id = uuid.uuid4()
+
+        TO_EXECUTE = generated_code
+        request = self._prepare_request(
+            TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
+        )
+        request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-        # removing last state to not re-execute code with errors
-        if session_id is not None:
-            if output["process_status"] != "completed":
-                self.sessions[session_id] = self.sessions[session_id][:-1]
-        return output, session_id
+        new_session_created = output.pop("new_session_created", False)
+
+        # Rebuild state by executing concatenated history
+        if session_id is not None and new_session_created:
+            history = self.session_histories.get(session_id, [])
+            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
+            request = self._prepare_request(
+                combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+            )
+            request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
+            try:
+                output = await self._send_request(request, timeout)
+            except httpx.TimeoutException:
+                output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+        # Append to history if successful execution (process_status == 'completed')
+        if output.get("process_status") == "completed":
+            self.session_histories[request_session_id].append(generated_code)
+
+        return output, request_session_id
 
     async def is_proof_correct(self, pred_output, timeout=30.0):
         TO_EXECUTE = pred_output
@@ -380,13 +347,68 @@ class LocalSandbox(Sandbox):
             LOG.error("Error during parsing output: %s", output.text)
             return {"process_status": "error", "stdout": "", "stderr": "Unknown error"}
 
-    def _prepare_request(self, generated_code, timeout, language="ipython", std_input=""):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language="ipython",
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity="Plain",
+    ):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
             "timeout": timeout,
             "language": language,
+            "max_output_characters": max_output_characters,
+            "traceback_verbosity": traceback_verbosity,
         }
+
+    async def delete_session(self, session_id: str) -> None:
+        """Delete an IPython session on the local sandbox server."""
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                response = await self.http_session.delete(
+                    url=f"http://{self.host}:{self.port}/sessions/{session_id}",
+                    timeout=10.0,
+                    headers={"X-Session-ID": session_id},
+                )
+                if response.status_code == 200:  # Success
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
+                    return
+                if response.status_code == 404:  # We were routed to a different worker
+                    LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
+                    return
+                response.raise_for_status()
+            except (
+                httpx.ReadTimeout,  # retry for other communication errors and statuses
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.RemoteProtocolError,
+                httpx.HTTPStatusError,
+            ) as e:
+                LOG.warning("Retry %d/%d deleting session %s – %s", attempt + 1, max_retries, session_id, e)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    LOG.warning(f"Failed to delete session {session_id} after {max_retries} attempts. ")
+            except Exception as e:
+                LOG.warning(
+                    "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
+                    session_id,
+                    e,
+                    type(e).__name__,
+                    e,
+                    traceback.format_exc(),
+                )
+                raise  # Re-raise unexpected exceptions
 
 
 sandboxes = {
