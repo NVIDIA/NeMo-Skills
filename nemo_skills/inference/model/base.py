@@ -208,8 +208,8 @@ class BaseModel:
                         result = self._parse_completion_response(response, include_response=include_response, **kwargs)
                 else:
                     raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-
-                self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
+                if not stream:
+                    self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
                 return result
 
             except openai.BadRequestError as e:
