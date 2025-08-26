@@ -96,14 +96,14 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
 class ContextLimitRetryConfig:
     """Configuration for context limit retry behavior, i.e., when the context limit is exceeded."""
 
-    enable_soft_fail: bool = False  # If True, will try to reduce the context by reducing the number of tokens to generate or the prompt or in the worst case return an empty generation, otherwise will raise the error
-    strategy: str = "reduce_generation"  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
+    enable_soft_fail: bool = False  # If True, will enable soft fail or try to reduce the context by reducing the number of tokens to generate/prompt and perform the task
+    strategy: str = None  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
     num_special_tokens_budget: int = 10  # Used when reducing the content of a message in the message list
 
     def __post_init__(self):
         """Validate configuration."""
         valid_strategies = ["reduce_generation", "reduce_prompt_from_start", "reduce_prompt_from_end"]
-        if self.strategy not in valid_strategies:
+        if self.strategy is not None and self.strategy not in valid_strategies:
             raise ValueError(f"strategy must be one of {valid_strategies}")
 
         if self.enable_soft_fail:
@@ -112,7 +112,7 @@ class ContextLimitRetryConfig:
     @property
     def reduce_generate_tokens(self):
         """Reduce the number of tokens to generate."""
-        if self.strategy == "reduce_generation":
+        if self.strategy is not None and self.strategy == "reduce_generation":
             LOG.info("Message is too long. Reducing the number of tokens to generate.")
             return True
         else:
@@ -121,7 +121,7 @@ class ContextLimitRetryConfig:
     @property
     def reduce_prompt_from_start(self):
         """Remove tokens from the start of the prompt."""
-        if self.strategy == "reduce_prompt_from_start":
+        if self.strategy is not None and self.strategy == "reduce_prompt_from_start":
             LOG.info("Message is too long. Removing tokens from the start of the prompt.")
             return True
         else:
@@ -130,7 +130,7 @@ class ContextLimitRetryConfig:
     @property
     def reduce_prompt_from_end(self):
         """Remove tokens from the end of the prompt."""
-        if self.strategy == "reduce_prompt_from_end":
+        if self.strategy is not None and self.strategy == "reduce_prompt_from_end":
             LOG.info("Message is too long. Removing tokens from the end of the prompt.")
             return True
         else:
@@ -171,12 +171,17 @@ async def handle_context_retries_async(
     except litellm.exceptions.ContextWindowExceededError as error:
         if not config.enable_soft_fail:
             raise error
+        else:
+            if config.strategy is None:
+                detailed_error = f"Context window exceeded. Soft fail is enabled but no strategy is configured. Returning empty generation.\n\n{error}"
+                LOG.warning(detailed_error)
+                return return_empty_generation_with_error(detailed_error)
 
-        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-        if modified_kwargs is None:
-            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+            modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+            if modified_kwargs is None:
+                return return_empty_generation_with_error(f"Could not apply strategy. {error}")
 
-        return await func(self, *args, **modified_kwargs)
+            return await func(self, *args, **modified_kwargs)
 
 
 def handle_context_retries_sync(

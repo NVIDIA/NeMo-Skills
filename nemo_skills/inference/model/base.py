@@ -59,7 +59,7 @@ class BaseModel:
         ssh_key_path: str | None = None,
         # Context limit retry config variables
         enable_soft_fail: bool = False,
-        context_limit_retry_strategy: str = "reduce_generation",
+        context_limit_retry_strategy: str | None = None,
         num_special_tokens_budget: int = 10,
     ):
         self._tunnel = None
