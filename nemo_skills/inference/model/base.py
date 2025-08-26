@@ -148,7 +148,6 @@ class BaseModel:
         if remove_stop_phrases:
             result["generation"] = trim_after_stop_phrases(result["generation"], stop_phrases)
 
-    @abc.abstractmethod
     def _get_tokenizer_endpoint(self) -> str | None:
         """Get the tokenizer endpoint if available."""
         return None
@@ -245,17 +244,18 @@ class BaseModel:
                 self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
                 return result
 
-            except litellm.exceptions.ContextWindowExceededError as e:
-                raise e
-
             except openai.BadRequestError as e:
-                if "output messages (reasoning and final)" in str(e) and retry_count < max_retries:
-                    retry_count += 1
-                    LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
-                    continue
-                else:
+                if "output messages (reasoning and final)" in str(e):
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
+                        continue
+
                     LOG.error(f"BadRequestError after {max_retries} retries, returning empty response: {e}")
                     return {"generation": "", "reasoning_content": "", "num_generated_tokens": 0}
+                else:
+                    raise e
+
         return result
 
     @with_context_retry

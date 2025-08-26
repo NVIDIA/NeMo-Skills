@@ -238,7 +238,7 @@ class CodeExecutionWrapper:
         code_output_begin: str,
         code_output_end: str,
         code_output_format: str,
-        tokens_to_generate: int = 512,
+        tokens_to_generate: int | None = None,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = -1,

@@ -63,15 +63,21 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         re.IGNORECASE | re.DOTALL,
     )
 
-    # Try pattern 1 first
-    match = pattern1.search(error_str)
-    if match:
-        max_context = int(match.group(1))
-        message_tokens = int(match.group(2))
-        return {
-            "max_context_length": max_context,
-            "message_tokens": message_tokens,
-        }
+    # Pattern 4: "The input (187537 tokens) is longer than the model's context length (131072 tokens)."
+    pattern4 = re.compile(
+        r"The input \((\d+) tokens\) is longer than the model's context length \((\d+) tokens\)", re.IGNORECASE
+    )
+
+    # Try patterns 1, 3, and 4
+    for pattern in [pattern1, pattern3, pattern4]:
+        match = pattern.search(error_str)
+        if match:
+            max_context = int(match.group(1))
+            message_tokens = int(match.group(2))
+            return {
+                "max_context_length": max_context,
+                "message_tokens": message_tokens,
+            }
 
     # Try pattern 2
     match = pattern2.search(error_str)
@@ -79,14 +85,6 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         return {
             "max_context_length": int(match.group(1)),
             "message_tokens": int(match.group(3)),
-        }
-
-    # Try pattern 3
-    match = pattern3.search(error_str)
-    if match:
-        return {
-            "max_context_length": int(match.group(1)),
-            "message_tokens": int(match.group(2)),
         }
 
     return None
