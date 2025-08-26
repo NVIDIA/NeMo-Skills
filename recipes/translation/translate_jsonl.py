@@ -19,7 +19,7 @@ def is_line_translatable_content(line: str) -> bool:
     stripped_line = line.strip()
     if not any(char.isalpha() for char in stripped_line):
         return False
-    if stripped_line.startswith('<') and stripped_line.endswith('>'):
+    if stripped_line.startswith("<") and stripped_line.endswith(">"):
         return False
     return True
 
@@ -124,8 +124,8 @@ class TranslationTask(GenerationTask):
         for dp in original_dps:
             current_dp_info = []
             for field_path in self.cfg.fields_to_translate:
-                has_wildcard = '*' in field_path
-                path_parts = field_path.split('.')
+                has_wildcard = "*" in field_path
+                path_parts = field_path.split(".")
                 field_key = path_parts[-1]  # Always use the last part (e.g., "value" from "conversations.*.value")
                 texts = _get_all_nested_fields(dp, field_path)
                 for text in texts:
@@ -155,7 +155,7 @@ class TranslationTask(GenerationTask):
         doc_original_stripped_lines_for_segmentation = []
 
         for doc_content in all_docs:
-            lines = doc_content.split('\n')
+            lines = doc_content.split("\n")
             current_doc_template = []
             current_doc_translatable_lines = []
             current_doc_translatable_indices = []
@@ -191,13 +191,13 @@ class TranslationTask(GenerationTask):
 
         # Store reconstruction data for postprocessing
         self._reconstruction_data = {
-            'original_dps': original_dps,
-            'dp_info_for_translation': dp_info_for_translation,
-            'doc_boundaries': doc_boundaries,
-            'doc_templates': doc_templates,
-            'doc_translatable_indices': doc_translatable_indices,
-            'doc_leading_spaces_lists': doc_leading_spaces_lists,
-            'doc_original_stripped_lines_for_segmentation': doc_original_stripped_lines_for_segmentation,
+            "original_dps": original_dps,
+            "dp_info_for_translation": dp_info_for_translation,
+            "doc_boundaries": doc_boundaries,
+            "doc_templates": doc_templates,
+            "doc_translatable_indices": doc_translatable_indices,
+            "doc_leading_spaces_lists": doc_leading_spaces_lists,
+            "doc_original_stripped_lines_for_segmentation": doc_original_stripped_lines_for_segmentation,
         }
 
         # Create translation data points with only the core fields
@@ -206,9 +206,9 @@ class TranslationTask(GenerationTask):
         async_position = 0
         for text in all_translatable_lines:
             translation_data_point = {
-                'source_lang': full_language_name('en'),
-                'target_lang': full_language_name(self.cfg.target_lang),
-                'src': text,
+                "source_lang": full_language_name("en"),
+                "target_lang": full_language_name(self.cfg.target_lang),
+                "src": text,
                 self.cfg.async_position_key: async_position,
             }
             translation_data_points.append(translation_data_point)
@@ -223,11 +223,11 @@ class TranslationTask(GenerationTask):
             # Use the first translation data point for logging
             sample_data_point = (
                 data[0]
-                if isinstance(data[0], dict) and 'src' in data[0]
+                if isinstance(data[0], dict) and "src" in data[0]
                 else {
-                    'source_lang': 'English',
-                    'target_lang': full_language_name(self.cfg.target_lang),
-                    'src': 'Sample text to translate',
+                    "source_lang": "English",
+                    "target_lang": full_language_name(self.cfg.target_lang),
+                    "src": "Sample text to translate",
                 }
             )
             filled_prompt = self.fill_prompt(sample_data_point, data)
@@ -241,8 +241,8 @@ class TranslationTask(GenerationTask):
 
         If the result cannot be extracted, return the original text.
         """
-        left_loc = text.rfind('〘')
-        right_loc = text.rfind('〙')
+        left_loc = text.rfind("〘")
+        right_loc = text.rfind("〙")
         if left_loc != -1 and right_loc != -1 and left_loc < right_loc:
             text = text[left_loc + 1 : right_loc]
         elif left_loc != -1:
@@ -268,7 +268,7 @@ class TranslationTask(GenerationTask):
 
         # Load individual translation results
         individual_results = []
-        with open(output_file, 'r', encoding='utf-8') as f:
+        with open(output_file, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     individual_results.append(json.loads(line))
@@ -279,23 +279,23 @@ class TranslationTask(GenerationTask):
         translated_segments_for_all_docs = []
         for result in individual_results:
             # The base class should have stored the generation in 'generation' field
-            if 'generation' in result:
-                translated_segments_for_all_docs.append(result['generation'])
-            elif 'response' in result:
-                translated_segments_for_all_docs.append(result['response'])
+            if "generation" in result:
+                translated_segments_for_all_docs.append(result["generation"])
+            elif "response" in result:
+                translated_segments_for_all_docs.append(result["response"])
             else:
                 # Fallback: look for any text field
                 translated_segments_for_all_docs.append(str(result))
 
         reconstruction_data = self._reconstruction_data
-        original_dps = reconstruction_data['original_dps']
-        dp_info_for_translation = reconstruction_data['dp_info_for_translation']
-        doc_boundaries = reconstruction_data['doc_boundaries']
-        doc_templates = reconstruction_data['doc_templates']
-        doc_translatable_indices = reconstruction_data['doc_translatable_indices']
-        doc_leading_spaces_lists = reconstruction_data['doc_leading_spaces_lists']
+        original_dps = reconstruction_data["original_dps"]
+        dp_info_for_translation = reconstruction_data["dp_info_for_translation"]
+        doc_boundaries = reconstruction_data["doc_boundaries"]
+        doc_templates = reconstruction_data["doc_templates"]
+        doc_translatable_indices = reconstruction_data["doc_translatable_indices"]
+        doc_leading_spaces_lists = reconstruction_data["doc_leading_spaces_lists"]
         doc_original_stripped_lines_for_segmentation = reconstruction_data[
-            'doc_original_stripped_lines_for_segmentation'
+            "doc_original_stripped_lines_for_segmentation"
         ]
 
         # Reassemble documents
@@ -314,7 +314,7 @@ class TranslationTask(GenerationTask):
             current_doc_segmented_translations = []
 
             if not translatable_indices:
-                all_results.append('\n'.join(template))
+                all_results.append("\n".join(template))
                 all_segmented_translations.append([])
                 continue
 
@@ -325,7 +325,7 @@ class TranslationTask(GenerationTask):
                 current_doc_segmented_translations.append({"src": original_stripped_line, "tgt": translated_segment})
                 template[idx_in_template] = leading_spaces + translated_segment
 
-            all_results.append('\n'.join(template))
+            all_results.append("\n".join(template))
             all_segmented_translations.append(current_doc_segmented_translations)
 
         final_output_data = []
@@ -367,9 +367,9 @@ class TranslationTask(GenerationTask):
 
         # Write reassembled results back to output file
         LOG.info(f"Writing {len(final_output_data)} reassembled documents to {output_file}")
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             for dp in final_output_data:
-                f.write(json.dumps(dp, ensure_ascii=False) + '\n')
+                f.write(json.dumps(dp, ensure_ascii=False) + "\n")
 
         LOG.info("Postprocessing completed successfully")
 
