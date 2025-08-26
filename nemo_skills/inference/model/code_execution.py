@@ -145,8 +145,8 @@ class CodeExecutionWrapper:
 
                 # openai and trtllm don't show what stop word was triggered, so we assume that it was `code_end`
                 # if there's an unfinished code block
-                if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
-                    current_output_segment += code_end
+                if output.count(code_end) + 1 == output.count(code_begin):
+                    output += code_end
 
                 # Update the prompt based on format
                 if is_openai_format:
