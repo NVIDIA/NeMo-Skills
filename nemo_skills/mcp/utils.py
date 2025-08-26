@@ -15,11 +15,17 @@
 import importlib
 import importlib.util
 import json
+import logging
 import os
+import tempfile
 
+from mcp import StdioServerParameters
 from mcp.types import CallToolResult
+from omegaconf import OmegaConf
 
-from nemo_skills.mcp.clients import MCPStreamableHttpClient
+from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
+
+logger = logging.getLogger(__name__)
 
 
 def locate(path):
@@ -47,4 +53,27 @@ def exa_auth_connector(client: MCPStreamableHttpClient):
 
 
 def exa_output_formatter(result: CallToolResult):
+    if getattr(result, "isError", False):
+        logger.error(f"Exa error: {result}")
+        return result.content[0].text
     return json.loads(result.content[0].text)["results"]
+
+
+def hydra_config_connector_factory(config_obj):
+    """Return a connector that writes the provided OmegaConf config to a temp YAML and injects Hydra args.
+
+    Assumes `config_obj` is an OmegaConf DictConfig; we just OmegaConf.save and inject
+    `--config-dir`/`--config-name`. Path and argument management only.
+    """
+
+    def connector(client: MCPStdioClient):
+        temp_dir = tempfile.mkdtemp(prefix="mcp_cfg_")
+        cfg_path = os.path.join(temp_dir, "config.yaml")
+        OmegaConf.save(config_obj, cfg_path, resolve=True)
+
+        client.server_params = StdioServerParameters(
+            command=client.server_params.command,
+            args=list(client.server_params.args) + ["--config-dir", temp_dir, "--config-name", "config"],
+        )
+
+    return connector

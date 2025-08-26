@@ -224,15 +224,13 @@ class MCPHttpClient(MCPClient):
 
 
 class MCPStreamableHttpClient(MCPClient):
-    def __init__(
-        self, base_url: str, output_formatter: Callable | None = None, auth_connector: Callable | None = None
-    ):
+    def __init__(self, base_url: str, output_formatter: Callable | None = None, init_hook: Callable | None = None):
         self.output_formatter = output_formatter
         self.base_url = base_url
-        self.auth_connector = auth_connector
+        self.init_hook = init_hook
         self.tools: List[Dict[str, Any]] = []
-        if self.auth_connector is not None:
-            self.auth_connector(self)
+        if self.init_hook is not None:
+            self.init_hook(self)
 
     async def list_tools(self):
         async with streamablehttp_client(self.base_url) as (read_stream, write_stream, _):
@@ -269,11 +267,21 @@ class MCPStreamableHttpClient(MCPClient):
 
 
 class MCPStdioClient(MCPClient):
-    def __init__(self, command: str, args: list[str] | None = None):
+    def __init__(
+        self,
+        command: str,
+        args: list[str] | None = None,
+        init_hook: Callable | None = None,
+        output_formatter: Callable | None = None,
+    ):
         if args is None:
             args = []
         self.server_params = StdioServerParameters(command=command, args=args)
         self.tools: List[Dict[str, Any]] = []
+        self._command_connector = init_hook
+        self.output_formatter = output_formatter
+        if self._command_connector is not None:
+            self._command_connector(self)
 
     async def list_tools(self):
         async with stdio_client(self.server_params) as (read_stream, write_stream):
@@ -301,6 +309,8 @@ class MCPStdioClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
+                if self.output_formatter:
+                    return self.output_formatter(result)
                 return result.structuredContent
 
 

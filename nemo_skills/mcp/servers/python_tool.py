@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Annotated
 
 import hydra
+from httpx import RemoteProtocolError
 from hydra.core.config_store import ConfigStore
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -47,9 +49,13 @@ async def execute(
 ) -> ExecutionResult:
     """Executes the given python code"""
     language = "ipython"
-    output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
-    logger.info("Ran request with status: %s", output["process_status"])
-    return output
+    try:
+        output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
+    except RemoteProtocolError:
+        return {"process_status": "fail", "stdout": "", "stderr": f"Error connecting to sandbox"}
+    return json.loads(
+        output["stdout"]
+    )  # Sandbox bug fix: Remove extra layer of output wrapping, the result is a {"process_status": ..., "stdout": ..., "stderr": ...} dict
 
 
 @dataclass

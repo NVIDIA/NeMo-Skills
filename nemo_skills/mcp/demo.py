@@ -13,27 +13,63 @@
 # limitations under the License.
 
 import asyncio
+import logging
+from dataclasses import asdict, dataclass, field
+
+import hydra
+from hydra.core.config_store import ConfigStore
+from omegaconf import OmegaConf
 
 from nemo_skills.inference.model.vllm import VLLMModel
 from nemo_skills.mcp.adapters import registry
 from nemo_skills.mcp.clients import MCPClientManager, MCPStdioClient, MCPStreamableHttpClient
-from nemo_skills.mcp.utils import locate
+from nemo_skills.mcp.utils import hydra_config_connector_factory, locate
+
+logger = logging.getLogger(__name__)
 
 # Initialize the VLLMModel with your local vLLM instance
 # Adjust model name and port as configured in your vLLM server
 
 
-async def run_demo():
-    model = VLLMModel(model="Qwen/Qwen3-8B", host="127.0.0.1", port="8000")
-    model_type = "qwen"
+@dataclass
+class PythonToolMCPConfig:
+    pass
+
+
+@dataclass
+class DemoConfig:
+    model: str = "Qwen/Qwen3-8B"
+    model_type: str = "qwen"
+    vllm_host: str = "127.0.0.1"
+    vllm_port: str = "8000"
+    python_tool: PythonToolMCPConfig = field(default_factory=PythonToolMCPConfig)
+    sandbox: dict = field(
+        default_factory=lambda: {
+            "sandbox_type": "local",
+        }
+    )
+
+
+cs = ConfigStore.instance()
+cs.store(name="base_mcp_demo_config", node=DemoConfig)
+
+
+async def run_demo(cfg: DemoConfig):
+    model = VLLMModel(model=cfg.model, host=cfg.vllm_host, port=cfg.vllm_port)
+    model_type = cfg.model_type
+    # Build a Hydra config for the python MCP server and inject via connector
+    # Accept whatever object Hydra parsed (dataclass/DictConfig) and convert to plain dict
     python_client = MCPStdioClient(
-        "python", ["-m", "nemo_skills.mcp.servers.python_tool"], hide_args={"execute": ["session_id", "timeout"]}
+        "python",
+        ["-m", "nemo_skills.mcp.servers.python_tool"],
+        hide_args={"execute": ["session_id", "timeout"]},
+        init_hook=hydra_config_connector_factory(cfg),
     )
     exa_client = MCPStreamableHttpClient(
         base_url="https://mcp.exa.ai/mcp",
         enabled_tools=["web_search_exa"],
         output_formatter=locate("nemo_skills.mcp.utils.exa_output_formatter"),
-        auth_connector=locate("nemo_skills.mcp.utils.exa_auth_connector"),
+        init_hook=locate("nemo_skills.mcp.utils.exa_auth_connector"),
     )
 
     manager = MCPClientManager()
@@ -95,6 +131,7 @@ async def run_demo():
         print("\nTool calls:")
         for tool_call in response["tool_calls"]:
             tool_args = registry.get_interpreter(model_type).parse(tool_call)
+            print(f"Executing tool: {tool_args}")
             tool_result = await manager.execute_tool(**tool_args)
             tool_msg = registry.get_response_formatter(model_type).format(tool_call, tool_result)
             print(tool_msg)
@@ -106,5 +143,12 @@ async def run_demo():
             break
 
 
+# @hydra.main(version_base=None, config_name="base_mcp_demo_config")
+# def main(cfg: DemoConfig):
+def main():
+    cfg = DemoConfig(sandbox={"sandbox_type": "local"})
+    asyncio.run(run_demo(cfg))
+
+
 if __name__ == "__main__":
-    asyncio.run(run_demo())
+    main()
