@@ -256,7 +256,7 @@ class MCPClient(metaclass=MCPClientMeta):
     Example (configured via OmegaConf, similar to mcp_demo.py):
     ```python
     from omegaconf import OmegaConf
-    from nemo_skills.mcp.config_loader import build_client_manager
+    from nemo_skills.mcp.config import build_client_manager
 
     cfg = OmegaConf.create({
         "tools": [
@@ -317,7 +317,7 @@ class MCPStreamableHttpClient(MCPClient):
     Example (OmegaConf config, like in mcp_demo.py):
     ```python
     from omegaconf import OmegaConf
-    from nemo_skills.mcp.config_loader import build_client_manager
+    from nemo_skills.mcp.config import build_client_manager
 
     cfg = OmegaConf.create({
         "tools": [
@@ -399,7 +399,7 @@ class MCPStdioClient(MCPClient):
     Example (OmegaConf config, like in mcp_demo.py):
     ```python
     from omegaconf import OmegaConf
-    from nemo_skills.mcp.config_loader import build_client_manager
+    from nemo_skills.mcp.config import build_client_manager
 
     cfg = OmegaConf.create({
         "tools": [
@@ -489,7 +489,7 @@ class MCPClientManager:
     Example (using config loader, like in mcp_demo.py):
     ```python
     from omegaconf import OmegaConf
-    from nemo_skills.mcp.config_loader import build_client_manager
+    from nemo_skills.mcp.config import build_client_manager
 
     cfg = OmegaConf.create({
         "tools": [
