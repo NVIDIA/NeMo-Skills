@@ -21,6 +21,7 @@ import yaml
 
 from nemo_skills import _containers
 from nemo_skills.pipeline.app import app
+from nemo_skills.pipeline.utils import is_mounted_filepath
 
 
 def is_docker_available():
@@ -81,7 +82,7 @@ def setup():
                 continue
 
         # initializing default containers
-        config = {'executor': config_type, 'containers': _containers}
+        config = {"executor": config_type, "containers": _containers}
 
         mounts = typer.prompt(
             "\nWe execute all commands in docker containers, so you need to "
@@ -91,11 +92,46 @@ def setup():
             "as well as for your models (e.g. /trt_models, /hf_models).\n"
             "If you're setting up a Slurm config, make sure to use the cluster paths here.\n"
             "What mounts would you like to add? (comma separated)",
-            default=f"/home/{os.getlogin()}:/workspace" if config_type == 'local' else None,
+            default=f"/home/{os.getlogin()}:/workspace" if config_type == "local" else None,
         )
 
+        # parse mounts early so we can validate HF_HOME against them
+        mounts_list = [m.strip() for m in mounts.split(",")]
+
+        # Prompt for HF_HOME and validate it is within one of the mounts. Allow retry.
+        hf_home = ""
+        while True:
+            hf_home = typer.prompt(
+                "\nBy default we require HF_HOME env variable to be defined in your cluster config.\n"
+                "If it's not set, you might be accidentally re-downloading the models every time you run ns commands.\n"
+                "Note that it's not enough to just define it in your environment, you need it to be explicitly listed "
+                "in the config.\nIt should be a mounted path that's consistent with your "
+                "cluster setup and mounts list (e.g. /workspace/...).\n"
+                "If you don't define it, the jobs will fail unless you run commands with --skip_hf_home_check.\n"
+                "Set HF_HOME for this cluster now or leave empty to skip.",
+                default="",
+            )
+            if not hf_home:
+                # user chose to skip HF_HOME
+                break
+
+            # validate using provided helper
+            if is_mounted_filepath(cluster_config=None, path=hf_home, mounts=mounts_list):
+                break
+
+            # invalid HF_HOME; ask to retry or skip
+            retry = typer.confirm(
+                f"\nThe path '{hf_home}' does not appear to be inside any of the configured mounts: {mounts_list}.\n"
+                "Would you like to try entering HF_HOME again?",
+                default=True,
+            )
+            if not retry:
+                typer.echo("Skipping HF_HOME setting for this cluster.")
+                hf_home = ""
+                break
+
         env_vars = typer.prompt(
-            "\nYou can also specify any environment variables that you want to be accessible in containers.\n"
+            "\nYou can also specify any other environment variables that you want to be accessible in containers.\n"
             "Can either define just the name (we take value from the current environment), "
             "or name=value to use a fixed value.\n"
             "By default we will always pass "
@@ -105,12 +141,14 @@ def setup():
             default="",
         )
 
-        config['mounts'] = [m.strip() for m in mounts.split(",")]
-        config['env_vars'] = [e.strip() for e in env_vars.split(",") if e.strip()]
-        if not config['env_vars']:
-            config.pop('env_vars')
+        config["mounts"] = mounts_list
+        config["env_vars"] = [e.strip() for e in env_vars.split(",") if e.strip()]
+        if hf_home:
+            config["env_vars"].append(f"HF_HOME={hf_home}")
+        if not config["env_vars"]:
+            config.pop("env_vars")
 
-        if config_type == 'slurm':
+        if config_type == "slurm":
             ssh_access = typer.confirm(
                 "\nIt's recommended to run ns commands from a local workstation (not on the cluster) "
                 "and let us take care of uploading your code / scheduling jobs through ssh.\n"
@@ -120,36 +158,36 @@ def setup():
             )
             if ssh_access:
                 ssh_tunnel = {}
-                ssh_tunnel['host'] = typer.prompt("\nWhat is the ssh hostname of your cluster?")
-                ssh_tunnel['user'] = typer.prompt(
+                ssh_tunnel["host"] = typer.prompt("\nWhat is the ssh hostname of your cluster?")
+                ssh_tunnel["user"] = typer.prompt(
                     "\nWhat is your ssh username on the cluster?",
                     default=os.getlogin(),
                 )
                 default_key = os.path.expanduser("~/.ssh/id_rsa")
-                ssh_tunnel['identity'] = typer.prompt(
+                ssh_tunnel["identity"] = typer.prompt(
                     "\nWhat is the path to your ssh private key? If you don't use key, leave empty.",
                     default=default_key if os.path.exists(default_key) else "",
                 )
-                if ssh_tunnel['identity'] == "":
-                    ssh_tunnel.pop('identity')
-                ssh_tunnel['job_dir'] = typer.prompt(
+                if ssh_tunnel["identity"] == "":
+                    ssh_tunnel.pop("identity")
+                ssh_tunnel["job_dir"] = typer.prompt(
                     "\nWe need some place to keep uploaded code and experiment metadata on cluster.\n"
                     "What path do you want to use for that (you might need to clean it "
                     "up periodically if you submit many experiments)?",
                 )
-                config['ssh_tunnel'] = ssh_tunnel
+                config["ssh_tunnel"] = ssh_tunnel
             else:
-                config['job_dir'] = typer.prompt(
+                config["job_dir"] = typer.prompt(
                     "\nWe need some place to experiment metadata and packaged code.\n"
                     "What path do you want to use for that (you might need to clean it "
                     "up periodically if you submit many experiments)?",
                 )
-            config['account'] = typer.prompt("\nWhat is the slurm account you want to use?")
-            config['partition'] = typer.prompt(
+            config["account"] = typer.prompt("\nWhat is the slurm account you want to use?")
+            config["partition"] = typer.prompt(
                 "\nWhat is the default slurm partition you want to use? "
                 "You can always override with --partition argument.",
             )
-            config['job_name_prefix'] = ""
+            config["job_name_prefix"] = ""
             timeouts = typer.prompt(
                 "\nIf your cluster has a strict time limit for each job, we need to "
                 "know the value to be able to save checkpoints before the job is killed.\n"
@@ -163,7 +201,7 @@ def setup():
                 }
 
         # Create the config file
-        with open(config_file, 'wt') as fout:
+        with open(config_file, "wt") as fout:
             yaml.dump(config, fout, sort_keys=False, indent=4)
 
         typer.echo(
@@ -173,7 +211,7 @@ def setup():
             f"https://github.com/NVIDIA/NeMo-Skills/tree/main/dockerfiles"
         )
 
-        if config_type == 'local':
+        if config_type == "local":
             pull_containers = typer.confirm(
                 "\nWould you like to pull all the necessary Docker containers now? "
                 "This might take some time but ensures everything is ready to use.\n"
@@ -184,7 +222,7 @@ def setup():
             if pull_containers:
                 if is_docker_available():
                     typer.echo("\nPulling Docker containers...")
-                    pull_docker_containers(config['containers'])
+                    pull_docker_containers(config["containers"])
                     typer.echo("All containers have been pulled!")
                 else:
                     typer.echo(
