@@ -98,7 +98,7 @@ class ContextLimitRetryConfig:
 
     enable_soft_fail: bool = False  # If True, will enable soft fail or try to reduce the context by reducing the number of tokens to generate/prompt and perform the task
     strategy: str = None  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
-    num_special_tokens_budget: int = 10  # Used when reducing the content of a message in the message list
+    num_special_tokens_budget: int = 100  # To account for the discrepancy when tokenizing a message content standalone and when tokenizing it as part of a message list. Keep it high to be safe.
 
     def __post_init__(self):
         """Validate configuration."""

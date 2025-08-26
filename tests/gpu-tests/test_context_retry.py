@@ -46,9 +46,9 @@ class TestEnvironment:
     def validate_environment(self):
         """Validate required environment variables"""
         if not self.model_path:
-            pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+            pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test", allow_module_level=True)
         if not self.model_type:
-            pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+            pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test", allow_module_level=True)
 
 
 class CommandBuilder:
