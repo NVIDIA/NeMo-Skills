@@ -268,9 +268,6 @@ def _try_reduce_prompt_tokens(
     num_prompt_tokens_to_keep = max_context_length - completion_tokens
     prompt = kwargs["prompt"]
 
-    LOG.info(f"Prompt type: {type(prompt)}")
-    LOG.info(f"num_prompt_tokens_to_keep: {num_prompt_tokens_to_keep}")
-
     if isinstance(prompt, str):
         return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)
     elif isinstance(prompt, list):
@@ -285,7 +282,6 @@ def _trim_string_prompt(
 ) -> dict:
     """Trim a string prompt to fit within token limits."""
     encoded_prompt = tokenizer.encode(prompt)
-    LOG.info(f"Length of encoded prompt: {len(encoded_prompt)}")
 
     if config.reduce_prompt_from_start:
         trimmed_encoded = encoded_prompt[-num_tokens_to_keep:]
@@ -366,7 +362,7 @@ def _trim_messages_from_start(
     messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
 ) -> list:
     """Returns the suffix of the current message list that fits within the token budget."""
-    trimmed_messages = []
+    trimmed_message_list = []
     total_messages = len(messages)
     cumulative_tokens = 0  # For tracking the length of the previous suffix
 
@@ -398,14 +394,14 @@ def _trim_messages_from_start(
             if trimmed_content:  # Successfully trimmed the content of the current message
                 message_copy = messages[suffix_start_idx].copy()
                 message_copy["content"] = trimmed_content
-                return [message_copy] + trimmed_messages
+                return [message_copy] + trimmed_message_list
             else:
-                return trimmed_messages
+                return trimmed_message_list
 
         else:
             # Track the length of the current suffix
             cumulative_tokens = suffix_token_count
-            trimmed_messages = [messages[suffix_start_idx]] + trimmed_messages
+            trimmed_message_list = test_messages
 
     return []
 

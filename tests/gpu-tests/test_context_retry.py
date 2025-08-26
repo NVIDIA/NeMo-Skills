@@ -169,3 +169,44 @@ def test_context_retry_reduce_prompt_start():
 
     docker_run(f"ls {output_dir}")
     assert os.path.exists(output_file), "Output file not found"
+
+
+@pytest.mark.gpu
+def test_context_retry_reduce_prompt_end():
+    """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, in this test we remove tokens from the end of the prompt."""
+
+    NUM_SAMPLES = 1
+
+    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
+    if not model_path:
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
+    if not model_type:
+        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-eval-reduce-prompt-end"
+    input_file = f"{output_dir}/input.jsonl"
+    output_file = f"{output_dir}/output.jsonl"
+    docker_rm_and_mkdir(input_file)
+    docker_rm_and_mkdir(output_file)
+
+    _create_fake_big_input_file(input_file, num_samples=NUM_SAMPLES)
+
+    cmd = (
+        f"ns generate "
+        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
+        f"    --model {model_path} "
+        f"    --server_type vllm "
+        f"    --output_dir {output_dir} "
+        f"    --input_file {input_file} "
+        f"    --server_gpus 1 "
+        f"    --server_nodes 1 "
+        f"    ++prompt_config=generic/default "
+        f"    ++server.enable_soft_fail=True "
+        f"    ++server.context_limit_retry_strategy=reduce_prompt_from_end "
+    )
+
+    subprocess.run(cmd, shell=True, check=True)
+
+    docker_run(f"ls {output_dir}")
+    assert os.path.exists(output_file), "Output file not found"
