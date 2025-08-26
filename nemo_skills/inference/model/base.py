@@ -175,7 +175,7 @@ class BaseModel:
     async def generate_async(
         self,
         prompt: str | list[dict],
-        tokens_to_generate: int = 2048,
+        tokens_to_generate: int | None = None,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = -1,
@@ -263,7 +263,7 @@ class BaseModel:
     def generate_sync(
         self,
         prompt: str | list[dict],
-        tokens_to_generate: int = 2048,
+        tokens_to_generate: int | None = None,
         temperature: float = 0.0,
         top_p: float = 0.95,
         top_k: int = -1,
