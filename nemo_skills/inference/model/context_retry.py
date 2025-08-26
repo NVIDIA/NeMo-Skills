@@ -366,6 +366,7 @@ def _trim_messages_from_start(
     messages: list, rem_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
 ) -> list:
     """Returns the suffix of the current message list that fits within the token budget."""
+    trimmed_messages = []
     total_messages = len(messages)
     cumulative_tokens = 0  # For tracking the length of the previous suffix
 
@@ -374,13 +375,18 @@ def _trim_messages_from_start(
         suffix_start_idx = -(idx + 1)
         test_messages = messages[suffix_start_idx:]
         encoded = tokenizer.encode(test_messages)
+
         if encoded is None:
             continue
 
         suffix_token_count = len(encoded)
+        LOG.info(f"Length of encoded suffix: {suffix_token_count}")
 
         if suffix_token_count > rem_token_budget:
             # Try to partially include the first message of this slice
+            LOG.info(
+                f"idx: {idx}, suffix_token_count: {suffix_token_count}, rem_token_budget: {rem_token_budget}, cumulative_tokens: {cumulative_tokens}"
+            )
             remaining_tokens = rem_token_budget - cumulative_tokens
             trimmed_content = get_trimmed_content(
                 content=messages[suffix_start_idx]["content"],
@@ -392,13 +398,14 @@ def _trim_messages_from_start(
             if trimmed_content:  # Successfully trimmed the content of the current message
                 message_copy = messages[suffix_start_idx].copy()
                 message_copy["content"] = trimmed_content
-                return [message_copy] + messages[suffix_start_idx + 1 :]
+                return [message_copy] + trimmed_messages
             else:
-                return messages[suffix_start_idx + 1 :]
+                return trimmed_messages
 
         else:
             # Track the length of the current suffix
             cumulative_tokens = suffix_token_count
+            trimmed_messages = [messages[suffix_start_idx]] + trimmed_messages
 
     return []
 
