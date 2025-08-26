@@ -216,8 +216,6 @@ class ContextRetryTestSuite:
 
     def run_generation_test(self, test_name: str, retry_strategy: str):
         """Run generation test with specified retry strategy"""
-        self.setup_test()
-
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         input_file, output_file = self.output_manager.setup_io_files(output_dir)
 
