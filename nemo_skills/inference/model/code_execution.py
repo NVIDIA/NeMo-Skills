@@ -46,7 +46,7 @@ class CodeExecutionConfig:
     user_end: str = ""
     assistant_begin: str = ""
     assistant_end: str = ""
-    final_answer_begin: str = ""
+    final_answer_begin: str = "Final Answer:"
     final_answer_end: str = ""
 
 class CodeExecutionWrapper:
@@ -80,7 +80,7 @@ class CodeExecutionWrapper:
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
 
-        # sanity check 
+        # NOTE: sanity check. These tags will be used later in the generation loop, for harmony text completion. 
         if not is_openai_format:
             assert self.config.user_begin !="", "user_begin is required for harmony response in text completion. Add the field `user_begin` to your prompt template"
             assert self.config.user_end !="", "user_end is required for harmony response in text completion. Add the field `user_end` to your prompt template"
@@ -109,7 +109,8 @@ class CodeExecutionWrapper:
                 max_code_executions=max_code_executions,
                 extra_body=extra_body,
             )
-
+        
+        # this is the max number of code executions
         effective_max_code_executions = self.config.max_code_executions
         if max_code_executions is not None:
             effective_max_code_executions = max_code_executions
@@ -120,6 +121,8 @@ class CodeExecutionWrapper:
         else:
             new_prompt = copy.deepcopy(prompt)
 
+        # set up timeout limit for the generation loop. 
+        # this includes all the time spent calling the LLM, executing the code, etc. 
         start_time = int(time.time())
 
         stop_phrases = stop_phrases or []
@@ -146,13 +149,15 @@ class CodeExecutionWrapper:
 
         #NOTE: constrain generation of effective max executions plus some buffer. 
         # ideally, each generation produces a block, then max_generation_rounds = effective_max_code_executions
-        # however, some models like to pause and think, so we add a buffer, eg 2x effective_max_code_executions
+        # however, some models like to pause and think, which means that some generations will not contain a code block. 
+        # Hence we set a another limit, which is max_generation_rounds. This is the max number of generations we can have, for this input problem. 
+        # The generation stops when it reaches effective_max_code_executsion, OR max_generation_rounds, whichever comes first. 
         generation_index = 0
-        max_generation_rounds= effective_max_code_executions*2 
+        max_generation_rounds= effective_max_code_executions*2 # this is arbitrary. 
 
-        # NOTE: because some models like to pause and think, we will only track the number of code round executed and the total number of generations 
         while code_rounds_executed <= effective_max_code_executions and generation_index <= max_generation_rounds:
 
+            # if we timeout for this problem, we break out of the loop
             generation_time_start = time.time()
             if timeout is not None:
                 # updating timeout to account for the time already spent
@@ -161,6 +166,7 @@ class CodeExecutionWrapper:
                 if request['timeout'] <= 0:
                     break
 
+            # here we send the prompt to LLM
             output_dict = await self.model.generate_async(**request, remove_stop_phrases=False)
             print(f"--------------DEBUGGING generation_index: {generation_index}: output_dict-------------")
             print(output_dict)
@@ -169,10 +175,8 @@ class CodeExecutionWrapper:
             # no need to do anything with this as the code below should just exit, so that's only for logging
             stopped_on_repetition = output_dict.get('stopped_on_repetition', False)
 
-            # openai don't show what stop word was triggered, so we assume that it was `code_end`
-            # if there's an unfinished code block
-            # if is_openai_format and output_dict.get('finish_reason') == 'stop':
-            # NOTE: change this to accomondate gpt-oss, which uses vllm but is an openai model, so should be treated the same as openai
+            # NOTE: If we see there is more code_begin than code_end, the code generation was stopped, and the last token was `code_end`
+            # we add it back for code parsing. 
             if output_dict.get('finish_reason') == 'stop':
                 if output.count(code_end) + 1 == output.count(code_begin):
                     output += code_end
@@ -180,16 +184,19 @@ class CodeExecutionWrapper:
             print(f"--------------DEBUGGING generation_index: {generation_index}: output-------------")
             print(output)
 
-            # Update the prompt with the LLM's response
+            # Update the prompt with the LLM's response (e.g. code generation or thinking)
             if is_openai_format:
+                # openai format is a list
                 request['prompt'].append({'role': 'assistant', 'content': output})
             else:
+                # non-openai format (text completion) is formatted string. 
                 request['prompt'] += output
 
             # if it's the extra iteration, we don't execute the code block and just finish
             if generation_index == effective_max_code_executions:
                 print(f"--------------DEBUGGING generation_index: {generation_index}: reached effective_max_code_executions, break-------------")
                 break
+            
             # adjusting requested tokens to account for what has been generated already
             request['tokens_to_generate'] -= num_generated_tokens
             total_num_generated_tokens += num_generated_tokens
@@ -203,14 +210,19 @@ class CodeExecutionWrapper:
             # that the last code_begin is not closed to ensure that we are inside the code block
             if output.endswith(code_end) and output.rfind(code_begin) > output.rfind(code_end, 0, -1):
                 print(f"--------------DEBUGGING generation_index: {generation_index}: Found code------------")
+                
+                # extract and execute the code block
                 code_execution_time_start, execution_dict, session_id = await self.execute_generated_code(
                     prompt, code_begin, code_end, output, session_id
                 )
                 print(f"--------------DEBUGGING generation_index: {generation_index}: code execution_dict-------------")
                 print(execution_dict)
+                
+                # calculate the remaining code executions, and tell the model how many are left. 
                 remaining_code_executions = None
                 if self.config.add_remaining_code_executions:
                     remaining_code_executions = effective_max_code_executions - generation_index - 1
+                
                 # adding code output to the prompt
                 code_output = format_code_output(
                     execution_dict, code_output_begin, code_output_end, code_output_format, remaining_code_executions
@@ -220,29 +232,36 @@ class CodeExecutionWrapper:
 
                 # update the prompt with the code output
                 if is_openai_format:
-                    # change to -1 for the assistant message
+                    # -1 for the assistant message, which is the last message. 
                     request['prompt'][-1]['content'] += code_output
                 else:
                     request['prompt'] += code_output
 
+                # calculate code execution time. 
                 code_execution_time += int(time.time() - code_execution_time_start)
                 code_rounds_executed += 1
 
             else: 
-                # NOTE: if no code was generated, we just ignore
+                # NOTE: if no code was generated, we just ignore. Sometimes model is just thinking. 
                 pass
             
-            # NOTE: regardless of whether code was generated, we increase generation index
+            # NOTE: regardless of whether code was generated, we increase generation index, to track the number of generations. 
             generation_index += 1
 
             # NOTE: we need to check if the final answer has been generated. 
             # If so, we should break out the loop to prevent furthur interactions with the LLM
-            if not is_openai_format:
+            if is_openai_format:
+                # the default final answer begin is "Final Answer:"
+                if self.config.final_answer_begin in request['prompt'][-1]['content']:
+                    print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
+                    break
+            else:
                 if self.config.final_answer_begin in output:
                     print(f"--------------DEBUGGING generation_index: {generation_index}: Final answer found, break-------------")
                     break
 
-            # NOTE: some models (like gpt-oss) require a confirmation signal from the user so that LLM can continue generating
+            # NOTE: model hasn't generated the final answer yet, so we should continue with generation. 
+            # some models (like gpt-oss) likes a confirmation signal from the user so that LLM can continue generating
             if is_openai_format:
                 request['prompt'].append({'role': 'user', 'content': "continue"})
             else:

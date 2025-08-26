@@ -272,11 +272,9 @@ class GenerationTask:
             }
             else:
                 pass
-
             llm = get_code_execution_model(**self.cfg.server, harmony_prompt_config=harmony_prompt_config, sandbox=sandbox)
         else:
             llm = get_model(**self.cfg.server)
-
         return llm
 
     def setup_prompt(self):
