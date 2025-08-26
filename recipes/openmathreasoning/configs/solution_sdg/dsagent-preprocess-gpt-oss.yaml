@@ -82,6 +82,7 @@ stages:
     code_end: "<|call|>" 
     output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
     output_end: "<|end|><|start|>assistant"
+    is_harmony_format: true # whether is harmony text completion format
     dependencies:
       - judge_answers
     # You can use CPU partition for this script, if available

@@ -20,38 +20,81 @@ import re
 from collections import Counter
 
 
-def validate_code_execution(text, code_begin="```python", code_end="```", output_begin="```output", output_end="```"):
-    lines = text.split('\n')
-    i = 0
+def validate_code_execution(text, code_begin="```python", code_end="```", output_begin="```output", output_end="```", is_harmony_format=False):
+    #NOTE: add parser for harmony format
+    if is_harmony_format:
+        # Parse sequentially to validate the order: code_begin -> code_end -> output_begin -> output_end (repeating >=0 times)
+        # State: 0=expect code_begin, 1=expect code_end, 2=expect output_begin, 3=expect output_end
+        state = 0
+        position = 0
+        complete_cycles = 0
+        
+        while position < len(text):
+            if state == 0:  # Looking for code_begin
+                next_pos = text.find(code_begin, position)
+                if next_pos == -1:
+                    break  # No more code blocks found
+                position = next_pos + len(code_begin)
+                state = 1
+                
+            elif state == 1:  # Looking for code_end
+                next_pos = text.find(code_end, position)
+                if next_pos == -1:
+                    return False  # Unmatched code_begin
+                position = next_pos + len(code_end)
+                state = 2
+                
+            elif state == 2:  # Looking for output_begin
+                next_pos = text.find(output_begin, position)
+                if next_pos == -1:
+                    return False  # Missing output_begin after code block
+                position = next_pos + len(output_begin)
+                state = 3
+                
+            elif state == 3:  # Looking for output_end
+                next_pos = text.find(output_end, position)
+                if next_pos == -1:
+                    return False  # Unmatched output_begin
+                position = next_pos + len(output_end)
+                state = 0  # Complete cycle, look for next code_begin
+                complete_cycles += 1
+        
+        # Valid if we have at least one complete cycle and ended in state 0 (not mid-cycle)
+        return complete_cycles >= 0 and state == 0
+    
+    else:
+        # in non-harmony format, we can rely on the `python\n` to parse the code blocks and output blocks.
+        lines = text.split('\n')
+        i = 0
 
-    while i < len(lines):
-        if lines[i] == code_begin:
-            code_end_idx = -1
-            for j in range(i + 1, len(lines)):
-                if lines[j] == code_end:
-                    code_end_idx = j
-                    break
+        while i < len(lines):
+            if lines[i] == code_begin:
+                code_end_idx = -1
+                for j in range(i + 1, len(lines)):
+                    if lines[j] == code_end:
+                        code_end_idx = j
+                        break
 
-            if code_end_idx == -1:
-                return False
+                if code_end_idx == -1:
+                    return False
 
-            if code_end_idx + 1 >= len(lines) or lines[code_end_idx + 1] != output_begin:
-                return False
+                if code_end_idx + 1 >= len(lines) or lines[code_end_idx + 1] != output_begin:
+                    return False
 
-            output_end_idx = -1
-            for j in range(code_end_idx + 2, len(lines)):
-                if lines[j] == output_end:
-                    output_end_idx = j
-                    break
+                output_end_idx = -1
+                for j in range(code_end_idx + 2, len(lines)):
+                    if lines[j] == output_end:
+                        output_end_idx = j
+                        break
 
-            if output_end_idx == -1:
-                return False
+                if output_end_idx == -1:
+                    return False
 
-            i = output_end_idx + 1
-        else:
-            i += 1
+                i = output_end_idx + 1
+            else:
+                i += 1
 
-    return True
+        return True
 
 
 def cut_final_answer_part(output):
@@ -168,6 +211,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--output_begin", type=str, default="```output", help="Start of output block tag")
     parser.add_argument("--output_end", type=str, default="```", help="End of output block tag")
+    parser.add_argument("--is_harmony_format", action="store_true", help="Whether the generation is in harmony text completionformat")
     args = parser.parse_args()
 
     output_dir = os.path.dirname(args.output_file)
