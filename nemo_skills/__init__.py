@@ -21,7 +21,7 @@ _containers = {
     "sglang": "igitman/nemo-skills-sglang:0.7.0",
     "nemo": "igitman/nemo-skills-nemo:0.7.0",
     "megatron": "igitman/nemo-skills-megatron:0.7.0",
-    "sandbox": "igitman/nemo-skills-sandbox:0.7.0",
+    "sandbox": "igitman/nemo-skills-sandbox:0.7.1",
     "nemo-skills": "igitman/nemo-skills:0.7.0",
     "verl": "igitman/nemo-skills-verl:0.7.0",
     "nemo-rl": "igitman/nemo-skills-nemo-rl:0.7.0",
