@@ -56,6 +56,15 @@ async def run_demo():
                 },
                 {
                     "id": "exa",
+                    "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                    "params": {
+                        "command": "python",
+                        "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
+                        "init_hook": "nemo_skills.mcp.utils.exa_stdio_connector",
+                    },
+                },
+                {
+                    "id": "exa_mcp",
                     "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
                     "params": {
                         "base_url": "https://mcp.exa.ai/mcp",
