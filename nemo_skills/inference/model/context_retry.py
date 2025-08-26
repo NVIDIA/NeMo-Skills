@@ -112,20 +112,29 @@ class ContextLimitRetryConfig:
     @property
     def reduce_generate_tokens(self):
         """Reduce the number of tokens to generate."""
-        LOG.info("Message is too long. Reducing the number of tokens to generate.")
-        return self.strategy == "reduce_generation"
+        if self.strategy == "reduce_generation":
+            LOG.info("Message is too long. Reducing the number of tokens to generate.")
+            return True
+        else:
+            return False
 
     @property
     def reduce_prompt_from_start(self):
         """Remove tokens from the start of the prompt."""
-        LOG.info("Message is too long. Removing tokens from the start of the prompt.")
-        return self.strategy == "reduce_prompt_from_start"
+        if self.strategy == "reduce_prompt_from_start":
+            LOG.info("Message is too long. Removing tokens from the start of the prompt.")
+            return True
+        else:
+            return False
 
     @property
     def reduce_prompt_from_end(self):
         """Remove tokens from the end of the prompt."""
-        LOG.info("Message is too long. Removing tokens from the end of the prompt.")
-        return self.strategy == "reduce_prompt_from_end"
+        if self.strategy == "reduce_prompt_from_end":
+            LOG.info("Message is too long. Removing tokens from the end of the prompt.")
+            return True
+        else:
+            return False
 
 
 def with_context_retry(func: Callable) -> Callable:
@@ -295,10 +304,10 @@ def _trim_list_prompt(
     """Trim a list-based prompt to fit within token limits."""
     prompt_copy = copy.deepcopy(prompt_list)
 
-    if config.reduce_prompt_from_end:
-        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, config, tokenizer)
-    else:  # reduce_prompt_from_start
+    if config.reduce_prompt_from_start:
         trimmed_messages = _trim_messages_from_start(prompt_copy, num_tokens_to_keep, config, tokenizer)
+    else:  # reduce_prompt_from_end
+        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, config, tokenizer)
 
     if not trimmed_messages:
         detailed_error = f"Not able to trim the prompt. Returning empty generation.\n\n{original_error}"
