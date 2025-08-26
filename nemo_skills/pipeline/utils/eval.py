@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.dataset.utils import get_dataset_module
+from nemo_skills.dataset.utils import get_dataset_module, import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
@@ -362,7 +362,10 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
+                if os.sep in generation_module:
+                    generation_task = import_from_path(generation_module or benchmark_args.generation_module)
+                else:
+                    generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
                 if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
                     raise ValueError(
                         f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
