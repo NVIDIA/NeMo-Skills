@@ -166,7 +166,6 @@ class BaseModel:
             return self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
         elif isinstance(prompt, list):
             request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            request_params["skip_special_tokens"] = False
             return request_params
         else:
             raise ValueError("Either prompt or messages must be provided")
