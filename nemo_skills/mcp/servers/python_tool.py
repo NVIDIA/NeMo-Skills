@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Annotated
 
-import hydra
 from httpx import RemoteProtocolError
-from hydra.core.config_store import ConfigStore
 from mcp.server.fastmcp import FastMCP
+from omegaconf import OmegaConf
 from pydantic import Field
 
 from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.mcp.utils import load_mcp_config
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class ExecutionResult:
 
 mcp = FastMCP(name="python_tool")
 
-# Initialized from Hydra config in main()
+# Initialized from config in main()
 sandbox = None
 
 
@@ -53,25 +54,41 @@ async def execute(
         output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
     except RemoteProtocolError:
         return {"process_status": "fail", "stdout": "", "stderr": f"Error connecting to sandbox"}
-    return json.loads(
-        output["stdout"]
-    )  # Sandbox bug fix: Remove extra layer of output wrapping, the result is a {"process_status": ..., "stdout": ..., "stderr": ...} dict
+    return output
 
 
-@dataclass
-class PythonToolConfig:
-    # Arbitrary sandbox config; e.g. {sandbox_type: local, host: 127.0.0.1, port: 6000}
-    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
+def main():
+    parser = argparse.ArgumentParser(description="MCP server for executing Python code in a sandbox")
+    parser.add_argument("--config", dest="config", type=str, required=False, help="Path to OmegaConf YAML file")
+    parser.add_argument(
+        "--config-dir",
+        dest="config_dir",
+        type=str,
+        required=False,
+        help="Directory containing config file (Hydra-compatible)",
+    )
+    parser.add_argument(
+        "--config-name",
+        dest="config_name",
+        type=str,
+        default="config",
+        help="Config file name without extension (Hydra-compatible)",
+    )
+    args = parser.parse_args()
 
+    try:
+        cfg = load_mcp_config(
+            config=args.config,
+            config_dir=args.config_dir,
+            config_name=args.config_name,
+        )
+    except ValueError as e:
+        logger.warning(f"{e} Falling back to default local sandbox config.")
+        cfg = OmegaConf.create({"sandbox": {"sandbox_type": "local"}})
 
-cs = ConfigStore.instance()
-cs.store(name="base_python_tool_config", node=PythonToolConfig)
-
-
-@hydra.main(version_base=None, config_name="base_python_tool_config")
-def main(cfg: PythonToolConfig):
     global sandbox
-    sandbox = get_sandbox(**cfg.sandbox)
+    sandbox_cfg = OmegaConf.to_container(cfg.sandbox, resolve=True)
+    sandbox = get_sandbox(**sandbox_cfg)
     # Initialize and run the server
     mcp.run(transport="stdio")
 

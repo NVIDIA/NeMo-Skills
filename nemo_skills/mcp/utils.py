@@ -18,10 +18,11 @@ import json
 import logging
 import os
 import tempfile
+from typing import Optional
 
 from mcp import StdioServerParameters
 from mcp.types import CallToolResult
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
 
@@ -84,3 +85,37 @@ def hydra_config_connector_factory(config_obj):
         )
 
     return connector
+
+
+def load_mcp_config(
+    config: Optional[str] = None,
+    config_dir: Optional[str] = None,
+    config_name: str = "config",
+) -> DictConfig:
+    """Load an OmegaConf config for MCP servers, supporting `--config` and Hydra-like flags. No fallback.
+
+    Precedence: config > (config_dir + config_name). If none found, raises ValueError.
+
+    Args:
+        config: Path to YAML config file.
+        config_dir: Directory containing the config file (Hydra-compatible).
+        config_name: Config filename stem without extension.
+
+    Returns:
+        DictConfig loaded from the discovered source or created from default.
+    """
+
+    # Determine config path if not explicitly provided
+    config_path: Optional[str] = config
+    if not config_path and config_dir:
+        candidate_yaml = os.path.join(config_dir, f"{config_name}.yaml")
+        candidate_yml = os.path.join(config_dir, f"{config_name}.yml")
+        if os.path.exists(candidate_yaml):
+            config_path = candidate_yaml
+        elif os.path.exists(candidate_yml):
+            config_path = candidate_yml
+
+    if config_path and os.path.exists(config_path):
+        return OmegaConf.load(config_path)
+
+    raise ValueError("No configuration file found. Provide --config or --config-dir/--config-name.")
