@@ -55,7 +55,6 @@ async def exa_websearch(
     payload = {"query": f"{query}"}
 
     response = requests.post(url, headers=headers, json=payload)
-    logger.info(f"Exa response: {response.json()}")
 
     if response.status_code != 200:
         return {"error": response.json()["error"]}
