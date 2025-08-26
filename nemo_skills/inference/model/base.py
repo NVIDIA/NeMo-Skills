@@ -60,7 +60,7 @@ class BaseModel:
         # Context limit retry config variables
         enable_soft_fail: bool = False,
         context_limit_retry_strategy: str | None = None,
-        num_special_tokens_budget: int = 10,
+        num_special_tokens_budget: int = 100,
     ):
         self._tunnel = None
         self.model_name_or_path = model
