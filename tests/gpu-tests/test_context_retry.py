@@ -36,14 +36,14 @@ class TestConfig:
     server_nodes: int = 1
 
 
+@dataclass
 class TestEnvironment:
     """Manages test environment setup and validation"""
 
-    def __init__(self):
-        self.model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-        self.model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
+    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
 
-    def validate_environment(self):
+    def __post_init__(self):
         """Validate required environment variables"""
         if not self.model_path:
             pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
@@ -146,6 +146,20 @@ class MetricsValidator:
         except FileNotFoundError:
             return True  # No metrics file indicates failure
 
+    def validate_eval_completion_but_empty_generation(self, output_dir: str) -> bool:
+        """Validate that evaluation completion is successful"""
+        metrics_file = f"{output_dir}/eval-results/gsm8k/metrics.json"
+        assert os.path.exists(metrics_file), "Metrics file not found"
+
+        with open(metrics_file, "r") as f:
+            metrics = json.load(f)["gsm8k"]["pass@1"]
+
+        # The generation is empty for all samples, so the metrics should be 0
+        assert metrics["num_entries"] == self.config.num_samples
+        assert metrics["symbolic_correct"] == 0
+
+        return True
+
     def validate_generation_output(self, output_file: str) -> bool:
         """Validate that generation output exists"""
         return os.path.exists(output_file)
@@ -180,14 +194,8 @@ class ContextRetryTestSuite:
         self.output_manager = OutputManager()
         self.validator = MetricsValidator(self.config)
 
-    def setup_test(self):
-        """Common test setup"""
-        self.env.validate_environment()
-
     def run_eval_test(self, test_name: str, enable_soft_fail: bool, retry_strategy: str, expect_success: bool = True):
         """Run evaluation test with specified parameters"""
-        self.setup_test()
-
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         cmd = self.cmd_builder.build_eval_cmd(output_dir, enable_soft_fail, retry_strategy)
 
@@ -197,6 +205,14 @@ class ContextRetryTestSuite:
             return self.validator.validate_eval_metrics(output_dir)
         else:
             return self.validator.validate_eval_failure(output_dir)
+
+    def run_eval_completion_test(self, test_name: str, enable_soft_fail: bool, retry_strategy: str):
+        """Run evaluation test for completion."""
+        output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
+        cmd = self.cmd_builder.build_eval_cmd(output_dir, enable_soft_fail, retry_strategy)
+        subprocess.run(cmd, shell=True, check=True)
+
+        self.validator.validate_eval_completion_but_empty_generation(output_dir)
 
     def run_generation_test(self, test_name: str, retry_strategy: str):
         """Run generation test with specified retry strategy"""
@@ -218,12 +234,6 @@ test_suite = ContextRetryTestSuite()
 
 
 @pytest.mark.gpu
-def test_context_retry_reduce_generation_enabled():
-    """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
-    test_suite.run_eval_test(test_name="vllm-eval", enable_soft_fail=True, retry_strategy="reduce_generation")
-
-
-@pytest.mark.gpu
 def test_context_retry_reduce_generation_disabled():
     """Test that the generation doesn't finish successfully if soft fail is disabled."""
     result = test_suite.run_eval_test(
@@ -233,6 +243,20 @@ def test_context_retry_reduce_generation_disabled():
         expect_success=False,
     )
     assert result, "Expected test to fail but it succeeded"
+
+
+@pytest.mark.gpu
+def test_context_retry_no_strategy():
+    """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
+    test_suite.run_eval_completion_test(test_name="vllm-eval-no-strategy", enable_soft_fail=True, retry_strategy=None)
+
+
+@pytest.mark.gpu
+def test_context_retry_reduce_generation_enabled():
+    """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
+    test_suite.run_eval_test(
+        test_name="vllm-eval-reduce-generation-enabled", enable_soft_fail=True, retry_strategy="reduce_generation"
+    )
 
 
 @pytest.mark.gpu
