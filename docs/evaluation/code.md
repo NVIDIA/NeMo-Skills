@@ -144,6 +144,9 @@ ns eval \
 ```
 replacing <...> with your desired parameters.
 
+To evaluate the same model with SWE-agent,
+all you need to do is replace `openhands` with `swe_agent` in the command above.
+
 ### ioi24
 
 - Benchmark is defined in [`nemo_skills/dataset/ioi24/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ioi24/__init__.py)
