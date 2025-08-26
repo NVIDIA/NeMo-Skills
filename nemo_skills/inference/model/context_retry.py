@@ -231,7 +231,7 @@ def _prepare_context_error_retry(
 
 def _try_reduce_generation_tokens(kwargs: dict, parsed_error: dict, original_error: Exception) -> dict:
     """Try to reduce the number of tokens to generate."""
-    original_tokens = kwargs.get("tokens_to_generate", 2048)
+    original_budget = kwargs.get("tokens_to_generate", None)
     max_context_length = parsed_error["max_context_length"]
     message_tokens = parsed_error["message_tokens"]
 
@@ -242,11 +242,12 @@ def _try_reduce_generation_tokens(kwargs: dict, parsed_error: dict, original_err
 
     reduced_generation_budget = max_context_length - message_tokens
     # This min operation is probably not needed but just in case
-    reduced_tokens = min(original_tokens, reduced_generation_budget)
+    if original_budget is not None:
+        reduced_tokens = min(original_budget, reduced_generation_budget)
+    else:
+        reduced_tokens = reduced_generation_budget
 
-    LOG.warning(
-        f"Reducing tokens_to_generate from {original_tokens} to {reduced_tokens} to stay within the context window."
-    )
+    LOG.warning(f"Reducing tokens_to_generate to {reduced_tokens} to stay within the context window.")
 
     modified_kwargs = kwargs.copy()
     modified_kwargs["tokens_to_generate"] = reduced_tokens
@@ -262,8 +263,12 @@ def _try_reduce_prompt_tokens(
 ) -> dict:
     """Try to reduce the number of tokens in the prompt."""
     max_context_length = parsed_error["max_context_length"]
-    message_tokens = parsed_error["message_tokens"]
     completion_tokens = kwargs["tokens_to_generate"]
+
+    if completion_tokens is None:
+        detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
+        LOG.warning(detailed_error)
+        return None
 
     if completion_tokens >= max_context_length:
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
