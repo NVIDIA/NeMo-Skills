@@ -102,12 +102,12 @@ def setup():
         hf_home = ""
         while True:
             hf_home = typer.prompt(
-                "By default we require HF_HOME env variable to be defined in your cluster config.\n"
+                "\nBy default we require HF_HOME env variable to be defined in your cluster config.\n"
                 "If it's not set, you might be accidentally re-downloading the models every time you run ns commands.\n"
                 "Note that it's not enough to just define it in your environment, you need it to be explicitly listed "
-                "in the config. It should be a mounted path that's consistent with your "
+                "in the config.\nIt should be a mounted path that's consistent with your "
                 "cluster setup and mounts list (e.g. /workspace/...).\n"
-                "If you don't define it, the jobs will fail unless, you can run commands with --skip_hf_home_check."
+                "If you don't define it, the jobs will fail unless you run commands with --skip_hf_home_check.\n"
                 "Set HF_HOME for this cluster now or leave empty to skip.",
                 default="",
             )

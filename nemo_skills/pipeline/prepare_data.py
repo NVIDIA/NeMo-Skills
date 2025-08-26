@@ -60,7 +60,6 @@ def prepare_data(
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
     skip_hf_home_check: bool = typer.Option(
         False,
-        "--skip-hf-home-check",
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
 ):

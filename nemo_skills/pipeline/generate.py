@@ -148,7 +148,6 @@ def generate(
     ),
     skip_hf_home_check: bool = typer.Option(
         False,
-        "--skip-hf-home-check",
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),

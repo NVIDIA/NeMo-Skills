@@ -418,7 +418,7 @@ def add_task(
             raise RuntimeError(
                 "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
                 f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
-                "Please add a new variable: HF_HOME=/path/to/your/hf_home"
+                "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
             )
         if not is_mounted_filepath(cluster_config, env_vars["HF_HOME"]):
             raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
