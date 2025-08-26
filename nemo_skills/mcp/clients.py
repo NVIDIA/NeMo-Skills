@@ -224,6 +224,58 @@ class MCPClientMeta(type):
 
 
 class MCPClient(metaclass=MCPClientMeta):
+    """Abstract base for Model Context Protocol (MCP) clients.
+
+    This base class defines the minimal interface used by the tool runtime:
+    - list_tools(): Return a list of tool descriptors with `name`, `description`, and
+      `input_schema` (JSON Schema) fields.
+    - call_tool(tool, args): Invoke a tool by name with a dict of arguments.
+
+    Common configurables are injected by the metaclass and can be passed to any
+    concrete MCP client constructor without changing its signature:
+    - hide_args: Dict[str, list[str]] mapping tool name -> argument keys to hide.
+      Hidden keys are pruned from input schemas returned by list_tools().
+    - disabled_tools: Iterable[str] of tool names to disable.
+    - enabled_tools: Iterable[str] of tool names to allow (acts as an allowlist).
+    - output_formatter: Optional callable that post-processes results of call_tool().
+    - init_hook: Optional callable run after client initialization (e.g., to inject
+      credentials or wire connectors).
+
+    Example (manual usage):
+    ```python
+    client = MCPStdioClient(
+        command="python",
+        args=["-m", "nemo_skills.mcp.servers.python_tool"],
+        hide_args={"execute": ["session_id", "timeout"]},
+    )
+    tools = await client.list_tools()
+    safe = client.sanitize("execute", {"code": "print(1)", "timeout": 999})
+    result = await client.call_tool("execute", safe)
+    ```
+
+    Example (configured via OmegaConf, similar to mcp_demo.py):
+    ```python
+    from omegaconf import OmegaConf
+    from nemo_skills.mcp.config_loader import build_client_manager
+
+    cfg = OmegaConf.create({
+        "tools": [
+            {
+                "id": "python",
+                "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                "params": {
+                    "command": "python",
+                    "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
+                    "hide_args": {"execute": ["session_id", "timeout"]},
+                },
+            },
+        ]
+    })
+    manager = build_client_manager(cfg)
+    tools = await manager.list_all_tools()
+    ```
+    """
+
     # Manual sanitization helpers (input-only)
     def sanitize(self, tool: str, args: dict) -> dict:
         """Return a copy of args with hidden keys removed for the given tool."""
@@ -247,6 +299,53 @@ class MCPClient(metaclass=MCPClientMeta):
 
 
 class MCPStreamableHttpClient(MCPClient):
+    """MCP client that connects to servers over the Streamable HTTP transport.
+
+    Args:
+        base_url: Base URL of the MCP server, e.g. "https://host:port/mcp".
+
+    Behavior:
+    - list_tools() fetches tool metadata from the server and normalizes schema
+      field names (supports both input_schema and inputSchema).
+    - call_tool() returns the server's structuredContent when present, otherwise
+      returns the raw result object.
+
+    The following optional configurables can be supplied (injected by the
+    metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,
+    init_hook.
+
+    Example (OmegaConf config, like in mcp_demo.py):
+    ```python
+    from omegaconf import OmegaConf
+    from nemo_skills.mcp.config_loader import build_client_manager
+
+    cfg = OmegaConf.create({
+        "tools": [
+            {
+                "id": "exa_mcp",
+                "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
+                "params": {
+                    "base_url": "https://mcp.exa.ai/mcp",
+                    "enabled_tools": ["web_search_exa"],
+                    "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
+                    "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
+                },
+            }
+        ]
+    })
+    manager = build_client_manager(cfg)
+    tools = await manager.list_all_tools()
+    result = await manager.execute_tool("exa_mcp.web_search_exa", {"query": "nemo skills"})
+    ```
+
+    Example (manual usage):
+    ```python
+    client = MCPStreamableHttpClient(base_url="https://mcp.example.com/mcp")
+    tools = await client.list_tools()
+    result = await client.call_tool("some_tool", {"x": 1})
+    ```
+    """
+
     def __init__(self, base_url: str):
         self.base_url = base_url
         self.tools: List[Dict[str, Any]] = []
@@ -283,6 +382,65 @@ class MCPStreamableHttpClient(MCPClient):
 
 
 class MCPStdioClient(MCPClient):
+    """MCP client that launches a server via stdio.
+
+    Args:
+        command: Executable to launch (e.g., "python").
+        args: Command-line arguments (e.g., ["-m", "nemo_skills.mcp.servers.python_tool"]).
+
+    Behavior:
+    - list_tools() fetches tool metadata from the running stdio server.
+    - call_tool() returns the server's structuredContent.
+
+    The following optional configurables can be supplied (injected by the
+    metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,
+    init_hook.
+
+    Example (OmegaConf config, like in mcp_demo.py):
+    ```python
+    from omegaconf import OmegaConf
+    from nemo_skills.mcp.config_loader import build_client_manager
+
+    cfg = OmegaConf.create({
+        "tools": [
+            {
+                "id": "python",
+                "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                "params": {
+                    "command": "python",
+                    "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
+                    "hide_args": {"execute": ["session_id", "timeout"]},
+                    "init_hook": {
+                        "$locate": "nemo_skills.mcp.utils.hydra_config_connector_factory",
+                        "kwargs": {"config_obj": "@@full_config"},
+                    },
+                },
+            },
+            {
+                "id": "exa",
+                "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                "params": {
+                    "command": "python",
+                    "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
+                    "init_hook": "nemo_skills.mcp.utils.exa_stdio_connector",
+                },
+            },
+        ]
+    })
+    manager = build_client_manager(cfg)
+    tools = await manager.list_all_tools()
+    # Example tool call
+    result = await manager.execute_tool("python.execute", {"code": "print(1)"})
+    ```
+
+    Example (manual usage):
+    ```python
+    client = MCPStdioClient(command="python", args=["-m", "nemo_skills.mcp.servers.python_tool"])
+    tools = await client.list_tools()
+    result = await client.call_tool("execute", {"code": "print(1)"})
+    ```
+    """
+
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
@@ -319,6 +477,40 @@ class MCPStdioClient(MCPClient):
 
 
 class MCPClientManager:
+    """Registry and orchestrator for multiple MCP clients.
+
+    Responsibilities:
+    - register(name, client): Add a client under a unique name.
+    - list_all_tools(): Merge tool listings across clients; names are qualified
+      as "{client}.{tool}" to avoid collisions.
+    - execute_tool(tool_name, args): Route a qualified tool call to the owning
+      client (stripping the client prefix automatically).
+
+    Example (using config loader, like in mcp_demo.py):
+    ```python
+    from omegaconf import OmegaConf
+    from nemo_skills.mcp.config_loader import build_client_manager
+
+    cfg = OmegaConf.create({
+        "tools": [
+            {"id": "python", "client": "nemo_skills.mcp.clients.MCPStdioClient", "params": {"command": "python", "args": ["-m", "nemo_skills.mcp.servers.python_tool"]}},
+            {"id": "exa_mcp", "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient", "params": {"base_url": "https://mcp.exa.ai/mcp"}},
+        ]
+    })
+    manager = build_client_manager(cfg)
+    tools = await manager.list_all_tools()
+    out = await manager.execute_tool("python.execute", {"code": "print('ok')"})
+    ```
+
+    Example (manual registration):
+    ```python
+    manager = MCPClientManager()
+    manager.register("python", MCPStdioClient(command="python", args=["-m", "nemo_skills.mcp.servers.python_tool"]))
+    tools = await manager.list_all_tools()
+    out = await manager.execute_tool("python.execute", {"code": "print('ok')"})
+    ```
+    """
+
     def __init__(self):
         self.clients = {}
         self.tool_map: dict[str, str] = {}  # maps "client.tool" -> client_name
