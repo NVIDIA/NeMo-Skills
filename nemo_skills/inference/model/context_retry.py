@@ -210,6 +210,8 @@ def _prepare_context_error_retry(
         detailed_error = f"Not able to parse the context window exceeded error. Returning empty generation.\n\n{error}"
         LOG.warning(detailed_error)
         return None
+    else:
+        LOG.info(f"Parsed error: {parsed_error}")
 
     # Apply the configured strategy
     if config.reduce_generate_tokens:
@@ -265,6 +267,8 @@ def _try_reduce_prompt_tokens(
 
     num_prompt_tokens_to_keep = max_context_length - completion_tokens
     prompt = kwargs["prompt"]
+
+    LOG.info(f"Prompt: {type(prompt)}")
 
     if isinstance(prompt, str):
         return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)

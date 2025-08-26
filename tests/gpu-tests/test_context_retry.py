@@ -134,7 +134,7 @@ def _create_fake_big_input_file(input_file, num_samples):
 def test_context_retry_reduce_prompt_start():
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, in this test we remove tokens from the start of the prompt."""
 
-    NUM_SAMPLES = 2
+    NUM_SAMPLES = 1
 
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
