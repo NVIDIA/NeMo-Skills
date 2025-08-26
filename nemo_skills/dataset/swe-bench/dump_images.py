@@ -1,5 +1,18 @@
-#!/usr/bin/env python3
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
+import argparse
 import json
 import os
 import subprocess
@@ -57,21 +70,27 @@ def convert_to_sif(container_name, output_dir):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: python dump_swe_containers.py <input_file> <output_directory> [max_workers]")
-        print("  input_file: JSONL file to read container URLs from")
-        print("  output_directory: Directory to save SIF files")
-        print("  max_workers: Number of parallel conversions (default: 4)")
-        sys.exit(1)
+    """Parse command-line arguments using argparse."""
+    parser = argparse.ArgumentParser(
+        description="Convert Docker containers from a JSONL test file into Apptainer SIF images."
+    )
 
-    jsonl_path = sys.argv[1]
-    output_dir = sys.argv[2]
-    max_workers = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+    parser.add_argument("input_file", help="JSONL file to read container URLs from (SWE-bench format)")
+    parser.add_argument("output_directory", help="Directory to save SIF files")
+    parser.add_argument(
+        "--max-workers", "-j", type=int, default=20, help="Number of parallel conversions (default: 20)"
+    )
+
+    args = parser.parse_args()
+
+    jsonl_path = args.input_file
+    output_dir = args.output_directory
+    max_workers = args.max_workers
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Read container names from jsonl_path
+    # Read container names from JSONL
     if not os.path.exists(jsonl_path):
         print(f"Error: {jsonl_path} not found!")
         sys.exit(1)
@@ -81,8 +100,7 @@ def main():
 
     print(f"Found {len(container_names)} unique containers to convert.")
     print(f"Output directory: {output_dir}")
-    print(f"Using {max_workers} parallel workers.")
-    print()
+    print(f"Using {max_workers} parallel workers.\n")
 
     # Convert containers in parallel
     successful = 0
@@ -103,8 +121,7 @@ def main():
             else:
                 failed += 1
 
-    print()
-    print(f"Conversion complete!")
+    print("\nConversion complete!")
     print(f"Successful: {successful}")
     print(f"Failed: {failed}")
     print(f"Total: {len(container_names)}")

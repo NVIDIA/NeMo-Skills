@@ -6,6 +6,11 @@ More details are coming soon!
 
 ### swe-bench
 
+!!! note
+    While swe-bench evaluation will work out-of-the-box without extra setup, it won't be efficient as we will be re-downloading docker containers
+    each time it's launched. Please read [below](#data-preparation) for the details of how to prepare the containers beforehand to avoid this.
+    The downloaded containers will take a <FILL IN> Gb of space, but will make evaluations considerably faster.
+
 - Benchmark is defined in [`nemo_skills/dataset/swe-bench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/swe-bench/__init__.py)
 - Original benchmark source is [here](https://github.com/SWE-bench/SWE-bench).
 
@@ -21,51 +26,49 @@ ns prepare_data swe-bench
 
 This command downloads the SWE-bench Verified dataset. If you want to use a different dataset, you can use the **--dataset_name** and **--split** options to set the HuggingFace path and split respectively.
 
-By default the dataset is downloaded to `nemo_skills/dataset/swe-bench/default.yaml`. To download to a different file, use the **--setup** option, e.g. `--setup custom` will download to `nemo_skills/dataset/swe-bench/custom.yaml`. You can then evaluate on this dataset with the `--split` option of `ns eval`, e.g. `ns eval --split custom`.
+By default the dataset is downloaded to `nemo_skills/dataset/swe-bench/default.jsonl`. To download to a different file, use the **--setup** option, e.g. `--setup custom` will download to `nemo_skills/dataset/swe-bench/custom.jsonl`. You can then evaluate on this dataset with the `--split` option of `ns eval`, e.g. `ns eval --split custom`.
 
-SWE-bench inference and evaluation runs inside of prebuilt container images from the SWE-bench team. By default, this command will configure them to be downloaded from Dockerhub every time you run `ns eval`. Assuming you're running on a Slurm cluster, if you have the SWE-bench images downloaded somewhere on it in SIF format, you can use them directly. To do so, first add the folder with the images to the mounts in your cluster config, e.g. like this:
+SWE-bench inference and evaluation runs inside of prebuilt container images from the SWE-bench team. By default, this command will configure them to be downloaded from Dockerhub every time you run `ns eval`. To avoid this we recommend to download the images beforehand in .sif format and include that path in the data file, so it
+can be used in the evaluation job.
+Note that you can follow the steps below irrespective of whether you're running locally or on Slurm, assuming you have enough disk space to store all containers.
+
+Here's how you can use it to download all images for SWE-bench Verified:
+
+1. Start by preparing the data with the default command: `ns prepare_data swe-bench`
+2. Determine the folder you want to download the images into. Make sure it is accessible from inside the NeMo-Skills container, e.g. mounted in your cluster config.
+3. Run the download script on the cluster:
+   ```
+   ns run_cmd \
+     --cluster=<CLUSTER_NAME> \
+     --command="python nemo_skills/dataset/swe-bench/dump_images.py \
+                nemo_skills/dataset/swe-bench/default.jsonl \
+                <MOUNTED_PATH_TO_IMAGES_FOLDER>"
+   ```
+   If any images fail to download, you can rerun the exact same command and it will automatically re-attempt to download the missing images, skipping the ones that were already downloaded.
+
+4. Rerun `ns prepare_data`, using the `--container_formatter` option to specify the path to the newly downloaded images, as shown below.
+
+   ```
+   ns prepare_data swe-bench \
+       --container_formatter "<MOUNTED_PATH_TO_IMAGES_FOLDER>/swebench_sweb.eval.x86_64.{instance_id}.sif"
+   ```
+
+You can use any existing mounted path in your cluster config or define a new one, e.g.
 
 ```
 mounts:
   - <CLUSTER_PATH_TO_FOLDER_WITH_IMAGES>:/swe-bench-images
 ```
 
-Then, use the option **--container_formatter** to specify the mounted path to the images, e.g. like this:
-
-```
-ns prepare_data swe-bench \
-    --container_formatter "/swe-bench-images/swebench_sweb.eval.x86_64.{instance_id}.sif"
-```
-
 When this path is accessed during evaluation, `{instance_id}` will be replaced by the value of the instance_id column in the dataset, replacing `__` with `_1776_`. For example, `astropy__astropy-12907` becomes `astropy_1776_astropy-12907`.
-
-<details>
-<summary>Downloading SIF files for a dataset</summary>
-
-For convenience, we provide a script to download SIF images for a dataset. Here's how you can use it to download all images for SWE-bench Verified:
-
-1. Start by preparing the data with the default command: `ns prepare_data swe-bench`
-2. Determine the folder you want to download the images into. Make sure it is accessible from inside the NeMo-Skills container, e.g. mounted in your cluster config.
-3. Run the download script on the cluster:
-```
-ns run_cmd \
-  --cluster=<CLUSTER_NAME> \
-  --command="python nemo_skills/dataset/swe-bench/dump_images.py nemo_skills/dataset/swe-bench/default.jsonl <MOUNTED_PATH_TO_IMAGES_FOLDER>"
-```
-
-If any images fail to download, you can rerun the exact same command and it will automatically re-attempt to download the missing images, skipping the ones that were already downloaded.
-
-4. Rerun `ns prepare_data`, using the `--container_formatter` option to specify the path to the newly downloaded images, as shown above.
-</details>
 
 #### SWE-bench-specific parameters
 
 There are a few parameters specific to SWE-bench. They have to be specified with the `++` prefix. All of them are optional, except for ++agent_framework.
 
-- **++agent_framework:** which agentic framework to use. Must be either `swe_agent` or `openhands`.
-  - No default, must be specified explicitly.
+- **++agent_framework:** which agentic framework to use. Must be either `swe_agent` or `openhands`. No default, must be specified explicitly.
 
-- **++agent_framework_repo:** URL of the repository to use for SWE-agent/OpenHands. Allows you to pass in a custom fork of these repositories. If you do this, you may find it helpful to check [this file](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/eval/swebench.py) to understand how the frameworks are used internally. This is passed directly as an argument to `git clone`, so it should probably end in `.git`.
+- **++agent_framework_repo:** URL of the repository to use for SWE-agent/OpenHands. Allows you to pass in a custom fork of these repositories. If you do this, you may find it helpful to check [nemo_skills/inference/eval/swebench.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/eval/swebench.py) to understand how the frameworks are used internally. This is passed directly as an argument to `git clone`, so it should probably end in `.git`.
   - Defaults to the official repositories: [`https://github.com/SWE-agent/SWE-agent.git`](https://github.com/SWE-agent/SWE-agent) for SWE-agent, [`https://github.com/All-Hands-AI/OpenHands.git`](https://github.com/All-Hands-AI/OpenHands) for OpenHands.
 
 - **++agent_framework_commit:** The commit hash to use when cloning agent_framework_repo. Allows you to pin SWE-agent/OpenHands to a specific version.
