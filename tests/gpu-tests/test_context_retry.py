@@ -197,7 +197,7 @@ class ContextRetryTestSuite:
 
     def run_no_strategy_test(self, server_type: str, test_name: str, enable_soft_fail: bool, retry_strategy: str):
         """Run evaluation test for completion."""
-        output_dir = self.output_manager.setup_output_dir(server_type, self.env.model_type, test_name)
+        output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         cmd = self.cmd_builder.build_eval_cmd(output_dir, server_type, enable_soft_fail, retry_strategy)
         subprocess.run(cmd, shell=True, check=True)
 
@@ -240,7 +240,7 @@ test_suite = ContextRetryTestSuite()
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+@pytest.mark.parametrize("server_type", ["sglang", "trtllm", "vllm"])
 def test_context_retry_no_strategy(server_type):
     """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
     test_suite.run_no_strategy_test(
@@ -252,7 +252,7 @@ def test_context_retry_no_strategy(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+@pytest.mark.parametrize("server_type", ["sglang", "trtllm", "vllm"])
 def test_context_retry_reduce_generation_enabled(server_type):
     """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
     test_suite.run_reduce_generation_test(
@@ -264,7 +264,7 @@ def test_context_retry_reduce_generation_enabled(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+@pytest.mark.parametrize("server_type", ["sglang", "trtllm", "vllm"])
 def test_context_retry_reduce_generation_disabled(server_type):
     """Test that the generation doesn't finish successfully if soft fail is disabled."""
     result = test_suite.run_reduce_generation_test(
@@ -278,7 +278,7 @@ def test_context_retry_reduce_generation_disabled(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+@pytest.mark.parametrize("server_type", ["sglang", "trtllm", "vllm"])
 def test_context_retry_reduce_prompt_start(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the start."""
@@ -295,7 +295,7 @@ def test_context_retry_reduce_prompt_start(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm", "sglang", "trtllm"])
+@pytest.mark.parametrize("server_type", ["sglang", "trtllm", "vllm"])
 def test_context_retry_reduce_prompt_end(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the end."""

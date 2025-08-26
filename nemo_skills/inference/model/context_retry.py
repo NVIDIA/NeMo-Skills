@@ -142,16 +142,15 @@ def with_context_retry(func: Callable) -> Callable:
     Decorator to add context limit retry logic to generate functions.
     Uses the model's context_limit_retry_config attribute.
     """
-    default_config = ContextLimitRetryConfig()
 
     @functools.wraps(func)
     async def async_wrapper(self, *args, **kwargs):
-        config = getattr(self, "context_limit_retry_config", default_config)
+        config = getattr(self, "context_limit_retry_config")
         return await handle_context_retries_async(func, self, args, kwargs, config)
 
     @functools.wraps(func)
     def sync_wrapper(self, *args, **kwargs):
-        config = getattr(self, "context_limit_retry_config", default_config)
+        config = getattr(self, "context_limit_retry_config")
         return handle_context_retries_sync(func, self, args, kwargs, config)
 
     # Return the appropriate wrapper based on whether the function is async
