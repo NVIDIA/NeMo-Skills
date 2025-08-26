@@ -104,7 +104,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
 def get_sandbox_command(cluster_config):
     if cluster_config["executor"] == "none":
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
-    return "/entrypoint.sh && /start.sh"
+    return "/start-with-nginx.sh"
 
 
 @dataclass(kw_only=True)
@@ -507,7 +507,10 @@ def add_task(
 
     # finally a sandbox if needed
     if with_sandbox:
-        sandbox_env_updates = {"LISTEN_PORT": sandbox_port}
+        sandbox_env_updates = {
+            "LISTEN_PORT": sandbox_port,
+            "NGINX_PORT": sandbox_port,
+        }
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
