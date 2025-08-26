@@ -34,7 +34,8 @@ jobs:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-        docker pull igitman/nemo-skills:0.7.0 igitman/nemo-skills-sandbox:0.7.1
+        docker pull igitman/nemo-skills:0.7.0
+        docker pull igitman/nemo-skills-sandbox:0.7.1
         docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.7.1 &
         sleep 10
         export NEMO_SKILLS_SANDBOX_HOST=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' local-sandbox`
