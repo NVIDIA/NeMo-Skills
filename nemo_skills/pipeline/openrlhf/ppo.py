@@ -122,7 +122,7 @@ class PPOOpenRLHFTask:
 
     def format_wandb_args(self, disable_wandb, wandb_project, expname):
         if not disable_wandb:
-            if os.getenv('WANDB_API_KEY') is None:
+            if os.getenv("WANDB_API_KEY") is None:
                 raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
 
             cmd = (
@@ -161,7 +161,6 @@ class PPOOpenRLHFTask:
         return ray_job_cmd
 
     def get_cmd(self):
-
         self.logging_params = self.format_wandb_args(self.disable_wandb, self.wandb_project, self.expname)
         preamble_cmd = self.get_preamble_cmd()
 
@@ -232,7 +231,7 @@ class SupportedServers(str, Enum):
     sglang = "sglang"
 
 
-@openrlhf_app.command(name='ppo', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@openrlhf_app.command(name="ppo", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def ppo_openrlhf(
     ctx: typer.Context,
@@ -295,6 +294,10 @@ def ppo_openrlhf(
         False,
         help="If True, will use the sandbox to run the training job",
     ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -309,7 +312,7 @@ def ppo_openrlhf(
 ):
     """Runs OpenRLHF PPO training (openrlhf.cli.train_ppo_ray)"""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -328,8 +331,8 @@ def ppo_openrlhf(
             pipeline_utils.check_if_mounted(cluster_config, prompt_data)
 
     # Check if custom PPOOpenRLHFTask is provided via ctx.obj['ppo_task'], use that if available
-    if hasattr(ctx, 'obj') and ctx.obj is not None and isinstance(ctx.obj, dict) and 'ppo_task' in ctx.obj:
-        ppo_task = ctx.obj['ppo_task']  # type: type(PPOOpenRLHFTask)
+    if hasattr(ctx, "obj") and ctx.obj is not None and isinstance(ctx.obj, dict) and "ppo_task" in ctx.obj:
+        ppo_task = ctx.obj["ppo_task"]  # type: type(PPOOpenRLHFTask)
         assert isinstance(ppo_task, PPOOpenRLHFTask), "`ppo_task` must be a subclass of PPOOpenRLHFTask"
     else:
         ppo_task = None
@@ -389,7 +392,7 @@ def ppo_openrlhf(
             prev_task = pipeline_utils.add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-ppo-{job_id}',
+                task_name=f"{expname}-ppo-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["vllm"],
                 num_gpus=num_gpus,
@@ -407,6 +410,7 @@ def ppo_openrlhf(
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
         # explicitly setting sequential to False since we set dependencies directly
         pipeline_utils.run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
