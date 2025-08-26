@@ -208,7 +208,8 @@ def extract_answer(string: str, extract_from_boxed: bool = True, extract_regex: 
     # Attempt 1: try matching the harmony final answer pattern
     # this must be placed first, since gpt-oss models like to mumble "final answer" in its planning process, 
     # even though it hasn't generated the final answer yet. 
-    answer_pattern = "<|start|>assistant<|channel|>final<|message|>"
+    # must use escape to avoid regex injection!!
+    answer_pattern = re.escape("<|start|>assistant<|channel|>final<|message|>")
     match = re.search(answer_pattern, string, re.IGNORECASE)
     if match:
         # Extract everything from the start of "Answer: " to the end
