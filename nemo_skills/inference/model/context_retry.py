@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
 import litellm
+import openai
 
 from nemo_skills.utils import get_logger_name
 
@@ -109,7 +110,7 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
     match = pattern5.search(error_str)
     if match:
         return {
-            "max_context_length": int(match.group(1)),  # 131072
+            "max_context_length": int(match.group(1)),
             "message_tokens": int(match.group(3)),
         }
 
@@ -214,15 +215,18 @@ def handle_context_retries_sync(
     try:
         result = func(self, *args, **kwargs)
         return result
-    except litellm.exceptions.ContextWindowExceededError as error:
-        if not config.enable_soft_fail:
-            raise error
+    except openai.BadRequestError as error:
+        if "litellm.exceptions.ContextWindowExceededError" in str(error) or "Requested token count exceeds" in str(
+            error
+        ):
+            if not config.enable_soft_fail:
+                raise error
 
-        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-        if modified_kwargs is None:
-            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+            modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+            if modified_kwargs is None:
+                return return_empty_generation_with_error(f"Could not apply strategy. {error}")
 
-        return func(self, *args, **modified_kwargs)
+            return func(self, *args, **modified_kwargs)
 
 
 def _prepare_context_error_retry(
