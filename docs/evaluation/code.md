@@ -9,7 +9,7 @@ More details are coming soon!
 !!! note
     While swe-bench evaluation will work out-of-the-box without extra setup, it won't be efficient as we will be re-downloading docker containers
     each time it's launched. Please read [below](#data-preparation) for the details of how to prepare the containers beforehand to avoid this.
-    The downloaded containers will take a <FILL IN> Gb of space, but will make evaluations considerably faster.
+    The downloaded containers will take around 600Gb of space, but will make evaluations considerably faster.
 
 - Benchmark is defined in [`nemo_skills/dataset/swe-bench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/swe-bench/__init__.py)
 - Original benchmark source is [here](https://github.com/SWE-bench/SWE-bench).
