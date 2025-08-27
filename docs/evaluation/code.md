@@ -68,30 +68,23 @@ There are a few parameters specific to SWE-bench. They have to be specified with
 
 - **++agent_framework:** which agentic framework to use. Must be either `swe_agent` or `openhands`. No default, must be specified explicitly.
 
-- **++agent_framework_repo:** URL of the repository to use for SWE-agent/OpenHands. Allows you to pass in a custom fork of these repositories. If you do this, you may find it helpful to check [nemo_skills/inference/eval/swebench.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/eval/swebench.py) to understand how the frameworks are used internally. This is passed directly as an argument to `git clone`, so it should probably end in `.git`.
-  - Defaults to the official repositories: [`https://github.com/SWE-agent/SWE-agent.git`](https://github.com/SWE-agent/SWE-agent) for SWE-agent, [`https://github.com/All-Hands-AI/OpenHands.git`](https://github.com/All-Hands-AI/OpenHands) for OpenHands.
+- **++agent_framework_repo:** URL of the repository to use for SWE-agent/OpenHands. Allows you to pass in a custom fork of these repositories. If you do this, you may find it helpful to check [nemo_skills/inference/eval/swebench.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/eval/swebench.py) to understand how the frameworks are used internally. This is passed directly as an argument to `git clone`. Defaults to the official repositories: [`https://github.com/SWE-agent/SWE-agent.git`](https://github.com/SWE-agent/SWE-agent) for SWE-agent, [`https://github.com/All-Hands-AI/OpenHands.git`](https://github.com/All-Hands-AI/OpenHands) for OpenHands.
 
-- **++agent_framework_commit:** The commit hash to use when cloning agent_framework_repo. Allows you to pin SWE-agent/OpenHands to a specific version.
-  - Defaults to `HEAD`, i.e. the latest commit.
+- **++agent_framework_commit:** The commit hash to use when cloning agent_framework_repo. Allows you to pin SWE-agent/OpenHands to a specific version. Defaults to `HEAD`, i.e. the latest commit.
 
 - **++agent_config:** The config file to use for SWE-agent/OpenHands.
-  - For SWE-agent, this is a YAML file. See the [SWE-agent docs](https://swe-agent.com/latest/config/config/).
-  - For OpenHands, this is a TOML file. Nemo-Skills runs OpenHands via their SWE-bench evaluation script, so the only settings you can set are the LLM settings under the `[llm.model]` section. For more details, see the [OpenHands evaluation README](https://github.com/All-Hands-AI/OpenHands/blob/main/evaluation/README.md). Note that Nemo-Skills always uses the `[llm.model]` config section and therefore does not support multiple LLM configurations in one TOML file.
-  - NeMo-Skills overrides certain parameters, even if they are specified in the config file. These parameters are listed in a comment in the default config files below.
-  - Defaults to [`eval/swe-bench/swe-agent/default`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/default.yaml) for SWE-agent, [`eval/swe-bench/openhands/default`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/default.toml) for OpenHands. Note that if you store your configs in your local NeMo-Skills repo, then the path can be relative to the `nemo_skills/prompt` folder and the file extension is added automatically.
+    - For SWE-agent, this is a YAML file. See the [SWE-agent docs](https://swe-agent.com/latest/config/config/).
+    - For OpenHands, this is a TOML file. Nemo-Skills runs OpenHands via their SWE-bench evaluation script, so the only settings you can set are the LLM settings under the `[llm.model]` section. For more details, see the [OpenHands evaluation README](https://github.com/All-Hands-AI/OpenHands/blob/main/evaluation/README.md). Note that Nemo-Skills always uses the `[llm.model]` config section and therefore does not support multiple LLM configurations in one TOML file.
+    - NeMo-Skills overrides certain parameters, even if they are specified in the config file. These parameters are listed in a comment in the default config files below.
+    - Defaults to [eval/swe-bench/swe-agent/default](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/default.yaml) for SWE-agent, [eval/swe-bench/openhands/default](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/default.toml) for OpenHands. Note that if you store your configs in your local NeMo-Skills repo, then the path can be relative to the `nemo_skills/prompt` folder and the file extension is added automatically (same as how it works with regular [prompt configs](../basics/prompt-format.md)).
 
-- **++agent_max_turns:** The maximum number of turns the agent is allowed to take before the trajectory is forcibly terminated.
-  - Defaults to 100 for both SWE-agent and OpenHands.
+- **++agent_max_turns:** The maximum number of turns the agent is allowed to take before the trajectory is forcibly terminated. Defaults to 100 for both SWE-agent and OpenHands.
 
-- **++swebench_tests_timeout:** The timeout for tests after applying the generated patch during evaluation, in seconds.
-  - Defaults to 1800, i.e. 30 minutes.
+- **++swebench_tests_timeout:** The timeout for tests after applying the generated patch during evaluation, in seconds. Defaults to 1800, i.e. 30 minutes.
 
 #### Inference parameters
 
-For this benchmark, inference parameters work a bit differently. This is because it does not use the Nemo-Skills LLM client, instead the interaction with the LLM server is handled by SWE-agent/OpenHands. Most inference parameters are not passed to the LLM by default if you don't explicitly specify them, and some parameters may be unsupported, e.g. when using OpenHands. For more details, see below.
-
-<details>
-<summary>Inference parameter support</summary>
+For this benchmark, inference parameters work a bit differently. This is because it does not use the Nemo-Skills LLM client, instead the interaction with the LLM server is handled by SWE-agent/OpenHands. Most inference parameters are not passed to the LLM by default if you don't explicitly specify them, and some parameters may be unsupported, e.g. when using OpenHands.
 
 In order for a parameter to work, it needs to be supported in 2 places: by the agentic framework and by the LLM server itself. For framework support, see the following table:
 
@@ -109,7 +102,6 @@ In order for a parameter to work, it needs to be supported in 2 places: by the a
 In addition, keep in mind certain parameters may not be supported by your LLM server, because not all of them are part of the official [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat/create). However, VLLM and SGLang do support all of these parameters.
 
 It's worth noting that when using VLLM with a HuggingFace model, any parameters that are not passed to the server will be taken from the model's config on HuggingFace by default. This may or may not be what you want. To disable this, you can add `--generation-config vllm` to the `--server_args` parameter. See [VLLM docs](https://docs.vllm.ai/en/latest/configuration/engine_args.html#-generation-config).
-</details>
 
 #### Tool calling
 
@@ -126,7 +118,7 @@ In addition, both SWE-agent and OpenHands can run without native tool calling. T
 
 Here's how to run a sample evaluation of [Qwen3-Coder-30B-A3B-Instruct](https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct) with OpenHands on a Slurm cluster.
 
-1. Run `ns prepare_data swe-bench`
+1. Prepare the data following instructions [above](#data-preparation).
 2. Run
 ```
 ns eval \
@@ -137,7 +129,6 @@ ns eval \
     --server_nodes=1 \
     --server_gpus=8 \
     --benchmarks=swe-bench \
-    --expname=<EXPERIMENT_NAME> \
     --output_dir=<OUTPUT_DIR> \
     --num_chunks=10 \
     ++agent_framework=openhands \
