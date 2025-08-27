@@ -216,6 +216,7 @@ def handle_context_retries_sync(
         result = func(self, *args, **kwargs)
         return result
     except openai.BadRequestError as error:
+        LOG.info(f"L219: BadRequestError: {error}")
         if "litellm.exceptions.ContextWindowExceededError" in str(error) or "Requested token count exceeds" in str(
             error
         ):

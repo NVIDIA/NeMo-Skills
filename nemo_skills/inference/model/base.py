@@ -109,7 +109,6 @@ class BaseModel:
             self.base_url = base_url
 
         self.tokenizer = self._get_tokenizer(tokenizer)
-        LOG.info(f"Tokenzier: {self.tokenizer}")
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -157,10 +156,8 @@ class BaseModel:
         if tokenizer_endpoint is not None:
             return tokenizer_endpoint
         elif tokenizer is not None:
-            LOG.info(f"Initializing tokenizer from string: {tokenizer}")
             return self._initialize_tokenizer(tokenizer)
         elif self.model_name_or_path is not None:
-            LOG.info(f"Initializing tokenizer from model_name_or_path: {self.model_name_or_path}")
             return self._initialize_tokenizer(self.model_name_or_path)
         else:
             return None
