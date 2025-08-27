@@ -47,24 +47,24 @@ models = {
 }
 
 
-def get_model(server_type, **kwargs):
+def get_model(server_type, tokenizer=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    return model_class(**kwargs)
+    return model_class(tokenizer=tokenizer, **kwargs)
 
 
-def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
+def get_code_execution_model(server_type, tokenizer=None, code_execution=None, sandbox=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
-    model = get_model(server_type=server_type, **kwargs)
+    model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
     if code_execution is None:
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
+def get_online_genselect_model(server_type, tokenizer=None, online_genselect_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
-    model = get_model(server_type=server_type, **kwargs)
+    model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
     if online_genselect_config is None:
         online_genselect_config = OnlineGenSelectConfig()
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)

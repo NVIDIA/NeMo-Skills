@@ -25,6 +25,17 @@ import pytest
 from tests.conftest import docker_rm, docker_rm_and_mkdir, docker_run
 
 
+def _get_hf_model_name(model_str: str) -> str:
+    """Returns the model huggingface name which can be used to initialize the model's tokenizer"""
+    model_name = model_str.split("/")[-1]
+    if "llama" in model_name.lower():
+        return "meta-llama/" + model_name
+    elif "qwen" in model_name.lower():
+        return "Qwen/" + model_name
+    else:
+        return None
+
+
 @dataclass
 class TestConfig:
     """Configuration for test parameters"""
@@ -61,6 +72,8 @@ class CommandBuilder:
 
     def _build_base_cmd(self, cmd_type: str, output_dir: str, server_type: str) -> str:
         """Build base command with common parameters"""
+        model_name = _get_hf_model_name(self.env.model_path)
+        tokenizer_path = f"++tokenizer={model_name}" if model_name else ""
         return (
             f"ns {cmd_type} "
             f"    --cluster test-local --config_dir {self.base_path} "
@@ -68,7 +81,7 @@ class CommandBuilder:
             f"    --server_type {server_type} "
             f"    --output_dir {output_dir} "
             f"    --server_gpus {self.config.server_gpus} "
-            f"    --server_nodes {self.config.server_nodes} "
+            f"    --server_nodes {self.config.server_nodes} " + tokenizer_path
         )
 
     def build_eval_cmd(self, output_dir: str, server_type: str, enable_soft_fail: bool, retry_strategy: str) -> str:

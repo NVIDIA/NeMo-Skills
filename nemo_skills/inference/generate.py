@@ -263,7 +263,7 @@ class GenerationTask:
     def setup_llm(self):
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
+            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.cfg.tokenizer, sandbox=sandbox)
         elif self.cfg.online_genselect:
             # Use the same prompt parameters for genselect as the one used for generation
             self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
@@ -272,11 +272,13 @@ class GenerationTask:
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
-                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+                **self.cfg.server,
+                tokenizer=self.cfg.tokenizer,
+                online_genselect_config=self.cfg.online_genselect_config,
             )
         else:
             # Extract context retry config from server dict
-            llm = get_model(**self.cfg.server)
+            llm = get_model(**self.cfg.server, tokenizer=self.cfg.tokenizer)
 
         return llm
 

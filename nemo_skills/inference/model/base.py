@@ -19,6 +19,7 @@ import os
 import httpx
 import litellm
 import openai
+from transformers import AutoTokenizer
 
 from nemo_skills.utils import get_logger_name
 
@@ -48,6 +49,7 @@ class BaseModel:
     def __init__(
         self,
         model: str,
+        tokenizer: str | None = None,
         api_key: str | None = None,
         api_key_env_var: str | None = None,
         base_url: str | None = None,
@@ -106,8 +108,8 @@ class BaseModel:
         else:
             self.base_url = base_url
 
-        # Get the tokenizer endpoint if available
-        self.tokenizer = self._get_tokenizer_endpoint()
+        # Get the tokenizer endpoint if available, otherwise initialize from tokenizer string
+        self.tokenizer = self._get_tokenizer_endpoint() or self._initialize_tokenizer(tokenizer)
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -151,6 +153,12 @@ class BaseModel:
     def _get_tokenizer_endpoint(self) -> str | None:
         """Get the tokenizer endpoint if available."""
         return None
+
+    def _initialize_tokenizer(self, tokenizer: str | None) -> str | None:
+        if tokenizer is None:
+            return None
+        if isinstance(tokenizer, str):
+            return AutoTokenizer.from_pretrained(tokenizer)
 
     @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:
