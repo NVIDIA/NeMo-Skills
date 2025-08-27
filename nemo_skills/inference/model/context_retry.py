@@ -217,6 +217,8 @@ def _prepare_context_error_retry(
     else:
         LOG.info(f"Parsed error: {parsed_error}")
 
+    return None
+
     # Apply the configured strategy
     if config.reduce_generate_tokens:
         return _try_reduce_generation_tokens(kwargs, parsed_error, error)
