@@ -67,7 +67,9 @@ class WrapperAutoTokenizer:
     """Wrapper around the AutoTokenizer class to provide same interface as the ServerTokenizer class."""
 
     def __init__(self, model_name: str):
+        LOG.info(f"Initializing tokenizer from string: {model_name}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        LOG.info(f"Tokenzier: {self.tokenizer}")
 
     def encode(self, prompt: str | list[dict]) -> list[int]:
         """Encode the prompt using the tokenizer."""
