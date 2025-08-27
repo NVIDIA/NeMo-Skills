@@ -69,7 +69,7 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
     )
 
     # Try patterns 1, 3, and 4
-    for pattern in [pattern1, pattern3, pattern4]:
+    for pattern in [pattern1, pattern3]:
         match = pattern.search(error_str)
         if match:
             max_context = int(match.group(1))
@@ -85,6 +85,15 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         return {
             "max_context_length": int(match.group(1)),
             "message_tokens": int(match.group(3)),
+        }
+
+    # Try pattern 4
+    match = pattern4.search(error_str)
+    if match:
+        return {
+            # Context length is the second group
+            "max_context_length": int(match.group(2)),
+            "message_tokens": int(match.group(1)),
         }
 
     return None
@@ -212,7 +221,7 @@ def _prepare_context_error_retry(
     """
     parsed_error = parse_context_window_exceeded_error(error)
     if parsed_error is None:
-        detailed_error = f"Not able to parse the context window exceeded error- {parsed_error}. Returning empty generation.\n\n{error[:500]}"
+        detailed_error = f"Not able to parse the context window exceeded error- {parsed_error}. Returning empty generation.\n\n{error}"
         raise ValueError(detailed_error)
     else:
         LOG.info(f"Parsed error: {parsed_error}")
