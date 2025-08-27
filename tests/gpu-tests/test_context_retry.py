@@ -27,9 +27,10 @@ from tests.conftest import docker_rm, docker_rm_and_mkdir, docker_run
 
 def _get_hf_model_name(model_str: str) -> str:
     """Returns the model huggingface name which can be used to initialize the model's tokenizer"""
-    model_name = model_str.split("/")[-1]
+    model_name = model_str.rstrip("/").split("/")[-1]
     if "llama" in model_name.lower():
         return "meta-llama/" + model_name
+
     elif "qwen" in model_name.lower():
         return "Qwen/" + model_name
     else:
