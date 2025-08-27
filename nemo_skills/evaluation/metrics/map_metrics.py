@@ -29,6 +29,7 @@ from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
+    "hle": MathMetrics(requires_no_answer=False),
     "lean4-proof": Lean4Metrics,
     "lean4-statement": Lean4Metrics,
     "answer-judgement": AnswerJudgementMetrics,

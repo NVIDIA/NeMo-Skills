@@ -31,9 +31,9 @@ class MathMetrics(BaseMetrics):
             for score_method in score_dicts[0].keys():
                 # Get valid answers and their results for this field
                 valid_answers_and_results = [
-                    (elem['predicted_answer'], correctness_dict[score_method], elem['reward_model_score'])
+                    (elem["predicted_answer"], correctness_dict[score_method], elem["reward_model_score"])
                     for elem, correctness_dict in zip(predictions[:k], score_dicts[:k])
-                    if elem['predicted_answer'] is not None
+                    if elem["predicted_answer"] is not None
                 ]
 
                 # If no valid answers, it's incorrect
@@ -55,17 +55,17 @@ class MathMetrics(BaseMetrics):
                     is_correct_majority = answer_to_correctness_dict[top_cum_reward_answer]
                     self.eval_dict[f"rm_majority@{k}"][score_method] += is_correct_majority
 
-            no_answer = all(elem['predicted_answer'] is None for elem in predictions[:k])
+            no_answer = all(elem["predicted_answer"] is None for elem in predictions[:k])
             self.eval_dict[f"rm_best@{k}"]["no_answer"] += no_answer
             self.eval_dict[f"rm_majority@{k}"]["no_answer"] += no_answer
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         correctness_dict = {}
-        if 'symbolic_correct' in prediction:
-            correctness_dict["symbolic_correct"] = prediction['symbolic_correct']
-        if 'judgement' in prediction:
-            correctness_dict["judge_correct"] = is_correct_judgement(prediction['judgement'])
-        if 'judge_correct' in correctness_dict and 'symbolic_correct' in correctness_dict:
+        if "symbolic_correct" in prediction:
+            correctness_dict["symbolic_correct"] = prediction["symbolic_correct"]
+        if "judgement" in prediction:
+            correctness_dict["judge_correct"] = is_correct_judgement(prediction["judgement"])
+        if "judge_correct" in correctness_dict and "symbolic_correct" in correctness_dict:
             correctness_dict["both_correct"] = (
                 correctness_dict["symbolic_correct"] and correctness_dict["judge_correct"]
             )
@@ -76,11 +76,11 @@ class MathMetrics(BaseMetrics):
     @classmethod
     def get_incorrect_sample(cls, prediction: dict) -> dict:
         prediction = prediction.copy()
-        if 'symbolic_correct' in prediction:
-            prediction['symbolic_correct'] = False
-        if 'judgement' in prediction:
-            prediction['judgement'] = 'Judgement: No'
-        prediction['predicted_answer'] = None
+        if "symbolic_correct" in prediction:
+            prediction["symbolic_correct"] = False
+        if "judgement" in prediction:
+            prediction["judgement"] = "Judgement: No"
+        prediction["predicted_answer"] = None
         return prediction
 
     def update(self, predictions):
@@ -91,11 +91,11 @@ class MathMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-        predicted_answers = [pred['predicted_answer'] for pred in predictions]
+        predicted_answers = [pred["predicted_answer"] for pred in predictions]
         self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
-        if 'reward_model_score' in predictions[0]:
+        if "reward_model_score" in predictions[0]:
             self._compute_reward_at_k(predictions=predictions)
 
         # Log discrepancies between the two judgements
@@ -109,28 +109,30 @@ class MathMetrics(BaseMetrics):
                     "Question: %s\nPredicted answer: %s\nExpected answer: %s\nLLM reasoning: %s\n",
                     correctness_dict["symbolic_correct"],
                     correctness_dict["judge_correct"],
-                    prediction['problem'],
-                    prediction['predicted_answer'],
-                    prediction['expected_answer'],
-                    prediction['judgement'],
+                    prediction["problem"],
+                    prediction["predicted_answer"],
+                    prediction["expected_answer"],
+                    prediction["judgement"],
                 )
 
     def evaluations_to_print(self):
         """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
         return [
-            f'pass@1[avg-of-{self.max_k}]',
-            f'majority@{self.max_k}',
-            f'rm_best@{self.max_k}',
-            f'rm_majority@{self.max_k}',
-            f'pass@{self.max_k}',
+            f"pass@1[avg-of-{self.max_k}]",
+            f"majority@{self.max_k}",
+            f"rm_best@{self.max_k}",
+            f"rm_majority@{self.max_k}",
+            f"pass@{self.max_k}",
         ]
 
     def metrics_to_print(self):
-        return {
-            'num_entries': as_int,
-            'avg_tokens': as_int,
-            'gen_seconds': as_int,
-            'judge_correct': as_percentage,
-            'symbolic_correct': as_percentage,
-            'no_answer': as_percentage,
+        metrics_to_print = {
+            "num_entries": as_int,
+            "avg_tokens": as_int,
+            "gen_seconds": as_int,
+            "judge_correct": as_percentage,
+            "symbolic_correct": as_percentage,
         }
+        if self.requires_no_answer:
+            metrics_to_print["no_answer"] = as_percentage
+        return metrics_to_print
