@@ -25,6 +25,7 @@ httpx
 huggingface_hub
 hydra-core
 ipython
+iso639-lang
 litellm < 1.75.0  # some bug with asyncio.run hanging forever
 math-verify[antlr4_9_3]
 mcp
