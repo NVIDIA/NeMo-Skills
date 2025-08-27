@@ -64,14 +64,14 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(model=None, online_genselect_config=None, **kwargs):
+def get_online_genselect_model(model, online_genselect_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
     if isinstance(model, str):
         model = get_model(model=model, **kwargs)
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
 
 
-def get_tool_calling_model(model=None, sandbox=None, **kwargs):
+def get_tool_calling_model(model, sandbox, **kwargs):
     if isinstance(model, str):
         model = get_model(model=model, **kwargs)
     return ToolCallingWrapper(model, sandbox)
