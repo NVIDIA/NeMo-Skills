@@ -23,8 +23,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def process_problem_code(prob_data: dict, num_steps: int) -> str:
-    header_docstring = prob_data['sub_steps'][num_steps - 1]['function_header']
-    return_str = prob_data['sub_steps'][num_steps - 1]['return_line']
+    header_docstring = prob_data["sub_steps"][num_steps]["function_header"]
+    return_str = prob_data["sub_steps"][num_steps]["return_line"]
     string = f"{header_docstring}\n\n{return_str}"
     return string
 
@@ -34,10 +34,10 @@ def process_problem_steps(problem_data: dict, num_steps: int, previous_llm_code,
     output_lines = []
     next_step = []
     previous_code = []
-    for i in range(num_steps - 1):
+    for i in range(num_steps):
         output_lines.append(
             problem_data["sub_steps"][i]["step_description_prompt"]
-            + '\n'
+            + "\n"
             + problem_data["sub_steps"][i]["step_background"]
             if with_background
             else problem_data["sub_steps"][i]["step_description_prompt"]
@@ -47,11 +47,11 @@ def process_problem_steps(problem_data: dict, num_steps: int, previous_llm_code,
         output_lines.append("------")
 
     next_step.append(
-        problem_data["sub_steps"][num_steps - 1]["step_description_prompt"]
-        + '\n'
-        + problem_data["sub_steps"][num_steps - 1]["step_background"]
+        problem_data["sub_steps"][num_steps]["step_description_prompt"]
+        + "\n"
+        + problem_data["sub_steps"][num_steps]["step_background"]
         if with_background
-        else problem_data["sub_steps"][num_steps - 1]["step_description_prompt"]
+        else problem_data["sub_steps"][num_steps]["step_description_prompt"]
     )
     next_step.append(process_problem_code(problem_data, num_steps))
     output_str = "\n\n".join(output_lines[:-1])  # Remove the last "------"
@@ -62,16 +62,16 @@ def process_problem_steps(problem_data: dict, num_steps: int, previous_llm_code,
 
 def extract_python_script(response: str):
     # We will extract the python script from the response
-    if '```' in response:
+    if "```" in response:
         python_script = (
             response.split("```python")[1].split("```")[0]
-            if '```python' in response
-            else response.split('```')[1].split('```')[0]
+            if "```python" in response
+            else response.split("```")[1].split("```")[0]
         )
     else:
         LOG.info("Fail to extract python code from specific format.")
         python_script = response
-    python_script = re.sub(r'^\s*(import .*|from .*\s+import\s+.*)', '', python_script, flags=re.MULTILINE)
+    python_script = re.sub(r"^\s*(import .*|from .*\s+import\s+.*)", "", python_script, flags=re.MULTILINE)
     return python_script
 
 
@@ -126,12 +126,12 @@ def __init__(self, n_grid, x_out):
     (
         "62",
         0,
-    ): '''
+    ): """
 def __init__(self, length, basis_size, operator_dict):
     self.length = length
     self.basis_size = basis_size
     self.operator_dict = operator_dict
-'''.strip(),
+""".strip(),
     (
         "76",
         2,
@@ -249,10 +249,15 @@ def process_hdf5_to_tuple(step_id, test_num, h5py_file=H5PY_FILE):
             else:
                 raise FileNotFoundError(f'Path {group_path} not found in the file.')
     return data_lst
-    
-    
+
+
 # Local comparison helpers adapted from SciCode src/scicode/compare/cmp.py
+# Adding import here because function might use these libraries which might not be part of required_dependencies, for example: 17.1 -   "required_dependencies": "import sympy as sp; import numpy as np" - causes error:
+# "Traceback (most recent call last): assert cmp_tuple_or_list(init_eji_array(10,[4,6,8,10]), target)    if not are_dicts_close(v1, v2):    dict1 = process_symbol_in_dict(dict1)    if isinstance(value, sympy.Symbol): NameError: name 'sympy' is not defined",
 def are_dicts_close(dict1, dict2, atol=1e-8, rtol=1e-5):
+    import sympy
+    import scipy
+    import numpy as np
     dict1 = process_symbol_in_dict(dict1)
     dict2 = process_symbol_in_dict(dict2)
     if dict1.keys() != dict2.keys():
@@ -279,6 +284,7 @@ def are_dicts_close(dict1, dict2, atol=1e-8, rtol=1e-5):
 
 
 def process_symbol_in_dict(dict):
+    import sympy
     new_dict = {}
     for key, value in dict.items():
         new_dict[key] = value
@@ -291,12 +297,15 @@ def process_symbol_in_dict(dict):
 
 
 def are_csc_matrix_close(matrix1, matrix2):
+    import numpy as np
     dense1 = matrix1.toarray()
     dense2 = matrix2.toarray()
     return np.allclose(dense1, dense2)
 
 
 def cmp_tuple_or_list(var1, var2):
+    import scipy
+    import numpy as np
     if len(var1) != len(var2):
         return False
     for v1, v2 in zip(var1, var2):
