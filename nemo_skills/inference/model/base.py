@@ -271,7 +271,7 @@ class BaseModel:
                     LOG.error(f"BadRequestError after {max_retries} retries, returning empty response: {e}")
                     return {"generation": "", "reasoning_content": "", "num_generated_tokens": 0}
                 else:
-                    LOG.error(f"BadRequestError: {e}")
+                    LOG.error(f"BadRequestError: {e[:100]}")
                     break
                     raise e
 
