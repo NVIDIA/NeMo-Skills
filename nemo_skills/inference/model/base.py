@@ -154,7 +154,7 @@ class BaseModel:
         """Get the tokenizer endpoint if available."""
         return None
 
-    def _initialize_tokenizer(self, tokenizer: str | None) -> str | None:
+    def _initialize_tokenizer(self, tokenizer: str | None) -> AutoTokenizer | None:
         if tokenizer is None:
             return None
         if isinstance(tokenizer, str):

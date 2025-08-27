@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
 import litellm
+from transformers import AutoTokenizer
 
 from nemo_skills.utils import get_logger_name
 
@@ -200,7 +201,7 @@ def handle_context_retries_sync(
 
 
 def _prepare_context_error_retry(
-    kwargs: dict, config: ContextLimitRetryConfig, tokenizer, error: Exception
+    kwargs: dict, config: ContextLimitRetryConfig, tokenizer: Union[ServerTokenizer, AutoTokenizer], error: Exception
 ) -> dict | None:
     """Prepare kwargs for context error retry based on configured strategy.
 
@@ -218,6 +219,11 @@ def _prepare_context_error_retry(
     if config.reduce_generate_tokens:
         return _try_reduce_generation_tokens(kwargs, parsed_error, error)
     elif config.reduce_prompt_from_start or config.reduce_prompt_from_end:
+        if tokenizer is None:
+            # Without tokenizer, we can't trim the prompt.
+            detailed_error = f"Tokenizer is not set. Cannot reduce prompt tokens. Please set the tokenizer in your eval/generate request.\n\n{error}"
+            raise ValueError(detailed_error)
+
         return _try_reduce_prompt_tokens(kwargs, parsed_error, config, tokenizer, error)
     else:
         detailed_error = f"No valid strategy configured. Returning empty generation.\n\n{error}"
@@ -254,7 +260,7 @@ def _try_reduce_prompt_tokens(
     kwargs: dict,
     parsed_error: dict,
     config: ContextLimitRetryConfig,
-    tokenizer: ServerTokenizer,
+    tokenizer: Union[ServerTokenizer, AutoTokenizer],
     original_error: Exception,
 ) -> dict:
     """Try to reduce the number of tokens in the prompt."""
@@ -282,7 +288,11 @@ def _try_reduce_prompt_tokens(
 
 
 def _trim_string_prompt(
-    kwargs: dict, prompt: str, num_tokens_to_keep: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+    kwargs: dict,
+    prompt: str,
+    num_tokens_to_keep: int,
+    config: ContextLimitRetryConfig,
+    tokenizer: Union[ServerTokenizer, AutoTokenizer],
 ) -> dict:
     """Trim a string prompt to fit within token limits."""
     encoded_prompt = tokenizer.encode(prompt)
@@ -303,7 +313,7 @@ def _trim_list_prompt(
     prompt_list: list,
     num_tokens_to_keep: int,
     config: ContextLimitRetryConfig,
-    tokenizer: ServerTokenizer,
+    tokenizer: Union[ServerTokenizer, AutoTokenizer],
     original_error: Exception,
 ) -> dict:
     """Trim a list-based prompt to fit within token limits."""
