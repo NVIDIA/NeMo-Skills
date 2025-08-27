@@ -212,7 +212,7 @@ def _prepare_context_error_retry(
     """
     parsed_error = parse_context_window_exceeded_error(error)
     if parsed_error is None:
-        detailed_error = f"Not able to parse the context window exceeded error- {parsed_error}. Returning empty generation.\n\n{error}"
+        detailed_error = f"Not able to parse the context window exceeded error- {parsed_error}. Returning empty generation.\n\n{error[:500]}"
         raise ValueError(detailed_error)
     else:
         LOG.info(f"Parsed error: {parsed_error}")
