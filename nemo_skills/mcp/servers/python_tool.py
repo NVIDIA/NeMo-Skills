@@ -44,7 +44,7 @@ sandbox = None
 
 @mcp.tool()
 async def execute(
-    code: Annotated[str, Field(description="Code to run in python interpretter")],
+    code: Annotated[str, Field(description="Code to run in python interpreter")],
     session_id: Annotated[str | None, Field(description="Session id for session persistence")] = None,
     timeout: Annotated[float, Field(description="Time in seconds to allow the job to run")] = 10,
 ) -> ExecutionResult:
