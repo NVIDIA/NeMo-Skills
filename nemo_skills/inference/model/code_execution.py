@@ -73,7 +73,7 @@ class CodeExecutionWrapper:
             raise NotImplementedError("top_logprobs is not supported yet.")
 
         if stream:
-            return await self._stream_single(
+            return self._stream_single(
                 prompt=prompt,
                 code_begin=code_begin,
                 code_end=code_end,
@@ -143,11 +143,11 @@ class CodeExecutionWrapper:
                 # no need to do anything with this as the code below should just exit, so that's only for logging
                 stopped_on_repetition = output_dict.get("stopped_on_repetition", False)
 
-                # openai don't show what stop word was triggered, so we assume that it was `code_end`
+                # openai and trtllm don't show what stop word was triggered, so we assume that it was `code_end`
                 # if there's an unfinished code block
-                if is_openai_format and output_dict.get("finish_reason") == "stop":
-                    if output.count(code_end) + 1 == output.count(code_begin):
-                        output += code_end
+                if output.count(code_end) + 1 == output.count(code_begin):
+                    output += code_end
+
                 # Update the prompt based on format
                 if is_openai_format:
                     request["prompt"].append({"role": "assistant", "content": output})
@@ -284,7 +284,8 @@ class CodeExecutionWrapper:
         request["prompt"] = prompt
 
         output = await self._generate_single(**request)
-        self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
+        if not stream:
+            self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
 
         return output
 
@@ -338,11 +339,11 @@ class CodeExecutionWrapper:
         session_id = None  # For sandbox state continuity
         try:
             for generation_index in range(effective_max_code_executions + 1):
-                model_token_iterator = self.model._generate_single(prompt=current_full_prompt, **request)
+                model_token_iterator = await self.model.generate_async(prompt=current_full_prompt, **request)
 
                 current_output_segment = ""
                 num_generated_tokens = 0
-                for chunk in model_token_iterator:
+                async for chunk in model_token_iterator:
                     yield chunk
                     current_output_segment += chunk["generation"]
                     num_generated_tokens += 1
@@ -353,11 +354,11 @@ class CodeExecutionWrapper:
                 if not current_output_segment:
                     break
 
-                # openai don't show what stop word was triggered, so we assume that it was `code_end`
+                # openai and trtllm don't show what stop word was triggered, so we assume that it was `code_end`
                 # if there's an unfinished code block
-                if is_openai_format and chunk.get("finish_reason") == "stop":
-                    if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
-                        current_output_segment += code_end
+                if current_output_segment.count(code_end) + 1 == current_output_segment.count(code_begin):
+                    current_output_segment += code_end
+                    yield {"generation": code_end}
 
                 # Update the prompt based on format
                 if is_openai_format:
@@ -393,7 +394,6 @@ class CodeExecutionWrapper:
                         code_output_format,
                         remaining_code_executions,
                     )
-
                     yield {"generation": formatted_code_output}  # Yield the entire formatted code output as one chunk
 
                     # Append executed code's output to the prompt
@@ -401,7 +401,7 @@ class CodeExecutionWrapper:
                         current_full_prompt[-2]["content"] += formatted_code_output
                     else:
                         current_full_prompt += formatted_code_output
-                else:
+                else:  # if no code was generated, we need to finish
                     break
         finally:
             if session_id is not None and self.config.code_execution_language == "ipython":
