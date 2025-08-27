@@ -213,21 +213,28 @@ def handle_context_retries_sync(
 ) -> dict:
     """Sync version of context retry logic."""
     try:
+        context_window_error = False
         result = func(self, *args, **kwargs)
         return result
-    except openai.BadRequestError as error:
-        LOG.info(f"L219: BadRequestError: {error}")
-        if "litellm.exceptions.ContextWindowExceededError" in str(error) or "Requested token count exceeds" in str(
-            error
-        ):
-            if not config.enable_soft_fail:
-                raise error
+    except litellm.exceptions.ContextWindowExceededError as error:
+        context_window_error = True
+    except litellm.exceptions.BadRequestError as error:
+        if "Requested token count exceeds" in str(error):
+            context_window_error = True
+        else:
+            raise error
+    except Exception as error:
+        raise error
 
-            modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-            if modified_kwargs is None:
-                return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+    if context_window_error:
+        if not config.enable_soft_fail:
+            raise error
 
-            return func(self, *args, **modified_kwargs)
+        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+        if modified_kwargs is None:
+            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+
+        return func(self, *args, **modified_kwargs)
 
 
 def _prepare_context_error_retry(
