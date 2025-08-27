@@ -69,6 +69,7 @@ def get_benchmark_args_from_module(
     cluster_config,
     data_path,
     is_on_cluster,
+    eval_requires_judge,
     benchmark_group=None,
     override_dict=None,
 ):
@@ -127,7 +128,7 @@ def get_benchmark_args_from_module(
     if num_chunks == 0:
         num_chunks = None
 
-    if judge_args or judge_pipeline_args:
+    if judge_args or judge_pipeline_args or eval_requires_judge:
         # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
         eval_subfolder = "tmp-eval-results/"
     else:
@@ -161,7 +162,9 @@ def get_benchmark_args_from_module(
     )
 
 
-def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets):
+def add_default_args(
+    cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets, eval_requires_judge
+):
     benchmark_or_group_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark_or_group,
         data_dir=data_dir,
@@ -188,6 +191,7 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
                 cluster_config=cluster_config,
                 data_path=data_path,
                 is_on_cluster=is_on_cluster,
+                eval_requires_judge=eval_requires_judge,
                 override_dict=override_dict,
             )
             if data_dir:
@@ -207,6 +211,7 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
         cluster_config=cluster_config,
         data_path=data_path,
         is_on_cluster=is_on_cluster,
+        eval_requires_judge=eval_requires_judge,
     )
 
     if data_dir:
@@ -234,6 +239,7 @@ def prepare_eval_commands(
     with_sandbox,
     wandb_parameters,
     extra_eval_args,
+    eval_requires_judge,
     generation_type=None,
     generation_module=None,
 ):
@@ -269,6 +275,7 @@ def prepare_eval_commands(
             data_dir,
             extra_datasets_type,
             extra_datasets,
+            eval_requires_judge=eval_requires_judge,
         )
         for benchmark_args in cur_benchmarks:
             benchmark = benchmark_args.name
