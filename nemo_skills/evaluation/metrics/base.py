@@ -20,8 +20,8 @@ from collections import Counter, defaultdict
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
-    def __init__(self, requires_no_answer: bool = True):
-        self.requires_no_answer = requires_no_answer
+    def __init__(self, compute_no_answer: bool = True):
+        self.compute_no_answer = compute_no_answer
         self.reset()
 
     def update_common_metrics(self, agg_dict):
@@ -203,7 +203,7 @@ class BaseMetrics(abc.ABC):
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                 )
-            if self.requires_no_answer:
+            if self.compute_no_answer:
                 eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
 
             self._update_metrics_for_majority(
@@ -310,7 +310,7 @@ class BaseMetrics(abc.ABC):
                     predicted_answers=predicted_answers,
                 )
 
-                if predicted_answers is not None and self.requires_no_answer:
+                if predicted_answers is not None and self.compute_no_answer:
                     no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
                     eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
                     eval_dict[f"pass@1[avg-of-{k}]"]["no_answer"] += sum(no_answer_list) / k

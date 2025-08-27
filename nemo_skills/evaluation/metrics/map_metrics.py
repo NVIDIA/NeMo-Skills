@@ -29,7 +29,7 @@ from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
-    "hle": MathMetrics(requires_no_answer=False),
+    "hle": MathMetrics,
     "lean4-proof": Lean4Metrics,
     "lean4-statement": Lean4Metrics,
     "answer-judgement": AnswerJudgementMetrics,
@@ -50,4 +50,8 @@ METRICS_MAP = {
 def get_metrics(metric_type: str):
     if metric_type not in METRICS_MAP:
         raise ValueError(f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())}")
-    return METRICS_MAP[metric_type]()
+    if metric_type == "hle":
+        # HLE does not have "no answer" metric, so we set compute_no_answer to False
+        return METRICS_MAP[metric_type](compute_no_answer=False)
+    else:
+        return METRICS_MAP[metric_type]()
