@@ -22,7 +22,7 @@ This might sound a little complicated, so let's see how it works through an exam
     ns generate \
         --cluster=local \
         --server_type=trtllm \
-        --model=/workspace/qwen2.5-1.5b-instruct-trtllm \
+        --model=/hf_models/Qwen2.5-1.5B-Instruct \
         --server_gpus=1 \
         --output_dir=/workspace/generation-local-trtllm \
         --input_file=/workspace/input.jsonl \
@@ -37,7 +37,7 @@ This might sound a little complicated, so let's see how it works through an exam
     generate(
         cluster="local",
         server_type="trtllm",
-        model="/workspace/qwen2.5-1.5b-instruct-trtllm",
+        model="/hf_models/Qwen2.5-1.5B-Instruct",
         server_gpus=1,
         output_dir="/workspace/generation-local-trtllm",
         input_file="/workspace/input.jsonl",

@@ -167,7 +167,7 @@ Here is a sample command to run GenSelect evaluation:
 ```bash
 ns genselect \
     --preprocess_args="++input_dir=/workspace/openmath-nemotron-1.5b-eval-cot/eval-results-judged/hle" \
-    --model=/trt_models/openmath-nemotron-1.5b \
+    --model=/workspace/OpenMath-Nemotron-1.5B \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot/self_genselect_hle \
     --cluster=local \
     --server_type=sglang \
