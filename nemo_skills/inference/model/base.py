@@ -159,6 +159,9 @@ class BaseModel:
         elif tokenizer is not None:
             LOG.info(f"Initializing tokenizer from string: {tokenizer}")
             return self._initialize_tokenizer(tokenizer)
+        elif self.model_name_or_path is not None:
+            LOG.info(f"Initializing tokenizer from model_name_or_path: {self.model_name_or_path}")
+            return self._initialize_tokenizer(self.model_name_or_path)
         else:
             return None
 

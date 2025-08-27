@@ -83,7 +83,7 @@ class CommandBuilder:
             f"    --output_dir {output_dir} "
             f"    --server_gpus {self.config.server_gpus} "
             f"    --server_nodes {self.config.server_nodes} "
-            f"    ++max_concurrent_requests=1 " + tokenizer_path
+            f"    ++max_concurrent_requests=1 "
         )
 
     def build_eval_cmd(self, output_dir: str, server_type: str, enable_soft_fail: bool, retry_strategy: str) -> str:
