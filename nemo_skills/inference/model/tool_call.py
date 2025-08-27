@@ -15,15 +15,12 @@
 import asyncio
 import json
 import logging
-import textwrap
 from typing import Dict, List
 
 import yaml
-from litellm.types.utils import ChatCompletionMessageToolCall
 from omegaconf import OmegaConf
 
-from nemo_skills.code_execution.sandbox import Sandbox
-from nemo_skills.mcp.config import MCPConfig, build_client_manager, resolve_adapters
+from nemo_skills.mcp.config import build_client_manager, resolve_adapters
 from nemo_skills.utils import get_logger_name
 
 from .base import BaseModel
@@ -40,39 +37,40 @@ class ToolCallingWrapper:
 
     def __init__(self, model: BaseModel, tool_config_yaml: str, additional_config: dict):
         self.model = model
-        tool_cfg = yaml.safe_load(open(f"{tool_config_yaml}.yaml"))
+
+        with open(tool_config_yaml) as f:
+            tool_cfg = yaml.safe_load(f)
         tool_cfg.update(additional_config)
         tool_cfg = OmegaConf.create(tool_cfg)
+
         self.client_manager = build_client_manager(tool_cfg)
+        ## FIXME(sanyamk): All these need to be cohesive, so might as well be a single class.
         self.schema_adapter, self.call_interpreter, self.response_formatter = resolve_adapters(tool_cfg)
 
-    async def _parse_tool_calls(self, tool_calls: List[ChatCompletionMessageToolCall]):
-        """Convert tool calls to conversation message item."""
+    async def _execute_tool_call(self, tool_call):
+        ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
+        tool_name = tool_call["function"]["name"]
+        tool_args = tool_call["function"]["arguments"]
 
-        tool_calls = [
-            {
-                "type": tool_call.type,
-                "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
-            }
-            for tool_call in tool_calls
-        ]
-
-        return {"role": "assistant", "tool_calls": tool_calls}
-
-    ## TODO(sanyamk): Support tool call IDs.
-    async def _execute_tool_call(self, tool_args):
         try:
-            result = await self.client_manager.execute_tool(**tool_args)
+            tool_args = json.loads(tool_args)
+        except json.decoder.JSONDecodeError as e:
+            LOG.exception(e)
+            return {"error": "Tool argument parsing failed."}
+
+        try:
+            result = await self.client_manager.execute_tool(tool_name, tool_args)
         except Exception as e:
-            raise ValueError(f"{tool_args}, {e}")
+            LOG.exception(e)
+            return {"error": "Tool execution failed."}
+
         return result
 
-    async def _execute_tool_calls(self, tool_calls: List[ChatCompletionMessageToolCall]):
-        parsed_tool_calls = [self.call_interpreter.parse(tool_call) for tool_call in tool_calls]
-        tasks = [self._execute_tool_call(tool_call) for tool_call in parsed_tool_calls]
+    async def _execute_tool_calls(self, tool_calls: List):
+        tasks = [self._execute_tool_call(tool_call) for tool_call in tool_calls]
         tool_results = await asyncio.gather(*tasks)
         return [
-            self.response_formatter.format(tool_call, tool_result)
+            self.response_formatter.format(tool_call["function"]["name"], tool_result)
             for tool_call, tool_result in zip(tool_calls, tool_results)
         ]
 
@@ -82,11 +80,11 @@ class ToolCallingWrapper:
         tools: List[dict] = None,
         **generation_kwargs,
     ) -> Dict:
-        ## FIXME(sanyamk): Will be moved away from here.
-        tools = await self.client_manager.list_all_tools()
-        tools = self.schema_adapter.convert(tools)
         assert isinstance(prompt, list), "Only use ChatCompletion API for now."
-        assert isinstance(tools, list), "Missing tools specification."
+
+        assert tools is None, "Specify ++tool_config=</path/to/file.yaml> only."
+
+        tools = self.schema_adapter.convert(await self.client_manager.list_all_tools())
 
         ## Bookkeeping.
         num_tool_calls = 0
@@ -111,11 +109,13 @@ class ToolCallingWrapper:
                 reasoning_steps.append(reasoning_content)
 
             if tool_calls:
-                tool_calls_message = await self._parse_tool_calls(tool_calls)
-                # conversation.append(tool_calls_message) # @activatedgeek can you look into why this tool call formatting appears broken?
+                tool_calls_message = self.call_interpreter.parse(tool_calls)
+                conversation.append(tool_calls_message)
 
-                tool_calls_output_message = await self._execute_tool_calls(tool_calls)
-                conversation.extend(tool_calls_output_message)
+                ## TODO(sanyamk): refactor to not rely on hardcoded dict keys.
+                tool_calls_output_messages = await self._execute_tool_calls(tool_calls_message["tool_calls"])
+                conversation.extend(tool_calls_output_messages)
+
                 num_tool_calls += len(tool_calls)
 
                 continue

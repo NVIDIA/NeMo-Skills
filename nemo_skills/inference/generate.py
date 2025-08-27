@@ -136,9 +136,7 @@ class GenerateSolutionsConfig:
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
-    # TODO(sanyamk): tool configuration path
-    with_tools: bool = False
-    tool_config: str | None = None  # Path to tool configuration file. Required in `with_tools` is True
+    tool_config: str | None = None  # Path to tool configuration file.
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -272,7 +270,7 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, sandbox=self.sandbox)
-        elif self.cfg.with_tools:
+        elif self.cfg.tool_config:
             llm = get_tool_calling_model(
                 **self.cfg.server, tool_config=self.cfg.tool_config, additional_config={"sandbox": self.cfg.sandbox}
             )

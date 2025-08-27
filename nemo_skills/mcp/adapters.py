@@ -15,8 +15,9 @@
 
 import json
 from abc import ABC, abstractmethod
+from typing import List
 
-from openai.types.chat import ChatCompletionMessageToolCall
+from litellm.types.utils import ChatCompletionMessageToolCall
 
 
 # ==============================
@@ -54,7 +55,7 @@ class OpenAISchemaAdapter(ToolSchemaAdapter):
             {
                 "type": "function",
                 "function": {
-                    "name": f"{t['name']}",
+                    "name": t["name"],
                     "description": t["description"],
                     "parameters": t["input_schema"],
                 },
@@ -77,4 +78,34 @@ class CompletionResponseFormatter(ToolResponseFormatter):
             "role": "tool",
             "content": json.dumps(result),
             "tool_call_id": tool_call.id,
+        }
+
+
+class ChatCompletionCallInterpreter(ToolCallInterpreter):
+    """Convert tool calls to a chat message item.
+
+    Should be broadly compatible with any OpenAI-like APIs,
+    and HuggingFace Chat templates.
+
+    NOTE(sanyamk): For error handling, delay JSON parsing of arguments to the model class.
+    """
+
+    def parse(self, tool_calls: List[ChatCompletionMessageToolCall]):
+        tool_calls = [
+            {
+                "type": tool_call.type,
+                "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
+            }
+            for tool_call in tool_calls
+        ]
+
+        return {"role": "assistant", "tool_calls": tool_calls}
+
+
+class ChatCompletionResponseFormatter(ToolResponseFormatter):
+    def format(self, tool_name, result):
+        return {
+            "role": "tool",
+            "name": tool_name,
+            "content": json.dumps(result),
         }
