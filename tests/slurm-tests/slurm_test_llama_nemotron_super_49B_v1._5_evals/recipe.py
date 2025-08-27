@@ -62,9 +62,6 @@ def setup(workspace, cluster, expname_prefix):
     subprocess.run(ruler_data_cmd, shell=True, check=True)
 
 
-import subprocess
-
-
 def eval_reasoning_on(workspace, cluster, expname_prefix):
     """
     Run evals in Reasoning ON mode (string command + shell=True)
