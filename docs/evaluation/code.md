@@ -9,7 +9,7 @@ More details are coming soon!
 !!! note
     While swe-bench evaluation will work out-of-the-box without extra setup, it won't be efficient as we will be re-downloading docker containers
     each time it's launched. Please read [below](#data-preparation) for the details of how to prepare the containers beforehand to avoid this.
-    The downloaded containers will take around 600Gb of space, but will make evaluations considerably faster.
+    The downloaded containers will take around 650Gb of space, but will make evaluations considerably faster.
 
 - Benchmark is defined in [`nemo_skills/dataset/swe-bench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/swe-bench/__init__.py)
 - Original benchmark source is [here](https://github.com/SWE-bench/SWE-bench).
@@ -30,7 +30,7 @@ By default the dataset is downloaded to `nemo_skills/dataset/swe-bench/default.j
 
 SWE-bench inference and evaluation runs inside of prebuilt container images from the SWE-bench team. By default, this command will configure them to be downloaded from Dockerhub every time you run `ns eval`. To avoid this we recommend to download the images beforehand in .sif format and include that path in the data file, so it
 can be used in the evaluation job.
-Note that you can follow the steps below irrespective of whether you're running locally or on Slurm, assuming you have enough disk space to store all containers.
+Note that you can follow the steps below irrespective of whether you're running locally or on Slurm, assuming you have enough disk space (~650Gb) to store all containers.
 
 Here's how you can use it to download all images for SWE-bench Verified:
 
