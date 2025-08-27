@@ -22,10 +22,7 @@ from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_
 
 
 def download_models_ruler_data(workspace, cluster, expname_prefix):
-    # step1: local data preparation
-    prepare_datasets(["aime24", "aime25"])
-
-    # step2: download models
+    # download models
     cmd = (
         f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
         f"huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
@@ -53,7 +50,7 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         container="nemo",
     )
 
-    # step3: prepare ruler data on local cluster
+    # prepare ruler data on local cluster
     ruler_cmd = [
         "ns",
         "prepare_data",
@@ -436,7 +433,7 @@ def main():
 
     checker = (
         f"cd /nemo_run/code/tests/slurm-tests/slurm_test_llama_nemotron_super_49B_v1._5_evals && "
-        f"python check.py --workspace {args.workspace} "
+        f"python check_eval_results.py --workspace {args.workspace} "
     )
 
     run_cmd(
