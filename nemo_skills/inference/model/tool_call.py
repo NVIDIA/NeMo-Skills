@@ -40,7 +40,7 @@ class ToolCallingWrapper:
 
     def __init__(self, model: BaseModel, tool_config_yaml: str, additional_config: dict):
         self.model = model
-        tool_cfg = yaml.safe_load(tool_config_yaml)
+        tool_cfg = yaml.safe_load(open(f"{tool_config_yaml}.yaml"))
         tool_cfg.update(additional_config)
         tool_cfg = OmegaConf.create(tool_cfg)
         self.client_manager = build_client_manager(tool_cfg)
@@ -49,17 +49,32 @@ class ToolCallingWrapper:
     async def _parse_tool_calls(self, tool_calls: List[ChatCompletionMessageToolCall]):
         """Convert tool calls to conversation message item."""
 
-        tool_calls = [self.call_interpreter.parse(tool_call) for tool_call in tool_calls]
+        tool_calls = [
+            {
+                "type": tool_call.type,
+                "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
+            }
+            for tool_call in tool_calls
+        ]
 
         return {"role": "assistant", "tool_calls": tool_calls}
 
     ## TODO(sanyamk): Support tool call IDs.
     async def _execute_tool_call(self, tool_args):
-        return await self.manager.execute_tool(*tool_args)
+        try:
+            result = await self.client_manager.execute_tool(**tool_args)
+        except Exception as e:
+            raise ValueError(f"{tool_args}, {e}")
+        return result
 
-    async def _execute_tool_calls(self, tool_calls: List[dict]):
-        tasks = [self._execute_tool_call(tool_call) for tool_call in tool_calls]
-        return await asyncio.gather(*tasks)
+    async def _execute_tool_calls(self, tool_calls: List[ChatCompletionMessageToolCall]):
+        parsed_tool_calls = [self.call_interpreter.parse(tool_call) for tool_call in tool_calls]
+        tasks = [self._execute_tool_call(tool_call) for tool_call in parsed_tool_calls]
+        tool_results = await asyncio.gather(*tasks)
+        return [
+            self.response_formatter.format(tool_call, tool_result)
+            for tool_call, tool_result in zip(tool_calls, tool_results)
+        ]
 
     async def generate_async(
         self,
@@ -69,6 +84,7 @@ class ToolCallingWrapper:
     ) -> Dict:
         ## FIXME(sanyamk): Will be moved away from here.
         tools = await self.client_manager.list_all_tools()
+        tools = self.schema_adapter.convert(tools)
         assert isinstance(prompt, list), "Only use ChatCompletion API for now."
         assert isinstance(tools, list), "Missing tools specification."
 
@@ -96,11 +112,10 @@ class ToolCallingWrapper:
 
             if tool_calls:
                 tool_calls_message = await self._parse_tool_calls(tool_calls)
-                conversation.append(tool_calls_message)
+                # conversation.append(tool_calls_message) # @activatedgeek can you look into why this tool call formatting appears broken?
 
-                tool_calls_output_message = await self._execute_tool_calls(tool_calls_message["tool_calls"])
+                tool_calls_output_message = await self._execute_tool_calls(tool_calls)
                 conversation.extend(tool_calls_output_message)
-
                 num_tool_calls += len(tool_calls)
 
                 continue

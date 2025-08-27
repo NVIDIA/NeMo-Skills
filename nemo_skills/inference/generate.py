@@ -138,6 +138,7 @@ class GenerateSolutionsConfig:
 
     # TODO(sanyamk): tool configuration path
     with_tools: bool = False
+    tool_config: str | None = None  # Path to tool configuration file. Required in `with_tools` is True
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -272,7 +273,9 @@ class GenerationTask:
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, sandbox=self.sandbox)
         elif self.cfg.with_tools:
-            llm = get_tool_calling_model(**self.cfg.server, sandbox=self.sandbox)
+            llm = get_tool_calling_model(
+                **self.cfg.server, tool_config=self.cfg.tool_config, additional_config={"sandbox": self.cfg.sandbox}
+            )
         else:
             llm = get_model(**self.cfg.server)
 
