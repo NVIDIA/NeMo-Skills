@@ -40,7 +40,7 @@ class ServerTokenizer:
         self.tokenizer_url = url
         self.detokenizer_url = url.replace("/tokenize", "/detokenize")
 
-    def encode(self, prompt: str | list[dict]) -> list:
+    def encode(self, prompt: str | list[dict]) -> list[int]:
         """Encode the prompt using the tokenizer endpoint."""
         if isinstance(prompt, str):
             payload = {"prompt": prompt}
@@ -64,12 +64,12 @@ class ServerTokenizer:
 
 
 class WrapperAutoTokenizer:
-    """Wrapper around the AutoTokenizer class to provide similar functionality to the ServerTokenizer class."""
+    """Wrapper around the AutoTokenizer class to provide same interface as the ServerTokenizer class."""
 
     def __init__(self, model_name: str):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    def encode(self, prompt: str | list[dict]) -> list:
+    def encode(self, prompt: str | list[dict]) -> list[int]:
         """Encode the prompt using the tokenizer."""
         if isinstance(prompt, str):
             return self.tokenizer.encode(prompt)

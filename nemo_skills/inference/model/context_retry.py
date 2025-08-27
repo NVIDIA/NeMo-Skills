@@ -21,11 +21,10 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
 import litellm
-from transformers import AutoTokenizer
 
 from nemo_skills.utils import get_logger_name
 
-from .utils import ServerTokenizer
+from .utils import ServerTokenizer, WrapperAutoTokenizer
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -201,7 +200,10 @@ def handle_context_retries_sync(
 
 
 def _prepare_context_error_retry(
-    kwargs: dict, config: ContextLimitRetryConfig, tokenizer: Union[ServerTokenizer, AutoTokenizer], error: Exception
+    kwargs: dict,
+    config: ContextLimitRetryConfig,
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
+    error: Exception,
 ) -> dict | None:
     """Prepare kwargs for context error retry based on configured strategy.
 
@@ -260,7 +262,7 @@ def _try_reduce_prompt_tokens(
     kwargs: dict,
     parsed_error: dict,
     config: ContextLimitRetryConfig,
-    tokenizer: Union[ServerTokenizer, AutoTokenizer],
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
     original_error: Exception,
 ) -> dict:
     """Try to reduce the number of tokens in the prompt."""
@@ -278,6 +280,9 @@ def _try_reduce_prompt_tokens(
     num_prompt_tokens_to_keep = max_context_length - completion_tokens
     prompt = kwargs["prompt"]
 
+    LOG.info(f"Prompt type: {type(prompt)}")
+    LOG.info(f"Prompt: {prompt}")
+
     if isinstance(prompt, str):
         return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)
     elif isinstance(prompt, list):
@@ -292,7 +297,7 @@ def _trim_string_prompt(
     prompt: str,
     num_tokens_to_keep: int,
     config: ContextLimitRetryConfig,
-    tokenizer: Union[ServerTokenizer, AutoTokenizer],
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> dict:
     """Trim a string prompt to fit within token limits."""
     encoded_prompt = tokenizer.encode(prompt)
@@ -313,7 +318,7 @@ def _trim_list_prompt(
     prompt_list: list,
     num_tokens_to_keep: int,
     config: ContextLimitRetryConfig,
-    tokenizer: Union[ServerTokenizer, AutoTokenizer],
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
     original_error: Exception,
 ) -> dict:
     """Trim a list-based prompt to fit within token limits."""
@@ -335,7 +340,10 @@ def _trim_list_prompt(
 
 
 def _trim_messages_from_end(
-    messages: list, remaining_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+    messages: list,
+    remaining_token_budget: int,
+    config: ContextLimitRetryConfig,
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
     """Trim messages from the end of the list."""
     trimmed_messages = []
@@ -349,10 +357,12 @@ def _trim_messages_from_end(
             continue
 
         prefix_token_count = len(encoded)
+        LOG.info(f"Prefix token count: {prefix_token_count}")
 
         if prefix_token_count > remaining_token_budget:
             # Try to partially include this message: Remove tokens from the previous messages -> cumulative_tokens
             num_remaining_tokens = remaining_token_budget - cumulative_tokens
+            LOG.info(f"Num remaining tokens: {num_remaining_tokens}")
             trimmed_content = get_trimmed_content(
                 content=message["content"],
                 num_remaining_tokens=num_remaining_tokens,
@@ -373,7 +383,10 @@ def _trim_messages_from_end(
 
 
 def _trim_messages_from_start(
-    messages: list, remaining_token_budget: int, config: ContextLimitRetryConfig, tokenizer: ServerTokenizer
+    messages: list,
+    remaining_token_budget: int,
+    config: ContextLimitRetryConfig,
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
     """Returns the suffix of the current message list that fits within the token budget."""
     trimmed_message_list = []
@@ -424,7 +437,7 @@ def get_trimmed_content(
     content: str,
     num_remaining_tokens: int,
     num_special_tokens_budget: int,
-    tokenizer: ServerTokenizer,
+    tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
     trim_suffix: bool = True,
 ) -> str:
     """
