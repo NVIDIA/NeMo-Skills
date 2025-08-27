@@ -20,7 +20,9 @@ import os
 import sys
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-LOG = logging.getLogger(__name__)
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # Required accuracy fields for pass@1[avg-of-16]; scicode/hle require different fields.
