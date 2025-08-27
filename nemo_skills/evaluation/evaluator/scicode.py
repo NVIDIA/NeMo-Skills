@@ -27,7 +27,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class ScicodeEvaluatorConfig:
-    sandbox: dict = field(default_factory=lambda: {'sandbox_type': 'local'})
+    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
     timeout: float = 30.0
     num_parallel_requests: int = 20
 
@@ -43,17 +43,17 @@ async def _execute_single_test(args):
     sanitized_tests = []
     for tc in test_lst:
         lines = []
-        for line in tc.split('\n'):
+        for line in tc.split("\n"):
             if re.match(r"^\s*(from\s+scicode\.|import\s+scicode)\b", line):
                 continue
             lines.append(line)
-        sanitized_tests.append('\n'.join(lines))
+        sanitized_tests.append("\n".join(lines))
 
     code = full_generation + eval_prefix + f"targets = process_hdf5_to_tuple('{step_number}', {len(test_lst)})\n"
     for idx in range(len(sanitized_tests)):
         code += f"target = targets[{idx}]\n\n"
-        for line in sanitized_tests[idx].split('\n'):
-            code += line + '\n'
+        for line in sanitized_tests[idx].split("\n"):
+            code += line + "\n"
 
     sandbox = get_sandbox(**eval_config.sandbox)
     output_dict, _ = await sandbox.execute_code(code, timeout=eval_config.timeout, max_output_characters=100000)
@@ -66,13 +66,13 @@ def test_code(eval_config, scicode_data):
     json_idx = {}
 
     for prob_data in scicode_data:
-        json_idx[prob_data['problem_id']] = scicode_data.index(prob_data)
+        json_idx[prob_data["problem_id"]] = scicode_data.index(prob_data)
 
     # Prepare all tasks for parallel execution
     tasks = []
     for elem_idx, elem in enumerate(scicode_data):
-        for step_id, full_generation in elem['generation'].items():
-            problem_id, subtask_step = step_id.split('.')
+        for step_id, full_generation in elem["generation"].items():
+            problem_id, subtask_step = step_id.split(".")
             json_content = scicode_data[json_idx[problem_id]]
             tasks.append((eval_config, elem_idx, full_generation, json_content, subtask_step))
 
@@ -100,11 +100,29 @@ def test_code(eval_config, scicode_data):
 
 def eval_scicode(cfg):
     eval_config = ScicodeEvaluatorConfig(**cfg.eval_config)
+
+    # Install scipy 1.10.1 - the last version that includes scipy.integrate.simps
+    # which is used by some scicode tests. Newer versions renamed it to simpson.
+    LOG.info("Installing scipy 1.10.1 for scicode evaluation...")
+
+    async def install_scipy():
+        sandbox = get_sandbox(**eval_config.sandbox)
+        result, _ = await sandbox.execute_code(
+            "pip install scipy==1.10.1 --force-reinstall -q", language="shell", timeout=120.0
+        )
+        if result["process_status"] != "completed":
+            LOG.warning(f"Failed to install scipy 1.10.1: {result.get('stderr', 'Unknown error')}")
+        else:
+            LOG.info("Successfully installed scipy 1.10.1")
+        await sandbox.close()
+
+    asyncio.run(install_scipy())
+
     for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
+        with open(file, "rt", encoding="utf-8") as fin:
             data = [json.loads(line) for line in fin]
         status_lists = test_code(eval_config, data)
-        with open(file, 'wt', encoding='utf-8') as fout:
+        with open(file, "wt", encoding="utf-8") as fout:
             for idx, elem in enumerate(data):
-                elem['eval_status'] = status_lists[idx]
+                elem["eval_status"] = status_lists[idx]
                 fout.write(json.dumps(elem) + "\n")
