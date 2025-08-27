@@ -281,7 +281,7 @@ def _try_reduce_prompt_tokens(
     prompt = kwargs["prompt"]
 
     LOG.info(f"Prompt type: {type(prompt)}")
-    LOG.info(f"Prompt: {prompt}")
+    LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
 
     if isinstance(prompt, str):
         return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)
