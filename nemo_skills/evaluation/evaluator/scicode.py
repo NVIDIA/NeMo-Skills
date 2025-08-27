@@ -101,12 +101,14 @@ def test_code(eval_config, scicode_data):
 def eval_scicode(cfg):
     eval_config = ScicodeEvaluatorConfig(**cfg.eval_config)
 
-    # Install scipy 1.10.1 - the last version that includes scipy.integrate.simps
-    # which is used by some scicode tests. Newer versions renamed it to simpson.
-    LOG.info("Installing scipy 1.10.1 for scicode evaluation...")
+    # Install required packages for scicode evaluation
+    LOG.info("Installing required packages for scicode evaluation...")
 
-    async def install_scipy():
+    async def install_packages():
         sandbox = get_sandbox(**eval_config.sandbox)
+
+        # Install scipy 1.10.1 - the last version that includes scipy.integrate.simps
+        # which is used by some scicode tests. Newer versions renamed it to simpson.
         result, _ = await sandbox.execute_code(
             "pip install scipy==1.10.1 --force-reinstall -q", language="shell", timeout=120.0
         )
@@ -114,9 +116,17 @@ def eval_scicode(cfg):
             LOG.warning(f"Failed to install scipy 1.10.1: {result.get('stderr', 'Unknown error')}")
         else:
             LOG.info("Successfully installed scipy 1.10.1")
+
+        # Upgrade matplotlib for tests that use mpl_toolkits.mplot3d
+        result, _ = await sandbox.execute_code("pip install --upgrade matplotlib -q", language="shell", timeout=120.0)
+        if result["process_status"] != "completed":
+            LOG.warning(f"Failed to upgrade matplotlib: {result.get('stderr', 'Unknown error')}")
+        else:
+            LOG.info("Successfully upgraded matplotlib")
+
         await sandbox.close()
 
-    asyncio.run(install_scipy())
+    asyncio.run(install_packages())
 
     for file in unroll_files(cfg.input_files):
         with open(file, "rt", encoding="utf-8") as fin:
