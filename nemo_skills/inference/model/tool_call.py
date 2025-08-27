@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
 import textwrap
 from typing import Dict, List
 
+import yaml
 from litellm.types.utils import ChatCompletionMessageToolCall
+from omegaconf import OmegaConf
 
 from nemo_skills.code_execution.sandbox import Sandbox
+from nemo_skills.mcp.config import MCPConfig, build_client_manager, resolve_adapters
 from nemo_skills.utils import get_logger_name
 
 from .base import BaseModel
@@ -34,88 +38,28 @@ class ToolCallingWrapper:
     TODO(sanyamk): Supports only Chat Completions API for now.
     """
 
-    def __init__(self, model: BaseModel, sandbox: Sandbox):
+    def __init__(self, model: BaseModel, tool_config_yaml: str, additional_config: dict):
         self.model = model
-        self.sandbox = sandbox
+        tool_cfg = yaml.safe_load(tool_config_yaml)
+        tool_cfg.update(additional_config)
+        tool_cfg = OmegaConf.create(tool_cfg)
+        self.client_manager = build_client_manager(tool_cfg)
+        self.schema_adapter, self.call_interpreter, self.response_formatter = resolve_adapters(tool_cfg)
 
     async def _parse_tool_calls(self, tool_calls: List[ChatCompletionMessageToolCall]):
         """Convert tool calls to conversation message item."""
 
-        tool_calls = [
-            {
-                "type": tool_call.type,
-                "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
-            }
-            for tool_call in tool_calls
-        ]
+        tool_calls = [self.call_interpreter.parse(tool_call) for tool_call in tool_calls]
 
         return {"role": "assistant", "tool_calls": tool_calls}
 
     ## TODO(sanyamk): Support tool call IDs.
-    async def _execute_tool_call(self, tool_name: str, tool_args):
-        if isinstance(tool_args, str):
-            try:
-                tool_args = json.loads(tool_args)
-            except json.decoder.JSONDecodeError as e:
-                LOG.exception(e)
-
-                return {
-                    "role": "tool",
-                    "name": tool_name,
-                    "content": json.dumps({"error": "Tool execution failed, unable to parse arguments."}),
-                }
-
-        ## TODO(sanyamk): Replace tool handlers with MCP.
-        if tool_name == "exa_websearch":
-            tool_code = textwrap.dedent(
-                f"""
-                from exa_py import Exa
-                import os
-
-                exa = Exa(os.getenv("EXA_API_KEY"))
-
-                result = exa.answer({repr(tool_args["query"])})
-
-                print(result.answer)
-            """
-            )
-        else:
-            try:
-                raise NotImplementedError
-            except NotImplementedError as e:
-                LOG.exception(e)
-
-            return {
-                "role": "tool",
-                "name": tool_name,
-                "content": json.dumps({"error": "Tool not supported."}),
-            }
-
-        tool_output, _ = await self.sandbox.execute_code(generated_code=tool_code, language="python")
-
-        if tool_output["process_status"] != "completed":
-            try:
-                raise ValueError(tool_output["stderr"])
-            except ValueError as e:
-                LOG.exception(e)
-
-            return {
-                "role": "tool",
-                "name": tool_name,
-                "content": json.dumps({"error": tool_output["stderr"]}),
-            }
-
-        return {
-            "role": "tool",
-            "name": tool_name,
-            "content": json.dumps({"result": tool_output["stdout"]}),
-        }
+    async def _execute_tool_call(self, tool_args):
+        return await self.manager.execute_tool(*tool_args)
 
     async def _execute_tool_calls(self, tool_calls: List[dict]):
-        return [
-            await self._execute_tool_call(tool_call["function"]["name"], tool_call["function"]["arguments"])
-            for tool_call in tool_calls
-        ]
+        tasks = [self._execute_tool_call(tool_call) for tool_call in tool_calls]
+        return await asyncio.gather(*tasks)
 
     async def generate_async(
         self,
@@ -124,26 +68,7 @@ class ToolCallingWrapper:
         **generation_kwargs,
     ) -> Dict:
         ## FIXME(sanyamk): Will be moved away from here.
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "exa_websearch",
-                    "description": "Search the web using Exa. Provide relevant links in your answer.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query for Exa.",
-                            }
-                        },
-                        "required": ["query"],
-                    },
-                },
-            }
-        ]
-
+        tools = await self.client_manager.list_all_tools()
         assert isinstance(prompt, list), "Only use ChatCompletion API for now."
         assert isinstance(tools, list), "Missing tools specification."
 
