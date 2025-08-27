@@ -24,7 +24,7 @@ To convert the checkpoint from one format to another use a command like this
 ns convert \
     --cluster=slurm \
     --input_model=/hf_models/Meta-Llama-3.1-70B-Instruct \
-    --output_model=/trt_models/llama3.1-70b-instruct \
+    --output_model=/nemo_models/llama3.1-70b-instruct \
     --convert_from=hf \
     --convert_to=nemo \
     --model_type=llama \
