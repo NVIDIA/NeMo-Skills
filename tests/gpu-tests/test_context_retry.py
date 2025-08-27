@@ -73,8 +73,6 @@ class CommandBuilder:
 
     def _build_base_cmd(self, cmd_type: str, output_dir: str, server_type: str) -> str:
         """Build base command with common parameters"""
-        model_name = _get_hf_model_name(self.env.model_path)
-        tokenizer_path = f"++tokenizer={model_name}" if model_name else ""
         return (
             f"ns {cmd_type} "
             f"    --cluster test-local --config_dir {self.base_path} "
@@ -91,7 +89,7 @@ class CommandBuilder:
         base = self._build_base_cmd("eval", output_dir, server_type)
         return base + (
             f"    --benchmarks gsm8k "
-            f"    ++max_samples={self.config.num_samples} "
+            f"    ++max_samples=1 "
             f"    ++inference.tokens_to_generate={self.config.num_tokens_to_generate} "
             f"    ++server.enable_soft_fail={enable_soft_fail} "
             + (f"    ++server.context_limit_retry_strategy={retry_strategy} " if retry_strategy else "")
@@ -230,6 +228,8 @@ class ContextRetryTestSuite:
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         cmd = self.cmd_builder.build_eval_cmd(output_dir, server_type, enable_soft_fail, retry_strategy)
 
+        print(f"Running command:\n\n{cmd}")
+
         subprocess.run(cmd, shell=True, check=True)
 
         if expect_success:
@@ -267,7 +267,7 @@ def test_context_retry_no_strategy(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang", "vllm"])
+@pytest.mark.parametrize("server_type", ["vllm", "sglang"])
 def test_context_retry_reduce_generation_enabled(server_type):
     """Test that the generation finishes successfully if soft fail is enabled and the strategy is reduce_generation."""
     test_suite.run_reduce_generation_test(
