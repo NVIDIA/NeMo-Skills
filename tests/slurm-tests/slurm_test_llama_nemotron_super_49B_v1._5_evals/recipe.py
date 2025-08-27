@@ -21,7 +21,7 @@ from nemo_skills.dataset.prepare import prepare_datasets
 from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
 
 
-def download_models_ruler_data(workspace, cluster, expname_prefix):
+def setup(workspace, cluster, expname_prefix):
     # download models
     cmd = (
         f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
@@ -50,8 +50,8 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         container="nemo",
     )
 
-    ruler_cmd = f"""
-    ns prepare_data --cluster=local ruler \
+    ruler_data_cmd = f"""
+    ns prepare_data --cluster={cluster} \
         --setup nemotron_super_128k \
         --tokenizer_path nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 \
         --max_seq_length 131072 \
@@ -59,7 +59,7 @@ def download_models_ruler_data(workspace, cluster, expname_prefix):
         --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-download-ruler-data
     """
-    subprocess.run(ruler_cmd, shell=True, check=True)
+    subprocess.run(ruler_data_cmd, shell=True, check=True)
 
 
 import subprocess
@@ -288,7 +288,7 @@ def main():
 
     # launch for eval jobs
     prepare_data_locally()
-    download_models_ruler_data(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
     eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
     eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
