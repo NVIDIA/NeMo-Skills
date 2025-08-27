@@ -225,6 +225,7 @@ def eval(
         "server_args": judge_server_args,
         "server_entrypoint": judge_server_entrypoint,
     }
+    eval_requires_judge = any(param_value for param_value in judge_server_parameters.values())
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -273,6 +274,7 @@ def eval(
         with_sandbox,
         wandb_parameters,
         extra_eval_args,
+        eval_requires_judge=eval_requires_judge,
         generation_type=generation_type,
         generation_module=generation_module,
     )
@@ -326,7 +328,7 @@ def eval(
                 job_id_to_tasks[idx] = prev_tasks
         # scheduling judge jobs if needed
         for idx, (benchmark, benchmark_args) in enumerate(benchmarks_dict.items()):
-            if not benchmark_args.requires_judge:
+            if not eval_requires_judge and not benchmark_args.requires_judge:
                 continue
             dependent_job_ids = benchmark_args.job_ids
             dependent_tasks = []
