@@ -15,16 +15,16 @@
 import abc
 import logging
 import os
+from typing import Union
 
 import httpx
 import litellm
 import openai
-from transformers import AutoTokenizer
 
 from nemo_skills.utils import get_logger_name
 
 from .context_retry import ContextLimitRetryConfig, with_context_retry
-from .utils import trim_after_stop_phrases
+from .utils import ServerTokenizer, WrapperAutoTokenizer, trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -108,8 +108,7 @@ class BaseModel:
         else:
             self.base_url = base_url
 
-        # Get the tokenizer endpoint if available, otherwise initialize from tokenizer string
-        self.tokenizer = self._get_tokenizer_endpoint() or self._initialize_tokenizer(tokenizer)
+        self.tokenizer = self._get_tokenizer(tokenizer)
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -150,6 +149,16 @@ class BaseModel:
         if remove_stop_phrases:
             result["generation"] = trim_after_stop_phrases(result["generation"], stop_phrases)
 
+    def _get_tokenizer(self, tokenizer: str | None) -> Union[ServerTokenizer, WrapperAutoTokenizer, None]:
+        """Get the tokenizer endpoint if available, otherwise initialize from tokenizer string"""
+        tokenizer_endpoint = self._get_tokenizer_endpoint()
+        if tokenizer_endpoint is not None:
+            return tokenizer_endpoint
+        elif tokenizer is not None:
+            return self._initialize_tokenizer(tokenizer)
+        else:
+            return None
+
     def _get_tokenizer_endpoint(self) -> str | None:
         """Get the tokenizer endpoint if available."""
         return None
@@ -158,7 +167,7 @@ class BaseModel:
         if tokenizer is None:
             return None
         if isinstance(tokenizer, str):
-            return AutoTokenizer.from_pretrained(tokenizer)
+            return WrapperAutoTokenizer(tokenizer)
 
     @abc.abstractmethod
     def _build_chat_request_params(self, **kwargs) -> dict:

@@ -17,6 +17,7 @@ import re
 from typing import Union
 
 import requests
+from transformers import AutoTokenizer
 
 from nemo_skills.utils import get_logger_name
 
@@ -60,6 +61,24 @@ class ServerTokenizer:
 
         text = response.json()["prompt"]
         return text
+
+
+class WrapperAutoTokenizer:
+    """Wrapper around the AutoTokenizer class to provide similar functionality to the ServerTokenizer class."""
+
+    def __init__(self, model_name: str):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    def encode(self, prompt: str | list[dict]) -> list:
+        """Encode the prompt using the tokenizer."""
+        if isinstance(prompt, str):
+            return self.tokenizer.encode(prompt)
+        elif isinstance(prompt, list):
+            return self.tokenizer.apply_chat_template(prompt, add_generation_prompt=True)
+
+    def decode(self, tokens: list[int]) -> str:
+        """Decode a list of tokens using the tokenizer."""
+        return self.tokenizer.decode(tokens)
 
 
 class RequestException(RuntimeError):
