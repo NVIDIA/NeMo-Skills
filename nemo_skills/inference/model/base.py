@@ -109,6 +109,7 @@ class BaseModel:
             self.base_url = base_url
 
         self.tokenizer = self._get_tokenizer(tokenizer)
+        LOG.info(f"Tokenzier: {self.tokenizer}")
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
@@ -151,10 +152,12 @@ class BaseModel:
 
     def _get_tokenizer(self, tokenizer: str | None) -> Union[ServerTokenizer, WrapperAutoTokenizer, None]:
         """Get the tokenizer endpoint if available, otherwise initialize from tokenizer string"""
+        LOG.info(f"Getting tokenizer: {tokenizer}")
         tokenizer_endpoint = self._get_tokenizer_endpoint()
         if tokenizer_endpoint is not None:
             return tokenizer_endpoint
         elif tokenizer is not None:
+            LOG.info(f"Initializing tokenizer from string: {tokenizer}")
             return self._initialize_tokenizer(tokenizer)
         else:
             return None
