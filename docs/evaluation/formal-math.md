@@ -10,17 +10,18 @@ Evaluation constructs a complete Lean 4 file from the model output and dataset m
 
 At a high level, for each JSONL line in your result manifests we do the following:
 
-1) Build the final Lean program to check
-  - Normalize the model output to keep only the intended Lean code (controlled by `final_answer_key`).
-  - Insert the dataset-provided header (imports and configuration) to ensure a consistent environment (always included from dataset).
-  - Use the dataset’s original theorem (formal statement). If the model output includes a theorem declaration, we strip it and replace it with the canonical statement from the dataset to prevent statement tampering (controlled by `restate_formal_statement`; stripping governed by `strip_theorem_from_proof`).
-  - Prefer prompting the model to emit only the proof body; any generated theorem declaration will be replaced as above.
+1. Build the final Lean program to check.
+   All the parameters mentioned here are *evaluation* parameters which are controlled with `--extra_eval_args="++eval_config.<parameter_name>=<parameter_value>`
+      - Normalize the model output to keep only the intended Lean code. By default we only extract generation after `**FINAL ANSWER**`, but you can change the split phrase with `final_answer_key` parameter. If the `final_answer_key` phrase isn't present, we use the full generation instead.
+      - Insert the dataset-provided header (imports and configuration) to ensure a consistent environment (always included from dataset).
+      - Use the dataset’s original theorem (formal statement). If the model output includes a theorem declaration, we strip it and replace it with the canonical statement from the dataset to prevent statement tampering (controlled by `restate_formal_statement`; stripping governed by  `strip_theorem_from_proof`).
+      - If you're changing default prompt, it's best to ask the model to emit only the proof body; any generated theorem declaration will be replaced as above.
 
-2) Run the assembled program in the Lean sandbox
-  - The sandboxed checker returns a status indicating success, error, or timeout. If the proof typechecks but uses `sorry`, this is recorded explicitly.
+2. Run the assembled program in the Lean sandbox
+      - The sandboxed checker returns a status indicating success, error, or timeout. If the proof typechecks but uses `sorry`, this is recorded explicitly.
 
-3) Persist results
-  - We write back the assembled proof and its `proof_status` into the same JSONL files, replacing them atomically.
+3. Persist results
+      - We write back the assembled proof and its `proof_status` into the same JSONL files, replacing them atomically.
 
 ## Key configuration and evaluation considerations
 
