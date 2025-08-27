@@ -82,7 +82,8 @@ class CommandBuilder:
             f"    --server_type {server_type} "
             f"    --output_dir {output_dir} "
             f"    --server_gpus {self.config.server_gpus} "
-            f"    --server_nodes {self.config.server_nodes} " + tokenizer_path
+            f"    --server_nodes {self.config.server_nodes} "
+            f"    ++max_samples=1 " + tokenizer_path
         )
 
     def build_eval_cmd(self, output_dir: str, server_type: str, enable_soft_fail: bool, retry_strategy: str) -> str:
