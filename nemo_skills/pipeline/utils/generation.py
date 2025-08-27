@@ -81,7 +81,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
 
     outputs = []
     total_files = len(check_commands)
-    LOG.info(f"Checking {total_files} files in batches of {batch_size}...")
+    LOG.debug(f"Checking {total_files} files in batches of {batch_size}...")
 
     for i in range(0, len(check_commands), batch_size):
         batch = check_commands[i : i + batch_size]
@@ -89,7 +89,7 @@ def get_remaining_jobs(cluster_config, output_dir, random_seeds, chunk_ids, reru
         total_batches = (len(check_commands) + batch_size - 1) // batch_size
 
         if total_files > 100:  # Show progress for large file sets
-            LOG.info(f"Processing batch {batch_num}/{total_batches}...")
+            LOG.debug(f"Processing batch {batch_num}/{total_batches}...")
 
         command = f"bash -c '{'; '.join(batch)}'"
 
