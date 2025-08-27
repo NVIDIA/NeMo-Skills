@@ -239,7 +239,7 @@ eval(
         "++inference.temperature=0.6"
     ),
     cluster=cluster,
-    model=f"{output_dir}/qwq-32b-trtllm",
+    model=f"{output_dir}/QwQ-32B",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
     run_after=f"{expname}-download-hf", # (3)!

@@ -11,13 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# used to execute code within these tags
-code_begin: "<tool_call>"
-code_end: "</tool_call>"
-# used to extract the code output
-code_output_begin: "\n```output\n"
-code_output_end: "```\n"
-# used to post-process code output
-# choices: llama, qwen
-code_output_format: "qwen"
