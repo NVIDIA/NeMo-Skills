@@ -236,8 +236,8 @@ class GenerationTask:
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
-        self.llm = self.setup_llm()
-        self.prompt = self.setup_prompt()
+        self.prompt, tokenizer = self.setup_prompt()
+        self.llm = self.setup_llm(tokenizer)
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
@@ -262,10 +262,10 @@ class GenerationTask:
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
-    def setup_llm(self):
+    def setup_llm(self, tokenizer: str):
         if self.cfg.code_execution:
             sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.cfg.tokenizer, sandbox=sandbox)
+            llm = get_code_execution_model(**self.cfg.server, tokenizer=tokenizer, sandbox=sandbox)
         elif self.cfg.online_genselect:
             # Use the same prompt parameters for genselect as the one used for generation
             self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
@@ -275,12 +275,12 @@ class GenerationTask:
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
                 **self.cfg.server,
-                tokenizer=self.cfg.tokenizer,
+                tokenizer=tokenizer,
                 online_genselect_config=self.cfg.online_genselect_config,
             )
         else:
             # Extract context retry config from server dict
-            llm = get_model(**self.cfg.server, tokenizer=self.cfg.tokenizer)
+            llm = get_model(**self.cfg.server, tokenizer=tokenizer)
 
         return llm
 
@@ -302,7 +302,7 @@ class GenerationTask:
         if self.cfg.system_message is not None:
             prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
-        return prompt
+        return prompt, tokenizer
 
     def log_example_prompt(self, data):
         data_point = deepcopy(data[0])
