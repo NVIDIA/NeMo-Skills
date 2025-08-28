@@ -35,4 +35,4 @@ user_end: "<|end|>"
 assistant_begin: "<|start|>assistant"
 assistant_end: "<|end|>"
 
-stop_phrases: ['<|call|>', '<|return|>']
+stop_phrases: ['<|return|>']
