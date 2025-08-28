@@ -136,6 +136,7 @@ class GenerateSolutionsConfig:
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
+    ## FIXME(sanyamk): Rethink the structure of this configuration.
     tool_config: str | None = None  # Path to tool configuration file.
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
