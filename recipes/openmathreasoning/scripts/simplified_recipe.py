@@ -40,20 +40,6 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         expname=f"{expname_prefix}-download-assets",
         log_dir=f"{workspace}/download-assets",
     )
-    # convert QwQ trtllm format
-    convert(
-        ctx=wrap_arguments("--max_seq_len 10000"),
-        cluster=cluster,
-        input_model=f"{workspace}/QwQ-32B",
-        output_model=f"{workspace}/qwq32b-trtllm",
-        convert_from="hf",
-        convert_to="trtllm",
-        num_gpus=num_gpus,
-        model_type="qwen",
-        hf_model_name="Qwen/QwQ-32B",
-        expname=f"{expname_prefix}-convert-qwq-trtllm",
-        run_after=f"{expname_prefix}-download-assets",
-    )
 
     if training_backend == "nemo-aligner":
         # convert Qwen2.5-14B-Instruct to nemo format
@@ -80,7 +66,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     )
 
     generate(
-        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml " f"++prompt_template=qwen-instruct "),
+        ctx=wrap_arguments(f"++prompt_config={workspace}/extract-problems.yaml"),
         cluster=cluster,
         input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/sdg/problems",
@@ -98,17 +84,14 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
     generate(
         ctx=wrap_arguments(
-            f"++prompt_config=generic/math "
-            f"++inference.temperature=0.6 "
-            f"++inference.tokens_to_generate=8192 "
-            f"++prompt_template=qwen-instruct "
+            f"++prompt_config=generic/math ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "
         ),
         cluster=cluster,
         input_file=f"{workspace}/sdg/extracted-problems.jsonl",
         output_dir=f'{workspace}/sdg/solutions',
         expname=f'{expname_prefix}-solution-generation',
-        run_after=[f'{expname_prefix}-problem-extraction', f'{expname_prefix}-convert-qwq-trtllm'],
-        model=f'{workspace}/qwq32b-trtllm',
+        run_after=f'{expname_prefix}-problem-extraction',
+        model=f"{workspace}/QwQ-32B",
         server_type='trtllm',
         server_gpus=num_gpus,
         log_samples=not wandb_params['disable_wandb'],
@@ -126,7 +109,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
             f"    ++input_files={workspace}/sdg/solutions/output.jsonl "
             f"    ++output_path={workspace}/sft-data.jsonl "
             f"    ++prompt_config=generic/math "
-            f"    ++prompt_template=qwen-instruct "
+            f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
             f"    ++filters.remove_contaminated=false "
             f"    ++add_unlabeled=true "
             f"    ++filters.remove_no_think_tags=true "
@@ -163,17 +146,18 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
     elif training_backend == "nemo-rl":
         sft_nemo_rl(
             ctx=wrap_arguments(
-                '++sft.max_num_epochs=4 '  # training for a bit longer here
-                '++policy.dtensor_cfg.tensor_parallel_size=8 '
                 '++policy.max_total_sequence_length=8192 '
                 '++policy.train_global_batch_size=32 '
-                '++policy.optimizer.kwargs.lr=1e-5 '
-                '++policy.dtensor_cfg.sequence_parallel=true '
-                '++policy.dtensor_cfg.activation_checkpointing=true '
+                '++policy.megatron_cfg.tensor_model_parallel_size=4 '
+                '++policy.megatron_cfg.context_parallel_size=2 '
+                '++policy.megatron_cfg.optimizer.lr=1e-4 '
+                '++policy.megatron_cfg.optimizer.min_lr=1e-6 '
+                '++sft.max_num_epochs=2 '
             ),
             cluster=cluster,
             output_dir=f'{workspace}/training',
             hf_model=f'{workspace}/Qwen2.5-14B-Instruct',
+            backend="megatron",
             num_gpus=num_gpus,
             num_nodes=1,
             disable_wandb=wandb_params['disable_wandb'],

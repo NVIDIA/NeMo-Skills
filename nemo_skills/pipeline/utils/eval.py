@@ -15,13 +15,13 @@
 import importlib
 import logging
 import os
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.dataset.utils import get_dataset_module
+from nemo_skills.dataset.utils import get_dataset_module, import_from_path
+from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
 
@@ -69,6 +69,7 @@ def get_benchmark_args_from_module(
     cluster_config,
     data_path,
     is_on_cluster,
+    eval_requires_judge,
     benchmark_group=None,
     override_dict=None,
 ):
@@ -79,11 +80,11 @@ def get_benchmark_args_from_module(
         if pipeline_utils.is_mounted_filepath(cluster_config, data_path):
             input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
             unmounted_input_file = pipeline_utils.get_unmounted_path(cluster_config, input_file)
-            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace('/nemo_run/code/', ''))
+            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace("/nemo_run/code/", ""))
         else:
             # will be copied over in this case as it must come from extra datasets
             input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark.replace('.', '/')}/{split}.jsonl"
-            unmounted_path = Path(data_path) / benchmark.replace('.', '/') / f"{split}.jsonl"
+            unmounted_path = Path(data_path) / benchmark.replace(".", "/") / f"{split}.jsonl"
     else:
         # on cluster we will always use the mounted path
         input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
@@ -96,19 +97,21 @@ def get_benchmark_args_from_module(
             raise ValueError(
                 f"Data file {unmounted_path} does not exist on cluster. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
     else:
         if not Path(unmounted_path).exists():
             raise ValueError(
                 f"Data file {unmounted_path} does not exist locally. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
 
-    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", override_dict=override_dict)
+    # this is deprecated, should remove in the future
+    prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", "", override_dict=override_dict)
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
-    generation_args = f"++prompt_config={prompt_config} {generation_args}"
+    if prompt_config:
+        generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
 
     generation_module = get_arg_from_module_or_dict(
@@ -125,7 +128,7 @@ def get_benchmark_args_from_module(
     if num_chunks == 0:
         num_chunks = None
 
-    if judge_args or judge_pipeline_args:
+    if judge_args or judge_pipeline_args or eval_requires_judge:
         # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
         eval_subfolder = "tmp-eval-results/"
     else:
@@ -134,6 +137,14 @@ def get_benchmark_args_from_module(
     if benchmark_group:
         eval_subfolder += f"{benchmark_group}/"
     eval_subfolder += benchmark
+
+    # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
+    # TODO: is there a better way to handle this?
+    if benchmark == "swe-bench" and cluster_config["executor"] == "local":
+        LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
+        os.environ["NEMO_SKILLS_PRIVILEGED_DOCKER"] = "1"
+
+    eval_args += f" ++split={split} "
 
     return BenchmarkArgs(
         name=benchmark,
@@ -151,7 +162,9 @@ def get_benchmark_args_from_module(
     )
 
 
-def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets):
+def add_default_args(
+    cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets, eval_requires_judge
+):
     benchmark_or_group_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark_or_group,
         data_dir=data_dir,
@@ -178,8 +191,12 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
                 cluster_config=cluster_config,
                 data_path=data_path,
                 is_on_cluster=is_on_cluster,
+                eval_requires_judge=eval_requires_judge,
                 override_dict=override_dict,
             )
+            if data_dir:
+                benchmark_args.eval_args += f" ++data_dir={data_dir} "
+
             # TODO: should it be optional?
             benchmark_args.score_module = benchmark_or_group_module.SCORE_MODULE
             benchmarks_args.append(benchmark_args)
@@ -187,16 +204,20 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
 
     # Single benchmark
     benchmark = benchmark_or_group
-    return [
-        get_benchmark_args_from_module(
-            benchmark_module=benchmark_or_group_module,
-            benchmark=benchmark,
-            split=split,
-            cluster_config=cluster_config,
-            data_path=data_path,
-            is_on_cluster=is_on_cluster,
-        )
-    ]
+    benchmark_args = get_benchmark_args_from_module(
+        benchmark_module=benchmark_or_group_module,
+        benchmark=benchmark,
+        split=split,
+        cluster_config=cluster_config,
+        data_path=data_path,
+        is_on_cluster=is_on_cluster,
+        eval_requires_judge=eval_requires_judge,
+    )
+
+    if data_dir:
+        benchmark_args.eval_args += f" ++data_dir={data_dir} "
+
+    return [benchmark_args]
 
 
 def prepare_eval_commands(
@@ -218,10 +239,19 @@ def prepare_eval_commands(
     with_sandbox,
     wandb_parameters,
     extra_eval_args,
+    eval_requires_judge,
+    generation_type=None,
+    generation_module=None,
 ):
     # TODO: there is a bit too much code duplication here and logic is quite dense, should try to refactor
 
     # TODO: should we allow setting num chunks per benchmark when not using groups? Maybe benchmark:rs_num:num_chunks?
+
+    if generation_type is not None:
+        if generation_module is not None:
+            raise ValueError("Cannot specify both generation_module and generation_type. ")
+
+        generation_module = GENERATION_MODULE_MAP[generation_type]
 
     benchmarks_or_groups = {
         k: int(v) for k, v in [b.split(":") if ":" in b else (b, -1) for b in benchmarks_or_groups.split(",")]
@@ -230,7 +260,7 @@ def prepare_eval_commands(
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
     if num_jobs is None:
-        if cluster_config['executor'] == 'slurm':
+        if cluster_config["executor"] == "slurm":
             num_jobs = -1  # -1 means run all benchmarks in parallel
         else:
             # for local executor, it makes no sense to use other values
@@ -245,6 +275,7 @@ def prepare_eval_commands(
             data_dir,
             extra_datasets_type,
             extra_datasets,
+            eval_requires_judge=eval_requires_judge,
         )
         for benchmark_args in cur_benchmarks:
             benchmark = benchmark_args.name
@@ -307,7 +338,7 @@ def prepare_eval_commands(
 
     cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters['server_gpus'], exclusive, server_parameters['server_type']
+        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
     )
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
@@ -330,7 +361,7 @@ def prepare_eval_commands(
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     benchmark_output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -338,10 +369,14 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                generation_task = importlib.import_module(benchmark_args.generation_module)
-                if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+                effective_generation_module = generation_module or benchmark_args.generation_module
+                if effective_generation_module and os.sep in effective_generation_module:
+                    generation_task = import_from_path(effective_generation_module)
+                else:
+                    generation_task = importlib.import_module(effective_generation_module)
+                if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
                     raise ValueError(
-                        f"Module {benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+                        f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
                         "Please provide a valid generation module."
                     )
                 generation_task = generation_task.GENERATION_TASK_CLASS
@@ -366,7 +401,7 @@ def prepare_eval_commands(
                     eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
                     chunk_id=chunk_id,
                     num_chunks=benchmark_args.num_chunks,
-                    script=benchmark_args.generation_module,
+                    script=generation_module or benchmark_args.generation_module,
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 )

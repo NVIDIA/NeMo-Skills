@@ -10,16 +10,17 @@ Here are some of the features we support:
 
 - [Flexible LLM inference](basics/inference.md):
     - Seamlessly switch between API providers, local server and large-scale Slurm jobs for LLM inference.
-    - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang), [Megatron](https://github.com/NVIDIA/Megatron-LM) or [NeMo](https://github.com/NVIDIA/NeMo).
+    - Host models (on 1 or many nodes) with [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), [vLLM](https://github.com/vllm-project/vllm), [sglang](https://github.com/sgl-project/sglang) or [Megatron](https://github.com/NVIDIA/Megatron-LM).
     - Scale SDG jobs from 1 GPU on a local machine all the way to tens of thousands of GPUs on a Slurm cluster.
 - [Model evaluation](pipelines/evaluation.md):
     - Evaluate your models on many popular benchmarks.
-        - Math problem solving: hmmt_feb25, brumo25, aime24, aime25, omni-math (and many more)
-        - Formal proofs in Lean: minif2f, proofnet
-        - Coding skills: scicode, livecodebench, human-eval, mbpp
-        - Chat/instruction following: ifeval, arena-hard
-        - General knowledge: mmlu, mmlu-pro, gpqa
-        - Long context: ruler
+        - [**Math (natural language**)](./evaluation/natural-math.md): e.g. [aime24](./evaluation/natural-math.md#aime24), [aime25](./evaluation/natural-math.md#aime25), [hmmt_feb25](./evaluation/natural-math.md#hmmt_feb25)
+        - [**Math (formal language)**](./evaluation/formal-math.md): e.g. [minif2f](./evaluation/formal-math.md#minif2f), [proofnet](./evaluation/formal-math.md#proofnet), [putnam-bench](./evaluation/formal-math.md#putnam-bench)
+        - [**Code**](./evaluation/code.md): e.g. [swe-bench](./evaluation/code.md#swe-bench), [livecodebench](./evaluation/code.md#livecodebench)
+        - [**Scientific knowledge**](./evaluation/scientific-knowledge.md): e.g., [hle](./evaluation/scientific-knowledge.md#hle), [scicode](./evaluation/scientific-knowledge.md#scicode), [gpqa](./evaluation/scientific-knowledge.md#gpqa)
+        - [**Instruction following**](./evaluation/instruction-following.md): e.g. [ifbench](./evaluation/instruction-following.md#ifbench), [ifeval](./evaluation/instruction-following.md#ifeval)
+        - [**Long-context**](./evaluation/long-context.md): e.g. [ruler](./evaluation/long-context.md#ruler), [mrcr](./evaluation/long-context.md#mrcr)
+        - [**Tool-calling**](./evaluation/tool-calling.md): e.g. [bfcl_v3](./evaluation/tool-calling.md#bfcl_v3)
     - Easily parallelize each evaluation across many Slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](pipelines/training.md): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
@@ -30,3 +31,6 @@ commands and their options.
 You can find more examples of how to use NeMo-Skills in the [tutorials](./tutorials/index.md) page.
 
 We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
+
+We support many popular benchmarks and it's easy to add new in the future. The following categories of benchmarks are supported
+

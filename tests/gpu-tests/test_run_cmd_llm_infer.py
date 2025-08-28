@@ -32,7 +32,6 @@ def test_run_cmd_llm_infer():
     model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    prompt_template = 'llama3-instruct' if model_type == 'llama' else 'qwen-instruct'
 
     model_info = [
         ("vllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),

@@ -15,15 +15,15 @@
 executor: slurm
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.6.1
-  vllm: igitman/nemo-skills-vllm:0.6.1
-  sglang: igitman/nemo-skills-sglang:0.6.1
-  nemo: igitman/nemo-skills-nemo:0.6.1
-  megatron: igitman/nemo-skills-megatron:0.6.1
-  sandbox: igitman/nemo-skills-sandbox:0.6.1
-  nemo-skills: igitman/nemo-skills:0.6.1
-  verl: igitman/nemo-skills-verl:0.6.1
-  nemo-rl: igitman/nemo-skills-nemo-rl:0.6.1
+  trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
+  vllm: vllm/vllm-openai:v0.10.1.1
+  sglang: igitman/nemo-skills-sglang:0.7.0
+  nemo: igitman/nemo-skills-nemo:0.7.0
+  megatron: igitman/nemo-skills-megatron:0.7.0
+  sandbox: igitman/nemo-skills-sandbox:0.7.1
+  nemo-skills: igitman/nemo-skills:0.7.0
+  verl: igitman/nemo-skills-verl:0.7.0
+  nemo-rl: igitman/nemo-skills-nemo-rl:0.7.0
 
 job_name_prefix: "nemo_skills:"
 
@@ -53,7 +53,7 @@ job_name_prefix: "nemo_skills:"
 # mounts:
 #   - <slurm location for your data/models>:<where to mount in a container>
 #   e.g.
-#   - <path on slurm>/trt_models:/trt_models
+#   - <path on slurm>/models:/models
 #   - <path on slurm>/data:/data
 #   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
 #   - <path on slurm>/NeMo-Aligner:/opt/NeMo-Aligner
@@ -65,3 +65,7 @@ job_name_prefix: "nemo_skills:"
 # timeouts:
 #   partition_name1: 06:00:00
 #   partition_name2: 01:30:00
+
+# define any environment variables. Note that HF_HOME is required by default and needs to be a mounted path!
+# env_vars:
+#   - HF_HOME=/models/hf-cache

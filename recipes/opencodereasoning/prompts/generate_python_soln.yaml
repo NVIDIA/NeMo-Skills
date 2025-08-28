@@ -1,16 +1,14 @@
 # Prompt Config used for generation of reasoning prompts using reasoning capable models
 # Note the use of "{instruction}" key in user prompt
 
-system: ""
-
 user: |-
   You are a helpful and harmless assistant. You should think step-by-step before responding to the instruction below.
-  
+
   Please use python programming language only. You must use `input()` to get user input and `print()` to output your response.
 
   You must use ```python for just the final solution code block with the following format:
   ```python
   # Your code here
   ```
-  
+
   {question}

@@ -5,8 +5,7 @@ We assume you have `/workspace` defined in your [cluster config](../../basics/cl
 all commands on a slurm cluster. Change the commands accordingly if running locally
 (but it's going to take a lot of time).
 We also assume you have the [Llama3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct)
-on that cluster inside `/trt_models/llama-3.1-405b-instruct` (should be mounted in your config)
-that's been [converted](../../pipelines/checkpoint-conversion.md) to TensorRT-LLM format.
+on that cluster inside `/hf_models/Llama-3.1-405B-Instruct` (should be mounted in your config).
 See [generation docs](../../pipelines/generation.md) for how you can change the below commands to instead
 run inference through Nvidia NIM API.
 
@@ -25,7 +24,7 @@ MATH dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=512 \
@@ -34,7 +33,9 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
-    ++prompt_template=llama3-base
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 GSM8K dataset.
@@ -43,7 +44,7 @@ GSM8K dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=64 \
@@ -52,7 +53,9 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
-    ++prompt_template=llama3-base
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 ## Problem augmentation
@@ -64,7 +67,7 @@ MATH dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=80 \
@@ -72,8 +75,10 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
-    ++prompt_template=llama3-instruct \
-    ++generation_key=problem
+    ++generation_key=problem \
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 GSM8K dataset.
@@ -82,7 +87,7 @@ GSM8K dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=10 \
@@ -90,8 +95,10 @@ ns generate \
     --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
-    ++prompt_template=llama3-instruct \
-    ++generation_key=problem
+    ++generation_key=problem \
+    ++use_completions_api=True \
+    ++tokenizer=meta-llama/Llama-3.1-405B \
+    ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 ## Solutions for augmented data
@@ -112,7 +119,7 @@ for i in range(80):
     generate(
         cluster="slurm",
         server_type="trtllm",
-        model="/trt_models/llama-3.1-405b-instruct",
+        model="/hf_models/Llama-3.1-405B-Instruct",
         server_gpus=8,
         server_nodes=2,
         num_random_seeds=32,
@@ -121,7 +128,9 @@ for i in range(80):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=math_text_detailed "
-            f"++prompt_template=llama3-base "
+            f"++use_completions_api=True "
+            f"++tokenizer=meta-llama/Llama-3.1-405B "
+            f"++stop_phrase='\n\n\n\n\n\n' "
         ),
     )
 ```
@@ -137,7 +146,7 @@ for i in range(10):
     generate(
         cluster="slurm",
         server_type="trtllm",
-        model="/trt_models/llama-3.1-405b-instruct",
+        model="/hf_models/Llama-3.1-405B-Instruct",
         server_gpus=8,
         server_nodes=2,
         num_random_seeds=32,
@@ -146,7 +155,9 @@ for i in range(10):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=gsm8k_text_detailed "
-            f"++prompt_template=llama3-base "
+            f"++use_completions_api=True "
+            f"++tokenizer=meta-llama/Llama-3.1-405B "
+            f"++stop_phrase='\n\n\n\n\n\n' "
         ),
     )
 ```
@@ -256,7 +267,6 @@ To avoid the models from generating extremely short solutions, we remove solutio
 ```bash
 ns run_cmd --cluster=slurm \
 python -m nemo_skills.training.prepare_data \
-    ++prompt_template=llama3-instruct \
     ++prompt_config=generic/math \
     ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
     ++output_path=/workspace/sft_data.jsonl \
@@ -265,7 +275,7 @@ python -m nemo_skills.training.prepare_data \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \
     ++min_solution_length=200 \
-    ++hf_model_name="meta-llama/Meta-Llama-3.1-8B" \
+    ++tokenizer="meta-llama/Meta-Llama-3.1-8B" \
     ++max_solution_length=1024 \
     ++filters.remove_contaminated=true \
     ++contamination_file=/workspace/new-problems-solution-augmentation/contamination-llm/output.jsonl

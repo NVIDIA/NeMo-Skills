@@ -25,12 +25,13 @@ from nemo_skills.prompt.utils import get_prompt
 def apply_format(elem, prompt):
     assert len(elem['messages']) == 2
     elem['input'] = prompt.fill({'problem': elem['messages'][0]['content']})
-    elem['output'] = elem['messages'][1]['content'] + prompt.config.template.assistant_end
+    elem['output'] = prompt.format_assistant_response(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="math")
 
-prompt = get_prompt('generic/math', 'qwen-instruct')
+prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct')
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -49,7 +50,7 @@ To get this data, follow instructions for the **second-round** SFT data in [Open
 
 ### Math GenSelect data
 
-Coming soon!
+We have not released this data yes. Please open an issue if you need it.
 
 ### Code CoT data
 
@@ -100,12 +101,13 @@ def apply_format(elem, prompt):
     question = get_question(metadata['dataset'], metadata['split'], int(metadata['index']))
 
     elem['input'] = prompt.fill({'question': question})
-    elem['output'] = elem['messages'][1]['content'] + prompt.config.template.assistant_end
+    elem['output'] = prompt.format_assistant_response(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="code")
 
-prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'qwen-instruct')
+prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'Qwen/Qwen2.5-32B-Instruct')
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -124,12 +126,13 @@ from nemo_skills.prompt.utils import get_prompt
 
 def apply_format(elem, prompt):
     elem['input'] = prompt.fill({'question': elem['input']})
-    elem['output'] += prompt.config.template.assistant_end
+    elem['output'] = prompt.format_assistant_response(elem['output'])
     return elem
 
 dataset = load_dataset("nvidia/OpenScienceReasoning-2", split="train")
 
-prompt = get_prompt('generic/default', 'qwen-instruct')  # data already includes instruction
+prompt = get_prompt('generic/default', 'Qwen/Qwen2.5-32B-Instruct')  # data already includes instruction
+prompt.config.system = ""  # disabling default identity system message
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 
@@ -141,12 +144,13 @@ dataset.to_json("open-reasoning-science-cot.jsonl")
 
 We mostly use the same training commands as for [OpenMathReasoning models](../openmathreasoning/training.md#run-training). The only difference
 is that we pack sequences to 49152 length and use a little different hyperparameters detailed in the following table.
+Note that unlike OpenMathReasoning, we are not starting from *Math* models, but are using standard base models for all model sizes.
 
-|                       | **lr** | **min_lr** | **TP** | **PP** | **CP** |
-| --------------------- | ------ | ---------- | ------ | ------ | ------ |
-| **Qwen2.5-Math-1.5B** | 1e-4   | 1e-7       | 1      | 1      | 4      |
-| **Qwen2.5-Math-7B**   | 1e-4   | 1e-7       | 4      | 1      | 4      |
-| **Qwen2.5-14B**       | 1e-4   | 1e-7       | 8      | 1      | 4      |
-| **Qwen2.5-32B**       | 1e-4   | 1e-7       | 8      | 2      | 4      |
+|                  | **lr** | **min_lr** | **TP** | **PP** | **CP** |
+| ---------------- | ------ | ---------- | ------ | ------ | ------ |
+| **Qwen2.5-1.5B** | 1e-4   | 1e-7       | 1      | 1      | 4      |
+| **Qwen2.5-7B**   | 1e-4   | 1e-7       | 4      | 1      | 4      |
+| **Qwen2.5-14B**  | 1e-4   | 1e-7       | 8      | 1      | 4      |
+| **Qwen2.5-32B**  | 1e-4   | 1e-7       | 8      | 2      | 4      |
 
 All models are trained for 30000 steps with a single round of SFT and we take the last checkpoint as the final model.

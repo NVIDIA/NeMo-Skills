@@ -107,12 +107,8 @@ def format_passthrough(data):
 
 def prepare_math_dataset(split_ds):
     # Format the examples, removing original columns
-    train_formatted = split_ds["train"].map(
-        format_passthrough,
-    )
-    val_formatted = split_ds["validation"].map(
-        format_passthrough,
-    )
+    train_formatted = split_ds["train"].map(format_passthrough)
+    val_formatted = split_ds["validation"].map(format_passthrough)
 
     return {
         "train": train_formatted,
@@ -148,10 +144,6 @@ class NSTaskDataSpec(TaskDataSpec):
     prompt_spec: dict[str, Any] | None = None
 
 
-def apply_ns_chat_template(prompt, datum_dict) -> str:
-    return prompt.fill(datum_dict, return_templated_dict=True)
-
-
 # TaskDataProcessFnCallable
 def ns_data_processor(
     datum_dict: dict[str, Any],
@@ -163,19 +155,23 @@ def ns_data_processor(
     prompt_spec = task_data_spec.prompt_spec
     extra_env_info = copy.deepcopy(datum_dict)
 
-    message_log: LLMMessageLogType = []
-
     prompt = get_prompt(
         prompt_config=prompt_spec["prompt_config"],
-        prompt_template=prompt_spec["prompt_template"],
+        tokenizer=tokenizer,
         examples_type=prompt_spec["examples_type"],
         config_dir=prompt_spec["config_dir"],
-        template_dir=prompt_spec["template_dir"],
     )
-    message_log = apply_ns_chat_template(prompt, datum_dict)
-
-    for message in message_log:
-        message["token_ids"] = tokenizer([message['content']], return_tensors="pt")["input_ids"][0]
+    # we need to include system message here as roles are only used for masking
+    # so prompt.fill can return a combined system + user message
+    # if we use separate, it will have double BOS in the tokens!
+    user_message = prompt.fill(datum_dict)
+    message_log = [
+        {
+            'role': 'user',
+            'content': user_message,
+            'token_ids': tokenizer([user_message], return_tensors="pt", add_special_tokens=False)["input_ids"][0],
+        }
+    ]
 
     length = sum(len(m["token_ids"]) for m in message_log)
 

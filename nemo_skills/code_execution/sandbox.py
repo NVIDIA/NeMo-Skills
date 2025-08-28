@@ -13,17 +13,18 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import glob
 import json
 import logging
 import os
 import re
+import traceback
 import uuid
-from concurrent.futures import ThreadPoolExecutor
-from itertools import zip_longest
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
-import requests
+import httpx
 import tqdm
 
 from nemo_skills.code_execution.utils import clean_formal_generation
@@ -33,63 +34,10 @@ from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help, unroll_fi
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-class DummyFuture:
-    def __init__(self, return_value):
-        self.return_value = return_value
-
-    def result(self):
-        return self.return_value
-
-
 def unroll_files(input_files):
     for manifest_pattern in input_files:
         for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
             yield manifest
-
-
-def cleanup_tmp_files(input_files):
-    # removing any potentially present tmp files
-    for manifest in unroll_files(input_files):
-        try:
-            os.remove(manifest + "-tmp")
-        except OSError:
-            pass
-
-
-def dump_data(input_files, data, map_to_future):
-    LOG.info("Waiting for current results and dumping to tmp files")
-    tmp_file_handles = [
-        open(manifest + f"-tmp", "at", encoding="utf-8", buffering=1) for manifest in unroll_files(input_files)
-    ]
-
-    for line_data in data:
-        for file_data, file_handle in zip(line_data, tmp_file_handles):
-            if file_data is None:
-                continue
-            line_dict = json.loads(file_data)
-            if not line_dict:
-                file_handle.write("\n")
-                continue
-            line_dict["proof_status"] = map_to_future[(line_dict["predicted_proof"])].result()
-            file_handle.write(json.dumps(line_dict) + "\n")
-
-    for file_handle in tmp_file_handles:
-        file_handle.close()
-
-
-def write_tmp_files_back(input_files):
-    """Will gracefully handle early exits on errors by properly merging files"""
-    LOG.info("Writing temporary files back into original files")
-    for manifest in unroll_files(input_files):
-        # copying the rest of the results unchanged if any to tmp file
-        with open(manifest + "-tmp", "rt") as fin:
-            processed_lines = sum(1 for _ in fin)
-        with open(manifest, "rt", encoding="utf-8") as fin, open(manifest + "-tmp", "at", encoding="utf-8") as fout:
-            for line_idx, line in enumerate(fin):
-                if line_idx >= processed_lines:
-                    fout.write(line)
-        # then replacing original file with tmp file
-        os.replace(manifest + "-tmp", manifest)
 
 
 def extract_proof_only(lean_code: str) -> str:
@@ -97,7 +45,7 @@ def extract_proof_only(lean_code: str) -> str:
     if not lines:
         return ""
 
-    header_start_pattern = re.compile(r'^\s*(theorem|example)\b')
+    header_start_pattern = re.compile(r"^\s*(theorem|example)\b")
     header_start_idx = None
 
     # 1. Find where the theorem starts
@@ -164,40 +112,50 @@ class Sandbox(abc.ABC):
     ):
         self.host = host
         self.port = port
-        session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(pool_maxsize=1500, pool_connections=1500, max_retries=3)
-        session.mount('http://', adapter)
-        session.mount('https://', adapter)
-        self.http_session = session
+        # Create async HTTP client with high limits
+        self.http_session = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=2048, max_connections=2048),
+        )
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
-        # will keep state of code sessions
-        self.sessions = {}
+        self.session_histories = defaultdict(list)  # session_id -> list of generated_code
 
-    def clear_session(self, session_id):
-        del self.sessions[session_id]
+    async def close(self):
+        """Close the HTTP session."""
+        await self.http_session.aclose()
 
-    def _send_request(self, request, timeout):
+    async def _send_request(self, request, timeout):
+        session_id = request.pop("session_id", None)
+        extra_headers = {}
+        if session_id is not None:
+            extra_headers["X-Session-ID"] = str(session_id)
+
         if self.ssh_server and self.ssh_key_path:
+            # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
 
-            sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-            output = sshtunnel_request.post(
-                url=self._get_execute_url(),
-                data=json.dumps(request),
-                timeout=timeout,
-                headers={"Content-Type": "application/json"},
-            )
+            def ssh_request():
+                sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
+                return sshtunnel_request.post(
+                    url=self._get_execute_url(),
+                    data=json.dumps(request),
+                    timeout=timeout,
+                    headers={"Content-Type": "application/json", **extra_headers},
+                )
+
+            # Native async requires more lines of code, so we use to_thread
+            # Should be ok since this is a debug mode
+            output = await asyncio.to_thread(ssh_request)
         else:
-            output = self.http_session.post(
+            output = await self.http_session.post(
                 url=self._get_execute_url(),
-                data=json.dumps(request),
+                content=json.dumps(request),
                 timeout=timeout,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **extra_headers},
             )
         # retrying 502 errors
         if output.status_code == 502:
-            raise requests.exceptions.Timeout
+            raise httpx.TimeoutException("502 error")
         return self._parse_request_output(output)
 
     @abc.abstractmethod
@@ -209,217 +167,171 @@ class Sandbox(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _prepare_request(self, generated_code, timeout):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language="ipython",
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity="Plain",
+    ):
         pass
 
-    def execute_code(
+    @abc.abstractmethod
+    async def delete_session(self, session_id: str) -> None:
+        """Delete a remote execution session if supported by the backend."""
+        pass
+
+    async def execute_code(
         self,
         generated_code: str,
         std_input: str = "",
-        language: str = 'ipython',
+        language: str = "ipython",
         timeout: float = 10.0,
         max_output_characters: int = 1000,
         session_id: Optional[str] = None,
-        traceback_verbosity='plain',  # could be plain, context, verbose, or minimal
+        traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-
-        if session_id is None and language == "ipython":  # creating a new session with empty state
-            session_id = uuid.uuid4()
-            self.sessions[session_id] = []
-
-        if session_id is not None:
-            self.sessions[session_id].append(generated_code)
-
-        if language == 'ipython':
-            TO_EXECUTE = """
-import traceback
-import json
-import os
-import re
-import warnings
-warnings.filterwarnings('ignore')
-os.environ['OPENBLAS_NUM_THREADS'] = '16'
-
-from IPython.core.interactiveshell import InteractiveShell
-from IPython.utils import io
-
-def simplify_errors(error_text):
-    def strip_ansi_codes(text):
-        ansi_escape = re.compile(r'\\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
-
-    error_text = strip_ansi_codes(error_text)
-    output = []
-    for line in error_text.split('\\n'):
-        if line.strip().startswith('File <ipython-'):
-            continue
-        output.append(line)
-    return '\\n'.join(output)
-
-code_snippets = []
-"""
-            for code_snippet in self.sessions[session_id]:
-                TO_EXECUTE += f'\ncode_snippets.append({repr(code_snippet)})\n'
-
-            # we do `strip() + \\n` below to ensure that `print(res)` and `res` return the same output
-            TO_EXECUTE += f"""
-try:
-    shell = InteractiveShell()
-    shell.InteractiveTB.set_mode(mode='{traceback_verbosity}')
-    for code in code_snippets:
-        with io.capture_output() as captured:
-            exec_result = shell.run_cell(code)
-    stdout = captured.stdout.replace("Out[1]: ", "").strip()
-    stderr = captured.stderr.replace("Out[1]: ", "").strip()
-    if len(stdout) > {max_output_characters}:
-        stdout = stdout[:{max_output_characters}] + "<output cut>"
-    if len(stderr) > {max_output_characters}:
-        stderr = stderr[:{max_output_characters}] + "<output cut>"
-    if stdout:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stdout = simplify_errors(stdout)
-        stdout += "\\n"
-    if stderr:
-        if '{traceback_verbosity}' in ['Minimal', 'Plain']:
-            stderr = simplify_errors(stderr)
-        stderr += "\\n"
-    has_error = exec_result.error_before_exec or exec_result.error_in_exec
-    to_return = {{"process_status": "error" if has_error else "completed", "stdout": stdout, "stderr": stderr}}
-
-except Exception:
-    # removing useless prefix from traceback
-    to_return = {{
-        "process_status": "error",
-        "stdout": "",
-        "stderr": "\\n".join(traceback.format_exc().split("\\n")[3:]),
-    }}
-print(json.dumps(to_return))
-"""
-        elif language in ["python", "pypy3", "python3", "lean4"]:
-            if session_id is not None:
-                raise RuntimeError(
-                    f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
-                )
-            TO_EXECUTE = generated_code
-        else:
+        if language in ["python", "pypy3", "python3", "lean4", "shell"] and session_id is not None:
+            raise RuntimeError(
+                f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
+            )
+        if language not in ["ipython", "python", "pypy3", "python3", "lean4", "shell"]:
             raise ValueError(f"Unsupported language: {language}")
+        if language != "ipython" and traceback_verbosity != "Plain":
+            raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
-        request = self._prepare_request(TO_EXECUTE, timeout, language, std_input)
+        request_session_id = session_id
+        if request_session_id is None and language == "ipython":  # creating a new session with empty state
+            request_session_id = uuid.uuid4()
+
+        TO_EXECUTE = generated_code
+        request = self._prepare_request(
+            TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
+        )
+        request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
         try:
-            output = self._send_request(request, timeout)
-        except requests.exceptions.Timeout:
+            output = await self._send_request(request, timeout)
+        except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-        # removing last state to not re-execute code with errors
-        if session_id is not None:
-            if output['stderr'] or 'Traceback (most recent call last)' in output['stdout']:
-                self.sessions[session_id] = self.sessions[session_id][:-1]
-        return output, session_id
+        new_session_created = output.pop("new_session_created", False)
 
-    def is_proof_correct(self, pred_output, timeout=30.0):
+        # Rebuild state by executing concatenated history
+        if session_id is not None and new_session_created:
+            history = self.session_histories.get(session_id, [])
+            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
+            request = self._prepare_request(
+                combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+            )
+            request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
+            try:
+                output = await self._send_request(request, timeout)
+            except httpx.TimeoutException:
+                output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+        # Append to history if successful execution (process_status == 'completed')
+        if output.get("process_status") == "completed":
+            self.session_histories[request_session_id].append(generated_code)
+
+        return output, request_session_id
+
+    async def is_proof_correct(self, pred_output, timeout=30.0):
         TO_EXECUTE = pred_output
 
         request = self._prepare_request(TO_EXECUTE, timeout, "lean4")
         try:
-            output = self._send_request(request, timeout)
-        except requests.exceptions.Timeout:
+            output = await self._send_request(request, timeout)
+        except httpx.TimeoutException:
             return "timeout"
-        if output['process_status'] == 'completed' and output['stdout'] != '':
-            return 'has_sorry'
+        if output["process_status"] == "completed" and output["stdout"] != "":
+            return "has_sorry"
         return output["process_status"]
 
-    def batch_evaluate_results(
+    async def batch_evaluate_results(
         self,
         input_files: List[str],
         num_parallel_requests=10,
-        in_memory_lines=500,
         timeout=30.0,
         answer_format="lean4-proof",
-        ignore_cache: bool = False,
         use_predicted_proof_key: bool = False,
         final_answer_key: str = "**FINAL ANSWER**",
         restate_formal_statement: bool = True,
         strip_theorem_from_proof: bool = True,
     ):
-        """Will write if the results are correct back into the original files."""
+        """Evaluate results and write back to original files."""
 
-        file_handles = [open(manifest, "rt", encoding="utf-8") for manifest in unroll_files(input_files)]
-        cleanup_tmp_files(input_files)
+        semaphore = asyncio.Semaphore(num_parallel_requests)
 
-        data = []
-        with ThreadPoolExecutor(max_workers=num_parallel_requests) as executor:
-            for line_idx, lines in tqdm.tqdm(enumerate(zip_longest(*file_handles))):
-                if line_idx % in_memory_lines == 0:
-                    if line_idx > 0:  # dumping into tmp files
-                        dump_data(input_files, data, map_to_future)
-                    # new in-memory buffer
-                    data = []
-                    map_to_future = {}
+        async def process_line(line_data):
+            """Process a single line and return updated line data."""
+            if not line_data or not line_data.strip():
+                return line_data
 
-                data.append([])
-                for file_line in lines:
-                    data[-1].append(file_line)
-                    if file_line is None:  # if different files have different number of lines
-                        continue
-                    line_dict = json.loads(file_line)
-                    if not line_dict:  # can be empty for incomplete generations
-                        continue
+            line_dict = json.loads(line_data)
+            if not line_dict:
+                return line_data
 
-                    if answer_format == "lean4-proof":
-                        if not use_predicted_proof_key:
-                            generation = clean_formal_generation(
-                                line_dict["generation"], final_answer_key=final_answer_key
-                            )
-                            line_dict["predicted_proof"] = (
-                                line_dict["header"]
-                                + (line_dict["formal_statement"] if restate_formal_statement else '')
-                                + extract_proof_only(generation)
-                                if strip_theorem_from_proof
-                                else generation
-                            )
-                        else:
-                            if "predicted_proof" not in line_dict:
-                                raise ValueError(
-                                    "predicted_proof key not found in the line_dict. "
-                                    "Set use_predicted_proof_key=False to re-combine"
-                                )
-                    elif answer_format == "lean4-statement":
-                        if not use_predicted_proof_key:
-                            generation = clean_formal_generation(line_dict["generation"])
-                            header = get_lean4_header()
-                            line_dict["predicted_proof"] = header + generation + "\n sorry"
-                        else:
-                            if "predicted_proof" not in line_dict:
-                                raise ValueError(
-                                    "predicted_proof key not found in the line_dict. "
-                                    "Set use_predicted_proof_key=False to re-combine"
-                                )
-                    else:
-                        raise ValueError(f'Unknown answer_format: {answer_format}')
-
-                    data[-1][-1] = json.dumps(line_dict)
-
-                    predicted_proof = line_dict["predicted_proof"]
-
-                    if predicted_proof in map_to_future:
-                        continue
-
-                    if ignore_cache or line_dict.get("proof_status") is None:
-                        map_to_future[predicted_proof] = executor.submit(
-                            self.is_proof_correct,
-                            predicted_proof,
-                            timeout=timeout,
+            # Prepare predicted_proof based on format
+            if answer_format == "lean4-proof":
+                if not use_predicted_proof_key:
+                    generation = clean_formal_generation(line_dict["generation"], final_answer_key=final_answer_key)
+                    line_dict["predicted_proof"] = (
+                        line_dict["header"]
+                        + (line_dict["formal_statement"] if restate_formal_statement else "")
+                        + extract_proof_only(generation)
+                        if strip_theorem_from_proof
+                        else generation
+                    )
+                else:
+                    if "predicted_proof" not in line_dict:
+                        raise ValueError(
+                            "predicted_proof key not found in the line_dict. "
+                            "Set use_predicted_proof_key=False to re-combine"
                         )
-                    else:
-                        map_to_future[predicted_proof] = DummyFuture(line_dict["proof_status"])
+            elif answer_format == "lean4-statement":
+                if not use_predicted_proof_key:
+                    generation = clean_formal_generation(line_dict["generation"])
+                    header = get_lean4_header()
+                    line_dict["predicted_proof"] = header + generation + "\n sorry"
+                else:
+                    if "predicted_proof" not in line_dict:
+                        raise ValueError(
+                            "predicted_proof key not found in the line_dict. "
+                            "Set use_predicted_proof_key=False to re-combine"
+                        )
+            else:
+                raise ValueError(f"Unknown answer_format: {answer_format}")
 
-            for file_handle in file_handles:
-                file_handle.close()
+            # Evaluate proof with concurrency control
+            async with semaphore:
+                proof_status = await self.is_proof_correct(line_dict["predicted_proof"], timeout=timeout)
+                line_dict["proof_status"] = proof_status
 
-            if len(data) > 0:
-                dump_data(input_files, data, map_to_future)
+            return json.dumps(line_dict)
 
-        write_tmp_files_back(input_files)
+        # Process each file
+        for input_file in unroll_files(input_files):
+            # Read all lines
+            with open(input_file, "rt", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            # Process lines concurrently with progress bar
+            print(f"Processing {input_file}...")
+            processed_lines = []
+            for line in tqdm.tqdm(lines):
+                result = await process_line(line.rstrip("\n"))
+                processed_lines.append(result)
+
+            # Write to temp file then replace original
+            temp_file = input_file + "-tmp"
+            with open(temp_file, "wt", encoding="utf-8") as f:
+                for line in processed_lines:
+                    f.write(line + "\n")
+
+            # Replace original with temp file
+            os.replace(temp_file, input_file)
 
 
 class LocalSandbox(Sandbox):
@@ -433,49 +345,74 @@ class LocalSandbox(Sandbox):
             return output.json()
         except json.JSONDecodeError:
             LOG.error("Error during parsing output: %s", output.text)
-            return {'process_status': 'error', 'stdout': '', 'stderr': 'Unknown error'}
+            return {"process_status": "error", "stdout": "", "stderr": "Unknown error"}
 
-    def _prepare_request(self, generated_code, timeout, language='ipython', std_input=""):
+    def _prepare_request(
+        self,
+        generated_code,
+        timeout,
+        language="ipython",
+        std_input="",
+        max_output_characters=1000,
+        traceback_verbosity="Plain",
+    ):
         return {
             "generated_code": generated_code,
             "std_input": std_input,
             "timeout": timeout,
             "language": language,
+            "max_output_characters": max_output_characters,
+            "traceback_verbosity": traceback_verbosity,
         }
 
+    async def delete_session(self, session_id: str) -> None:
+        """Delete an IPython session on the local sandbox server."""
+        max_retries = 3
+        retry_delay = 2
 
-class PistonSandbox(Sandbox):
-    """Piston sandbox (https://github.com/engineer-man/piston)"""
-
-    def _get_execute_url(self):
-        return f"{self.host}/execute"
-
-    def _parse_request_output(self, output):
-        output = output.json()
-        if output['run']['signal'] == "SIGKILL":
-            return {'result': None, 'error_message': 'Unknown error: SIGKILL'}
-        return json.loads(output['run']['output'])
-
-    def _prepare_request(self, generated_code, timeout):
-        return {
-            "language": "py",
-            "version": "3.10.0",
-            "files": [
-                {
-                    "content": generated_code,
-                }
-            ],
-            "stdin": "",
-            "args": [],
-            "run_timeout": timeout * 1000.0,  # milliseconds
-            "compile_memory_limit": -1,
-            "run_memory_limit": -1,
-        }
+        for attempt in range(max_retries):
+            try:
+                response = await self.http_session.delete(
+                    url=f"http://{self.host}:{self.port}/sessions/{session_id}",
+                    timeout=10.0,
+                    headers={"X-Session-ID": session_id},
+                )
+                if response.status_code == 200:  # Success
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
+                    return
+                if response.status_code == 404:  # We were routed to a different worker
+                    LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
+                    if session_id in self.session_histories:
+                        del self.session_histories[session_id]
+                    return
+                response.raise_for_status()
+            except (
+                httpx.ReadTimeout,  # retry for other communication errors and statuses
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.RemoteProtocolError,
+                httpx.HTTPStatusError,
+            ) as e:
+                LOG.warning("Retry %d/%d deleting session %s – %s", attempt + 1, max_retries, session_id, e)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    LOG.warning(f"Failed to delete session {session_id} after {max_retries} attempts. ")
+            except Exception as e:
+                LOG.warning(
+                    "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
+                    session_id,
+                    e,
+                    type(e).__name__,
+                    e,
+                    traceback.format_exc(),
+                )
+                raise  # Re-raise unexpected exceptions
 
 
 sandboxes = {
-    'local': LocalSandbox,
-    'piston': PistonSandbox,
+    "local": LocalSandbox,
 }
 
 
@@ -487,5 +424,5 @@ def get_sandbox(sandbox_type: str = "local", **kwargs):
 
 def sandbox_params():
     """Returns sandbox documentation (to include in cmd help)."""
-    prefix = f'\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}'
+    prefix = f"\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}"
     return python_doc_to_cmd_help(Sandbox, docs_prefix=prefix, arg_prefix="sandbox.")

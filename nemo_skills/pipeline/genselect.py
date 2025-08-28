@@ -18,8 +18,8 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
 from nemo_skills.pipeline.utils import get_server_command
+from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -77,7 +77,9 @@ def genselect(
     benchmark: str = typer.Option(help="The benchmark to use for genselect"),
     input_key: str = typer.Option("problem", help="The input key which forms the prompt"),
     output_key: str = typer.Option("generation", help="This is the key whose value will be used during genselect"),
-    answer_key: str = typer.Option(None, help="This is the key whose value determines the correctness of the response"),
+    answer_key: str = typer.Option(
+        None, help="This is the key whose value determines the correctness of the response"
+    ),
     preprocess_args: str = typer.Option(None, help="Can specify extra arguments to prepare the data for genselect"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -114,7 +116,7 @@ def genselect(
     ),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync samples to.",
     ),
     installation_command: str | None = typer.Option(
@@ -122,6 +124,10 @@ def genselect(
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
+    ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
@@ -135,7 +141,7 @@ def genselect(
     (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -146,13 +152,12 @@ def genselect(
 
     if log_samples:
         wandb_parameters = {
-            'name': wandb_name or expname,
-            'project': wandb_project,
-            'group': wandb_group,
+            "name": wandb_name or expname,
+            "project": wandb_project,
+            "group": wandb_group,
         }
     else:
         wandb_parameters = None
-
 
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
 
@@ -204,17 +209,14 @@ def genselect(
         _task_dependencies = []
 
     extra_eval_args = (
-        f" ++input_key={input_key} "
-        f" ++output_key={output_key} "
-        f" ++answer_key={answer_key} "
-        f" ++benchmark={benchmark} "  
+        f" ++input_key={input_key}  ++output_key={output_key}  ++answer_key={answer_key}  ++benchmark={benchmark} "
     )
     extra_arguments_original = extra_arguments + extra_eval_args
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Add the preprocessing command for genselect
         preprocess_args = (
-            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} " 
+            f" ++num_random_seeds={len(random_seeds)} ++output_dir={output_dir} "
             + extra_eval_args
             + (preprocess_args if preprocess_args is not None else "")
         )
@@ -235,12 +237,13 @@ def genselect(
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
+            skip_hf_home_check=skip_hf_home_check,
         )
-        
+
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -274,12 +277,14 @@ def genselect(
                 )
 
                 for _ in range(dependent_jobs + 1):
-                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                    task_name = f"{expname}-rs{seed}" if seed is not None else expname
                     if chunk_id is not None:
-                        task_name += f'-chunk{chunk_id}'
+                        task_name += f"-chunk{chunk_id}"
                     new_task = pipeline_utils.add_task(
                         exp,
-                        cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=generation_cmd),
+                        cmd=pipeline_utils.wait_for_server(
+                            server_address=server_address, generation_commands=generation_cmd
+                        ),
                         task_name=task_name,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
@@ -293,7 +298,7 @@ def genselect(
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
                         task_dependencies=(
-                            prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                            prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                         ),
                         get_server_command=get_server_command,
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,

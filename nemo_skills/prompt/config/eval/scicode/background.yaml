@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
   PROBLEM DESCRIPTION:
   You will be provided with problem steps along with background knowledge necessary for solving the problem. Your task will be to develop a Python solution focused on the next step of the problem-solving process.

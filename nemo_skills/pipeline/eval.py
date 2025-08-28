@@ -22,6 +22,7 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import ExtraDatasetType
+from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
 from nemo_skills.pipeline.utils.eval import prepare_eval_commands
@@ -54,6 +55,13 @@ def eval(
         "If you want to use multiple benchmarks, separate them with comma. E.g. gsm8k:4,human-eval",
     ),
     expname: str = typer.Option("eval", help="Name of the experiment"),
+    generation_type: GenerationType | None = typer.Option(None, help="Type of generation to perform"),
+    generation_module: str = typer.Option(
+        None,
+        help="Path to the generation module to use. "
+        "If not specified, will use the registered generation module for the "
+        "generation type (which is required in this case).",
+    ),
     model: str = typer.Option(None, help="Path to the model to be evaluated"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
     server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
@@ -152,8 +160,12 @@ def eval(
     ),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync samples to.",
+    ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
         None,
@@ -173,7 +185,7 @@ def eval(
     (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting evaluation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -188,31 +200,32 @@ def eval(
 
     if log_samples:
         wandb_parameters = {
-            'name': wandb_name or expname,
-            'project': wandb_project,
-            'group': wandb_group,
+            "name": wandb_name or expname,
+            "project": wandb_project,
+            "group": wandb_group,
         }
     else:
         wandb_parameters = None
 
     server_parameters = {
-        'model': model,
-        'server_type': server_type,
-        'server_address': server_address,
-        'server_gpus': server_gpus,
-        'server_nodes': server_nodes,
-        'server_args': server_args,
-        'server_entrypoint': server_entrypoint,
+        "model": model,
+        "server_type": server_type,
+        "server_address": server_address,
+        "server_gpus": server_gpus,
+        "server_nodes": server_nodes,
+        "server_args": server_args,
+        "server_entrypoint": server_entrypoint,
     }
     judge_server_parameters = {
-        'model': judge_model,
-        'server_type': judge_server_type,
-        'server_address': judge_server_address,
-        'server_gpus': judge_server_gpus,
-        'server_nodes': judge_server_nodes,
-        'server_args': judge_server_args,
-        'server_entrypoint': judge_server_entrypoint,
+        "model": judge_model,
+        "server_type": judge_server_type,
+        "server_address": judge_server_address,
+        "server_gpus": judge_server_gpus,
+        "server_nodes": judge_server_nodes,
+        "server_args": judge_server_args,
+        "server_entrypoint": judge_server_entrypoint,
     }
+    eval_requires_judge = any(param_value for param_value in judge_server_parameters.values())
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -223,7 +236,7 @@ def eval(
     env_vars = pipeline_utils.get_env_variables(cluster_config)
     data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
 
-    if extra_datasets_type == ExtraDatasetType.cluster and cluster_config['executor'] != 'slurm':
+    if extra_datasets_type == ExtraDatasetType.cluster and cluster_config["executor"] != "slurm":
         raise ValueError(
             "Extra datasets type is set to 'cluster', but the executor is not 'slurm'. "
             "Please use 'local' or change the cluster config."
@@ -261,6 +274,9 @@ def eval(
         with_sandbox,
         wandb_parameters,
         extra_eval_args,
+        eval_requires_judge=eval_requires_judge,
+        generation_type=generation_type,
+        generation_module=generation_module,
     )
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
@@ -285,7 +301,7 @@ def eval(
                     cmd=pipeline_utils.wait_for_server(
                         server_address=job_server_address, generation_commands=" && ".join(cmds)
                     ),
-                    task_name=f'{expname}-{"-".join(job_benchmarks)}',
+                    task_name=f"{expname}-{'-'.join(job_benchmarks)}",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
@@ -298,12 +314,13 @@ def eval(
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
                     task_dependencies=(
-                        prev_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                        prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                     ),
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
                     slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                     installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
                 )
                 prev_tasks = [new_task]
                 all_tasks.append(new_task)
@@ -311,7 +328,7 @@ def eval(
                 job_id_to_tasks[idx] = prev_tasks
         # scheduling judge jobs if needed
         for idx, (benchmark, benchmark_args) in enumerate(benchmarks_dict.items()):
-            if not benchmark_args.requires_judge:
+            if not eval_requires_judge and not benchmark_args.requires_judge:
                 continue
             dependent_job_ids = benchmark_args.job_ids
             dependent_tasks = []
@@ -321,16 +338,16 @@ def eval(
 
             benchmark_seeds = benchmark_args.num_samples
             if benchmark_seeds == 0:
-                judge_pipeline_args['input_file'] = str(
-                    Path(output_dir) / benchmark_args.eval_subfolder / 'output.jsonl'
+                judge_pipeline_args["input_file"] = str(
+                    Path(output_dir) / benchmark_args.eval_subfolder / "output.jsonl"
                 )
             else:
-                judge_pipeline_args['input_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
-                judge_pipeline_args['num_random_seeds'] = int(benchmark_seeds)
+                judge_pipeline_args["input_dir"] = str(Path(output_dir) / benchmark_args.eval_subfolder)
+                judge_pipeline_args["num_random_seeds"] = int(benchmark_seeds)
             # subfolder always starts with tmp-* for judge and we want to remove tmp-
             assert benchmark_args.eval_subfolder.startswith("tmp-")
             benchmark_args.eval_subfolder = benchmark_args.eval_subfolder[4:]
-            judge_pipeline_args['output_dir'] = str(Path(output_dir) / benchmark_args.eval_subfolder)
+            judge_pipeline_args["output_dir"] = str(Path(output_dir) / benchmark_args.eval_subfolder)
             judge_ctx = deepcopy(ctx)
             # removing any extra arguments here as they are assumed to be for the main job
             judge_ctx.args = []
@@ -341,7 +358,7 @@ def eval(
 
             # the default parameters always have server_address, but it needs to be removed if model is self-hosted
             if judge_server_gpus is not None:
-                judge_pipeline_args['server_address'] = None
+                judge_pipeline_args["server_address"] = None
 
             for judge_server_param, judge_server_value in judge_server_parameters.items():
                 if judge_server_value is not None:
@@ -353,7 +370,7 @@ def eval(
             judge_tasks = _generate(
                 ctx=judge_ctx,
                 expname=f"{expname}-{benchmark}-judge",
-                log_dir=log_dir + '/judge',
+                log_dir=log_dir + "/judge",
                 cluster=cluster,
                 partition=partition,
                 time_min=time_min,
@@ -365,7 +382,7 @@ def eval(
                 installation_command=installation_command,
                 _reuse_exp=exp,
                 _task_dependencies=(
-                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                    dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                 ),
                 **judge_pipeline_args,
             )
@@ -410,7 +427,7 @@ def eval(
             summarize_task = pipeline_utils.add_task(
                 exp,
                 cmd=command,
-                task_name=f'{expname}-{benchmark}-summarize-results',
+                task_name=f"{expname}-{benchmark}-summarize-results",
                 log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
@@ -418,9 +435,10 @@ def eval(
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
                 task_dependencies=(
-                    dependent_tasks if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                    dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                 ),
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             all_tasks.append(summarize_task)
             if benchmark_args.benchmark_group:
@@ -442,7 +460,7 @@ def eval(
             score_task = pipeline_utils.add_task(
                 exp,
                 cmd=command,
-                task_name=f'{expname}-{group}-compute-score',
+                task_name=f"{expname}-{group}-compute-score",
                 log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
                 container=cluster_config["containers"]["nemo-skills"],
                 cluster_config=cluster_config,
@@ -450,9 +468,10 @@ def eval(
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
                 task_dependencies=(
-                    group_tasks[group] if cluster_config['executor'] == 'slurm' else all_tasks + _task_dependencies
+                    group_tasks[group] if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                 ),
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             all_tasks.append(score_task)
 

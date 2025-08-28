@@ -19,14 +19,10 @@ import re
 import sys
 from copy import deepcopy
 from dataclasses import field
-from enum import Enum
-from os import makedirs, path
+from os import path
 from pathlib import Path
-from typing import Any
 
 import hydra
-import typer
-from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
@@ -38,6 +34,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class GenSelectConfig(GenerateSolutionsConfig):
     """Genselect parameters."""
+
     input_file: str
     output_file: str
 
@@ -107,15 +104,15 @@ class GenSelectTask(GenerationTask):
         output_file = Path(self.cfg.output_file).parent.parent / self.cfg.benchmark / Path(self.cfg.output_file).name
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(input_file, 'r') as f, open(output_file, 'w') as fout:
+        with open(input_file, "r") as f, open(output_file, "w") as fout:
             for single_correctness_instance in single_correctness_instances:
-                fout.write(json.dumps(single_correctness_instance) + '\n')
+                fout.write(json.dumps(single_correctness_instance) + "\n")
 
             for line in f:
                 instance = json.loads(line)
                 output_instance = deepcopy(instance)
 
-                judgment = self._extract_judgment(instance['genselect_comparison'], max_idx=instance["max_idx"])
+                judgment = self._extract_judgment(instance["genselect_comparison"], max_idx=instance["max_idx"])
                 if judgment is not None:
                     output_instance["judgment_idx"] = judgment
                 else:
@@ -134,11 +131,11 @@ class GenSelectTask(GenerationTask):
                 del output_instance["max_idx"]
                 del output_instance["num_solutions"]
 
-                fout.write(json.dumps(output_instance) + '\n')
+                fout.write(json.dumps(output_instance) + "\n")
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_genselect_config')
+@hydra.main(version_base=None, config_name="base_genselect_config")
 def generate(cfg: GenSelectConfig):
     cfg = GenSelectConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -154,7 +151,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()
