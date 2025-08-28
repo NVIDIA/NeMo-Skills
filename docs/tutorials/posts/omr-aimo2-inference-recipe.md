@@ -39,7 +39,7 @@ pip uninstall -y tensorrt
 pip3 install tensorrt_llm==1.1.0rc0
 
 # Install NeMo-Skills from the specified branch
-pip install git+https://github.com/NVIDIA/NeMo-Skills.git@dc32d6a
+pip install git+https://github.com/NVIDIA/NeMo-Skills.git
 ```
 
 -----
