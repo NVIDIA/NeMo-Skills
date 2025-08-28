@@ -51,7 +51,7 @@ async def exa_websearch(
         "x-api-key": EXA_API_KEY,
         "Content-Type": "application/json",
     }
-    payload = {"query": f"{query}"}
+    payload = {"query": query}
 
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=headers, json=payload)
