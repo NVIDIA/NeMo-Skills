@@ -5,7 +5,7 @@ readtime: 20
 
 # Building an Efficient Inference Engine for Math Problems
 
-This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO24 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 5× faster batched inference compared to BF16 on two H100 GPUs.
+This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO24 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 4× faster batched inference compared to BF16 on two H100 GPUs.
 
 We will leverage [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) for optimized model serving, including an advanced technique called ReDrafter for speculative decoding.
 
@@ -235,17 +235,17 @@ We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) 
 In the notebook, you can:
 
 - Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).
-- Compare performance benchmarks such as **time-to-first-token** and **throughput per device**.
-- Explore advanced controls like **early stopping after a fixed time** or **terminating after the first N generations complete**.
+- Compare performance benchmarks.
+- Explore advanced controls like **terminating after the first N generations complete**.
 - Run inference with tool-calling.
 
 Here’s a sample of the kind of benchmark results you’ll see:
 
 | Metric                        | BF16 | FP8   | FP8+ReDrafter  |
 |-------------------------------|---------------|-------|-------|
-| Total Generation Time (s)     | 170.4 | 72.9  |  33.8 |
-| Batch Throughput (Tok/s)          | 518 | 1029   |  2036  |
-| Average Sample Throughput (Tok/s) | 44.1 | 89.9    |  175.7   |
+| Total Generation Time (s)     | 118 | 77  |  40  |
+| Batch Throughput (Tok/s)          | 380 | 648   |  1343  |
+| Average Sample Throughput (Tok/s) | 38 | 65    |  134  |
 
 *(full benchmarks and code available in the notebook)*
 
