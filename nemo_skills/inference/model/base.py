@@ -108,7 +108,10 @@ class BaseModel:
         else:
             self.base_url = base_url
 
-        self.tokenizer = self._get_tokenizer(tokenizer)
+        if enable_soft_fail:
+            self.tokenizer = self._get_tokenizer(tokenizer)
+        else:
+            self.tokenizer = None
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
         if api_key is None:  # self-hosted models don't need the key, but still require the parameter
