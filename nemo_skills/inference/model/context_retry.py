@@ -315,7 +315,6 @@ def _try_reduce_prompt_tokens(
     num_prompt_tokens_to_keep = max_context_length - completion_tokens
     prompt = kwargs["prompt"]
 
-    LOG.info(f"Prompt type: {type(prompt)}")
     LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
 
     if isinstance(prompt, str):
