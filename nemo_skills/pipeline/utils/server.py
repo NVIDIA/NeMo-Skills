@@ -16,7 +16,7 @@ import logging
 from enum import Enum
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, get_server_wait_cmd
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -63,15 +63,6 @@ def should_get_random_port(server_gpus, exclusive, server_type):
 
 def wrap_python_path(cmd):
     return f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
-
-
-def get_server_wait_cmd(server_address):
-    # might be required if we are not hosting server ourselves
-    # this will try to handshake in a loop and unblock when the server responds
-    return (
-        f"echo 'Waiting for the server to start at {server_address}' && "
-        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done "
-    )
 
 
 def set_python_path_and_wait_for_server(server_address, generation_commands):
