@@ -1,15 +1,17 @@
 ---
-date: 2025-08-21
+date: 2025-08-28
 readtime: 20
 ---
 
 # Building an Efficient Inference Engine for Math Problems
 
-This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO24 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 4× faster batched inference compared to BF16 on two H100 GPUs.
+This tutorial guides you through creating a high-performance inference engine using [NeMo-Skills](https://nvidia.github.io/NeMo-Skills/) to tackle complex math problems. It demonstrates the inference pipeline used to win the [AIMO-2 competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/writeups/nemoskills-1st-place-solution-nemoskills). With FP8 quantization and ReDrafter speculative decoding, we demonstrate up to 4× faster batched inference compared to BF16 on two H100 GPUs.
 
 We will leverage [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) for optimized model serving, including an advanced technique called ReDrafter for speculative decoding.
 
 By the end of this tutorial and companion notebook, you will have a local setup capable of running efficient inference with a large language model (LLM) integrated with a code execution sandbox.
+
+<!-- more -->
 
 ## What We'll Cover
 
@@ -38,7 +40,7 @@ Once inside the `nvcr.io/nvidia/pytorch:25.05-py3` container, run the following 
 pip uninstall -y tensorrt
 pip3 install tensorrt_llm==1.1.0rc0
 
-# Install NeMo-Skills from the specified branch
+# Install NeMo-Skills
 pip install git+https://github.com/NVIDIA/NeMo-Skills.git
 ```
 
@@ -72,10 +74,12 @@ huggingface-cli download nvidia/OpenMathReasoning --repo-type dataset --local-di
 
 For FP8 quantization, a small calibration dataset representative of inference data is essential. We'll use a subset of the `OpenMathReasoning` dataset to create it. Save the following as `prepare_calibration_data.py`:
 
-```python
+```python title="prepare_calibration_data.py"
 import os
-from datasets import load_dataset, Dataset
 from itertools import islice
+
+from datasets import Dataset, load_dataset
+
 from nemo_skills.prompt.utils import get_prompt
 
 # Define paths and parameters
@@ -89,17 +93,20 @@ print(f"Loading and formatting {CALIB_SIZE} samples for calibration...")
 ds_samples = load_dataset(CALIB_DATASET_NAME, split=CALIB_SPLIT, streaming=True)
 ds_samples = list(islice(ds_samples, CALIB_SIZE))
 
-prompt_template = get_prompt('generic/math', 'qwen-instruct')
-calibration_dataset = Dataset.from_dict({
-    "text": [
-        prompt_template.fill(
-            {k: v for k, v in sample.items() if k in ['problem', 'generation']},
-            continue_prefix_generation=True,
-            prefix_generation_to_response=True
-        )
-        for sample in ds_samples
-    ]
-})
+prompt_template = get_prompt('generic/math', tokenizer='nvidia/OpenMath-Nemotron-14B-kaggle')
+calibration_dataset = Dataset.from_dict(
+    {
+        "text": [
+            prompt_template.format_assistant_response(
+                prompt_template.fill(
+                    {k: v for k, v in sample.items() if k in ['problem', 'generated_solution']},
+                    start_assistant_response_key='generated_solution',
+                )
+            )
+            for sample in ds_samples
+        ]
+    }
+)
 
 os.makedirs(LOCAL_DATASET_PATH, exist_ok=True)
 calibration_dataset.to_parquet(f"{LOCAL_DATASET_PATH}/data.parquet")
@@ -252,7 +259,7 @@ Here’s a sample of the kind of benchmark results you’ll see:
 
 ## 5\. Optional: Enabling tool-calling and the code execution sandbox
 
-The OpenMath LLM is a powerful tool-instruction reasoning model. This means it doesn't just generate text; it can also write and execute Python code in a secure sandbox to solve problems. In the companion notebook, we provide an example how to launch both the LLM server and its accompanying code execution sandbox.
+The OpenMath LLM is a powerful model that can use Python as a tool integrated in its reasoning. This means it doesn't just generate text; it can also write and execute Python code in a sandbox to solve problems. In the companion notebook, we provide an example how to launch both the LLM server and its accompanying code execution sandbox.
 
 The interaction works like this:
 
@@ -262,11 +269,47 @@ The interaction works like this:
 4.  The output is fed back to the LLM for continued generation or to finalize its answer.
 
 Here's an example of such an interaction:
-<details><summary><b>Show Example Output</b></summary>
+<details markdown><summary><b>Show Example Output</b></summary>
 
-```bash
-Therefore, b = k - 7 = 21 or 49. So, same result. Therefore, sum is 70.\n\nAlternatively, maybe I can write a small program to check for all bases b > 9, compute 9b + 7 and b + 7, check if the latter divides the former, and collect all such bases. Then sum them. Let\'s do that to verify.\n\nHere\'s a Python code to perform the check:\n\n<tool_call>\n# Initialize a list to store valid bases\nvalid_bases = []\n\n# Check bases from 10 upwards\nfor b in range(10, 10000):  # Arbitrary large upper limit\n    num1 = 9 * b + 7\n    num2 = b + 7\n    if num1 % num2 == 0:\n        valid_bases.append(b)\n        print(f"Found base: {b}")\n\n# Sum the valid bases\nsum_bases = sum(valid_bases)\nprint(f"Sum: {sum_bases}")\n\n# If sum is over 1000, take modulo 1000\nif sum_bases > 1000:\n    result = sum_bases % 1000\nelse:\n    result = sum_bases\n\nprint(f"Final Result: {result}")\n</tool_call>\n```output\nFound base: 21\nFound base: 49\nSum: 70\nFinal Result: 70\n```\nThe code confirms that the valid bases are 21 and 49, summing to 70.
+Therefore, b = k - 7 = 21 or 49. So, same result. Therefore, sum is 70.
+
+Alternatively, maybe I can write a small program to check for all bases b > 9, compute 9b + 7 and b + 7, check if the latter divides the former, and collect all such bases. Then sum them. Let's do that to verify.
+
+Here's a Python code to perform the check:
+
 ```
+    <tool_call>
+    # Initialize a list to store valid bases
+    valid_bases = []
+
+    # Check bases from 10 upwards
+    for b in range(10, 10000):  # Arbitrary large upper limit
+        num1 = 9 * b + 7
+        num2 = b + 7
+        if num1 % num2 == 0:
+            valid_bases.append(b)
+            print(f"Found base: {b}")
+
+    # Sum the valid bases
+    sum_bases = sum(valid_bases)
+    print(f"Sum: {sum_bases}")
+
+    # If sum is over 1000, take modulo 1000
+    if sum_bases > 1000:
+        result = sum_bases % 1000
+    else:
+        result = sum_bases
+
+    print(f"Final Result: {result}")
+    </tool_call>
+    ```output
+    Found base: 21
+    Found base: 49
+    Sum: 70
+    Final Result: 70
+    ```
+```
+The code confirms that the valid bases are 21 and 49, summing to 70.
 
 </details>
 
