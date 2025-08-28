@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import enum
 import logging
 import os
 from collections import defaultdict
@@ -29,6 +30,11 @@ from nemo_skills.pipeline.utils.eval import prepare_eval_commands
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+class SingleNodeMode(str, enum.Enum):
+    sequential = "sequential"
+    parallel = "parallel"
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -114,6 +120,12 @@ def eval(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
+    single_node_mode: SingleNodeMode = typer.Option(
+        SingleNodeMode.parallel,
+        help="Whether to run benchmarks in parallel or sequentially on a single node. "
+        "If running in parallel, ++max_concurrent_requests parameter is respected per "
+        "benchmark, but not globally across benchmarks.",
+    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -195,6 +207,10 @@ def eval(
         pass
     try:
         extra_datasets_type = extra_datasets_type.value
+    except AttributeError:
+        pass
+    try:
+        single_node_mode = single_node_mode.value
     except AttributeError:
         pass
 
