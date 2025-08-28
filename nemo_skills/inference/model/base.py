@@ -151,14 +151,17 @@ class BaseModel:
 
     def _get_tokenizer(self, tokenizer: str | None) -> Union[ServerTokenizer, WrapperAutoTokenizer, None]:
         """Get the tokenizer endpoint if available, otherwise initialize from tokenizer string"""
-        LOG.info(f"Getting tokenizer: {tokenizer}")
         tokenizer_endpoint = self._get_tokenizer_endpoint()
         if tokenizer_endpoint is not None:
             return tokenizer_endpoint
         elif tokenizer is not None:
             return self._initialize_tokenizer(tokenizer)
         elif self.model_name_or_path is not None:
-            return self._initialize_tokenizer(self.model_name_or_path)
+            try:
+                return self._initialize_tokenizer(self.model_name_or_path)
+            except Exception as e:
+                LOG.warning(f"No tokenizer found for model: {self.model_name_or_path}")
+                return None
         else:
             return None
 
