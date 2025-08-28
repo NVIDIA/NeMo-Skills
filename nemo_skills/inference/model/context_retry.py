@@ -191,7 +191,7 @@ async def handle_context_retries_async(
     """Async version of context retry logic."""
     try:
         context_window_error = False
-        result = func(self, *args, **kwargs)
+        result = await func(self, *args, **kwargs)
         return result
     except litellm.exceptions.ContextWindowExceededError as error:
         context_window_error = True
