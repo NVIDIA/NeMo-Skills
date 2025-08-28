@@ -38,9 +38,8 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.9
     hooks:
-      ## See https://docs.astral.sh/ruff/formatter/#sorting-imports.
       - id: ruff-check
-        args: ["--select", "I", "--fix"]
+        args: ["--fix"]
       - id: ruff-format
 
   - repo: local
