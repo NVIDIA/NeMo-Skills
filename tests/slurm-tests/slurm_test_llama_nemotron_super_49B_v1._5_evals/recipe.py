@@ -240,7 +240,6 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
         --benchmarks hle:1 \
         --server_gpus=8 \
-        --dependent_jobs=1 \
         --judge_model {workspace}/Qwen2.5-32B-Instruct \
         --judge_server_type vllm \
         --judge_server_gpus=8 \
