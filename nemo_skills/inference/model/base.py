@@ -150,20 +150,25 @@ class BaseModel:
             result["generation"] = trim_after_stop_phrases(result["generation"], stop_phrases)
 
     def _get_tokenizer(self, tokenizer: str | None) -> Union[ServerTokenizer, WrapperAutoTokenizer, None]:
-        """Get the tokenizer endpoint if available, otherwise initialize from tokenizer string"""
+        """Initialize the tokenizer from the string, otherwise initialize the tokenizer endpoint"""
+        # Try to initialize the tokenizer from tokenizer string
+        for tokenizer_string in [tokenizer, self.model_name_or_path]:
+            if tokenizer_string is None:
+                continue
+
+            wrapped_tokenizer = self._initialize_tokenizer(tokenizer_string)
+            if wrapped_tokenizer is not None:
+                return wrapped_tokenizer
+
+        # Try to initialize the tokenizer endpoint
         tokenizer_endpoint = self._get_tokenizer_endpoint()
         if tokenizer_endpoint is not None:
             return tokenizer_endpoint
-        elif tokenizer is not None:
-            return self._initialize_tokenizer(tokenizer)
-        elif self.model_name_or_path is not None:
-            try:
-                return self._initialize_tokenizer(self.model_name_or_path)
-            except Exception as e:
-                LOG.warning(f"No tokenizer found for model: {self.model_name_or_path}")
-                return None
-        else:
-            return None
+    
+        # No tokenizer found
+        LOG.info(f"No tokenizer found for model: {self.model_name_or_path}")
+        return None
+        
 
     def _get_tokenizer_endpoint(self) -> str | None:
         """Get the tokenizer endpoint if available."""

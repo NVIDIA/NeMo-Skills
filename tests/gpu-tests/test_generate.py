@@ -26,7 +26,7 @@ from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu
-def test_vllm_generate_greedy(server_type):
+def test_vllm_generate_greedy():
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
