@@ -243,8 +243,8 @@ pass@16           | 166         | 18881      | 1552        | 87.35%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 42970      | 2414        | 3.46%            | 31.14%           | 65           | 288
-pass@16           | 42970      | 2414        | 9.23%            | 43.40%           | 65           | 288
+pass@1[avg-of-16] | 35418      | 4271        | 13.59%           | 37.83%           | 80           | 338
+pass@16           | 35418      | 4271        | 25.00%           | 52.07%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning on)
@@ -458,8 +458,8 @@ pass@16           | 166         | 609        | 1156        | 33.73%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 3070       | 1036        | 0.10%            | 21.38%           | 65           | 288
-pass@16           | 3070       | 1036        | 1.54%            | 32.64%           | 65           | 288
+pass@1[avg-of-16] | 2762       | 673         | 7.66%            | 24.69%           | 80           | 338
+pass@16           | 2762       | 673         | 11.25%           | 36.39%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning off)

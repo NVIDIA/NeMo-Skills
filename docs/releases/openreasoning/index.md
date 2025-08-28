@@ -16,11 +16,11 @@ The foundation of these models is their dataset. We generated **5 million high-q
 Our models demonstrate exceptional performance across a suite of challenging reasoning benchmarks. The 7B, 14B, and 32B models consistently set new state-of-the-art records for their size classes.
 
 | **Model** | **AritificalAnalysisIndex*** | **GPQA** | **MMLU-PRO** | **HLE** | **LiveCodeBench*** | **SciCode** | **AIME24** | **AIME25** | **HMMT FEB 25**  |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1.5B**| 31.0 | 31.6 | 47.5 | 5.5 | 28.6 | 2.2 | 55.5 | 45.6 | 31.5 |
-| **7B** | 54.7 | 61.1 | 71.9 | 8.3 | 63.3 | 16.2 | 84.7 | 78.2 | 63.5 |
-| **14B** | 60.9 | 71.6 | 77.5 | 10.1 | 67.8 | 23.5 | 87.8 | 82.0 | 71.2 |
-| **32B** | 64.3 | 73.1 | 80.0 | 11.9 | 70.2 | 28.5 | 89.2 | 84.0 | 73.8 |
+| :---    | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1.5B**| 31.0 | 31.6 | 47.5 | 5.5  | 28.6 | 1.0  | 55.5 | 45.6 | 31.5 |
+| **7B**  | 54.7 | 61.1 | 71.9 | 8.3  | 63.3 | 20.3 | 84.7 | 78.2 | 63.5 |
+| **14B** | 60.9 | 71.6 | 77.5 | 10.1 | 67.8 | 32.4 | 87.8 | 82.0 | 71.2 |
+| **32B** | 64.3 | 73.1 | 80.0 | 11.9 | 70.2 | 39.6 | 89.2 | 84.0 | 73.8 |
 
 \* This is our estimation of the Artificial Analysis Intelligence Index, not an official score.
 
