@@ -47,7 +47,6 @@ def setup(workspace, cluster, expname_prefix):
         expname=f"{expname_prefix}-patch-qwen-config",
         log_dir=f"{workspace}/download-assets",
         run_after=f"{expname_prefix}-download-models",
-        container="nemo",
     )
 
     ruler_data_cmd = f"""
