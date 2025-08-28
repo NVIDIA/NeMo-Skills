@@ -164,11 +164,10 @@ class BaseModel:
         tokenizer_endpoint = self._get_tokenizer_endpoint()
         if tokenizer_endpoint is not None:
             return tokenizer_endpoint
-    
+
         # No tokenizer found
         LOG.info(f"No tokenizer found for model: {self.model_name_or_path}")
         return None
-        
 
     def _get_tokenizer_endpoint(self) -> str | None:
         """Get the tokenizer endpoint if available."""

@@ -22,7 +22,12 @@ import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
+from nemo_skills.utils import (
+    compute_chunk_ids,
+    get_logger_name,
+    setup_logging,
+    str_ids_to_list,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 

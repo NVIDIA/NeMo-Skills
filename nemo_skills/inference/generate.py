@@ -273,7 +273,10 @@ class GenerationTask:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=tokenizer, sandbox=self.sandbox)
         elif self.cfg.tool_config:
             llm = get_tool_calling_model(
-                **self.cfg.server, tool_config=self.cfg.tool_config, tokenizer=tokenizer, additional_config={"sandbox": self.cfg.sandbox}
+                **self.cfg.server,
+                tool_config=self.cfg.tool_config,
+                tokenizer=tokenizer,
+                additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
             llm = get_model(**self.cfg.server, tokenizer=tokenizer)
@@ -291,7 +294,6 @@ class GenerationTask:
             )
 
         return llm
-
 
     def setup_prompt(self):
         if self.cfg.prompt_format == "openai":
@@ -313,7 +315,6 @@ class GenerationTask:
         LOG.info("Prompt used: %s", prompt)
         return prompt, tokenizer
 
-    
     def setup_llm(self, tokenizer: str):
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
 
@@ -321,7 +322,10 @@ class GenerationTask:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=tokenizer, sandbox=self.sandbox)
         elif self.cfg.tool_config:
             llm = get_tool_calling_model(
-                **self.cfg.server, tool_config=self.cfg.tool_config, tokenizer=tokenizer, additional_config={"sandbox": self.cfg.sandbox}
+                **self.cfg.server,
+                tool_config=self.cfg.tool_config,
+                tokenizer=tokenizer,
+                additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
             llm = get_model(**self.cfg.server, tokenizer=tokenizer)
