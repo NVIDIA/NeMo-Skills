@@ -68,7 +68,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning ON
-    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.6 ++inference.top_p=0.95 ++skip_filled=True ++system_message="
+    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.6 ++inference.top_p=0.95"
 
     # Math / Code / Science (Reasoning ON)
     cmd = f"""
