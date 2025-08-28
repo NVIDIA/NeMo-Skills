@@ -56,6 +56,8 @@ def combine_cmds(cmds: list[str], single_node_mode: str) -> str:
     if single_node_mode == "sequential":
         return " && ".join(cmds)
     elif single_node_mode == "parallel":
+        if len(cmds) == 1:
+            return cmds[0]
         return " & ".join(f"( {cmd} )" for cmd in cmds) + " & wait "
     raise ValueError(f"Unknown single_node_mode: {single_node_mode}")
 
