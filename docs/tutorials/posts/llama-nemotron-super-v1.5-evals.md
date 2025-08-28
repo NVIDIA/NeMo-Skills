@@ -225,15 +225,12 @@ pass@1[avg-of-16] | 12032       | 4879       | 12516       | 81.44%           | 
 majority@16       | 12032       | 4879       | 12516       | 83.05%           | 0.00%
 pass@16           | 12032       | 4879       | 12516       | 91.32%           | 0.00%
 
--------------------------------------------------- hle --------------------------------------------------
-evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
-pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%            | 64.13%
-majority@16       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
-pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
+-------------------------------------------- hle --------------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct
+pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%
+majority@16       | 2158        | 12111      | 7782        | 7.61%         | 2.34%
+pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%
 ```
-
-!!!note
-    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
 
 
 #### Results for Code Reasoning benchmarks (Reasoning on)
