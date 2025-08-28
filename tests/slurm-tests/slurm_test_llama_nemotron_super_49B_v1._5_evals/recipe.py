@@ -165,7 +165,6 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         ++inference.temperature=0.6 \
         ++inference.top_p=0.95 \
         ++skip_filled=True \
-        ++system_message= \
         --run_after {expname_prefix}-download-ruler-data \
         --expname {expname_prefix}-ruler-on
     """
