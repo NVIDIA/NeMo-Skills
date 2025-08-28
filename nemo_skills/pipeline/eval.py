@@ -26,7 +26,7 @@ from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
-from nemo_skills.pipeline.utils.eval import prepare_eval_commands
+from nemo_skills.pipeline.utils.eval import combine_cmds, prepare_eval_commands
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -314,7 +314,7 @@ def eval(
                 has_tasks = True
                 new_task = pipeline_utils.add_task(
                     exp,
-                    cmd=pipeline_utils.wrap_python_path(cmd=" && ".join(cmds)),
+                    cmd=pipeline_utils.wrap_python_path(cmd=combine_cmds(cmds, single_node_mode)),
                     task_name=f"{expname}-{'-'.join(job_benchmarks)}",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
