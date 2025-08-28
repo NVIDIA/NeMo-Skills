@@ -160,7 +160,6 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --benchmarks ruler.nemotron_super_128k \
         --data_dir {workspace}/ns-data \
         --server_gpus=8 \
-        --dependent_jobs=1 \
         ++inference.temperature=0.6 \
         ++inference.top_p=0.95 \
         ++skip_filled=True \
