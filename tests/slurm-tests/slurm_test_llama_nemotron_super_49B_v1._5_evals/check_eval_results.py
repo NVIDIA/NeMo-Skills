@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import argparse
 import io
 import json
 import os
-import sys
 
-# --------------------------- Config ---------------------------
-# Required accuracy fields for pass@1[avg-of-16]; scicode/hle require different fields.
 REASONING_TASKS = [
     "math-500",
     "aime24",
@@ -44,7 +42,6 @@ REASONING_REQUIRED_FIELDS = {
     "hle": ["judge_correct", "symbolic_correct"],
 }
 
-# Expected metric ranges for reasoning tasks
 REASONING_METRIC_RANGES = {
     "reasoning_on": {
         "math-500": (90.0, 100.0),
@@ -80,7 +77,6 @@ REASONING_METRIC_RANGES = {
     },
 }
 
-# --------------------------- Tool-calling (bfcl_v3) ---------------------------
 TOOLCALLING_METRIC_PATHS = {
     "overall_accuracy": ["overall_accuracy", "accuracy"],
     "overall_non_live": ["non_live_single_turn", "overall_non_live", "accuracy"],
@@ -118,7 +114,6 @@ TOOLCALLING_METRIC_RANGES = {
     },
 }
 
-# --------------------------- RULER (ruler.nemotron_super_128k) ---------------------------
 RULER_TASKS = [
     "ruler.nemotron_super_128k",
     "ruler.nemotron_super_128k.niah_single_1",
@@ -172,199 +167,86 @@ RULER_METRIC_RANGES = {
 }
 
 
-# --------------------------- Helpers ---------------------------
-def load_json(path):
+# ---------------- Helpers ----------------
+def load_json(path: str):
     with io.open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def is_numeric(value):
-    try:
-        float(value)
-        return True
-    except Exception:
-        return False
+def get_nested(d: dict, path):
+    for k in path:
+        if not isinstance(d, dict) or k not in d:
+            return None
+        d = d[k]
+    return d
 
 
-def format_percentage(value):
-    try:
-        return "%.2f%%" % float(value)
-    except Exception:
-        return str(value)
-
-
-def detect_reasoning_mode(dir_name):
-    if "reasoning_on" in dir_name:
+def detect_mode(name: str):
+    if "reasoning_on" in name:
         return "reasoning_on"
-    if "reasoning_off" in dir_name:
+    if "reasoning_off" in name:
         return "reasoning_off"
     return None
 
 
-def get_nested_value(dictionary, path):
-    cur = dictionary
-    for key in path:
-        if not isinstance(cur, dict) or key not in cur:
-            return None
-        cur = cur[key]
-    return cur
-
-
-# ---------------- Math Science General Reasoning verify ----------------
-def verify_reasoning_metrics(bucket_path, mode):
-    success = True
-    for benchmark in REASONING_TASKS:
-        metrics_path = os.path.join(bucket_path, "eval-results", benchmark, "metrics.json")
-        if not os.path.isfile(metrics_path):
-            print(f"[REASONING:{benchmark:<12}] metrics.json missing")
-            success = False
-            continue
-        try:
-            data = load_json(metrics_path)
-        except Exception as e:
-            print(f"[REASONING:{benchmark:<12}] unreadable: {e}")
-            success = False
-            continue
-
-        pass1_block = data.get(benchmark, {}).get("pass@1[avg-of-16]")
-        if not isinstance(pass1_block, dict):
-            print(f"[REASONING:{benchmark:<12}] missing pass@1[avg-of-16]")
-            success = False
-            continue
-
-        required_fields = REASONING_REQUIRED_FIELDS[benchmark]
-        expected_range = REASONING_METRIC_RANGES[mode][benchmark]
-
-        if benchmark in REASONING_BENCHMARKS_SCIENCE_HLE:
-            for field in required_fields:
-                if field not in pass1_block or not is_numeric(pass1_block[field]):
-                    print(f"[REASONING:{benchmark:<12}] missing/non-numeric {field}")
-                    success = False
-                    continue
-                lower_bound, upper_bound = expected_range[field]
-                value = float(pass1_block[field])
-                if not (lower_bound <= value <= upper_bound):
-                    print(
-                        f"[REASONING:{benchmark:<12}] {field}={format_percentage(value)} out of range [{lower_bound:.2f}%, {upper_bound:.2f}%]"
-                    )
-                    success = False
+# ---------------- Assert-only checks ----------------
+def check_reasoning(bucket: str, mode: str):
+    for bench in REASONING_TASKS:
+        f = os.path.join(bucket, "eval-results", bench, "metrics.json")
+        data = load_json(f)
+        block = data[bench]["pass@1[avg-of-16]"]
+        if bench in REASONING_BENCHMARKS_SCIENCE_HLE:
+            for field in REASONING_REQUIRED_FIELDS[bench]:
+                val = float(block[field])  # will raise if missing/non-numeric
+                lo, hi = REASONING_METRIC_RANGES[mode][bench][field]
+                assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
         else:
-            field = required_fields[0]
-            if field not in pass1_block or not is_numeric(pass1_block[field]):
-                print(f"[REASONING:{benchmark:<12}] missing/non-numeric {field}")
-                success = False
-                continue
-            lower_bound, upper_bound = expected_range
-            value = float(pass1_block[field])
-            if not (lower_bound <= value <= upper_bound):
-                print(
-                    f"[REASONING:{benchmark:<12}] {field}={format_percentage(value)} out of range [{lower_bound:.2f}%, {upper_bound:.2f}%]"
-                )
-                success = False
-    return success
+            field = REASONING_REQUIRED_FIELDS[bench][0]
+            val = float(block[field])
+            lo, hi = REASONING_METRIC_RANGES[mode][bench]
+            assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
 
 
-# ---------------- Tool-calling verify ----------------
-def verify_toolcalling_metrics(bucket_path, mode):
-    success = True
-    metrics_path = os.path.join(bucket_path, "eval-results", "bfcl_v3", "metrics.json")
-    if not os.path.isfile(metrics_path):
-        print(f"[TOOL] metrics.json missing: {metrics_path}")
-        return False
-    try:
-        data = load_json(metrics_path)
-    except Exception as e:
-        print(f"[TOOL] unreadable: {e}")
-        return False
-
-    expected_ranges = TOOLCALLING_METRIC_RANGES[mode]
-    for category, path in sorted(TOOLCALLING_METRIC_PATHS.items()):
-        value = get_nested_value(data, path)
-        if not is_numeric(value):
-            print(f"[TOOL:{category:<20}] missing/non-numeric accuracy at {'/'.join(path)}")
-            success = False
-            continue
-        lower_bound, upper_bound = expected_ranges[category]
-        value = float(value)
-        if not (lower_bound <= value <= upper_bound):
-            print(
-                f"[TOOL:{category:<20}] accuracy={format_percentage(value)} out of range [{lower_bound:.2f}%, {upper_bound:.2f}%]"
-            )
-            success = False
-    return success
+def check_toolcalling(bucket: str, mode: str):
+    f = os.path.join(bucket, "eval-results", "bfcl_v3", "metrics.json")
+    data = load_json(f)
+    for cat, path in TOOLCALLING_METRIC_PATHS.items():
+        val = float(get_nested(data, path))
+        lo, hi = TOOLCALLING_METRIC_RANGES[mode][cat]
+        assert lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]"
 
 
-# ---------------- RULER verify ----------------
-def verify_ruler_metrics(bucket_path, mode):
-    success = True
-    metrics_path = os.path.join(bucket_path, "eval-results", "ruler.nemotron_super_128k", "metrics.json")
-    if not os.path.isfile(metrics_path):
-        print(f"[RULER] metrics.json missing: {metrics_path}")
-        return False
-    try:
-        data = load_json(metrics_path)
-    except Exception as e:
-        print(f"[RULER] unreadable: {e}")
-        return False
-
-    expected_ranges = RULER_METRIC_RANGES[mode]
+def check_ruler(bucket: str, mode: str):
+    f = os.path.join(bucket, "eval-results", "ruler.nemotron_super_128k", "metrics.json")
+    data = load_json(f)
     for task in RULER_TASKS:
-        node = data.get(task, {})
-        if not (isinstance(node, dict) and "pass@1" in node and isinstance(node["pass@1"], dict)):
-            print(f"[RULER:{task}] missing pass@1")
-            success = False
-            continue
-        value = node["pass@1"].get("accuracy")
-        if not is_numeric(value):
-            print(f"[RULER:{task}] missing/non-numeric Accuracy")
-            success = False
-            continue
-        lower_bound, upper_bound = expected_ranges[task]
-        value = float(value)
-        if not (lower_bound <= value <= upper_bound):
-            print(
-                f"[RULER:{task}] Accuracy={format_percentage(value)} out of range [{lower_bound:.2f}, {upper_bound:.2f}]"
-            )
-            success = False
-    return success
+        val = float(data[task]["pass@1"]["accuracy"])
+        lo, hi = RULER_METRIC_RANGES[mode][task]
+        assert lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]"
 
 
-# --------------------------- Main ---------------------------
+# ---------------- Main ----------------
 def main():
-    parser = argparse.ArgumentParser(description="Hard verify: reasoning + tool-calling + ruler (errors only)")
-    parser.add_argument("--workspace", required=True, help="Workspace root containing eval buckets")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description="Assert-only verifier: reasoning + tool-calling + ruler")
+    ap.add_argument("--workspace", required=True, help="Workspace root containing eval buckets")
+    args = ap.parse_args()
 
-    workspace_root = os.path.abspath(os.path.expanduser(args.workspace))
-    if not os.path.isdir(workspace_root):
-        print(f"Workspace not found: {workspace_root}")
-        sys.exit(1)
-
-    verification_passed = True
-    for bucket_name in sorted(os.listdir(workspace_root)):
-        bucket_path = os.path.join(workspace_root, bucket_name)
-        if not (os.path.isdir(bucket_path) and os.path.isdir(os.path.join(bucket_path, "eval-results"))):
+    root = os.path.abspath(os.path.expanduser(args.workspace))
+    for bucket in sorted(os.listdir(root)):
+        bpath = os.path.join(root, bucket)
+        if not os.path.isdir(os.path.join(bpath, "eval-results")):
             continue
-        mode = detect_reasoning_mode(bucket_name)
+        mode = detect_mode(bucket)
         if not mode:
             continue
-
-        if "tool_calling" in bucket_name:
-            if not verify_toolcalling_metrics(bucket_path, mode):
-                verification_passed = False
-        elif "ruler" in bucket_name:
-            if not verify_ruler_metrics(bucket_path, mode):
-                verification_passed = False
+        if "tool_calling" in bucket:
+            check_toolcalling(bpath, mode)
+        elif "ruler" in bucket:
+            check_ruler(bpath, mode)
         else:
-            if not verify_reasoning_metrics(bucket_path, mode):
-                verification_passed = False
+            check_reasoning(bpath, mode)
 
-    if verification_passed:
-        print("OVERALL_OK: True")
-        sys.exit(0)
-    else:
-        print("OVERALL_OK: False")
-        sys.exit(1)
+    print("ALL CHECKS PASSED")
 
 
 if __name__ == "__main__":
