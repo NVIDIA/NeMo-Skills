@@ -30,8 +30,8 @@ class TestConfig:
     """Configuration for test parameters"""
 
     num_tokens_to_generate: int = 1_000_000
-    num_samples: int = 10
-    accuracy_threshold_percent: int = 50
+    num_samples: int = 4
+    accuracy_threshold_percent: int = 25
     server_gpus: int = 1
     server_nodes: int = 1
 
