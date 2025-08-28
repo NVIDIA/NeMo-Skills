@@ -167,7 +167,6 @@ RULER_METRIC_RANGES = {
 }
 
 
-# ---------------- Helpers ----------------
 def load_json(path: str):
     with io.open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -194,7 +193,12 @@ def check_reasoning(bucket: str, mode: str):
     for bench in REASONING_TASKS:
         f = os.path.join(bucket, "eval-results", bench, "metrics.json")
         data = load_json(f)
-        block = data[bench]["pass@1[avg-of-16]"]
+        if bench in {"math-500", "aime24", "aime25", "gpqa", "livecodebench", "scicode"}:
+            block = get_nested(data[bench], ["pass@1[avg-of-4]"])
+        elif bench in {"mmlu-pro", "hle"}:
+            block = get_nested(data[bench], ["pass@1"])
+        else:
+            raise AssertionError(f"Unexpected benchmark: {bench}")
         if bench in REASONING_BENCHMARKS_SCIENCE_HLE:
             for field in REASONING_REQUIRED_FIELDS[bench]:
                 val = float(block[field])  # will raise if missing/non-numeric

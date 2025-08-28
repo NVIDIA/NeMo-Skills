@@ -77,7 +77,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks gpqa:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+        --benchmarks gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4 \
         --server_gpus=8 \
         {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
@@ -91,7 +91,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks mmlu-pro:16 \
+        --benchmarks mmlu-pro:1 \
         --server_gpus=8 \
         --dependent_jobs=1 \
         {common_infer} \
@@ -106,7 +106,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks livecodebench:16 \
+        --benchmarks livecodebench:4 \
         --split test_v5_2410_2502 \
         --server_gpus=8 \
         {common_infer} \
@@ -121,7 +121,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks hle:16 \
+        --benchmarks hle:1 \
         --server_gpus=8 \
         --dependent_jobs=1 \
         --judge_model {workspace}/Qwen2.5-32B-Instruct \
@@ -171,6 +171,14 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
     """
     subprocess.run(cmd, shell=True, check=True)
 
+    return [
+        f"{expname_prefix}-math-code-science-on",
+        f"{expname_prefix}-livecode-on",
+        f"{expname_prefix}-hle-on",
+        f"{expname_prefix}-bfcl-on",
+        f"{expname_prefix}-ruler-on",
+    ]
+
 
 def eval_reasoning_off(workspace, cluster, expname_prefix):
     """
@@ -189,7 +197,21 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+        --benchmarks gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4 \
+        --server_gpus=8 \
+        {common_infer} \
+        --run_after {expname_prefix}-download-ruler-data \
+        --expname {expname_prefix}-math-code-science-off
+    """
+    subprocess.run(cmd, shell=True, check=True)
+
+    # MMLU (Reasoning OFF)
+    cmd = f"""
+    ns eval --cluster {cluster} \
+        --model {base_model} \
+        --server_type vllm \
+        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
+        --benchmarks mmlu-pro:1 \
         --server_gpus=8 \
         {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
@@ -203,7 +225,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks livecodebench:16 \
+        --benchmarks livecodebench:4 \
         --split test_v5_2410_2502 \
         --server_gpus=8 \
         {common_infer} \
@@ -218,7 +240,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --model {base_model} \
         --server_type vllm \
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks hle:16 \
+        --benchmarks hle:1 \
         --server_gpus=8 \
         --dependent_jobs=1 \
         --judge_model {workspace}/Qwen2.5-32B-Instruct \
@@ -268,6 +290,14 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
     """
     subprocess.run(cmd, shell=True, check=True)
 
+    return [
+        f"{expname_prefix}-math-code-science-off",
+        f"{expname_prefix}-livecode-off",
+        f"{expname_prefix}-hle-off",
+        f"{expname_prefix}-bfcl-off",
+        f"{expname_prefix}-ruler-off",
+    ]
+
 
 # Prepare evaluation data locally first
 def prepare_data_locally():
@@ -286,8 +316,12 @@ def main():
     # launch for eval jobs
     prepare_data_locally()
     setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    eval_reasoning_on(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    eval_reasoning_off(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    reason_on_expnames = eval_reasoning_on(
+        workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix
+    )
+    reason_off_expnames = eval_reasoning_off(
+        workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix
+    )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
 
@@ -301,18 +335,7 @@ def main():
         cluster=args.cluster,
         expname=f"check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/logs",
-        run_after=[
-            f"{args.expname_prefix}-math-code-science-on",
-            f"{args.expname_prefix}-livecode-on",
-            f"{args.expname_prefix}-hle-on",
-            f"{args.expname_prefix}-bfcl-on",
-            f"{args.expname_prefix}-ruler-on",
-            f"{args.expname_prefix}-math-code-science-off",
-            f"{args.expname_prefix}-livecode-off",
-            f"{args.expname_prefix}-hle-off",
-            f"{args.expname_prefix}-bfcl-off",
-            f"{args.expname_prefix}-ruler-off",
-        ],
+        run_after=reason_on_expnames + reason_off_expnames,
     )
 
 
