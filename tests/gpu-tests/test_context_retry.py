@@ -215,8 +215,6 @@ class ContextRetryTestSuite:
         output_dir = self.output_manager.setup_output_dir(self.env.model_type, test_name)
         cmd = self.cmd_builder.build_eval_cmd(output_dir, server_type, enable_soft_fail, retry_strategy)
 
-        print(f"Running command:\n\n{cmd}")
-
         subprocess.run(cmd, shell=True, check=True)
 
         if expect_success:
