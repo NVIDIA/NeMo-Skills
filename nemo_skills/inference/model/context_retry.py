@@ -190,22 +190,26 @@ async def handle_context_retries_async(
 ) -> dict:
     """Async version of context retry logic."""
     try:
-        result = await func(self, *args, **kwargs)
+        context_window_error = False
+        result = func(self, *args, **kwargs)
         return result
     except litellm.exceptions.ContextWindowExceededError as error:
+        context_window_error = True
+    except litellm.BadRequestError as error:
+        if "Requested token count exceeds" in str(error):
+            context_window_error = True
+        else:
+            raise error
+
+    if context_window_error:
         if not config.enable_soft_fail:
             raise error
-        else:
-            if config.strategy is None:
-                detailed_error = f"Context window exceeded. Soft fail is enabled but no strategy is configured. Returning empty generation.\n\n{error}"
-                LOG.warning(detailed_error)
-                return return_empty_generation_with_error(detailed_error)
 
-            modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-            if modified_kwargs is None:
-                return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+        modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+        if modified_kwargs is None:
+            return return_empty_generation_with_error(f"Could not apply strategy. {error}")
 
-            return await func(self, *args, **modified_kwargs)
+        return await func(self, *args, **modified_kwargs)
 
 
 def handle_context_retries_sync(
@@ -218,13 +222,11 @@ def handle_context_retries_sync(
         return result
     except litellm.exceptions.ContextWindowExceededError as error:
         context_window_error = True
-    except litellm.exceptions.BadRequestError as error:
+    except litellm.BadRequestError as error:
         if "Requested token count exceeds" in str(error):
             context_window_error = True
         else:
             raise error
-    except Exception as error:
-        raise error
 
     if context_window_error:
         if not config.enable_soft_fail:
