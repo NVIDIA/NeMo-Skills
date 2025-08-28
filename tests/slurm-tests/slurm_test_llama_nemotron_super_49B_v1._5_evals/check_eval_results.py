@@ -194,19 +194,20 @@ def check_reasoning(bucket: str, mode: str):
         f = os.path.join(bucket, "eval-results", bench, "metrics.json")
         data = load_json(f)
         if bench in {"math-500", "aime24", "aime25", "gpqa", "livecodebench", "scicode"}:
-            block = get_nested(data[bench], ["pass@1[avg-of-4]"])
+            result_block = get_nested(data[bench], ["pass@1[avg-of-4]"])
         elif bench in {"mmlu-pro", "hle"}:
-            block = get_nested(data[bench], ["pass@1"])
+            result_block = get_nested(data[bench], ["pass@1"])
         else:
             raise AssertionError(f"Unexpected benchmark: {bench}")
+
         if bench in REASONING_BENCHMARKS_SCIENCE_HLE:
             for field in REASONING_REQUIRED_FIELDS[bench]:
-                val = float(block[field])  # will raise if missing/non-numeric
+                val = float(result_block[field])
                 lo, hi = REASONING_METRIC_RANGES[mode][bench][field]
                 assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
         else:
             field = REASONING_REQUIRED_FIELDS[bench][0]
-            val = float(block[field])
+            val = float(result_block[field])
             lo, hi = REASONING_METRIC_RANGES[mode][bench]
             assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
 
