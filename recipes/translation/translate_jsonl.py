@@ -25,7 +25,6 @@ from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTa
 from nemo_skills.utils import nested_dataclass, setup_logging
 
 LOG = logging.getLogger(__name__)
-MAX_CONTEXT_LENGTH = 500
 
 
 def is_line_translatable_content(line: str) -> bool:
@@ -84,7 +83,7 @@ def full_language_name(lang_code: str) -> str:
     """
 
     lang_code = lang_code.lower().strip()
-    language = iso639.languages.get(alpha2=lang_code)
+    language = iso639.Lang(lang_code)
     if language:
         return language.name
 
@@ -192,7 +191,7 @@ class TranslationTask(GenerationTask):
 
                     current_doc_template.append(None)
                     current_doc_translatable_lines.append(stripped_line)
-                    all_translatable_lines.append(stripped_line[:MAX_CONTEXT_LENGTH])
+                    all_translatable_lines.append(stripped_line)
                     current_doc_translatable_indices.append(i)
                     current_doc_leading_spaces_list.append(leading_spaces)
                     current_doc_original_stripped_lines.append(stripped_line)
