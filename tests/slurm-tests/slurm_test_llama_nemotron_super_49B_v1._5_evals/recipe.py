@@ -280,7 +280,6 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --benchmarks ruler.nemotron_super_128k \
         --data_dir {workspace}/ns-data \
         --server_gpus=8 \
-        --dependent_jobs=1 \
         ++inference.temperature=0.0 \
         ++inference.top_p=1.0 \
         ++skip_filled=True \
