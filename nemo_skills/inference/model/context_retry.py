@@ -251,7 +251,7 @@ def _prepare_context_error_retry(
 
     # Apply the configured strategy
     if config.reduce_generate_tokens:
-        return _try_reduce_generation_tokens(kwargs, parsed_error, error)
+        return _try_reduce_generation_tokens(kwargs, parsed_error, config, error)
     elif config.reduce_prompt_from_start or config.reduce_prompt_from_end:
         if tokenizer is None:
             # Without tokenizer, we can't trim the prompt.
@@ -265,7 +265,9 @@ def _prepare_context_error_retry(
         return None
 
 
-def _try_reduce_generation_tokens(kwargs: dict, parsed_error: dict, original_error: Exception) -> dict:
+def _try_reduce_generation_tokens(
+    kwargs: dict, parsed_error: dict, config: ContextLimitRetryConfig, original_error: Exception
+) -> dict:
     """Try to reduce the number of tokens to generate."""
     original_budget = kwargs.get("tokens_to_generate", None)
     max_context_length = parsed_error["max_context_length"]
@@ -276,7 +278,8 @@ def _try_reduce_generation_tokens(kwargs: dict, parsed_error: dict, original_err
         LOG.warning(detailed_error)
         return None
 
-    reduced_generation_budget = max_context_length - message_tokens
+    # Reduce the generation budget by further accounting for certain special tokens to be safe
+    reduced_generation_budget = (max_context_length - message_tokens) - config.num_special_tokens_budget
     # This min operation is probably not needed but just in case
     if original_budget is not None:
         reduced_tokens = min(original_budget, reduced_generation_budget)
