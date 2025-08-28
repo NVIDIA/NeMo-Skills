@@ -122,7 +122,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
         --benchmarks hle:1 \
         --server_gpus=8 \
-        --dependent_jobs=1 \
+        --num_chunks=2 \
         --judge_model {workspace}/Qwen2.5-32B-Instruct \
         --judge_server_type vllm \
         --judge_server_gpus=8 \
@@ -160,9 +160,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --benchmarks ruler.nemotron_super_128k \
         --data_dir {workspace}/ns-data \
         --server_gpus=8 \
-        ++inference.temperature=0.6 \
-        ++inference.top_p=0.95 \
-        ++skip_filled=True \
+        {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
         --expname {expname_prefix}-ruler-on
     """
@@ -186,7 +184,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning OFF
-    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 ++inference.top_p=1.0 ++skip_filled=True ++system_message=/no_think"
+    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 ++inference.top_p=1.0 ++system_message=/no_think"
 
     # Math / Code / Science (Reasoning OFF)
     cmd = f"""
@@ -210,6 +208,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
         --benchmarks mmlu-pro:1 \
         --server_gpus=8 \
+        --num_chunks=2 \
         {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
         --expname {expname_prefix}-math-code-science-off
@@ -239,6 +238,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
         --benchmarks hle:1 \
         --server_gpus=8 \
+        --num_chunks=2 \
         --judge_model {workspace}/Qwen2.5-32B-Instruct \
         --judge_server_type vllm \
         --judge_server_gpus=8 \
@@ -276,10 +276,8 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --benchmarks ruler.nemotron_super_128k \
         --data_dir {workspace}/ns-data \
         --server_gpus=8 \
-        ++inference.temperature=0.0 \
-        ++inference.top_p=1.0 \
-        ++skip_filled=True \
-        ++system_message=/no_think \
+        --num_chunks=2 \
+        {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
         --expname {expname_prefix}-ruler-off
     """

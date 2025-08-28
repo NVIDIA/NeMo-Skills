@@ -32,25 +32,23 @@ def main():
     args = ap.parse_args()
 
     # 1) Run simplified_recipe
-    cmd = [
-        sys.executable,
-        "-m",
-        "recipes.openmathreasoning.scripts.simplified_recipe",
-        "--cluster",
-        args.cluster,
-        "--workspace",
-        args.workspace,
-        "--training_backend",
-        args.backend,
-        "--expname_prefix",
-        args.expname_prefix,
-    ]
-    if args.disable_wandb:
-        cmd.append("--disable_wandb")
-    elif args.wandb_project:
-        cmd += ["--wandb_project", args.wandb_project]
+    def run_simplified_recipe(args):
+        cmd = f"""
+        python -m recipes.openmathreasoning.scripts.simplified_recipe \
+            --cluster {args.cluster} \
+            --workspace {args.workspace} \
+            --training_backend {args.backend} \
+            --expname_prefix {args.expname_prefix}
+        """
 
-    subprocess.run(cmd, check=True)
+        if args.disable_wandb:
+            cmd += " --disable_wandb"
+        elif args.wandb_project:
+            cmd += f" --wandb_project {args.wandb_project}"
+
+        subprocess.run(cmd, shell=True, check=True)
+
+    run_simplified_recipe(args)
 
     # 2) Schedule a dependent check job ON THE CLUSTER.
     #    This downloads the checker into the workspace and runs it there.
