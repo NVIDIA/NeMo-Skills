@@ -19,7 +19,7 @@ import random
 import sys
 import time
 from copy import deepcopy
-from dataclasses import asdict, field
+from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -435,10 +435,17 @@ class GenerationTask:
         return None
 
     async def process_single_datapoint(self, data_point, all_data):
+        # Handle inference config - check if it's a dataclass or already a dict
+        if is_dataclass(self.cfg.inference):
+            inference_params = asdict(self.cfg.inference)
+        else:
+            # Already a dict from Hydra
+            inference_params = dict(self.cfg.inference)
+
         generation_params = {
             "prompt": self.fill_prompt(data_point, all_data),
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
-            **asdict(self.cfg.inference),
+            **inference_params,
             **self.extra_generate_params,
         }
 

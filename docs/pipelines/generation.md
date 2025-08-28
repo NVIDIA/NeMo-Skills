@@ -117,7 +117,7 @@ Then we can run the generation
 ns generate \
        --cluster=slurm \
        --server_type=trtllm \
-       --model=/trt_models/llama-3.1-405b-instruct \
+       --model=/hf_models/Llama-3.1-405B-Instruct \
        --server_gpus=8 \
        --server_nodes=2 \
        --num_random_seeds=32 \
