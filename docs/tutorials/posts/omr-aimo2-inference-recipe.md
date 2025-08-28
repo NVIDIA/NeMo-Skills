@@ -243,9 +243,8 @@ Here’s a sample of the kind of benchmark results you’ll see:
 
 | Metric                        | BF16 | FP8   | FP8+ReDrafter  |
 |-------------------------------|---------------|-------|-------|
-| Total Generation Time (s)     | 118 | 77  |  40  |
-| Batch Throughput (Tok/s)          | 380 | 648   |  1343  |
-| Average Sample Throughput (Tok/s) | 38 | 65    |  134  |
+| Total Generation Time (s)     | 118.3 | 73.3  |  32.4  |
+| Average Sample Throughput (Tok/s) | 37.9 | 68.1   |  162.4  |
 
 *(full benchmarks and code available in the notebook)*
 
