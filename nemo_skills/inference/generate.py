@@ -240,8 +240,16 @@ class GenerationTask:
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
-        self.prompt, tokenizer = self.setup_prompt()
-        self.llm = self.setup_llm(tokenizer)
+        # Setup tokenizer
+        if self.cfg.use_completions_api or self.cfg.server["enable_soft_fail"]:
+            # These are the only cases where we need a tokenizer
+            self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
+        else:
+            self.tokenizer = None
+
+        # Setup prompt formatter and LLM
+        self.prompt = self.setup_prompt()
+        self.llm = self.setup_llm()
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
@@ -266,69 +274,35 @@ class GenerationTask:
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
-    def setup_llm(self, tokenizer: str):
-        self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-
-        if self.cfg.code_execution:
-            llm = get_code_execution_model(**self.cfg.server, tokenizer=tokenizer, sandbox=self.sandbox)
-        elif self.cfg.tool_config:
-            llm = get_tool_calling_model(
-                **self.cfg.server,
-                tool_config=self.cfg.tool_config,
-                tokenizer=tokenizer,
-                additional_config={"sandbox": self.cfg.sandbox},
-            )
-        else:
-            llm = get_model(**self.cfg.server, tokenizer=tokenizer)
-
-        if self.cfg.online_genselect:
-            # Use the same prompt parameters for genselect as the one used for generation
-            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
-            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
-            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
-            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
-            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
-            llm = get_online_genselect_model(
-                **{**self.cfg.server, "model": llm, "tokenizer": tokenizer},
-                online_genselect_config=self.cfg.online_genselect_config,
-            )
-
-        return llm
-
     def setup_prompt(self):
         if self.cfg.prompt_format == "openai":
             return None
 
-        if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
-        else:
-            tokenizer = None
-
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=tokenizer,
+            tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
         )
         if self.cfg.system_message is not None:
             prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
-        return prompt, tokenizer
+        return prompt
 
-    def setup_llm(self, tokenizer: str):
+    def setup_llm(self):
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
 
         if self.cfg.code_execution:
-            llm = get_code_execution_model(**self.cfg.server, tokenizer=tokenizer, sandbox=self.sandbox)
+            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
         elif self.cfg.tool_config:
             llm = get_tool_calling_model(
                 **self.cfg.server,
                 tool_config=self.cfg.tool_config,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            llm = get_model(**self.cfg.server, tokenizer=tokenizer)
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
         if self.cfg.online_genselect:
             # Use the same prompt parameters for genselect as the one used for generation
@@ -338,7 +312,7 @@ class GenerationTask:
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
-                **{**self.cfg.server, "model": llm, "tokenizer": tokenizer},
+                **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
                 online_genselect_config=self.cfg.online_genselect_config,
             )
 
