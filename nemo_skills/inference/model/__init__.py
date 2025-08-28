@@ -71,7 +71,7 @@ def get_online_genselect_model(model, online_genselect_config=None, **kwargs):
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
 
 
-def get_tool_calling_model(model=None, tool_config=None, additional_config=None, **kwargs):
+def get_tool_calling_model(model, tool_config, additional_config=None, **kwargs):
     if isinstance(model, str):
         model = get_model(model=model, **kwargs)
     return ToolCallingWrapper(model, tool_config_yaml=tool_config, additional_config=additional_config)

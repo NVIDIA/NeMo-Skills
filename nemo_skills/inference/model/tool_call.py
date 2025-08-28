@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import copy
 import json
 import logging
 from typing import Dict, List
@@ -52,12 +53,16 @@ class ToolCallingWrapper:
         tool_name = tool_call["function"]["name"]
         tool_args = tool_call["function"]["arguments"]
 
+        ##
+        # TODO(sanyamk): Not all tool arguments might necessarily be in JSON format.
+        #   Kept here to handle errors for now.
         try:
             tool_args = json.loads(tool_args)
         except json.decoder.JSONDecodeError as e:
             LOG.exception(e)
             return {"error": "Tool argument parsing failed."}
 
+        ## TODO(sanyamk): Only exceptions related to tool execution here, all others must fail.
         try:
             result = await self.client_manager.execute_tool(tool_name, tool_args)
         except Exception as e:
@@ -91,7 +96,7 @@ class ToolCallingWrapper:
         generation_steps = []
         reasoning_steps = []
 
-        conversation = list(prompt)
+        conversation = copy.deepcopy(prompt)
 
         while True:
             generation = await self.model.generate_async(prompt=conversation, tools=tools, **generation_kwargs)
