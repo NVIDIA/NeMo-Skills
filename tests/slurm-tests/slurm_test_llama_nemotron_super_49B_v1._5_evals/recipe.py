@@ -92,7 +92,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
         --benchmarks mmlu-pro:1 \
         --server_gpus=8 \
-        --dependent_jobs=1 \
+        --num_chunks=2 \
         {common_infer} \
         --run_after {expname_prefix}-download-ruler-data \
         --expname {expname_prefix}-math-code-science-on
