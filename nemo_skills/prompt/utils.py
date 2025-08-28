@@ -267,8 +267,6 @@ class Prompt:
                 "format, so please set tokenizer to a valid value."
             )
 
-        LOG.info(f"Messages: {str(messages)[:100]}")
-
         if self.tokenizer is not None:
             chat_template_kwargs = chat_template_kwargs or {}
             try:
