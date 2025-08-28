@@ -566,3 +566,12 @@ def maybe_get_env(value: Union[Any, List[Any]], env_name, default=None, cast: Ca
         if not found_value:
             value = default
     return value
+
+
+def get_server_wait_cmd(server_address):
+    # might be required if we are not hosting server ourselves
+    # this will try to handshake in a loop and unblock when the server responds
+    return (
+        f"echo 'Waiting for the server to start at {server_address}' && "
+        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done "
+    )

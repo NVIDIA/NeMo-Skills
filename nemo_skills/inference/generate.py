@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import random
+import subprocess
 import sys
 import time
 from copy import deepcopy
@@ -40,6 +41,7 @@ from nemo_skills.utils import (
     chunk_data,
     get_help_message,
     get_logger_name,
+    get_server_wait_cmd,
     nested_dataclass,
     remove_thinking,
     setup_logging,
@@ -529,6 +531,14 @@ class GenerationTask:
 
         Path(self.cfg.output_file + "-async").unlink()
 
+    def wait_for_server(self):
+        server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
+        if not server_address:
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
+        server_start_cmd = get_server_wait_cmd(server_address)
+        subprocess.run(server_start_cmd, shell=True, check=True)
+
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
@@ -553,6 +563,7 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
+        self.wait_for_server()
         asyncio.run(self.async_loop(data))
 
         self.postprocess()

@@ -224,7 +224,7 @@ def genselect(
                 task_name = f"{expname}-rs{seed}" if seed is not None else expname
                 new_task = pipeline_utils.add_task(
                     exp,
-                    cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
+                    cmd=pipeline_utils.wrap_python_path(cmd=cmd),
                     task_name=task_name,
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],

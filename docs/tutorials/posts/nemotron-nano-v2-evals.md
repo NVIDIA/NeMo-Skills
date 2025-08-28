@@ -269,18 +269,15 @@ pass@1[avg-of-8] | 12032       | 2534       | 7824        | 73.95%           | 0
 majority@8       | 12032       | 2534       | 7824        | 76.30%           | 0.00%
 pass@8           | 12032       | 2534       | 7824        | 86.44%           | 0.00%
 
-------------------------------------------------- hle --------------------------------------
+------------------------------------------- hle --------------------------------------------
 evaluation_mode  | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct
 pass@1[avg-of-8] | 2158        | 10173      | 16336       | 5.94%         | 3.43%
-majority@8       | 2158        | 10173      | 16336       | 5.08%         | 4.02%
+majority@8       | 2158        | 10173      | 16336       | 6.02%         | 3.42%
 pass@8           | 2158        | 10173      | 16336       | 19.93%        | 12.14%
 ```
 
 !!!note
     When testing on smaller benchmarks like GPQA, we observed significant performance variance --- results varied from 53 to 65 across different random seeds, and the model showed high sensitivity to prompt changes.
-
-!!!note
-    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
 
 
 #### Results for Code Reasoning benchmarks

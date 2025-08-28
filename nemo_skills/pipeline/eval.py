@@ -298,9 +298,7 @@ def eval(
                 has_tasks = True
                 new_task = pipeline_utils.add_task(
                     exp,
-                    cmd=pipeline_utils.wait_for_server(
-                        server_address=job_server_address, generation_commands=" && ".join(cmds)
-                    ),
+                    cmd=pipeline_utils.wrap_python_path(cmd=" && ".join(cmds)),
                     task_name=f"{expname}-{'-'.join(job_benchmarks)}",
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],
