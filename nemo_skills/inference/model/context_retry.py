@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
 import litellm
-import openai
 
 from nemo_skills.utils import get_logger_name
 
@@ -312,7 +311,8 @@ def _try_reduce_prompt_tokens(
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
         raise ValueError(detailed_error)
 
-    num_prompt_tokens_to_keep = max_context_length - completion_tokens
+    # SGLang has thrown error for exact equality. Subtracting the num_special_tokens_budget to be safe.
+    num_prompt_tokens_to_keep = (max_context_length - completion_tokens) - config.num_special_tokens_budget
     prompt = kwargs["prompt"]
 
     LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
@@ -359,9 +359,9 @@ def _trim_list_prompt(
     prompt_copy = copy.deepcopy(prompt_list)
 
     if config.reduce_prompt_from_start:
-        trimmed_messages = _trim_messages_from_start(prompt_copy, num_tokens_to_keep, config, tokenizer)
+        trimmed_messages = _trim_messages_from_start(prompt_copy, num_tokens_to_keep, tokenizer)
     else:  # reduce_prompt_from_end
-        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, config, tokenizer)
+        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, tokenizer)
 
     if not trimmed_messages:
         detailed_error = f"Not able to trim the prompt. Returning empty generation.\n\n{original_error}"
@@ -376,7 +376,6 @@ def _trim_list_prompt(
 def _trim_messages_from_end(
     messages: list,
     remaining_token_budget: int,
-    config: ContextLimitRetryConfig,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
     """Trim messages from the end of the list."""
@@ -400,7 +399,6 @@ def _trim_messages_from_end(
             trimmed_content = get_trimmed_content(
                 content=message["content"],
                 num_remaining_tokens=num_remaining_tokens,
-                num_special_tokens_budget=config.num_special_tokens_budget,
                 tokenizer=tokenizer,
                 trim_suffix=True,  # Since we're trimming from the end, we want to trim the suffix of the current message
             )
@@ -419,7 +417,6 @@ def _trim_messages_from_end(
 def _trim_messages_from_start(
     messages: list,
     remaining_token_budget: int,
-    config: ContextLimitRetryConfig,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
     """Returns the suffix of the current message list that fits within the token budget."""
@@ -448,7 +445,6 @@ def _trim_messages_from_start(
             trimmed_content = get_trimmed_content(
                 content=messages[suffix_start_idx]["content"],
                 num_remaining_tokens=remaining_tokens,
-                num_special_tokens_budget=config.num_special_tokens_budget,
                 tokenizer=tokenizer,
                 trim_suffix=False,  # Since we're trimming from the start, we want to trim the prefix of the current message
             )
@@ -470,16 +466,14 @@ def _trim_messages_from_start(
 def get_trimmed_content(
     content: str,
     num_remaining_tokens: int,
-    num_special_tokens_budget: int,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
     trim_suffix: bool = True,
 ) -> str:
     """
     Get the trimmed content of a message.
     """
-    # Remove the budget for special tokens
-    if num_remaining_tokens > num_special_tokens_budget:
-        num_remaining_tokens = num_remaining_tokens - num_special_tokens_budget
+    # Make sure we have a positive number of tokens to keep.
+    if num_remaining_tokens > 0:
         encoded_content = tokenizer.encode(content)
         if trim_suffix:
             encoded_content = encoded_content[:num_remaining_tokens]
