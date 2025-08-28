@@ -530,6 +530,9 @@ class GenerationTask:
 
     def wait_for_server(self):
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
+        if not server_address:
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_start_cmd = get_server_wait_cmd(server_address)
         subprocess.run(server_start_cmd, shell=True, check=True)
 
