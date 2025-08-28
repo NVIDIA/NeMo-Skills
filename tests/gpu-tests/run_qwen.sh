@@ -1,11 +1,11 @@
 # will run all tests starting from only a HF checkpoint. Only requires 1 GPU.
 # also need to define HF_TOKEN for some of the tests
-# model needs to be inside /mnt/datadrive/nemo-skills-test-data/Qwen2.5-Math-7B-Instruct
+# model needs to be inside /mnt/datadrive/nemo-skills-test-data/Qwen3-4B
 # if you need to place it in a different location, modify test-local.yaml config
 # example: HF_TOKEN=<> ./tests/gpu-tests/run.sh
 set -e
 
-export NEMO_SKILLS_TEST_HF_MODEL=/mnt/datadrive/nemo-skills-test-data/Qwen2.5-Math-7B-Instruct
+export NEMO_SKILLS_TEST_HF_MODEL=/mnt/datadrive/nemo-skills-test-data/Qwen3-4B
 export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
 
 # generation/evaluation tests
