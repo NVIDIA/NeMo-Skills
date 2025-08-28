@@ -235,17 +235,17 @@ We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) 
 In the notebook, you can:
 
 - Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).
-- Compare performance benchmarks such as **time-to-first-token** and **throughput per device**.
-- Explore advanced controls like **early stopping after a fixed time** or **terminating after the first N generations complete**.
+- Compare performance benchmarks.
+- Explore advanced controls like **terminating after the first N generations complete**.
 - Run inference with tool-calling.
 
 Here’s a sample of the kind of benchmark results you’ll see:
 
 | Metric                        | BF16 | FP8   | FP8+ReDrafter  |
 |-------------------------------|---------------|-------|-------|
-| Total Generation Time (s)     | 170.4 | 72.9  |  33.8 |
-| Batch Throughput (Tok/s)          | 518 | 1029   |  2036  |
-| Average Sample Throughput (Tok/s) | 44.1 | 89.9    |  175.7   |
+| Total Generation Time (s)     | 118 | 77  |  40  |
+| Batch Throughput (Tok/s)          | 380 | 648   |  1343  |
+| Average Sample Throughput (Tok/s) | 38 | 65    |  134  |
 
 *(full benchmarks and code available in the notebook)*
 
