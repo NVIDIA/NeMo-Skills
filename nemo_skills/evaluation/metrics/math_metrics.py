@@ -24,7 +24,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 class MathMetrics(BaseMetrics):
     # TODO: how can we ensure that user-defined aggregations have all the same metrics as in base?
-    answer_key: str = "predicted_answer"
 
     def __init__(self, compute_no_answer: bool = True, answer_key: str = "predicted_answer"):
         super().__init__(compute_no_answer=compute_no_answer)
@@ -79,14 +78,13 @@ class MathMetrics(BaseMetrics):
 
         return correctness_dict
 
-    @classmethod
-    def get_incorrect_sample(cls, prediction: dict) -> dict:
+    def get_incorrect_sample(self, prediction: dict) -> dict:
         prediction = prediction.copy()
         if "symbolic_correct" in prediction:
             prediction["symbolic_correct"] = False
         if "judgement" in prediction:
             prediction["judgement"] = "Judgement: No"
-        prediction[cls.answer_key] = None
+        prediction[self.answer_key] = None
         return prediction
 
     def update(self, predictions):

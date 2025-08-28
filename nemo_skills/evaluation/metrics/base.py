@@ -97,8 +97,7 @@ class BaseMetrics(abc.ABC):
         self.max_end_time = float("-inf")
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
-    @classmethod
-    def get_incorrect_sample(cls, predictions: list[dict]) -> list[dict]:
+    def get_incorrect_sample(self, predictions: list[dict]) -> list[dict]:
         """Needs to replace predictions with something that evaluates as incorrect.
 
         This is used in filtering based on length, where we want to automatically grade
