@@ -25,18 +25,6 @@ import pytest
 from tests.conftest import docker_rm, docker_rm_and_mkdir, docker_run
 
 
-def _get_hf_model_name(model_str: str) -> str:
-    """Returns the model huggingface name which can be used to initialize the model's tokenizer"""
-    model_name = model_str.rstrip("/").split("/")[-1]
-    if "llama" in model_name.lower():
-        return "meta-llama/" + model_name
-
-    elif "qwen" in model_name.lower():
-        return "Qwen/" + model_name
-    else:
-        return None
-
-
 @dataclass
 class TestConfig:
     """Configuration for test parameters"""
@@ -81,7 +69,6 @@ class CommandBuilder:
             f"    --output_dir {output_dir} "
             f"    --server_gpus {self.config.server_gpus} "
             f"    --server_nodes {self.config.server_nodes} "
-            f"    ++max_concurrent_requests=1 "
         )
 
     def build_eval_cmd(self, output_dir: str, server_type: str, enable_soft_fail: bool, retry_strategy: str) -> str:
@@ -89,7 +76,7 @@ class CommandBuilder:
         base = self._build_base_cmd("eval", output_dir, server_type)
         return base + (
             f"    --benchmarks gsm8k "
-            f"    ++max_samples=1 "
+            f"    ++max_samples={self.config.num_samples} "
             f"    ++inference.tokens_to_generate={self.config.num_tokens_to_generate} "
             f"    ++server.enable_soft_fail={enable_soft_fail} "
             + (f"    ++server.context_limit_retry_strategy={retry_strategy} " if retry_strategy else "")
