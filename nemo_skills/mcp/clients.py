@@ -102,7 +102,19 @@ def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
 
 def _wrap_call_tool_output_formatter(method):
     async def wrapped(self, *args, **kwargs):
-        result = await method(self, *args, **kwargs)
+        # Normalize to keyword-style and sanitize before delegating.
+        tool_name = kwargs.get("tool") if "tool" in kwargs else (args[0] if len(args) >= 1 else None)
+        provided_args = kwargs.get("args") if "args" in kwargs else (args[1] if len(args) >= 2 else None)
+
+        if tool_name is None:
+            raise TypeError("call_tool requires 'tool' as first positional or keyword argument")
+        if not isinstance(provided_args, dict):
+            raise TypeError("call_tool requires 'args' dict as second positional or keyword argument")
+
+        sanitized_args = self.sanitize(tool_name, provided_args)
+
+        # Delegate with normalized kwargs only to avoid leaking unexpected kwargs
+        result = await method(self, tool=tool_name, args=sanitized_args)
         output_formatter = getattr(self, "output_formatter", None)
         if callable(output_formatter):
             return output_formatter(result)
@@ -152,7 +164,8 @@ class MCPClientMeta(type):
     - Wraps `list_tools` so its returned tool schemas are post-processed to
       remove arguments specified in `_hide_args` (by pruning properties and
       updating `required`).
-    - Input sanitization is available via `sanitize` method on the client.
+    - Input sanitization is performed automatically for call_tool() based on
+      `_hide_args`. A manual `sanitize` helper also exists if needed.
     - Ensures every instance has a default `_hide_args` attribute even when
       subclasses do not define/override `__init__`.
 
@@ -187,8 +200,9 @@ class MCPClientMeta(type):
     # The model could still hypothetically call the tool with the hidden argument,
     # but as long as the sanitize method is called, the hidden argument will be
     # removed from the input schema.
-    safe_args = client.sanitize("tool_name", {"timeout": 100000, "x": 1})
-    result = await client.call_tool("tool_name", timeout=10, **safe_args)
+    # Sanitization is automatic for call_tool(); hidden keys like "timeout"
+    # will be removed from the provided args before the actual tool call.
+    result = await client.call_tool("tool_name", {"timeout": 100000, "x": 1})
 
     ```
     """
@@ -249,8 +263,9 @@ class MCPClient(metaclass=MCPClientMeta):
         hide_args={"execute": ["session_id", "timeout"]},
     )
     tools = await client.list_tools()
-    safe = client.sanitize("execute", {"code": "print(1)", "timeout": 999})
-    result = await client.call_tool("execute", safe)
+    # Manual sanitize is not required; hidden keys are pruned automatically
+    # when calling tools.
+    result = await client.call_tool("execute", {"code": "print(1)", "timeout": 999})
     ```
 
     Example (configured via OmegaConf, similar to mcp_demo.py):
@@ -276,7 +291,7 @@ class MCPClient(metaclass=MCPClientMeta):
     ```
     """
 
-    # Manual sanitization helpers (input-only)
+    # Manual sanitization helpers (input-only; optional, as call_tool auto-sanitizes)
     def sanitize(self, tool: str, args: dict) -> dict:
         """Return a copy of args with hidden keys removed for the given tool."""
         return _sanitize_input_args_for_tool(args, tool, self._hide_args)
@@ -307,8 +322,8 @@ class MCPStreamableHttpClient(MCPClient):
     Behavior:
     - list_tools() fetches tool metadata from the server and normalizes schema
       field names (supports both input_schema and inputSchema).
-    - call_tool() returns the server's structuredContent when present, otherwise
-      returns the raw result object.
+    - call_tool() automatically sanitizes arguments based on `hide_args` and
+      returns the server's structuredContent when present, otherwise returns the raw result object.
 
     The following optional configurables can be supplied (injected by the
     metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,
@@ -390,7 +405,8 @@ class MCPStdioClient(MCPClient):
 
     Behavior:
     - list_tools() fetches tool metadata from the running stdio server.
-    - call_tool() returns the server's structuredContent.
+    - call_tool() automatically sanitizes arguments based on `hide_args` and
+      returns the server's structuredContent.
 
     The following optional configurables can be supplied (injected by the
     metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,

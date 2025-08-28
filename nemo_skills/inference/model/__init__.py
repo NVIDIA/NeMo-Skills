@@ -28,6 +28,9 @@ from .megatron import MegatronModel
 from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
 
+# Tool Calling
+from .tool_call import ToolCallingWrapper
+
 # Utilities
 from .vllm import VLLMModel
 
@@ -61,12 +64,17 @@ def get_code_execution_model(server_type, code_execution=None, sandbox=None, **k
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
+def get_online_genselect_model(model, online_genselect_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
-    model = get_model(server_type=server_type, **kwargs)
-    if online_genselect_config is None:
-        online_genselect_config = OnlineGenSelectConfig()
-    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
+    if isinstance(model, str):
+        model = get_model(model=model, **kwargs)
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
+
+
+def get_tool_calling_model(model, tool_config, additional_config=None, **kwargs):
+    if isinstance(model, str):
+        model = get_model(model=model, **kwargs)
+    return ToolCallingWrapper(model, tool_config_yaml=tool_config, additional_config=additional_config)
 
 
 def server_params():

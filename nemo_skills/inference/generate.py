@@ -22,7 +22,7 @@ import time
 from copy import deepcopy
 from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import hydra
 from omegaconf import ListConfig, OmegaConf
@@ -34,6 +34,7 @@ from nemo_skills.inference.model import (
     get_code_execution_model,
     get_model,
     get_online_genselect_model,
+    get_tool_calling_model,
     server_params,
 )
 from nemo_skills.prompt.utils import get_prompt
@@ -134,6 +135,9 @@ class GenerateSolutionsConfig:
     online_genselect: bool = False
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
+
+    ## FIXME(sanyamk): Rethink the structure of this configuration.
+    tool_config: str | None = None  # Path to tool configuration file.
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -263,10 +267,18 @@ class GenerationTask:
         self.output_lock = None
 
     def setup_llm(self):
+        self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+
         if self.cfg.code_execution:
-            sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
-        elif self.cfg.online_genselect:
+            llm = get_code_execution_model(**self.cfg.server, sandbox=self.sandbox)
+        elif self.cfg.tool_config:
+            llm = get_tool_calling_model(
+                **self.cfg.server, tool_config=self.cfg.tool_config, additional_config={"sandbox": self.cfg.sandbox}
+            )
+        else:
+            llm = get_model(**self.cfg.server)
+
+        if self.cfg.online_genselect:
             # Use the same prompt parameters for genselect as the one used for generation
             self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
             self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
@@ -274,10 +286,9 @@ class GenerationTask:
             self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
             self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
             llm = get_online_genselect_model(
-                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
+                **{**self.cfg.server, "model": llm},
+                online_genselect_config=self.cfg.online_genselect_config,
             )
-        else:
-            llm = get_model(**self.cfg.server)
 
         return llm
 
@@ -445,10 +456,10 @@ class GenerationTask:
             inference_params = dict(self.cfg.inference)
 
         generation_params = {
-            "prompt": self.fill_prompt(data_point, all_data),
-            "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
             **inference_params,
             **self.extra_generate_params,
+            "prompt": self.fill_prompt(data_point, all_data),
+            "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
         }
 
         if self.cfg.code_execution:
