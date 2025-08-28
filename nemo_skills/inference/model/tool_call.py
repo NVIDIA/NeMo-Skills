@@ -16,6 +16,7 @@ import asyncio
 import copy
 import json
 import logging
+from collections import defaultdict
 from typing import Dict, List
 
 import yaml
@@ -39,6 +40,7 @@ class ToolCallingWrapper:
     def __init__(self, model: BaseModel, tool_config_yaml: str, additional_config: dict):
         self.model = model
 
+        ## FIXME(sanyamk): redo configuration specification.
         with open(tool_config_yaml) as f:
             tool_cfg = yaml.safe_load(f)
         tool_cfg.update(additional_config)
@@ -75,7 +77,7 @@ class ToolCallingWrapper:
         tasks = [self._execute_tool_call(tool_call) for tool_call in tool_calls]
         tool_results = await asyncio.gather(*tasks)
         return [
-            self.response_formatter.format(tool_call["function"]["name"], tool_result)
+            self.response_formatter.format(tool_call, tool_result)
             for tool_call, tool_result in zip(tool_calls, tool_results)
         ]
 
@@ -83,6 +85,7 @@ class ToolCallingWrapper:
         self,
         prompt: List,
         tools: List[dict] = None,
+        tokens_to_generate: int = None,
         **generation_kwargs,
     ) -> Dict:
         assert isinstance(prompt, list), "Only use ChatCompletion API for now."
@@ -91,28 +94,30 @@ class ToolCallingWrapper:
 
         tools = self.schema_adapter.convert(await self.client_manager.list_all_tools())
 
-        ## Bookkeeping.
-        num_tool_calls = 0
-        generation_steps = []
-        reasoning_steps = []
-
+        result_steps = defaultdict(list)
         conversation = copy.deepcopy(prompt)
 
         while True:
-            generation = await self.model.generate_async(prompt=conversation, tools=tools, **generation_kwargs)
+            if isinstance(tokens_to_generate, int) and tokens_to_generate <= 0:
+                break
 
-            content = generation.get("generation")
-            reasoning_content = generation.get("reasoning_content")
+            generation = await self.model.generate_async(
+                prompt=conversation,
+                tools=tools,
+                tokens_to_generate=tokens_to_generate,
+                **generation_kwargs,
+            )
+
+            if isinstance(tokens_to_generate, int):
+                tokens_to_generate -= generation["num_generated_tokens"]
+
+            for k in ["generation", "num_generated_tokens", "reasoning_content", "finish_reason"]:
+                if k in generation:
+                    result_steps[k].append(generation[k])
+
+            conversation.append({"role": "assistant", "content": result_steps["generation"][-1]})
+
             tool_calls = generation.get("tool_calls", [])
-
-            if content:
-                generation_steps.append(content)
-                message = {"role": "assistant", "content": content}
-                conversation.append(message)
-
-            if reasoning_content:
-                reasoning_steps.append(reasoning_content)
-
             if tool_calls:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
                 conversation.append(tool_calls_message)
@@ -121,15 +126,15 @@ class ToolCallingWrapper:
                 tool_calls_output_messages = await self._execute_tool_calls(tool_calls_message["tool_calls"])
                 conversation.extend(tool_calls_output_messages)
 
-                num_tool_calls += len(tool_calls)
+                result_steps["num_tool_calls"].append(len(tool_calls))
 
                 continue
 
             break
 
-        return {
-            "generation": "".join(generation_steps),
-            "num_tool_calls": num_tool_calls,
-            "reasoning_content": reasoning_steps,
-            "conversation": conversation,
-        }
+        result_steps["generation"] = "".join(result_steps["generation"])
+        result_steps["num_generated_tokens"] = sum(result_steps["num_generated_tokens"])
+        result_steps["num_tool_calls"] = sum(result_steps["num_tool_calls"])
+        result_steps["conversation"] = conversation
+
+        return result_steps

@@ -94,6 +94,7 @@ class ChatCompletionCallInterpreter(ToolCallInterpreter):
         tool_calls = [
             {
                 "type": tool_call.type,
+                "id": tool_call.id,
                 "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
             }
             for tool_call in tool_calls
@@ -103,9 +104,15 @@ class ChatCompletionCallInterpreter(ToolCallInterpreter):
 
 
 class ChatCompletionResponseFormatter(ToolResponseFormatter):
-    def format(self, tool_name, result):
+    """Convert tool call result to chat message item.
+
+    Use in conjunction with `ChatCompletionCallInterpreter`.
+    """
+
+    def format(self, tool_call, result):
         return {
             "role": "tool",
-            "name": tool_name,
+            "name": tool_call["function"]["name"],
+            "tool_call_id": tool_call["id"],
             "content": json.dumps(result),
         }
