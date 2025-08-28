@@ -289,8 +289,8 @@ pass@8           | 315         | 14059      | 3207        | 81.59%
 
 --------------------------------------------------- scicode ---------------------------------------------------
 evaluation_mode  | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-8] | 29461      | 3053        | 0.96%            | 18.58%           | 65           | 288
-pass@8           | 29461      | 3053        | 3.08%            | 28.82%           | 65           | 288
+pass@1[avg-of-8] | 24795      | 5620        | 7.81%            | 23.56%           | 80           | 338
+pass@8           | 24795      | 5620        | 15.00%           | 36.39%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks
