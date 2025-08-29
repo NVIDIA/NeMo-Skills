@@ -213,6 +213,7 @@ GENERATION_TASK_CLASS = IOIExecutionGenerationTask
 @hydra.main(version_base=None, config_name='base_ioi_generation_config')
 def ioi_generation(cfg: IOIExecutionConfig):
     cfg = IOIExecutionConfig(_init_nested=True, **cfg)
+    LOG.info("Note: IOI Module is being used.")
     LOG.info("Config used: %s", cfg)
     task = IOIExecutionGenerationTask(cfg)
     task.generate()
