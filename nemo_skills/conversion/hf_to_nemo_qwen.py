@@ -144,7 +144,8 @@ def convert(args):
         "mcore_gpt transformer_engine must be enabled (or disabled) together."
     )
 
-    param_to_weights = lambda param: param.float()
+    def param_to_weights(param):
+        return param.float()
 
     checkpoint = OrderedDict()
     checkpoint["state_dict"] = OrderedDict()
@@ -173,14 +174,14 @@ def convert(args):
     if mcore_gpt:
         assert nemo_config.activation.startswith("fast-"), "mcore only supports fast version of gated linear unit."
 
-    for l in range(int(num_layers)):
-        print(f"converting layer {l}")
-        old_tensor_shape = model.state_dict()[f"model.layers.{l}.self_attn.q_proj.weight"].size()
+    for layer_idx in range(int(num_layers)):
+        print(f"converting layer {layer_idx}")
+        old_tensor_shape = model.state_dict()[f"model.layers.{layer_idx}.self_attn.q_proj.weight"].size()
         new_q_tensor_shape = (head_num, head_size) + old_tensor_shape[1:]
         new_kv_tensor_shape = (num_query_groups, head_size) + old_tensor_shape[1:]
-        q = model.state_dict()[f"model.layers.{l}.self_attn.q_proj.weight"].view(*new_q_tensor_shape)
-        k = model.state_dict()[f"model.layers.{l}.self_attn.k_proj.weight"].view(*new_kv_tensor_shape)
-        v = model.state_dict()[f"model.layers.{l}.self_attn.v_proj.weight"].view(*new_kv_tensor_shape)
+        q = model.state_dict()[f"model.layers.{layer_idx}.self_attn.q_proj.weight"].view(*new_q_tensor_shape)
+        k = model.state_dict()[f"model.layers.{layer_idx}.self_attn.k_proj.weight"].view(*new_kv_tensor_shape)
+        v = model.state_dict()[f"model.layers.{layer_idx}.self_attn.v_proj.weight"].view(*new_kv_tensor_shape)
         qkv_weights = torch.empty((0, head_size) + old_tensor_shape[1:])
         heads_per_group = head_num // num_query_groups
         for i in range(num_query_groups):
@@ -189,16 +190,18 @@ def convert(args):
             qkv_weights = torch.cat((qkv_weights, v[i : i + 1, :, :]))
         qkv_weights = qkv_weights.reshape([head_size * (head_num + 2 * num_query_groups), hidden_size])
         if mcore_gpt:
-            qkv_weights_base_name = f"model.decoder.layers.{l}.self_attention.linear_qkv.weight"
+            qkv_weights_base_name = f"model.decoder.layers.{layer_idx}.self_attention.linear_qkv.weight"
         else:
-            qkv_weights_base_name = f"model.language_model.encoder.layers.{l}.self_attention.query_key_value.weight"
+            qkv_weights_base_name = (
+                f"model.language_model.encoder.layers.{layer_idx}.self_attention.query_key_value.weight"
+            )
         checkpoint["state_dict"][qkv_weights_base_name] = param_to_weights(qkv_weights)
 
         new_q_tensor_shape = (head_num, head_size)
         new_kv_tensor_shape = (num_query_groups, head_size)
-        q = model.state_dict()[f"model.layers.{l}.self_attn.q_proj.bias"].view(*new_q_tensor_shape)
-        k = model.state_dict()[f"model.layers.{l}.self_attn.k_proj.bias"].view(*new_kv_tensor_shape)
-        v = model.state_dict()[f"model.layers.{l}.self_attn.v_proj.bias"].view(*new_kv_tensor_shape)
+        q = model.state_dict()[f"model.layers.{layer_idx}.self_attn.q_proj.bias"].view(*new_q_tensor_shape)
+        k = model.state_dict()[f"model.layers.{layer_idx}.self_attn.k_proj.bias"].view(*new_kv_tensor_shape)
+        v = model.state_dict()[f"model.layers.{layer_idx}.self_attn.v_proj.bias"].view(*new_kv_tensor_shape)
         qkv_bias = torch.empty((0, head_size))
         heads_per_group = head_num // num_query_groups
         for i in range(num_query_groups):
@@ -211,52 +214,52 @@ def convert(args):
             ]
         )
         if mcore_gpt:
-            qkv_bias_base_name = f"model.decoder.layers.{l}.self_attention.linear_qkv.bias"
+            qkv_bias_base_name = f"model.decoder.layers.{layer_idx}.self_attention.linear_qkv.bias"
         else:
-            qkv_bias_base_name = f"model.language_model.encoder.layers.{l}.self_attention.query_key_value.bias"
+            qkv_bias_base_name = f"model.language_model.encoder.layers.{layer_idx}.self_attention.query_key_value.bias"
         checkpoint["state_dict"][qkv_bias_base_name] = param_to_weights(qkv_bias)
 
         # attention dense
-        o_weight = model.state_dict()[f"model.layers.{l}.self_attn.o_proj.weight"]
+        o_weight = model.state_dict()[f"model.layers.{layer_idx}.self_attn.o_proj.weight"]
         if mcore_gpt:
-            o_weight_base_name = f"model.decoder.layers.{l}.self_attention.linear_proj.weight"
+            o_weight_base_name = f"model.decoder.layers.{layer_idx}.self_attention.linear_proj.weight"
         else:
-            o_weight_base_name = f"model.language_model.encoder.layers.{l}.self_attention.dense.weight"
+            o_weight_base_name = f"model.language_model.encoder.layers.{layer_idx}.self_attention.dense.weight"
         checkpoint["state_dict"][o_weight_base_name] = param_to_weights(o_weight)
 
         # MLP
-        mlp_down_weight = model.state_dict()[f"model.layers.{l}.mlp.gate_proj.weight"]
-        mlp_gate_weight = model.state_dict()[f"model.layers.{l}.mlp.up_proj.weight"]
+        mlp_down_weight = model.state_dict()[f"model.layers.{layer_idx}.mlp.gate_proj.weight"]
+        mlp_gate_weight = model.state_dict()[f"model.layers.{layer_idx}.mlp.up_proj.weight"]
         if mcore_gpt:
-            mlp_down_base_name = f"model.decoder.layers.{l}.mlp.linear_fc1.weight"
+            mlp_down_base_name = f"model.decoder.layers.{layer_idx}.mlp.linear_fc1.weight"
         else:
-            mlp_down_base_name = f"model.language_model.encoder.layers.{l}.mlp.dense_h_to_4h.weight"
+            mlp_down_base_name = f"model.language_model.encoder.layers.{layer_idx}.mlp.dense_h_to_4h.weight"
         mlp_down_weight = torch.cat((mlp_down_weight, mlp_gate_weight), axis=0)
         checkpoint["state_dict"][mlp_down_base_name] = param_to_weights(mlp_down_weight)
 
-        mlp_up_weight = model.state_dict()[f"model.layers.{l}.mlp.down_proj.weight"]
+        mlp_up_weight = model.state_dict()[f"model.layers.{layer_idx}.mlp.down_proj.weight"]
         if mcore_gpt:
-            mlp_up_base_name = f"model.decoder.layers.{l}.mlp.linear_fc2.weight"
+            mlp_up_base_name = f"model.decoder.layers.{layer_idx}.mlp.linear_fc2.weight"
         else:
-            mlp_up_base_name = f"model.language_model.encoder.layers.{l}.mlp.dense_4h_to_h.weight"
+            mlp_up_base_name = f"model.language_model.encoder.layers.{layer_idx}.mlp.dense_4h_to_h.weight"
         checkpoint["state_dict"][mlp_up_base_name] = param_to_weights(mlp_up_weight)
 
         # LayerNorm
-        input_ln_weight = model.state_dict()[f"model.layers.{l}.input_layernorm.weight"]
+        input_ln_weight = model.state_dict()[f"model.layers.{layer_idx}.input_layernorm.weight"]
         if mcore_gpt:
-            input_ln_base_name = f"model.decoder.layers.{l}.self_attention.linear_qkv.layer_norm_weight"
+            input_ln_base_name = f"model.decoder.layers.{layer_idx}.self_attention.linear_qkv.layer_norm_weight"
         else:
-            input_ln_base_name = f"model.language_model.encoder.layers.{l}.input_layernorm.weight"
+            input_ln_base_name = f"model.language_model.encoder.layers.{layer_idx}.input_layernorm.weight"
         checkpoint["state_dict"][input_ln_base_name] = param_to_weights(input_ln_weight)
 
-        post_attn_ln_weight = model.state_dict()[f"model.layers.{l}.post_attention_layernorm.weight"]
+        post_attn_ln_weight = model.state_dict()[f"model.layers.{layer_idx}.post_attention_layernorm.weight"]
         if mcore_gpt:
-            post_attn_ln_base_name = f"model.decoder.layers.{l}.mlp.linear_fc1.layer_norm_weight"
+            post_attn_ln_base_name = f"model.decoder.layers.{layer_idx}.mlp.linear_fc1.layer_norm_weight"
         else:
-            post_attn_ln_base_name = f"model.language_model.encoder.layers.{l}.post_attention_layernorm.weight"
+            post_attn_ln_base_name = f"model.language_model.encoder.layers.{layer_idx}.post_attention_layernorm.weight"
         checkpoint["state_dict"][post_attn_ln_base_name] = param_to_weights(post_attn_ln_weight)
 
-        print(f"done layer {l}")
+        print(f"done layer {layer_idx}")
 
     final_ln_weight = model.state_dict()["model.norm.weight"]
     if mcore_gpt:

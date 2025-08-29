@@ -87,7 +87,7 @@ def extract_judgment(text, max_idx=None):
         else:
             judgement = None
 
-    except:
+    except Exception:
         judgement = None
 
     if judgement is not None and max_idx is not None:

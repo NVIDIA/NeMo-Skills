@@ -24,6 +24,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from datasets import Dataset, load_dataset
 from nemo_rl.algorithms.grpo import MasterConfig, grpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig
@@ -57,8 +58,6 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 # ===============================================================================
 #                             Custom Math Dataset (@nemo-skills)
 # ===============================================================================
-
-from datasets import Dataset, load_dataset
 
 
 def load_jsonl_as_dataset(

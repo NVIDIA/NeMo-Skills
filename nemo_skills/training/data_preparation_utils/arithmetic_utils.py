@@ -132,7 +132,7 @@ def evaluate_postfix_once(postfix):
             try:
                 if int(result) == result:
                     result = int(result)
-            except:
+            except Exception:
                 result = float(result)
 
             return result, a_start, b_end

@@ -129,7 +129,7 @@ def jload(filepath, mode="r", verbose=False):
             try:
                 data = json.loads(line)
                 dataset.append(data)
-            except:
+            except Exception:
                 if verbose:
                     print(f"[jload] Error parsing line {line_id} in file {f}: {line}")
                 continue
@@ -262,7 +262,7 @@ def jload_chunk(filepath, num_chunks: int, chunk_id: int, mode="r", verbose=Fals
         try:
             data = json.loads(line)
             dataset.append(data)
-        except:
+        except Exception:
             if verbose:
                 print(f"[jload_chunk] Error parsing line {idx} in file {filepath}: {line}")
             continue

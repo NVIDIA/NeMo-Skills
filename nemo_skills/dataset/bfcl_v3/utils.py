@@ -54,7 +54,7 @@ def func_doc_language_specific_pre_processing(function, test_category):
     if len(function) == 0:
         return function
 
-    assert type(function) == list
+    assert isinstance(function, list)
     for item in function:
         # Add language specific hints to the function description
         item["description"] = item["description"] + _get_language_specific_hint(test_category)

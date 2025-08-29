@@ -57,7 +57,7 @@ def preprocess_code(generation_dict: dict, language="python"):
         try:
             next_line = completion.index(generic_start_end_tag)
             completion = completion[:next_line].strip()
-        except:
+        except Exception:
             print(completion)
             print("================\n")
 
@@ -67,7 +67,7 @@ def preprocess_code(generation_dict: dict, language="python"):
         try:
             next_line = completion.index(generic_start_end_tag)
             completion = completion[:next_line].strip()
-        except:
+        except Exception:
             print(completion)
             print("================\n")
 

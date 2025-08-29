@@ -34,7 +34,6 @@ def test_run_cmd_llm_infer():
         ("vllm", os.getenv("NEMO_SKILLS_TEST_HF_MODEL")),
     ]
 
-    outputs_map = {}
     for server_type, model_path in model_info:
         if not model_path:
             continue
@@ -58,7 +57,7 @@ def test_run_cmd_llm_infer():
             f"--server_nodes 1 "
             f"--command '{command}'"
         )
-        job = subprocess.run(cmd, shell=True, check=True)
+        subprocess.run(cmd, shell=True, check=True)
 
         jsonl_file = Path(output_dir) / "output.txt"
 
