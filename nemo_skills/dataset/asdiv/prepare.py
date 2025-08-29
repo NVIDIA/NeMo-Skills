@@ -44,7 +44,7 @@ if __name__ == "__main__":
             try:
                 if int(new_entry["expected_answer"]) == new_entry["expected_answer"]:
                     new_entry["expected_answer"] = int(new_entry["expected_answer"])
-            except:
+            except Exception:
                 pass
 
             fout.write(json.dumps(new_entry) + "\n")
