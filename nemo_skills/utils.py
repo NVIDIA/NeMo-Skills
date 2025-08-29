@@ -30,15 +30,7 @@ from rich.logging import RichHandler
 
 # isort: off
 import nemo_skills
-from nemo_skills.file_utils import (
-    jdump,
-    jload,
-    jload_chunk,
-    count_newlines,
-    calculate_chunk_indices,
-    unroll_files,
-)  # noqa # pylint: disable=unused-import
-
+from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump, jload, jload_chunk, count_newlines
 # isort: on
 
 

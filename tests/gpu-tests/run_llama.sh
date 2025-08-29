@@ -11,6 +11,7 @@ export NEMO_SKILLS_TEST_MODEL_TYPE=llama
 # generation/evaluation tests
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
+pytest tests/gpu-tests/test_context_retry.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
 pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x
 pytest tests/gpu-tests/test_contamination.py -s -x

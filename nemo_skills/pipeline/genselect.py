@@ -35,7 +35,6 @@ def get_genselect_cmd(
         f"    ++output_dir={output_dir} "
         f"    ++inference.random_seed={random_seed} "
         f"    ++inference.temperature=0.7 "
-        f"    ++inference.tokens_to_generate=2048 "
         f"    ++inference.top_k=-1 "
         f"    ++inference.top_p=0.95 "
     )
