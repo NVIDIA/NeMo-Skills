@@ -29,7 +29,7 @@ import tqdm
 
 from nemo_skills.code_execution.utils import clean_formal_generation
 from nemo_skills.dataset.utils import get_lean4_header
-from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help, unroll_files
+from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help
 
 LOG = logging.getLogger(get_logger_name(__file__))
 

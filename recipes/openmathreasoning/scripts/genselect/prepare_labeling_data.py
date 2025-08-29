@@ -16,12 +16,12 @@
 """Script to prepare labeling data for GenSelect"""
 
 import argparse
+import hashlib
 import json
 import logging
 import multiprocessing as mp
 import os
 import random
-import hashlib
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial

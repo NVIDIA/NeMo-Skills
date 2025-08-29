@@ -140,7 +140,7 @@ def execute_multi_turn_func_call(
                 # Some function returns a object instance, which is not serializable
                 try:
                     func_call_result = json.dumps(func_call_result)
-                except:
+                except Exception:
                     func_call_result = str(func_call_result)
             else:
                 func_call_result = str(func_call_result)

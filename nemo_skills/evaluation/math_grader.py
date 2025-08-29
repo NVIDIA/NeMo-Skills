@@ -56,7 +56,7 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
         gt_answer = int(gt_answer) % take_modulo
         try:
             predicted_answer = int(predicted_answer) % take_modulo
-        except:
+        except Exception:
             predicted_answer = None
         # no need to simpy call in this case
         return predicted_answer == gt_answer
