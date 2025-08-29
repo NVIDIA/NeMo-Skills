@@ -1,2 +1,3 @@
 recursive-include nemo_skills *.yaml
 recursive-include nemo_skills *.txt
+recursive-include nemo_skills *.toml
