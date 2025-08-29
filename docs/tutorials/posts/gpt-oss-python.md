@@ -230,7 +230,7 @@ generate(
         "++chat_template_kwargs.builtin_tools=[python] "
     ),
     cluster=cluster,
-    expname="gpt-oss-eval-with-python",
+    expname="gpt-oss-sdg-with-python",
     model="openai/gpt-oss-120b",
     server_type='vllm',
     # can customize the number of GPUs used
