@@ -98,7 +98,6 @@ def main(cfg) -> None:
     init_distributed(trainer, ptl_model, cfg.model.get("transformer_engine", False))
 
     # use the entire dataset
-    train_valid_test_num_samples = [-1, -1, -1]
 
     train_ds, validation_ds = [
         AllTaskDataset(

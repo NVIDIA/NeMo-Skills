@@ -365,7 +365,6 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
 
     if cluster_config.get("executor") != "slurm":
         tunnel = run.LocalTunnel(job_dir=None)
-        all_dirs_exist = True
         missing_source_locations = []
         for directory in directories:
             result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)

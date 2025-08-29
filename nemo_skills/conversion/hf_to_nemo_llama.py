@@ -200,7 +200,8 @@ def convert(args):
         "mcore_gpt transformer_engine must be enabled (or disabled) together."
     )
 
-    param_to_weights = lambda param: param.float()
+    def param_to_weights(param):
+        return param.float()
 
     checkpoint = OrderedDict()
     checkpoint["state_dict"] = OrderedDict()

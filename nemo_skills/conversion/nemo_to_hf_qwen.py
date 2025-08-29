@@ -110,7 +110,9 @@ def convert(
             input_nemo_path, trainer=dummy_trainer, override_config_path=model_config, map_location=map_location
         )
 
-        param_to_weights = lambda param: param.to(dtype)
+        def param_to_weights(param):
+            return param.to(dtype)
+
         checkpoint = OrderedDict()
 
         hidden_size = model.cfg.hidden_size
