@@ -12,9 +12,7 @@
 # limitations under the License.
 
 import argparse
-import os
 import subprocess
-import sys
 
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 

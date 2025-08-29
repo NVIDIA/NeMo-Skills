@@ -13,12 +13,22 @@
 # limitations under the License.
 
 import argparse
-
-# Download model and ruler on cluster
 import subprocess
 
 from nemo_skills.dataset.prepare import prepare_datasets
 from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
+
+# Run this first before run recipe.py
+# ruler_data_cmd = f"""
+# ns prepare_data --cluster={cluster} \
+#     --setup nemotron_super_128k \
+#     --tokenizer_path nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 \
+#     --max_seq_length 131072 \
+#     --data_dir {workspace}/ns-data \
+#     --run_after {expname_prefix}-patch-qwen-config \
+#     --expname {expname_prefix}-download-ruler-data
+# """
+# subprocess.run(ruler_data_cmd, shell=True, check=True)
 
 
 def setup(workspace, cluster, expname_prefix):
@@ -35,6 +45,7 @@ def setup(workspace, cluster, expname_prefix):
     )
 
     # Update config to support 128k
+    # TODO Remove code below and replace with soft fail after #723 is merged
     cmd = (
         f'jq \'. + {{"rope_scaling": {{"type": "yarn", "factor": 4.0, "original_max_position_embeddings": 32768}}}}\' '
         f"{workspace}/Qwen2.5-32B-Instruct/config.json > {workspace}/Qwen2.5-32B-Instruct/config_tmp.json && "
@@ -48,17 +59,6 @@ def setup(workspace, cluster, expname_prefix):
         log_dir=f"{workspace}/download-assets",
         run_after=f"{expname_prefix}-download-models",
     )
-
-    ruler_data_cmd = f"""
-    ns prepare_data --cluster={cluster} \
-        --setup nemotron_super_128k \
-        --tokenizer_path nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 \
-        --max_seq_length 131072 \
-        --data_dir {workspace}/ns-data \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-download-ruler-data
-    """
-    subprocess.run(ruler_data_cmd, shell=True, check=True)
 
 
 def eval_reasoning_on(workspace, cluster, expname_prefix):
@@ -79,7 +79,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --benchmarks gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4 \
         --server_gpus=8 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-math-code-science-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -94,7 +94,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --server_gpus=8 \
         --num_chunks=2 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-math-code-science-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -109,7 +109,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --split test_v5_2410_2502 \
         --server_gpus=8 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-livecode-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -128,7 +128,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --judge_server_gpus=8 \
         --extra_judge_args "++inference.tokens_to_generate=4096" \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-hle-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -146,7 +146,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --server_args "--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py \
                        --tool-call-parser llama_nemotron_json \
                        --enable-auto-tool-choice" \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-bfcl-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -161,7 +161,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix):
         --data_dir {workspace}/ns-data \
         --server_gpus=8 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-ruler-on
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -195,7 +195,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --benchmarks gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4 \
         --server_gpus=8 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-math-code-science-off
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -210,7 +210,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --server_gpus=8 \
         --num_chunks=2 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-math-code-science-off
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -225,7 +225,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --split test_v5_2410_2502 \
         --server_gpus=8 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-livecode-off
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -244,7 +244,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --judge_server_gpus=8 \
         --extra_judge_args "++inference.tokens_to_generate=4096" \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-hle-off
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -262,7 +262,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --server_args "--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py \
                        --tool-call-parser llama_nemotron_json \
                        --enable-auto-tool-choice" \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-bfcl-off
     """
     subprocess.run(cmd, shell=True, check=True)
@@ -278,7 +278,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix):
         --server_gpus=8 \
         --num_chunks=2 \
         {common_infer} \
-        --run_after {expname_prefix}-download-ruler-data \
+        --run_after {expname_prefix}-patch-qwen-config \
         --expname {expname_prefix}-ruler-off
     """
     subprocess.run(cmd, shell=True, check=True)
