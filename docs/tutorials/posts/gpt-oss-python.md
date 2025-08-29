@@ -81,6 +81,7 @@ eval(
         "++chat_template_kwargs.builtin_tools=[python] "
     ),
     cluster=cluster,
+    # optional parameter here, but useful when chaining multiple jobs together in pipelines
     expname="gpt-oss-eval-with-python",
     model="openai/gpt-oss-120b",
     server_type='vllm',
@@ -115,6 +116,7 @@ eval(
         "++inference.extra_body.reasoning_effort=high "
     ),
     cluster=cluster,
+    # optional parameter here, but useful when chaining multiple jobs together in pipelines
     expname="gpt-oss-eval-no-python",
     model="openai/gpt-oss-120b",
     server_type='vllm',
@@ -230,6 +232,7 @@ generate(
         "++chat_template_kwargs.builtin_tools=[python] "
     ),
     cluster=cluster,
+    # optional parameter here, but useful when chaining multiple jobs together in pipelines
     expname="gpt-oss-eval-with-python",
     model="openai/gpt-oss-120b",
     server_type='vllm',
