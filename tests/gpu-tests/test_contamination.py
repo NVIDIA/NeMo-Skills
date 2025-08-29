@@ -14,7 +14,6 @@
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -58,7 +57,7 @@ def test_check_contamination():
     )
 
     generate(
-        ctx=wrap_arguments(f""),
+        ctx=wrap_arguments(""),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         generation_type="check_contamination",

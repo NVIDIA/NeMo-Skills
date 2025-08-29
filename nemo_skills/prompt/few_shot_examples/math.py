@@ -62,8 +62,8 @@ Multiplying the first equation by 3, we have $3(-b + c) = 3 (-12) \\Rightarrow -
 """.strip(),
     },
     {
-        'problem': 'Let $f(x)$ be an odd function.  Is $f(f(x))$ even, odd, or neither?\n\nEnter "odd", "even", or "neither".',
-        'solution': '''
+        "problem": 'Let $f(x)$ be an odd function.  Is $f(f(x))$ even, odd, or neither?\n\nEnter "odd", "even", or "neither".',
+        "solution": """
 To determine whether $f(f(x))$ is even, odd, or neither, we need to use the property of $f(x)$ being an odd function.
 
 An odd function is defined as:
@@ -90,7 +90,7 @@ This matches the definition of an odd function.
 
 So, the answer is:
 \\[ \\boxed{\\text{odd}} \\]
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "A rectangular box $P$ is inscribed in a sphere of radius $r$. The surface area of $P$ is 384, and the sum of the lengths of its 12 edges is 112. What is $r$?",
@@ -179,12 +179,12 @@ So c is \\boxed{-7}
 """.strip(),
     },
     {
-        'problem': 'Let $f(x)$ be an odd function.  Is $f(f(x))$ even, odd, or neither?\n\nEnter "odd", "even", or "neither".',
-        'solution': '''
+        "problem": 'Let $f(x)$ be an odd function.  Is $f(f(x))$ even, odd, or neither?\n\nEnter "odd", "even", or "neither".',
+        "solution": """
 The definition of an odd function is that $f(-x) = -f(x)$.
 Applying this to $f(f(-x))$ we get $f(f(-x)) = f(-f(x)) = -f(f(x))$.
 Thus, $f(f(x))$ is an \\boxed{odd} function.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "At the 2007 Math Olympics, Team Canada won $17$ out of a possible $100$ medals. Which one of the following is closest to the fraction of medals that they won? $$\n\\frac{1}{4} \\qquad \\frac{1}{5} \\qquad \\frac{1}{6} \\qquad \\frac{1}{7} \\qquad \\frac{1}{8}\n$$",
@@ -950,7 +950,7 @@ So the radius of the sphere $r$ is $\\boxed{10}$.
 math_text_with_code_precalculus = [
     {
         "problem": "If $\\det \\mathbf{M} = -2,$ then find $ \\det (\\mathbf{M}^4).$",
-        "solution": '''
+        "solution": """
 We know that det(AB) = det(A) * det(B).
 We will use this fact to compute $\\det (\\mathbf{M}^4)$ using Python code.
 {code_begin}det_M = -2
@@ -963,22 +963,22 @@ det_M_4
 16
 {code_output_end}
 So the answer is \\boxed{16}.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "If $\\sin x = 3 \\cos x,$ then what is $\\sin x \\cos x$?",
-        "solution": '''
+        "solution": """
 We know that $\\sin^2 x + \\cos^2 x = 1.$
 Substituting $\\sin x = 3 \\cos x$ in the above equation, we get  $9 \\cos^2 x + \\cos^2 x = 1$
 Thus, $\\cos^2 x = \\frac{1}{10}$.
 Since $\\sin x \\cos x = 3 \\cos x \\cos x = 3 \\cos^2 x$.
 Substituting $\\cos^2 x = \\frac{1}{10}$, we get the $\\sin x \\cos x = \\frac{3}{10}$.
 Hence, the answer is $\\boxed{\\frac{3}{10}}$.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "Let $\\mathbf{a} = \\begin{pmatrix} 2 \\\\ 1 \\\\ 5 \\end{pmatrix}.$  Find the vector $\\mathbf{b}$ such that $\\mathbf{a} \\cdot \\mathbf{b} = 11$ and\n\\[\\mathbf{a} \\times \\mathbf{b} = \\begin{pmatrix} -13 \\\\ -9 \\\\ 7 \\end{pmatrix}.\\]",
-        "solution": '''
+        "solution": """
 Using the dot product and cross product constraints, we can solve the problem using the sympy library.
 {code_begin}from sympy import symbols, Eq, solve
 from sympy.vector import CoordSys3D
@@ -1008,11 +1008,11 @@ print([solution[b1], solution[b2], solution[b3]])
 [-1, 3, 2]
 {code_output_end}
 So the answer is $\\boxed{\\begin{pmatrix} -1 \\\\ 3 \\\\ 2 \\end{pmatrix}}$.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "Simplify $\\tan \\frac{\\pi}{24} + \\tan \\frac{7 \\pi}{24}.$",
-        "solution": '''
+        "solution": """
 We will use sympy's simplify function to simplify the given trigonometric expression.
 {code_begin}from sympy import tan, pi, simplify
 
@@ -1031,11 +1031,11 @@ print(simplified_expression)
 -2*sqrt(3) + 2*sqrt(6)
 {code_output_end}
 So the answer is $\\boxed{2 \\sqrt{6} - 2 \\sqrt{3}}$.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "A certain regular tetrahedron has three of its vertices at the points $(0,1,2),$ $(4,2,1),$ and $(3,1,5).$  Find the coordinates of the fourth vertex, given that they are also all integers.",
-        "solution": '''
+        "solution": """
 The key insight to finding the missing vertex is that a regular tetrahedron has all the sides of equal length.
 Using the three provided vertices, we can create three equations constraining the fourth vertex and solve them to get solutions.
 Here' the solution in Python's sympy library.
@@ -1072,13 +1072,13 @@ integer_solutions
 [(3, -2, 2)]
 {code_output_end}
 Hence the fourth vertex is \\boxed{(3,-2,2)}.
-'''.strip(),
+""".strip(),
     },
 ]
 
 math_text_with_code_prealgebra = [
     {
-        "problem": "Six students participate in an apple eating contest. The graph shows the number of apples eaten by each participating student. Aaron ate the most apples and Zeb ate the fewest. How many more apples than Zeb did Aaron eat?\n\n[asy]\ndefaultpen(linewidth(1pt)+fontsize(10pt));\npair[] yaxis = new pair[8];\nfor( int i = 0 ; i < 8 ; ++i ){\n\nyaxis[i] = (0,i);\n\ndraw(yaxis[i]--yaxis[i]+(13,0));\n}\ndraw((0,0)--(0,7));\ndraw((13,7)--(13,0));\n\nfill((1,0)--(1,2)--(2,2)--(2,0)--cycle,grey);\nfill((3,0)--(3,3)--(4,3)--(4,0)--cycle,grey);\nfill((5,0)--(5,6)--(6,6)--(6,0)--cycle,grey);\nfill((7,0)--(7,4)--(8,4)--(8,0)--cycle,grey);\nfill((9,0)--(9,3)--(10,3)--(10,0)--cycle,grey);\nfill((11,0)--(11,1)--(12,1)--(12,0)--cycle,grey);\nlabel(\"0\",yaxis[0],W);\nlabel(\"1\",yaxis[1],W);\nlabel(\"2\",yaxis[2],W);\nlabel(\"3\",yaxis[3],W);\nlabel(\"4\",yaxis[4],W);\nlabel(\"5\",yaxis[5],W);\nlabel(\"6\",yaxis[6],W);\nlabel(\"7\",yaxis[7],W);\nlabel(\"Students/Participants\",(6.5,0),S);\nlabel(\"Results of an Apple Eating Contest\",(6.5,7),N);\nlabel(rotate(90)*\"$\\#$ of Apples Eaten\",(-1,3.5),W);\n[/asy]",
+        "problem": 'Six students participate in an apple eating contest. The graph shows the number of apples eaten by each participating student. Aaron ate the most apples and Zeb ate the fewest. How many more apples than Zeb did Aaron eat?\n\n[asy]\ndefaultpen(linewidth(1pt)+fontsize(10pt));\npair[] yaxis = new pair[8];\nfor( int i = 0 ; i < 8 ; ++i ){\n\nyaxis[i] = (0,i);\n\ndraw(yaxis[i]--yaxis[i]+(13,0));\n}\ndraw((0,0)--(0,7));\ndraw((13,7)--(13,0));\n\nfill((1,0)--(1,2)--(2,2)--(2,0)--cycle,grey);\nfill((3,0)--(3,3)--(4,3)--(4,0)--cycle,grey);\nfill((5,0)--(5,6)--(6,6)--(6,0)--cycle,grey);\nfill((7,0)--(7,4)--(8,4)--(8,0)--cycle,grey);\nfill((9,0)--(9,3)--(10,3)--(10,0)--cycle,grey);\nfill((11,0)--(11,1)--(12,1)--(12,0)--cycle,grey);\nlabel("0",yaxis[0],W);\nlabel("1",yaxis[1],W);\nlabel("2",yaxis[2],W);\nlabel("3",yaxis[3],W);\nlabel("4",yaxis[4],W);\nlabel("5",yaxis[5],W);\nlabel("6",yaxis[6],W);\nlabel("7",yaxis[7],W);\nlabel("Students/Participants",(6.5,0),S);\nlabel("Results of an Apple Eating Contest",(6.5,7),N);\nlabel(rotate(90)*"$\\#$ of Apples Eaten",(-1,3.5),W);\n[/asy]',
         "solution": """
 There are a total of six columns in the graph with values: 2, 3, 6, 4, 3, and 1.
 Since Aaron ate the most apples, and Zeb ate the fewest apples, we can answer the question using the following Python code.
@@ -1146,7 +1146,7 @@ Hence, there are a total of \\boxed{5} perfect cubes between 100 and 900.
     },
     {
         "problem": "Find the smallest positive integer $x$ which is greater than $1$ and relatively prime to $120$ (recall that relatively prime means that the GCD of $x$ and $120$ is $1$)",
-        "solution": '''
+        "solution": """
 To compute the smallest positive integer which is relatively prime to 120, we can iterate over all the numbers greater than 1 and less than 120, and break whenever we find a number which has a gcd of 1 with 120.
 {code_begin}from sympy import gcd
 
@@ -1162,73 +1162,73 @@ print(answer)
 7
 {code_output_end}
 Hence, \\boxed{7} is the smallest number which is relatively prime to 120.
-'''.strip(),
+""".strip(),
     },
     {
         "problem": "In square $ABCD$, point $M$ is the midpoint of side $AB$ and point $N$ is the midpoint of side $BC$. What is the ratio of the area of triangle $AMN$ to the area of square $ABCD$? Express your answer as a common fraction.",
-        "solution": '''
+        "solution": """
 Let each side of the square be 1. So the area of ABCD is 1^2=1.
 The triangle AMN, has base of length AM=1/2, and height of length of 1/2 as well since BN=1/2.
 Hence, area of AMN = (1/2) * base * height = (1/2) * (1/2) * (1/2) = 1/8.
 Hence. ratio of area of AMN to ABCD is $\\boxed{\\frac{1}{8}}$.
-'''.strip(),
+""".strip(),
     },
 ]
 
 
 math_problem_augmentation = [
     {
-        'problem': '''
+        "problem": """
 In the equation
 $$5x^2-kx+1=0$$
 determine $k$ such that the difference of the roots be equal to unity.
-'''.strip(),
-        'augmented_problem': '''
+""".strip(),
+        "augmented_problem": """
 The roots $x_1$ and $x_2$ of the equation
 $$x^2-3ax+a^2=0$$
 are such that
 $x_1^2+x_2^2=1.75$.
 Determine $a$.
-'''.strip(),
+""".strip(),
     },
     {
-        'problem': '''
+        "problem": """
 Solve the following equation
 $\\ds\\f{3+x}{3x}=\\sqrt {\\ds\\f{1}{9}+\\ds\\f{1}{x}\\sqrt {\\ds\\f{4}{9}+\\ds\\f{2}{x^2}}}$
-'''.strip(),
-        'augmented_problem': '''
+""".strip(),
+        "augmented_problem": """
 Solve the following equation
 $\\sqrt {1+x\\sqrt {x^2+24}}=x+1$
-'''.strip(),
+""".strip(),
     },
     {
-        'problem': '''
+        "problem": """
 In an infinitely decreasing geometric progression the sum
 of all the terms occupying odd places is equal to 36, and that of all
 the terms at even places equals 12.
 Find the progression.
-'''.strip(),
-        'augmented_problem': '''
+""".strip(),
+        "augmented_problem": """
 The sum of the terms of an infinitely decreasing geometric
 progression is equal to 56, and the sum of the squared terms of the
 same progression is 448.
 Find the first term and the common ratio.
-'''.strip(),
+""".strip(),
     },
     {
-        'problem': '''
+        "problem": """
 Two railway stations are at a distance of 96 km from each other.
 One train covers this distance 40 minutes faster than does the other.
 The speed of the first train is 12 km/h higher than that of the second.
 Determine the speed of both trains.
-'''.strip(),
-        'augmented_problem': '''
+""".strip(),
+        "augmented_problem": """
 A student was asked to multiply 78 by a two-digit number
 in which the tens digit was three times as large as the units digit;
 by mistake, he interchanged the digits in the second factor and
 thus obtained a product smaller than the true product by 2808.
 What was the true product?
-'''.strip(),
+""".strip(),
     },
 ]
 

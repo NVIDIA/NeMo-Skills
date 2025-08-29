@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-h5py
-# needed for persistent sessions
-ipython
 
 # this are requirements for code execution - put all packages that LLM should have access to in here
 annotated-types>=0.7.0
+h5py
+# needed for persistent sessions
+ipython
 numpy
 pandas
+psutil
 scipy
 sympy
 tqdm
-psutil

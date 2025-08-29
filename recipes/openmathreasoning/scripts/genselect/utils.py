@@ -15,11 +15,12 @@
 
 """Utils for GenSelect pipeline"""
 
-
-from scipy import stats
-from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 import random
 import re
+
+from scipy import stats
+
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 def _format_instance(instance, max_solutions=16):
@@ -40,17 +41,17 @@ def _format_instance(instance, max_solutions=16):
 
     consolidated_solutions = consolidated_solutions.rstrip("\n")
     new_instance = {
-        "problem": instance["problem"], 
-        "solutions": consolidated_solutions, 
-        "max_idx": max_idx, 
+        "problem": instance["problem"],
+        "solutions": consolidated_solutions,
+        "max_idx": max_idx,
         "num_solutions": num_solutions,
-        "expected_answer": instance["expected_answer"]
+        "expected_answer": instance["expected_answer"],
     }
 
     for idx in range(num_solutions):
         new_instance[f"predicted_answer_{idx}"] = instance[f"predicted_answer_{idx}"]
         new_instance[f"label_{idx}"] = instance[f"label_{idx}"]
-    
+
     return new_instance
 
 
@@ -60,7 +61,7 @@ def _generate_random_count(min_val=2, max_val=16, peak=8):
         return min_val
     mean = peak
     std = (max_val - min_val) / 6  # This ensures most values fall within range
-    
+
     # Generate truncated normal distribution
     a = (min_val - mean) / std
     b = (max_val - mean) / std
@@ -100,7 +101,7 @@ def extract_summary(reasoning_solution, just_true_summary=False):
     tag = "</think>"
     think_tag_position = reasoning_solution.rfind(tag)
     if think_tag_position != -1:
-        summary = reasoning_solution[think_tag_position + len(tag):]
+        summary = reasoning_solution[think_tag_position + len(tag) :]
         if summary.count("\\boxed") == 1:
             if len(summary) > 3000:
                 summary = summary[-3000:]
@@ -119,11 +120,11 @@ def extract_summary(reasoning_solution, just_true_summary=False):
         reasoning_solution = reasoning_solution.replace("<think>", " ")
         reasoning_solution = reasoning_solution.strip()
         return reasoning_solution
-    
+
 
 def segregate_instances(all_instances):
     """
-    Segregate solutions into correct and incorrect based on the judgement. 
+    Segregate solutions into correct and incorrect based on the judgement.
     Also remove incorrect solutions without any predicted answer.
     """
     correct_solutions = []
@@ -150,30 +151,31 @@ def create_comparison_instance(correct_solutions, incorrect_solutions, max_solut
         random.shuffle(correct_solutions)
         correct_solutions = correct_solutions[:num_incorrect]
         num_correct = num_incorrect
-    
+
     total_candidate_solutions = min(num_correct + num_incorrect, max_solutions)
 
     num_solutions = _generate_random_count(
-        min_val=2, max_val=total_candidate_solutions, peak=(total_candidate_solutions + 2) // 2)
-    
+        min_val=2, max_val=total_candidate_solutions, peak=(total_candidate_solutions + 2) // 2
+    )
+
     cand_solutions, remaining_solutions = [], []
     # First add at least one correct and one incorrect solution
     # Add correct solution
     random.shuffle(correct_solutions)
-    cand_solutions.append(('Correct', correct_solutions[0]))
+    cand_solutions.append(("Correct", correct_solutions[0]))
     # Add incorrect solution
     random.shuffle(incorrect_solutions)
-    cand_solutions.append(('Incorrect', incorrect_solutions[0]))
+    cand_solutions.append(("Incorrect", incorrect_solutions[0]))
 
     # Add remaining solutions
     for solution in correct_solutions[1:]:
-        remaining_solutions.append(('Correct', solution))
+        remaining_solutions.append(("Correct", solution))
     for solution in incorrect_solutions[1:]:
-        remaining_solutions.append(('Incorrect', solution))
+        remaining_solutions.append(("Incorrect", solution))
 
     # Shuffle remaining solutions and add to candidate solutions till we reach num_solutions
     random.shuffle(remaining_solutions)
-    cand_solutions.extend(remaining_solutions[:num_solutions - 2])
+    cand_solutions.extend(remaining_solutions[: num_solutions - 2])
 
     # Shuffle candidate solutions
     random.shuffle(cand_solutions)
@@ -183,7 +185,7 @@ def create_comparison_instance(correct_solutions, incorrect_solutions, max_solut
         "problem": correct_solutions[0]["problem"],
         "expected_answer": correct_solutions[0]["expected_answer"],
     }
-    
+
     # Format the instance
     for i, (label, solution) in enumerate(cand_solutions):
         instance[f"solution_{i}"] = solution["generation"]

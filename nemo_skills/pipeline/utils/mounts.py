@@ -337,7 +337,7 @@ def resolve_mount_paths(cluster_config: dict, mount_paths: str | list | dict, cr
             add_mount_path(src, dest, cluster_config)
 
         if create_remote_dir:
-            LOG.info(f"Creating remote directories for mount paths:")
+            LOG.info("Creating remote directories for mount paths:")
             all_src_dir = [src for src, _ in mount_paths_list]
             # Check if it is a file or a directory and only create the directory
             for idx in range(len(all_src_dir)):

@@ -15,7 +15,6 @@
 
 """Script to prepare labeling data for GenSelect"""
 
-
 import argparse
 import json
 import logging
@@ -74,7 +73,7 @@ def read_data(file_paths):
 
 
 def hash_signature(problem, solutions):
-    text = (problem + solutions).encode('utf-8')
+    text = (problem + solutions).encode("utf-8")
     return hashlib.md5(text).hexdigest()
 
 
@@ -171,7 +170,7 @@ def save_data(unique_instances, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    with open(os.path.join(output_dir, f"output.jsonl"), "w") as f:
+    with open(os.path.join(output_dir, "output.jsonl"), "w") as f:
         for instance in unique_instances:
             f.write(json.dumps(instance) + "\n")
 

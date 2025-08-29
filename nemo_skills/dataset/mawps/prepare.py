@@ -27,7 +27,7 @@ subsets = ["addsub", "singleeq", "singleop", "multiarith"]
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / f"test.jsonl")
+    output_file = str(data_dir / "test.jsonl")
 
     data = []
     for subset in subsets:

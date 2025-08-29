@@ -16,7 +16,6 @@ import argparse
 import importlib.util
 import json
 import sys
-from pathlib import Path
 from typing import Any, Dict, List
 
 
@@ -25,7 +24,7 @@ def load_metric_files(metric_files: List[str]) -> Dict[str, Any]:
     combined_metrics = {}
 
     for metric_file in metric_files:
-        with open(metric_file, 'r') as f:
+        with open(metric_file, "r") as f:
             metrics = json.load(f)
             combined_metrics.update(metrics)
 
@@ -34,7 +33,7 @@ def load_metric_files(metric_files: List[str]) -> Dict[str, Any]:
 
 def import_score_module(score_module: str):
     """Dynamically import score module from module name or file path."""
-    if score_module.endswith('.py') or '/' in score_module:
+    if score_module.endswith(".py") or "/" in score_module:
         # Treat as file path
         spec = importlib.util.spec_from_file_location("score_module", score_module)
         module = importlib.util.module_from_spec(spec)
@@ -47,10 +46,10 @@ def import_score_module(score_module: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compute scores from metric files')
-    parser.add_argument('metric_files', nargs='+', help='List of metric.json files to combine')
-    parser.add_argument('--score_module', required=True, help='Score module name or path to python file')
-    parser.add_argument('--save_metrics_file', required=True, help='Output file to save final metrics')
+    parser = argparse.ArgumentParser(description="Compute scores from metric files")
+    parser.add_argument("metric_files", nargs="+", help="List of metric.json files to combine")
+    parser.add_argument("--score_module", required=True, help="Score module name or path to python file")
+    parser.add_argument("--save_metrics_file", required=True, help="Output file to save final metrics")
 
     args = parser.parse_args()
 
@@ -62,9 +61,9 @@ def main():
     final_metrics = score_module.compute_score(combined_metrics)
 
     # Save final metrics
-    with open(args.save_metrics_file, 'w') as f:
+    with open(args.save_metrics_file, "w") as f:
         json.dump(final_metrics, f, indent=2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

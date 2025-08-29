@@ -22,13 +22,13 @@ from tqdm import tqdm
 def write_data_to_file(output_file, data):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            entry['expected_answer'] = entry.pop('answer')
+            entry["expected_answer"] = entry.pop("answer")
             json.dump(entry, fout)
             fout.write("\n")
 
 
 if __name__ == "__main__":
-    dataset = load_dataset("MathArena/hmmt_feb_2025")['train']
+    dataset = load_dataset("MathArena/hmmt_feb_2025")["train"]
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
     output_file = data_dir / "test.jsonl"

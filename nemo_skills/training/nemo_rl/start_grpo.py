@@ -28,7 +28,7 @@ from nemo_rl.algorithms.grpo import MasterConfig, grpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset
-from nemo_rl.data.interfaces import DatumSpec, LLMMessageLogType, TaskDataProcessFnCallable, TaskDataSpec
+from nemo_rl.data.interfaces import DatumSpec, TaskDataProcessFnCallable, TaskDataSpec
 from nemo_rl.distributed.ray_actor_environment_registry import ACTOR_ENVIRONMENT_REGISTRY, get_actor_python_env
 from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES, init_ray
 from nemo_rl.environments.interfaces import EnvironmentInterface
@@ -59,7 +59,6 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 # ===============================================================================
 
 from datasets import Dataset, load_dataset
-from nemo_rl.data.interfaces import TaskDataSpec
 
 
 def load_jsonl_as_dataset(
@@ -90,7 +89,7 @@ def load_jsonl_as_dataset(
 
 
 def extract_dataset(split, dataset_path):
-    if not dataset_path.startswith('/'):
+    if not dataset_path.startswith("/"):
         original_ds = load_dataset(dataset_path, split=split)
     else:
         original_ds = load_jsonl_as_dataset(dataset_path)
@@ -167,9 +166,9 @@ def ns_data_processor(
     user_message = prompt.fill(datum_dict)
     message_log = [
         {
-            'role': 'user',
-            'content': user_message,
-            'token_ids': tokenizer([user_message], return_tensors="pt", add_special_tokens=False)["input_ids"][0],
+            "role": "user",
+            "content": user_message,
+            "token_ids": tokenizer([user_message], return_tensors="pt", add_special_tokens=False)["input_ids"][0],
         }
     ]
 

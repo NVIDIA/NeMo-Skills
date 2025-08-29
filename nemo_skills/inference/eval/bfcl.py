@@ -15,13 +15,11 @@
 import json
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, field
 from functools import partial
 
 import hydra
 import litellm
-from omegaconf import OmegaConf
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
 from nemo_skills.inference.eval.bfcl_utils import (
@@ -282,7 +280,7 @@ class BFCLGenerationTask(GenerationTask):
                         LOG.info("Empty response from the model. Proceed to next turn.")
                         break
 
-                except Exception as e:
+                except Exception:
                     LOG.info("Failed to decode the model response. Proceed to next turn.")
                     break
 
@@ -340,14 +338,14 @@ class BFCLGenerationTask(GenerationTask):
                     for func_call in model_response["tool_calls"]
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
-            
+
         except Exception as e:
             # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
             # We just check to limit the generation to a string
             LOG.error(f"Failed to parse function calls from the model response: {e}")
-            generation = (model_response["generation"] if isinstance(model_response["generation"], str) else "")
+            generation = model_response["generation"] if isinstance(model_response["generation"], str) else ""
             tool_call_ids = []
-        
+
         return {
             "generation": generation,
             "tool_call_ids": tool_call_ids,
@@ -358,7 +356,7 @@ class BFCLGenerationTask(GenerationTask):
     def _remove_thinking_from_message_content(self, model_response_text):
         """If specified, remove the thinking part of the model response text."""
         if self.cfg.thinking_end in model_response_text:
-            return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
+            return model_response_text.split(self.cfg.thinking_end)[-1].lstrip("\n")
         else:
             # If the thinking didn't finish, we can keep it empty
             return ""
@@ -375,7 +373,7 @@ GENERATION_TASK_CLASS = BFCLGenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_bfcl_generation_config')
+@hydra.main(version_base=None, config_name="base_bfcl_generation_config")
 def bfcl_generation(cfg: BFCLGenerationConfig):
     cfg = BFCLGenerationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -390,7 +388,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

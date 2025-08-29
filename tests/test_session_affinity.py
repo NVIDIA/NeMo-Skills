@@ -22,10 +22,8 @@ import random
 import threading
 import time
 import uuid
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import numpy as np
 import pytest
 import requests
 

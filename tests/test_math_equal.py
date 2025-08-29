@@ -39,9 +39,9 @@ from nemo_skills.evaluation.math_grader import math_equal
         ("\$10", "10"),
         ("10%", "10"),
         ("10\\%", "10"),
-        (5 / 2, '\\frac{5}{2}'),
-        ('\\frac{1}{3}', '\\dfrac{1}{3}'),
-        ('(r+5)(r+5)', '(r+5)^2'),
+        (5 / 2, "\\frac{5}{2}"),
+        ("\\frac{1}{3}", "\\dfrac{1}{3}"),
+        ("(r+5)(r+5)", "(r+5)^2"),
         ("\\frac{\\sqrt{3}}{3}", "\\frac{\\sqrt{3}}{3} \\approx 0.577"),
         (
             "\\begin{pmatrix}0&0&0\\\\0&1&0\\\\0&0&1\\end{pmatrix}",

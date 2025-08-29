@@ -14,7 +14,6 @@
 
 import abc
 import math
-import random
 from collections import Counter, defaultdict
 
 
@@ -103,7 +102,7 @@ class BaseMetrics(abc.ABC):
         This is used in filtering based on length, where we want to automatically grade
         all solutions longer than a specified threshold as incorrect.
         """
-        raise NotImplementedError(f"Needs to be implemented in metrics class to support filtering on length.")
+        raise NotImplementedError("Needs to be implemented in metrics class to support filtering on length.")
 
     def _update_score_metrics_for_majority(
         self,

@@ -20,11 +20,10 @@ import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
-from nemo_skills.inference.chat_interface.core import AppConfig
 from nemo_skills.inference.chat_interface.chat_service import AppContext
+from nemo_skills.inference.chat_interface.core import AppConfig
 from nemo_skills.inference.chat_interface.ui import ChatUI
 from nemo_skills.utils import setup_logging
-
 
 cs = ConfigStore.instance()
 cs.store(name="base_chat_interface_config", node=AppConfig)

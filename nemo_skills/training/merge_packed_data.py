@@ -1,5 +1,4 @@
 import argparse
-import os
 
 import numpy as np
 from tqdm import tqdm
@@ -7,9 +6,9 @@ from tqdm import tqdm
 
 def load_packed_arrays(prefix):
     # Load using memory mapping for constant memory usage
-    input_ids = np.load(f"{prefix}.input_ids.npy", mmap_mode='r')
-    loss_mask = np.load(f"{prefix}.loss_mask.npy", mmap_mode='r')
-    seq_start_id = np.load(f"{prefix}.seq_start_id.npy", mmap_mode='r')
+    input_ids = np.load(f"{prefix}.input_ids.npy", mmap_mode="r")
+    loss_mask = np.load(f"{prefix}.loss_mask.npy", mmap_mode="r")
+    seq_start_id = np.load(f"{prefix}.seq_start_id.npy", mmap_mode="r")
     return input_ids, loss_mask, seq_start_id
 
 
@@ -30,13 +29,13 @@ def merge_packed_arrays(prefixes, output_prefix):
     print("Initializing merged arrays with total samples:", total_samples)
     # Allocate merged arrays as memory-mapped files
     merged_input_ids = np.lib.format.open_memmap(
-        f"{output_prefix}.input_ids.npy", mode='w+', dtype=np.int32, shape=(total_samples, max_input_len)
+        f"{output_prefix}.input_ids.npy", mode="w+", dtype=np.int32, shape=(total_samples, max_input_len)
     )
     merged_loss_mask = np.lib.format.open_memmap(
-        f"{output_prefix}.loss_mask.npy", mode='w+', dtype=np.bool_, shape=(total_samples, max_input_len)
+        f"{output_prefix}.loss_mask.npy", mode="w+", dtype=np.bool_, shape=(total_samples, max_input_len)
     )
     merged_seq_start_id = np.lib.format.open_memmap(
-        f"{output_prefix}.seq_start_id.npy", mode='w+', dtype=np.int32, shape=(total_samples, max_seq_starts)
+        f"{output_prefix}.seq_start_id.npy", mode="w+", dtype=np.int32, shape=(total_samples, max_seq_starts)
     )
     # Initialize with default values
     merged_input_ids[:] = -1

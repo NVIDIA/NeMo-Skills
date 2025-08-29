@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import json
-import re
 import copy
-import inspect
 import importlib
+import inspect
+import json
+import logging
+import re
 
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-# Copied from: 
-# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/eval_checker/multi_turn_eval/multi_turn_utils.py 
-# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py 
+# Copied from:
+# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/eval_checker/multi_turn_eval/multi_turn_utils.py
+# - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py
 
 
 CLASS_FILE_PATH_MAPPING = {
@@ -47,7 +47,9 @@ STATELESS_CLASSES = [
 
 MAXIMUM_STEP_LIMIT = 20
 
-DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = "I have updated some more functions you can choose from. What about now?"
+DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
+    "I have updated some more functions you can choose from. What about now?"
+)
 
 
 def convert_to_function_call(function_call_list):
@@ -59,9 +61,7 @@ def convert_to_function_call(function_call_list):
         for key, value in function_call.items():
             if type(value) == str:
                 value = json.loads(value)
-            execution_list.append(
-                f"{key}({','.join([f'{k}={repr(v)}' for k,v in value.items()])})"
-            )
+            execution_list.append(f"{key}({','.join([f'{k}={repr(v)}' for k, v in value.items()])})")
 
     return execution_list
 
@@ -89,9 +89,7 @@ def execute_multi_turn_func_call(
     for class_name in involved_classes:
         module_name = CLASS_FILE_PATH_MAPPING[class_name]
         # TODO: Handler the model name issue from handler more elegantly
-        instance_name = (
-            f"sample_model_{test_entry_id}_{class_name.lower()}_instance"
-        )
+        instance_name = f"sample_model_{test_entry_id}_{class_name.lower()}_instance"
         if instance_name not in globals():
             module = importlib.import_module(module_name)
             class_ = getattr(module, class_name)
@@ -99,9 +97,7 @@ def execute_multi_turn_func_call(
             if class_name not in STATELESS_CLASSES:
                 class_initial_config = initial_config.get(class_name, {})
                 # Deep copy the initial configuration to avoid mutation issues
-                class_instance._load_scenario(
-                    copy.deepcopy(class_initial_config), long_context=long_context
-                )
+                class_instance._load_scenario(copy.deepcopy(class_initial_config), long_context=long_context)
             globals()[instance_name] = class_instance
         # This happens in subsequent turns
         else:
@@ -110,9 +106,7 @@ def execute_multi_turn_func_call(
         involved_instances[class_name] = class_instance
 
         # Retrieve all method names and map them to the instance
-        for method_name, method in inspect.getmembers(
-            class_instance, predicate=inspect.ismethod
-        ):
+        for method_name, method in inspect.getmembers(class_instance, predicate=inspect.ismethod):
             # Skip private methods
             if method_name.startswith("_"):
                 continue
@@ -125,7 +119,7 @@ def execute_multi_turn_func_call(
 
         # Evaluate the function call
         try:
-            # We need to make a copy here because otherwise the `eval(func_call)` would error. 
+            # We need to make a copy here because otherwise the `eval(func_call)` would error.
             func_call_copy = func_call
             # Before calling `eval`, we need to make sure that the function call is safe
             # We do so by checking if the function is `kill` or `exit`, etc.
