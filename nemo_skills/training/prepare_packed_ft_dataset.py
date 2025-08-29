@@ -418,7 +418,9 @@ def tokenize_dataset(cfg: "DictConfig"):
                         data[key] = val[:max_seq_length]
             return
 
-        ceil_to_nearest = lambda n, m: (n + m - 1) // m * m
+        def ceil_to_nearest(n, m):
+            return (n + m - 1) // m * m
+
         for data in dataset:
             max_length_to_pad = min(max_seq_length, ceil_to_nearest(len(data["input_ids"]), pad_seq_length_to_mult))
             pre_pad_dataset(data, max_seq_length, max_length_to_pad, pad_id)

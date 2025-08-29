@@ -91,7 +91,7 @@ class GenSelectTask(GenerationTask):
             else:
                 judgment = None
 
-        except:
+        except Exception:
             judgment = None
 
         if judgment is not None and max_idx is not None:

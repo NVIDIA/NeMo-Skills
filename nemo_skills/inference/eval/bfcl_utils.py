@@ -53,13 +53,13 @@ DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
 
 
 def convert_to_function_call(function_call_list):
-    if type(function_call_list) == dict:
+    if isinstance(function_call_list, dict):
         function_call_list = [function_call_list]
     # function_call_list is of type list[dict[str, str]] or list[dict[str, dict]]
     execution_list = []
     for function_call in function_call_list:
         for key, value in function_call.items():
-            if type(value) == str:
+            if isinstance(value, str):
                 value = json.loads(value)
             execution_list.append(f"{key}({','.join([f'{k}={repr(v)}' for k, v in value.items()])})")
 
@@ -134,13 +134,13 @@ def execute_multi_turn_func_call(
 
             func_call_result = eval(func_call)
 
-            if type(func_call_result) == str:
+            if isinstance(func_call_result, str):
                 pass
-            elif type(func_call_result) == dict:
+            elif isinstance(func_call_result, dict):
                 # Some function returns a object instance, which is not serializable
                 try:
                     func_call_result = json.dumps(func_call_result)
-                except:
+                except Exception:
                     func_call_result = str(func_call_result)
             else:
                 func_call_result = str(func_call_result)

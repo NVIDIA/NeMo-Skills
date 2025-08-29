@@ -205,7 +205,7 @@ class DropIncorrectArithmetic(BaseFilter):
                         return [DataEntry(data=None, metrics=dict(num_removed=1))]
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception:
                 pass
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
@@ -356,7 +356,7 @@ class SplitArithmetic(BaseFilter):
 
             try:
                 solution_steps = solve_expression(expr)
-            except:
+            except Exception:
                 new_text.append(text[last_end:end])
                 last_end = end
                 continue
@@ -375,7 +375,7 @@ class SplitArithmetic(BaseFilter):
                 last_end = end
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception:
                 new_text.append(text[last_end:end])
                 last_end = end
 
