@@ -4,6 +4,8 @@
 
 ## bfcl_v3
 
+BFCL v3 consists of seventeen distinct evaluation subsets that comprehensively test various aspects of function calling capabilities, from simple function calls to complex multi-turn interactions.
+
 - Benchmark is defined in [`nemo_skills/dataset/bfcl_v3/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/bfcl_v3/__init__.py)
 - Original benchmark source is [here](https://github.com/ShishirPatil/gorilla/tree/main/berkeley-function-call-leaderboard).
 
@@ -76,7 +78,7 @@ ns eval \
 --server_args="--enable-auto-tool-choice --tool-call-parser hermes"
 ```
 
-**Sample Commands**:
+**Sample Command**:
 
 The following command evaluates the `Qwen3-4B` model which uses a standard tool-calling format supported by vllm
 
