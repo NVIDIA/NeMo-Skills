@@ -15,8 +15,7 @@
 import argparse
 import subprocess
 
-from nemo_skills.dataset.prepare import prepare_datasets
-from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
+from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
 # Run this first before run recipe.py
 # ruler_data_cmd = f"""
@@ -326,7 +325,7 @@ def main():
     run_cmd(
         ctx=wrap_arguments(checker),
         cluster=args.cluster,
-        expname=f"check-eval-results-for-llama-49b",
+        expname="check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/logs",
         run_after=reason_on_expnames + reason_off_expnames,
     )
