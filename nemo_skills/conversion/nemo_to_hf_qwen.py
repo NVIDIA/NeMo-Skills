@@ -89,7 +89,7 @@ def convert(
         map_location = None
 
     if precision is None:
-        precision = model.cfg.precision
+        precision = model_config.precision
     if precision in [32, "32"]:
         dtype = torch.float32
     elif precision in [16, "16", "16-mixed"]:

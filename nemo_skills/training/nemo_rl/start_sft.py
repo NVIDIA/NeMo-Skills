@@ -23,6 +23,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, cast
 
+import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
