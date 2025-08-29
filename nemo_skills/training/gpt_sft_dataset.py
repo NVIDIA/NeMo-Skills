@@ -694,7 +694,7 @@ class GPTSFTPackedDataset(GPTSFTDataset):
             # pad to the nearest multiple of 16 for FP8 training
             # for many datasets in practice, all packed sequence lengths are very close to the
             # target length (2048, 4096, 8192), so there is very minimal padding
-            max_length = max(len(l) for l in input_ids)
+            max_length = max(len(input_id) for input_id in input_ids)
             max_length = min(self.max_seq_length, self._ceil_to_nearest(max_length, self.pad_seq_length_to_mult))
         assert max_length <= self.max_seq_length
 
@@ -706,10 +706,10 @@ class GPTSFTPackedDataset(GPTSFTDataset):
             cu_seqlens.append([0])
             cu_seqlens_unpadded.append([0])
             seqlens = np.array(item["seq_boundaries"][1:]) - np.array(item["seq_boundaries"][:-1])
-            for l in seqlens:
+            for seqlen in seqlens:
                 # length minus 1 because input_ids is truncated by 1 for labels
-                position_ids[-1].extend(list(range(l - 1)))
-                cu_seqlens[-1].append(cu_seqlens[-1][-1] + l - 1)
+                position_ids[-1].extend(list(range(seqlen - 1)))
+                cu_seqlens[-1].append(cu_seqlens[-1][-1] + seqlen - 1)
 
             # the last seq needs to be the max seq len because rope and attn kernels expect no padding
             assert cu_seqlens[-1][-1] <= max_length
