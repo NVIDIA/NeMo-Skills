@@ -150,8 +150,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
                 "++policy.train_global_batch_size=32 "
                 "++policy.megatron_cfg.tensor_model_parallel_size=4 "
                 "++policy.megatron_cfg.context_parallel_size=2 "
-                "++policy.megatron_cfg.optimizer.lr=1e-4 "
-                "++policy.megatron_cfg.optimizer.min_lr=1e-6 "
+                "++policy.megatron_cfg.optimizer.lr=1e-4 "  # needs higher LR than aligner
                 "++sft.max_num_epochs=2 "
             ),
             cluster=cluster,
@@ -197,21 +196,9 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
         server_gpus=num_gpus,
         benchmarks="aime24:8,aime25:8",
         output_dir=f"{workspace}/evals/after-training",
-        num_jobs=1 if cluster == "local" else -1,
+        num_jobs=1,
         expname=f"{expname_prefix}-final-eval",
         run_after=[f"{expname_prefix}-convert-back-to-hf", f"{expname_prefix}-training"],
-    )
-
-    # summarize results, after the evaluation job is done
-    summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
-    if not wandb_params["disable_wandb"]:
-        summarize_cmd += f" --wandb_name {expname_prefix}-final-eval --wandb_project {wandb_params['wandb_project']}"
-    run_cmd(
-        ctx=wrap_arguments(summarize_cmd),
-        cluster=cluster,
-        expname=f"{expname_prefix}-final-eval-summarize-results",
-        run_after=f"{expname_prefix}-final-eval",
-        log_dir=f"{workspace}/summarize-results/after-training",
     )
 
 
@@ -228,20 +215,6 @@ def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix,
         num_jobs=1,
         expname=f"{expname_prefix}-baseline-eval",
         run_after=f"{expname_prefix}-download-assets",
-    )
-
-    # summarize results, after the evaluation job is done
-    summarize_cmd = f"ns summarize_results {workspace}/evals/baseline "
-    if not wandb_params["disable_wandb"]:
-        summarize_cmd += (
-            f" --wandb_name {expname_prefix}-baseline-eval --wandb_project {wandb_params['wandb_project']}"
-        )
-    run_cmd(
-        ctx=wrap_arguments(summarize_cmd),
-        cluster=cluster,
-        expname=f"{expname_prefix}-baseline-summarize-results",
-        run_after=f"{expname_prefix}-baseline-eval",
-        log_dir=f"{workspace}/summarize-results/baseline",
     )
 
 
