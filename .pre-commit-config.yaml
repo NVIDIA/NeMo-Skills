@@ -39,8 +39,7 @@ repos:
     rev: v0.12.9
     hooks:
       - id: ruff-check
-      # F401 is the import error. nemo_skills/utils.py has certain imports that are not used in the file but used in files which import it.
-        args: ["--fix", "--per-file-ignores=__init__.py:F401,nemo_skills/utils.py:F401,nemo_skills/pipeline/cli.py:F401"]
+        args: ["--fix"]
       - id: ruff-format
 
   - repo: local
