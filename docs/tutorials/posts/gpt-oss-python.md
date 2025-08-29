@@ -233,7 +233,7 @@ generate(
     ),
     cluster=cluster,
     # optional parameter here, but useful when chaining multiple jobs together in pipelines
-    expname="gpt-oss-eval-with-python",
+    expname="gpt-oss-sdg-with-python",
     model="openai/gpt-oss-120b",
     server_type='vllm',
     # can customize the number of GPUs used
