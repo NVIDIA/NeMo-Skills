@@ -21,7 +21,7 @@ By the end of this tutorial and companion notebook, you will have a local setup 
 4.  **Launching the Inference Server**: Set up the LLM server and a parallel code execution sandbox to handle the tool-use capabilities of our model.
 5.  **Running Inference**: Finally, we'll send math problems to our custom inference engine and observe its problem-solving abilities.
 
-See the [companion notebook](../notebooks/demo_aimo_inference.ipynb) for launching the inference server and benchmarking.
+See the [companion notebook](https://github.com/NVIDIA/NeMo-Skills/tree/main/docs/tutorials/notebooks/demo_aimo_inference.ipynb) for launching the inference server and benchmarking.
 
 -----
 
@@ -238,7 +238,7 @@ Your TensorRT-LLM engine, now supercharged with ReDrafter, is ready to be served
 
 ## 4\. Benchmarking and results
 
-We’ve prepared a [companion notebook](../notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference.
+We’ve prepared a [companion notebook](https://github.com/NVIDIA/NeMo-Skills/tree/main/docs/tutorials/notebooks/demo_aimo_inference.ipynb) where you can try out the full pipeline yourself. The notebook was run with the same container setup and installations as section 1 above, along with 2 H100 GPUs for inference.
 In the notebook, you can:
 
 - Run inference on different TensorRT-LLM engines (BF16, FP8, FP8+ReDrafter).
@@ -313,4 +313,4 @@ The code confirms that the valid bases are 21 and 49, summing to 70.
 
 </details>
 
-To turn off tool-calling in the [companion notebook](../notebooks/demo_aimo_inference.ipynb) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/).
+To turn off tool-calling in the [companion notebook](https://github.com/NVIDIA/NeMo-Skills/tree/main/docs/tutorials/notebooks/demo_aimo_inference.ipynb) use `get_model` instead of `get_code_execution_model` as shown in the NeMo-Skills [docs](https://nvidia.github.io/NeMo-Skills/).
