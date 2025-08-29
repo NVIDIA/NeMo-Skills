@@ -66,7 +66,7 @@ def test_metrics(tmp_path, max_seq_len):
     def recursive_compare_metrics(metrics1, metrics2, tol=1e-6):
         """Compare numerical values in nested JSON structures of metrics."""
 
-        if type(metrics1) != type(metrics2):
+        if not isinstance(metrics1, type(metrics2)):
             return False
 
         if isinstance(metrics1, dict):
