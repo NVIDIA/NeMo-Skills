@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import openai
+
 from .base import BaseModel
 
 
