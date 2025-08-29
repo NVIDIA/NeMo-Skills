@@ -213,7 +213,9 @@ def convert(
             input_ln_base_name = f"model.layers.{layer_idx}.input_layernorm.weight"
             checkpoint[input_ln_base_name] = param_to_weights(input_ln_weight)
 
-            post_attn_ln_weight = model.state_dict()[f"model.decoder.layers.{layer_idx}.mlp.linear_fc1.layer_norm_weight"]
+            post_attn_ln_weight = model.state_dict()[
+                f"model.decoder.layers.{layer_idx}.mlp.linear_fc1.layer_norm_weight"
+            ]
             post_attn_ln_base_name = f"model.layers.{layer_idx}.post_attention_layernorm.weight"
             checkpoint[post_attn_ln_base_name] = param_to_weights(post_attn_ln_weight)
 

@@ -119,6 +119,7 @@ def format_reasoning_trace_with_summary(
     ]
 
     formatted_instances = []
+    invalid_summary_count = 0
 
     # Ensure that the number of summaries is the same as the number of reasoning instances
     list_of_summary_instances = [

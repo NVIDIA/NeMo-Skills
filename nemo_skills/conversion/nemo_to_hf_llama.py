@@ -158,7 +158,9 @@ def convert(
         for layer_idx in range(int(num_layers)):
             print(f"converting layer {layer_idx}")
 
-            qkv_weights = model.state_dict()[f"{weight_base_name}.decoder.layers.{layer_idx}.self_attention.linear_qkv.weight"]
+            qkv_weights = model.state_dict()[
+                f"{weight_base_name}.decoder.layers.{layer_idx}.self_attention.linear_qkv.weight"
+            ]
             qkv_weights = qkv_weights.reshape([qkv_total_dim, head_size, hidden_size])
 
             q_slice = torch.cat(
@@ -188,7 +190,9 @@ def convert(
             checkpoint[v_weights_base_name] = param_to_weights(qkv_weights[v_slice].reshape(-1, hidden_size))
 
             # attention dense
-            o_weight = model.state_dict()[f"{weight_base_name}.decoder.layers.{layer_idx}.self_attention.linear_proj.weight"]
+            o_weight = model.state_dict()[
+                f"{weight_base_name}.decoder.layers.{layer_idx}.self_attention.linear_proj.weight"
+            ]
             o_weight_base_name = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
             checkpoint[o_weight_base_name] = param_to_weights(o_weight)
 
@@ -203,7 +207,9 @@ def convert(
             checkpoint[mlp_down_proj_base_name] = param_to_weights(mlp_down_proj_weight)
             checkpoint[mlp_gate_proj_base_name] = param_to_weights(mlp_gate_proj_weight)
 
-            mlp_up_proj_weight = model.state_dict()[f"{weight_base_name}.decoder.layers.{layer_idx}.mlp.linear_fc2.weight"]
+            mlp_up_proj_weight = model.state_dict()[
+                f"{weight_base_name}.decoder.layers.{layer_idx}.mlp.linear_fc2.weight"
+            ]
             mlp_up_proj_base_name = f"model.layers.{layer_idx}.mlp.down_proj.weight"
             checkpoint[mlp_up_proj_base_name] = param_to_weights(mlp_up_proj_weight)
 

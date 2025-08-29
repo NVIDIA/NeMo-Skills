@@ -248,7 +248,9 @@ def convert(args):
         if mcore_gpt:
             qkv_weights_base_name = f"model.decoder.layers.{layer_idx}.self_attention.linear_qkv.weight"
         else:
-            qkv_weights_base_name = f"model.language_model.encoder.layers.{layer_idx}.self_attention.query_key_value.weight"
+            qkv_weights_base_name = (
+                f"model.language_model.encoder.layers.{layer_idx}.self_attention.query_key_value.weight"
+            )
         checkpoint["state_dict"][qkv_weights_base_name] = param_to_weights(qkv_weights)
 
         # attention dense
