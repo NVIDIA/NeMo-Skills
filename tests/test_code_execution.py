@@ -296,7 +296,7 @@ async def test_lean4_basic_code_execution():
     output, session_id = await sandbox.execute_code(correct_code, language="lean4")
 
     # Assertions for the correct code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", "Expected the process to complete successfully"
     assert expected_output == output["stdout"], f"Expected the output to include '{expected_output}'"
     assert output["stderr"] == "", "Expected no error output"
@@ -317,7 +317,7 @@ async def test_lean4_mathlib_code_execution():
     output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4")
 
     # Assertions for the mathlib code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", "Expected the process to complete successfully"
     assert expected_output == output["stdout"], f"Expected the output to include '{expected_output}'"
     assert output["stderr"] == "", "Expected no error output"
@@ -334,7 +334,7 @@ async def test_shell_code_execution():
     output, session_id = await sandbox.execute_code(correct_code_shell, language="shell")
 
     # Assertions for the shell code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", f"Expected the process to complete successfully, got {output}"
     assert expected_output in output["stdout"], f"Expected the output to include '{expected_output}', got {output}"
     assert output["stderr"] == "", f"Expected no error output, got {output}"
@@ -346,7 +346,7 @@ async def test_shell_code_execution():
     output, session_id = await sandbox.execute_code(incorrect_code_shell, language="shell")
 
     # Assertions for the shell code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "error", f"Expected the process to complete with error, got {output}"
     assert output["stdout"] == "", f"Expected the output to be empty, got {output}"
     assert expected_error in output["stderr"], f"Expected error, got {output}"
@@ -368,7 +368,7 @@ async def test_lean4_code_execution_failure():
     error_output, session_id = await sandbox.execute_code(incorrect_code, language="lean4")
 
     # Assertions for the error case
-    assert session_id == None
+    assert session_id is None
     print(error_output)
     assert error_output["process_status"] == "failed", "Expected the process to fail due to syntax error"
     assert "unexpected token '#eval" in error_output["stdout"].lower(), (
