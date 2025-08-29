@@ -22,7 +22,7 @@ import tqdm
 from latex2sympy2_extended import NormalizationConfig, normalize_latex
 from math_verify import LatexExtractionConfig, StringExtractionConfig, parse, verify
 
-from nemo_skills.utils import get_logger_name, unroll_files
+from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 

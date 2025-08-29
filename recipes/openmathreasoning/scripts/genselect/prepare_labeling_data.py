@@ -21,6 +21,7 @@ import logging
 import multiprocessing as mp
 import os
 import random
+import hashlib
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
@@ -32,7 +33,6 @@ from nemo_skills.utils import get_logger_name, unroll_files
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(get_logger_name(__file__))
-import hashlib
 
 # Skip if the solutions are too long
 SKIP_LENGTH = 100_000
