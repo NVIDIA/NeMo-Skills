@@ -18,6 +18,7 @@ ns prepare_data bfcl_v3
 ```
 
 This command performs the following operations:
+
 - Downloads the complete set of BFCL v3 evaluation files
 - Processes and organizes data into seventeen separate subset folders
 - Creates standardized test files in JSONL format
@@ -130,7 +131,7 @@ ns eval \
 
 
 !!!note
-  To evaluate individual splits of `bfcl_v3`, such as `simple`, use `benchmarks=bfcl_v3.simple`.
+    To evaluate individual splits of `bfcl_v3`, such as `simple`, use `benchmarks=bfcl_v3.simple`.
 
 !!!note
-  Currently, ns summarize_results does not support benchmarks with custom aggregation requirements like BFCL v3. To handle this, the evaluation pipeline automatically launches a dependent job that processes the individual subset scores using [our scoring script](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/bfcl_v3/bfcl_score.py).
+    Currently, ns summarize_results does not support benchmarks with custom aggregation requirements like BFCL v3. To handle this, the evaluation pipeline automatically launches a dependent job that processes the individual subset scores using [our scoring script](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/bfcl_v3/bfcl_score.py).
