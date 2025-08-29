@@ -24,7 +24,7 @@ def main():
     ap.add_argument("--cluster", required=True)
     ap.add_argument("--backend", required=True, choices=["nemo-aligner", "nemo-rl"], help="Training backend")
     ap.add_argument("--workspace", required=True, help="Workspace path")
-    ap.add_argument("--wandb_project", default=None, help="W&B project name")
+    ap.add_argument("--wandb_project", default="nemo-skills-slurm-ci", help="W&B project name")
     ap.add_argument("--expname_prefix", required=True, help="Experiment name prefix used inside the recipe")
     ap.add_argument("--disable_wandb", action="store_true", help="Disable W&B logging in the recipe")
     args = ap.parse_args()
@@ -42,7 +42,6 @@ def main():
     elif args.wandb_project:
         cmd += f" --wandb_project {args.wandb_project} "
 
-    print(cmd)
     subprocess.run(cmd, shell=True, check=True)
 
     checker_cmd = (

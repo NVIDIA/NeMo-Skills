@@ -15,7 +15,15 @@
 import argparse
 
 from nemo_skills.dataset.prepare import prepare_datasets
-from nemo_skills.pipeline.cli import convert, eval, generate, run_cmd, sft_nemo_rl, train, wrap_arguments
+from nemo_skills.pipeline.cli import (
+    convert,
+    eval,
+    generate,
+    run_cmd,
+    sft_nemo_rl,
+    train,
+    wrap_arguments,
+)
 
 
 def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
@@ -199,6 +207,8 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
         num_jobs=1,
         expname=f"{expname_prefix}-final-eval",
         run_after=[f"{expname_prefix}-convert-back-to-hf", f"{expname_prefix}-training"],
+        wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
+        wandb_project=wandb_params["wandb_project"],
     )
 
 
@@ -215,6 +225,8 @@ def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix,
         num_jobs=1,
         expname=f"{expname_prefix}-baseline-eval",
         run_after=f"{expname_prefix}-download-assets",
+        wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
+        wandb_project=wandb_params["wandb_project"],
     )
 
 
