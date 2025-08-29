@@ -30,7 +30,7 @@ from rich.logging import RichHandler
 
 # isort: off
 import nemo_skills
-from nemo_skills.file_utils import calculate_chunk_indices
+from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump, jload, jload_chunk, count_newlines
 # isort: on
 
 
@@ -261,7 +261,7 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = "", level: int = 
             try:
                 default_factory = default_factory()
                 default_str = f" = {default_factory}"
-            except:
+            except Exception:
                 pass
             if is_dataclass(default_factory):
                 default_str = f" = {field_type}()"
