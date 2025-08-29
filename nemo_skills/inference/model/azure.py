@@ -27,7 +27,7 @@ class AzureOpenAIModel(OpenAIModel):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.litellm_kwargs['api_version'] = api_version
+        self.litellm_kwargs["api_version"] = api_version
 
     def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
         api_key = super()._get_api_key(api_key, api_key_env_var, base_url)

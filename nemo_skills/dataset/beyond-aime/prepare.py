@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import json
 from pathlib import Path
 
@@ -24,7 +23,7 @@ def save_data():
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
 
-    output_file = data_dir / f"test.jsonl"
+    output_file = data_dir / "test.jsonl"
     data = load_dataset("ByteDance-Seed/BeyondAIME")["test"]
 
     with open(output_file, "wt", encoding="utf-8") as fout:

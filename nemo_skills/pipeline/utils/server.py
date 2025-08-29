@@ -62,7 +62,7 @@ def should_get_random_port(server_gpus, exclusive, server_type):
 
 
 def wrap_python_path(cmd):
-    return f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
+    return "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
 
 
 def set_python_path_and_wait_for_server(server_address, generation_commands):
@@ -168,7 +168,7 @@ def get_server_command(
         num_tasks = 1
     elif server_type == "sglang":
         if num_nodes > 1:
-            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+            multinode_args = " --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_sglang"

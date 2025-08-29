@@ -29,7 +29,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def preprocess_code(generation_dict: dict, language="python"):
-    completion = generation_dict['generation']
+    completion = generation_dict["generation"]
     completion = completion.strip()
     completion = completion.replace("\r", "")
 
@@ -48,8 +48,8 @@ def preprocess_code(generation_dict: dict, language="python"):
         return generation_dict
     #####
 
-    start_with_lang_tag = f'```{language}'
-    generic_start_end_tag = f'```'
+    start_with_lang_tag = f"```{language}"
+    generic_start_end_tag = "```"
 
     if start_with_lang_tag in completion:
         def_line = completion.index(start_with_lang_tag) + len(start_with_lang_tag)
@@ -141,15 +141,15 @@ def eval_livecodebench(cfg):
             timeout=6 if eval_config.language == "python" else 30,
         )
 
-        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             eval_grades = json.load(fin)
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
-                sample['graded_list'] = eval_grades['eval'][sample['task_id']]['graded_list']
+                sample["graded_list"] = eval_grades["eval"][sample["task_id"]]["graded_list"]
                 f.write(json.dumps(sample) + "\n")
 
         # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
 def eval_livecodebench_pro(cfg):
@@ -192,16 +192,16 @@ def eval_evalplus(cfg):
         }
         eval_config.update(OmegaConf.to_container(cfg.eval_config))
         evaluate(Namespace(**eval_config))
-        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             evalplus_grades = json.load(fin)
         # adding is_correct key to allow compute_metrics to work
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
-                sample['is_correct'] = evalplus_grades['eval'][sample['task_id']][0]['base_status'] == "pass"
-                sample['is_correct-plus'] = (
-                    sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
+                sample["is_correct"] = evalplus_grades["eval"][sample["task_id"]][0]["base_status"] == "pass"
+                sample["is_correct-plus"] = (
+                    sample["is_correct"] and evalplus_grades["eval"][sample["task_id"]][0]["plus_status"] == "pass"
                 )
                 f.write(json.dumps(sample) + "\n")
 
         # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")

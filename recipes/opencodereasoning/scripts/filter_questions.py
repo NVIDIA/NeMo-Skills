@@ -13,17 +13,17 @@
 # limitations under the License.
 
 import argparse
-import tqdm
 
-from nemo_skills import utils
+import tqdm
 from transformers import AutoTokenizer
 
+from nemo_skills import utils
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Filter questions based on token length")
-    parser.add_argument('--input_file', type=str, required=True, help='Path to the input JSONL file')
-    parser.add_argument('--output_file', type=str, required=True, help='Path to save the filtered JSONL file')
-    parser.add_argument('--filter_len', type=int, default=3200, help='Maximum token length for filtering')
+    parser.add_argument("--input_file", type=str, required=True, help="Path to the input JSONL file")
+    parser.add_argument("--output_file", type=str, required=True, help="Path to save the filtered JSONL file")
+    parser.add_argument("--filter_len", type=int, default=3200, help="Maximum token length for filtering")
 
     args = parser.parse_args()
 
@@ -31,11 +31,11 @@ if __name__ == "__main__":
 
     # Load data
     data = utils.jload(args.input_file)
-    tokenizer = AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-0528')
+    tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/DeepSeek-R1-0528")
 
     filtered_dataset = []
     for sample in tqdm.tqdm(data, total=len(data)):
-        tokenized_input = tokenizer.encode(sample['question'], add_special_tokens=True)
+        tokenized_input = tokenizer.encode(sample["question"], add_special_tokens=True)
         if len(tokenized_input) > args.filter_len:
             continue
 

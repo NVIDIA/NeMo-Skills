@@ -89,7 +89,7 @@ class SciCodeGenerationTask(GenerationTask):
                 llm_output = await super().process_single_datapoint(prepare_data_point, all_data)
             # TODO: this is a hack (as not all servers return that),
             # but eventually we should support handling errors like this globally for all generations
-            except litellm.exceptions.ContextWindowExceededError as e:
+            except litellm.exceptions.ContextWindowExceededError:
                 LOG.warning(
                     "SciCode generation failed due to running out of context. "
                     "Failing for subsequent subtasks automatically.",

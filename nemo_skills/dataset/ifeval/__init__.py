@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-DATASET_GROUP = 'chat'
+DATASET_GROUP = "chat"
 METRICS_TYPE = "if"
 EVAL_ARGS = "++eval_type=if ++generation_key=response"
 GENERATION_ARGS = "++prompt_config=generic/default ++generation_key=response"

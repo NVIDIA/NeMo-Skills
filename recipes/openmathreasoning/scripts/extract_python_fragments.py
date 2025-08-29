@@ -20,7 +20,7 @@ from typing import List
 
 
 def extract_python_blocks_with_context(document: str, args) -> List[str]:
-    pattern = fr'{args.code_begin}(.*?){args.code_end}```output\n(.*?)\n```'
+    pattern = rf"{args.code_begin}(.*?){args.code_end}```output\n(.*?)\n```"
 
     matches = list(re.finditer(pattern, document, re.DOTALL))
 
@@ -59,31 +59,31 @@ def extract_python_blocks_with_context(document: str, args) -> List[str]:
 
 
 def process_jsonl_file(args) -> None:
-    with open(args.input_file, 'r', encoding='utf-8') as f_in, open(args.output_file, 'w', encoding='utf-8') as f_out:
+    with open(args.input_file, "r", encoding="utf-8") as f_in, open(args.output_file, "w", encoding="utf-8") as f_out:
         for idx, line in enumerate(f_in):
             try:
                 entry = json.loads(line.strip())
 
-                if 'generation' not in entry:
+                if "generation" not in entry:
                     print(f"Warning: Line {idx} does not contain a 'generation' field, skipping.")
                     continue
 
-                generation = entry['generation']
+                generation = entry["generation"]
                 fragments = extract_python_blocks_with_context(generation, args)
 
                 for fragment_idx, fragment in enumerate(fragments):
                     output_entry = {
-                        'index': idx,  # Original line position
-                        'fragment_index': fragment_idx,  # Position within the fragments of this generation
-                        'fragment': fragment,
-                        'original_generation': generation,  # Store the original generation for reference
+                        "index": idx,  # Original line position
+                        "fragment_index": fragment_idx,  # Position within the fragments of this generation
+                        "fragment": fragment,
+                        "original_generation": generation,  # Store the original generation for reference
                     }
                     # Include all original fields except 'generation'
                     for key, value in entry.items():
-                        if key != 'generation':
+                        if key != "generation":
                             output_entry[key] = value
 
-                    f_out.write(json.dumps(output_entry) + '\n')
+                    f_out.write(json.dumps(output_entry) + "\n")
 
             except json.JSONDecodeError:
                 print(f"Warning: Line {idx} contains invalid JSON, skipping.")
@@ -94,13 +94,13 @@ def process_jsonl_file(args) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract Python code blocks with context from JSONL file')
-    parser.add_argument('--input_file', type=str, required=True, help='Path to input JSONL file')
-    parser.add_argument('--output_file', type=str, required=True, help='Path to output JSONL file')
+    parser = argparse.ArgumentParser(description="Extract Python code blocks with context from JSONL file")
+    parser.add_argument("--input_file", type=str, required=True, help="Path to input JSONL file")
+    parser.add_argument("--output_file", type=str, required=True, help="Path to output JSONL file")
     parser.add_argument("--code_begin", type=str, required=True, help="Start of code block tag")
     parser.add_argument("--code_end", type=str, required=True, help="End of code block tag")
     parser.add_argument(
-        '--window_size', type=int, default=1500, help='Size of context window before and after code block'
+        "--window_size", type=int, default=1500, help="Size of context window before and after code block"
     )
 
     args = parser.parse_args()

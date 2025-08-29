@@ -17,10 +17,8 @@ import glob
 import logging
 import os
 import shutil
-import tarfile
 
 import numpy as np
-import tensorstore  # need to import it for bf16 support
 import zarr
 
 logging.basicConfig(level=logging.INFO)
@@ -83,8 +81,8 @@ def main():
     copy_items = []
     for ix, path in enumerate(checkpoint_paths):
         full_path = os.path.join(args.checkpoint_dir, path)
-        if 'model_weights' in os.listdir(full_path):
-            full_path = os.path.join(full_path, 'model_weights')
+        if "model_weights" in os.listdir(full_path):
+            full_path = os.path.join(full_path, "model_weights")
 
         for item in os.listdir(full_path):
             # if item is not a directory, skip it
@@ -126,7 +124,7 @@ def main():
     ckpt_name = os.path.join(
         args.checkpoint_dir,
         args.name_prefix
-        + ("-".join([str(step) for step in args.steps]) if args.steps is not None else '')
+        + ("-".join([str(step) for step in args.steps]) if args.steps is not None else "")
         + "-averaged",
         "model_weights",
     )

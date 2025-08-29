@@ -15,18 +15,16 @@
 
 """Script to merge new summaries into the reasoning trace"""
 
-
-import json
-import re
-import glob
 import argparse
+import glob
+import json
 import os
-
-from typing import List, Dict, Optional
+import re
 from os import path
-from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-from nemo_skills.evaluation.math_grader import extract_answer
+from typing import Dict, List, Optional
 
+from nemo_skills.evaluation.math_grader import extract_answer
+from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 def read_jsonl_file(file_path: str, key: Optional[str] = None) -> List[Dict]:
@@ -38,7 +36,7 @@ def read_jsonl_file(file_path: str, key: Optional[str] = None) -> List[Dict]:
                 instances.append(instance[key])
             else:
                 instances.append(instance)
-    
+
     return instances
 
 
@@ -50,11 +48,11 @@ def is_valid_summary(reasoning_instance: Dict, summary_instance: Dict) -> bool:
         return True
 
     # Otherwise check for the surface form to ensure that the summary has the same answer, even if incorrect, as the reasoning solution
-    return (reasoning_instance["predicted_answer"] == summary_instance["predicted_answer"])
+    return reasoning_instance["predicted_answer"] == summary_instance["predicted_answer"]
 
 
 def select_best_summary(valid_summaries):
-    """Select the best summary from the list of valid summaries. 
+    """Select the best summary from the list of valid summaries.
     Currently we just select the longest valid summary in terms of characters."""
 
     return max(valid_summaries, key=lambda x: len(x["generation"]))
@@ -79,23 +77,22 @@ def trim_reasoning_generation(reasoning_generation, start_tag, end_tag, strict_e
             return None
         reasoning_trace += f"\n{end_tag}"
     else:
-        reasoning_trace = reasoning_trace[:end_tag_position + len(end_tag)]
+        reasoning_trace = reasoning_trace[: end_tag_position + len(end_tag)]
 
     # Extract the answer from the reasoning trace by searching for boxed entries
     answer_from_reasoning_trace = extract_answer(reasoning_trace)
-    
+
     # If the answer is found, trim the reasoning trace to the step with the rightmost boxed entry
     if answer_from_reasoning_trace:
-        answer_expression = r'\\boxed\{"[ ]*' + re.escape(answer_from_reasoning_trace) + r'[ ]*\}'
+        answer_expression = r'\\boxed\{"[ ]*' + re.escape(answer_from_reasoning_trace) + r"[ ]*\}"
         matches = list(re.finditer(answer_expression, reasoning_trace))
-    
+
         # Return the rightmost match if any
         if matches:
             rightmost_match = matches[-1]
             # Remove steps after the rightmost match
             reasoning_trace = (
-                reasoning_trace[: rightmost_match.end()]
-                + reasoning_trace[rightmost_match.end() :].split("\n\n")[0]
+                reasoning_trace[: rightmost_match.end()] + reasoning_trace[rightmost_match.end() :].split("\n\n")[0]
             )
 
             # If the end tag is not present, add it
@@ -117,12 +114,18 @@ def format_reasoning_trace_with_summary(
         return [], 0, 0, len(reasoning_instances), 0
 
     # We have multiple summaries for the same reasoning trace
-    list_of_summary_instances = [read_jsonl_file(summary_file) for summary_file in glob.glob(path.join(summary_dir, "*.jsonl"))]
+    list_of_summary_instances = [
+        read_jsonl_file(summary_file) for summary_file in glob.glob(path.join(summary_dir, "*.jsonl"))
+    ]
 
     formatted_instances = []
 
     # Ensure that the number of summaries is the same as the number of reasoning instances
-    list_of_summary_instances = [summary_instances for summary_instances in list_of_summary_instances if len(reasoning_instances)==len(summary_instances)]
+    list_of_summary_instances = [
+        summary_instances
+        for summary_instances in list_of_summary_instances
+        if len(reasoning_instances) == len(summary_instances)
+    ]
 
     # If there are no valid summaries, return an empty list and the counts
     if len(list_of_summary_instances) == 0:
@@ -130,16 +133,21 @@ def format_reasoning_trace_with_summary(
         return [], 0, 0, len(reasoning_instances), 0
 
     all_summaries = list(zip(*list_of_summary_instances))
-    for (reasoning_instance, summaries_for_reasoning_instance) in zip(reasoning_instances, all_summaries):
+    for reasoning_instance, summaries_for_reasoning_instance in zip(reasoning_instances, all_summaries):
         # Step 1 - Trim the reasoning generation
-        trimmed_reasoning_trace = trim_reasoning_generation(reasoning_instance["generation"], start_tag, end_tag, strict_end_tag=strict_end_tag)
+        trimmed_reasoning_trace = trim_reasoning_generation(
+            reasoning_instance["generation"], start_tag, end_tag, strict_end_tag=strict_end_tag
+        )
 
         # If the reasoning generation is not trimmed, skip this instance
         if trimmed_reasoning_trace is None:
             continue
-        
-        valid_summaries = [summary_instance for summary_instance in summaries_for_reasoning_instance 
-                        if is_valid_summary(reasoning_instance, summary_instance)]
+
+        valid_summaries = [
+            summary_instance
+            for summary_instance in summaries_for_reasoning_instance
+            if is_valid_summary(reasoning_instance, summary_instance)
+        ]
 
         if len(valid_summaries) == 0:
             continue  # Can't format this instance with new summary. Skip it.
@@ -156,7 +164,6 @@ def format_reasoning_trace_with_summary(
     return formatted_instances
 
 
-
 def main():
     parser = argparse.ArgumentParser(description="Merge new summary into the reasoning trace")
     parser.add_argument("--reasoning_file", type=str, required=True, help="Path to the reasoning file")
@@ -165,13 +172,16 @@ def main():
     parser.add_argument("--start_tag", type=str, default="<think>", help="Start tag")
     parser.add_argument("--end_tag", type=str, default="</think>", help="End tag")
     parser.add_argument("--strict_end_tag", type=bool, default=False, help="Strict end tag")
-    parser.add_argument(
-        "--summary_separator", type=str, default="", help="Separator between reasoning and summary"
-    )
+    parser.add_argument("--summary_separator", type=str, default="", help="Separator between reasoning and summary")
     args = parser.parse_args()
 
     formatted_instances = format_reasoning_trace_with_summary(
-        args.reasoning_file, args.summary_dir, args.start_tag, args.end_tag, args.strict_end_tag, args.summary_separator
+        args.reasoning_file,
+        args.summary_dir,
+        args.start_tag,
+        args.end_tag,
+        args.strict_end_tag,
+        args.summary_separator,
     )
 
     # Create output directory if it doesn't exist

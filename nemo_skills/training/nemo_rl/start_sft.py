@@ -26,7 +26,7 @@ from typing import Any, Dict, cast
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
-from nemo_rl.data import DataConfig, hf_datasets
+from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset
 from nemo_rl.data.interfaces import DatumSpec, LLMMessageLogType, TaskDataSpec
 
@@ -268,7 +268,7 @@ def sft_preprocessor(
 
 def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     print("\n▶ Setting up data...")
-    assert data_config["dataset_name"] == 'prompt_response_dataset'
+    assert data_config["dataset_name"] == "prompt_response_dataset"
     data = PromptResponseDataset(
         data_config["train_data_path"],
         data_config["val_data_path"],

@@ -32,7 +32,7 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
         The loaded dictionary.
     """
     if config_dir is None:
-        config_dir = str(Path(__file__).parent.absolute() / 'eval_group')
+        config_dir = str(Path(__file__).parent.absolute() / "eval_group")
 
     if config.endswith(".yaml"):
         config_path = Path(config).absolute()

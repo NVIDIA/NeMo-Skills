@@ -76,28 +76,28 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         model=f"{workspace}/Qwen2.5-14B-Instruct",
         server_type="vllm",
         server_gpus=num_gpus,
-        log_samples=not wandb_params['disable_wandb'],
+        log_samples=not wandb_params["disable_wandb"],
         # using prefix as group to make it easier to see all sdg steps together
-        wandb_group=f'{expname_prefix}-sdg',
-        wandb_project=wandb_params['wandb_project'],
+        wandb_group=f"{expname_prefix}-sdg",
+        wandb_project=wandb_params["wandb_project"],
     )
 
     generate(
         ctx=wrap_arguments(
-            f"++prompt_config=generic/math ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "
+            "++prompt_config=generic/math ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "
         ),
         cluster=cluster,
         input_file=f"{workspace}/sdg/extracted-problems.jsonl",
-        output_dir=f'{workspace}/sdg/solutions',
-        expname=f'{expname_prefix}-solution-generation',
-        run_after=f'{expname_prefix}-problem-extraction',
+        output_dir=f"{workspace}/sdg/solutions",
+        expname=f"{expname_prefix}-solution-generation",
+        run_after=f"{expname_prefix}-problem-extraction",
         model=f"{workspace}/QwQ-32B",
-        server_type='trtllm',
+        server_type="trtllm",
         server_gpus=num_gpus,
-        log_samples=not wandb_params['disable_wandb'],
+        log_samples=not wandb_params["disable_wandb"],
         # using prefix as group to make it easier to see all sdg steps together
-        wandb_group=f'{expname_prefix}-sdg',
-        wandb_project=wandb_params['wandb_project'],
+        wandb_group=f"{expname_prefix}-sdg",
+        wandb_project=wandb_params["wandb_project"],
     )
 
 
@@ -125,20 +125,20 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
     if training_backend == "nemo-aligner":
         train(
             ctx=wrap_arguments(
-                f"++model.data.train_ds.max_seq_length=8192 "
-                f"++model.data.train_ds.global_batch_size=32 "
-                f"++model.tensor_model_parallel_size=4 "
-                f"++model.context_parallel_size=2 "
-                f"++model.optim.lr=1e-5 "
-                f"++trainer.sft.max_epochs=2 "
+                "++model.data.train_ds.max_seq_length=8192 "
+                "++model.data.train_ds.global_batch_size=32 "
+                "++model.tensor_model_parallel_size=4 "
+                "++model.context_parallel_size=2 "
+                "++model.optim.lr=1e-5 "
+                "++trainer.sft.max_epochs=2 "
             ),
             cluster=cluster,
             output_dir=f"{workspace}/training",
             nemo_model=f"{workspace}/qwen2.5-14b-instruct-nemo",
             num_gpus=num_gpus,
             num_nodes=1,
-            disable_wandb=wandb_params['disable_wandb'],
-            wandb_project=wandb_params['wandb_project'],
+            disable_wandb=wandb_params["disable_wandb"],
+            wandb_project=wandb_params["wandb_project"],
             training_data=f"{workspace}/sft-data.jsonl",
             expname=f"{expname_prefix}-training",
             run_after=[f"{expname_prefix}-prepare-training-data", f"{expname_prefix}-convert-14b-nemo"],
@@ -146,23 +146,23 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
     elif training_backend == "nemo-rl":
         sft_nemo_rl(
             ctx=wrap_arguments(
-                '++policy.max_total_sequence_length=8192 '
-                '++policy.train_global_batch_size=32 '
-                '++policy.megatron_cfg.tensor_model_parallel_size=4 '
-                '++policy.megatron_cfg.context_parallel_size=2 '
-                '++policy.megatron_cfg.optimizer.lr=1e-4 '
-                '++policy.megatron_cfg.optimizer.min_lr=1e-6 '
-                '++sft.max_num_epochs=2 '
+                "++policy.max_total_sequence_length=8192 "
+                "++policy.train_global_batch_size=32 "
+                "++policy.megatron_cfg.tensor_model_parallel_size=4 "
+                "++policy.megatron_cfg.context_parallel_size=2 "
+                "++policy.megatron_cfg.optimizer.lr=1e-4 "
+                "++policy.megatron_cfg.optimizer.min_lr=1e-6 "
+                "++sft.max_num_epochs=2 "
             ),
             cluster=cluster,
-            output_dir=f'{workspace}/training',
-            hf_model=f'{workspace}/Qwen2.5-14B-Instruct',
+            output_dir=f"{workspace}/training",
+            hf_model=f"{workspace}/Qwen2.5-14B-Instruct",
             backend="megatron",
             num_gpus=num_gpus,
             num_nodes=1,
-            disable_wandb=wandb_params['disable_wandb'],
-            wandb_project=wandb_params['wandb_project'],
-            training_data=f'{workspace}/sft-data.jsonl',
+            disable_wandb=wandb_params["disable_wandb"],
+            wandb_project=wandb_params["wandb_project"],
+            training_data=f"{workspace}/sft-data.jsonl",
             expname=f"{expname_prefix}-training",
             run_after=f"{expname_prefix}-prepare-training-data",
             final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf",
@@ -172,7 +172,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
 
 
 def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
-    if training_backend == 'nemo-aligner':
+    if training_backend == "nemo-aligner":
         # converting back to HF format
         convert(
             ctx=wrap_arguments(""),
@@ -190,7 +190,7 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
 
     # launching evaluation
     eval(
-        ctx=wrap_arguments(f"++inference.tokens_to_generate=16384 "),
+        ctx=wrap_arguments("++inference.tokens_to_generate=16384 "),
         cluster=cluster,
         model=f"{workspace}/training/qwen2.5-14b-improved-hf",
         server_type="vllm",
@@ -204,7 +204,7 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
 
     # summarize results, after the evaluation job is done
     summarize_cmd = f"ns summarize_results {workspace}/evals/after-training "
-    if not wandb_params['disable_wandb']:
+    if not wandb_params["disable_wandb"]:
         summarize_cmd += f" --wandb_name {expname_prefix}-final-eval --wandb_project {wandb_params['wandb_project']}"
     run_cmd(
         ctx=wrap_arguments(summarize_cmd),
@@ -232,7 +232,7 @@ def initial_eval(workspace, cluster, num_gpus, training_backend, expname_prefix,
 
     # summarize results, after the evaluation job is done
     summarize_cmd = f"ns summarize_results {workspace}/evals/baseline "
-    if not wandb_params['disable_wandb']:
+    if not wandb_params["disable_wandb"]:
         summarize_cmd += (
             f" --wandb_name {expname_prefix}-baseline-eval --wandb_project {wandb_params['wandb_project']}"
         )

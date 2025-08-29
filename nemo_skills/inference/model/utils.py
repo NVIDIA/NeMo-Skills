@@ -14,7 +14,6 @@
 
 import logging
 import re
-from typing import Union
 
 import requests
 from transformers import AutoTokenizer

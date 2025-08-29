@@ -24,26 +24,26 @@ def main():
     parser.add_argument("--no_verbose", action="store_true", help="Print verbose logs")
     args, unknown = parser.parse_known_args()
 
-    extra_arguments = f'{" ".join(unknown)}'
+    extra_arguments = f"{' '.join(unknown)}"
 
     print(f"Deploying model {args.model}")
     print("Starting OpenAI Server")
 
     if args.no_verbose:
-        logging_args = ' --disable-log-requests --disable-log-stats '
+        logging_args = " --disable-log-requests --disable-log-stats "
     else:
         logging_args = ""
 
     cmd = (
-        f'python3 -m vllm.entrypoints.openai.api_server '
+        f"python3 -m vllm.entrypoints.openai.api_server "
         f'    --model="{args.model}" '
         f'    --served-model-name="{args.model}"'
-        f'    --trust-remote-code '
+        f"    --trust-remote-code "
         f'    --host="0.0.0.0" '
-        f'    --port={args.port} '
-        f'    --tensor-parallel-size={args.num_gpus} '
-        f'    {logging_args} '
-        f'    {extra_arguments} ' + (' | grep -v "200 OK"' if args.no_verbose else "")
+        f"    --port={args.port} "
+        f"    --tensor-parallel-size={args.num_gpus} "
+        f"    {logging_args} "
+        f"    {extra_arguments} " + (' | grep -v "200 OK"' if args.no_verbose else "")
     )
 
     subprocess.run(cmd, shell=True, check=True)

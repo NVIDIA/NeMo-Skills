@@ -17,17 +17,19 @@ import json
 
 
 def filter(input_file, output_file_yes, output_file_no, mode):
-    with open(input_file, 'r') as infile, open(output_file_yes, 'w') as outfile_yes, open(
-        output_file_no, 'w'
-    ) as outfile_no:
+    with (
+        open(input_file, "r") as infile,
+        open(output_file_yes, "w") as outfile_yes,
+        open(output_file_no, "w") as outfile_no,
+    ):
         for line in infile:
             data = json.loads(line)
             generation = data.pop("generation")
             data[f"classify_{mode}_gen"] = generation
             if generation.startswith(mode):
-                outfile_yes.write(json.dumps(data) + '\n')
+                outfile_yes.write(json.dumps(data) + "\n")
             else:
-                outfile_no.write(json.dumps(data) + '\n')
+                outfile_no.write(json.dumps(data) + "\n")
 
 
 if __name__ == "__main__":

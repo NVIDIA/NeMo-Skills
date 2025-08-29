@@ -23,7 +23,7 @@ import wandb
 
 
 def _process_and_log_samples(jsonl_file, num_samples, output_name, tmpdirname):
-    with open(jsonl_file, 'r') as file:
+    with open(jsonl_file, "r") as file:
         lines = list(enumerate(file.readlines(), 1))
 
     random_pairs = random.sample(lines, min(num_samples, len(lines)))
@@ -34,7 +34,7 @@ def _process_and_log_samples(jsonl_file, num_samples, output_name, tmpdirname):
         samples_dict[str(line_num)] = sample
 
     samples_file = os.path.join(tmpdirname, output_name)
-    with open(samples_file, 'w') as f:
+    with open(samples_file, "w") as f:
         json.dump(samples_dict, f, indent=2)
 
     wandb.save(samples_file, base_path=tmpdirname)

@@ -13,10 +13,9 @@
 # limitations under the License.
 import copy
 import functools
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, Dict, List
 
-import aiohttp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client

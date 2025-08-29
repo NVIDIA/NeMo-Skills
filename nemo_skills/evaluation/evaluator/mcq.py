@@ -41,10 +41,10 @@ def eval_mcq(cfg):
         return parsed
 
     for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
+        with open(file, "rt", encoding="utf-8") as fin:
             data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
+        with open(file, "wt", encoding="utf-8") as fout:
             for sample in tqdm(data):
-                sample['predicted_answer'] = extract_letter(sample["generation"])
-                sample['symbolic_correct'] = sample['predicted_answer'] == sample['expected_answer']
+                sample["predicted_answer"] = extract_letter(sample["generation"])
+                sample["symbolic_correct"] = sample["predicted_answer"] == sample["expected_answer"]
                 fout.write(json.dumps(sample) + "\n")
