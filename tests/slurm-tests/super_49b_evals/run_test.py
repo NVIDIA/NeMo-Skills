@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import argparse
-import subprocess
 
-from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
 
 # Run this first before run recipe.py
 # ns prepare_data ruler --cluster=ord \
@@ -53,115 +52,106 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.6 ++inference.top_p=0.95"
 
     # Math / Code / Science (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4 \
-        --server_gpus=8 \
-        --num_jobs=1 \
-        {common_infer} \
-        --run_after {expname_prefix}-download-models \
-        --expname {expname_prefix}-math-code-science-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
+        server_gpus=8,
+        num_jobs=1,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     # MMLU (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks mmlu-pro:1 \
-        --server_gpus=8 \
-        --num_chunks=2 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-math-code-science-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        benchmarks="mmlu-pro:1",
+        server_gpus=8,
+        num_chunks=2,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     # LiveCodeBench (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks livecodebench:4 \
-        --split test_v5_2410_2502 \
-        --server_gpus=8 \
-        --num_jobs=1 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-livecode-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        benchmarks="livecodebench:4",
+        split="test_v5_2410_2502",
+        server_gpus=8,
+        num_jobs=1,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-livecode-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     # HLE (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on \
-        --benchmarks hle:1 \
-        --server_gpus=8 \
-        --num_chunks=2 \
-        --judge_model {workspace}/Qwen2.5-32B-Instruct \
-        --judge_server_type vllm \
-        --judge_server_gpus=8 \
-        --extra_judge_args "++inference.tokens_to_generate=4096 ++server.enable_soft_fail=True" \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-hle-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer} ++server.enable_soft_fail=True"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        benchmarks="hle:1",
+        server_gpus=8,
+        num_chunks=2,
+        judge_model=f"{workspace}/Qwen2.5-32B-Instruct",
+        judge_server_type="vllm",
+        judge_server_gpus=8,
+        extra_judge_args="++inference.tokens_to_generate=4096 ++server.enable_soft_fail=True",
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-hle-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     # BFCL (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --benchmarks bfcl_v3 \
-        --model {base_model} \
-        --server_gpus=8 \
-        --num_jobs=2 \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on_tool_calling \
-        {common_infer} \
-        ++use_client_parsing=False \
-        --server_args "--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py \
-                       --tool-call-parser llama_nemotron_json \
-                       --enable-auto-tool-choice" \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-bfcl-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer} ++use_client_parsing=False"),
+        cluster=cluster,
+        benchmarks="bfcl_v3",
+        model=base_model,
+        server_gpus=8,
+        num_jobs=2,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_tool_calling",
+        server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-bfcl-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     # RULER (Reasoning ON)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_on_ruler \
-        --benchmarks ruler.nemotron_super_128k \
-        --data_dir {workspace}/ns-data \
-        --server_gpus=8 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-ruler-on \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-on
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_ruler",
+        benchmarks="ruler.nemotron_super_128k",
+        data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
+        server_gpus=8,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-ruler-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+    )
 
     return [
         f"{expname_prefix}-math-code-science-on",
@@ -184,116 +174,107 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
     common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 ++inference.top_p=1.0 ++system_message=/no_think"
 
     # Math / Code / Science (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4 \
-        --num_jobs=1 \
-        --server_gpus=8 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-math-code-science-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        benchmarks="gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4",
+        num_jobs=1,
+        server_gpus=8,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     # MMLU (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks mmlu-pro:1 \
-        --server_gpus=8 \
-        --num_chunks=2 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-math-code-science-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        benchmarks="mmlu-pro:1",
+        server_gpus=8,
+        num_chunks=2,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     # LiveCodeBench (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks livecodebench:4 \
-        --split test_v5_2410_2502 \
-        --server_gpus=8 \
-        --num_jobs=1 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-livecode-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        benchmarks="livecodebench:4",
+        split="test_v5_2410_2502",
+        server_gpus=8,
+        num_jobs=1,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-livecode-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     # HLE (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off \
-        --benchmarks hle:1 \
-        --server_gpus=8 \
-        --num_chunks=2 \
-        --judge_model {workspace}/Qwen2.5-32B-Instruct \
-        --judge_server_type vllm \
-        --judge_server_gpus=8 \
-        --extra_judge_args "++inference.tokens_to_generate=4096 ++server.enable_soft_fail=True" \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-hle-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        benchmarks="hle:1",
+        server_gpus=8,
+        num_chunks=2,
+        judge_model=f"{workspace}/Qwen2.5-32B-Instruct",
+        judge_server_type="vllm",
+        judge_server_gpus=8,
+        extra_judge_args="++inference.tokens_to_generate=4096 ++server.enable_soft_fail=True",
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-hle-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     # BFCL (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --benchmarks bfcl_v3 \
-        --model {base_model} \
-        --server_gpus=8 \
-        --num_jobs=2 \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off_tool_calling \
-        {common_infer} \
-        ++use_client_parsing=False \
-        --server_args "--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py \
-                       --tool-call-parser llama_nemotron_json \
-                       --enable-auto-tool-choice" \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-bfcl-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer} ++use_client_parsing=False"),
+        cluster=cluster,
+        benchmarks="bfcl_v3",
+        model=base_model,
+        server_gpus=8,
+        num_jobs=2,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_tool_calling",
+        server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-bfcl-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     # RULER (Reasoning OFF)
-    cmd = f"""
-    ns eval --cluster {cluster} \
-        --model {base_model} \
-        --server_type vllm \
-        --output_dir {workspace}/llama_nemotron_49b_1_5_reasoning_off_ruler \
-        --benchmarks ruler.nemotron_super_128k \
-        --data_dir {workspace}/ns-data \
-        --server_gpus=8 \
-        --num_chunks=2 \
-        {common_infer} \
-        --run_after {expname_prefix}-patch-qwen-config \
-        --expname {expname_prefix}-ruler-off \
-        --wandb_project {wandb_project} \
-        --wandb_name {expname_prefix}-llama-nemotron-eval-reasoning-off
-    """
-    subprocess.run(cmd, shell=True, check=True)
+    eval(
+        ctx=wrap_arguments(f"{common_infer}"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_ruler",
+        benchmarks="ruler.nemotron_super_128k",
+        data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
+        server_gpus=8,
+        num_chunks=2,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-ruler-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+    )
 
     return [
         f"{expname_prefix}-math-code-science-off",
@@ -302,12 +283,6 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         f"{expname_prefix}-bfcl-off",
         f"{expname_prefix}-ruler-off",
     ]
-
-
-# Prepare evaluation data locally first
-def prepare_data_locally():
-    cmd = "ns prepare_data gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"
-    subprocess.run(cmd, shell=True, check=True)
 
 
 def main():
@@ -319,16 +294,18 @@ def main():
 
     args = parser.parse_args()
 
-    # launch for eval jobs
-    prepare_data_locally()
+    # prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
+
     setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
-    reason_on_expnames = eval_reasoning_on(
+
+    reasoning_on_expnames = eval_reasoning_on(
         workspace=args.workspace,
         cluster=args.cluster,
         expname_prefix=args.expname_prefix,
         wandb_project=args.wandb_project,
     )
-    reason_off_expnames = eval_reasoning_off(
+
+    reasoning_off_expnames = eval_reasoning_off(
         workspace=args.workspace,
         cluster=args.cluster,
         expname_prefix=args.expname_prefix,
@@ -346,7 +323,7 @@ def main():
         cluster=args.cluster,
         expname="check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/logs",
-        run_after=reason_on_expnames + reason_off_expnames,
+        run_after=reasoning_on_expnames + reasoning_off_expnames,
     )
 
 
