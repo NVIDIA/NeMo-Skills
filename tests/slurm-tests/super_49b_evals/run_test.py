@@ -60,7 +60,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
         server_gpus=8,
         server_args="--max-num-seqs=1024",
-        num_jobs=1,
+        num_jobs=2,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
         wandb_project=wandb_project,
@@ -104,12 +104,13 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # HLE (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++server.enable_soft_fail=True"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on",
         benchmarks="hle:1",
+        num_chunks=2,
         server_gpus=8,
         server_args="--max-num-seqs=1024",
         judge_model=f"{workspace}/Qwen2.5-32B-Instruct",
