@@ -19,6 +19,7 @@ import os
 import shutil
 
 import numpy as np
+import tensorstore  # need to import it for bf16 support  # noqa: F401
 import zarr
 
 logging.basicConfig(level=logging.INFO)
