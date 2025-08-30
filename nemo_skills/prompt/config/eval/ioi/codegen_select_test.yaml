@@ -5,7 +5,7 @@ user: |-
   
   Select the test script that provides the most useful information for improving the proposed solution by looking at the execution output.
 
-  The final improved solution should be the index of the test script that wrapped in \\boxed{}.
+  The final improved solution should be the index of the test script that wrapped in \\boxed{{}}.
 
   ## Problem
   {question}
