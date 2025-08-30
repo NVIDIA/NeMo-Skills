@@ -160,6 +160,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
                 "++policy.megatron_cfg.context_parallel_size=2 "
                 "++policy.megatron_cfg.optimizer.lr=1e-4 "  # needs higher LR than aligner
                 "++sft.max_num_epochs=4 "  # needs to train for longer
+                # TODO: still doesn't get to the same accuracy!
             ),
             cluster=cluster,
             output_dir=f"{workspace}/training",
