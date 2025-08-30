@@ -48,11 +48,11 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning ON
-    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.6 ++inference.top_p=0.95"
-
+    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95 "
+    tokens_to_generate = "++inference.tokens_to_generate=65536 "
     # Math / Code / Science (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -68,7 +68,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # MMLU (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -84,7 +84,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # LiveCodeBench (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -101,7 +101,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # HLE (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer} ++server.enable_soft_fail=True"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++server.enable_soft_fail=True"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -121,7 +121,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # BFCL (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer} ++use_client_parsing=False"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++use_client_parsing=False"),
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=base_model,
@@ -141,7 +141,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # RULER (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -169,14 +169,12 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning OFF
-    common_infer = (
-        "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 "
-        "++inference.top_p=1.0 ++system_message=/no_think "
-    )
+    common_params = "++inference.temperature=0.0 ++inference.top_p=1.0 ++system_message=/no_think "
+    tokens_to_generate = "++inference.tokens_to_generate=65536 "
 
     # Math / Code / Science (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -192,7 +190,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
     # MMLU (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -208,7 +206,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
     # LiveCodeBench (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -225,7 +223,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
     # HLE (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -245,7 +243,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
     # BFCL (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer} ++use_client_parsing=False"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++use_client_parsing=False"),
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=base_model,
@@ -265,7 +263,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
     # RULER (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_infer}"),
+        ctx=wrap_arguments(f"{common_params}"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
