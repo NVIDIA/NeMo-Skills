@@ -60,8 +60,8 @@ ns eval \
     --server_type=vllm \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
-    --output_dir=/workspace/evals/baseline
-
+    --output_dir=/workspace/evals/baseline \
+    --num_jobs=1
 # summarize results, after the evaluation job is done
 ns summarize_results --cluster=local /workspace/evals/baseline --wandb_name=baseline-evals
 ```
@@ -242,15 +242,14 @@ ns nemo_rl sft \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
-    --backend=fsdp \
+    --backend=megatron \
     --final_hf_path=/workspace/training/qwen2.5-14b-improved-hf \
-    ++sft.max_num_epochs=4 \
-    ++policy.dtensor_cfg.tensor_parallel_size=8 \
     ++policy.max_total_sequence_length=8192 \
     ++policy.train_global_batch_size=32 \
-    ++policy.optimizer.kwargs.lr=1e-5 \
-    ++policy.dtensor_cfg.sequence_parallel=true \
-    ++policy.dtensor_cfg.activation_checkpointing=true
+    ++policy.megatron_cfg.tensor_model_parallel_size=4 \
+    ++policy.megatron_cfg.context_parallel_size=2 \
+    ++policy.megatron_cfg.optimizer.lr=1e-4 \
+    ++sft.max_num_epochs=2
 ```
 
 To learn more about SFT configuration, see the [NeMo-Skills training](https://nvidia.github.io/NeMo-Skills/pipelines/training/) documentation. If you have W\&B logging enabled, you can inspect the training metrics there.
@@ -285,6 +284,7 @@ ns eval \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
     --output_dir=/workspace/evals/after-training \
+    --num_jobs=1 \
     ++inference.tokens_to_generate=16384
 # summarize results, after the evaluation job is done
 ns summarize_results --cluster=local /workspace/evals/after-training --wandb_name=after-training-evals
