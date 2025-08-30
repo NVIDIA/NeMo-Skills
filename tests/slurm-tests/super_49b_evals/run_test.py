@@ -14,7 +14,7 @@
 
 import argparse
 
-from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 # Run this first before run recipe.py
 # ns prepare_data ruler --cluster=ord \
@@ -24,14 +24,12 @@ from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
 #     --data_dir /workspace/ns-data
 # """
 
-# TODO: to python interface
-# TODO: no duplicate expnames, reuse wandb name and expname
-
 
 def setup(workspace, cluster, expname_prefix):
     # download models
+    model = "Llama-3_3-Nemotron-Super-49B-v1_5"
     cmd = (
-        f"hf download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
+        f"hf download nvidia/{model} --local-dir {workspace}/{model} && "
         f"hf download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
     )
     run_cmd(
@@ -43,9 +41,7 @@ def setup(workspace, cluster, expname_prefix):
 
 
 def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
-    """
-    Run evals in Reasoning ON mode (string command + shell=True)
-    """
+    """Run evals in Reasoning ON mode"""
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning ON
@@ -57,14 +53,14 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        output_dir=f"{workspace}/reasoning_on",
         benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
         server_gpus=8,
         num_jobs=1,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     # MMLU (Reasoning ON)
@@ -73,14 +69,14 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        output_dir=f"{workspace}/reasoning_on",
         benchmarks="mmlu-pro:1",
         server_gpus=8,
         num_chunks=2,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     # LiveCodeBench (Reasoning ON)
@@ -89,7 +85,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        output_dir=f"{workspace}/reasoning_on",
         benchmarks="livecodebench:4",
         split="test_v5_2410_2502",
         server_gpus=8,
@@ -97,7 +93,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-livecode-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     # HLE (Reasoning ON)
@@ -106,7 +102,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on",
+        output_dir=f"{workspace}/reasoning_on",
         benchmarks="hle:1",
         server_gpus=8,
         num_chunks=2,
@@ -117,7 +113,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-hle-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     # BFCL (Reasoning ON)
@@ -129,12 +125,12 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         server_gpus=8,
         num_jobs=2,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_tool_calling",
+        output_dir=f"{workspace}/reasoning_on_tool_calling",
         server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     # RULER (Reasoning ON)
@@ -143,14 +139,14 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_on_ruler",
+        output_dir=f"{workspace}/reasoning_on_ruler",
         benchmarks="ruler.nemotron_super_128k",
         data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
         server_gpus=8,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-ruler-on",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-on",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
     return [
@@ -163,15 +159,14 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
 
 def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
-    """
-    Run evals in Reasoning OFF mode (shell=True style)
-    temperature=0.0, top_p=1.0, system_message=/no_think
-    Keep tokens_to_generate=65536 (except RULER)
-    """
+    """Run evals in Reasoning OFF mode"""
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning OFF
-    common_infer = "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 ++inference.top_p=1.0 ++system_message=/no_think"
+    common_infer = (
+        "++inference.tokens_to_generate=65536 ++inference.temperature=0.0 "
+        "++inference.top_p=1.0 ++system_message=/no_think "
+    )
 
     # Math / Code / Science (Reasoning OFF)
     eval(
@@ -179,14 +174,14 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        output_dir=f"{workspace}/reasoning_off",
         benchmarks="gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4",
         num_jobs=1,
         server_gpus=8,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     # MMLU (Reasoning OFF)
@@ -195,14 +190,14 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        output_dir=f"{workspace}/reasoning_off",
         benchmarks="mmlu-pro:1",
         server_gpus=8,
         num_chunks=2,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     # LiveCodeBench (Reasoning OFF)
@@ -211,7 +206,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        output_dir=f"{workspace}/reasoning_off",
         benchmarks="livecodebench:4",
         split="test_v5_2410_2502",
         server_gpus=8,
@@ -219,7 +214,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-livecode-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     # HLE (Reasoning OFF)
@@ -228,7 +223,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off",
+        output_dir=f"{workspace}/reasoning_off",
         benchmarks="hle:1",
         server_gpus=8,
         num_chunks=2,
@@ -239,7 +234,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-hle-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     # BFCL (Reasoning OFF)
@@ -251,12 +246,12 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         server_gpus=8,
         num_jobs=2,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_tool_calling",
+        output_dir=f"{workspace}/reasoning_off_tool_calling",
         server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     # RULER (Reasoning OFF)
@@ -265,7 +260,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         model=base_model,
         server_type="vllm",
-        output_dir=f"{workspace}/llama_nemotron_49b_1_5_reasoning_off_ruler",
+        output_dir=f"{workspace}/reasoning_off_ruler",
         benchmarks="ruler.nemotron_super_128k",
         data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
         server_gpus=8,
@@ -273,7 +268,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-ruler-off",
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-llama-nemotron-eval-reasoning-off",
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
     return [
@@ -294,7 +289,7 @@ def main():
 
     args = parser.parse_args()
 
-    # prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
+    prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
 
     setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
@@ -322,7 +317,7 @@ def main():
         ctx=wrap_arguments(checker),
         cluster=args.cluster,
         expname="check-eval-results-for-llama-49b",
-        log_dir=f"{args.workspace}/logs",
+        log_dir=f"{args.workspace}/check-results-logs",
         run_after=reasoning_on_expnames + reasoning_off_expnames,
     )
 

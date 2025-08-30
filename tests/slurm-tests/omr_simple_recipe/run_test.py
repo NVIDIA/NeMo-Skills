@@ -53,7 +53,7 @@ def main():
         ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
         expname=f"check-sft-results-for-{args.backend}",
-        log_dir=f"{args.workspace}/logs",
+        log_dir=f"{args.workspace}/check-results-logs",
         run_after=[  # this are launched in simplified recipe
             f"{args.expname_prefix}-final-eval",
             f"{args.expname_prefix}-baseline-eval",
