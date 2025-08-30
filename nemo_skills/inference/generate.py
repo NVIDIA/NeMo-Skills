@@ -383,7 +383,7 @@ class GenerationTask:
         return remaining_data
 
     # TODO: data will not include any samples skipped after restart
-    def fill_prompt(self, data_point, data):
+    def fill_prompt(self, data_point, data, prompt=None):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
@@ -397,7 +397,8 @@ class GenerationTask:
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
             data_point['total_code_executions'] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
-        filled_prompt = self.prompt.fill(
+        prompt = prompt or self.prompt
+        filled_prompt = prompt.fill(
             data_point,
             multi_turn_key=self.cfg.multi_turn_key,
             prefix_generation_to_response=self.cfg.prefix_generation_to_response,
@@ -448,7 +449,7 @@ class GenerationTask:
 
     async def process_single_datapoint(self, data_point, all_data, prompt=None):
         generation_params = {
-            "prompt": prompt or self.fill_prompt(data_point, all_data),
+            "prompt": self.fill_prompt(data_point, all_data, prompt=prompt),
             "stop_phrases": combine_stop_phrases(
                 self.prompt.stop_phrases if self.prompt is not None else None, self.extra_stop_phrases
             ),
