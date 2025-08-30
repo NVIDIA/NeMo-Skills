@@ -25,6 +25,9 @@ from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 # """
 
 
+# TODO: run a subset of ruler?
+
+
 def setup(workspace, cluster, expname_prefix):
     # download models
     model = "Llama-3_3-Nemotron-Super-49B-v1_5"
@@ -126,7 +129,10 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         num_jobs=2,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on_tool_calling",
-        server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
+        server_args=(
+            f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py "
+            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice "
+        ),
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-on",
         wandb_project=wandb_project,
@@ -247,7 +253,10 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         num_jobs=2,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_off_tool_calling",
-        server_args=f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py --tool-call-parser llama_nemotron_json --enable-auto-tool-choice",
+        server_args=(
+            f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py "
+            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice "
+        ),
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-off",
         wandb_project=wandb_project,
