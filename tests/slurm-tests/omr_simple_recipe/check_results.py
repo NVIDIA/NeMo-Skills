@@ -74,12 +74,13 @@ def main():
     ap.add_argument("--workspace", required=True, help="Workspace directory containing eval results.")
     args = ap.parse_args()
 
-    workspace = Path(args.workspace).expanduser()
-    baseline_results = load_json(workspace / "evals" / "baseline" / "eval-results" / "metrics.json")
-    after_training_results = load_json(workspace / "evals" / "after-training" / "eval-results" / "metrics.json")
-
-    for bm in ("aime24", "aime25"):
-        check_benchmark(bm, baseline_results, after_training_results)
+    for benchmark in ("aime24", "aime25"):
+        common_path = Path(args.workspace) / "evals"
+        baseline_results = load_json(common_path / "baseline" / "eval-results" / benchmark / "metrics.json")
+        after_training_results = load_json(
+            common_path / "after-training" / "eval-results" / benchmark / "metrics.json"
+        )
+        check_benchmark(benchmark, baseline_results, after_training_results)
 
     print("All checks passed.")
 
