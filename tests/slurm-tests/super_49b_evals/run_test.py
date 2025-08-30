@@ -17,15 +17,15 @@ import argparse
 from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 # Run this first before run recipe.py
-# ns prepare_data ruler --cluster=ord \
-#     --setup nemotron_super_128k \
+# note that we are using 10x fewer samples here for testing purposes than
+# the default in ruler
+# ns prepare_data ruler --cluster=<> \
+#     --setup nemotron_super_128k_slurm_ci \
 #     --tokenizer_path nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 \
 #     --max_seq_length 131072 \
+#     --num_samples 50 \
 #     --data_dir /workspace/ns-data
 # """
-
-
-# TODO: run a subset of ruler?
 
 
 def setup(workspace, cluster, expname_prefix):
@@ -59,6 +59,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         output_dir=f"{workspace}/reasoning_on",
         benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
         server_gpus=8,
+        server_args="--max-num-seqs=1024",
         num_jobs=1,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
@@ -75,6 +76,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         output_dir=f"{workspace}/reasoning_on",
         benchmarks="mmlu-pro:1",
         server_gpus=8,
+        server_args="--max-num-seqs=1024",
         num_chunks=2,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
@@ -92,6 +94,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="livecodebench:4",
         split="test_v5_2410_2502",
         server_gpus=8,
+        server_args="--max-num-seqs=1024",
         num_jobs=1,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-livecode-on",
@@ -108,7 +111,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         output_dir=f"{workspace}/reasoning_on",
         benchmarks="hle:1",
         server_gpus=8,
-        num_chunks=2,
+        server_args="--max-num-seqs=1024",
         judge_model=f"{workspace}/Qwen2.5-32B-Instruct",
         judge_server_type="vllm",
         judge_server_gpus=8,
@@ -126,12 +129,12 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="bfcl_v3",
         model=base_model,
         server_gpus=8,
-        num_jobs=2,
+        num_jobs=1,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on_tool_calling",
         server_args=(
             f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py "
-            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice "
+            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice --max-num-seqs=1024"
         ),
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-on",
@@ -165,6 +168,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
         num_jobs=1,
         server_gpus=8,
+        server_args="--max-num-seqs=1024",
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-off",
         wandb_project=wandb_project,
@@ -180,7 +184,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         output_dir=f"{workspace}/reasoning_off",
         benchmarks="mmlu-pro:1",
         server_gpus=8,
-        num_chunks=2,
+        server_args="--max-num-seqs=1024",
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-off",
         wandb_project=wandb_project,
@@ -197,6 +201,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="livecodebench:4",
         split="test_v5_2410_2502",
         server_gpus=8,
+        server_args="--max-num-seqs=1024",
         num_jobs=1,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-livecode-off",
@@ -213,9 +218,9 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         output_dir=f"{workspace}/reasoning_off",
         benchmarks="hle:1",
         server_gpus=8,
-        num_chunks=2,
+        server_args="--max-num-seqs=1024",
         judge_model=f"{workspace}/Qwen2.5-32B-Instruct",
-        judge_server_type="vllm",
+        judge_server_type="sglang",
         judge_server_gpus=8,
         extra_judge_args="++inference.tokens_to_generate=4096 ++server.enable_soft_fail=True",
         run_after=f"{expname_prefix}-download-models",
@@ -231,12 +236,11 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="bfcl_v3",
         model=base_model,
         server_gpus=8,
-        num_jobs=2,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_off_tool_calling",
         server_args=(
             f"--tool-parser-plugin {base_model}/llama_nemotron_toolcall_parser_no_streaming.py "
-            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice "
+            f"--tool-call-parser llama_nemotron_json --enable-auto-tool-choice --max-num-seqs=1024"
         ),
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-bfcl-off",
@@ -251,10 +255,10 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         model=base_model,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_off_ruler",
-        benchmarks="ruler.nemotron_super_128k",
+        benchmarks="ruler.nemotron_super_128k_slurm_ci",
         data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
         server_gpus=8,
-        num_chunks=2,
+        server_args="--max-num-seqs=1024",
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-ruler-off",
         wandb_project=wandb_project,
