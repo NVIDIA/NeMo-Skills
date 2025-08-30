@@ -162,7 +162,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         model=base_model,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_off",
-        benchmarks="gpqa:4,mmlu-pro:4,scicode:4,math-500:4,aime24:4,aime25:4",
+        benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
         num_jobs=1,
         server_gpus=8,
         run_after=f"{expname_prefix}-download-models",
