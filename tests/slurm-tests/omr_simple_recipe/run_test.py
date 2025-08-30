@@ -45,8 +45,8 @@ def main():
     subprocess.run(cmd, shell=True, check=True)
 
     checker_cmd = (
-        f"cd /nemo_run/code/tests/slurm-tests/slurm_test_openmathreasoning && "
-        f"python check_sft_results.py --workspace {args.workspace} "
+        f"cd /nemo_run/code/tests/slurm-tests/omr_simple_recipe && "
+        f"python check_results.py --workspace {args.workspace} "
     )
 
     run_cmd(

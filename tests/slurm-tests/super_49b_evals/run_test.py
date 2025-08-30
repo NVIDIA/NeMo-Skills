@@ -25,6 +25,9 @@ from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 #     --data_dir /workspace/ns-data
 # """
 
+# TODO: to python interface
+# TODO: no duplicate expnames, reuse wandb name and expname
+
 
 def setup(workspace, cluster, expname_prefix):
     # download models
@@ -335,8 +338,7 @@ def main():
     # schedule a dependent check job on the cluster and check if the results are as expected
 
     checker = (
-        f"cd /nemo_run/code/tests/slurm-tests/slurm_test_llama_nemotron_super_49B_v1._5_evals && "
-        f"python check_eval_results.py --workspace {args.workspace} "
+        f"cd /nemo_run/code/tests/slurm-tests/super_49b_evals && python check_results.py --workspace {args.workspace} "
     )
 
     run_cmd(
