@@ -16,4 +16,4 @@ uv venv .venv --python 3.10
 source .venv/bin/activate
 uv pip install -e .
 
-./tests/slurm-tests/run_all.sh
+./tests/slurm-tests/run_all.sh $1
