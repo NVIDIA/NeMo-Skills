@@ -139,28 +139,11 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
-    # RULER (Reasoning ON)
-    eval(
-        ctx=wrap_arguments(f"{common_params}"),
-        cluster=cluster,
-        model=base_model,
-        server_type="vllm",
-        output_dir=f"{workspace}/reasoning_on_ruler",
-        benchmarks="ruler.nemotron_super_128k",
-        data_dir="/workspace/ns-data",  # using global workspace here to reuse between test runs
-        server_gpus=8,
-        run_after=f"{expname_prefix}-download-models",
-        expname=f"{expname_prefix}-ruler-on",
-        wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
-    )
-
     return [
         f"{expname_prefix}-math-code-science-on",
         f"{expname_prefix}-livecode-on",
         f"{expname_prefix}-hle-on",
         f"{expname_prefix}-bfcl-on",
-        f"{expname_prefix}-ruler-on",
     ]
 
 

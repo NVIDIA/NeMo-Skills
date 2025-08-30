@@ -130,22 +130,6 @@ RULER_TASKS = [
 ]
 
 RULER_METRIC_RANGES = {
-    "reasoning_on": {
-        "ruler.nemotron_super_128k": (64.0, 69.0),
-        "ruler.nemotron_super_128k.niah_single_1": (97.5, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (94.0, 99.0),
-        "ruler.nemotron_super_128k.niah_single_3": (97.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_1": (70.0, 75.0),
-        "ruler.nemotron_super_128k.niah_multikey_2": (55.0, 60.0),
-        "ruler.nemotron_super_128k.niah_multikey_3": (19.0, 24.0),
-        "ruler.nemotron_super_128k.niah_multivalue": (92.0, 97.0),
-        "ruler.nemotron_super_128k.niah_multiquery": (88.0, 93.0),
-        "ruler.nemotron_super_128k.vt": (54.0, 59.0),
-        "ruler.nemotron_super_128k.cwe": (0.0, 2.0),
-        "ruler.nemotron_super_128k.fwe": (85.0, 90.0),
-        "ruler.nemotron_super_128k.qa_1": (44.0, 49.0),
-        "ruler.nemotron_super_128k.qa_2": (39.0, 44.0),
-    },
     "reasoning_off": {
         "ruler.nemotron_super_128k": (63.5, 68.5),
         "ruler.nemotron_super_128k.niah_single_1": (97.5, 100.0),
