@@ -19,12 +19,12 @@ from pathlib import Path
 # Hard-coded accuracy ranges for baseline and after-training results
 RANGE_CONSTRAINTS = {
     "after_training": {
-        "aime24": (20.0, 30.0),
-        "aime25": (17.5, 27.5),
+        "aime24": {"pass@1[avg-of-8]": (20.0, 30.0), "majority@8": (28.33, 38.33)},
+        "aime25": {"pass@1[avg-of-8]": (17.5, 27.5), "majority@8": (32.22, 42.22)},
     },
     "baseline": {
-        "aime24": (6.25, 16.25),
-        "aime25": (8.75, 18.75),
+        "aime24": {"pass@1[avg-of-8]": (6.25, 16.25), "majority@8": (13.33, 23.33)},
+        "aime25": {"pass@1[avg-of-8]": (8.75, 18.75), "majority@8": (11.67, 21.67)},
     },
 }
 
@@ -37,9 +37,9 @@ def load_json(path: Path):
         return json.load(f)
 
 
-def get_aime_symbolic_avg8(d: dict, bench_key: str) -> float:
-    """Extract the value of pass@1[avg-of-8].symbolic_correct and convert to float."""
-    return float(d[bench_key]["pass@1[avg-of-8]"]["symbolic_correct"])
+def get_aime_symbolic(d: dict, bench_key: str, metric_key: str) -> float:
+    """Extract the value of a specific metric and convert to float."""
+    return float(d[bench_key][metric_key]["symbolic_correct"])
 
 
 def in_range(value: float, lo: float, hi: float) -> bool:
@@ -54,17 +54,22 @@ def check_benchmark(benchmark: str, baseline_results: dict, after_training_resul
       - after-training accuracy must be within its allowed range
       - after-training accuracy must be strictly greater than baseline accuracy
     """
-    baseline_acc = get_aime_symbolic_avg8(baseline_results, benchmark)
-    after_acc = get_aime_symbolic_avg8(after_training_results, benchmark)
+    for metric in ["pass@1[avg-of-8]", "majority@8"]:
+        baseline_acc = get_aime_symbolic(baseline_results, benchmark, metric)
+        after_acc = get_aime_symbolic(after_training_results, benchmark, metric)
 
-    lo_b, hi_b = RANGE_CONSTRAINTS["baseline"][benchmark]
-    lo_a, hi_a = RANGE_CONSTRAINTS["after_training"][benchmark]
+        lo_b, hi_b = RANGE_CONSTRAINTS["baseline"][benchmark][metric]
+        lo_a, hi_a = RANGE_CONSTRAINTS["after_training"][benchmark][metric]
 
-    assert in_range(baseline_acc, lo_b, hi_b), f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%]"
-    assert in_range(after_acc, lo_a, hi_a), f"{benchmark}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%]"
-    assert after_acc > baseline_acc, (
-        f"{benchmark}: after_training {after_acc}% not greater than baseline {baseline_acc}%"
-    )
+        assert in_range(baseline_acc, lo_b, hi_b), (
+            f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%] for metric {metric}"
+        )
+        assert in_range(after_acc, lo_a, hi_a), (
+            f"{benchmark}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%] for metric {metric}"
+        )
+        assert after_acc > baseline_acc, (
+            f"{benchmark}: after_training {after_acc}% not greater than baseline {baseline_acc}%"
+        )
 
 
 def main():
