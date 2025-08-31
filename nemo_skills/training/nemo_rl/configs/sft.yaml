@@ -81,7 +81,7 @@ policy:
       #adam
       adam_beta1: 0.9
       adam_beta2: 0.98
-      adam_eps: 1e-5
+      adam_eps: 1e-8
 
       #sgd
       sgd_momentum: 0.9
