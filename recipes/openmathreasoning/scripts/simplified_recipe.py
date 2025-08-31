@@ -111,23 +111,23 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
 def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix, wandb_params):
     # convert the generated solutions to a format that can be used for training
-    run_cmd(
-        ctx=wrap_arguments(
-            f"python -m nemo_skills.training.prepare_data "
-            f"    ++input_files={workspace}/sdg/solutions/output.jsonl "
-            f"    ++output_path={workspace}/sft-data.jsonl "
-            f"    ++prompt_config=generic/math "
-            f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
-            f"    ++filters.remove_contaminated=false "
-            f"    ++add_unlabeled=true "
-            f"    ++filters.remove_no_think_tags=true "
-            f"    ++filters.trim_solutions=false"
-        ),
-        cluster=cluster,
-        expname=f"{expname_prefix}-prepare-training-data",
-        run_after=f"{expname_prefix}-solution-generation",
-        log_dir=f"{workspace}/prepare-training-data",
-    )
+    # run_cmd(
+    #     ctx=wrap_arguments(
+    #         f"python -m nemo_skills.training.prepare_data "
+    #         f"    ++input_files={workspace}/sdg/solutions/output.jsonl "
+    #         f"    ++output_path={workspace}/sft-data.jsonl "
+    #         f"    ++prompt_config=generic/math "
+    #         f"    ++tokenizer=Qwen/Qwen2.5-32B-Instruct "
+    #         f"    ++filters.remove_contaminated=false "
+    #         f"    ++add_unlabeled=true "
+    #         f"    ++filters.remove_no_think_tags=true "
+    #         f"    ++filters.trim_solutions=false"
+    #     ),
+    #     cluster=cluster,
+    #     expname=f"{expname_prefix}-prepare-training-data",
+    #     run_after=f"{expname_prefix}-solution-generation",
+    #     log_dir=f"{workspace}/prepare-training-data",
+    # )
 
     # train the model
     if training_backend == "nemo-aligner":
@@ -150,6 +150,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
             training_data=f"{workspace}/sft-data.jsonl",
             expname=f"{expname_prefix}-training",
             run_after=[f"{expname_prefix}-prepare-training-data", f"{expname_prefix}-convert-14b-nemo"],
+            partition="interactive",
         )
     elif training_backend == "nemo-rl":
         sft_nemo_rl(
@@ -158,9 +159,8 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
                 "++policy.train_global_batch_size=32 "
                 "++policy.megatron_cfg.tensor_model_parallel_size=4 "
                 "++policy.megatron_cfg.context_parallel_size=2 "
-                "++policy.megatron_cfg.optimizer.lr=1e-4 "  # needs higher LR than aligner
-                "++sft.max_num_epochs=4 "  # needs to train for longer
-                # TODO: still doesn't get to the same accuracy!
+                "++policy.megatron_cfg.optimizer.lr=1e-5 "
+                "++sft.max_num_epochs=2 "
             ),
             cluster=cluster,
             output_dir=f"{workspace}/training",
@@ -174,6 +174,7 @@ def run_training(workspace, cluster, num_gpus, training_backend, expname_prefix,
             expname=f"{expname_prefix}-training",
             run_after=f"{expname_prefix}-prepare-training-data",
             final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf",
+            partition="interactive",
         )
     else:
         raise ValueError(f"Unknown training backend: {training_backend}")
@@ -210,6 +211,7 @@ def final_eval(workspace, cluster, num_gpus, training_backend, expname_prefix, w
         run_after=[f"{expname_prefix}-convert-back-to-hf", f"{expname_prefix}-training"],
         wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
         wandb_project=wandb_params["wandb_project"],
+        partition="interactive",
     )
 
 
@@ -284,8 +286,8 @@ if __name__ == "__main__":
         args.expname_prefix,
         wandb_params,
     )
-    prepare(*args)
-    initial_eval(*args)
-    run_sdg(*args)
+    # prepare(*args)
+    # initial_eval(*args)
+    # run_sdg(*args)
     run_training(*args)
     final_eval(*args)
