@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+from itertools import combinations
 import tempfile
 from collections import OrderedDict, defaultdict
 from pathlib import Path
@@ -171,10 +172,15 @@ def calculate_metric_range(input_files):
     return metric_range
 
 
-def calculate_consistency_rate(input_file):
+def calculate_similarity(answer1: str | None, answer2:str | None) -> float:
+    if answer1 is None and answer2 is None:
+        return 0
+    return 1 if answer1 == answer2 else 0
+
+def calculate_consistency_rate(input_files):
 
     per_idx_preds = defaultdict(list)
-    for inp_f in inp_files:
+    for inp_f in input_files:
         with open(inp_f, "rt", encoding="utf-8") as f:
             for idx, line in enumerate(f):
                 data = read_predictions([line], idx, [f])
