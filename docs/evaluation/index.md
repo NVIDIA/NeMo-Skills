@@ -117,6 +117,47 @@ pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             |
 pass@4           | 164         | 215        | 219         | 79.27%             | 74.39%
 ```
 
+### Standard deviation metrics for variance analysis
+
+When using multiple samples (k > 1), the evaluation automatically computes standard deviation metrics to help analyze the variance in benchmark performance. These metrics appear alongside the regular pass@k metrics:
+
+- **`pass@1[std-across-k-runs]`**: Standard deviation of pass rates across k benchmark runs
+  - Each "run" uses one attempt per sample (attempt i from each sample forms run i)
+  - Measures: "How much does the pass rate vary between different benchmark runs?"
+  - **Example**: With 3 samples × 4 attempts, you get 4 runs where run 1 uses attempt 1 from each sample, run 2 uses attempt 2, etc.
+
+- **`pass@1[avg-sample-std-of-k]`**: Average of per-sample standard deviations
+  - For each sample, calculates standard deviation across its k attempts, then averages these
+  - Measures: "What's the average within-sample variance?"
+  - **Example**: Sample 1 has attempts [1,0,1,0] → std=57.7%, Sample 2 has [1,1,0,0] → std=57.7%, average = 57.7%
+
+Each metric contains values for different score methods (e.g., "correct", "partial") as nested dictionary keys.
+
+**Example output structure in `metrics.json`:**
+```json
+{
+  "pass@1[std-across-4-runs]": {
+    "correct": 16.67
+  },
+  "pass@1[avg-sample-std-of-4]": {
+    "correct": 38.49
+  },
+  "pass@1[avg-of-4]": {
+    "correct": 75.25
+  },
+  "pass@4": {
+    "correct": 89.15
+  }
+}
+```
+
+These metrics help you understand:
+- **Benchmark consistency**: Low `std-across-k-runs` means different random seeds produce similar benchmark scores
+- **Sample difficulty distribution**: Low `avg-sample-std-of-k` means most samples have consistent difficulty across attempts
+- **Variance sources**: Compare the two metrics to understand if variance comes from benchmark-level randomness vs sample-level difficulty
+
+The metrics automatically appear when evaluating with multiple samples and provide valuable insights for benchmark reliability analysis.
+
 ## Customizing evaluations
 
 You can customize any part of the evaluation. Here are a few examples
