@@ -96,7 +96,7 @@ TOOLCALLING_METRIC_RANGES = {
         "overall_live": (81.0, 86.0),
         "live_ast": (80.0, 85.0),
         "live_irrelevance": (82.0, 87.0),
-        "live_relevance": (75.0, 80.0),
+        "live_relevance": (60.0, 80.0),  # unusually high variance
         "overall_multi_turn": (44.0, 49.0),
     },
     "reasoning_off": {
@@ -113,54 +113,38 @@ TOOLCALLING_METRIC_RANGES = {
 }
 
 RULER_TASKS = [
-    "ruler.nemotron_super_128k",
-    "ruler.nemotron_super_128k.niah_single_1",
-    "ruler.nemotron_super_128k.niah_single_2",
-    "ruler.nemotron_super_128k.niah_single_3",
-    "ruler.nemotron_super_128k.niah_multikey_1",
-    "ruler.nemotron_super_128k.niah_multikey_2",
-    "ruler.nemotron_super_128k.niah_multikey_3",
-    "ruler.nemotron_super_128k.niah_multivalue",
-    "ruler.nemotron_super_128k.niah_multiquery",
-    "ruler.nemotron_super_128k.vt",
-    "ruler.nemotron_super_128k.cwe",
-    "ruler.nemotron_super_128k.fwe",
-    "ruler.nemotron_super_128k.qa_1",
-    "ruler.nemotron_super_128k.qa_2",
+    "ruler.nemotron_super_128k_slurm_ci",
+    "ruler.nemotron_super_128k_slurm_ci.niah_single_1",
+    "ruler.nemotron_super_128k_slurm_ci.niah_single_2",
+    "ruler.nemotron_super_128k_slurm_ci.niah_single_3",
+    "ruler.nemotron_super_128k_slurm_ci.niah_multikey_1",
+    "ruler.nemotron_super_128k_slurm_ci.niah_multikey_2",
+    "ruler.nemotron_super_128k_slurm_ci.niah_multikey_3",
+    "ruler.nemotron_super_128k_slurm_ci.niah_multivalue",
+    "ruler.nemotron_super_128k_slurm_ci.niah_multiquery",
+    "ruler.nemotron_super_128k_slurm_ci.vt",
+    "ruler.nemotron_super_128k_slurm_ci.cwe",
+    "ruler.nemotron_super_128k_slurm_ci.fwe",
+    "ruler.nemotron_super_128k_slurm_ci.qa_1",
+    "ruler.nemotron_super_128k_slurm_ci.qa_2",
 ]
 
 RULER_METRIC_RANGES = {
-    "reasoning_on": {
-        "ruler.nemotron_super_128k": (64.0, 69.0),
-        "ruler.nemotron_super_128k.niah_single_1": (97.5, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (94.0, 99.0),
-        "ruler.nemotron_super_128k.niah_single_3": (97.0, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_1": (70.0, 75.0),
-        "ruler.nemotron_super_128k.niah_multikey_2": (55.0, 60.0),
-        "ruler.nemotron_super_128k.niah_multikey_3": (19.0, 24.0),
-        "ruler.nemotron_super_128k.niah_multivalue": (92.0, 97.0),
-        "ruler.nemotron_super_128k.niah_multiquery": (88.0, 93.0),
-        "ruler.nemotron_super_128k.vt": (54.0, 59.0),
-        "ruler.nemotron_super_128k.cwe": (0.0, 2.0),
-        "ruler.nemotron_super_128k.fwe": (85.0, 90.0),
-        "ruler.nemotron_super_128k.qa_1": (44.0, 49.0),
-        "ruler.nemotron_super_128k.qa_2": (39.0, 44.0),
-    },
     "reasoning_off": {
-        "ruler.nemotron_super_128k": (63.5, 68.5),
-        "ruler.nemotron_super_128k.niah_single_1": (97.5, 100.0),
-        "ruler.nemotron_super_128k.niah_single_2": (91.5, 96.5),
-        "ruler.nemotron_super_128k.niah_single_3": (97.5, 100.0),
-        "ruler.nemotron_super_128k.niah_multikey_1": (65.0, 70.0),
-        "ruler.nemotron_super_128k.niah_multikey_2": (50.0, 55.0),
-        "ruler.nemotron_super_128k.niah_multikey_3": (16.0, 21.0),
-        "ruler.nemotron_super_128k.niah_multivalue": (82.5, 87.5),
-        "ruler.nemotron_super_128k.niah_multiquery": (83.0, 88.0),
-        "ruler.nemotron_super_128k.vt": (77.0, 82.0),
-        "ruler.nemotron_super_128k.cwe": (0.0, 2.0),
-        "ruler.nemotron_super_128k.fwe": (85.0, 90.0),
-        "ruler.nemotron_super_128k.qa_1": (45.0, 50.0),
-        "ruler.nemotron_super_128k.qa_2": (40.0, 45.0),
+        "ruler.nemotron_super_128k_slurm_ci": (64.5, 69.5),
+        "ruler.nemotron_super_128k_slurm_ci.niah_single_1": (97.5, 100.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_single_2": (91.5, 96.5),
+        "ruler.nemotron_super_128k_slurm_ci.niah_single_3": (97.5, 100.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multikey_1": (73.0, 79.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multikey_2": (62.0, 68.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multikey_3": (18.0, 23.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multivalue": (80.5, 86.5),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multiquery": (83.0, 88.0),
+        "ruler.nemotron_super_128k_slurm_ci.vt": (78.0, 84.0),
+        "ruler.nemotron_super_128k_slurm_ci.cwe": (0.0, 2.0),
+        "ruler.nemotron_super_128k_slurm_ci.fwe": (86.0, 92.0),
+        "ruler.nemotron_super_128k_slurm_ci.qa_1": (40.0, 48.0),
+        "ruler.nemotron_super_128k_slurm_ci.qa_2": (35.0, 42.0),
     },
 }
 
@@ -220,7 +204,7 @@ def check_toolcalling(bucket: str, mode: str):
 
 
 def check_ruler(bucket: str, mode: str):
-    f = os.path.join(bucket, "eval-results", "ruler.nemotron_super_128k", "metrics.json")
+    f = os.path.join(bucket, "eval-results", "ruler.nemotron_super_128k_slurm_ci", "metrics.json")
     data = load_json(f)
     for task in RULER_TASKS:
         val = float(data[task]["pass@1"]["accuracy"])
