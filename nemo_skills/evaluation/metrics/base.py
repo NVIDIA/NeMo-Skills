@@ -414,7 +414,15 @@ class BaseMetrics(abc.ABC):
 
     def evaluations_to_print(self):
         """We will log all pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
+        metrics_to_print = [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
+
+        # Add std dev metrics for variance analysis when k > 1
+        if self.max_k > 1:
+            metrics_to_print.extend(
+                [f"pass@1[std-across-{self.max_k}-runs]", f"pass@1[avg-sample-std-of-{self.max_k}]"]
+            )
+
+        return metrics_to_print
 
 
 def as_percentage(metric_value):

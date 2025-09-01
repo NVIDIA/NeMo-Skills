@@ -443,3 +443,57 @@ def test_near_zero_but_not_zero_variance():
 
     assert abs(actual_std - expected_std) < 1e-10
     assert actual_std > 0  # Should be small but non-zero
+
+
+def test_evaluations_to_print_includes_std_dev_when_k_greater_than_1():
+    """Test evaluations_to_print includes std dev metrics when k > 1."""
+    metrics = BenchmarkStdMetrics()
+    metrics.max_k = 4
+    
+    evaluations = metrics.evaluations_to_print()
+    
+    expected_evaluations = [
+        "pass@1[avg-of-4]",
+        "majority@4", 
+        "pass@4",
+        "pass@1[std-across-4-runs]",
+        "pass@1[avg-sample-std-of-4]"
+    ]
+    
+    assert evaluations == expected_evaluations
+
+
+def test_evaluations_to_print_excludes_std_dev_when_k_equals_1():
+    """Test evaluations_to_print excludes std dev metrics when k = 1."""
+    metrics = BenchmarkStdMetrics()
+    metrics.max_k = 1
+    
+    evaluations = metrics.evaluations_to_print()
+    
+    expected_evaluations = [
+        "pass@1[avg-of-1]",
+        "majority@1",
+        "pass@1"
+    ]
+    
+    assert evaluations == expected_evaluations
+    # Verify std dev metrics are NOT included
+    assert "pass@1[std-across-1-runs]" not in evaluations
+    assert "pass@1[avg-sample-std-of-1]" not in evaluations
+
+
+def test_evaluations_to_print_different_k_values():
+    """Test evaluations_to_print works correctly with various k values."""
+    metrics = BenchmarkStdMetrics()
+    
+    # Test k=2
+    metrics.max_k = 2
+    evaluations_k2 = metrics.evaluations_to_print()
+    assert "pass@1[std-across-2-runs]" in evaluations_k2
+    assert "pass@1[avg-sample-std-of-2]" in evaluations_k2
+    
+    # Test k=5
+    metrics.max_k = 5  
+    evaluations_k5 = metrics.evaluations_to_print()
+    assert "pass@1[std-across-5-runs]" in evaluations_k5
+    assert "pass@1[avg-sample-std-of-5]" in evaluations_k5
