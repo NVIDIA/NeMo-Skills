@@ -311,6 +311,7 @@ def configure_client(
     server_address: str,
     server_args: str,
     server_entrypoint: str | None,
+    server_container: str | None,
     get_random_port: bool,
     extra_arguments: str,
 ):
@@ -348,6 +349,8 @@ def configure_client(
             "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
+        if server_container:
+            server_config["container"] = server_container
         extra_arguments = (
             f"{extra_arguments} ++server.server_type={server_type} ++server.host=127.0.0.1 "
             f"++server.port={server_port} ++server.model={model} "

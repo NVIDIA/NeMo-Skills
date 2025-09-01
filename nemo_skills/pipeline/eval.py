@@ -92,6 +92,9 @@ def eval(
         help="Path to the entrypoint of the judge server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     extra_judge_args: str = typer.Option(
         "", help="Additional arguments for judge (passed to generate script, so should start with ++)"
     ),
@@ -231,6 +234,7 @@ def eval(
         "server_nodes": server_nodes,
         "server_args": server_args,
         "server_entrypoint": server_entrypoint,
+        "server_container": server_container,
     }
     judge_server_parameters = {
         "model": judge_model,
