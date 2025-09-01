@@ -196,7 +196,7 @@ def calculate_consistency_rate(input_files):
         for answer1, answer2 in pairs:
             total_similarity += calculate_similarity(answer1, answer2)
 
-    return round(total_similarity / total_combinations,2)
+    return round(total_similarity / total_combinations * 100, 2)
 
 @app.command()
 @typer_unpacker
