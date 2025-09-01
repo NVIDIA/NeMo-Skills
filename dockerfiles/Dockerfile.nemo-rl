@@ -1,4 +1,6 @@
 # copied and edited from https://github.com/NVIDIA/NeMo-RL/blob/main/docker/Dockerfile
+# TODO: from next update try to re-use their dockerfile as is as they support specifying the commit
+
 ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:25.05-cuda12.9-devel-ubuntu24.04
 FROM ${BASE_IMAGE} AS base
 
@@ -47,7 +49,7 @@ ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
 FROM base AS hermetic
 
 ARG NEMO_RL_COMMIT
-ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-9af0a529e3230724444e4d74504b2e61538508f7}
+ENV NEMO_RL_COMMIT=${NEMO_RL_COMMIT:-9301d36cbf847212430b84a27cfe6990f773b7cf}
 
 RUN git clone https://github.com/NVIDIA-NeMo/RL.git /opt/NeMo-RL && cd /opt/NeMo-RL && git checkout ${NEMO_RL_COMMIT} && git submodule update --init --recursive
 
@@ -97,3 +99,6 @@ ENV NEMO_RL_VENV_DIR=/opt/ray_venvs
 RUN UV_LINK_MODE=symlink uv run nemo_rl/utils/prefetch_venvs.py
 
 RUN git clone https://github.com/NVIDIA/NeMo-Skills.git /opt/NeMo-Skills && cd /opt/NeMo-Skills && uv pip install .
+
+COPY dockerfiles/nemo-rl.patch /opt/NeMo-RL/nemo-rl.patch
+RUN cd /opt/NeMo-RL && git apply /opt/NeMo-RL/nemo-rl.patch
