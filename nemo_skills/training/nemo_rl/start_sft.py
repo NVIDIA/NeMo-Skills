@@ -18,20 +18,17 @@ import argparse
 import json
 import os
 import pprint
-import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, Dict
 
-import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset
-from nemo_rl.data.interfaces import DatumSpec, LLMMessageLogType, TaskDataSpec
-
-# from nemo_rl.data.llm_message_utils import get_formatted_message_log
+from nemo_rl.data.interfaces import DatumSpec, TaskDataSpec
+from nemo_rl.data.llm_message_utils import get_formatted_message_log
 from nemo_rl.distributed.virtual_cluster import init_ray
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
@@ -124,105 +121,6 @@ def parse_args():
     args, overrides = parser.parse_known_args()
 
     return args, overrides
-
-
-# TODO: remove these two functions and import after bug fix is merged
-def get_first_index_that_differs(str1: str, str2: str) -> int:
-    """Get the first index that differs between two strings."""
-    for i, (c1, c2) in enumerate(zip(str1, str2)):
-        if c1 != c2:
-            return i
-    return min(len(str1), len(str2))
-
-
-def get_formatted_message_log(
-    message_log: LLMMessageLogType,
-    tokenizer: TokenizerType,
-    task_data_spec: TaskDataSpec,
-    add_bos_token: bool = True,
-    add_eos_token: bool = True,
-    add_generation_prompt: bool = False,
-) -> LLMMessageLogType:
-    """Format and tokenize chat messages using the specified template.
-
-    Args:
-        message_log: List of message dicts with 'role' and 'content' keys
-        tokenizer: Tokenizer for converting text to token IDs
-        task_data_spec: Task spec for this dataset.
-        add_bos_token: Whether to add bos token to first message if it is not already present. Default: True
-        add_eos_token: Whether to add eos token to last message if it is not already present. Default: True
-        add_generation_prompt: Whether to include assistant's generation prompt in user messages. Default: False
-
-    Returns:
-        The message log with updated 'token_ids' and 'content' fields.
-    """
-    new_message_log: LLMMessageLogType = []
-    prev_formatted_message = ""
-    message_log_strs: list[dict[str, str]] = cast(
-        list[dict[str, str]], message_log
-    )  # we just use the str:str parts here
-
-    if task_data_spec.prompt:
-        message_log_strs = [
-            {
-                "role": "user",
-                "content": task_data_spec.prompt.format(message_log_strs[0]["content"]),
-            }
-        ] + message_log_strs[1:]
-
-    for i, message in enumerate(message_log_strs):
-        # If enabled, add_generation_prompt is only used on user messages to include
-        # the assistant's generation prompt as part of the user message.
-        formatted_message: str = tokenizer.apply_chat_template(  # type: ignore
-            message_log_strs[: i + 1],
-            add_generation_prompt=add_generation_prompt and message["role"] == "user",
-            tokenize=False,
-            add_special_tokens=False,
-        )
-
-        ## get the length of the previous message, excluding the eos token (if present)
-        prev_message_len_no_eos: int = get_first_index_that_differs(
-            prev_formatted_message,
-            formatted_message,
-        )
-
-        ## pull out the chunk corresponding to the current message
-        message_chunk = formatted_message[prev_message_len_no_eos:]
-
-        if i == 0:
-            if add_bos_token:
-                if tokenizer.bos_token is None:
-                    warnings.warn(
-                        "add_bos_token is True but the tokenizer does not have a BOS token. Skipping BOS token addition."
-                    )
-                elif not message_chunk.startswith(tokenizer.bos_token):
-                    message_chunk = tokenizer.bos_token + message_chunk
-
-        if i == len(message_log_strs) - 1:
-            if add_eos_token:
-                if tokenizer.eos_token is None:
-                    warnings.warn(
-                        "add_eos_token is True but the tokenizer does not have an EOS token. Skipping EOS token addition."
-                    )
-                elif not message_chunk.endswith(tokenizer.eos_token):
-                    message_chunk += tokenizer.eos_token
-
-        new_message = message.copy()
-        new_message["token_ids"] = tokenizer(message_chunk, return_tensors="pt", add_special_tokens=False)[
-            "input_ids"
-        ][0]
-        if len(new_message["token_ids"]) == 0:
-            # if there is an empty message, the empty `token_ids` tensor ends up being in fp32,
-            # which causes `_validate_tensor_consistency` to fail. To fix this, we convert the
-            # empty tensor to int64.
-            new_message["token_ids"] = new_message["token_ids"].to(torch.int64)  # type: ignore
-
-        new_message["content"] = message_chunk
-        new_message_log.append(new_message)
-
-        prev_formatted_message = formatted_message
-
-    return new_message_log
 
 
 # =======================================================
