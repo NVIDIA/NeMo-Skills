@@ -371,6 +371,7 @@ def summarize_robustness(
         consistency_rate = calculate_consistency_rate(input_files)
         rob_metrics_to_print[benchmark] = metric_ranges
         rob_metrics_to_print[benchmark]['cons_rate'] = consistency_rate
+    print(rob_metrics_to_print)
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
@@ -381,10 +382,12 @@ def summarize_robustness(
     print(header)
     print("-" * 80)
     # Print all rows
-    for benchmark, metrics in rob_metrics_to_print.items():        
+    for benchmark, metrics in rob_metrics_to_print.items():
+        print(benchmark, metrics)    
         for metric_name, values in metrics.items():
+            print(metric_name, values)
             header = f"{benchmark:<15} | {metric_name:<20} |"
-            header += '|'.join(f"{agg_val:<8}" for agg_fn, agg_val in values.items())
+            header += '|'.join(f" {agg_val:<8}" for agg_fn, agg_val in values.items())
             print(header)
     print('\n')
 
