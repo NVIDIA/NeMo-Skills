@@ -14,7 +14,7 @@
 
 import argparse
 
-from nemo_skills.pipeline.cli import eval, run_cmd, wrap_arguments
+from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 # Run this first before run recipe.py
 # note that we are using 10x fewer samples here for testing purposes than
@@ -284,23 +284,23 @@ def main():
 
     args = parser.parse_args()
 
-    # prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
+    prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
 
-    # setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
-    # reasoning_on_expnames = eval_reasoning_on(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    reasoning_on_expnames = eval_reasoning_on(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
-    # reasoning_off_expnames = eval_reasoning_off(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    reasoning_off_expnames = eval_reasoning_off(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
 
@@ -313,7 +313,7 @@ def main():
         cluster=args.cluster,
         expname="check-eval-results-for-llama-49b",
         log_dir=f"{args.workspace}/check-results-logs",
-        # run_after=reasoning_on_expnames + reasoning_off_expnames,
+        run_after=reasoning_on_expnames + reasoning_off_expnames,
     )
 
 
