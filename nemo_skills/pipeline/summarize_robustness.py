@@ -369,10 +369,8 @@ def summarize_robustness(
 
         metric_ranges = calculate_metric_range(input_files)
         consistency_rate = calculate_consistency_rate(input_files)
-        rob_metrics_to_print[benchmark] = {
-            'acc_range': metric_ranges,
-            'cons_rate': consistency_rate
-        }
+        rob_metrics_to_print[benchmark] = metric_ranges
+        rob_metrics_to_print[benchmark]['cons_rate'] = consistency_rate
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
