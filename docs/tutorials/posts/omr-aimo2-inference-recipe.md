@@ -1,6 +1,7 @@
 ---
 date: 2025-08-28
 readtime: 20
+authors: "Darragh Hanley, Igor Gitman, Allessio Devoto, Rakib Hasan"
 ---
 
 # Building an Efficient Inference Engine for Solving Math Problems
