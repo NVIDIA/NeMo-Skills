@@ -171,6 +171,27 @@ def calculate_metric_range(input_files):
     return metric_range
 
 
+def calculate_consistency_rate(input_file):
+
+    per_idx_preds = defaultdict(list)
+    for inp_f in inp_files:
+        with open(inp_f, "rt", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                data = read_predictions([line], idx, [f])
+                per_idx_preds[idx].append(data[0]['predicted_answer'])
+    responses = per_idx_preds.values()
+    total_similarity = 0
+    total_combinations = 0
+
+    for response_set in responses:
+        pairs = combinations(response_set, 2)
+        num_pairs = len(response_set) * (len(response_set) - 1) / 2
+        total_combinations += num_pairs
+        for answer1, answer2 in pairs:
+            total_similarity += calculate_similarity(answer1, answer2)
+
+    return round(total_similarity / total_combinations,2)
+
 @app.command()
 @typer_unpacker
 def summarize_robustness(
@@ -341,14 +362,18 @@ def summarize_robustness(
             evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
 
         metric_ranges = calculate_metric_range(input_files)
-        rob_metrics_to_print[benchmark] = metric_ranges
+        consistency_rate = calculate_consistency_rate(input_files)
+        rob_metrics_to_print[benchmark] = {
+            'acc_range': metric_ranges,
+            'cons_rate': consistency_rate
+        }
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
 
     printed_max_seq_len = False
     header = f"{'dataset':<15} | {'metric':<20} |"
-    header += '|'.join(f"{stat:<8}" for stat in ['min', 'max', 'mean'])
+    header += '|'.join(f" {stat:<8}" for stat in ['min', 'max', 'mean', 'CR'])
     print(header)
     print("-" * 80)
     # Print all rows
