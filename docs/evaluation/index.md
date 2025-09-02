@@ -105,58 +105,30 @@ you will see the following output after summarizing results
 
 ```
 ---------------------------------------- gsm8k -----------------------------------------
-evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
-pass@1[avg-of-4] | 1319        | 180        | 680         | 80.44%           | 6.31%
-majority@4       | 1319        | 180        | 680         | 88.40%           | 0.15%
-pass@4           | 1319        | 180        | 680         | 93.63%           | 0.15%
+evaluation_mode               | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
+pass@1[avg-of-4]             | 1319        | 180        | 680         | 80.44%           | 6.31%
+pass@1[std-across-4-runs]    | 1319        | 180        | 680         | 11.2%            | 3.8%
+pass@1[avg-sample-std-of-4]  | 1319        | 180        | 680         | 32.7%            | 18.4%
+majority@4                   | 1319        | 180        | 680         | 88.40%           | 0.15%
+pass@4                       | 1319        | 180        | 680         | 93.63%           | 0.15%
 
 
 -------------------------------------------- human-eval -------------------------------------------
-evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_plus_tests
-pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 59.30%
-pass@4           | 164         | 215        | 219         | 79.27%             | 74.39%
+evaluation_mode               | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_plus_tests
+pass@1[avg-of-4]             | 164         | 215        | 219         | 64.63%             | 59.30%
+pass@1[std-across-4-runs]    | 164         | 215        | 219         | 14.8%              | 16.5%
+pass@1[avg-sample-std-of-4]  | 164         | 215        | 219         | 41.2%              | 43.9%
+majority@4                   | 164         | 215        | 219         | 74.39%             | 69.51%
+pass@4                       | 164         | 215        | 219         | 79.27%             | 74.39%
 ```
 
 ### Standard deviation metrics for variance analysis
 
-When using multiple samples (k > 1), the evaluation automatically computes standard deviation metrics to help analyze the variance in benchmark performance. These metrics appear alongside the regular pass@k metrics:
+When using multiple samples (k > 1), the evaluation automatically computes standard deviation metrics alongside the regular pass@k metrics:
 
-- **`pass@1[std-across-k-runs]`**: Standard deviation of pass rates across k benchmark runs
-  - Each "run" uses one attempt per sample (attempt i from each sample forms run i)
-  - Measures: "How much does the pass rate vary between different benchmark runs?"
-  - **Example**: With 3 samples × 4 attempts, you get 4 runs where run 1 uses attempt 1 from each sample, run 2 uses attempt 2, etc.
+- **`pass@1[std-across-k-runs]`**: Standard deviation of pass rates across k benchmark runs. Measures how much the pass rate varies between different benchmark runs.
 
-- **`pass@1[avg-sample-std-of-k]`**: Average of per-sample standard deviations
-  - For each sample, calculates standard deviation across its k attempts, then averages these
-  - Measures: "What's the average within-sample variance?"
-  - **Example**: Sample 1 has attempts [1,0,1,0] → std=57.7%, Sample 2 has [1,1,0,0] → std=57.7%, average = 57.7%
-
-Each metric contains values for different score methods (e.g., "correct", "partial") as nested dictionary keys.
-
-**Example output structure in `metrics.json`:**
-```json
-{
-  "pass@1[std-across-4-runs]": {
-    "correct": 16.67
-  },
-  "pass@1[avg-sample-std-of-4]": {
-    "correct": 38.49
-  },
-  "pass@1[avg-of-4]": {
-    "correct": 75.25
-  },
-  "pass@4": {
-    "correct": 89.15
-  }
-}
-```
-
-These metrics help you understand:
-- **Benchmark consistency**: Low `std-across-k-runs` means different random seeds produce similar benchmark scores
-- **Sample difficulty distribution**: Low `avg-sample-std-of-k` means most samples have consistent difficulty across attempts
-- **Variance sources**: Compare the two metrics to understand if variance comes from benchmark-level randomness vs sample-level difficulty
-
-The metrics automatically appear when evaluating with multiple samples and provide valuable insights for benchmark reliability analysis.
+- **`pass@1[avg-sample-std-of-k]`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples.
 
 ## Customizing evaluations
 
