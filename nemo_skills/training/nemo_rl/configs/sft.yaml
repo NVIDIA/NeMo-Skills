@@ -136,6 +136,18 @@ policy:
       foreach: False
       fused: False
 
+  scheduler:
+  - name: "torch.optim.lr_scheduler.LinearLR"
+    kwargs:
+      start_factor: 0.1
+      end_factor: 1.0
+      total_iters: 50  # number of warmup steps
+  - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+    kwargs:
+      T_max: 2950      # number of lr decay steps
+      eta_min: 1e-7    # minimum learning rate after decay
+  - milestones: [50]
+
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
   dataset_name: prompt_response_dataset
