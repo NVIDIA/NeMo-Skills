@@ -307,14 +307,12 @@ class BFCLGenerationTask(GenerationTask):
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
 
-                # Process the model response text
-                proc_model_response = self._process_model_response(model_response)
                 # Add the processed model response to the current turn responses
-                current_turn_response.append(proc_model_response["generation"])
+                current_turn_response.append(model_response["generation"])
 
                 # Try decoding the model response
                 try:
-                    decoded_model_responses = convert_to_function_call(proc_model_response["generation"])
+                    decoded_model_responses = convert_to_function_call(model_response["generation"])
                     if is_empty_execute_response(decoded_model_responses):
                         LOG.info("Empty response from the model. Proceed to next turn.")
                         break
@@ -334,7 +332,7 @@ class BFCLGenerationTask(GenerationTask):
                 )
 
                 # Add the execution results to the chat history for the next turn
-                for execution_result, tool_call_id in zip(execution_results, proc_model_response["tool_call_ids"]):
+                for execution_result, tool_call_id in zip(execution_results, model_response["tool_call_ids"]):
                     tool_message = {
                         "role": "tool",
                         "content": execution_result,
