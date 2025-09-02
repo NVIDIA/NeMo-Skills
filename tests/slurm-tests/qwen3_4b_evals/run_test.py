@@ -19,10 +19,10 @@ from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     """Run evals in Reasoning ON mode"""
-    base_model = f"{workspace}/Qwen3.4B"
+    base_model = "Qwen/Qwen3-4B"
 
     # Common settings for reasoning ON
-    common_params = "++inference.temperature=0.6 ++inference.top_p=0.9 "
+    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95 "
     tokens_to_generate = "++inference.tokens_to_generate=8192 "
 
     # BFCL (Reasoning ON)
