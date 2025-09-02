@@ -49,11 +49,10 @@ def format_entry(entry, language):
 
     return {
         "expected_answer": entry["answer"],
-        # "examples_type": f'mmlu_pro_few_shot_{category}',
         "extract_from_boxed": "False",
         "extract_regex": extract_regex,
-        "subset_for_metrics": category,
-        "language": language,
+        "subset_for_metrics": language,
+        "category": category,
         **get_mcq_fields(entry["question"], entry["options"], language),
     }
 
