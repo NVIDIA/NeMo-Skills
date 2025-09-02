@@ -17,6 +17,18 @@ import argparse
 from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 
+def setup(workspace, cluster, expname_prefix):
+    # download models
+    model = "Qwen/Qwen3-4B"
+    cmd = f"huggingface-cli download {model}"
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        expname=f"{expname_prefix}-download-models",
+        log_dir=f"{workspace}/download-assets",
+    )
+
+
 def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     """Run evals in Reasoning ON mode"""
     base_model = "Qwen/Qwen3-4B"
@@ -36,6 +48,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on_tool_calling",
         expname=f"{expname_prefix}-bfcl-on",
+        run_after=f"{expname_prefix}-download-models",
         wandb_project=wandb_project,
         wandb_name=f"{expname_prefix}-qwen3-4b-eval-reasoning-on",
     )
@@ -55,6 +68,8 @@ def main():
     args = parser.parse_args()
 
     prepare_data(ctx=wrap_arguments("bfcl_v3"))
+
+    setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
     reasoning_on_expnames = eval_reasoning_on(
         workspace=args.workspace,
