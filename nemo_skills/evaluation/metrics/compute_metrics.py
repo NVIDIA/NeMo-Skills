@@ -64,7 +64,6 @@ class ComputeMetrics:
 
     def compute_metrics(self, input_files):
         """Computing metrics based on the provided input files."""
-        # Initialize calculators. Only call setup on the first replicate, as before.
         self.calculators = {
             "_all_": [
                 [self.get_metrics_calculator() for _ in range(self.monte_carlo_samples)]
@@ -77,7 +76,6 @@ class ComputeMetrics:
         # sorting input files to ensure consistent order
         input_files = sorted(input_files)
 
-        # Read all examples first to enable bootstrap shuffling.
         examples = []  # list of tuples: (subset_key, data_list)
         with ExitStack() as stack:
             file_handles = [
