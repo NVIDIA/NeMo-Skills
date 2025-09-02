@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from contextlib import ExitStack
 from itertools import zip_longest
+
+import numpy as np
 
 from nemo_skills.dataset.utils import get_dataset_module
 from nemo_skills.evaluation.metrics.map_metrics import get_metrics
@@ -32,10 +35,14 @@ class ComputeMetrics:
         max_samples=-1,
         metric_type=None,
         max_seq_len=None,
+        monte_carlo_samples=5,  # Useful maj@k and pass@k to shuffle generations for one sample
+        bootstrap_samples=20,  # Bootstrap sampling to get confidence std. dev. for the metrics
     ):
         self.max_samples = max_samples
         self.metric_type = metric_type
         self.max_seq_len = max_seq_len
+        self.bootstrap_samples = bootstrap_samples
+        self.monte_carlo_samples = monte_carlo_samples
         if self.metric_type is None:
             benchmark_module, _, _ = get_dataset_module(
                 benchmark,
@@ -46,7 +53,8 @@ class ComputeMetrics:
             )
             self.metric_type = benchmark_module.METRICS_TYPE
 
-        # Dictionary to store metrics calculators for different subsets
+        # Dictionary to store metrics calculators for different subsets.
+        # Each subset maps to a list of calculators, one per bootstrap sample.
         self.calculators = {}
 
     def get_metrics_calculator(self):
@@ -56,13 +64,21 @@ class ComputeMetrics:
 
     def compute_metrics(self, input_files):
         """Computing metrics based on the provided input files."""
-        # only calling setup on the main one
-        self.calculators = {"_all_": self.get_metrics_calculator()}
-        self.calculators["_all_"].setup(input_files)
+        # Initialize calculators. Only call setup on the first replicate, as before.
+        self.calculators = {
+            "_all_": [
+                [self.get_metrics_calculator() for _ in range(self.monte_carlo_samples)]
+                for _ in range(self.bootstrap_samples)
+            ]
+        }
+        # Setup for only one calculator
+        self.calculators["_all_"][0][0].setup(input_files)
 
         # sorting input files to ensure consistent order
         input_files = sorted(input_files)
 
+        # Read all examples first to enable bootstrap shuffling.
+        examples = []  # list of tuples: (subset_key, data_list)
         with ExitStack() as stack:
             file_handles = [
                 stack.enter_context(open(file, "rt", encoding="utf-8")) for file in unroll_files(input_files)
@@ -77,25 +93,118 @@ class ComputeMetrics:
                     for i in range(len(data)):
                         if int(data[i]["num_generated_tokens"]) <= self.max_seq_len:
                             continue
-                        data[i] = self.calculators["_all_"].get_incorrect_sample(data[i])
-                # checking if we need to create a new metrics calculator
+                        # Use the first replicate's calculator to construct an incorrect sample.
+                        data[i] = self.calculators["_all_"][0][0].get_incorrect_sample(data[i])
                 data_subset = data[0].get("subset_for_metrics", "_all_")
                 if data_subset not in self.calculators:
-                    self.calculators[data_subset] = self.get_metrics_calculator()
-                self.calculators["_all_"].update(data)
-                if data_subset != "_all_":
-                    self.calculators[data_subset].update(data)
+                    self.calculators[data_subset] = [
+                        [self.get_metrics_calculator() for _ in range(self.monte_carlo_samples)]
+                        for _ in range(self.bootstrap_samples)
+                    ]
+                examples.append((data_subset, data))
+
+        use_bootstrap = self.metric_type not in ["arena"]  # Arena already uses bootstrap for their metrics
+        if use_bootstrap:
+            rng = np.random.RandomState(42)
+            bootstrap_metric_list = []
+            for bootstrap_idx in range(self.bootstrap_samples):
+                # sample with replacement from a stratified sampling of the subsets
+                examples_bootstrap = self.sample_bootstrap_stratified_per_subset(examples, rng)
+                examples_bootstrap = copy.deepcopy(examples_bootstrap)
+                mc_metric_list = []
+                for monte_carlo_idx in range(self.monte_carlo_samples):
+                    self.shuffle_per_example_generations(examples_bootstrap, rng)
+                    mc_metrics = self.compute_metrics_for_examples(examples_bootstrap, bootstrap_idx, monte_carlo_idx)
+                    mc_metric_list.append(mc_metrics)
+                mc_metrics = _average_metrics_dicts(mc_metric_list, include_std_dev=False)
+                bootstrap_metric_list.append(mc_metrics)
+            metrics = _average_metrics_dicts(bootstrap_metric_list, include_std_dev=True)
+        else:
+            metrics = self.compute_metrics_for_examples(examples, 0, 0)
+        return metrics
+
+    def shuffle_per_example_generations(self, examples, rng):
+        for subset_key, base_data in examples:
+            # raise Exception(f"{base_data}, {rng.shuffle(base_data)}, {base_data}")
+            rng.shuffle(base_data)
+        return examples
+
+    def sample_bootstrap_stratified_per_subset(self, examples, rng):
+        subset_indices = {}
+        for i, (subset_key, _) in enumerate(examples):
+            subset_indices[subset_key] = subset_indices.get(subset_key, []) + [i]
+        bootstrap_indices = []
+        for subset_key, indices in subset_indices.items():
+            bootstrap_indices.extend(rng.choice(indices, size=len(indices), replace=True))
+        examples_bootstrap = [examples[i] for i in bootstrap_indices]
+        return examples_bootstrap
+
+    def compute_metrics_for_examples(self, examples, bootstrap_idx, monte_carlo_idx):
+        for subset_key, base_data in examples:
+            self.calculators["_all_"][bootstrap_idx][monte_carlo_idx].update(base_data)
+            if subset_key != "_all_":
+                self.calculators[subset_key][bootstrap_idx][monte_carlo_idx].update(base_data)
 
         # collecting metrics from all calculators
         metrics = {}
-        for data_subset, calculator in self.calculators.items():
-            metrics[data_subset] = calculator.get_metrics()
+        for data_subset, calculators in self.calculators.items():
+            metrics[data_subset] = calculators[bootstrap_idx][monte_carlo_idx].get_metrics()
             # we are removing pass@1[avg-of-1] as it's the same as pass@1
             metrics[data_subset].pop("pass@1[avg-of-1]", None)
         return metrics
 
     def metrics_to_print(self):
-        return self.calculators["_all_"].metrics_to_print()
+        return self.calculators["_all_"][0][0].metrics_to_print()
 
     def evaluations_to_print(self):
-        return self.calculators["_all_"].evaluations_to_print()
+        return self.calculators["_all_"][0][0].evaluations_to_print()
+
+
+def _average_metrics_dicts(dicts_list, include_std_dev=False):
+    """Recursively average a list of metrics dictionaries.
+
+    Assumes all dictionaries share the same structure and numeric leaves.
+    For list/tuple leaves, averages over corresponding indices.
+    When include_std_dev is False, returns the mean of the metrics.
+    When include_std_dev is True, returns a dict {"avg": mean, "std": std}.
+    """
+    if not dicts_list:
+        return {}
+
+    # If leaf is numeric, compute mean directly
+    first = dicts_list[0]
+    if not isinstance(first, dict):
+        if isinstance(first, (list, tuple)):
+            result = []
+            for i in range(len(first)):
+                values = [d[i] for d in dicts_list]
+                # If all values are the same, return the first one
+                if all(v == values[0] for v in values):
+                    result.append(values[0])
+                else:
+                    mean = sum(values) / len(values)
+                    if include_std_dev:
+                        std = (sum((x - mean) ** 2 for x in values) / len(values)) ** 0.5
+                        result.append({"avg": mean, "std": std})
+                    else:
+                        result.append(mean)
+            return type(first)(result)  # Convert back to original type (list/tuple)
+        else:
+            # numeric or other leaf types
+            values = [v for v in dicts_list]
+            # If all values are the same, return the first one
+            if all(v == values[0] for v in values):
+                return values[0]
+            mean = sum(values) / len(values)
+            if include_std_dev:
+                std = (sum((x - mean) ** 2 for x in values) / len(values)) ** 0.5
+                return {"avg": mean, "std": std}
+            return mean
+
+    # Otherwise, recurse over keys
+    averaged = {}
+    keys = first.keys()
+    for key in keys:
+        values_for_key = [d[key] for d in dicts_list]
+        averaged[key] = _average_metrics_dicts(values_for_key, include_std_dev)
+    return averaged

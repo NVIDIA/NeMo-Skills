@@ -15,6 +15,7 @@
 import abc
 import math
 from collections import Counter, defaultdict
+from typing import Union
 
 
 # Base class for metrics computation
@@ -332,20 +333,28 @@ class BaseMetrics(abc.ABC):
         return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
 
 
-def as_percentage(metric_value):
+def as_percentage(metric_value: Union[float, dict]):
+    if isinstance(metric_value, dict):
+        return f"{float(metric_value['avg']):.2f} ± {float(metric_value['std']):.2f}%"
     return f"{metric_value:.2f}%"
 
 
-def as_int(metric_value):
+def as_int(metric_value: Union[float, dict]):
+    if isinstance(metric_value, dict):
+        return f"{int(metric_value['avg']):.2f} ± {int(metric_value['std']):.2f}"
     return f"{int(metric_value)}"
 
 
-def as_float(metric_value):
+def as_float(metric_value: Union[float, dict]):
+    if isinstance(metric_value, dict):
+        return f"{float(metric_value['avg']):.2f} ± {float(metric_value['std']):.2f}"
     return f"{float(metric_value):.2f}"
 
 
-def default_formatting(metric_value):
+def default_formatting(metric_value: Union[float, dict]):
     """Assumes floats are percentage and rest without changes."""
     if isinstance(metric_value, float):
         return as_percentage(metric_value)
+    elif isinstance(metric_value, dict):
+        return as_float(metric_value)
     return str(metric_value)

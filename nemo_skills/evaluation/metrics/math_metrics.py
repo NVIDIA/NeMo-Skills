@@ -15,7 +15,7 @@
 import logging
 from collections import defaultdict
 
-from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int, as_percentage
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.utils import get_logger_name
 
@@ -132,8 +132,8 @@ class MathMetrics(BaseMetrics):
     def metrics_to_print(self):
         metrics_to_print = {
             "num_entries": as_int,
-            "avg_tokens": as_int,
-            "gen_seconds": as_int,
+            "avg_tokens": as_float,
+            "gen_seconds": as_float,
             "judge_correct": as_percentage,
             "symbolic_correct": as_percentage,
         }
