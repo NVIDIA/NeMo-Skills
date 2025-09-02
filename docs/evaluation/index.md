@@ -105,30 +105,30 @@ you will see the following output after summarizing results
 
 ```
 ---------------------------------------- gsm8k -----------------------------------------
-evaluation_mode               | num_entries | avg_tokens | gen_seconds | symbolic_correct | no_answer
-pass@1[avg-of-4]             | 1319        | 180        | 680         | 80.44%           | 6.31%
-pass@1[std-across-4-runs]    | 1319        | 180        | 680         | 11.2%            | 3.8%
-pass@1[avg-sample-std-of-4]  | 1319        | 180        | 680         | 32.7%            | 18.4%
-majority@4                   | 1319        | 180        | 680         | 88.40%           | 0.15%
-pass@4                       | 1319        | 180        | 680         | 93.63%           | 0.15%
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | symbolic_correct_std_across_runs | symbolic_correct_avg_sample_std | no_answer | no_answer_std_across_runs | no_answer_avg_sample_std
+pass@1[avg-of-4] | 1319        | 180        | 680         | 80.44%           | 0.112                            | 0.327                           | 6.31%     | 0.038                     | 0.184
+majority@4       | 1319        | 180        | 680         | 88.40%           | 0.112                            | 0.327                           | 0.15%     | 0.038                     | 0.184
+pass@4           | 1319        | 180        | 680         | 93.63%           | 0.112                            | 0.327                           | 0.15%     | 0.038                     | 0.184
 
 
 -------------------------------------------- human-eval -------------------------------------------
-evaluation_mode               | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_plus_tests
-pass@1[avg-of-4]             | 164         | 215        | 219         | 64.63%             | 59.30%
-pass@1[std-across-4-runs]    | 164         | 215        | 219         | 14.8%              | 16.5%
-pass@1[avg-sample-std-of-4]  | 164         | 215        | 219         | 41.2%              | 43.9%
-majority@4                   | 164         | 215        | 219         | 74.39%             | 69.51%
-pass@4                       | 164         | 215        | 219         | 79.27%             | 74.39%
+evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_base_tests_std_across_runs | passing_base_tests_avg_sample_std | passing_plus_tests | passing_plus_tests_std_across_runs | passing_plus_tests_avg_sample_std
+pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 0.148                              | 0.412                             | 59.30%             | 0.165                              | 0.439
+majority@4       | 164         | 215        | 219         | 74.39%             | 0.148                              | 0.412                             | 69.51%             | 0.165                              | 0.439
+pass@4           | 164         | 215        | 219         | 79.27%             | 0.148                              | 0.412                             | 74.39%             | 0.165                              | 0.439
 ```
 
 ### Standard deviation metrics for variance analysis
 
-When using multiple samples (k > 1), the evaluation automatically computes standard deviation metrics alongside the regular pass@k metrics:
+When using multiple samples (k > 1), the evaluation automatically computes standard deviation metrics as additional columns for each metric in the main evaluation modes:
 
-- **`pass@1[std-across-k-runs]`**: Standard deviation of pass rates across k benchmark runs. Measures how much the pass rate varies between different benchmark runs.
+- **`{metric_name}_std_across_runs`**: Standard deviation of metric values across max_k benchmark runs. Measures how much the metric varies between different benchmark runs (each run uses attempt i from each sample).
 
-- **`pass@1[avg-sample-std-of-k]`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples.
+- **`{metric_name}_avg_sample_std`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples (for each sample, calculates std dev across its max_k attempts, then averages).
+
+These std dev columns are added as additional columns to `pass@1[avg-of-max_k]`, `majority@max_k`, and `pass@max_k` evaluation modes only when max_k > 1 and sample data is available, providing variance statistics alongside the main performance metrics.
+
+**Note**: Standard deviation values are reported in decimal format (0-1 range) rather than percentages, even when the main metrics are displayed as percentages. This applies to all metric types including correctness rates, error rates, and other performance measures.
 
 ## Customizing evaluations
 

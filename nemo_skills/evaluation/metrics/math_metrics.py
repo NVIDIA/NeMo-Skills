@@ -15,7 +15,7 @@
 import logging
 from collections import defaultdict
 
-from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int, as_percentage
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from nemo_skills.utils import get_logger_name
 
@@ -121,18 +121,13 @@ class MathMetrics(BaseMetrics):
 
     def evaluations_to_print(self):
         """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        evaluations_to_print = [
+        return [
             f"pass@1[avg-of-{self.max_k}]",
             f"majority@{self.max_k}",
             f"rm_best@{self.max_k}",
             f"rm_majority@{self.max_k}",
             f"pass@{self.max_k}",
         ]
-        if self.max_k > 1:
-            evaluations_to_print.extend(
-                [f"pass@1[std-across-{self.max_k}-runs]", f"pass@1[avg-sample-std-of-{self.max_k}]"]
-            )
-        return evaluations_to_print
 
     def metrics_to_print(self):
         metrics_to_print = {
@@ -144,4 +139,9 @@ class MathMetrics(BaseMetrics):
         }
         if self.compute_no_answer:
             metrics_to_print["no_answer"] = as_percentage
+        if self.max_k > 1:
+            metrics_to_print["judge_correct_std_across_runs"] = as_float
+            metrics_to_print["judge_correct_avg_sample_std"] = as_float
+            metrics_to_print["symbolic_correct_std_across_runs"] = as_float
+            metrics_to_print["symbolic_correct_avg_sample_std"] = as_float
         return metrics_to_print

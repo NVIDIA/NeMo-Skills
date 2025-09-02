@@ -46,83 +46,75 @@ class BaseMetrics(abc.ABC):
         return metrics_dict
 
     def _add_benchmark_std_metrics(self, metrics_dict):
-        """Add standard deviation metrics for benchmark evaluation variability.
+        """Add standard deviation metrics as columns to existing evaluation modes.
 
-        Computes two complementary variance measures:
+        Only processes data for max_k when max_k > 1 and sample data is available.
+        Adds std metrics as additional columns to evaluation modes:
+        - {score_method}_std_across_runs: Standard deviation of metric values across max_k benchmark runs
+        - {score_method}_avg_sample_std: Average of per-sample standard deviations
 
-        1. pass@1[std-across-k-runs]: Standard deviation of pass rates across k benchmark runs
+        Computes two complementary variance measures for max_k only:
+
+        1. std_across_runs: Standard deviation of metric values across max_k benchmark runs
            - Each "run" uses attempt i from each sample (transpose of data)
-           - Measures: "How much does pass rate vary between different benchmark runs?"
+           - Measures: "How much does the metric vary between different benchmark runs?"
 
-        2. pass@1[avg-sample-std-of-k]: Average of per-sample standard deviations
-           - For each sample, calculates std dev across its k attempts, then averages
+        2. avg_sample_std: Average of per-sample standard deviations
+           - For each sample, calculates std dev across its max_k attempts, then averages
            - Measures: "What's the average within-sample variance?"
 
-        Example:
+        Only adds columns to: pass@1[avg-of-max_k], majority@max_k, and pass@max_k
+        evaluation modes when they exist in metrics_dict.
+
+        Example (max_k=4):
             3 samples × 4 attempts = [[1,0,1,0], [1,1,0,0], [0,1,1,1]]
 
             Benchmark runs (transpose):
-            - Run 1: [1,1,0] → 66.67% pass rate
-            - Run 2: [0,1,1] → 66.67% pass rate
-            - Run 3: [1,0,1] → 66.67% pass rate
-            - Run 4: [0,0,1] → 33.33% pass rate
-            → std-across-4-runs = stdev([66.67, 66.67, 66.67, 33.33]) ≈ 19.25
+            - Run 1: [1,1,0] → avg 0.6667
+            - Run 2: [0,1,1] → avg 0.6667
+            - Run 3: [1,0,1] → avg 0.6667
+            - Run 4: [0,0,1] → avg 0.3333
+            → std_across_runs = stdev([0.6667, 0.6667, 0.6667, 0.3333]) ≈ 0.1925
 
             Sample std devs:
-            - Sample 1: stdev([100,0,100,0]) ≈ 57.73
-            - Sample 2: stdev([100,100,0,0]) ≈ 57.73
-            - Sample 3: stdev([0,100,100,100]) ≈ 50.00
-            → avg-sample-std-of-4 = (57.73 + 57.73 + 50.00) / 3 ≈ 55.15
+            - Sample 1: stdev([1,0,1,0]) ≈ 0.5773
+            - Sample 2: stdev([1,1,0,0]) ≈ 0.5773
+            - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
+            → avg_sample_std = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
         """
+        if self.max_k <= 1:
+            return
+
         for score_method, k_dict in self.all_scores.items():
-            for k, sample_list in k_dict.items():
-                if not sample_list:
-                    continue
-                self._add_benchmark_run_std(metrics_dict, score_method, k, sample_list)
-                self._add_average_sample_std(metrics_dict, score_method, k, sample_list)
+            if sample_list := k_dict.get(self.max_k):
+                # Calculate benchmark run std dev
+                run_scores = [[] for _ in range(self.max_k)]
+                for sample_scores in sample_list:
+                    for run_idx, score in enumerate(sample_scores):
+                        run_scores[run_idx].append(score)
 
-    def _add_benchmark_run_std(self, metrics_dict, score_method, k, sample_list):
-        """Calculate standard deviation across k benchmark runs."""
-        metric_key = f"pass@1[std-across-{k}-runs]"
-        if metric_key not in metrics_dict:
-            metrics_dict[metric_key] = {}
+                run_averages = [sum(scores) / len(scores) for scores in run_scores]
+                benchmark_std = statistics.stdev(run_averages) if len(run_averages) > 1 else 0.0
 
-        if k == 1:
-            metrics_dict[metric_key][score_method] = 0.0
-            return
+                # Calculate average sample std dev
+                sample_std_devs = []
+                for sample_scores in sample_list:
+                    if len(sample_scores) > 1:
+                        sample_std_devs.append(statistics.stdev(sample_scores))
+                    else:
+                        sample_std_devs.append(0.0)
+                avg_sample_std = sum(sample_std_devs) / len(sample_std_devs) if sample_std_devs else 0.0
 
-        # Transpose: samples×attempts → runs×samples
-        run_scores = [[] for _ in range(k)]
-        for sample_scores in sample_list:
-            for run_idx, score in enumerate(sample_scores):
-                run_scores[run_idx].append(score)
+                # Add std metrics as columns to relevant evaluation modes
+                std_column_names = {
+                    f"{score_method}_std_across_runs": benchmark_std,
+                    f"{score_method}_avg_sample_std": avg_sample_std,
+                }
 
-        # Calculate pass rate for each benchmark run and compute std dev
-        run_averages = [sum(scores) / len(scores) * 100.0 for scores in run_scores]
-        std_dev = statistics.stdev(run_averages)
-        metrics_dict[metric_key][score_method] = std_dev
-
-    def _add_average_sample_std(self, metrics_dict, score_method, k, sample_list):
-        """Calculate average of per-sample standard deviations."""
-        metric_key = f"pass@1[avg-sample-std-of-{k}]"
-        if metric_key not in metrics_dict:
-            metrics_dict[metric_key] = {}
-
-        if k == 1:
-            metrics_dict[metric_key][score_method] = 0.0
-            return
-
-        # Calculate std dev for each sample, then average
-        sample_std_devs = []
-        for sample_scores in sample_list:
-            if len(sample_scores) >= 2:
-                sample_scores_pct = [score * 100.0 for score in sample_scores]
-                sample_std_devs.append(statistics.stdev(sample_scores_pct))
-            else:
-                sample_std_devs.append(0.0)
-
-        avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
-        metrics_dict[metric_key][score_method] = avg_sample_std
+                # Update metrics dict with std metrics
+                for eval_mode in self.evaluations_to_print():
+                    if eval_mode in metrics_dict:
+                        metrics_dict[eval_mode].update(std_column_names)
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
@@ -414,12 +406,7 @@ class BaseMetrics(abc.ABC):
 
     def evaluations_to_print(self):
         """We will log all pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        evaluations_to_print = [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
-        if self.max_k > 1:
-            evaluations_to_print.extend(
-                [f"pass@1[std-across-{self.max_k}-runs]", f"pass@1[avg-sample-std-of-{self.max_k}]"]
-            )
-        return evaluations_to_print
+        return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
 
 
 def as_percentage(metric_value):
