@@ -301,7 +301,7 @@ class BFCLGenerationTask(GenerationTask):
 
                 if self.cfg.remove_thinking:
                     self._remove_thinking_from_message_content(
-                        self.messsage_parser.get_response_text(model_response["message"])
+                        self.message_parser.get_response_text(model_response["message"])
                     )
 
                 # Add the message to the state dict for chat history
