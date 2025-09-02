@@ -306,9 +306,10 @@ class BFCLGenerationTask(GenerationTask):
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
 
                 if self.cfg.remove_thinking:
-                    self._remove_thinking_from_message_content(
+                    trimmed_response_text = self._remove_thinking_from_message_content(
                         self.message_parser.get_response_text(model_response["message"])
                     )
+                    self.message_parser.set_response_text(model_response["message"], trimmed_response_text)
 
                 # Add the message to the state dict for chat history
                 state_dict["messages"].append(model_response["message"])
