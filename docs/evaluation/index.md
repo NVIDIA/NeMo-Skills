@@ -106,16 +106,16 @@ you will see the following output after summarizing results
 ```
 ---------------------------------------- gsm8k -----------------------------------------
 evaluation_mode  | num_entries | avg_tokens | gen_seconds | symbolic_correct | symbolic_correct_std_across_runs | symbolic_correct_avg_sample_std | no_answer | no_answer_std_across_runs | no_answer_avg_sample_std
-pass@1[avg-of-4] | 1319        | 180        | 680         | 80.44%           | 0.112                            | 0.327                           | 6.31%     | 0.038                     | 0.184
-majority@4       | 1319        | 180        | 680         | 88.40%           | 0.112                            | 0.327                           | 0.15%     | 0.038                     | 0.184
-pass@4           | 1319        | 180        | 680         | 93.63%           | 0.112                            | 0.327                           | 0.15%     | 0.038                     | 0.184
+pass@1[avg-of-4] | 1319        | 180        | 680         | 80.44%           | 11.2%                            | 32.7%                           | 6.31%     | 3.8%                      | 18.4%
+majority@4       | 1319        | 180        | 680         | 88.40%           | 11.2%                            | 32.7%                           | 0.15%     | 3.8%                      | 18.4%
+pass@4           | 1319        | 180        | 680         | 93.63%           | 11.2%                            | 32.7%                           | 0.15%     | 3.8%                      | 18.4%
 
 
 -------------------------------------------- human-eval -------------------------------------------
 evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests | passing_base_tests_std_across_runs | passing_base_tests_avg_sample_std | passing_plus_tests | passing_plus_tests_std_across_runs | passing_plus_tests_avg_sample_std
-pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 0.148                              | 0.412                             | 59.30%             | 0.165                              | 0.439
-majority@4       | 164         | 215        | 219         | 74.39%             | 0.148                              | 0.412                             | 69.51%             | 0.165                              | 0.439
-pass@4           | 164         | 215        | 219         | 79.27%             | 0.148                              | 0.412                             | 74.39%             | 0.165                              | 0.439
+pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 14.8%                              | 41.2%                             | 59.30%             | 16.5%                              | 43.9%
+majority@4       | 164         | 215        | 219         | 74.39%             | 14.8%                              | 41.2%                             | 69.51%             | 16.5%                              | 43.9%
+pass@4           | 164         | 215        | 219         | 79.27%             | 14.8%                              | 41.2%                             | 74.39%             | 16.5%                              | 43.9%
 ```
 
 ### Standard deviation metrics for variance analysis
@@ -128,7 +128,7 @@ When using multiple samples (k > 1), the evaluation automatically computes stand
 
 These std dev columns are added as additional columns to `pass@1[avg-of-max_k]`, `majority@max_k`, and `pass@max_k` evaluation modes only when max_k > 1 and sample data is available, providing variance statistics alongside the main performance metrics.
 
-**Note**: Standard deviation values are reported in decimal format (0-1 range) rather than percentages, even when the main metrics are displayed as percentages. This applies to all metric types including correctness rates, error rates, and other performance measures.
+**Note**: Standard deviation values are now reported in percentage format, consistent with the main metrics display format. This applies to all metric types including correctness rates, error rates, and other performance measures.
 
 ## Customizing evaluations
 
