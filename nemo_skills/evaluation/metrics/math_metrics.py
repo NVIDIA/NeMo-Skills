@@ -121,13 +121,18 @@ class MathMetrics(BaseMetrics):
 
     def evaluations_to_print(self):
         """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        return [
+        evaluations_to_print = [
             f"pass@1[avg-of-{self.max_k}]",
             f"majority@{self.max_k}",
             f"rm_best@{self.max_k}",
             f"rm_majority@{self.max_k}",
             f"pass@{self.max_k}",
         ]
+        if self.max_k > 1:
+            evaluations_to_print.extend(
+                [f"pass@1[std-across-{self.max_k}-runs]", f"pass@1[avg-sample-std-of-{self.max_k}]"]
+            )
+        return evaluations_to_print
 
     def metrics_to_print(self):
         metrics_to_print = {
