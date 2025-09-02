@@ -91,7 +91,6 @@ class ComputeMetrics:
                     for i in range(len(data)):
                         if int(data[i]["num_generated_tokens"]) <= self.max_seq_len:
                             continue
-                        # Use the first replicate's calculator to construct an incorrect sample.
                         data[i] = self.calculators["_all_"][0][0].get_incorrect_sample(data[i])
                 data_subset = data[0].get("subset_for_metrics", "_all_")
                 if data_subset not in self.calculators:
@@ -123,7 +122,6 @@ class ComputeMetrics:
 
     def shuffle_per_example_generations(self, examples, rng):
         for subset_key, base_data in examples:
-            # raise Exception(f"{base_data}, {rng.shuffle(base_data)}, {base_data}")
             rng.shuffle(base_data)
         return examples
 
