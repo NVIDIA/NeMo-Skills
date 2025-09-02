@@ -16,6 +16,7 @@ import json
 import logging
 import sys
 from dataclasses import asdict, field
+from functools import partial
 
 import hydra
 import litellm
@@ -91,15 +92,15 @@ class BFCLGenerationConfig(GenerateSolutionsConfig):
             # We only need the response parser from the model handler
             self.response_parser = model_handler._parse_query_response_prompting
 
-            # # 2. Initialize the prompt formatter
-            # # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
-            # # So we use the tokenizer to format the prompt instead which uses the chat template directly
-            # from transformers import AutoTokenizer
+            # 2. Initialize the prompt formatter
+            # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
+            # So we use the tokenizer to format the prompt instead which uses the chat template directly
+            from transformers import AutoTokenizer
 
-            # self.tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
-            # self.message_formatter = partial(
-            #     self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True
-            # )
+            self.tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
+            self.message_formatter = partial(
+                self.tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True
+            )
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -132,22 +133,22 @@ class BFCLGenerationTask(GenerationTask):
             messages = [{"role": "system", "content": self.cfg.system_message}] + messages
 
         # Step 1: Construct the prompt
-        # if self.cfg.use_client_parsing:
-        #     fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
-        #     input_dict = {
-        #         "prompt": fmted_prompt,
-        #         "include_response": True,
-        #         **asdict(self.cfg.inference),
-        #         **self.extra_generate_params,
-        #     }
-        # else:
-        input_dict = {
-            "prompt": messages,
-            "tools": tools,
-            "include_response": True,
-            **asdict(self.cfg.inference),
-            **self.extra_generate_params,
-        }
+        if self.cfg.use_client_parsing:
+            fmted_prompt = self.cfg.message_formatter(messages, tools=tools)
+            input_dict = {
+                "prompt": fmted_prompt,
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
+        else:
+            input_dict = {
+                "prompt": messages,
+                "tools": tools,
+                "include_response": True,
+                **asdict(self.cfg.inference),
+                **self.extra_generate_params,
+            }
 
         # Step 2: Query the LLM server
         # Enable soft-fail when the models run out of context
