@@ -44,6 +44,8 @@ def format_entry(entry, language):
     extract_regex = LANG_LIBS[language][5].replace("({})", r"\(?([ABCDEFGHIJ])\)?")
     if language == "en":
         extract_regex = extract_regex.lstrip("the").strip()
+        extract_regex = extract_regex.replace("\\(", "\\**\\(")
+        extract_regex = extract_regex.replace("\\)?", "\\)?\\**")
 
     return {
         "expected_answer": entry["answer"],
