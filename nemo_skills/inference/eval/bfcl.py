@@ -79,31 +79,33 @@ class ClientMessageParser:
 
     def __init__(self, cfg: BFCLGenerationConfig):
         self.cfg = cfg
+        self._validate_and_setup_client_parsing()
 
+    def _validate_and_setup_client_parsing(self):
         # Importing here since bfcl_eval is not a main dependency of NeMo-Skills
         from bfcl_eval.constants.model_config import local_inference_model_map
 
-        if cfg.model_name is None:
+        if self.cfg.model_name is None:
             raise ValueError("model_name is required when use_client_parsing is True")
 
-        if "-FC" not in cfg.model_name[-3:]:
+        if "-FC" not in self.cfg.model_name[-3:]:
             # Add FC by default
-            LOG.info(f"Assuming the function calling version of model is being used: {cfg.model_name}")
-            cfg.model_name += "-FC"
+            LOG.info(f"Assuming the function calling version of model is being used: {self.cfg.model_name}")
+            self.cfg.model_name += "-FC"
 
-        if cfg.model_name not in local_inference_model_map:
+        if self.cfg.model_name not in local_inference_model_map:
             # TODO: We can present the user the nearest model name that is supported
             raise ValueError(
-                f"{cfg.model_name} is not supported by BFCL Eval. "
+                f"{self.cfg.model_name} is not supported by BFCL Eval. "
                 f"Supported models: {list(local_inference_model_map.keys())}"
             )
 
-        LOG.info(f"Using client parsing for {cfg.model_name}")
+        LOG.info(f"Using client parsing for {self.cfg.model_name}")
 
         # Initialize the response parser
-        model_handler_class = local_inference_model_map[cfg.model_name].model_handler
+        model_handler_class = local_inference_model_map[self.cfg.model_name].model_handler
         # Initialize the model handler - Temperature is not used but required by the model handler
-        model_handler = model_handler_class(cfg.model_name, temperature=cfg.inference.temperature)
+        model_handler = model_handler_class(self.cfg.model_name, temperature=self.cfg.inference.temperature)
         # We only need the response parser from the model handler
         self.response_parser = model_handler._parse_query_response_prompting
 
@@ -114,9 +116,6 @@ class ClientMessageParser:
         self.message_formatter = partial(tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
 
     def construct_input_dict(self, messages: list[dict], tools: list[dict]):
-        if self.cfg.system_message:
-            messages = [{"role": "system", "content": self.cfg.system_message}] + messages
-
         fmted_prompt = self.message_formatter(messages, tools=tools)
         return {
             "prompt": fmted_prompt,
@@ -154,7 +153,7 @@ class ClientMessageParser:
             "num_generated_tokens": output_dict.get("num_generated_tokens", 0),
         }
 
-    def get_responses_text(self, message):
+    def get_response_text(self, message):
         return message["content"]
 
 
@@ -195,7 +194,7 @@ class ServerMessageParser:
 
         return output_dict
 
-    def get_responses_text(self, message):
+    def get_response_text(self, message):
         return message.content
 
 
@@ -203,9 +202,9 @@ class BFCLGenerationTask(GenerationTask):
     def __init__(self, cfg: BFCLGenerationConfig):
         super().__init__(cfg)
         if cfg.use_client_parsing:
-            self.message_parser = ClientMessageParser(cfg.model_name, cfg)
+            self.message_parser = ClientMessageParser(cfg)
         else:
-            self.message_parser = ServerMessageParser(cfg.model_name, cfg)
+            self.message_parser = ServerMessageParser(cfg)
 
     def log_example_prompt(self, data):
         """BFCL is a multi-turn benchmark, so we can't print a single prompt."""
@@ -220,6 +219,9 @@ class BFCLGenerationTask(GenerationTask):
         tools = inference_state_dict["tools"]
 
         # Step 1: Construct the input dictionary
+        if self.cfg.system_message:
+            messages = [{"role": "system", "content": self.cfg.system_message}] + messages
+
         input_dict = self.message_parser.construct_input_dict(messages, tools)
 
         # Step 2: Query the LLM server
@@ -302,7 +304,7 @@ class BFCLGenerationTask(GenerationTask):
 
                 if self.cfg.remove_thinking:
                     self._remove_thinking_from_message_content(
-                        self.messsage_parser.get_responses_text(model_response["message"])
+                        self.messsage_parser.get_response_text(model_response["message"])
                     )
 
                 # Add the message to the state dict for chat history
