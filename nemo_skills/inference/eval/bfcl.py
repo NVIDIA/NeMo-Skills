@@ -156,6 +156,9 @@ class ClientMessageParser:
     def get_response_text(self, message):
         return message["content"]
 
+    def set_response_text(self, message, response_text):
+        message["content"] = response_text
+
 
 class ServerMessageParser:
     """Server side message parser."""
@@ -193,6 +196,9 @@ class ServerMessageParser:
 
     def get_response_text(self, message):
         return message.content
+
+    def set_response_text(self, message, response_text):
+        message.content = response_text
 
 
 class BFCLGenerationTask(GenerationTask):
