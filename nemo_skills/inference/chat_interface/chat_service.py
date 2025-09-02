@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Iterator
 
-from nemo_skills.inference.chat_interface.core import ModelLoader, PromptManager, CodeExecStatus, AppConfig
+from nemo_skills.inference.chat_interface.core import AppConfig, CodeExecStatus, ModelLoader, PromptManager
 
 logger = logging.getLogger(__name__)
 

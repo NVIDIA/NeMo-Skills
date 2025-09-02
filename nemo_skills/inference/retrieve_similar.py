@@ -32,7 +32,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 def top_k_similarity(from_emb, to_emb, top_k, chunk_size):
     # Process the cosine similarity computation in constant memory
-    TopKResult = namedtuple('TopKResult', ['values', 'indices'])
+    TopKResult = namedtuple("TopKResult", ["values", "indices"])
     all_values = []
     all_indices = []
     n = to_emb.shape[0]
@@ -55,7 +55,7 @@ def encode(model, data, batch_size):
 def read_data(file_paths, retrieve_key) -> list:
     all_data = set()
     for file_path in unroll_files(file_paths):
-        with open(file_path, 'rt', encoding='utf-8') as file:
+        with open(file_path, "rt", encoding="utf-8") as file:
             all_data.update(set([json.loads(line)[retrieve_key] for line in file]))
     return list(all_data)
 
@@ -71,11 +71,11 @@ class RetrieveSimilarConfig:
     output_file: str
 
     # the model used to compute embedding, default is sentence transformer
-    model: str = 'multi-qa-MiniLM-L6-cos-v1'
+    model: str = "multi-qa-MiniLM-L6-cos-v1"
 
     # how many most-similar examples to retrieve
     top_k: int = 3
-    retrieve_key: str = 'problem'
+    retrieve_key: str = "problem"
 
     # batch size for computing embeddings - increasing will make it faster but use more memory
     batch_size: int = 2048
@@ -85,13 +85,13 @@ class RetrieveSimilarConfig:
 
     def __post_init__(self):
         if isinstance(self.retrieve_from, str):
-            if ',' in self.retrieve_from:
+            if "," in self.retrieve_from:
                 self.retrieve_from = self.retrieve_from.split(",")
             else:
                 self.retrieve_from = self.retrieve_from.split(" ")
 
         if isinstance(self.compare_to, str):
-            if ',' in self.compare_to:
+            if "," in self.compare_to:
                 self.compare_to = self.compare_to.split(",")
             else:
                 self.compare_to = self.compare_to.split(" ")
@@ -126,21 +126,21 @@ def retrieve_similar(cfg: RetrieveSimilarConfig):
         top_k_similar_items.append(
             {
                 cfg.retrieve_key: compare_item,
-                'similar_items': similar_items,
-                'similarity_scores': similarity_scores,
+                "similar_items": similar_items,
+                "similarity_scores": similarity_scores,
             }
         )
 
-    with open(cfg.output_file, 'w', encoding='utf-8') as fout:
+    with open(cfg.output_file, "w", encoding="utf-8") as fout:
         for entry in top_k_similar_items:
-            fout.write(json.dumps(entry) + '\n')
+            fout.write(json.dumps(entry) + "\n")
 
 
 HELP_MESSAGE = get_help_message(RetrieveSimilarConfig)
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

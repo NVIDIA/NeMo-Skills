@@ -35,7 +35,7 @@ class OnlineGenSelectConfig:
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     temperature: float = 0.6
-    tokens_to_generate: int = 2048
+    tokens_to_generate: int | None = None
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     regex: str = r"Judg[e]?ment: (\d+)"
     remove_thinking: bool = True  # Remove thinking tokens from the comparison key

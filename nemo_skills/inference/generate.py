@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import random
+import subprocess
 import sys
 import time
 from copy import deepcopy
@@ -24,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
-from omegaconf import ListConfig, OmegaConf
+from omegaconf import ListConfig
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
@@ -33,6 +34,7 @@ from nemo_skills.inference.model import (
     get_code_execution_model,
     get_model,
     get_online_genselect_model,
+    get_tool_calling_model,
     server_params,
 )
 from nemo_skills.prompt.utils import get_prompt
@@ -40,6 +42,7 @@ from nemo_skills.utils import (
     chunk_data,
     get_help_message,
     get_logger_name,
+    get_server_wait_cmd,
     nested_dataclass,
     remove_thinking,
     setup_logging,
@@ -55,7 +58,7 @@ class InferenceConfig:
     top_p: float = 0.95
     min_p: float = 0.0
     random_seed: int = 0
-    tokens_to_generate: int = 2048
+    tokens_to_generate: int | None = None
     repetition_penalty: float = 1.0
     top_logprobs: int | None = None
 
@@ -98,7 +101,7 @@ class GenerateSolutionsConfig:
 
     # maximum number of concurrent requests to the server for the async loop
     # if sync loop is used, this is the batch size
-    max_concurrent_requests: int = 512
+    max_concurrent_requests: int = 1024
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -132,6 +135,9 @@ class GenerateSolutionsConfig:
     online_genselect: bool = False
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
+
+    ## FIXME(sanyamk): Rethink the structure of this configuration.
+    tool_config: str | None = None  # Path to tool configuration file.
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -234,8 +240,16 @@ class GenerationTask:
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
-        self.llm = self.setup_llm()
+        # Setup tokenizer
+        if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
+            # These are the only cases where we need a tokenizer
+            self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
+        else:
+            self.tokenizer = None
+
+        # Setup prompt formatter and LLM
         self.prompt = self.setup_prompt()
+        self.llm = self.setup_llm()
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
@@ -260,37 +274,13 @@ class GenerationTask:
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
-    def setup_llm(self):
-        if self.cfg.code_execution:
-            sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
-        elif self.cfg.online_genselect:
-            # Use the same prompt parameters for genselect as the one used for generation
-            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
-            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
-            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
-            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
-            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
-            llm = get_online_genselect_model(
-                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
-            )
-        else:
-            llm = get_model(**self.cfg.server)
-
-        return llm
-
     def setup_prompt(self):
         if self.cfg.prompt_format == "openai":
             return None
 
-        if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
-        else:
-            tokenizer = None
-
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=tokenizer,
+            tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
         )
@@ -298,6 +288,35 @@ class GenerationTask:
             prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
         return prompt
+
+    def setup_llm(self):
+        self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+
+        if self.cfg.code_execution:
+            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
+        elif self.cfg.tool_config:
+            llm = get_tool_calling_model(
+                **self.cfg.server,
+                tool_config=self.cfg.tool_config,
+                tokenizer=self.tokenizer,
+                additional_config={"sandbox": self.cfg.sandbox},
+            )
+        else:
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+
+        if self.cfg.online_genselect:
+            # Use the same prompt parameters for genselect as the one used for generation
+            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
+            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
+            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
+            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
+            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
+            llm = get_online_genselect_model(
+                **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
+                online_genselect_config=self.cfg.online_genselect_config,
+            )
+
+        return llm
 
     def log_example_prompt(self, data):
         data_point = deepcopy(data[0])
@@ -443,10 +462,10 @@ class GenerationTask:
             inference_params = dict(self.cfg.inference)
 
         generation_params = {
-            "prompt": self.fill_prompt(data_point, all_data),
-            "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
             **inference_params,
             **self.extra_generate_params,
+            "prompt": self.fill_prompt(data_point, all_data),
+            "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
         }
 
         if self.cfg.code_execution:
@@ -526,6 +545,14 @@ class GenerationTask:
 
         Path(self.cfg.output_file + "-async").unlink()
 
+    def wait_for_server(self):
+        server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
+        if not server_address:
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
+        server_start_cmd = get_server_wait_cmd(server_address)
+        subprocess.run(server_start_cmd, shell=True, check=True)
+
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
@@ -550,6 +577,7 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
+        self.wait_for_server()
         asyncio.run(self.async_loop(data))
 
         self.postprocess()

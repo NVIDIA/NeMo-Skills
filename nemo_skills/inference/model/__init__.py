@@ -21,12 +21,16 @@ from .base import BaseModel
 
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
+from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
 from .megatron import MegatronModel
 
 # Online GenSelect
 from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
+
+# Tool Calling
+from .tool_call import ToolCallingWrapper
 
 # Utilities
 from .vllm import VLLMModel
@@ -46,27 +50,32 @@ models = {
 }
 
 
-def get_model(server_type, **kwargs):
+def get_model(server_type, tokenizer=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
-    return model_class(**kwargs)
+    return model_class(tokenizer=tokenizer, **kwargs)
 
 
-def get_code_execution_model(server_type, code_execution=None, sandbox=None, **kwargs):
+def get_code_execution_model(server_type, tokenizer=None, code_execution=None, sandbox=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
-    model = get_model(server_type=server_type, **kwargs)
+    model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
     if code_execution is None:
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(server_type, online_genselect_config=None, **kwargs):
+def get_online_genselect_model(model, tokenizer=None, online_genselect_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
-    model = get_model(server_type=server_type, **kwargs)
-    if online_genselect_config is None:
-        online_genselect_config = OnlineGenSelectConfig()
-    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
+    if isinstance(model, str):
+        model = get_model(model=model, tokenizer=tokenizer, **kwargs)
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
+
+
+def get_tool_calling_model(model, tool_config, tokenizer=None, additional_config=None, **kwargs):
+    if isinstance(model, str):
+        model = get_model(model=model, tokenizer=tokenizer, **kwargs)
+    return ToolCallingWrapper(model, tool_config_yaml=tool_config, additional_config=additional_config)
 
 
 def server_params():

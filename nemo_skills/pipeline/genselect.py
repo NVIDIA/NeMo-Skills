@@ -35,7 +35,6 @@ def get_genselect_cmd(
         f"    ++output_dir={output_dir} "
         f"    ++inference.random_seed={random_seed} "
         f"    ++inference.temperature=0.7 "
-        f"    ++inference.tokens_to_generate=2048 "
         f"    ++inference.top_k=-1 "
         f"    ++inference.top_p=0.95 "
     )
@@ -225,7 +224,7 @@ def genselect(
                 task_name = f"{expname}-rs{seed}" if seed is not None else expname
                 new_task = pipeline_utils.add_task(
                     exp,
-                    cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
+                    cmd=pipeline_utils.wrap_python_path(cmd=cmd),
                     task_name=task_name,
                     log_dir=log_dir,
                     container=cluster_config["containers"]["nemo-skills"],

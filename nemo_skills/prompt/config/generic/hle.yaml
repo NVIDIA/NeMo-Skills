@@ -7,4 +7,3 @@ system: |-
   Confidence: {{your confidence score between 0% and 100% for your answer}}
 
 user: "{problem}"
-

@@ -43,8 +43,8 @@ class RepoMetadata:
 
 # Registry of external repos that should be packaged with the code in the experiment
 EXTERNAL_REPOS = {
-    'nemo_skills': RepoMetadata(
-        name='nemo_skills', path=Path(__file__).absolute().parents[2]
+    "nemo_skills": RepoMetadata(
+        name="nemo_skills", path=Path(__file__).absolute().parents[2]
     ),  # path to nemo_skills repo
 }
 
@@ -110,29 +110,29 @@ def get_git_repo_path(path: str | Path = None):
 
 def get_packager(extra_package_dirs: tuple[str] | None = None):
     """Will check if we are running from a git repo and use git packager or default packager otherwise."""
-    nemo_skills_dir = get_registered_external_repo('nemo_skills').path
+    nemo_skills_dir = get_registered_external_repo("nemo_skills").path
 
     if extra_package_dirs:
-        include_patterns = [str(Path(d) / '*') for d in extra_package_dirs]
+        include_patterns = [str(Path(d) / "*") for d in extra_package_dirs]
         include_pattern_relative_paths = [str(Path(d).parent) for d in extra_package_dirs]
     else:
         include_patterns = []
         include_pattern_relative_paths = []
 
-    check_uncommited_changes = not bool(int(os.getenv('NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK', 0)))
+    check_uncommited_changes = not bool(int(os.getenv("NEMO_SKILLS_DISABLE_UNCOMMITTED_CHANGES_CHECK", 0)))
 
     # are we in a git repo? If yes, we are uploading the current code
     repo_path = get_git_repo_path(path=None)  # check if we are in a git repo in pwd
 
     if repo_path:
         # Do we have nemo_skills package in this repo? If no, we need to pick it up from installed location
-        if not (Path(repo_path) / 'nemo_skills').is_dir():
+        if not (Path(repo_path) / "nemo_skills").is_dir():
             LOG.info(
                 "Not running from NeMo-Skills repo, trying to upload installed package. "
                 "Make sure there are no extra files in %s",
-                str(nemo_skills_dir / '*'),
+                str(nemo_skills_dir / "*"),
             )
-            include_patterns.append(str(nemo_skills_dir / '*'))
+            include_patterns.append(str(nemo_skills_dir / "*"))
         else:
             # picking up local dataset files if we are in the right repo
             include_patterns.append(str(nemo_skills_dir / "dataset/**/*.jsonl"))
@@ -151,9 +151,9 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     else:
         LOG.info(
             "Not running from a git repo, trying to upload installed package. Make sure there are no extra files in %s",
-            str(nemo_skills_dir / '*'),
+            str(nemo_skills_dir / "*"),
         )
-        include_patterns.append(str(nemo_skills_dir / '*'))
+        include_patterns.append(str(nemo_skills_dir / "*"))
         include_pattern_relative_paths.append(str(nemo_skills_dir.parent))
 
         root_package = run.PatternPackager(
@@ -164,10 +164,10 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
     extra_repos = {}
     if len(EXTERNAL_REPOS) > 1:
         # Insert root package as the first package
-        extra_repos['nemo_run'] = root_package
+        extra_repos["nemo_run"] = root_package
 
         for repo_name, repo_meta in EXTERNAL_REPOS.items():
-            if repo_name == 'nemo_skills':
+            if repo_name == "nemo_skills":
                 continue
 
             repo_path = repo_meta.path
@@ -178,7 +178,7 @@ def get_packager(extra_package_dirs: tuple[str] | None = None):
                 )
             else:
                 # Extra repos is not a git repo, so we need to package all files in the directory
-                repo_include_pattern = [str(Path(repo_path) / '*')]
+                repo_include_pattern = [str(Path(repo_path) / "*")]
                 repo_include_pattern_relative_path = [str(Path(repo_path).parent)]
                 extra_repos[repo_name] = run.PatternPackager(
                     include_pattern=repo_include_pattern,

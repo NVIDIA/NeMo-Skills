@@ -26,30 +26,30 @@ def eval_ifbench(cfg):
     for jsonl_file in unroll_files(cfg.input_files):
         parent_dir = Path(jsonl_file).absolute().parent
         cmd = (
-            'cd /opt/benchmarks/IFBench && python -m run_eval '
-            f'--input_data={jsonl_file} '
-            f'--input_response_data={jsonl_file} '
-            f'--output_dir={parent_dir} '
+            "cd /opt/benchmarks/IFBench && python -m run_eval "
+            f"--input_data={jsonl_file} "
+            f"--input_response_data={jsonl_file} "
+            f"--output_dir={parent_dir} "
         )
         subprocess.run(cmd, shell=True, check=True)
         # fusing eval metrics back into the generation file
         with open(jsonl_file, "rt", encoding="utf-8") as f:
             samples = [json.loads(line) for line in f]
 
-        with open(parent_dir / 'eval_results_loose.jsonl', 'rt', encoding="utf-8") as f:
+        with open(parent_dir / "eval_results_loose.jsonl", "rt", encoding="utf-8") as f:
             eval_results = [json.loads(line) for line in f]
         for sample, eval_result in zip(samples, eval_results):
-            sample['loose_eval'] = eval_result
+            sample["loose_eval"] = eval_result
 
-        with open(parent_dir / 'eval_results_strict.jsonl', 'rt', encoding="utf-8") as f:
+        with open(parent_dir / "eval_results_strict.jsonl", "rt", encoding="utf-8") as f:
             eval_results = [json.loads(line) for line in f]
         for sample, eval_result in zip(samples, eval_results):
-            sample['strict_eval'] = eval_result
+            sample["strict_eval"] = eval_result
 
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
 
         # removing metric files to avoid reusing them
-        (parent_dir / 'eval_results_loose.jsonl').unlink()
-        (parent_dir / 'eval_results_strict.jsonl').unlink()
+        (parent_dir / "eval_results_loose.jsonl").unlink()
+        (parent_dir / "eval_results_strict.jsonl").unlink()

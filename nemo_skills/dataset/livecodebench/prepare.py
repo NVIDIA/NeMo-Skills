@@ -74,7 +74,7 @@ def clean_data(dataset):
             question += f"```python\n{data['starter_code']}\n```\n\n"
         else:
             question += f"{PromptConstants.FORMATTING_WITHOUT_STARTER_CODE}\n\n"
-            question += f"```python\n# YOUR CODE HERE\n```\n\n"
+            question += "```python\n# YOUR CODE HERE\n```\n\n"
 
         data["task_id"] = data["question_id"]
         data["question"] = question.replace("    ", "\t")

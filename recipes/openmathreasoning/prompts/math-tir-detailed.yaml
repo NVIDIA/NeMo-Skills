@@ -12,5 +12,5 @@ system: |-
 
 user: |-
   Solve the following math problem using Python code for the calculations.
-  
+
   {problem}

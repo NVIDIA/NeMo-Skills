@@ -23,11 +23,11 @@ from nemo_skills.dataset.utils import get_mcq_fields
 
 
 def format_entry(entry):
-    category = entry['category'].replace(" ", "_")  # Fix computer science category
+    category = entry["category"].replace(" ", "_")  # Fix computer science category
 
     return {
-        "expected_answer": entry['answer'],
-        "examples_type": f'mmlu_pro_few_shot_{category}',
+        "expected_answer": entry["answer"],
+        "examples_type": f"mmlu_pro_few_shot_{category}",
         "subset_for_metrics": category,
         **get_mcq_fields(entry["question"], entry["options"]),
     }

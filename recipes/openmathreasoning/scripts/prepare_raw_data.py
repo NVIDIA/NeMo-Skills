@@ -25,14 +25,14 @@ MAX_TOKENS = 24000
 def clean_quoted_text(text):
     # Simple pattern to match anything between [quote] and [/quote]
     # including nested quotes
-    while '[quote' in text and '[/quote]' in text:
+    while "[quote" in text and "[/quote]" in text:
         # Find the last occurring [quote] (handles nesting)
-        start = text.rfind('[quote')
+        start = text.rfind("[quote")
         if start == -1:
             break
 
         # Find the first [/quote] after that position
-        end = text.find('[/quote]', start)
+        end = text.find("[/quote]", start)
         if end == -1:
             break
 
@@ -44,7 +44,7 @@ def clean_quoted_text(text):
 
 def process_element(elem, tokenizer, max_tokens):
     data = {}
-    data['forum_post'] = elem['original_question']
+    data["forum_post"] = elem["original_question"]
     data["forum_discussions"] = ""
     current_text = ""
     current_tokens = 0
@@ -86,8 +86,8 @@ if __name__ == "__main__":
         # Process the dataset in parallel with a progress bar
         processed_data = list(
             tqdm(
-                pool.imap(process_element_wrapper, dataset['train']),
-                total=len(dataset['train']),
+                pool.imap(process_element_wrapper, dataset["train"]),
+                total=len(dataset["train"]),
                 desc="Processing dataset",
             )
         )

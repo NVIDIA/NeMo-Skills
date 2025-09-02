@@ -51,6 +51,17 @@ class BenchmarkArgs:
         return bool(self.judge_args or self.judge_pipeline_args)
 
 
+def combine_cmds(cmds: list[str], single_node_mode: str) -> str:
+    """Combine multiple eval commands into a single eval cmd."""
+    if single_node_mode == "sequential":
+        return " && ".join(cmds)
+    elif single_node_mode == "parallel":
+        if len(cmds) == 1:
+            return cmds[0]
+        return " & ".join(f"( {cmd} )" for cmd in cmds) + " & wait "
+    raise ValueError(f"Unknown single_node_mode: {single_node_mode}")
+
+
 def get_arg_from_module_or_dict(module, arg_name, default_value=None, override_dict=None):
     """If argument is in a dict, take from there. If not, take from the module."""
     if override_dict and arg_name in override_dict:

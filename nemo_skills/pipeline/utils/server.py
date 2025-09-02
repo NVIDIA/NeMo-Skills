@@ -16,7 +16,7 @@ import logging
 from enum import Enum
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, get_server_wait_cmd
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -61,18 +61,18 @@ def should_get_random_port(server_gpus, exclusive, server_type):
     return server_gpus != 8 and not exclusive and server_type != "megatron"
 
 
-def wait_for_server(server_address, generation_commands):
-    cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
+def wrap_python_path(cmd):
+    return "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
+
+
+def set_python_path_and_wait_for_server(server_address, generation_commands):
     if server_address is not None:
-        cmd += (
-            # might be required if we are not hosting server ourselves
-            # this will try to handshake in a loop and unblock when the server responds
-            f"echo 'Waiting for the server to start at {server_address}' && "
-            f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
-        )
+        cmd = get_server_wait_cmd(server_address) + " && "
+    else:
+        cmd = ""
     # will run in a single task always (no need to check mpi env vars)
     cmd += f"{generation_commands}"
-    return cmd
+    return wrap_python_path(cmd)
 
 
 def get_ray_server_cmd(start_cmd):
@@ -168,7 +168,7 @@ def get_server_command(
         num_tasks = 1
     elif server_type == "sglang":
         if num_nodes > 1:
-            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+            multinode_args = " --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_sglang"
