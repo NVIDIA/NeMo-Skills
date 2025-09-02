@@ -44,6 +44,9 @@ class MathMetrics(BaseMetrics):
                 # If no valid answers, it's incorrect
                 if not valid_answers_and_results:
                     is_correct = False
+                    # Avoid missing key if 100% of the predictions are no answer
+                    self.eval_dict[f"rm_best@{k}"][score_method] += 0
+                    self.eval_dict[f"rm_majority@{k}"][score_method] += 0
                 else:
                     is_correct_best = sorted(valid_answers_and_results, key=lambda x: x[2], reverse=True)[0][1]
                     self.eval_dict[f"rm_best@{k}"][score_method] += is_correct_best

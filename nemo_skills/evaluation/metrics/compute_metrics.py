@@ -105,10 +105,10 @@ class ComputeMetrics:
 
         use_bootstrap = self.metric_type not in ["arena"]  # Arena already uses bootstrap for their metrics
         if use_bootstrap:
-            rng = np.random.RandomState(42)
             bootstrap_metric_list = []
             for bootstrap_idx in range(self.bootstrap_samples):
                 # sample with replacement from a stratified sampling of the subsets
+                rng = np.random.RandomState(bootstrap_idx)
                 examples_bootstrap = self.sample_bootstrap_stratified_per_subset(examples, rng)
                 examples_bootstrap = copy.deepcopy(examples_bootstrap)
                 mc_metric_list = []
@@ -167,6 +167,8 @@ def _average_metrics_dicts(dicts_list, include_std_dev=False):
     For list/tuple leaves, averages over corresponding indices.
     When include_std_dev is False, returns the mean of the metrics.
     When include_std_dev is True, returns a dict {"avg": mean, "std": std}.
+
+    Raises a ValueError if the dictionaries have different keys (usually happens if the returned metric keys are not consistent between bootstrap samples)
     """
     if not dicts_list:
         return {}
