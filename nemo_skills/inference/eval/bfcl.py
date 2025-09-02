@@ -175,20 +175,17 @@ class ServerMessageParser:
         """Parse the output dictionary to get the model response."""
 
         output_dict["message"] = output_dict["response"].choices[0].message
-        output_dict["tool_calls"] = []
-        if output_dict["message"].tool_calls:
-            output_dict["tool_calls"] = output_dict["message"].tool_calls
+        tool_calls = [] if output_dict["message"].tool_calls is None else output_dict["message"].tool_calls
 
         try:
-            generation = [
-                {func_call.function.name: func_call.function.arguments} for func_call in output_dict["tool_calls"]
-            ]
-            tool_call_ids = [func_call.id for func_call in output_dict["tool_calls"]]
+            generation = [{func_call.function.name: func_call.function.arguments} for func_call in tool_calls]
+            tool_call_ids = [func_call.id for func_call in tool_calls]
         except Exception:
             generation = output_dict["generation"] if isinstance(output_dict["generation"], str) else ""
             tool_call_ids = []
 
         output_dict["generation"] = generation
+        output_dict["tool_calls"] = tool_calls
         output_dict["tool_call_ids"] = tool_call_ids
         output_dict["num_generated_tokens"] = output_dict.get("num_generated_tokens", 0)
 
