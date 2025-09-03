@@ -380,8 +380,7 @@ We also support automatic trimming of generation budget or context when using vl
 
 === "reduce_prompt_from_start"
 
-    ```python hl_lines="13-14"
-
+    ```python hl_lines="15-16"
     from nemo_skills.prompt.utils import get_prompt
     from nemo_skills.inference.model import get_model
 
@@ -390,22 +389,24 @@ We also support automatic trimming of generation budget or context when using vl
         tokenizer="Qwen/Qwen3-0.6B",
     )
 
-    input_prompt = prompt.fill({"problem": "What's 2 + 2?"})
+    # Construct a fake long prompt
+    fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
     llm = get_model(
         model="Qwen/Qwen3-0.6B",
         server_type="vllm",
         enable_soft_fail=True,
-        context_limit_retry_strategy="reduce_generation"
+        context_limit_retry_strategy="reduce_prompt_from_start",
     )
 
-    # The 1M generation budget is well beyond the 40960 context window size of Qwen/Qwen3-0.6B
-    # We will automatically reduce the generation budget to fit in the context window
-    output_dict = llm.generate_sync(input_prompt, tokens_to_generate=1_000_000)
+    # We will automatically reduce the prompt from the start to fit in the context window
+    # Note that this requires the `tokens_to_generate` budget to be specified
+    output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
     ```
 
 === "reduce_prompt_from_end"
 
-    ```python hl_lines="13-14"
+    ```python hl_lines="15-16"
 
     from nemo_skills.prompt.utils import get_prompt
     from nemo_skills.inference.model import get_model
@@ -427,6 +428,5 @@ We also support automatic trimming of generation budget or context when using vl
 
     # We will automatically reduce the prompt from the end to fit in the context window
     # Note that this requires the `tokens_to_generate` budget to be specified
-    output_dict = llm.generate_sync(input_prompt, tokens_to_generate=1024)
-
+    output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
     ```
