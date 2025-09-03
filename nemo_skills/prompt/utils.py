@@ -233,7 +233,7 @@ class Prompt:
             # If not, the thinking string should be added to the "content" field during preprocessing
             # Tokenizers for models like Qwen3-4B don't add thinking to the assistant string by themselves
             assert thinking in assistant_string, (
-                f"The thinking content is not part of the assistant string. We suggest you add the thinking string to the 'content' field during preprocessing. \nThinking string:{thinking}\n\nAssistant string:{formatted_response}"
+                f"The thinking content is not part of the assistant string. We suggest you add the thinking string to the 'content' field during preprocessing.\n\nThinking string:{thinking}\n\nAssistant string:{formatted_response}"
             )
 
         return formatted_response
