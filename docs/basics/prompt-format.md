@@ -79,6 +79,8 @@ If you're running one of the pipeline scripts, you can control the prompt by usi
 ++examples_type=...
 ```
 
+#### Example 1 - Basic Prompt
+
 If you're implementing a new script, you can use the following code to create a prompt and then use it:
 
 ```python
@@ -98,8 +100,6 @@ which outputs
   }
 ]
 ```
-
-You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
 
 
 If your data is already formatted as a list of openai messages, you can directly use it as an input to the pipeline scripts
@@ -129,3 +129,33 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 What's 2 + 2?<|im_end|>
 <|im_start|>assistant
 ```
+
+#### Example 3 - Overriding the System Message
+
+In the above example, the system message comes from the tokenizer. We can override this system message by setting `++system_message=...`. Here is an example of overriding the system message while creating a prompt
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt(
+  "generic/math",
+  tokenizer="Qwen/Qwen2.5-32B-Instruct",
+  system_message="You are a helpful chatbot"
+)
+print(prompt.fill({'problem': "What's 2 + 2?"}))
+```
+
+which outputs
+
+```python-console
+<|im_start|>system
+You are a helpful chatbot<|im_end|>
+<|im_start|>user
+Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{}.
+
+What's 2 + 2?<|im_end|>
+<|im_start|>assistant
+```
+
+
+You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
