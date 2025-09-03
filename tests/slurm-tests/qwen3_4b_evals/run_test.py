@@ -36,7 +36,6 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on_tool_calling",
         expname=f"{expname_prefix}-bfcl-on",
-        run_after=f"{expname_prefix}-download-models",
         wandb_project=wandb_project,
         wandb_name=f"{expname_prefix}-qwen3-4b-eval-reasoning-on",
     )
