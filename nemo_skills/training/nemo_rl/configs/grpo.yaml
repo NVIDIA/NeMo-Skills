@@ -50,6 +50,7 @@ policy:
   pipeline_model_parallel_size: 1
   context_parallel_size: 1
   lr: 1e-6
+  weight_decay: 0.01
 
   dtensor_cfg:
     enabled: true
@@ -89,7 +90,7 @@ policy:
     name: "torch.optim.AdamW"
     kwargs:
       lr: ${policy.lr}
-      weight_decay: 0.01
+      weight_decay: ${policy.weight_decay}
       betas: [0.9, 0.999]
       eps: 1e-8
       # when using Dtensor, we need to set foreach
@@ -135,7 +136,7 @@ policy:
       optimizer: "adam"
       lr: ${policy.lr}
       min_lr: 1.0e-6
-      weight_decay: 0.01
+      weight_decay: ${policy.weight_decay}
       bf16: true
       fp16: false
       params_dtype: "float32"
