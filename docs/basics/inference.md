@@ -118,11 +118,11 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     sandbox = get_sandbox()  # localhost by default
     llm = get_code_execution_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm", sandbox=sandbox)
-    prompt_obj = get_prompt('generic/default', code_tags='llama3') # (1)!
-    prompt_obj.config.system = ( # (2)!
+    system_message = ( # (2)!
         "Environment: ipython\n\n"
         "Use Python to solve this math problem."
     )
+    prompt_obj = get_prompt('generic/default', code_tags='llama3', system_message=system_message) # (1)!
     prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
     print(prompt) # (3)!
     output = await llm.generate_async(prompt=prompt, **prompt.get_code_execution_args()) # (4)!

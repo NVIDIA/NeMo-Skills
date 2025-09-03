@@ -529,8 +529,9 @@ Here is the problem you need to solve:
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt("generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code")
-    prompt.config.system = ""
+    prompt = get_prompt(
+        "generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code", system_message=""
+    )
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
