@@ -21,12 +21,9 @@ class Tool(ABC):
     """Abstract base for module-based tools.
 
     Conventions:
-    - provider_id is a short, unique identifier (e.g., "python").
     - list_tools() returns a list of dicts with keys: name, description, input_schema.
     - execute() is invoked with the bare tool name (no provider prefix).
     """
-
-    provider_id: str
 
     @abstractmethod
     def default_config(self) -> Dict[str, Any]:
@@ -52,8 +49,8 @@ class ToolManager:
     """Registry/Router for module-based tools.
 
     - Loads tool classes from module specs using nemo_skills.mcp.utils.locate.
-    - Applies per-tool overrides based on provider_id.
-    - Exposes merged tool list with qualified names: "{provider_id}.{tool_name}".
+    - Applies per-tool overrides based on the tool class name.
+    - Exposes merged tool list with qualified names: "{ToolClassName}.{tool_name}".
     - Routes tool executions by splitting the qualified name.
     """
 
@@ -64,7 +61,7 @@ class ToolManager:
         context: Dict[str, Any] | None = None,
     ) -> None:
         self._tools: Dict[str, Tool] = {}
-        self._qualified_tool_map: Dict[str, str] = {}  # qualified name -> provider_id
+        self._qualified_tool_map: Dict[str, str] = {}  # qualified name -> tool_class_name
         self._tool_list_cache: List[Dict[str, Any]] | None = None
 
         overrides = overrides or {}
@@ -78,15 +75,12 @@ class ToolManager:
                 tool_cls = tool_cls_or_obj.__class__
             tool: Tool = tool_cls() if inspect.isclass(tool_cls_or_obj) else tool_cls_or_obj
 
-            if not hasattr(tool, "provider_id"):
-                raise ValueError(f"Tool at '{spec}' is missing provider_id")
+            provider_key = tool.__class__.__name__
+            if provider_key in self._tools:
+                raise ValueError(f"Duplicate tool class registered: '{provider_key}'")
 
-            provider_id = getattr(tool, "provider_id")
-            if provider_id in self._tools:
-                raise ValueError(f"Duplicate tool provider_id registered: '{provider_id}'")
-
-            tool.configure(overrides.get(provider_id), context)
-            self._tools[provider_id] = tool
+            tool.configure((overrides.get(provider_key) if overrides else None), context)
+            self._tools[provider_key] = tool
 
     async def shutdown(self) -> None:
         for tool in self._tools.values():
@@ -127,11 +121,11 @@ class ToolManager:
 
     def _resolve(self, qualified_name: str) -> tuple[Tool, str]:
         if "." not in qualified_name:
-            raise ValueError(f"Tool name must be qualified as 'provider.tool'. Received: '{qualified_name}'")
+            raise ValueError(f"Tool name must be qualified as 'ToolClassName.tool'. Received: '{qualified_name}'")
         provider_id, bare_name = qualified_name.split(".", 1)
         tool = self._tools.get(provider_id)
         if tool is None:
-            raise ValueError(f"No tool registered for provider_id '{provider_id}'")
+            raise ValueError(f"No tool registered for class '{provider_id}'")
         return tool, bare_name
 
     async def execute_tool(self, qualified_name: str, args: Dict[str, Any]):

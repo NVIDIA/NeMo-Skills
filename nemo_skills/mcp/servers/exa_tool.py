@@ -84,8 +84,6 @@ def main():
 
 
 class ExaTool(MCPClientTool):
-    provider_id = "exa"
-
     def __init__(self) -> None:
         super().__init__()
         # Defaults for stdio Exa server launch using explicit client class
@@ -103,8 +101,6 @@ class ExaTool(MCPClientTool):
 
 
 class ExaMCPTool(MCPClientTool):
-    provider_id = "exa_mcp"
-
     def __init__(self) -> None:
         super().__init__()
         # Defaults for Exa hosted MCP over HTTP using explicit client class

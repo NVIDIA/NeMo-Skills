@@ -85,8 +85,6 @@ def main():
 
 
 class PythonTool(MCPClientTool):
-    provider_id = "python"
-
     def __init__(self) -> None:
         super().__init__()
         # Defaults for stdio Python MCP using explicit client class
