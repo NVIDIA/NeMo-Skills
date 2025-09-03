@@ -24,50 +24,48 @@ Some reference numbers for reference and commands for reproduction:
 | qwen3-32b-thinking | Public       | 74.9 | 71.7 | 72.8 | 72.1 | 73.5 | 70.2 |
 | qwen3-32b-thinking | Nemo-Skills  | 72.7 | 70.4 | 74.0 | 73.7 | 76.3 | 73.9 |
 
-#### GPT-OSS-120B
+=== "GPT-OSS-120B"
 
-(Note that the short max generation length.)
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=openai/gpt-oss-120b \
+        --benchmarks mmlu-prox \
+        --output_dir=[output dir] \
+        --num_chunks=16 \
+        --server_type=vllm \
+        --server_gpus=4 \
+        --server_args='--async-scheduling' \
+        ++inference.tokens_to_generate=2048
+    ```
 
-```
-ns eval \
-    --cluster=[cluster] \
-    --model=openai/gpt-oss-120b \
-    --benchmarks mmlu-prox \
-    --output_dir=[output dir] \
-    --num_chunks=16 \
-    --server_type=vllm \
-    --server_gpus=4 \
-    --server_args='--async-scheduling' \
-    ++inference.tokens_to_generate=2048
-```
+=== "Mistral-Small-3.1"
 
-#### Mistral-Small-3.1
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=mistralai/Mistral-Small-3.1-24B-Instruct-2503 \
+        --benchmarks mmlu-prox \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --num_chunks=16 \
+        --server_gpus=2 \
+        --server_args='--tokenizer-mode mistral --config-format mistral --load-format mistral' \
+        ++inference.tokens_to_generate=2048
+    ```
 
-```
-ns eval \
-    --cluster=[cluster] \
-    --model=mistralai/Mistral-Small-3.1-24B-Instruct-2503 \
-    --benchmarks mmlu-prox \
-    --output_dir=[output dir] \
-    --server_type=vllm \
-    --num_chunks=16 \
-    --server_gpus=2 \
-    --server_args='--tokenizer-mode mistral --config-format mistral --load-format mistral' \
-    ++inference.tokens_to_generate=2048
-```
+=== "Qwen3-32B-Thinking"
 
-#### Qwen3-32B-Thinking
-
-```
-ns eval \
-    --cluster=[cluster] \
-    --model=Qwen/Qwen3-32B \
-    --benchmarks mmlu-prox \
-    --output_dir=[output dir] \
-    --server_type=vllm \
-    --num_chunks=32 \
-    --server_gpus=2 \
-    ++inference.temperature=0.6 \
-    ++inference.top_k=20 \
-    ++inference.tokens_to_generate=38912
-```
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=Qwen/Qwen3-32B \
+        --benchmarks mmlu-prox \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --num_chunks=32 \
+        --server_gpus=2 \
+        ++inference.temperature=0.6 \
+        ++inference.top_k=20 \
+        ++inference.tokens_to_generate=38912
+    ```
