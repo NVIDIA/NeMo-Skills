@@ -293,10 +293,9 @@ def sft_nemo_rl(
             raise ValueError("training_data is required when num_training_jobs > 0")
         if training_data.startswith("/"):  # could ask to download from HF
             training_data = get_mounted_path(cluster_config, training_data)
-        if validation_data is None:
-            validation_data = training_data
-        else:
+        if validation_data is not None:
             validation_data = get_mounted_path(cluster_config, validation_data)
+            print("validation_data", validation_data)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
