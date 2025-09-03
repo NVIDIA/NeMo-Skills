@@ -20,7 +20,7 @@ import os
 import pprint
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
@@ -66,6 +66,7 @@ class PromptResponseDataset:
         }
         # Validation split (optional)
         print("validation_data", val_ds_path)
+        print(f"[DEBUG] val_ds_path raw: {val_ds_path!r}, type={type(val_ds_path).__name__}")
         if val_ds_path:
             self.formatted_ds["validation"] = self.load_or_process_split(val_ds_path, "val")
         else:
@@ -187,7 +188,6 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         print("  ⚠ No validation dataset provided.")
 
     train_dataset = data.formatted_ds["train"]
-    val_dataset = data.formatted_ds["validation"]
     sft_task_spec = data.task_spec
 
     train_dataset = AllTaskProcessedDataset(
@@ -202,10 +202,10 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         ),
         max_seq_length=data_config["max_input_seq_length"],
     )
-
-    if val_dataset is not None:
+    val_dataset: Optional[AllTaskProcessedDataset] = None
+    if data.formatted_ds["validation"] is not None:
         val_dataset = AllTaskProcessedDataset(
-            val_dataset,
+            data.formatted_ds["validation"],
             tokenizer,
             sft_task_spec,
             partial(
@@ -247,7 +247,6 @@ def main():
     print(f"📊 Using log directory: {config['logger']['log_dir']}")
     if config["checkpointing"]["enabled"]:
         print(f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}")
-
     init_ray()
 
     # setup tokenizer
