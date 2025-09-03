@@ -49,6 +49,7 @@ policy:
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   context_parallel_size: 1
+  lr: 1e-6
 
   dtensor_cfg:
     enabled: true
@@ -87,7 +88,7 @@ policy:
   optimizer:
     name: "torch.optim.AdamW"
     kwargs:
-      lr: 5.0e-6
+      lr: ${policy.lr}
       weight_decay: 0.01
       betas: [0.9, 0.999]
       eps: 1e-8
@@ -95,6 +96,18 @@ policy:
       # and fused to False
       foreach: False
       fused: False
+
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 1.0
+        end_factor: 1.0
+        total_iters: 1  # must be >=1
+    - name: "torch.optim.lr_scheduler.ConstantLR"
+      kwargs:
+        factor: 1.0
+        total_iters: ${sft.max_num_steps}  # switch immediately
+    - milestones: [0]
 
 
   megatron_cfg:
@@ -120,7 +133,7 @@ policy:
 
     optimizer:
       optimizer: "adam"
-      lr: 1.0e-6
+      lr: ${policy.lr}
       min_lr: 1.0e-6
       weight_decay: 0.01
       bf16: true
@@ -158,17 +171,7 @@ policy:
       use_custom_fsdp: false
       data_parallel_sharding_strategy: "optim_grads_params"
 
-  scheduler:
-    - name: "torch.optim.lr_scheduler.LinearLR"
-      kwargs:
-        start_factor: 0.1
-        end_factor: 1.0
-        total_iters: 50
-    - name: "torch.optim.lr_scheduler.ConstantLR"
-      kwargs:
-        factor: 1.0
-        total_iters: 10000000000
-    - milestones: [50]
+
 
   generation:
     backend: "vllm"
