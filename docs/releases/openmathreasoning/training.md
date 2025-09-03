@@ -41,8 +41,7 @@ for inference_mode in ["cot", "tir", "genselect"]:
         code_tags = 'openmath'
     if inference_mode == 'genselect':  # already formatted
         prompt_config = {'user': '{problem}'}
-    prompt = get_prompt(prompt_config, 'Qwen/Qwen2.5-32B-Instruct', code_tags)
-    prompt.config.system = ""  # disabling default identity system message
+    prompt = get_prompt(prompt_config, tokenizer='Qwen/Qwen2.5-32B-Instruct', code_tags=code_tags, system_message="")
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 
@@ -288,8 +287,7 @@ for inference_mode in ["cot", "tir", "genselect"]:
         prompt_config = {'user': '{problem}'}
     func = partial(filter_func, inference_mode=inference_mode)
     dataset[inference_mode] = dataset[inference_mode].filter(func, num_proc=20)
-    prompt = get_prompt(prompt_config, 'Qwen/Qwen2.5-32B-Instruct', code_tags)
-    prompt.config.system = ""  # disabling default identity system message
+    prompt = get_prompt(prompt_config, tokenizer='Qwen/Qwen2.5-32B-Instruct', code_tags=code_tags, system_message="")
     func = partial(apply_format, prompt=prompt, is_tir=(inference_mode == 'tir'))
     dataset[inference_mode] = dataset[inference_mode].map(func, num_proc=20)
 
