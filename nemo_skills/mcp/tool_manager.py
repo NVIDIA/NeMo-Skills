@@ -38,7 +38,9 @@ class Tool(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def execute(
+        self, tool_name: str, arguments: Dict[str, Any], extra_args: Dict[str, Any] | None = None
+    ) -> Any:
         pass
 
     async def shutdown(self) -> None:  # Optional hook
@@ -128,6 +130,6 @@ class ToolManager:
             raise ValueError(f"No tool registered for class '{provider_id}'")
         return tool, bare_name
 
-    async def execute_tool(self, qualified_name: str, args: Dict[str, Any]):
+    async def execute_tool(self, qualified_name: str, args: Dict[str, Any], extra_args: Dict[str, Any] | None = None):
         tool, bare = self._resolve(qualified_name)
-        return await tool.execute(bare, args)
+        return await tool.execute(bare, args, extra_args=extra_args)

@@ -98,5 +98,5 @@ class MCPClientTool(Tool):
     async def list_tools(self) -> List[Dict[str, Any]]:
         return await self._client.list_tools()
 
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]):
-        return await self._client.call_tool(tool_name, arguments)
+    async def execute(self, tool_name: str, arguments: Dict[str, Any], extra_args: Dict[str, Any] | None = None):
+        return await self._client.call_tool(tool=tool_name, args=arguments, extra_args=extra_args)

@@ -15,7 +15,7 @@
 import argparse
 import logging
 from dataclasses import dataclass
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any, Dict
 
 from httpx import RemoteProtocolError
 from mcp.server.fastmcp import FastMCP
@@ -104,21 +104,14 @@ class PythonTool(MCPClientTool):
             }
         )
 
-    def configure(self, overrides: Dict[str, Any] | None = None, context: Dict[str, Any] | None = None) -> None:
-        # Delegate to base for client construction and hook invocation
-        super().configure(overrides=overrides, context=context)
-
-    async def list_tools(self) -> List[Dict[str, Any]]:
-        # Delegate to the MCP client to fetch authoritative schemas
-        return await self._client.list_tools()
-
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]):
+    async def execute(self, tool_name: str, arguments: Dict[str, Any], extra_args: Dict[str, Any] | None = None):
         if tool_name != "execute":
             raise ValueError(f"Unknown tool for PythonTool: {tool_name}")
-        # Fallback timeout if not provided
+        # Ensure timeout is sent via extra_args (post-sanitize), not in main arguments
         arguments = dict(arguments)
-        arguments.setdefault("timeout", self._config.get("exec_timeout_s", 10))
-        return await self._client.call_tool("execute", arguments)
+        merged_extra = dict(extra_args or {})
+        merged_extra.setdefault("timeout", self._config.get("exec_timeout_s", 10))
+        return await self._client.call_tool(tool="execute", args=arguments, extra_args=merged_extra)
 
     async def shutdown(self) -> None:
         return None

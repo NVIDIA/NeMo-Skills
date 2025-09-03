@@ -79,7 +79,8 @@ class ToolCallingWrapper:
 
         ## TODO(sanyamk): Only exceptions related to tool execution here, all others must fail.
         try:
-            result = await self.tool_manager.execute_tool(tool_name, tool_args)
+            # Allow providers to specify extra_args behavior internally if needed in the future
+            result = await self.tool_manager.execute_tool(tool_name, tool_args, extra_args=None)
         except Exception as e:
             LOG.exception(e)
             return {"error": "Tool execution failed."}
