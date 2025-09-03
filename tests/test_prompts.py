@@ -955,7 +955,7 @@ Reasoning: Explain why the extracted_final_answer is correct or incorrect based 
 
 Judgement: Answer 'yes' if extracted_final_answer matches the [correct_answer] given above, or is within a small margin of error for numerical problems. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
 
-Confidence: The extracted confidence score between 0|\%| and 100|\%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Confidence: The extracted confidence score between 0|%%| and 100|%%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
     assert (
