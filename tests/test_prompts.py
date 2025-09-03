@@ -139,6 +139,18 @@ def test_generic_default_prompt():
     assert prompt.fill({"question": "How are you?"}) == expected_prompt
 
 
+def test_thinking_output_format():
+    """Test that the thinking part is added to the assistant response."""
+    prompt = get_prompt("generic/math", tokenizer="openai/gpt-oss-120b")
+
+    expected_prompt = """<|channel|>analysis<|message|>Let me think step by step.... The answer is 4<|end|><|start|>assistant<|channel|>final<|message|>The answer is 4<|return|>"""
+    output_prompt = prompt.format_assistant_response(
+        content="The answer is 4", thinking="Let me think step by step.... The answer is 4"
+    )
+
+    assert output_prompt == expected_prompt, "Formatted assistant response is not as expected"
+
+
 def test_generic_math_prompt():
     prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B-Instruct")
 
