@@ -236,7 +236,7 @@ def summarize_results(
     benchmarks_paths = []
 
     # Check for Option 3 - Root directory corresponds to a benchmark
-    if Path(results_dir).is_dir() and len(glob.glob(f'{results_dir}/output*jsonl')) > 0:
+    if Path(results_dir).is_dir() and (len(glob.glob(f'{results_dir}/output*jsonl')) > 0 or len(glob.glob(f'{results_dir}/output_chunk_*.jsonl')) > 0):
         benchmarks_paths = [results_dir]
     else:
         cand_results_dir = Path(results_dir) / 'eval-results'
@@ -246,7 +246,7 @@ def summarize_results(
         else:
             # Assume by default it's Option 2.
             # Verify if it indeed has this structure: {results_dir}/{benchmark}/output*jsonl
-            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0:
+            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0 and len(glob.glob(f'{results_dir}/*/output_chunk_*.jsonl')) == 0:
                 raise ValueError(
                     f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
                 )
@@ -265,7 +265,7 @@ def summarize_results(
         # Ascertain that the benchmarks_paths are valid
         for benchmark_path in benchmarks_paths:
             # Valid benchmark_path should contain output*jsonl files
-            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
+            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0 and len(glob.glob(f'{benchmark_path}/output_chunk_*.jsonl')) == 0:
                 raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
     else:
         print(f"No benchmarks found in {results_dir}")
@@ -299,6 +299,10 @@ def summarize_results(
         has_greedy = Path(f'{benchmark_path}/output.jsonl').exists()
         input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
         has_sampling = len(input_files) > 0
+        
+        # Check for chunked output files (e.g., output_chunk_*.jsonl)
+        chunked_files = glob.glob(f'{benchmark_path}/output_chunk_*.jsonl')
+        has_chunked = len(chunked_files) > 0
 
         if has_greedy and has_sampling:
             raise ValueError(
@@ -306,9 +310,25 @@ def summarize_results(
                 "This indicates that the evaluation was done multiple times with different sampling parameters. "
                 "It's not clear how to process this! Please remove output.jsonl or output-rs*.jsonl files and rerun."
             )
+        
+        if has_greedy and has_chunked:
+            raise ValueError(
+                f"Both output.jsonl and output_chunk_*.jsonl found for benchmark {benchmark}. "
+                "This indicates that the evaluation was done multiple times with different chunking parameters. "
+                "It's not clear how to process this! Please remove output.jsonl or output_chunk_*.jsonl files and rerun."
+            )
+        
+        if has_sampling and has_chunked:
+            raise ValueError(
+                f"Both output-rs*.jsonl and output_chunk_*.jsonl found for benchmark {benchmark}. "
+                "This indicates that the evaluation was done multiple times with different parameters. "
+                "It's not clear how to process this! Please remove output-rs*.jsonl or output_chunk_*.jsonl files and rerun."
+            )
 
         if has_greedy:
             input_files = [f'{benchmark_path}/output.jsonl']
+        elif has_chunked:
+            input_files = chunked_files
 
         metrics = metrics_calculator.compute_metrics(input_files=input_files)
         if len(metrics) > 1:  # has subsets
