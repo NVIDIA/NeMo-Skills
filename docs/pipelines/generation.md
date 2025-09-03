@@ -336,12 +336,19 @@ generate(
 If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
 a dependent [run_cmd command](./run-cmd.md).
 
+!!! warning
+    Currently preprocess_cmd doesn't work correctly with `num_chunks>1`
 
 ### Context-Window Limits
 
 Certain input-output combinations can exceed a model's context window limits. By default, such generation/evaluation jobs will fail.
 
-By passing in `++server.enable_soft_fail=True`, any context length errors will be caught during the generation, and the output dictionary would have an `{"generation": "", "error": "context_window_exceeded"}`  and a `"detailed_error"` field which has the detailed reason for the context.
+By passing in `++server.enable_soft_fail=True`, any context length errors will be caught during the generation, and the output dictionary would have an
+
+```python
+{"generation": "", "error": "context_window_exceeded"}
+```
+and a `"detailed_error"` field which has the detailed reason for the context.
 
 We also support automatic trimming of generation budget or context when using vllm or sglang using the following three methods:
 
@@ -377,6 +384,11 @@ We also support automatic trimming of generation budget or context when using vl
     # We will automatically reduce the generation budget to fit in the context window
     output_dict = llm.generate_sync(input_prompt, tokens_to_generate=1_000_000)
     ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_generation
+    ```
 
 === "reduce_prompt_from_start"
 
@@ -402,6 +414,11 @@ We also support automatic trimming of generation budget or context when using vl
     # We will automatically reduce the prompt from the start to fit in the context window
     # Note that this requires the `tokens_to_generate` budget to be specified
     output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_start
     ```
 
 === "reduce_prompt_from_end"
@@ -429,4 +446,9 @@ We also support automatic trimming of generation budget or context when using vl
     # We will automatically reduce the prompt from the end to fit in the context window
     # Note that this requires the `tokens_to_generate` budget to be specified
     output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_end
     ```
