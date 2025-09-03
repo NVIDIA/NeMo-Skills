@@ -1,12 +1,12 @@
 # Math (natural language)
 
-We support a variety of natural language math benchmarks. For all benchmarks in this group, the task is to find an answer to a math problem. This is typically a number or an expression that an LLM during generation step is instructed
-to put inside a `\boxed{}` field.
+This section details how to evaluate natural language math benchmarks. For all benchmarks in this group, the goal is to find an answer to a math problem. Typically, a large language model (LLM) is instructed to put the answer (a number or an expression) inside a `\boxed{}` field during the generation step.
 
-Most answers in these benchmarks can be compared using a
-[symbolic checker](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py#L47) but a few require using LLM-as-a-judge to evaluate the equivalency of the epxressions. We will see below how we can use LLM-as-a-judge in the `eval` pipeline with NeMo-Skills.
+While most answers can be compared using a [symbolic checker](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py#L47), some require an LLM-as-a-judge to evaluate the equivalence of expressions. This document shows how to integrate an LLM-as-a-judge into the `eval` pipeline with NeMo-Skills.
 
-We have seen in [Evaluation](index.md) how to use `ns eval` to perform a benchmark evaluation which uses symbolic checker. To add LLM-as-judge in to the evaluation, we just need to add extra judge related parameters that serve as parameters for LLM-as-judge model.
+## Using LLM-as-a-judge
+
+To add LLM-as-a-judge to your [evaluation](index.md), you just need to include extra judge-related parameters when running the `ns eval` command.
 
 === "ns interface"
 
@@ -46,10 +46,9 @@ We have seen in [Evaluation](index.md) how to use `ns eval` to perform a benchma
 
     )
     ```
+### Dataset definition
 
-Alternatively, you can move judge related parameters completely from the evaluation command into the dataset directly. For example, consider [hle benchmark](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/hle/__init__.py). This lets you define judge parameters specific to each benchmark separately.
-
- In the benchmark definition `__init__.py` script, you can add judge related parameters, which will be used as default LLM-as-judge model parameters.
+Alternatively, you can define the judge parameters directly within the dataset itself. This is useful for specifying different judge parameters for each benchmark. For example, in a benchmark's __init__.py file, you can add default LLM-as-judge model parameters:
 
 ```bash
 JUDGE_PIPELINE_ARGS = {
@@ -60,6 +59,7 @@ JUDGE_PIPELINE_ARGS = {
 JUDGE_ARGS = "++prompt_config=judge/hle ++generation_key=judgement ++add_generation_stats=False"
 ```
 
+You can take a look at [hle benchmark](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/hle/__init__.py) defintion as an example.
 
 ## How we extract answers
 
@@ -107,9 +107,9 @@ The following benchmarks require LLM-as-a-judge:
 - [math-odyssey](#math-odyssey)
 - [gaokao2023en](#gaokao2023en)
 
-## Custom prompt for LLM-as-Judge
+## Custom the LLM-as-Judge's prompt
 
-If you want to use custom prompt for LLM-as-Judge, you can do so as following. In the benchmark definition (`__init__.py` script):
+If you want to use custom prompt for LLM-as-Judge, you can define it within the benchmark's `__init__.py` script:
 
 ```bash
 JUDGE_PIPELINE_ARGS = {
