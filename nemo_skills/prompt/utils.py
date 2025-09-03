@@ -96,8 +96,8 @@ class CodeTags:
 
 @nested_dataclass(kw_only=True)
 class PromptConfig:
-    user_message: str
-    system_message: str | None = None
+    user: str
+    system: str | None = None
     code_tags: CodeTags = None
     few_shot_examples: FewShotExamplesConfig = field(default_factory=FewShotExamplesConfig)
 
@@ -189,7 +189,7 @@ class Prompt:
             examples = ""
         else:
             examples = f"{self.config.few_shot_examples.prefix}{filled_examples}{self.config.few_shot_examples.suffix}"
-        user_message = self.config.user_message.format(examples=examples, **input_dict)
+        user_message = self.config.user.format(examples=examples, **input_dict)
         return user_message
 
     def get_code_execution_args(self):
@@ -252,9 +252,9 @@ class Prompt:
             The filled prompt - either a string or a list of dictionaries.
         """
 
-        if self.config.system_message is not None:
+        if self.config.system is not None:
             messages = [
-                {"role": "system", "content": self.config.system_message},
+                {"role": "system", "content": self.config.system},
             ]
         else:
             messages = []
@@ -351,7 +351,7 @@ def get_prompt(
         config = prompt_config
 
     if system_message is not None:
-        config["system_message"] = system_message
+        config["system"] = system_message
 
     code_tags_obj = None
     if code_tags is not None:
