@@ -84,7 +84,9 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
             # Check if this evaluation mode exists in all benchmarks
             missing_benchmarks = [b for b in benchmarks if eval_mode not in results[b]]
             if missing_benchmarks:
-                raise ValueError(f"Evaluation mode '{eval_mode}' missing in benchmarks: {missing_benchmarks}")
+                raise ValueError(
+                    f"Evaluation mode '{eval_mode}' missing in benchmarks: {missing_benchmarks}"
+                )
 
             # Get reference metrics from first benchmark to validate others against
             reference_metrics = set(results[reference_benchmark][eval_mode].keys())
@@ -113,10 +115,16 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
                     values.append(metric_value)
 
                 if metric_key != "num_entries":
-                    new_results[prefix][eval_mode][metric_key] = sum(values) / len(values)
+                    new_results[prefix][eval_mode][metric_key] = sum(values) / len(
+                        values
+                    )
                     # keeping the original float/int types
-                    if isinstance(results[reference_benchmark][eval_mode][metric_key], int):
-                        new_results[prefix][eval_mode][metric_key] = int(new_results[prefix][eval_mode][metric_key])
+                    if isinstance(
+                        results[reference_benchmark][eval_mode][metric_key], int
+                    ):
+                        new_results[prefix][eval_mode][metric_key] = int(
+                            new_results[prefix][eval_mode][metric_key]
+                        )
 
             # Add num_benchmarks_in_group instead of num_entries
             new_results[prefix][eval_mode]["num_benchmarks_in_group"] = len(benchmarks)
@@ -147,7 +155,9 @@ def summarize_results(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument. "
         "If not specified, will assume the results are in the local filesystem.",
     ),
-    config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
+    config_dir: str = typer.Option(
+        None, help="Can customize where we search for cluster configs"
+    ),
     benchmarks: Optional[str] = typer.Option(
         None,
         help="Specify benchmarks to run (comma separated). "
@@ -158,10 +168,16 @@ def summarize_results(
         help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
         "Can also specify through NEMO_SKILLS_DATA_DIR environment variable.",
     ),
-    remote_tar_dir: str = typer.Option(None, help="Directory where remote tar files are created on clusters"),
+    remote_tar_dir: str = typer.Option(
+        None, help="Directory where remote tar files are created on clusters"
+    ),
     debug: bool = typer.Option(False, help="Print debug information"),
-    mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
-    max_samples: int = typer.Option(-1, help="Limit metric computation only to first `max_samples`"),
+    mount_paths: str = typer.Option(
+        None, help="Comma separated list of paths to mount on the remote machine"
+    ),
+    max_samples: int = typer.Option(
+        -1, help="Limit metric computation only to first `max_samples`"
+    ),
     extra_datasets: str = typer.Option(
         None,
         help="Path to a custom dataset folder that will be searched in addition to the main one. "
@@ -186,15 +202,22 @@ def summarize_results(
         help="Path to save the metrics.json file. If not specified, will save to results_dir/metrics.json.",
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
-    wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
-    wandb_group: str = typer.Option(None, help="Name of the wandb group to sync results to."),
+    wandb_name: Optional[str] = typer.Option(
+        None, help="Name of the wandb experiment to sync these results to"
+    ),
+    wandb_group: str = typer.Option(
+        None, help="Name of the wandb group to sync results to."
+    ),
     wandb_project: str = typer.Option(
         "nemo-skills",
         help="Name of the wandb project to sync results to.",
     ),
 ):
     """Summarize results of an evaluation job."""
-    setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
+    setup_logging(
+        disable_hydra_logs=False,
+        log_level=logging.WARNING if not debug else logging.DEBUG,
+    )
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
@@ -212,7 +235,9 @@ def summarize_results(
         else:
             upload_path = results_dir
             temp_dir = tempfile.mkdtemp()
-            print(f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}")
+            print(
+                f"Copying results from {results_dir} on cluster {cluster} to {temp_dir}"
+            )
             os.makedirs(temp_dir, exist_ok=True)
             cluster_download_dir(
                 cluster_config,
@@ -236,7 +261,9 @@ def summarize_results(
     benchmarks_paths = []
 
     # Check for Option 3 - Root directory corresponds to a benchmark
-    if Path(results_dir).is_dir() and (len(glob.glob(f'{results_dir}/output*jsonl')) > 0 or len(glob.glob(f'{results_dir}/output_chunk_*.jsonl')) > 0):
+    if Path(results_dir).is_dir() and (
+        len(glob.glob(f"{results_dir}/output*jsonl")) > 0 or len(glob.glob(f"{results_dir}/output_chunk_*.jsonl")) > 0
+    ):
         benchmarks_paths = [results_dir]
     else:
         cand_results_dir = Path(results_dir) / "eval-results"
@@ -246,7 +273,10 @@ def summarize_results(
         else:
             # Assume by default it's Option 2.
             # Verify if it indeed has this structure: {results_dir}/{benchmark}/output*jsonl
-            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0 and len(glob.glob(f'{results_dir}/*/output_chunk_*.jsonl')) == 0:
+            if (
+                len(glob.glob(f"{results_dir}/*/output*jsonl")) == 0
+                and len(glob.glob(f"{results_dir}/*/output_chunk_*.jsonl")) == 0
+            ):
                 raise ValueError(
                     f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
                 )
@@ -265,7 +295,10 @@ def summarize_results(
         # Ascertain that the benchmarks_paths are valid
         for benchmark_path in benchmarks_paths:
             # Valid benchmark_path should contain output*jsonl files
-            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0 and len(glob.glob(f'{benchmark_path}/output_chunk_*.jsonl')) == 0:
+            if (
+                len(glob.glob(f"{benchmark_path}/output*jsonl")) == 0
+                and len(glob.glob(f"{benchmark_path}/output_chunk_*.jsonl")) == 0
+            ):
                 raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
     else:
         print(f"No benchmarks found in {results_dir}")
@@ -299,9 +332,9 @@ def summarize_results(
         has_greedy = Path(f"{benchmark_path}/output.jsonl").exists()
         input_files = glob.glob(f"{benchmark_path}/output-rs*.jsonl")
         has_sampling = len(input_files) > 0
-        
+
         # Check for chunked output files (e.g., output_chunk_*.jsonl)
-        chunked_files = glob.glob(f'{benchmark_path}/output_chunk_*.jsonl')
+        chunked_files = glob.glob(f"{benchmark_path}/output_chunk_*.jsonl")
         has_chunked = len(chunked_files) > 0
 
         if has_greedy and has_sampling:
@@ -310,14 +343,14 @@ def summarize_results(
                 "This indicates that the evaluation was done multiple times with different sampling parameters. "
                 "It's not clear how to process this! Please remove output.jsonl or output-rs*.jsonl files and rerun."
             )
-        
+
         if has_greedy and has_chunked:
             raise ValueError(
                 f"Both output.jsonl and output_chunk_*.jsonl found for benchmark {benchmark}. "
                 "This indicates that the evaluation was done multiple times with different chunking parameters. "
                 "It's not clear how to process this! Please remove output.jsonl or output_chunk_*.jsonl files and rerun."
             )
-        
+
         if has_sampling and has_chunked:
             raise ValueError(
                 f"Both output-rs*.jsonl and output_chunk_*.jsonl found for benchmark {benchmark}. "
@@ -326,7 +359,7 @@ def summarize_results(
             )
 
         if has_greedy:
-            input_files = [f'{benchmark_path}/output.jsonl']
+            input_files = [f"{benchmark_path}/output.jsonl"]
         elif has_chunked:
             input_files = chunked_files
 
@@ -406,7 +439,10 @@ def summarize_results(
                 Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json",
                 verbose=verbose,
             )
-            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json"))
+            print(
+                "Metrics are saved to",
+                str(Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json"),
+            )
         else:
             print("Metrics are saved to", save_metrics_path)
     except PermissionError:
