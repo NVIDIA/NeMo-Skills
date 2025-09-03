@@ -146,6 +146,19 @@ generate(
 
 You can inspect sdg/extracted-problems.yaml to see the outputs. There should be a new field containing the extracted problems. Let's use the QwQ-32B model to generate solutions to these problems.
 
+First we download the model. We will also use a TensorRT-LLM converted engine for data generation which can be faster.
+```
+# Download the model
+ns run_cmd --expname=qwq32b --log_dir=/workspace/QwQ-32B --cluster=slurm \
+    huggingface-cli download Qwen/QwQ-32B --local-dir /workspace/QwQ-32B
+
+# Convert to a trtllm version
+ns convert --cluster=slurm --expname=convert-qwq-trtllm --run_after=download-qwq --input_model=/workspace/QwQ-32B \
+    --output_model=/workspace/qwq32b-trtllm --convert_from=hf --convert_to=trtllm \
+    --num_gpus=8 --model_type=qwen --hf_model_name=Qwen/QwQ-32B --max_seq_len 10000
+```
+
+
 Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because NeMo-Skills can detect if the generation has already finished.
 
 ```py
@@ -160,7 +173,7 @@ generate(
     output_dir="/workspace/sdg/solutions",
     expname="solution-generation",
     run_after="problem-extraction",
-    model="/workspace/QwQ-32B",
+    model="/workspace/qwq32b-trtllm",
     server_type="trtllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
