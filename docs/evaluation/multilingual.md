@@ -37,7 +37,7 @@ ns eval \
     --num_chunks=16 \
     --server_type=vllm \
     --server_gpus=4 \
-    --server_args='--tensor-parallel-size 4 --async-scheduling' \
+    --server_args='--async-scheduling' \
     ++inference.tokens_to_generate=2048
 ```
 
@@ -52,7 +52,7 @@ ns eval \
     --server_type=vllm \
     --num_chunks=16 \
     --server_gpus=2 \
-    --server_args='--tokenizer-mode mistral --config-format mistral --load-format mistral --tensor-parallel-size 2' \
+    --server_args='--tokenizer-mode mistral --config-format mistral --load-format mistral' \
     ++inference.tokens_to_generate=2048
 ```
 
@@ -67,7 +67,6 @@ ns eval \
     --server_type=vllm \
     --num_chunks=32 \
     --server_gpus=2 \
-    --server_args='--tensor-parallel-size 2' \
     ++inference.temperature=0.6 \
     ++inference.top_k=20 \
     ++inference.tokens_to_generate=38912
