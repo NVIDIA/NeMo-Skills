@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import functools
+import json
 from abc import abstractmethod
 from typing import Any, Callable, Dict, List
 
@@ -104,6 +105,7 @@ def _wrap_call_tool_output_formatter(method):
         # Normalize to keyword-style and sanitize before delegating.
         tool_name = kwargs.get("tool") if "tool" in kwargs else (args[0] if len(args) >= 1 else None)
         provided_args = kwargs.get("args") if "args" in kwargs else (args[1] if len(args) >= 2 else None)
+        extra_args = kwargs.pop("extra_args", None)
 
         if tool_name is None:
             raise TypeError("call_tool requires 'tool' as first positional or keyword argument")
@@ -111,9 +113,14 @@ def _wrap_call_tool_output_formatter(method):
             raise TypeError("call_tool requires 'args' dict as second positional or keyword argument")
 
         sanitized_args = self.sanitize(tool_name, provided_args)
+        # Merge in extra_args AFTER sanitization so hidden/internal keys can be sent intentionally
+        if isinstance(extra_args, dict) and extra_args:
+            merged_args = {**sanitized_args, **extra_args}
+        else:
+            merged_args = sanitized_args
 
         # Delegate with normalized kwargs only to avoid leaking unexpected kwargs
-        result = await method(self, tool=tool_name, args=sanitized_args)
+        result = await method(self, tool=tool_name, args=merged_args)
         output_formatter = getattr(self, "output_formatter", None)
         if callable(output_formatter):
             return output_formatter(result)
@@ -488,4 +495,17 @@ class MCPStdioClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                return result.structuredContent
+                struct = getattr(result, "structuredContent", None)
+                if struct is not None:
+                    return struct
+                # Fallback: try to parse first content item as JSON, else return text
+                content = getattr(result, "content", None)
+                if content:
+                    first = content[0]
+                    text = getattr(first, "text", None)
+                    if isinstance(text, str):
+                        try:
+                            return json.loads(text)
+                        except Exception:
+                            return text
+                return result
