@@ -139,6 +139,18 @@ def test_generic_default_prompt():
     assert prompt.fill({"question": "How are you?"}) == expected_prompt
 
 
+def test_thinking_assistant_response():
+    """Test that the thinking part is added to the assistant response."""
+    prompt = get_prompt("generic/math", tokenizer="openai/gpt-oss-120b")
+
+    expected_prompt = """<|channel|>analysis<|message|>Let me think step by step.... The answer is 4<|end|><|start|>assistant<|channel|>final<|message|>The answer is 4<|return|>"""
+    output_prompt = prompt.format_assistant_response(
+        content="The answer is 4", thinking="Let me think step by step.... The answer is 4"
+    )
+
+    assert output_prompt == expected_prompt, "Formatted assistant response is not as expected"
+
+
 def test_generic_math_prompt():
     prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B-Instruct")
 
@@ -158,7 +170,9 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B", "nemotron", examples_type="math_text_with_code")
+    prompt = get_prompt(
+        "generic/math", tokenizer="meta-llama/Llama-3.1-8B", code_tags="nemotron", examples_type="math_text_with_code"
+    )
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -529,8 +543,9 @@ Here is the problem you need to solve:
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt("generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code")
-    prompt.config.system = ""
+    prompt = get_prompt(
+        "generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code", system_message=""
+    )
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -952,7 +967,7 @@ Reasoning: Explain why the extracted_final_answer is correct or incorrect based 
 
 Judgement: Answer 'yes' if extracted_final_answer matches the [correct_answer] given above, or is within a small margin of error for numerical problems. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
 
-Confidence: The extracted confidence score between 0|\%| and 100|\%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Confidence: The extracted confidence score between 0|\\%| and 100|\\%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
     assert (

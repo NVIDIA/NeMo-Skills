@@ -283,9 +283,8 @@ class GenerationTask:
             tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
+            system_message=self.cfg.system_message,
         )
-        if self.cfg.system_message is not None:
-            prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
