@@ -45,7 +45,7 @@ def eval_mcq(cfg):
             data = [json.loads(line) for line in fin]
         with open(file, "wt", encoding="utf-8") as fout:
             for sample in tqdm(data):
-                extract_from_boxed = sample.get("extract_from_boxed", "True") == "True"
+                extract_from_boxed = sample.get("extract_from_boxed", True)
                 extract_regex = sample.get("extract_regex", r"The final answer is (.+)$")
                 sample["predicted_answer"] = extract_letter(
                     sample["generation"], extract_from_boxed=extract_from_boxed, extract_regex=extract_regex
