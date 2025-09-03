@@ -215,7 +215,7 @@ cs.store(name="base_genselect_preprocess_config", node=GenSelectPreprocessConfig
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_genselect_preprocess_config')
+@hydra.main(version_base=None, config_name="base_genselect_preprocess_config")
 def genselect_preprocessor(cfg: GenSelectPreprocessConfig):
     cfg = GenSelectPreprocessConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)

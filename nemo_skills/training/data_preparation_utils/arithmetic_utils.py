@@ -16,13 +16,13 @@ import re
 from collections import Counter
 
 eval_funcs = {
-    "add": lambda **k: k.get('p') + k.get('q'),
-    "sub": lambda **k: k.get('p') - k.get('q'),
-    "mul": lambda **k: k.get('p') * k.get('q'),
-    "div": lambda **k: k.get('p') / k.get('q'),
-    "percent": lambda **k: k.get('p') * k.get('q') / 100,
-    "pow": lambda **k: k.get('p') ** k.get('q'),
-    "sqrt": lambda **k: k.get('p') ** 0.5,
+    "add": lambda **k: k.get("p") + k.get("q"),
+    "sub": lambda **k: k.get("p") - k.get("q"),
+    "mul": lambda **k: k.get("p") * k.get("q"),
+    "div": lambda **k: k.get("p") / k.get("q"),
+    "percent": lambda **k: k.get("p") * k.get("q") / 100,
+    "pow": lambda **k: k.get("p") ** k.get("q"),
+    "sqrt": lambda **k: k.get("p") ** 0.5,
 }
 
 
@@ -54,20 +54,20 @@ def extract_expressions(text: str):
         if c.isspace():
             if cur_expr:
                 cur_expr.append(c)
-        elif c == '.':
+        elif c == ".":
             if cur_expr and cur_expr[-1].isdigit():
                 cur_expr.append(c)
             elif cur_expr:
-                result = ''.join(cur_expr)
+                result = "".join(cur_expr)
                 yield result.rstrip(), start
         elif c.isdigit():
             cur_expr.append(c)
-        elif c == '=' and not cur_expr:
+        elif c == "=" and not cur_expr:
             continue
-        elif c in '+-/*=()':
+        elif c in "+-/*=()":
             cur_expr.append(c)
         else:
-            result = ''.join(cur_expr)
+            result = "".join(cur_expr)
             counter = Counter(result)
             if get_op_counts(counter) >= 2:
                 yield result.rstrip(), start
@@ -75,14 +75,14 @@ def extract_expressions(text: str):
         if prev_len == 0 and len(cur_expr) > 0:
             start = idx
 
-    result = ''.join(cur_expr)
+    result = "".join(cur_expr)
     counter = Counter(result)
     if get_op_counts(counter) >= 2:
         yield result.rstrip(), start
 
 
 def tokenize(expression):
-    token_pattern = r'(?<!\d)-\d+(\.\d+)?|\d+(\.\d+)?|\*\*|[+*/()-]'
+    token_pattern = r"(?<!\d)-\d+(\.\d+)?|\d+(\.\d+)?|\*\*|[+*/()-]"
     tokens = []
     for match in re.finditer(token_pattern, expression):
         token = match.group(0)
@@ -93,21 +93,21 @@ def tokenize(expression):
 
 
 def infix_to_postfix(tokens):
-    precedence = {'+': 1, '-': 1, '*': 2, '/': 2, '**': 3}
+    precedence = {"+": 1, "-": 1, "*": 2, "/": 2, "**": 3}
     output = []
     stack = []
 
     for token, start, end in tokens:
         if re.fullmatch("(?<!\d)-\d+(\.\d+)?|\d+(\.\d+)?", token):
             output.append((token, start, end))
-        elif token == '(':
+        elif token == "(":
             stack.append((token, start, end))
-        elif token == ')':
-            while stack and stack[-1][0] != '(':
+        elif token == ")":
+            while stack and stack[-1][0] != "(":
                 output.append(stack.pop())
             stack.pop()  # pop the '('
         else:
-            while stack and stack[-1][0] != '(' and precedence.get(stack[-1][0], 0) >= precedence.get(token, 0):
+            while stack and stack[-1][0] != "(" and precedence.get(stack[-1][0], 0) >= precedence.get(token, 0):
                 output.append(stack.pop())
             stack.append((token, start, end))
 
@@ -132,7 +132,7 @@ def evaluate_postfix_once(postfix):
             try:
                 if int(result) == result:
                     result = int(result)
-            except:
+            except Exception:
                 result = float(result)
 
             return result, a_start, b_end
@@ -148,7 +148,7 @@ def solve_expression(expression):
 
         left = expression[:start]
         right = expression[end:]
-        if left and left[-1] == '(' and right and right[0] == ')':
+        if left and left[-1] == "(" and right and right[0] == ")":
             left = left[:-1]
             right = right[1:]
 

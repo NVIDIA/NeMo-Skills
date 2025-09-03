@@ -15,10 +15,11 @@
 import json
 import os
 import re
-import urllib.request
-import requests
-from pathlib import Path
 import shutil
+import urllib.request
+from pathlib import Path
+
+import requests
 
 URL_prefix = "https://raw.githubusercontent.com/trishullab/PutnamBench/dc91ed7/lean4/src/"
 URL = "https://github.com/trishullab/PutnamBench/tree/dc91ed7/lean4/src"
@@ -31,36 +32,44 @@ informal_prefix_match = re.compile(informal_prefix_regex)
 header_regex = r"^(?:import|open|def|abbrev|noncomputable)\s+.*(?:\n(?:\s*\|.+|[ \t]+.+))*"
 header_regex_match = re.compile(header_regex, re.MULTILINE)
 
+
 def extract_theorem(filename):
     with open(filename, "r") as f:
         text = f.read()
-    
+
     # retrieve the theorem name, formal statement, informal prefix, informal statement, and header
     lean_matches = lean_regex_match.findall(text)
     assert len(lean_matches) == 1, "Multiple theorems found in the file"
     informal_prefixes = informal_prefix_match.findall(text)
     assert len(informal_prefixes) == 1, "Multiple informal prefixes found in the file"
     headers = header_regex_match.findall(text)
-    header = '\n'.join(headers) + '\n\n'
+    header = "\n".join(headers) + "\n\n"
     thm_name = lean_matches[0][1]
     full_thm = lean_matches[0][0]
     informal_prefix = informal_prefixes[0]
-    informal_statement = informal_prefix.replace("/--","").replace("-/","").strip()
+    informal_statement = informal_prefix.replace("/--", "").replace("-/", "").strip()
 
-    theorem={"name": thm_name, "formal_statement": full_thm, "informal_prefix": informal_prefix, "problem": informal_statement,"header": header}
+    theorem = {
+        "name": thm_name,
+        "formal_statement": full_thm,
+        "informal_prefix": informal_prefix,
+        "problem": informal_statement,
+        "header": header,
+    }
 
     return theorem
 
+
 def get_file_names_from_github(url):
-    response = requests.get(url)  
-      
-    if response.status_code == 200:  
-        # Extract file names using a regular expression  
-        # This regex pattern matches the hrefs of the files.   
-        # TODO: This is a pretty fragile approach, as it depends on GitHub's current HTML structure.  
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        # Extract file names using a regular expression
+        # This regex pattern matches the hrefs of the files.
+        # TODO: This is a pretty fragile approach, as it depends on GitHub's current HTML structure.
         # find all names with putnam*.lean
-        pattern = r'putnam[^"]+\.lean' 
-        matches = re.findall(pattern, response.text)  
+        pattern = r'putnam[^"]+\.lean'
+        matches = re.findall(pattern, response.text)
         return matches
     else:
         print(f"Failed to access {url}, Status code: {response.status_code}")
@@ -78,11 +87,11 @@ def download_dataset(output_path):
             urllib.request.urlretrieve(URL_prefix + file_name, os.path.join(output_path, file_name))
 
 
-
 def save_data(data, output_file):
     with open(output_file, "w", encoding="utf-8") as fout:
         for entry in data:
             fout.write(json.dumps(entry) + "\n")
+
 
 def delete_file(file_path):
     # delete the folder and all its contents
@@ -95,7 +104,7 @@ def main():
     original_folder = str(data_dir / "lean4")
     download_dataset(original_folder)
 
-    #extract data
+    # extract data
     theorems = []
     for filename in os.listdir(original_folder):
         if filename.endswith(".lean"):
@@ -106,5 +115,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()

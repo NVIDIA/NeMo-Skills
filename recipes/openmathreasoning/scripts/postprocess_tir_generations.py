@@ -21,7 +21,7 @@ from collections import Counter
 
 
 def validate_code_execution(text, code_begin="```python", code_end="```"):
-    lines = text.split('\n')
+    lines = text.split("\n")
     i = 0
 
     while i < len(lines):
@@ -76,8 +76,8 @@ def cut_final_answer_part(output):
 
 
 def replace_code_tags(text, args):
-    pattern = fr"{args.code_begin}(.*?)\n{args.code_end}"
-    replacement = fr"{args.new_code_begin}\1\n{args.new_code_end}"
+    pattern = rf"{args.code_begin}(.*?)\n{args.code_end}"
+    replacement = rf"{args.new_code_begin}\1\n{args.new_code_end}"
     processed_text = re.sub(pattern, replacement, text, flags=re.DOTALL)
 
     return processed_text
@@ -111,7 +111,7 @@ def filter_code_solution(sample, args):
 
     if args.new_code_begin and args.new_code_end:
         generation = replace_code_tags(generation, args)
-    
+
     sample["generation"] = generation
 
     return "Accepted"
@@ -145,12 +145,16 @@ if __name__ == "__main__":
     parser.add_argument("--code_begin", type=str, default="```python\n", help="Start of code block tag")
     parser.add_argument("--code_end", type=str, default="```\n", help="End of code block tag")
     parser.add_argument(
-        "--new_code_begin", type=str, default=None,
-        help="New start of code block tag, to replace the original one. If not specified, will not replace"
+        "--new_code_begin",
+        type=str,
+        default=None,
+        help="New start of code block tag, to replace the original one. If not specified, will not replace",
     )
     parser.add_argument(
-        "--new_code_end", type=str, default=None,
-        help="New end of code block tag, to replace the original one. If not specified, will not replace"
+        "--new_code_end",
+        type=str,
+        default=None,
+        help="New end of code block tag, to replace the original one. If not specified, will not replace",
     )
     args = parser.parse_args()
 

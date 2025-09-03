@@ -26,7 +26,6 @@ from nemo_skills.pipeline.utils import (
     check_mounts,
     get_cluster_config,
     get_exp,
-    get_free_port,
     get_mounted_path,
     get_timeout,
     resolve_mount_paths,
@@ -97,12 +96,15 @@ configs = {
     TrainingAlgo.rm: "rm_config",
 }
 
-rl_extra_args_fn = lambda params: (
-    f" ++model.data.data_prefix.train='[{params.training_data}]' "
-    f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-    f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-    f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-)
+
+def rl_extra_args_fn(params):
+    return (
+        f" ++model.data.data_prefix.train='[{params.training_data}]' "
+        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+    )
+
 
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (

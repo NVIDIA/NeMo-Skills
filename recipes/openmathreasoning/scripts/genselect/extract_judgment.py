@@ -15,10 +15,10 @@
 
 """Extracts the judgment from the GenSelect outputs and saves instances with the correct judgment"""
 
-import json
 import argparse
-
+import json
 from collections import Counter
+
 from utils import extract_judgment
 
 
@@ -47,13 +47,13 @@ def assign_rm_values(input_file, output_dir):
             if not correct_fmt:
                 continue
             else:
-                if (comp_instance[f"label_{judgment}"] == "Correct"):
+                if comp_instance[f"label_{judgment}"] == "Correct":
                     instance = {
                         "problem": comp_instance["problem"],
                         "solutions": comp_instance["solutions"],
                         "generation": rm_judgment,
                         "max_idx": max_idx,
-                        "num_solutions": max_idx + 1
+                        "num_solutions": max_idx + 1,
                     }
 
                     for i in range(max_idx + 1):
@@ -66,11 +66,9 @@ def assign_rm_values(input_file, output_dir):
                     instance["predicted_answer"] = comp_instance[f"predicted_answer_{judgment}"]
                     reasoning_instances.add(tuple(sorted(list(instance.items()))))
 
-
     print("Formatting of judgment: %s" % str(counter_fmt))
     print("# of instances: %d" % len(reasoning_instances))
     print("# of total instances: %d" % total_instances)
-
 
     reasoning_instances = list(reasoning_instances)
 
@@ -79,7 +77,6 @@ def assign_rm_values(input_file, output_dir):
         for instance in reasoning_instances:
             instance = dict(instance)
             fout.write(json.dumps(instance) + "\n")
-
 
 
 def main():

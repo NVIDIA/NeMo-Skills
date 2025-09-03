@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description="Create a tiny model for testing.")
 parser.add_argument("--model_type", type=str, required=True, choices=("qwen", "llama", "qwen_orm"))
 args = parser.parse_args()
 
-if args.model_type == 'qwen':
+if args.model_type == "qwen":
     model_name = "Qwen/Qwen2.5-1.5B"
     output_dir = "/tmp/nemo-skills-tests/qwen/tiny-model-hf"
     kwargs = dict(
@@ -33,7 +33,7 @@ if args.model_type == 'qwen':
         num_attention_heads=2,
         num_hidden_layers=2,
     )
-elif args.model_type == 'qwen_orm':
+elif args.model_type == "qwen_orm":
     # vLLM requires a minimum head dimension size of 32, so we use a larger value here
     model_name = "Qwen/Qwen2.5-Math-RM-72B"
     output_dir = "/tmp/nemo-skills-tests/qwen_orm/tiny-model-hf"
@@ -62,7 +62,7 @@ config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 config.update(kwargs)
 print("new config", config)
 
-if args.model_type == 'qwen_orm':
+if args.model_type == "qwen_orm":
     tiny_model = AutoModel.from_config(config, trust_remote_code=True)
 else:
     # create a tiny random model

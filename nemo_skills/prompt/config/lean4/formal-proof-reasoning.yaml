@@ -17,7 +17,7 @@
 # of theorems within the Lean 4 formal system.
 
 user: |-
-  Solve this Lean4 theorem. Please reason step by step, and put your final answer within **FINAL ANSWER**```lean4 ```. 
+  Solve this Lean4 theorem. Please reason step by step, and put your final answer within **FINAL ANSWER**```lean4 ```.
   DO NOT include any header or reference of the theorem in the final answer.
 
   For example, if you are proving a theorem:

@@ -13,12 +13,8 @@
 # limitations under the License.
 
 import logging
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import openai
 import requests
-from openai import BadRequestError
 
 from nemo_skills.utils import get_logger_name
 
@@ -46,7 +42,7 @@ class VLLMModel(BaseModel):
                 return ServerTokenizer(tokenize_url)
             else:
                 return None
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             return None
 
     def _build_request_body(self, top_k, min_p, repetition_penalty, extra_body: dict = None):

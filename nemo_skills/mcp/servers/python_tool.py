@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import json
 import logging
 from dataclasses import dataclass
 from typing import Annotated
@@ -53,7 +52,7 @@ async def execute(
     try:
         output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
     except RemoteProtocolError:
-        return {"process_status": "fail", "stdout": "", "stderr": f"Error connecting to sandbox"}
+        return {"process_status": "fail", "stdout": "", "stderr": "Error connecting to sandbox"}
     return output
 
 

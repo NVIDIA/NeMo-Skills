@@ -12,5 +12,5 @@ index e2c6a37..4ee6347 100644
 +            model.post_load_weights()
 +
          return model.eval()
- 
+
      @staticmethod

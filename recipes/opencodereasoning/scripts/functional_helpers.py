@@ -17,19 +17,20 @@ Usage:
 
 python functional_helpers.py <function name> --<ANY ADDITIONAL ARGUMENTS> ...
 """
+
 import glob
 import logging
 import os
 
 from fire import Fire
+from output_processing import post_process_generation
+
 from nemo_skills import utils
 
 # Utility function that checks if there are any extra arguments passed to the function
 from nemo_skills.utils import check_no_extra_args_fire, setup_logging
 
-from output_processing import post_process_generation
-
-logger = logging.getLogger('nemo_skills')
+logger = logging.getLogger("nemo_skills")
 
 
 def rename_files_to_json(data_path: str):
@@ -44,7 +45,7 @@ def rename_files_to_json(data_path: str):
         all_data_path = sorted(glob.glob(data_path))
 
         # Filter the .done files if they exist
-        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
+        all_data_path = [path for path in all_data_path if not path.endswith(".done")]
     else:
         all_data_path = [data_path]
 
@@ -82,7 +83,7 @@ def filter_invalid_samples(
         all_data_path = sorted(glob.glob(data_path))
 
         # Filter the .done files if they exist
-        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
+        all_data_path = [path for path in all_data_path if not path.endswith(".done")]
 
         out_file, ext = os.path.splitext(output_filename)
         all_output_filenames = [
@@ -110,7 +111,7 @@ def filter_invalid_samples(
         # Check for invalid samples with no 'is_valid_sample' key
         wrong_ids = []
         for sample_id, sample in enumerate(data):
-            if 'is_valid_sample' not in sample:
+            if "is_valid_sample" not in sample:
                 wrong_ids.append(sample_id)
 
         # Log the invalid samples
@@ -119,7 +120,7 @@ def filter_invalid_samples(
             logger.warning(f"Sample IDs: {wrong_ids}")
 
         # Filter invalid samples
-        data[:] = [sample for sample in data if sample.get('is_valid_sample', False)]
+        data[:] = [sample for sample in data if sample.get("is_valid_sample", False)]
         num_dropped = num_samples - len(data)
         logger.info(f"Filtered {num_dropped} invalid samples out of {num_samples} samples")
 
@@ -149,13 +150,12 @@ def filter_code_samples(
         all_data_path = sorted(glob.glob(data_path))
 
         # Filter the .done files if they exist
-        all_data_path = [path for path in all_data_path if not path.endswith('.done')]
+        all_data_path = [path for path in all_data_path if not path.endswith(".done")]
 
         out_file, ext = os.path.splitext(output_filename)
         all_output_filenames = [
             f"{out_file}_{os.path.basename(input_path)}" for idx, input_path in enumerate(all_data_path)
         ]
-
 
     else:
         # Just get the chunked file name of input, no need to load the data
@@ -178,10 +178,10 @@ def filter_code_samples(
         # Find position of Final Solution
         for sample_idx, sample in enumerate(data):
             # Inject default value for is_valid_sample
-            if 'is_valid_sample' not in sample:
-                sample['is_valid_sample'] = True
+            if "is_valid_sample" not in sample:
+                sample["is_valid_sample"] = True
 
-            output = sample['output']
+            output = sample["output"]
 
             # If filter reasoning is enabled, check the output exists only in output part
             if filter_reasoning:
@@ -198,7 +198,7 @@ def filter_code_samples(
 
                 else:
                     # If both reasoning tags are not found, reject the sample
-                    sample['is_valid_sample'] = False
+                    sample["is_valid_sample"] = False
                     continue
 
             else:
@@ -206,8 +206,8 @@ def filter_code_samples(
 
             # Check the generated code solutions
             check_output = {
-                'text': checked_output,
-                'finish_reason': 'stop',
+                "text": checked_output,
+                "finish_reason": "stop",
             }
             new_instructions = post_process_generation(
                 check_output, keep_explanations=keep_explanations, do_ast_check=do_ast_check
@@ -215,17 +215,17 @@ def filter_code_samples(
 
             # If after processing the output, the checks failed, reject the sample
             if new_instructions is None:
-                sample['is_valid_sample'] = False
+                sample["is_valid_sample"] = False
                 continue
 
-            sample['output'] = output
+            sample["output"] = output
 
         # Save the filtered data
         utils.jdump(data, os.path.join(output_dir, output_filename))
         logger.info(f"Saved the filtered data ({len(data)}) to {os.path.join(output_dir, output_filename)}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     setup_logging(disable_hydra_logs=False)
     check_no_extra_args_fire()  # Warn extra args for Fire
     Fire()

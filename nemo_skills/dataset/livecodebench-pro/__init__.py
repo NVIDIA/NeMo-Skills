@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-DATASET_GROUP = 'code'
-METRICS_TYPE = 'code'
+DATASET_GROUP = "code"
+METRICS_TYPE = "code"
 EVAL_ARGS = "++eval_type=livecodebench_pro"
 GENERATION_ARGS = "++prompt_config=eval/livecodebench/python_codegen"

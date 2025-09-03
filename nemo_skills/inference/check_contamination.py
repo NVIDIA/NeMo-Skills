@@ -16,11 +16,9 @@ import asyncio
 import json
 import logging
 import sys
-from collections import defaultdict
 from dataclasses import field
 
 import hydra
-from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params

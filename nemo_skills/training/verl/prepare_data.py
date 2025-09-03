@@ -13,34 +13,34 @@
 # limitations under the License.
 
 import argparse
-import pandas as pd
 import json
+
+import pandas as pd
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert JSONL to Parquet with specific transformations.")
-    parser.add_argument('--input_file', type=str, required=True, help='Path to the input JSONL file.')
-    parser.add_argument('--output_file', type=str, required=True, help='Path to the output Parquet file.')
-    parser.add_argument('--data_source', type=str, default='nemo-skills', help='Data source to be recorded in the output.')
-    parser.add_argument('--ability', type=str, default='math', help='Ability to be recorded in the output.')
+    parser.add_argument("--input_file", type=str, required=True, help="Path to the input JSONL file.")
+    parser.add_argument("--output_file", type=str, required=True, help="Path to the output Parquet file.")
+    parser.add_argument(
+        "--data_source", type=str, default="nemo-skills", help="Data source to be recorded in the output."
+    )
+    parser.add_argument("--ability", type=str, default="math", help="Ability to be recorded in the output.")
     return parser.parse_args()
+
 
 def transform_data(input_file, data_source, ability):
     # Read the JSONL file
     data = []
-    with open(input_file, 'r') as file:
+    with open(input_file, "r") as file:
         for line in file:
             json_line = json.loads(line)
             transformed_entry = {
-                'prompt': json_line['input'],
-                'reward_model': {
-                    'ground_truth': json_line['expected_answer'],
-                    'style': 'rule'
-                },
-                'extra_info': {
-                    'problem': json_line['problem']
-                },
-                'data_source': data_source,
-                'ability': ability
+                "prompt": json_line["input"],
+                "reward_model": {"ground_truth": json_line["expected_answer"], "style": "rule"},
+                "extra_info": {"problem": json_line["problem"]},
+                "data_source": data_source,
+                "ability": ability,
             }
             data.append(transformed_entry)
 
@@ -48,8 +48,10 @@ def transform_data(input_file, data_source, ability):
     df = pd.DataFrame(data)
     return df
 
+
 def save_to_parquet(df, output_file):
     df.to_parquet(output_file, index=False)
+
 
 def main():
     args = parse_args()
@@ -57,6 +59,6 @@ def main():
     save_to_parquet(transformed_df, args.output_file)
     print(f"Data transformed and saved to {args.output_file}")
 
+
 if __name__ == "__main__":
     main()
-

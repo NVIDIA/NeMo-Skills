@@ -59,20 +59,20 @@ class ArenaJudgeTask(GenerationTask):
             LOG.info("Example prompt in OpenAI format: \nData dictionary: %s", data_point)
             return
 
-        data_point['answer_1'] = data_point['generation']
-        data_point['answer_2'] = data_point['baseline_answer']
+        data_point["answer_1"] = data_point["generation"]
+        data_point["answer_2"] = data_point["baseline_answer"]
         LOG.info(
             "Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, all_data)
         )
 
     async def process_single_datapoint(self, data_point, all_data):
         gen_base_data = data_point.copy()
-        gen_base_data['answer_1'] = data_point['generation']
-        gen_base_data['answer_2'] = data_point['baseline_answer']
+        gen_base_data["answer_1"] = data_point["generation"]
+        gen_base_data["answer_2"] = data_point["baseline_answer"]
         # reversing the answers
         base_gen_data = data_point.copy()
-        base_gen_data['answer_2'] = data_point['generation']
-        base_gen_data['answer_1'] = data_point['baseline_answer']
+        base_gen_data["answer_2"] = data_point["generation"]
+        base_gen_data["answer_1"] = data_point["baseline_answer"]
 
         # Make two async calls instead of one batch call
         llm_output_1, llm_output_2 = await asyncio.gather(
@@ -81,8 +81,8 @@ class ArenaJudgeTask(GenerationTask):
         )
 
         return {
-            f'{self.cfg.generation_key}-gen-base': llm_output_1['generation'],
-            f'{self.cfg.generation_key}-base-gen': llm_output_2['generation'],
+            f"{self.cfg.generation_key}-gen-base": llm_output_1["generation"],
+            f"{self.cfg.generation_key}-base-gen": llm_output_2["generation"],
             "generation": "",  # dummy key since the downstream code expects it # TODO: fix this
         }
 
@@ -91,7 +91,7 @@ GENERATION_TASK_CLASS = ArenaJudgeTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_arena_judge_config')
+@hydra.main(version_base=None, config_name="base_arena_judge_config")
 def generate(cfg: ArenaJudgeConfig):
     cfg = ArenaJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -107,7 +107,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

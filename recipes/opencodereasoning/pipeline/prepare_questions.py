@@ -14,7 +14,6 @@
 
 import argparse
 import os
-from pathlib import Path
 
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
@@ -46,9 +45,9 @@ def prepare_questions(cluster, expname, output_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare Open Code Reasoning questions")
 
-    parser.add_argument('--cluster', type=str, required=True, help="Cluster name to run the job on.")
+    parser.add_argument("--cluster", type=str, required=True, help="Cluster name to run the job on.")
 
-    parser.add_argument('--expname', type=str, required=True, help="Experiment name for the job.")
+    parser.add_argument("--expname", type=str, required=True, help="Experiment name for the job.")
 
     parser.add_argument(
         "--output_dir",
@@ -59,7 +58,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if not 'HF_HOME' in os.environ:
+    if "HF_HOME" not in os.environ:
         print("HF_HOME environment variable not set in the enviroment, dataset cache will NOT be used.")
 
     prepare_questions(

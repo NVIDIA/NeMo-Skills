@@ -10,5 +10,3 @@ few_shot_examples:
   # by default there are no examples, but can be changed from code/cmd
 
 user: "{examples}{problem}\n\nSolution:\n"
-
-

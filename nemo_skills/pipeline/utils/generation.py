@@ -314,6 +314,7 @@ def configure_client(
     server_container: str | None,
     get_random_port: bool,
     extra_arguments: str,
+    server_container: str | None = None,
 ):
     """
     Utility function to configure a client for the model inference server.
@@ -328,6 +329,7 @@ def configure_client(
         server_entrypoint: Entry point for the server command (will use default if None).
         get_random_port: Whether to get a random port for the server.
         extra_arguments: Extra arguments to pass to the command.
+        server_container: Container to use for the server.
 
     Returns:
         A tuple containing:

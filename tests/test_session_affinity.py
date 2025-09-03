@@ -22,10 +22,8 @@ import random
 import threading
 import time
 import uuid
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import numpy as np
 import pytest
 import requests
 
@@ -426,7 +424,6 @@ except NameError:
 
         # Analyze results
         successful_sessions = sum(1 for _, success, _ in results if success)
-        total_operations = num_sessions * operations_per_session
         session_misses = 0
 
         for operations, success, message in results:

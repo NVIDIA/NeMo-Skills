@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    with open(args.input_file, 'r') as infile, open(args.output_file, 'w') as outfile:
+    with open(args.input_file, "r") as infile, open(args.output_file, "w") as outfile:
         for line in infile:
             data = json.loads(line)
             generation = data.pop("generation")
@@ -33,11 +33,11 @@ if __name__ == "__main__":
                 generation = generation.split("Output:")[1].strip()
             if "Answer not found" in generation or "Answer:" not in generation:
                 data["expected_answer"] = None
-                outfile.write(json.dumps(data) + '\n')
+                outfile.write(json.dumps(data) + "\n")
                 continue
             generation = generation.split("Answer:")[1].strip()
             # sometimes LLM uses math-problem format..
             if "\\boxed{" in generation:
                 generation = extract_answer(generation)
             data["expected_answer"] = generation
-            outfile.write(json.dumps(data) + '\n')
+            outfile.write(json.dumps(data) + "\n")

@@ -18,7 +18,7 @@ from nemo_skills.prompt.utils import get_prompt
 
 def test_generic_math_problem_augmentation_prompt():
     prompt = get_prompt(
-        'generic/problem-augmentation', 'meta-llama/Llama-3.1-8B-Instruct', examples_type='math_problem_augmentation'
+        "generic/problem-augmentation", "meta-llama/Llama-3.1-8B-Instruct", examples_type="math_problem_augmentation"
     )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -102,16 +102,16 @@ Start directly with the problem statement and DO NOT include any phrases such as
 After the problem is completed finish your response right away.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({'problem': "What's the meaning of life?"}) == expected_prompt
+    assert prompt.fill({"problem": "What's the meaning of life?"}) == expected_prompt
 
 
 def test_generic_codegen_prompt():
-    prompt = get_prompt('generic/codegen')
+    prompt = get_prompt("generic/codegen")
 
     expected_prompt = [
         {
-            'role': 'user',
-            'content': '''
+            "role": "user",
+            "content": '''
 Here is a problem for which you need to generate/complete code:
 def 2_plus_2():
     """Write code to solve 2 + 2"""
@@ -124,23 +124,23 @@ The solution should be in the following format:
 ```'''.strip(),
         },
     ]
-    assert prompt.fill({'question': 'def 2_plus_2():\n    """Write code to solve 2 + 2"""'}) == expected_prompt
+    assert prompt.fill({"question": 'def 2_plus_2():\n    """Write code to solve 2 + 2"""'}) == expected_prompt
 
 
 def test_generic_default_prompt():
-    prompt = get_prompt('generic/default')
+    prompt = get_prompt("generic/default")
 
     expected_prompt = [
         {
-            'role': 'user',
-            'content': 'How are you?',
+            "role": "user",
+            "content": "How are you?",
         },
     ]
-    assert prompt.fill({'question': 'How are you?'}) == expected_prompt
+    assert prompt.fill({"question": "How are you?"}) == expected_prompt
 
 
 def test_generic_math_prompt():
-    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B-Instruct')
+    prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B-Instruct")
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -154,11 +154,11 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 2 + 2 = ?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt('generic/math', 'meta-llama/Llama-3.1-8B', 'nemotron', examples_type='math_text_with_code')
+    prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B", "nemotron", examples_type="math_text_with_code")
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -329,12 +329,12 @@ So the bee is $\\boxed{1008\\sqrt{2} + 1008\\sqrt{6}}$ far from the starting poi
 
 Here is the problem you need to solve:
 2 + 2 = ?"""
-    assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
 
 
 def test_llama_code_output_format_examples():
     prompt = get_prompt(
-        'generic/math', 'meta-llama/Llama-3.1-8B-Instruct', 'llama3', examples_type='math_text_with_code'
+        "generic/math", "meta-llama/Llama-3.1-8B-Instruct", "llama3", examples_type="math_text_with_code"
     )
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -525,12 +525,12 @@ Here is the problem you need to solve:
 2 + 2 = ?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct', 'qwen', examples_type='math_text_with_code')
-    prompt.config.system = ''
+    prompt = get_prompt("generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code")
+    prompt.config.system = ""
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -706,16 +706,16 @@ Here is the problem you need to solve:
 2 + 2 = ?<|im_end|>
 <|im_start|>assistant
 """
-    assert prompt.fill({'problem': '2 + 2 = ?'}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
 
 
 def test_judge_arena():
-    prompt = get_prompt('judge/arena')
+    prompt = get_prompt("judge/arena")
 
     expected_prompt = [
         {
-            'role': 'system',
-            'content': '''
+            "role": "system",
+            "content": """
 Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants to the user prompt displayed below. You will be given assistant A's answer and assistant B's answer. Your job is to evaluate which assistant's answer is better.
 
 Begin your evaluation by generating your own answer to the prompt. You must provide your answers before judging any answers.
@@ -735,11 +735,11 @@ After providing your explanation, you must output only one of the following choi
 5. Assistant B is significantly better: [[B>>A]]
 
 Example output: "My final verdict is tie: [[A=B]]".
-'''.strip(),
+""".strip(),
         },
         {
-            'role': 'user',
-            'content': '''
+            "role": "user",
+            "content": """
 <|User Prompt|>
 What's better for a cold: tea or coffee?
 
@@ -750,13 +750,13 @@ Tea for sure
 <|The Start of Assistant B's Answer|>
 I mean, coffee, why do you even ask?
 <|The End of Assistant B's Answer|>
-'''.strip(),
+""".strip(),
         },
     ]
     assert (
         prompt.fill(
             {
-                'question': "What's better for a cold: tea or coffee?",
+                "question": "What's better for a cold: tea or coffee?",
                 "answer_1": "Tea for sure",
                 "answer_2": "I mean, coffee, why do you even ask?",
             }
@@ -766,12 +766,12 @@ I mean, coffee, why do you even ask?
 
 
 def test_judge_math():
-    prompt = get_prompt('judge/math')
+    prompt = get_prompt("judge/math")
 
     expected_prompt = [
         {
-            'role': 'user',
-            'content': '''
+            "role": "user",
+            "content": """
 You will be asked to look at the two answers (predicted and expected) to a math problem and to judge whether they are equivalent within the context of the problem.
 
 Please first explain your reasoning in a couple of sentences. Then respond with only Yes or No as your judgement on whether the two answers are the same.
@@ -847,13 +847,13 @@ YOUR TASK
 Problem: 1 + 1
 Predicted answer: eh, 15?
 Expected answer: 2
-'''.strip(),
+""".strip(),
         },
     ]
     assert (
         prompt.fill(
             {
-                'problem': "1 + 1",
+                "problem": "1 + 1",
                 "predicted_answer": "eh, 15?",
                 "expected_answer": "2",
             }
@@ -863,12 +863,12 @@ Expected answer: 2
 
 
 def test_judge_check_contamination():
-    prompt = get_prompt('judge/check-contamination')
+    prompt = get_prompt("judge/check-contamination")
 
     expected_prompt = [
         {
-            'role': 'user',
-            'content': '''
+            "role": "user",
+            "content": """
 Help me determine if the following two math problems are the same.
 
 First problem: 1 + 3
@@ -877,13 +877,13 @@ Second problem: what's 3 plus 1?
 Disregard the names and minor changes in word order that appear within.
 If the two problems are very similar and if they produce the same answer, we consider them to be the same problem.
 Respond with only "True" (problems are the same) or "False" (problems are different). Do not respond with anything else.
-'''.strip(),
+""".strip(),
         },
     ]
     assert (
         prompt.fill(
             {
-                'problem1': "1 + 3",
+                "problem1": "1 + 3",
                 "problem2": "what's 3 plus 1?",
             }
         )
@@ -892,7 +892,7 @@ Respond with only "True" (problems are the same) or "False" (problems are differ
 
 
 def test_generic_general_boxed_prompt():
-    prompt = get_prompt('generic/general-boxed', 'meta-llama/Llama-3.1-8B-Instruct')
+    prompt = get_prompt("generic/general-boxed", "meta-llama/Llama-3.1-8B-Instruct")
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -919,7 +919,7 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     assert (
         prompt.fill(
             {
-                'problem': 'What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9'
+                "problem": "What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9"
             }
         )
         == expected_prompt
@@ -927,7 +927,7 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 
 def test_llm_as_judge_hle_original_prompt():
-    prompt = get_prompt('judge/hle', 'meta-llama/Llama-3.1-8B-Instruct')
+    prompt = get_prompt("judge/hle", "meta-llama/Llama-3.1-8B-Instruct")
 
     expected_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 

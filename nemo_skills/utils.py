@@ -261,7 +261,7 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = "", level: int = 
             try:
                 default_factory = default_factory()
                 default_str = f" = {default_factory}"
-            except:
+            except Exception:
                 pass
             if is_dataclass(default_factory):
                 default_str = f" = {field_type}()"
