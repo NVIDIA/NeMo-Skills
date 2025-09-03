@@ -139,7 +139,7 @@ def test_generic_default_prompt():
     assert prompt.fill({"question": "How are you?"}) == expected_prompt
 
 
-def test_thinking_output_format():
+def test_thinking_assistant_response():
     """Test that the thinking part is added to the assistant response."""
     prompt = get_prompt("generic/math", tokenizer="openai/gpt-oss-120b")
 
