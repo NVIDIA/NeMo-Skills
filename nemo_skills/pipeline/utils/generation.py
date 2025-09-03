@@ -311,7 +311,6 @@ def configure_client(
     server_address: str,
     server_args: str,
     server_entrypoint: str | None,
-    server_container: str | None,
     get_random_port: bool,
     extra_arguments: str,
     server_container: str | None = None,
