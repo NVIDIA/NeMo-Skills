@@ -64,7 +64,6 @@ def main():
     )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
-
     checker = (
         f"cd /nemo_run/code/tests/slurm-tests/qwen3_4b_evals && python check_results.py --workspace {args.workspace} "
     )
