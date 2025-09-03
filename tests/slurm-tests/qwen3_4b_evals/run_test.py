@@ -17,18 +17,6 @@ import argparse
 from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 
-def setup(workspace, cluster, expname_prefix):
-    # download models
-    model = "Qwen/Qwen3-4B"
-    cmd = f"huggingface-cli download {model}"
-    run_cmd(
-        ctx=wrap_arguments(cmd),
-        cluster=cluster,
-        expname=f"{expname_prefix}-download-models",
-        log_dir=f"{workspace}/download-assets",
-    )
-
-
 def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     """Run evals in Reasoning ON mode"""
     base_model = "Qwen/Qwen3-4B"
@@ -39,11 +27,11 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
     # BFCL (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++model_name=Qwen/Qwen3-4B"),
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=base_model,
-        server_gpus=8,
+        server_gpus=2,
         num_jobs=1,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on_tool_calling",
@@ -59,7 +47,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Nemotron eval pipeline")
+    parser = argparse.ArgumentParser(description="Run Qwen3-4B eval pipeline")
     parser.add_argument("--workspace", required=True, help="Workspace directory containing all experiment data")
     parser.add_argument("--cluster", required=True, help="Cluster name, e.g. oci")
     parser.add_argument("--expname_prefix", required=True, help="Experiment name prefix")
@@ -68,8 +56,6 @@ def main():
     args = parser.parse_args()
 
     prepare_data(ctx=wrap_arguments("bfcl_v3"))
-
-    setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 
     reasoning_on_expnames = eval_reasoning_on(
         workspace=args.workspace,

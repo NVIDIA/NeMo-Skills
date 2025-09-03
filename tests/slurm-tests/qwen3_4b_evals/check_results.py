@@ -73,9 +73,8 @@ def check_toolcalling(bucket: str, mode: str):
         assert lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]"
 
 
-# ---------------- Main ----------------
 def main():
-    ap = argparse.ArgumentParser(description="Assert-only verifier: reasoning + tool-calling + ruler")
+    ap = argparse.ArgumentParser(description="Assert-only verifier: tool-calling")
     ap.add_argument("--workspace", required=True, help="Workspace root containing eval buckets")
     args = ap.parse_args()
 
