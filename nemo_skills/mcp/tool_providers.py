@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, Dict, List
 
+from omegaconf import OmegaConf
+
 from nemo_skills.mcp.tool_manager import Tool
-from nemo_skills.mcp.utils import locate
+from nemo_skills.mcp.utils import hydra_config_connector_factory, locate
 
 
 class MCPClientTool(Tool):
@@ -22,10 +25,8 @@ class MCPClientTool(Tool):
 
     def __init__(self) -> None:
         self._config: Dict[str, Any] = {
-            "transport": "stdio",
-            "command": "python",
-            "args": [],
-            "base_url": None,
+            "client": None,  # dotted path or class
+            "client_params": {},  # kwargs for client constructor
             "hide_args": {},
             "disabled_tools": [],
             "enabled_tools": [],
@@ -49,8 +50,6 @@ class MCPClientTool(Tool):
         return value
 
     def configure(self, overrides: Dict[str, Any] | None = None, context: Dict[str, Any] | None = None) -> None:
-        from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
-
         cfg = dict(self._config)
         if overrides:
             cfg.update(overrides)
@@ -58,28 +57,41 @@ class MCPClientTool(Tool):
         output_formatter = self._resolve_maybe_callable(cfg.get("output_formatter"))
         init_hook = self._resolve_maybe_callable(cfg.get("init_hook"))
 
-        if cfg.get("transport", "stdio") == "streamable_http":
-            self._client = MCPStreamableHttpClient(
-                base_url=cfg["base_url"],
-            )
-            # Inject common behaviors set by metaclass wrapper
-            # Note: MCPStreamableHttpClient __init__ doesn't accept these; we attach after
-            self._client._hide_args = cfg.get("hide_args", {})
-            self._client._disabled_tools = set(cfg.get("disabled_tools", []))
-            self._client._enabled_tools = set(cfg.get("enabled_tools", []))
-            self._client.output_formatter = output_formatter
-            if callable(init_hook):
-                init_hook(self._client)
-        else:
-            self._client = MCPStdioClient(
-                command=cfg["command"],
-                args=list(cfg.get("args", [])),
-                hide_args=cfg.get("hide_args"),
-                disabled_tools=cfg.get("disabled_tools"),
-                enabled_tools=cfg.get("enabled_tools"),
-                output_formatter=output_formatter,
-                init_hook=init_hook,
-            )
+        # Explicit config-connector activation: init_hook == "hydra" builds from full context
+        if init_hook == "hydra":
+            init_hook = hydra_config_connector_factory(OmegaConf.create(context or {}))
+
+        # Construct client (do not pass init_hook here; we will invoke it ourselves to allow context)
+        custom_client_cls = cfg.get("client")
+        if not custom_client_cls:
+            raise ValueError("MCPClientTool requires 'client' (class path or class) to be specified")
+        if isinstance(custom_client_cls, str):
+            custom_client_cls = locate(custom_client_cls)
+        client_params = dict(cfg.get("client_params", {}))
+
+        # User-specified client class and params
+        self._client = custom_client_cls(**client_params)
+
+        # Attach common behaviors post-init (recognized by MCP metaclass wrappers)
+        self._client._hide_args = cfg.get("hide_args", {})
+        self._client._disabled_tools = set(cfg.get("disabled_tools", []))
+        self._client._enabled_tools = set(cfg.get("enabled_tools", []))
+        self._client.output_formatter = output_formatter
+
+        # Invoke init_hook with context support if provided
+        if callable(init_hook):
+            try:
+                sig = inspect.signature(init_hook)
+                if len(sig.parameters) >= 2:
+                    init_hook(self._client, context)
+                else:
+                    init_hook(self._client)
+            except Exception:
+                # Fall back to best-effort single-arg invocation
+                try:
+                    init_hook(self._client)
+                except Exception:
+                    raise
 
         self._config = cfg
 

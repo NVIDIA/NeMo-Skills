@@ -23,7 +23,7 @@ from omegaconf import OmegaConf
 from pydantic import Field
 
 from nemo_skills.code_execution.sandbox import get_sandbox
-from nemo_skills.mcp.tool_manager import Tool
+from nemo_skills.mcp.tool_providers import MCPClientTool
 from nemo_skills.mcp.utils import add_config_args, load_mcp_config
 
 logger = logging.getLogger(__name__)
@@ -84,40 +84,35 @@ def main():
 # ==============================
 
 
-class PythonTool(Tool):
+class PythonTool(MCPClientTool):
     provider_id = "python"
 
     def __init__(self) -> None:
-        self._config: Dict[str, Any] = {
-            "exec_timeout_s": 10,
-            # args to pass to MCP stdio server
-            "command": "python",
-            "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
-            # hide args from schemas and sanitize at runtime
-            "hide_args": {"execute": ["session_id", "timeout"]},
-        }
-        # Lazy MCP client import to avoid circulars
-        self._mcp_client = None
-
-    def default_config(self) -> Dict[str, Any]:
-        return dict(self._config)
+        super().__init__()
+        # Defaults for stdio Python MCP using explicit client class
+        self._config.update(
+            {
+                "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                "client_params": {
+                    "command": "python",
+                    "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
+                },
+                # hide args from schemas and sanitize at runtime
+                "hide_args": {"execute": ["session_id", "timeout"]},
+                # use explicit Hydra connector built from full context by default
+                "init_hook": "hydra",
+                # execution-specific default
+                "exec_timeout_s": 10,
+            }
+        )
 
     def configure(self, overrides: Dict[str, Any] | None = None, context: Dict[str, Any] | None = None) -> None:
-        overrides = overrides or {}
-        self._config.update(overrides)
-
-        # Build MCP stdio client with hide_args applied
-        from nemo_skills.mcp.clients import MCPStdioClient
-
-        self._mcp_client = MCPStdioClient(
-            command=self._config["command"],
-            args=list(self._config["args"]),
-            hide_args=self._config.get("hide_args"),
-        )
+        # Delegate to base for client construction and hook invocation
+        super().configure(overrides=overrides, context=context)
 
     async def list_tools(self) -> List[Dict[str, Any]]:
         # Delegate to the MCP client to fetch authoritative schemas
-        return await self._mcp_client.list_tools()
+        return await self._client.list_tools()
 
     async def execute(self, tool_name: str, arguments: Dict[str, Any]):
         if tool_name != "execute":
@@ -125,7 +120,7 @@ class PythonTool(Tool):
         # Fallback timeout if not provided
         arguments = dict(arguments)
         arguments.setdefault("timeout", self._config.get("exec_timeout_s", 10))
-        return await self._mcp_client.call_tool("execute", arguments)
+        return await self._client.call_tool("execute", arguments)
 
     async def shutdown(self) -> None:
         return None

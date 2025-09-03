@@ -88,12 +88,14 @@ class ExaTool(MCPClientTool):
 
     def __init__(self) -> None:
         super().__init__()
-        # Defaults for stdio Exa server launch; users can override to streamable_http
+        # Defaults for stdio Exa server launch using explicit client class
         self._config.update(
             {
-                "transport": "stdio",
-                "command": "python",
-                "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
+                "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                "client_params": {
+                    "command": "python",
+                    "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
+                },
                 "hide_args": {},
                 "init_hook": "nemo_skills.mcp.utils.exa_stdio_connector",
             }
@@ -105,11 +107,13 @@ class ExaMCPTool(MCPClientTool):
 
     def __init__(self) -> None:
         super().__init__()
-        # Defaults for Exa hosted MCP over HTTP
+        # Defaults for Exa hosted MCP over HTTP using explicit client class
         self._config.update(
             {
-                "transport": "streamable_http",
-                "base_url": "https://mcp.exa.ai/mcp",
+                "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
+                "client_params": {
+                    "base_url": "https://mcp.exa.ai/mcp",
+                },
                 # Add API key via query param using the helper
                 "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
                 # Optional: limit to specific tools
