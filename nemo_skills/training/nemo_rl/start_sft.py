@@ -65,8 +65,6 @@ class PromptResponseDataset:
             "train": self.load_or_process_split(train_ds_path, "train"),
         }
         # Validation split (optional)
-        print("validation_data", val_ds_path)
-        print(f"[DEBUG] val_ds_path raw: {val_ds_path!r}, type={type(val_ds_path).__name__}")
         if val_ds_path:
             self.formatted_ds["validation"] = self.load_or_process_split(val_ds_path, "val")
         else:

@@ -88,7 +88,7 @@ def load_jsonl_as_dataset(
 
 
 def extract_dataset(split, dataset_path):
-    if dataset_path is None or str(dataset_path).strip() in {"", "???", "None"}:
+    if dataset_path is None:
         return None
     if not dataset_path.startswith("/"):
         original_ds = load_dataset(dataset_path, split=split)
