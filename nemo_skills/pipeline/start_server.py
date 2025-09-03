@@ -55,6 +55,7 @@ def start_server(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(None, help="Override container image for the hosted server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -97,6 +98,8 @@ def start_server(
         "server_entrypoint": server_entrypoint,
         "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
+    if server_container:
+        server_config["container"] = server_container
 
     with get_exp("server", cluster_config) as exp:
         cmd = ""
