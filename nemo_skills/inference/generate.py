@@ -136,8 +136,9 @@ class GenerateSolutionsConfig:
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
-    ## FIXME(sanyamk): Rethink the structure of this configuration.
-    tool_config: str | None = None  # Path to tool configuration file.
+    # Module-based tool configuration
+    tool_modules: list[str] | None = None  # List of tool module specs (e.g., module.path:ClassName)
+    tool_overrides: dict | None = field(default_factory=dict)  # provider_id -> overrides dict
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
@@ -294,10 +295,11 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
-        elif self.cfg.tool_config:
+        elif getattr(self.cfg, "tool_modules", None):
             llm = get_tool_calling_model(
                 **self.cfg.server,
-                tool_config=self.cfg.tool_config,
+                tool_modules=getattr(self.cfg, "tool_modules", None),
+                tool_overrides=getattr(self.cfg, "tool_overrides", None),
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )

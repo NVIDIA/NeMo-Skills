@@ -43,8 +43,12 @@ def locate(path):
         spec.loader.exec_module(module)
         return getattr(module, attr_name)
 
-    # Handle standard dotted module path
-    module_path, obj_name = path.rsplit(".", 1)
+    # Support module:ClassName syntax (common in CLI specs)
+    if ":" in path and not path.strip().endswith("::"):
+        module_path, obj_name = path.split(":", 1)
+    else:
+        # Handle standard dotted module path
+        module_path, obj_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, obj_name)
 
