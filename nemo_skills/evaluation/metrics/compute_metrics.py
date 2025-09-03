@@ -35,12 +35,12 @@ class ComputeMetrics:
         max_samples=-1,
         metric_type=None,
         max_seq_len=None,
-        bootstrap_samples=50,  # Number of bootstrap runs
+        monte_carlo_samples=50,  # Number of monte_carlo shuffles of generations
     ):
         self.max_samples = max_samples
         self.metric_type = metric_type
         self.max_seq_len = max_seq_len
-        self.bootstrap_samples = bootstrap_samples
+        self.monte_carlo_samples = monte_carlo_samples
         if self.metric_type is None:
             benchmark_module, _, _ = get_dataset_module(
                 benchmark,
@@ -52,7 +52,7 @@ class ComputeMetrics:
             self.metric_type = benchmark_module.METRICS_TYPE
 
         # Dictionary to store metrics calculators for different subsets.
-        # Each subset maps to a list of calculators, one per bootstrap sample.
+        # Each subset maps to a list of calculators, one per monte_carlo sample.
         self.calculators = {}
 
     def get_metrics_calculator(self):
@@ -62,7 +62,7 @@ class ComputeMetrics:
 
     def compute_metrics(self, input_files):
         """Computing metrics based on the provided input files."""
-        self.calculators = {"_all_": [self.get_metrics_calculator() for _ in range(self.bootstrap_samples)]}
+        self.calculators = {"_all_": [self.get_metrics_calculator() for _ in range(self.monte_carlo_samples)]}
         # Setup for only one calculator
         self.calculators["_all_"][0].setup(input_files)
 
@@ -88,40 +88,40 @@ class ComputeMetrics:
                 data_subset = data[0].get("subset_for_metrics", "_all_")
                 if data_subset not in self.calculators:
                     self.calculators[data_subset] = [
-                        self.get_metrics_calculator() for _ in range(self.bootstrap_samples)
+                        self.get_metrics_calculator() for _ in range(self.monte_carlo_samples)
                     ]
                 examples.append((data_subset, data))
 
-        use_bootstrap = self.metric_type not in ["arena"]  # Arena already uses bootstrap for their metrics
-        if use_bootstrap:
-            bootstrap_metric_list = []
-            for bootstrap_idx in range(self.bootstrap_samples):
-                rng = np.random.RandomState(bootstrap_idx)
-                examples_bootstrap = copy.deepcopy(examples)
-                examples_bootstrap = self.sample_with_replacement_generations(examples_bootstrap, rng)
-                bs_metrics = self.compute_metrics_for_examples(examples_bootstrap, bootstrap_idx)
-                bootstrap_metric_list.append(bs_metrics)
-            metrics = _average_metrics_dicts(bootstrap_metric_list, include_std_dev=True)
+        use_monte_carlo = self.metric_type not in ["arena"]  # Arena already uses monte_carlo for their metrics
+        if use_monte_carlo:
+            monte_carlo_metric_list = []
+            for monte_carlo_idx in range(self.monte_carlo_samples):
+                rng = np.random.RandomState(monte_carlo_idx)
+                examples_monte_carlo = copy.deepcopy(examples)
+                # Bootstrapping will sample with replacement, but it would underestimate pass@k
+                # Shuffling is unbiased, but variance is underestimated.
+                self.shuffle_per_example_generations(examples_monte_carlo, rng)
+                bs_metrics = self.compute_metrics_for_examples(examples_monte_carlo, monte_carlo_idx)
+                monte_carlo_metric_list.append(bs_metrics)
+            metrics = _average_metrics_dicts(monte_carlo_metric_list, include_std_dev=True)
         else:
             metrics = self.compute_metrics_for_examples(examples, 0)
         return metrics
 
-    def sample_with_replacement_generations(self, examples, rng):
-        new_examples = []
+    def shuffle_per_example_generations(self, examples, rng):
         for subset_key, base_data in examples:
-            new_examples.append((subset_key, rng.choice(base_data, size=len(base_data), replace=True)))
-        return new_examples
+            rng.shuffle(base_data)
 
-    def compute_metrics_for_examples(self, examples, bootstrap_idx):
+    def compute_metrics_for_examples(self, examples, monte_carlo_idx):
         for subset_key, base_data in examples:
-            self.calculators["_all_"][bootstrap_idx].update(base_data)
+            self.calculators["_all_"][monte_carlo_idx].update(base_data)
             if subset_key != "_all_":
-                self.calculators[subset_key][bootstrap_idx].update(base_data)
+                self.calculators[subset_key][monte_carlo_idx].update(base_data)
 
         # collecting metrics from all calculators
         metrics = {}
         for data_subset, calculators in self.calculators.items():
-            metrics[data_subset] = calculators[bootstrap_idx].get_metrics()
+            metrics[data_subset] = calculators[monte_carlo_idx].get_metrics()
             # we are removing pass@1[avg-of-1] as it's the same as pass@1
             metrics[data_subset].pop("pass@1[avg-of-1]", None)
         return metrics
@@ -141,7 +141,7 @@ def _average_metrics_dicts(dicts_list, include_std_dev=False):
     When include_std_dev is False, returns the mean of the metrics.
     When include_std_dev is True, returns a dict {"avg": mean, "std": std}.
 
-    Raises a ValueError if the dictionaries have different keys (usually happens if the returned metric keys are not consistent between bootstrap samples)
+    Raises a ValueError if the dictionaries have different keys (usually happens if the returned metric keys are not consistent between monte_carlo samples)
     """
     if not dicts_list:
         return {}
