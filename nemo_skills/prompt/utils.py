@@ -336,9 +336,9 @@ def load_config(config: str, config_dir: str | None = None) -> dict:
 def get_prompt(
     prompt_config: str | dict,
     tokenizer: Any | None = None,
-    system_message: str | None = None,
     code_tags: str | dict | None = None,
     examples_type: str | None = None,
+    system_message: str | None = None,
     config_dir: str | None = None,
     code_tags_dir: str | None = None,
 ) -> Prompt:

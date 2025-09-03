@@ -158,7 +158,9 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B", "nemotron", examples_type="math_text_with_code")
+    prompt = get_prompt(
+        "generic/math", tokenizer="meta-llama/Llama-3.1-8B", code_tags="nemotron", examples_type="math_text_with_code"
+    )
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
